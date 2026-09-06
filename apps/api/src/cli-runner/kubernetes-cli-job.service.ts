@@ -570,7 +570,9 @@ export class KubernetesCliJobService {
           `Recipe for source ${params.sourceId} is ${recipeB64.length} bytes ` +
             `compressed, over the ${MAX_ENV_VALUE_BYTES}-byte limit for one ` +
             'environment variable. The notebook is too large to hand to a CLI ' +
-            'job this way; split it or move bulk data into a notebook file.',
+            'job this way; split it or move bulk data into a notebook file. ' +
+            'When an augmentation notebook is attached, its cells count ' +
+            'toward the same budget as the connector notebook.',
         );
       }
       envMap.set('RECIPE_GZ_B64', { name: 'RECIPE_GZ_B64', value: recipeB64 });

@@ -8140,7 +8140,20 @@
     "/notebooks/scaffold": {
       "get": {
         "operationId": "NotebookController_scaffold",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "connector",
+                "augmentation"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -8162,7 +8175,20 @@
     "/notebooks/templates": {
       "get": {
         "operationId": "NotebookController_templates",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "connector",
+                "augmentation"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -8195,6 +8221,18 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "connector",
+                "augmentation"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -8209,7 +8247,7 @@
             }
           }
         },
-        "summary": "Read a CUSTOM source's notebook",
+        "summary": "Read a source's notebook",
         "tags": [
           "Notebooks"
         ]
@@ -8223,6 +8261,18 @@
             "required": true,
             "in": "path",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "connector",
+                "augmentation"
+              ],
               "type": "string"
             }
           }
@@ -8268,6 +8318,18 @@
             "required": true,
             "in": "path",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "connector",
+                "augmentation"
+              ],
               "type": "string"
             }
           }
@@ -14247,6 +14309,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "partialCoverage": {
+            "type": "boolean",
+            "description": "The connector covered only a slice of the source this run, so absence from seenHashes proves nothing and no asset is retired. Set it when the connector chooses its own cohort — a change feed, a resumable sweep, a date window — which the sampling strategy cannot express: strategy=ALL describes what the RUNTIME does with the stream, not how much of the source the connector decided to ask for."
           }
         },
         "required": [
@@ -22457,7 +22523,8 @@
               "cell",
               "all",
               "test_connection",
-              "preview_extract"
+              "preview_extract",
+              "preview_augment"
             ]
           },
           "targetCellId": {
@@ -22467,6 +22534,14 @@
           "maxAssets": {
             "type": "number",
             "description": "Assets to sample in preview_extract mode"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Which notebook to run. `connector` is the CUSTOM source’s own notebook; `augmentation` is the per-asset enrichment notebook any source type may carry. Defaults to `connector`, so every existing call keeps its meaning.",
+            "enum": [
+              "connector",
+              "augmentation"
+            ]
           }
         },
         "required": [
@@ -22491,8 +22566,17 @@
               "CELL",
               "ALL",
               "TEST_CONNECTION",
-              "PREVIEW_EXTRACT"
+              "PREVIEW_EXTRACT",
+              "PREVIEW_AUGMENT"
             ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "CONNECTOR",
+              "AUGMENTATION"
+            ],
+            "description": "Which notebook this execution ran."
           },
           "status": {
             "type": "string",

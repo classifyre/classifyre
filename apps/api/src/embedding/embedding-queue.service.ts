@@ -236,9 +236,7 @@ export class EmbeddingQueueService {
     if (previousQueue && previousQueue !== rt.queueName) {
       // Best-effort: the backlog names content that has to be re-embedded into
       // the new space anyway, and leaving it makes the queue depth a lie.
-      await boss
-        .deleteQueue(previousQueue)
-        .catch(() => undefined);
+      await boss.deleteQueue(previousQueue).catch(() => undefined);
     }
     return rt;
   }

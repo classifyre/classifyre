@@ -267,7 +267,7 @@ All URIs are relative to *http://localhost*
 *NotebooksApi* | [**notebookControllerCancel**](docs/NotebooksApi.md#notebookcontrollercancel) | **POST** /notebook/executions/{executionId}/cancel | Stop a running execution
 *NotebooksApi* | [**notebookControllerCreateExecution**](docs/NotebooksApi.md#notebookcontrollercreateexecution) | **POST** /sources/{sourceId}/notebook/executions | Start a notebook execution
 *NotebooksApi* | [**notebookControllerExportPython**](docs/NotebooksApi.md#notebookcontrollerexportpython) | **GET** /sources/{sourceId}/notebook/export | The notebook as an ordinary Python module
-*NotebooksApi* | [**notebookControllerGet**](docs/NotebooksApi.md#notebookcontrollerget) | **GET** /sources/{sourceId}/notebook | Read a CUSTOM source\&#39;s notebook
+*NotebooksApi* | [**notebookControllerGet**](docs/NotebooksApi.md#notebookcontrollerget) | **GET** /sources/{sourceId}/notebook | Read a source\&#39;s notebook
 *NotebooksApi* | [**notebookControllerGetExecution**](docs/NotebooksApi.md#notebookcontrollergetexecution) | **GET** /notebook/executions/{executionId} | Poll one execution
 *NotebooksApi* | [**notebookControllerListExecutions**](docs/NotebooksApi.md#notebookcontrollerlistexecutions) | **GET** /sources/{sourceId}/notebook/executions | Recent executions for a source
 *NotebooksApi* | [**notebookControllerScaffold**](docs/NotebooksApi.md#notebookcontrollerscaffold) | **GET** /notebooks/scaffold | The starter cells and the functions a notebook must define

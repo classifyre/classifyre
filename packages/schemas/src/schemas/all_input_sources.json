@@ -4207,6 +4207,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -4810,6 +4813,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -7628,6 +7634,9 @@
           "type": "boolean",
           "default": true,
           "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+        },
+        "augmentation": {
+          "$ref": "#/definitions/AugmentationConfig"
         }
       },
       "required": [
@@ -7676,6 +7685,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -7728,6 +7740,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -7780,6 +7795,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -7831,6 +7849,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -7882,6 +7903,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -7933,6 +7957,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -7984,6 +8011,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8035,6 +8065,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8087,6 +8120,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8139,6 +8175,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8191,6 +8230,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8243,6 +8285,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8295,6 +8340,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8347,6 +8395,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8399,6 +8450,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8451,6 +8505,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8644,6 +8701,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8696,6 +8756,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -8748,6 +8811,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -9275,6 +9341,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -9327,6 +9396,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -9379,6 +9451,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -9481,6 +9556,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -9670,6 +9748,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -9800,6 +9881,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -9880,6 +9964,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -10219,6 +10306,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -10466,6 +10556,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -10561,6 +10654,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -10737,6 +10833,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -11130,6 +11229,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -11402,6 +11504,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -11768,6 +11873,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -12010,6 +12118,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -12349,6 +12460,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -12601,6 +12715,9 @@
               "type": "boolean",
               "default": true,
               "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
             }
           },
           "required": [
@@ -12656,6 +12773,148 @@
         "name",
         "path"
       ],
+      "additionalProperties": false
+    },
+    "AugmentationNotebook": {
+      "title": "AugmentationNotebook",
+      "label": "Augmentation notebook",
+      "type": "object",
+      "description": "Cells run in document order in one fresh process per run, before the first asset is augmented. There is no persistent kernel: state is rebuilt from the current cell sources every time. The assembled code cells must define augment(asset); setup() and finalize() are optional.",
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Monotonic revision, bumped on every save. Used for optimistic locking so two editors cannot silently overwrite each other, and folded into the scan-cache signature so a code change re-augments cached assets."
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/definitions/NotebookCell"
+          },
+          "description": "Ordered notebook cells. The assembled code cells must define augment(asset). Capped at 50 cells so the augmentation recipe keeps headroom inside the 128 KB RECIPE_GZ_B64 budget next to a CUSTOM connector notebook that may already be large."
+        }
+      },
+      "required": [
+        "cells"
+      ],
+      "additionalProperties": false
+    },
+    "AugmentationLimits": {
+      "title": "AugmentationLimits",
+      "label": "Augmentation Limits",
+      "type": "object",
+      "description": "Bounds applied to every augmentation execution and scan.",
+      "properties": {
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 86400,
+          "default": 900,
+          "description": "Kill an augmentation execution that runs longer than this. Cells cannot be interrupted from inside Python, so this is the real stop button."
+        },
+        "per_asset_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "default": 30,
+          "description": "Kill a single augment(asset) call that runs longer than this. The asset proceeds as if augmentation were disabled and a scan warning is recorded."
+        },
+        "max_payload_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 134217728,
+          "default": 33554432,
+          "description": "Largest lazy payload (asset.payload()/asset.text()) served to the augmentation child per asset. Larger payloads resolve to an empty value rather than failing the scan."
+        },
+        "max_output_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 52428800,
+          "default": 2097152,
+          "description": "Total serialized cell output kept per execution. Larger outputs are truncated rather than stored."
+        },
+        "max_workers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "default": 1,
+          "description": "Augmentation child processes augmenting assets in parallel. Raise for CPU-bound augment() bodies; the default of 1 keeps asset order deterministic."
+        },
+        "max_consecutive_failures": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 10,
+          "description": "Circuit breaker: after this many consecutive per-asset failures the session disables itself for the rest of the run and warns once, so a systematically broken notebook cannot drown the run log one warning per asset."
+        }
+      },
+      "additionalProperties": false
+    },
+    "AugmentationConfig": {
+      "title": "AugmentationConfig",
+      "label": "Augmentation",
+      "type": "object",
+      "description": "Optional Python notebook that enriches every asset this source extracts \u2014 extra metadata, tags, links, URN and relationship edges \u2014 after extraction and before detection. Additive only: it cannot change what the connector extracted, cannot drop an asset, and cannot fail a scan. Disabled unless enabled is true.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Master switch. Absent or false means provably inert: not even a child process is started."
+        },
+        "notebook": {
+          "$ref": "#/definitions/AugmentationNotebook"
+        },
+        "variables": {
+          "type": "object",
+          "description": "Non-secret values the notebook reads with ctx.var(\"name\"), such as a lookup-table URL. Stored in clear text. Keys must be valid Python identifiers.",
+          "default": {},
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8192
+          },
+          "maxProperties": 64
+        },
+        "secrets": {
+          "type": "object",
+          "description": "Secret values the notebook reads with ctx.secret(\"name\"). Encrypted at rest and redacted from logs and cell output. Keys must be valid Python identifiers.",
+          "default": {},
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8192
+          },
+          "maxProperties": 64
+        },
+        "packages": {
+          "type": "array",
+          "maxItems": 50,
+          "default": [],
+          "items": {
+            "$ref": "#/definitions/NotebookPackage"
+          },
+          "description": "Python packages installed into the run environment before any cell executes. Installed with uv; the base image's own dependencies are always present and do not need listing."
+        },
+        "local_folders": {
+          "type": "array",
+          "maxItems": 10,
+          "default": [],
+          "items": {
+            "$ref": "#/definitions/NotebookLocalFolder"
+          },
+          "description": "Desktop only. Folders on this machine the notebook reads with ctx.folder(\"name\"). Not available in Kubernetes deployments, where files are uploaded to the source instead."
+        },
+        "limits": {
+          "$ref": "#/definitions/AugmentationLimits"
+        }
+      },
       "additionalProperties": false
     }
   }

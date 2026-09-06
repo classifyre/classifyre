@@ -132,6 +132,7 @@ model NotebookExecution {
   sourceId     String                  @map("source_id")
   revision     Int
   mode         NotebookExecutionMode
+  scope        NotebookScope           @default(CONNECTOR)
   targetCellId String?                 @map("target_cell_id")
   status       NotebookExecutionStatus @default(PENDING)
   // The cells as they were when this execution was requested.
@@ -160,6 +161,12 @@ enum NotebookExecutionMode {
   ALL
   TEST_CONNECTION
   PREVIEW_EXTRACT
+  PREVIEW_AUGMENT
+}
+
+enum NotebookScope {
+  CONNECTOR
+  AUGMENTATION
 }
 
 enum NotebookExecutionStatus {

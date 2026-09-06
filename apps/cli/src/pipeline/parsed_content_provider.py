@@ -67,6 +67,17 @@ class ParsedContentProvider:
             yield page
 
     async def fetch_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
+        # Augmentation may already have fetched these bytes (asset.payload()).
+        # Reuse them instead of re-downloading: the memo is run-scoped and
+        # bounded, and evicted with the asset at the end of processing.
+        peek = getattr(self._source, "peek_augmentation_bytes", None)
+        if callable(peek):
+            try:
+                memoized = peek(asset_id)
+            except Exception:
+                memoized = None
+            if memoized is not None:
+                return memoized
         return await self._source.fetch_content_bytes(asset_id)
 
     def asset_tags(self, asset_hash: str) -> Mapping[str, str]:

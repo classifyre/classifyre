@@ -27,7 +27,7 @@ interface CompletionManifest {
   classes: Record<
     string,
     {
-      fields: Array<{ label: string; detail?: string; required?: boolean }>;
+      fields?: Array<{ label: string; detail?: string; required?: boolean }>;
       members?: Array<{ label: string; kind: string; detail?: string }>;
     }
   >;
@@ -66,7 +66,8 @@ function renderObject(name: string): string {
 function renderClass(name: string): string {
   const definition = manifest.classes[name];
   if (!definition) return '';
-  const fields = definition.fields
+  // Method-only classes (AugmentedAsset) carry no dataclass fields.
+  const fields = (definition.fields ?? [])
     .map(
       (field) =>
         `  ${field.label}: ${field.detail ?? 'Any'}${field.required ? '  (required)' : ''}`,

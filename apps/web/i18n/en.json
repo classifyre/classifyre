@@ -3939,6 +3939,14 @@
       "failed": "Templates could not be loaded."
     }
   },
+  "augmentation": {
+    "docsLink": "How augmentation works",
+    "enableLabel": "Enable augmentation",
+    "intro": "A Python notebook that enriches every asset this source extracts — extra metadata, tags, links and lineage edges. Additive only: it cannot change what the connector extracted, drop an asset, or fail a scan.",
+    "runSample": "Run sample",
+    "saveSourceFirst": "Save this source once to start writing its augmentation notebook.",
+    "sectionTitle": "Augmentation"
+  },
   "review": {
     "title": "Duplicate review",
     "subtitle": "Assets that look like the same thing, grouped by why they matched.",

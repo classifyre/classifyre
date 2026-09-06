@@ -65,6 +65,52 @@ describe('redactRow', () => {
     expect(result.row['config']).toEqual({ path: '/data' });
     expect(result.stripped).toEqual([]);
   });
+
+  it('strips augmentation secrets but keeps the notebook and variables', () => {
+    // This is the test that would otherwise fail in production: without the
+    // augmentation path in the export guard, a source carrying augmentation
+    // secrets refuses to export at all.
+    const result = redactRow(spec({ redactMaskedConfig: true }), {
+      id: 's1',
+      config: {
+        type: 'POSTGRESQL',
+        masked: { password: encrypted('p') },
+        augmentation: {
+          enabled: true,
+          notebook: { revision: 2, cells: [] },
+          variables: { base_url: 'https://example.com' },
+          secrets: { enrichment_api_token: encrypted('t') },
+        },
+      },
+    });
+
+    const config = result.row['config'] as Record<string, unknown>;
+    expect(config).not.toHaveProperty('masked');
+    const augmentation = config['augmentation'] as Record<string, unknown>;
+    expect(augmentation).not.toHaveProperty('secrets');
+    // Configuration rides along; only the credential leaves are dropped.
+    expect(augmentation['enabled']).toBe(true);
+    expect(augmentation['notebook']).toEqual({ revision: 2, cells: [] });
+    expect(augmentation['variables']).toEqual({
+      base_url: 'https://example.com',
+    });
+    expect(config['maskedKeys']).toEqual(['password']);
+    expect(config['augmentationSecretKeys']).toEqual(['enrichment_api_token']);
+    expect(result.stripped).toEqual([
+      'config.masked',
+      'config.augmentation.secrets',
+    ]);
+    expect(() => assertNoSecrets('source', result.row)).not.toThrow();
+  });
+
+  it('adds no augmentation keys for a source without augmentation', () => {
+    const result = redactRow(spec({ redactMaskedConfig: true }), {
+      id: 's1',
+      config: { path: '/data' },
+    });
+
+    expect(result.row['config']).not.toHaveProperty('augmentationSecretKeys');
+  });
 });
 
 describe('assertNoSecrets', () => {

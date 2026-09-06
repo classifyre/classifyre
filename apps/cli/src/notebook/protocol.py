@@ -26,9 +26,22 @@ class ExecutionMode(StrEnum):
     TEST_CONNECTION = "test_connection"
     #: Rebuild state, then pull a bounded sample from extract().
     PREVIEW_EXTRACT = "preview_extract"
+    #: Run the augmentation notebook's setup()/augment()/finalize() over a
+    #: bounded sample of the REAL connector's assets, and report per-asset
+    #: diffs. Unlike preview_extract it needs the real source, so it runs as
+    #: its own flow rather than as an in-process cell replay.
+    PREVIEW_AUGMENT = "preview_augment"
     #: Parse and contract-check only. Runs no cells, so it is cheap enough for
     #: the editor to call on a debounce while someone is typing.
     VALIDATE = "validate"
+
+
+#: Which notebook a request addresses. ``connector`` is the CUSTOM source's
+#: own notebook; ``augmentation`` is the per-asset enrichment notebook any
+#: source type may carry. Every existing call means ``connector``.
+class NotebookScope(StrEnum):
+    CONNECTOR = "connector"
+    AUGMENTATION = "augmentation"
 
 
 class ExecutionStatus(StrEnum):
@@ -39,7 +52,13 @@ class ExecutionStatus(StrEnum):
 #: Modes that call one of the contract functions, and so require the notebook to
 #: actually define it. `cell` and `all` deliberately do not: an author must be
 #: able to run a cell while the notebook is still half-written.
-CONTRACT_MODES = frozenset({ExecutionMode.TEST_CONNECTION, ExecutionMode.PREVIEW_EXTRACT})
+CONTRACT_MODES = frozenset(
+    {
+        ExecutionMode.TEST_CONNECTION,
+        ExecutionMode.PREVIEW_EXTRACT,
+        ExecutionMode.PREVIEW_AUGMENT,
+    }
+)
 
 DEFAULT_MAX_OUTPUT_BYTES = 2 * 1024 * 1024
 DEFAULT_PREVIEW_ASSETS = 10
@@ -54,6 +73,7 @@ class ExecutionRequest:
     revision: int | None = None
     max_output_bytes: int = DEFAULT_MAX_OUTPUT_BYTES
     max_assets: int = DEFAULT_PREVIEW_ASSETS
+    scope: NotebookScope = NotebookScope.CONNECTOR
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> ExecutionRequest:
@@ -77,6 +97,15 @@ class ExecutionRequest:
         ):
             raise ValueError("mode 'cell' requires 'targetCellId'")
 
+        scope_value = str(raw.get("scope") or NotebookScope.CONNECTOR)
+        try:
+            scope = NotebookScope(scope_value)
+        except ValueError as exc:
+            valid_scopes = ", ".join(member.value for member in NotebookScope)
+            raise ValueError(
+                f"Unknown notebook scope {scope_value!r}. Expected one of: {valid_scopes}"
+            ) from exc
+
         return cls(
             recipe=recipe,
             mode=mode,
@@ -87,6 +116,7 @@ class ExecutionRequest:
                 raw.get("maxOutputBytes") or raw.get("max_output_bytes") or DEFAULT_MAX_OUTPUT_BYTES
             ),
             max_assets=int(raw.get("maxAssets") or raw.get("max_assets") or DEFAULT_PREVIEW_ASSETS),
+            scope=scope,
         )
 
 

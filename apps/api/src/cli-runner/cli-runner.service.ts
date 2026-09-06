@@ -905,13 +905,26 @@ export class CliRunnerService {
     // a notebook — Asset(tags={"<key>": "<value>"}) — and that key has to resolve
     // at scan time or the tag is dropped with a warning. Sending every active
     // one costs nothing: a tag detector loads no model and never reads content.
+    //
+    // Augmentation asserts tags on any source type, so the condition is CUSTOM
+    // *or* augmentation enabled. Without this the tag path is dead on both ends
+    // for a known source and every tag silently becomes a "matches no Tag
+    // detector" warning.
     const isCustomSource =
       String(recipe?.type || '')
         .trim()
         .toUpperCase() === 'CUSTOM';
-    const runtimeTagDetectors = isCustomSource
-      ? await this.customDetectorsService.buildRuntimeTagDetectors()
-      : [];
+    const augmentation = (recipe as Record<string, any> | null | undefined)?.[
+      'augmentation'
+    ];
+    const isAugmentationEnabled =
+      typeof augmentation === 'object' &&
+      augmentation !== null &&
+      (augmentation as Record<string, unknown>)['enabled'] === true;
+    const runtimeTagDetectors =
+      isCustomSource || isAugmentationEnabled
+        ? await this.customDetectorsService.buildRuntimeTagDetectors()
+        : [];
 
     // Merge all three sets, deduplicating by key (key-based wins over id-based).
     const seenKeys = new Set<string>();
@@ -1653,7 +1666,17 @@ export class CliRunnerService {
     }
 
     const decryptedConfig = this.toDecryptedRecipeConfig(source.config);
-    const request = { ...params.request, recipe: decryptedConfig };
+    // preview_augment reports whether each asserted tag matches a live Tag
+    // detector, so it needs the same hydrated recipe a scan gets. Other
+    // notebook modes never read detectors, and stay on the stored recipe.
+    const recipe =
+      String(params.request.mode || '') === 'preview_augment'
+        ? await this.hydrateCustomDetectorsForRun(
+            params.sourceId,
+            decryptedConfig,
+          )
+        : decryptedConfig;
+    const request = { ...params.request, recipe };
     const environment = process.env.ENVIRONMENT || 'development';
 
     // `validate` parses and contract-checks without running a cell, so nothing

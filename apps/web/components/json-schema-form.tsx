@@ -76,6 +76,11 @@ import {
   type ScheduleValue,
 } from "@/components/schedule-card";
 import { SamplingCard, type SamplingValue } from "@/components/sampling-card";
+import {
+  AugmentationAccordionBody,
+  type AugmentationEditorHandle,
+  type AugmentationValue,
+} from "@/components/notebook/augmentation-config";
 
 const LONG_TEXT_THRESHOLD = 120;
 
@@ -2197,6 +2202,14 @@ export interface JsonSchemaFormProps {
   cancelLabel?: string;
   showCancel?: boolean;
   disabled?: boolean;
+  /** Present on the edit page; the augmentation editor needs it for executions. */
+  sourceId?: string;
+  /** Receives the augmentation editor's handle so the page can run it. */
+  augmentationEditorRef?: React.RefObject<AugmentationEditorHandle | null>;
+  /** A cell's play button inside the augmentation editor. */
+  onAugmentationRunCell?: (cellId: string) => void;
+  /** Told when the augmentation editor starts/stops executing. */
+  onAugmentationBusyChange?: (busy: boolean) => void;
   assistantSourceType?: string;
   schedule?: ScheduleValue;
   onScheduleChange?: (value: ScheduleValue) => void;
@@ -2274,6 +2287,10 @@ export const JsonSchemaForm = React.forwardRef<
     cancelLabel,
     showCancel = true,
     disabled = false,
+    sourceId,
+    augmentationEditorRef,
+    onAugmentationRunCell,
+    onAugmentationBusyChange,
     assistantSourceType,
     schedule,
     autoScheduleStatus,
@@ -2412,6 +2429,7 @@ export const JsonSchemaForm = React.forwardRef<
   const maskedBlock = getBlockEntry(["masked", "masked_fields"]);
   const optionalBlock = getBlockEntry(["optional", "optional_fields"]);
   const samplingBlock = getBlockEntry(["sampling"]);
+  const augmentationBlock = getBlockEntry(["augmentation"]);
   const resourcesBlock = getBlockEntry(["resources"]);
 
   // Detect coupled auth: both required and masked are parallel oneOf unions where
@@ -2491,6 +2509,7 @@ export const JsonSchemaForm = React.forwardRef<
       maskedBlock?.key,
       optionalBlock?.key,
       samplingBlock?.key,
+      augmentationBlock?.key,
       resourcesBlock?.key,
     ].filter(Boolean) as string[],
   );
@@ -2952,6 +2971,31 @@ export const JsonSchemaForm = React.forwardRef<
                 isTabular={isTabular}
                 disabled={disabled}
               />
+            )}
+          />
+        )}
+
+        {augmentationBlock && (
+          <FormField
+            control={form.control}
+            name={augmentationBlock.key}
+            render={({ field }) => (
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="augmentation" className="border-none">
+                  <AccordionTrigger className="py-2 text-sm font-medium">
+                    {t("augmentation.sectionTitle")}
+                  </AccordionTrigger>
+                  <AugmentationAccordionBody
+                    sourceId={sourceId}
+                    value={field.value as AugmentationValue | undefined}
+                    onChange={field.onChange}
+                    disabled={disabled}
+                    editorRef={augmentationEditorRef}
+                    onBusyChange={onAugmentationBusyChange}
+                    onRunCell={onAugmentationRunCell}
+                  />
+                </AccordionItem>
+              </Accordion>
             )}
           />
         )}

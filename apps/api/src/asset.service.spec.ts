@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AssetService } from './asset.service';
 import { PrismaService } from './prisma.service';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
+import { CustomDetectorsService } from './custom-detectors.service';
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import {
@@ -79,6 +80,10 @@ describe('AssetService', () => {
     createFromIngestion: jest.fn(),
   };
 
+  const mockCustomDetectorsService = {
+    buildRuntimeTagDetectors: jest.fn(),
+  };
+
   const mockEmbeddingService = {
     semanticAssetIds: jest.fn(),
   };
@@ -99,6 +104,10 @@ describe('AssetService', () => {
         {
           provide: CustomDetectorExtractionsService,
           useValue: mockCustomDetectorExtractionsService,
+        },
+        {
+          provide: CustomDetectorsService,
+          useValue: mockCustomDetectorsService,
         },
         { provide: EmbeddingService, useValue: mockEmbeddingService },
         { provide: QueryEmbeddingService, useValue: mockQueryEmbeddingService },
@@ -122,6 +131,7 @@ describe('AssetService', () => {
     mockPrismaService.$queryRaw.mockResolvedValue([]);
     mockInquiryMatching.watchersForFindings.mockResolvedValue(new Map());
     mockCorrelationJobs.scheduleFull.mockResolvedValue(undefined);
+    mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue([]);
   });
 
   it('should be defined', () => {
@@ -2719,6 +2729,19 @@ describe('AssetService', () => {
           },
           [openFinding()],
         );
+
+        expect(result.resolvedForRemovedDetectors).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
+      it('keeps TAG findings the source config cannot name', async () => {
+        // TAG detectors are deliberately unselectable, so the stored recipe
+        // never lists them. Without the global lookup this cleanup resolves
+        // the finding in the same run that created it.
+        mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue([
+          { key: 'email-conduct-screen' },
+        ]);
+        const result = await runCleanup({ detectors: [] }, [openFinding()]);
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
         expect(findingUpdate).not.toHaveBeenCalled();

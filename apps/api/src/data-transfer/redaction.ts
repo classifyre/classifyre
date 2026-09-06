@@ -1,4 +1,7 @@
-import { MASKED_CONFIG_ENCRYPTED_PREFIX } from '../utils/masked-config.utils';
+import {
+  ENCRYPTED_CONFIG_PATHS,
+  MASKED_CONFIG_ENCRYPTED_PREFIX,
+} from '../utils/masked-config.utils';
 import type { TransferTableSpec } from './transfer-scopes';
 
 /**
@@ -66,19 +69,100 @@ export function redactRow(
 
   if (spec.redactMaskedConfig) {
     const config = cleaned['config'];
-    if (isPlainObject(config) && Object.hasOwn(config, 'masked')) {
-      const { masked, ...rest } = config;
-      // Keep a record of which credential fields the source expects, so the
-      // import can name them in its "re-enter these" warning without ever
-      // having carried a value.
-      const expected = isPlainObject(masked) ? Object.keys(masked) : [];
-      cleaned['config'] =
-        expected.length > 0 ? { ...rest, maskedKeys: expected } : rest;
-      stripped.push('config.masked');
+    if (isPlainObject(config)) {
+      let next = { ...config };
+      for (const path of ENCRYPTED_CONFIG_PATHS) {
+        const strippedPath = stripEncryptedPath(next, path);
+        if (strippedPath) {
+          next = strippedPath.config;
+          stripped.push(strippedPath.stripped);
+          if (strippedPath.expected.length > 0) {
+            next = { ...next, [strippedPath.keysField]: strippedPath.expected };
+          }
+        }
+      }
+      cleaned['config'] = next;
     }
   }
 
   return { row: cleaned, stripped };
+}
+
+/**
+ * Remove one encrypted path from an export-bound source config.
+ *
+ * `masked` goes wholesale (it is nothing but credentials); `augmentation`
+ * keeps everything except its `secrets` — the notebook, variables and limits
+ * are configuration, not credentials, and the import must see them. Either
+ * way the secret *names* are kept alongside (`maskedKeys`,
+ * `augmentationSecretKeys`) so the import can name them in its "re-enter
+ * these" warning without ever having carried a value. Returns null when the
+ * path is absent, so sources without augmentation gain no new keys.
+ */
+function stripEncryptedPath(
+  config: Record<string, unknown>,
+  path: string,
+): {
+  config: Record<string, unknown>;
+  stripped: string;
+  expected: string[];
+  keysField: string;
+} | null {
+  const segments = path.split('.');
+  if (segments.length === 1) {
+    const [key] = segments;
+    if (!Object.hasOwn(config, key)) return null;
+    const { [key]: removed, ...rest } = config;
+    return {
+      config: rest,
+      stripped: `config.${path}`,
+      expected: isPlainObject(removed) ? Object.keys(removed) : [],
+      keysField: 'maskedKeys',
+    };
+  }
+  const [head, ...tail] = segments;
+  const holder = config[head];
+  if (!isPlainObject(holder)) return null;
+  const leaf = tail[tail.length - 1];
+  let node: Record<string, unknown> = holder;
+  for (const segment of tail.slice(0, -1)) {
+    const next = node[segment];
+    if (!isPlainObject(next)) return null;
+    node = next;
+  }
+  if (!Object.hasOwn(node, leaf)) return null;
+  const nodeCopy: Record<string, unknown> = { ...node };
+  const removed = nodeCopy[leaf];
+  delete nodeCopy[leaf];
+  // Rebuild the chain so only the leaf is dropped and siblings survive.
+  let rebuilt: unknown = nodeCopy;
+  for (let index = tail.length - 2; index >= 0; index--) {
+    const parent = (
+      index === 0
+        ? { ...holder }
+        : { ...(getNested(holder, tail.slice(0, index)) ?? {}) }
+    ) as Record<string, unknown>;
+    parent[tail[index]] = rebuilt;
+    rebuilt = parent;
+  }
+  return {
+    config: { ...config, [head]: rebuilt },
+    stripped: `config.${path}`,
+    expected: isPlainObject(removed) ? Object.keys(removed) : [],
+    keysField: 'augmentationSecretKeys',
+  };
+}
+
+function getNested(
+  root: Record<string, unknown>,
+  segments: string[],
+): Record<string, unknown> | null {
+  let node: unknown = root;
+  for (const segment of segments) {
+    if (!isPlainObject(node)) return null;
+    node = node[segment];
+  }
+  return isPlainObject(node) ? node : null;
 }
 
 /**

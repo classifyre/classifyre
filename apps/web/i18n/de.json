@@ -3939,6 +3939,14 @@
       "failed": "Vorlagen konnten nicht geladen werden."
     }
   },
+  "augmentation": {
+    "docsLink": "So funktioniert Augmentation",
+    "enableLabel": "Augmentation aktivieren",
+    "intro": "Ein Python-Notebook, das jedes Asset dieser Quelle anreichert — zusätzliche Metadaten, Tags, Links und Herkunftskanten. Nur hinzufügend: Es kann weder ändern, was der Konnektor extrahiert hat, noch ein Asset verwerfen oder einen Scan fehlschlagen lassen.",
+    "runSample": "Stichprobe ausführen",
+    "saveSourceFirst": "Speichern Sie diese Quelle einmal, um mit dem Augmentation-Notebook zu beginnen.",
+    "sectionTitle": "Augmentierung"
+  },
   "review": {
     "title": "Dublettenprüfung",
     "subtitle": "Assets, die dasselbe zu sein scheinen — gruppiert danach, warum sie zusammenpassen.",

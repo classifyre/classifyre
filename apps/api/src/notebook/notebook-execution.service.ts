@@ -14,6 +14,7 @@ const MODE_BY_DTO: Record<string, NotebookExecutionMode> = {
   all: NotebookExecutionMode.ALL,
   test_connection: NotebookExecutionMode.TEST_CONNECTION,
   preview_extract: NotebookExecutionMode.PREVIEW_EXTRACT,
+  preview_augment: NotebookExecutionMode.PREVIEW_AUGMENT,
 };
 
 const DTO_BY_MODE: Record<NotebookExecutionMode, string> = {
@@ -21,6 +22,12 @@ const DTO_BY_MODE: Record<NotebookExecutionMode, string> = {
   [NotebookExecutionMode.ALL]: 'all',
   [NotebookExecutionMode.TEST_CONNECTION]: 'test_connection',
   [NotebookExecutionMode.PREVIEW_EXTRACT]: 'preview_extract',
+  [NotebookExecutionMode.PREVIEW_AUGMENT]: 'preview_augment',
+};
+
+const SCOPE_BY_DTO: Record<string, 'CONNECTOR' | 'AUGMENTATION'> = {
+  connector: 'CONNECTOR',
+  augmentation: 'AUGMENTATION',
 };
 
 @Injectable()
@@ -48,7 +55,13 @@ export class NotebookExecutionService {
     dto: CreateNotebookExecutionDto,
     triggeredBy?: string,
   ) {
-    const notebook = await this.notebooks.get(sourceId);
+    // preview_augment always addresses the augmentation notebook, whatever
+    // scope the caller sent; every other mode defaults to the connector.
+    const scope =
+      dto.mode === 'preview_augment'
+        ? 'augmentation'
+        : (dto.scope ?? 'connector');
+    const notebook = await this.notebooks.get(sourceId, scope);
 
     // `revision` here and `baseRevision` on the notebook PUT are the same
     // concept under two names, and there is no global ValidationPipe to
@@ -85,6 +98,7 @@ export class NotebookExecutionService {
         sourceId,
         revision: notebook.revision,
         mode: MODE_BY_DTO[dto.mode],
+        scope: SCOPE_BY_DTO[scope],
         targetCellId: dto.targetCellId ?? null,
         status: NotebookExecutionStatus.PENDING,
         // Snapshot, not a reference: an execution must remain readable after
@@ -95,7 +109,7 @@ export class NotebookExecutionService {
       },
     });
 
-    void this.run(execution.id, sourceId, dto);
+    void this.run(execution.id, sourceId, dto, scope);
     return execution;
   }
 
@@ -103,6 +117,7 @@ export class NotebookExecutionService {
     executionId: string,
     sourceId: string,
     dto: CreateNotebookExecutionDto,
+    scope: 'connector' | 'augmentation' = 'connector',
   ): Promise<void> {
     const startedAt = new Date();
     try {
@@ -117,6 +132,7 @@ export class NotebookExecutionService {
           request: {
             executionId,
             mode: dto.mode,
+            scope,
             targetCellId: dto.targetCellId,
             revision: dto.revision,
             maxAssets: dto.maxAssets,
@@ -255,6 +271,7 @@ export class NotebookExecutionService {
     sourceId: string;
     revision: number;
     mode: NotebookExecutionMode;
+    scope?: { toString(): string } | string | null;
     status: NotebookExecutionStatus;
     targetCellId: string | null;
     outputs: unknown;
@@ -270,6 +287,7 @@ export class NotebookExecutionService {
       sourceId: execution.sourceId,
       revision: execution.revision,
       mode: DTO_BY_MODE[execution.mode],
+      scope: String(execution.scope ?? 'CONNECTOR').toLowerCase(),
       status: execution.status,
       targetCellId: execution.targetCellId,
       outputs: execution.outputs,

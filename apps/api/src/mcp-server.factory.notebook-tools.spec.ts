@@ -98,13 +98,17 @@ describe('McpServerFactoryService notebook tools', () => {
       source: 'new b',
     });
 
-    expect(notebookService.update).toHaveBeenCalledWith('source-1', {
-      baseRevision: 1,
-      cells: [
-        { id: 'a', type: 'code', source: 'old a' },
-        { id: 'b', type: 'code', source: 'new b' },
-      ],
-    });
+    expect(notebookService.update).toHaveBeenCalledWith(
+      'source-1',
+      {
+        baseRevision: 1,
+        cells: [
+          { id: 'a', type: 'code', source: 'old a' },
+          { id: 'b', type: 'code', source: 'new b' },
+        ],
+      },
+      'connector',
+    );
   });
 
   it('update_notebook_cell surfaces a revision conflict instead of clobbering concurrent edits', async () => {
@@ -143,6 +147,7 @@ describe('McpServerFactoryService notebook tools', () => {
       {
         revision: 4,
         mode: 'test_connection',
+        scope: 'connector',
         targetCellId: undefined,
         maxAssets: undefined,
       },

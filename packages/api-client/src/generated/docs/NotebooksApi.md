@@ -7,7 +7,7 @@ All URIs are relative to *http://localhost*
 | [**notebookControllerCancel**](NotebooksApi.md#notebookcontrollercancel) | **POST** /notebook/executions/{executionId}/cancel | Stop a running execution |
 | [**notebookControllerCreateExecution**](NotebooksApi.md#notebookcontrollercreateexecution) | **POST** /sources/{sourceId}/notebook/executions | Start a notebook execution |
 | [**notebookControllerExportPython**](NotebooksApi.md#notebookcontrollerexportpython) | **GET** /sources/{sourceId}/notebook/export | The notebook as an ordinary Python module |
-| [**notebookControllerGet**](NotebooksApi.md#notebookcontrollerget) | **GET** /sources/{sourceId}/notebook | Read a CUSTOM source\&#39;s notebook |
+| [**notebookControllerGet**](NotebooksApi.md#notebookcontrollerget) | **GET** /sources/{sourceId}/notebook | Read a source\&#39;s notebook |
 | [**notebookControllerGetExecution**](NotebooksApi.md#notebookcontrollergetexecution) | **GET** /notebook/executions/{executionId} | Poll one execution |
 | [**notebookControllerListExecutions**](NotebooksApi.md#notebookcontrollerlistexecutions) | **GET** /sources/{sourceId}/notebook/executions | Recent executions for a source |
 | [**notebookControllerScaffold**](NotebooksApi.md#notebookcontrollerscaffold) | **GET** /notebooks/scaffold | The starter cells and the functions a notebook must define |
@@ -155,7 +155,7 @@ No authorization required
 
 ## notebookControllerExportPython
 
-> notebookControllerExportPython(sourceId)
+> notebookControllerExportPython(sourceId, scope)
 
 The notebook as an ordinary Python module
 
@@ -177,6 +177,8 @@ async function example() {
   const body = {
     // string
     sourceId: sourceId_example,
+    // 'connector' | 'augmentation' (optional)
+    scope: scope_example,
   } satisfies NotebookControllerExportPythonRequest;
 
   try {
@@ -197,6 +199,7 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **sourceId** | `string` |  | [Defaults to `undefined`] |
+| **scope** | `connector`, `augmentation` |  | [Optional] [Defaults to `undefined`] [Enum: connector, augmentation] |
 
 ### Return type
 
@@ -222,9 +225,9 @@ No authorization required
 
 ## notebookControllerGet
 
-> NotebookDto notebookControllerGet(sourceId)
+> NotebookDto notebookControllerGet(sourceId, scope)
 
-Read a CUSTOM source\&#39;s notebook
+Read a source\&#39;s notebook
 
 ### Example
 
@@ -242,6 +245,8 @@ async function example() {
   const body = {
     // string
     sourceId: sourceId_example,
+    // 'connector' | 'augmentation' (optional)
+    scope: scope_example,
   } satisfies NotebookControllerGetRequest;
 
   try {
@@ -262,6 +267,7 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **sourceId** | `string` |  | [Defaults to `undefined`] |
+| **scope** | `connector`, `augmentation` |  | [Optional] [Defaults to `undefined`] [Enum: connector, augmentation] |
 
 ### Return type
 
@@ -420,7 +426,7 @@ No authorization required
 
 ## notebookControllerScaffold
 
-> NotebookScaffoldDto notebookControllerScaffold()
+> NotebookScaffoldDto notebookControllerScaffold(scope)
 
 The starter cells and the functions a notebook must define
 
@@ -437,8 +443,13 @@ async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
   const api = new NotebooksApi();
 
+  const body = {
+    // 'connector' | 'augmentation' (optional)
+    scope: scope_example,
+  } satisfies NotebookControllerScaffoldRequest;
+
   try {
-    const data = await api.notebookControllerScaffold();
+    const data = await api.notebookControllerScaffold(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -451,7 +462,10 @@ example().catch(console.error);
 
 ### Parameters
 
-This endpoint does not need any parameter.
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **scope** | `connector`, `augmentation` |  | [Optional] [Defaults to `undefined`] [Enum: connector, augmentation] |
 
 ### Return type
 
@@ -477,7 +491,7 @@ No authorization required
 
 ## notebookControllerTemplates
 
-> Array&lt;NotebookTemplateDto&gt; notebookControllerTemplates()
+> Array&lt;NotebookTemplateDto&gt; notebookControllerTemplates(scope)
 
 Worked notebooks an author can start from or borrow cells out of
 
@@ -494,8 +508,13 @@ async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
   const api = new NotebooksApi();
 
+  const body = {
+    // 'connector' | 'augmentation' (optional)
+    scope: scope_example,
+  } satisfies NotebookControllerTemplatesRequest;
+
   try {
-    const data = await api.notebookControllerTemplates();
+    const data = await api.notebookControllerTemplates(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -508,7 +527,10 @@ example().catch(console.error);
 
 ### Parameters
 
-This endpoint does not need any parameter.
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **scope** | `connector`, `augmentation` |  | [Optional] [Defaults to `undefined`] [Enum: connector, augmentation] |
 
 ### Return type
 
@@ -534,7 +556,7 @@ No authorization required
 
 ## notebookControllerUpdate
 
-> UpdateNotebookResponseDto notebookControllerUpdate(sourceId, updateNotebookDto)
+> UpdateNotebookResponseDto notebookControllerUpdate(sourceId, updateNotebookDto, scope)
 
 Save a notebook
 
@@ -558,6 +580,8 @@ async function example() {
     sourceId: sourceId_example,
     // UpdateNotebookDto
     updateNotebookDto: ...,
+    // 'connector' | 'augmentation' (optional)
+    scope: scope_example,
   } satisfies NotebookControllerUpdateRequest;
 
   try {
@@ -579,6 +603,7 @@ example().catch(console.error);
 |------------- | ------------- | ------------- | -------------|
 | **sourceId** | `string` |  | [Defaults to `undefined`] |
 | **updateNotebookDto** | [UpdateNotebookDto](UpdateNotebookDto.md) |  | |
+| **scope** | `connector`, `augmentation` |  | [Optional] [Defaults to `undefined`] [Enum: connector, augmentation] |
 
 ### Return type
 

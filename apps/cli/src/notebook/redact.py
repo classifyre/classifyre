@@ -22,6 +22,22 @@ PLACEHOLDER = "••••"
 #: in the output and hide the bug the user is trying to read.
 MIN_REDACTABLE_LENGTH = 4
 
+#: Recipe paths whose leaf strings are secrets. ``masked`` is every source's
+#: credential bag; ``augmentation.secrets`` is the augmentation notebook's, kept
+#: at the top level (rather than under ``masked``) so the 38 ``*Masked``
+#: definitions do not all need the field. Driven from this one constant so the
+#: path knowledge does not scatter across consumers.
+ENCRYPTED_CONFIG_PATHS = ("masked", "augmentation.secrets")
+
+
+def _leaves_at_path(recipe: Mapping[str, Any], path: str) -> list[str]:
+    node: Any = recipe
+    for key in path.split("."):
+        if not isinstance(node, Mapping):
+            return []
+        node = node.get(key)
+    return _leaf_strings(node)
+
 
 class Redactor:
     """Replaces known secret values with a placeholder."""
@@ -49,8 +65,16 @@ class Redactor:
 
     @classmethod
     def from_recipe(cls, recipe: Mapping[str, Any] | None, **kwargs: Any) -> Redactor:
-        """Build a redactor from every leaf string under the recipe's `masked`."""
-        return cls(_leaf_strings((recipe or {}).get("masked")), **kwargs)
+        """Build a redactor from every secret leaf in the recipe.
+
+        Covers every path in ``ENCRYPTED_CONFIG_PATHS`` — the source's
+        ``masked`` bag and the augmentation notebook's ``secrets`` alike.
+        """
+        recipe = recipe or {}
+        secrets = [
+            leaf for path in ENCRYPTED_CONFIG_PATHS for leaf in _leaves_at_path(recipe, path)
+        ]
+        return cls(secrets, **kwargs)
 
     @property
     def active(self) -> bool:

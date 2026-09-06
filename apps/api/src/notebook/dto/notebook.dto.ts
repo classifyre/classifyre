@@ -129,7 +129,10 @@ export const NOTEBOOK_EXECUTION_MODES = [
   'all',
   'test_connection',
   'preview_extract',
+  'preview_augment',
 ] as const;
+
+export const NOTEBOOK_SCOPES = ['connector', 'augmentation'] as const;
 
 export class CreateNotebookExecutionDto {
   @ApiPropertyOptional({
@@ -173,6 +176,18 @@ export class CreateNotebookExecutionDto {
   @IsInt()
   @Min(1)
   maxAssets?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Which notebook to run. `connector` is the CUSTOM source\u2019s own ' +
+      'notebook; `augmentation` is the per-asset enrichment notebook any ' +
+      'source type may carry. Defaults to `connector`, so every existing ' +
+      'call keeps its meaning.',
+    enum: NOTEBOOK_SCOPES,
+  })
+  @IsOptional()
+  @IsIn(NOTEBOOK_SCOPES)
+  scope?: (typeof NOTEBOOK_SCOPES)[number];
 }
 
 export class NotebookExecutionDto {
@@ -185,8 +200,22 @@ export class NotebookExecutionDto {
   @ApiProperty()
   revision!: number;
 
-  @ApiProperty({ enum: ['CELL', 'ALL', 'TEST_CONNECTION', 'PREVIEW_EXTRACT'] })
+  @ApiProperty({
+    enum: [
+      'CELL',
+      'ALL',
+      'TEST_CONNECTION',
+      'PREVIEW_EXTRACT',
+      'PREVIEW_AUGMENT',
+    ],
+  })
   mode!: string;
+
+  @ApiPropertyOptional({
+    enum: ['CONNECTOR', 'AUGMENTATION'],
+    description: 'Which notebook this execution ran.',
+  })
+  scope?: string;
 
   @ApiProperty({
     enum: ['PENDING', 'RUNNING', 'SUCCESS', 'ERROR', 'CANCELLED', 'TIMEOUT'],
