@@ -248,6 +248,41 @@ def test_latest_strategy_is_bounded_by_the_page_size(source) -> None:
     assert len(collect(source(recipe))) == 10
 
 
+PARTIAL_COVERAGE_NOTEBOOK = """from classifyre import Asset, ctx
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS"}
+
+
+def extract():
+    ctx.set_partial_coverage("walks one slice of the register per run")
+    yield Asset(id="rec-1", name="Record 1", content="body")
+"""
+
+
+def test_a_cohort_connector_can_declare_partial_coverage(source) -> None:
+    """Absence must stop implying deletion when the run only looked at a slice.
+
+    Under strategy=ALL the platform retires every asset a run did not see. A
+    connector that chooses its own cohort each run never sees the rest of the
+    source, and the sampling strategy cannot say so on its behalf -- it
+    describes what the runtime does with the stream, not how much of the source
+    was asked for.
+    """
+    instance = source(build_recipe(PARTIAL_COVERAGE_NOTEBOOK))
+    assert instance.partial_coverage is False
+    collect(instance)
+    assert instance.partial_coverage is True
+    assert "one slice" in instance.partial_coverage_reason
+
+
+def test_an_ordinary_connector_does_not_declare_partial_coverage(source) -> None:
+    instance = source()
+    collect(instance)
+    assert instance.partial_coverage is False
+
+
 def test_max_assets_limit_is_enforced(source) -> None:
     recipe = build_recipe()
     recipe["optional"]["limits"] = {"max_assets": 3}

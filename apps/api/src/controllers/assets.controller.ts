@@ -485,6 +485,7 @@ export class SourceAssetsController {
       relationshipsLost,
       relationshipsDropped,
       relationshipErrors,
+      partialCoverage,
     } = finalizeDto;
     if (!runnerId) {
       throw new BadRequestException('runnerId is required');
@@ -502,9 +503,19 @@ export class SourceAssetsController {
     // Only strategy=ALL guarantees every asset was visited, so only then can
     // absence imply deletion. AUTOMATIC ingests one incremental slice per run,
     // so (like RANDOM/LATEST) absence never implies deletion.
+    //
+    // The strategy alone is not enough, though: it describes what the RUNTIME
+    // does with the connector's stream, not how much of the source the
+    // connector decided to ask for. A connector that picks its own cohort each
+    // run — a change feed, a resumable sweep, a date window — visits every
+    // asset it yielded and still covered a slice, and under ALL the platform
+    // retired everything outside that slice. Measured on the Firmenbuch
+    // corpus: 51,860 assets marked DELETED and 208,639 findings auto-resolved,
+    // 94% of the namespace, purely because each run looked somewhere else.
+    // `partialCoverage` is how a connector says so.
     const config = source.config as Record<string, any> | null;
     const samplingStrategy = config?.sampling?.strategy as string | undefined;
-    const isFullScan = samplingStrategy === 'ALL';
+    const isFullScan = samplingStrategy === 'ALL' && partialCoverage !== true;
 
     // Persist the AUTOMATIC sampling cursor so the next run resumes where this
     // one stopped. Sent only by AUTOMATIC runs; left untouched otherwise.

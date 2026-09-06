@@ -126,7 +126,17 @@ def _snippet(name: str, func: Any) -> str:
 #: Public on Context because the runtime reads them, but not part of what a
 #: notebook author writes -- offering them would be noise at best and a
 #: misleading suggestion at worst.
-RUNTIME_ONLY_MEMBERS = frozenset({"set_offset", "offset_consumed", "next_cursor"})
+RUNTIME_ONLY_MEMBERS = frozenset(
+    {
+        "set_offset",
+        "offset_consumed",
+        "next_cursor",
+        # The adapter reads these back off the run; the author only ever calls
+        # set_partial_coverage().
+        "partial_coverage",
+        "partial_coverage_reason",
+    }
+)
 
 
 def _members(cls: type) -> list[dict[str, Any]]:

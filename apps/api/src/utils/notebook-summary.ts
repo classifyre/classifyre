@@ -35,3 +35,35 @@ export function summarizeNotebook<T extends Pick<Source, 'config'>>(
     },
   };
 }
+
+/**
+ * Undo {@link summarizeNotebook} on the way back in.
+ *
+ * `summarizeNotebook` makes a read cheap, but it also makes the read's output
+ * an invalid input: `{ revision, cellCount, cellsOmitted: true }` is not a
+ * notebook and the CUSTOM schema rejects it. Callers do read-modify-write —
+ * that is how a variable, a schedule or a detector list is changed — so a read
+ * shape that cannot be written back turns every such edit into a validation
+ * error whose message says nothing about notebooks.
+ *
+ * The marker is treated as "leave the notebook alone": the stored cells are
+ * put back. A payload carrying real cells is passed through untouched, so
+ * editing the notebook through this endpoint still works.
+ */
+export function restoreOmittedNotebook<T>(incoming: T, stored: unknown): T {
+  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
+    return incoming;
+  }
+  const next = incoming as Record<string, any>;
+  const notebook = next.required?.notebook;
+  if (!notebook || notebook.cellsOmitted !== true) return incoming;
+
+  const storedNotebook = (stored as Record<string, any> | null)?.required
+    ?.notebook;
+  if (!storedNotebook || !Array.isArray(storedNotebook.cells)) return incoming;
+
+  return {
+    ...next,
+    required: { ...next.required, notebook: storedNotebook },
+  } as T;
+}

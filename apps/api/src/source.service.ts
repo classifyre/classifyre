@@ -62,6 +62,19 @@ function assertSerializableConfig(
   }
 }
 
+/**
+ * Ids per `deleteMany` when clearing edges for purged assets. Postgres has a
+ * hard parameter ceiling and a whole-source purge can name tens of thousands
+ * of assets, so the delete is chunked rather than sent as one enormous IN.
+ */
+const PURGE_EDGE_CHUNK = 500;
+
+function chunkIds(ids: string[], size: number): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
+}
+
 @Injectable()
 export class SourceService {
   private readonly logger = new Logger(SourceService.name);
@@ -371,7 +384,37 @@ export class SourceService {
       };
     }
 
+    // Collect the ids BEFORE deleting: `edges` is polymorphic (an endpoint can
+    // be an unresolved external URN) so it carries no foreign key to assets,
+    // and nothing else removes an edge when the asset it names goes away. A
+    // stale edge is not inert — the review index derives lineage profiles from
+    // edge endpoints and writes them to a table that DOES have the foreign
+    // key, so one orphan permanently fails the rebuild for the whole namespace.
+    const doomed = await this.prisma.asset.findMany({
+      where,
+      select: { id: true },
+    });
+    const doomedIds = doomed.map((a) => a.id);
+
     const result = await this.prisma.asset.deleteMany({ where });
+
+    let edgesRemoved = 0;
+    for (const slice of chunkIds(doomedIds, PURGE_EDGE_CHUNK)) {
+      const removed = await this.prisma.edge.deleteMany({
+        where: {
+          OR: [
+            { fromType: 'asset', fromId: { in: slice } },
+            { toType: 'asset', toId: { in: slice } },
+          ],
+        },
+      });
+      edgesRemoved += removed.count;
+    }
+    if (edgesRemoved > 0) {
+      this.logger.warn(
+        `Removed ${edgesRemoved} edge(s) that named the purged assets.`,
+      );
+    }
 
     this.logger.warn(
       `Purged ${result.count} asset(s) (with findings) from source ${sourceId}` +

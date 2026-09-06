@@ -38,7 +38,10 @@ import {
 } from '@prisma/client';
 import { CreateSourceDto } from '../dto/create-source.dto';
 import { PurgeSourceAssetsResponseDto } from '../dto/purge-source-assets.dto';
-import { summarizeNotebook } from '../utils/notebook-summary';
+import {
+  restoreOmittedNotebook,
+  summarizeNotebook,
+} from '../utils/notebook-summary';
 import { UpdateSourceDto } from '../dto/update-source.dto';
 import {
   BulkUpdateSourcesDto,
@@ -804,6 +807,17 @@ export class SourcesController {
     let normalizedConfig = updateSourceDto.config;
     let normalizedConfigRecord: Record<string, unknown> | undefined;
     if (updateSourceDto.config) {
+      // A read of this source returns the notebook as
+      // `{ revision, cellCount, cellsOmitted: true }` rather than its cells, so
+      // the obvious read-modify-write — GET, change a variable, PUT — sent that
+      // summary back and was rejected by the schema. Slimming the read without
+      // this made every config round trip fail, which is worse than the payload
+      // it saved. The marker means "the notebook is unchanged", so the stored
+      // cells are restored before validation.
+      normalizedConfig = restoreOmittedNotebook(
+        updateSourceDto.config,
+        source.config,
+      );
       const sourceType = updateSourceDto.type || source.type;
       normalizedConfig = this.validationService.validate(
         String(sourceType),

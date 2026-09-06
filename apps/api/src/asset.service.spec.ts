@@ -48,6 +48,10 @@ describe('AssetService', () => {
       updateMany: jest.fn(),
       findUnique: jest.fn(),
       deleteMany: jest.fn(),
+      delete: jest.fn(),
+    },
+    edge: {
+      deleteMany: jest.fn(),
     },
     finding: {
       findMany: jest.fn(),
@@ -3373,6 +3377,28 @@ describe('AssetService', () => {
             expect.not.objectContaining({ payloadCursor: expect.anything() }),
           ],
         });
+      });
+    });
+  });
+
+  describe('deleteAsset', () => {
+    // An edge endpoint is a (type, id) pair, not a foreign key, so deleting an
+    // asset used to leave edges pointing at nothing — and the correlation
+    // review rebuild, which DOES foreign-key its lineage rows, then failed
+    // with P2003 for the whole namespace.
+    it('removes the edges that named the asset', async () => {
+      mockPrismaService.asset.delete.mockResolvedValue({ id: 'a1' });
+      mockPrismaService.edge.deleteMany.mockResolvedValue({ count: 3 });
+
+      await service.deleteAsset({ id: 'a1' });
+
+      expect(mockPrismaService.edge.deleteMany).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { fromType: 'asset', fromId: 'a1' },
+            { toType: 'asset', toId: 'a1' },
+          ],
+        },
       });
     });
   });
