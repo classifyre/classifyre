@@ -368,6 +368,11 @@ class CustomSource(BaseSource):
                     "seen": int(frame.get("seen") or 0),
                 }
                 self._record_cursor(cursor_key, skip, frame)
+                if frame.get("partialCoverage"):
+                    self.declare_partial_coverage(
+                        str(frame.get("partialCoverageReason") or "")
+                        or "the notebook called ctx.set_partial_coverage()"
+                    )
                 break
 
             if frame_type != "item":
@@ -431,13 +436,24 @@ class CustomSource(BaseSource):
         return 0, max_assets, None, "window"
 
     def _record_cursor(self, key: str | None, offset: int, frame: dict[str, Any]) -> None:
-        if key is None:
-            return
-        # A cursor the notebook set itself wins: it knows its own pagination
-        # better than a positional offset does.
+        # A cursor the notebook set itself is explicit intent and is honoured
+        # under EVERY sampling strategy.
+        #
+        # This used to sit behind `if key is None: return`, and `key` is only
+        # set for AUTOMATIC sampling — so on a source sampling ALL (the default,
+        # and what every non-paginating connector uses) `ctx.set_cursor()` was
+        # accepted by the SDK, written by the notebook, and then dropped on the
+        # floor without a word. Any connector keeping run-to-run state that way
+        # silently restarted from nothing on every run: a resumable walk never
+        # advanced, and accumulated counts were rebuilt from one run's data and
+        # written back smaller.
         notebook_cursor = frame.get("cursor")
         if isinstance(notebook_cursor, dict) and notebook_cursor:
             self.set_next_sampling_cursor(notebook_cursor)
+            return
+        # The positional fallback stays AUTOMATIC-only: it is derived from this
+        # run's offset and page size, which mean nothing under other strategies.
+        if key is None:
             return
         self.record_automatic_offset(
             key, prev_offset=offset, fetched=int(frame.get("produced") or 0)

@@ -432,11 +432,27 @@ describe('SourceService', () => {
     const arrange = (count = 7) => {
       const deleteMany = jest.fn().mockResolvedValue({ count });
       const assetCount = jest.fn().mockResolvedValue(count);
+      // The purge collects the ids it is about to destroy so it can clear the
+      // edges naming them: `edges` has no foreign key to `assets`, so an
+      // orphan survives the delete and permanently fails the review rebuild.
+      const assetFindMany = jest.fn().mockResolvedValue(
+        Array.from({ length: Math.min(count, 3) }, (_, i) => ({
+          id: `doomed-${i}`,
+        })),
+      );
+      const edgeDeleteMany = jest.fn().mockResolvedValue({ count: 0 });
       const built = createService({
         source: { findUnique: jest.fn().mockResolvedValue({ id: 'src-1' }) },
-        asset: { deleteMany, count: assetCount },
+        asset: { deleteMany, count: assetCount, findMany: assetFindMany },
+        edge: { deleteMany: edgeDeleteMany },
       });
-      return { ...built, deleteMany, assetCount };
+      return {
+        ...built,
+        deleteMany,
+        assetCount,
+        assetFindMany,
+        edgeDeleteMany,
+      };
     };
 
     it('deletes everything when no predicate is given', async () => {
@@ -537,13 +553,35 @@ describe('SourceService', () => {
       const deleteMany = jest.fn();
       const { service } = createService({
         source: { findUnique: jest.fn().mockResolvedValue(null) },
-        asset: { deleteMany, count: jest.fn() },
+        asset: { deleteMany, count: jest.fn(), findMany: jest.fn() },
+        edge: { deleteMany: jest.fn() },
       });
 
       await expect(service.purgeAssets('missing')).rejects.toThrow(
         'Source with ID missing not found',
       );
       expect(deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('clears the edges that named the purged assets', async () => {
+      const { service, edgeDeleteMany } = arrange(3);
+
+      await service.purgeAssets('src-1');
+
+      expect(edgeDeleteMany).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            {
+              fromType: 'asset',
+              fromId: { in: ['doomed-0', 'doomed-1', 'doomed-2'] },
+            },
+            {
+              toType: 'asset',
+              toId: { in: ['doomed-0', 'doomed-1', 'doomed-2'] },
+            },
+          ],
+        },
+      });
     });
   });
 });

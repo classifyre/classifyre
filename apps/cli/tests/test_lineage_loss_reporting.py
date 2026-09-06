@@ -25,7 +25,7 @@ from src.outputs.base import RelationshipReport
 class _Sink:
     """Minimal stand-in for the REST sink: it only needs a report and edges."""
 
-    def __init__(self, *, result: dict[str, int] | None = None, raise_on_emit: bool = False):
+    def __init__(self, *, result: dict[str, Any] | None = None, raise_on_emit: bool = False):
         self.relationship_report = RelationshipReport()
         self.emitted: list[Any] = []
         self._result = (
@@ -33,7 +33,7 @@ class _Sink:
         )
         self._raise = raise_on_emit
 
-    async def emit_edges(self, edges: list[Any]) -> dict[str, int]:
+    async def emit_edges(self, edges: list[Any]) -> dict[str, Any]:
         if self._raise:
             raise RuntimeError("graph unreachable")
         self.emitted.extend(edges)
@@ -157,3 +157,32 @@ def test_error_strings_are_capped() -> None:
         report.record_failure(f"error {i}")
     assert len(report.errors) == RelationshipReport.MAX_ERRORS
     assert report.failed == 20
+
+
+@pytest.mark.asyncio
+async def test_a_chunk_the_api_rejected_is_lost_not_dropped() -> None:
+    """A per-chunk HTTP failure has to downgrade the run.
+
+    Second iteration: the API rejected every batch (SQLSTATE 21000, duplicate
+    conflict target) and the sink booked the whole loss as ``dropped`` — the
+    one bucket that is "expected in small numbers" and never degrades a run.
+    The run reported COMPLETED with 1,361 edges gone.
+    """
+    sink = _Sink(
+        result={
+            "upserted": 0,
+            "external": 0,
+            "dropped": 0,
+            "lost": 2,
+            "errors": ["HTTPError: 500 Internal Server Error"],
+        }
+    )
+    source = _Source(edges=["e1", "e2"])
+
+    await _emit_relationships(source, sink)
+
+    report = sink.relationship_report
+    assert report.lost == 2
+    assert report.emitted == 0
+    assert report.degraded is True
+    assert "HTTPError" in (report.summary() or "")

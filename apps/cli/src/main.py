@@ -232,16 +232,25 @@ async def _emit_relationships(source: Any, sink: Any, *, partial: bool = False) 
 
     tally = result if isinstance(result, dict) else {}
     unresolved = tally.get("dropped", 0) or 0
+    # Edges the sink assembled and then could not send. Same class of loss as
+    # emit_edges() raising outright — it just failed per chunk instead of for
+    # the whole batch, so it has to reach the same counter.
+    lost = tally.get("lost", 0) or 0
     if report is not None:
         report.record_emitted(
-            emitted=len(edges) - unresolved,
+            emitted=max(0, len(edges) - unresolved - lost),
             dropped=unresolved,
         )
+        if lost:
+            errors = tally.get("errors")
+            detail = "; ".join(errors) if isinstance(errors, list) and errors else "rejected by API"
+            report.record_lost(lost, detail)
     logger.info(
-        "Emitted %d relationship edge(s)%s%s",
-        len(edges),
+        "Emitted %d relationship edge(s)%s%s%s",
+        max(0, len(edges) - unresolved - lost),
         " (partial run)" if partial else "",
         f"; {unresolved} had an endpoint the API could not resolve" if unresolved else "",
+        f"; {lost} could not be sent" if lost else "",
     )
 
 
@@ -660,6 +669,19 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     if hasattr(sink, "set_sampling_cursor"):
                         sink.set_sampling_cursor(source.current_sampling_cursor())
 
+                    # A connector that covered a slice must say so before
+                    # finish(), which is what decides whether absence retires
+                    # an asset.
+                    if getattr(source, "partial_coverage", False) and hasattr(
+                        sink, "set_partial_coverage"
+                    ):
+                        sink.set_partial_coverage(source.partial_coverage_reason)
+                        logger.info(
+                            "Run declared partial coverage (%s): no asset will be retired "
+                            "for being absent from it",
+                            source.partial_coverage_reason or "no reason given",
+                        )
+
                     # Relationships go *before* finish(): finish() finalizes the
                     # run and marks it COMPLETED, and edges that land after that
                     # belong to a run that already claimed to be done.
@@ -681,6 +703,16 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         # relationships. Dropping them here is what made a slow
                         # warehouse scan produce a graph with no lineage at all.
                         await _emit_relationships(source, sink, partial=True)
+                        # A run that timed out mid-extraction did not visit the
+                        # rest of the source, so absence from it proves nothing.
+                        # Without this the timeout retires every asset the run
+                        # never reached — the slower the source, the more of it
+                        # gets deleted for being slow.
+                        if hasattr(sink, "set_partial_coverage"):
+                            sink.set_partial_coverage(
+                                "the run timed out during extraction and never "
+                                "reached the rest of the source"
+                            )
                         await sink.finish()
                         return
                     if sink_started:

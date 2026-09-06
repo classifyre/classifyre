@@ -223,4 +223,41 @@ describe('GraphService', () => {
       expect(finding?.caseFindingId).toBe('cf1');
     });
   });
+
+  describe('upsertEdges', () => {
+    // Second-iteration regression: a batch containing the same
+    // (from, to, relationType) twice made Postgres reject the WHOLE statement
+    // ("ON CONFLICT DO UPDATE command cannot affect row a second time",
+    // SQLSTATE 21000), so one repeated edge lost every other edge in the
+    // batch — 1,361 person→company edges in the run that found this.
+    it('collapses rows that share a conflict target instead of failing the batch', async () => {
+      mockPrisma.asset.findMany.mockResolvedValue([
+        { id: 'a1', hash: 'h1', updatedAt: new Date() },
+        { id: 'a2', hash: 'h2', updatedAt: new Date() },
+      ]);
+      mockPrisma.$executeRaw.mockResolvedValue(1);
+
+      const edge = {
+        fromType: 'asset',
+        fromHash: 'h1',
+        toType: 'asset',
+        toHash: 'h2',
+        relationType: 'ACCESSED',
+        confidence: 1,
+      };
+      const result = await service.upsertEdges({
+        sourceId: 's1',
+        edges: [edge, { ...edge, confidence: 0.5 }],
+      });
+
+      expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1);
+      const sql = mockPrisma.$executeRaw.mock.calls[0][0] as {
+        values: unknown[];
+      };
+      // One row's worth of bound parameters, not two.
+      expect(sql.values).toContain(0.5);
+      expect(sql.values).not.toContain(1);
+      expect(result.dropped).toBe(0);
+    });
+  });
 });

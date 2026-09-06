@@ -1791,6 +1791,19 @@ export class AssetService {
     const asset = await this.prisma.asset.delete({
       where,
     });
+    // Edges are not foreign keys — an endpoint is a (type, id) pair, so nothing
+    // in the schema removes them when the asset goes. An edge left naming a
+    // deleted asset breaks the correlation review rebuild (it writes a lineage
+    // profile row per endpoint, and that row IS foreign-keyed), which is how
+    // seven orphans once 500'd the whole Duplicate Review page.
+    await this.prisma.edge.deleteMany({
+      where: {
+        OR: [
+          { fromType: 'asset', fromId: asset.id },
+          { toType: 'asset', toId: asset.id },
+        ],
+      },
+    });
     await this.correlationJobs?.scheduleFull('asset deleted');
     return asset;
   }

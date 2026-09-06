@@ -78,6 +78,8 @@ class BaseSource(ABC):
         # before the override hook so subclasses can consult it there if needed.
         self._sampling_cursor: dict[str, Any] = self._load_sampling_cursor()
         self._next_sampling_cursor: dict[str, Any] | None = None
+        self._partial_coverage: bool = False
+        self._partial_coverage_reason: str = ""
         self._sampling_cursor_lock = threading.Lock()
         self._apply_initial_sampling_override(normalized_recipe)
         recipe.clear()
@@ -136,6 +138,28 @@ class BaseSource(ABC):
         cursor.
         """
         return self._next_sampling_cursor
+
+    def declare_partial_coverage(self, reason: str = "") -> None:
+        """Say that this run looked at only part of the source.
+
+        Retirement is driven by absence: under strategy=ALL an asset missing
+        from the run is taken to be gone from the source. That inference is
+        only sound if the run actually visited everything, and a connector that
+        picks its own cohort each run -- a change feed, a resumable sweep, a
+        date window -- never does. Raising this turns the inference off for the
+        run.
+        """
+        self._partial_coverage = True
+        if reason and not self._partial_coverage_reason:
+            self._partial_coverage_reason = str(reason)
+
+    @property
+    def partial_coverage(self) -> bool:
+        return bool(getattr(self, "_partial_coverage", False))
+
+    @property
+    def partial_coverage_reason(self) -> str:
+        return str(getattr(self, "_partial_coverage_reason", ""))
 
     def sampling_window_size(self, default: int = 100) -> int:
         """The per-run AUTOMATIC slice size (``rows_per_page``)."""

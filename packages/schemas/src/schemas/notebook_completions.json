@@ -207,8 +207,15 @@
           "label": "set_cursor",
           "kind": "method",
           "detail": "(cursor: 'Mapping[str, Any]') -> 'None'",
-          "documentation": "Record where this run got to, for the next run to resume from.\n\nOnly meaningful under AUTOMATIC sampling; other strategies ignore it.",
+          "documentation": "Record where this run got to, for the next run to resume from.\n\nHonoured under every sampling strategy. It used to be kept only under\nAUTOMATIC, which meant a connector that wanted run-to-run state had to\nadopt a sampling strategy chosen for something else entirely -- and one\nthat changes deletion semantics, since under AUTOMATIC an absent asset\nno longer implies a deleted one. Worse, the discard was silent: the call\nsucceeded, the notebook believed it had saved state, and the next run\nstarted from nothing.",
           "insertText": "set_cursor(${1:cursor})"
+        },
+        {
+          "label": "set_partial_coverage",
+          "kind": "method",
+          "detail": "(reason: 'str' = '') -> 'None'",
+          "documentation": "Declare that this run looked at only part of the source.\n\nCall it from any connector that chooses its own cohort -- a change\nfeed, a resumable sweep, a date window, an API with no \"list\neverything\" operation. Absence from this run then proves nothing and\nno asset is retired.\n\nThe sampling strategy cannot say this on a connector's behalf: it\ndescribes what the runtime does with the stream you yield, not how much\nof the source you decided to ask for. A cohort connector under\nstrategy=ALL is telling the platform it visited everything, and the\nplatform believes it -- every asset outside this run's cohort is marked\nDELETED and its findings auto-resolved. On the Firmenbuch corpus that\nwas 51,860 assets and 208,639 findings, none of them actually gone.\n\nIdempotent, and safe to call before you know how much you covered.",
+          "insertText": "set_partial_coverage()"
         },
         {
           "label": "should_abort",
