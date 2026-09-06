@@ -283,6 +283,43 @@ def test_an_ordinary_connector_does_not_declare_partial_coverage(source) -> None
     assert instance.partial_coverage is False
 
 
+def test_the_custom_source_opts_into_the_scan_cache(source) -> None:
+    """A notebook re-yields its whole cohort every run.
+
+    Without the cache every re-yielded asset is re-detected from scratch: the
+    Firmenbuch AI source burned 68 minutes a run re-analysing 326 unchanged
+    filings, and the PDF source 67 minutes re-converting 672 unchanged
+    documents. Detection is where a notebook run's time goes.
+    """
+    instance = source()
+    assert instance.SUPPORTS_SCAN_CACHE is True
+    # metadata mode is only sound because the checksum is a real content
+    # digest; see the class comment.
+    assert instance.scan_cache_verification_mode() == "metadata"
+
+
+def test_the_checksum_covers_fetched_bytes(source) -> None:
+    """Two files whose extracted text matches must not share a checksum.
+
+    The text in the checksum is what the parser produced, not what was
+    fetched — so without the raw-byte digest a metadata-mode cache could skip a
+    genuinely different document.
+    """
+    notebook = """from classifyre import Asset
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS"}
+
+
+def extract():
+    yield Asset(id="doc", name="doc", content_bytes=BYTES, mime_type="text/plain")
+"""
+    first = collect(source(build_recipe(notebook.replace("BYTES", "b'alpha'"))))
+    second = collect(source(build_recipe(notebook.replace("BYTES", "b'beta '"))))
+    assert first[0].checksum != second[0].checksum
+
+
 def test_max_assets_limit_is_enforced(source) -> None:
     recipe = build_recipe()
     recipe["optional"]["limits"] = {"max_assets": 3}

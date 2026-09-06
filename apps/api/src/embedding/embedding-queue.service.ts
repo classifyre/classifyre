@@ -199,18 +199,47 @@ export class EmbeddingQueueService {
    */
   private async ensureRuntime(): Promise<EmbeddingRuntime> {
     const rt = this.runtime();
-    if (rt.queueName) return rt;
     // Warms the per-schema configuration cache that every synchronous `cfg`
     // read below depends on, before the space is bound to it.
     await this.settings?.resolve();
     await this.capability.ensureReady();
     const space = await this.embeddings.configuredSpace();
+    if (rt.queueName && rt.spaceId === space.id) return rt;
+
+    // The queue name is derived from the space id, and the space is REPLACED
+    // whenever the embedding settings change (the rebuild purges every space
+    // and binds a new one). This used to bind once per process and never look
+    // again, so a rebuild left the enqueuing side writing to the retired
+    // space's queue while the worker listened on the new one: jobs piled up
+    // under a name nothing worked, the corpus stayed at zero vectors, and the
+    // only symptom was a "queued batches" number that grew forever.
+    //
+    // Two processes make this unavoidable rather than merely possible — the
+    // rebuild clears the cache in the pod that served the request, and the
+    // other pod never hears about it. So the binding is re-checked instead of
+    // invalidated: `configuredSpace()` is memoised per schema, so this costs
+    // nothing after the first call.
+    const previousQueue = rt.queueName;
+    if (previousQueue && rt.spaceId !== space.id) {
+      this.logger.warn(
+        `Embedding space changed (${rt.spaceId} -> ${space.id}); rebinding the ` +
+          `queue. Anything still queued on ${previousQueue} was written for a ` +
+          'space that no longer exists and is dropped.',
+      );
+    }
     rt.spaceId = space.id;
     rt.queueName = `${EMBEDDING_QUEUE_PREFIX}-${space.id}`;
     rt.recalibrateQueueName = `${RECALIBRATE_QUEUE_PREFIX}-${space.id}`;
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(rt.queueName, { policy: 'exclusive' });
     await boss.createQueue(rt.recalibrateQueueName, { policy: 'exclusive' });
+    if (previousQueue && previousQueue !== rt.queueName) {
+      // Best-effort: the backlog names content that has to be re-embedded into
+      // the new space anyway, and leaving it makes the queue depth a lie.
+      await boss
+        .deleteQueue(previousQueue)
+        .catch(() => undefined);
+    }
     return rt;
   }
 

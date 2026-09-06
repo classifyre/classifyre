@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 
 export type EmbeddingProviderKind = 'transformers-js' | 'openai-compatible';
 
@@ -10,6 +12,33 @@ export type EmbeddingProviderKind = 'transformers-js' | 'openai-compatible';
 function defaultIntraOpThreads(): number {
   const available = os.availableParallelism?.() ?? os.cpus().length;
   return Math.max(1, Math.min(4, Math.floor(available / 2)));
+}
+
+/**
+ * Where transformers.js may download and keep model weights.
+ *
+ * This used to be the relative `.cache/transformers`, which resolves against
+ * the process's working directory. In a container that directory is the
+ * application root, mounted read-only and owned by root while the process runs
+ * as a non-root uid — so every single embed request failed with
+ * `EACCES: permission denied, mkdir '.cache'`. The queue kept draining and
+ * re-queuing, the corpus stayed at zero vectors, and nothing above the worker
+ * log said why.
+ *
+ * A relative path is the wrong shape for this regardless: the cache has to
+ * outlive a working directory the operator never chose. Prefer an explicitly
+ * mounted cache, fall back to the temp directory, which is writable by
+ * definition — a re-download after a restart is a cost, not a failure.
+ */
+function defaultCacheDir(): string {
+  const preferred = '/var/cache/classifyre/embeddings';
+  try {
+    fs.mkdirSync(preferred, { recursive: true });
+    fs.accessSync(preferred, fs.constants.W_OK);
+    return preferred;
+  } catch {
+    return path.join(os.tmpdir(), 'classifyre', 'transformers');
+  }
 }
 
 function integerEnv(name: string, fallback: number, min: number, max: number) {
@@ -106,7 +135,7 @@ export class EmbeddingConfigService {
 
   readonly dtype = process.env.EMBEDDING_DTYPE ?? 'q8';
   readonly device = process.env.EMBEDDING_DEVICE ?? 'cpu';
-  readonly cacheDir = process.env.EMBEDDING_CACHE_DIR ?? '.cache/transformers';
+  readonly cacheDir = process.env.EMBEDDING_CACHE_DIR ?? defaultCacheDir();
   readonly localModelPath = process.env.EMBEDDING_LOCAL_MODEL_PATH;
   readonly allowRemoteModels = booleanEnv(
     'EMBEDDING_ALLOW_REMOTE_MODELS',
