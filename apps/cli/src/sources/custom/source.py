@@ -73,6 +73,22 @@ class CustomSourceError(RuntimeError):
 class CustomSource(BaseSource):
     source_type = "custom"
 
+    # A notebook connector re-yields its whole cohort every run, and until this
+    # was turned on every re-yielded asset was re-detected from scratch: the
+    # Firmenbuch AI-analysis source spent 68 minutes per run re-reading 326
+    # filings that had not changed since the run before, and the PDF source 67
+    # minutes re-converting 672 documents. Detection, not fetching, is where a
+    # notebook run's time goes, and that is exactly what the cache skips.
+    SUPPORTS_SCAN_CACHE = True
+
+    # "metadata", not "content": the strength of that mode depends on the
+    # checksum being a real content digest rather than a proxy, and here it is —
+    # `_to_scan_result` hashes the full text (plus the raw bytes when the
+    # notebook fetched a file), the resolved metadata and the tags. There is no
+    # mtime/size stand-in to be fooled by, so an unchanged checksum is proof and
+    # nothing has to be re-read to establish it.
+    SCAN_CACHE_VERIFY = "metadata"
+
     def __init__(
         self,
         recipe: dict[str, Any],
@@ -552,6 +568,20 @@ class CustomSource(BaseSource):
             # new tag.
             "tags": dict(sorted(tags.items())),
         }
+
+        # For a fetched file the text hashed above is what the parser
+        # *extracted*, so two different documents that extract to the same text
+        # would collide -- not good enough for metadata-mode cache
+        # verification. The bytes are already in hand, so hash them too.
+        #
+        # Added to the dict rather than declared inside it, so an asset that
+        # carries no bytes keeps the exact checksum basis it had before this
+        # key existed. Changing the basis re-checksums the whole corpus once
+        # (every asset reads as 'updated' and every cache entry misses), and
+        # there is no reason to pay that for the text-only assets -- which here
+        # are the companies and the people, i.e. almost all of them.
+        if raw_bytes is not None:
+            checksum_basis["content_bytes_sha256"] = hashlib.sha256(raw_bytes).hexdigest()
 
         # Normalized here rather than trusted as typed: a notebook can write
         # any string, and a URN spelled differently from the one the owning

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { parentPort } from 'node:worker_threads';
 import { setPriority } from 'node:os';
 import path from 'node:path';
@@ -47,6 +48,19 @@ async function extractorFor(config: WorkerRequest['config']) {
   extractorKey = key;
   extractorPromise = (async () => {
     const { env, pipeline } = await import('@huggingface/transformers');
+    // Create it here rather than trusting the library to: transformers.js
+    // mkdirs lazily, relative to the process cwd, and reports the failure as a
+    // bare EACCES with no mention of which directory it wanted or why. Failing
+    // here instead names the path.
+    try {
+      fs.mkdirSync(config.cacheDir, { recursive: true });
+    } catch (error) {
+      throw new Error(
+        `Embedding model cache directory ${config.cacheDir} is not writable ` +
+          `(${error instanceof Error ? error.message : String(error)}). Set ` +
+          'EMBEDDING_CACHE_DIR to a writable path.',
+      );
+    }
     env.cacheDir = config.cacheDir;
     env.allowRemoteModels = config.allowRemoteModels;
     if (config.localModelPath) env.localModelPath = config.localModelPath;

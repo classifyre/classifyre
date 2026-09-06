@@ -7,6 +7,7 @@ describe('EmbeddingQueueService', () => {
     insert: jest.fn(),
     send: jest.fn(),
     getQueueStats: jest.fn(),
+    deleteQueue: jest.fn(),
   };
   const prisma = {
     finding: { findMany: jest.fn(), update: jest.fn() },
@@ -65,6 +66,7 @@ describe('EmbeddingQueueService', () => {
     // underlying boss.work mock so existing call-inspection assertions hold.
     pgBoss.work.mockImplementation((q, o, h) => boss.work(q, o, h));
     boss.createQueue.mockResolvedValue(undefined);
+    boss.deleteQueue.mockResolvedValue(undefined);
     boss.work.mockResolvedValue(undefined);
     boss.insert.mockResolvedValue([]);
     embeddings.configuredSpace.mockResolvedValue({
@@ -106,6 +108,45 @@ describe('EmbeddingQueueService', () => {
     expect(capability.ensureReady.mock.invocationCallOrder[0]).toBeLessThan(
       boss.createQueue.mock.invocationCallOrder[0],
     );
+  });
+
+  it('rebinds when the embedding space has been replaced', async () => {
+    // A settings change purges every space and binds a new one, and the queue
+    // name is derived from the space id. Binding once per process left the
+    // enqueuing pod writing to the retired space's queue while the worker
+    // listened on the new one: 19,035 jobs accumulated under a name nothing
+    // worked and the corpus stayed at zero vectors. Two pods make this
+    // unavoidable — the rebuild only clears the cache in the pod that served
+    // the request.
+    await service.registerForNamespace();
+    expect(boss.work).toHaveBeenCalledWith(
+      'semantic-embeddings-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+      expect.anything(),
+      expect.any(Function),
+    );
+
+    embeddings.configuredSpace.mockResolvedValue({ id: 'b'.repeat(8) });
+    await service.registerForNamespace();
+
+    expect(boss.createQueue).toHaveBeenCalledWith(
+      `semantic-embeddings-${'b'.repeat(8)}`,
+      { policy: 'exclusive' },
+    );
+    // And the orphaned queue goes, so its depth stops being reported as work
+    // that is about to happen.
+    expect(boss.deleteQueue).toHaveBeenCalledWith(
+      'semantic-embeddings-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+    );
+  });
+
+  it('does not rebind while the space is unchanged', async () => {
+    await service.registerForNamespace();
+    boss.createQueue.mockClear();
+    boss.deleteQueue.mockClear();
+
+    await service.registerForNamespace();
+
+    expect(boss.deleteQueue).not.toHaveBeenCalled();
   });
 
   it('persists one deduplicated job per content hash', async () => {

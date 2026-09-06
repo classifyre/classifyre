@@ -64,7 +64,11 @@ api:
     TEMP_DIR: /tmp
     RUNNER_LOGS_DIR: /tmp/classifyre/runner-logs
     MAX_RUNNERS_PER_SOURCE: "5"
-    MAX_CONCURRENT_RUNNERS: "2"
+    # Four, not two: the register sweep is bounded by ingest+detection
+    # throughput rather than by any external API, and the k3d node sits around
+    # 23% CPU with two scans in flight. Six AUTO sources sharing two slots made
+    # the register wait behind whichever long job held one.
+    MAX_CONCURRENT_RUNNERS: "4"
     DEMO_MODE: "false"
 
   extraVolumeMounts:
