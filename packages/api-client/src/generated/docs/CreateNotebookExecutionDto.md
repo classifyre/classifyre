@@ -11,6 +11,7 @@ Name | Type
 `mode` | string
 `targetCellId` | string
 `maxAssets` | number
+`scope` | string
 
 ## Example
 
@@ -24,6 +25,7 @@ const example = {
   "mode": null,
   "targetCellId": null,
   "maxAssets": null,
+  "scope": null,
 } satisfies CreateNotebookExecutionDto
 
 console.log(example)

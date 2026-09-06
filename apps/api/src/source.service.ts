@@ -10,7 +10,7 @@ import { AssetType, Source, Prisma, RunnerStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import {
-  mergeMaskedConfig,
+  mergeEncryptedConfigs,
   stableStringify,
 } from './utils/masked-config.utils';
 import { normalizeSourceConfig } from './utils/source-config-normalizer';
@@ -212,13 +212,10 @@ export class SourceService {
         where: { id: sourceId },
         select: { config: true },
       });
-      const mergedConfig: Record<string, unknown> = {
-        ...updateSourceDto.config,
-        masked: mergeMaskedConfig(
-          (existing?.config as Record<string, unknown> | undefined)?.masked,
-          updateSourceDto.config.masked,
-        ),
-      };
+      const mergedConfig: Record<string, unknown> = mergeEncryptedConfigs(
+        existing?.config as Record<string, unknown> | undefined,
+        updateSourceDto.config as Record<string, unknown>,
+      );
       const encryptedConfig =
         this.maskedConfigCryptoService.encryptMaskedConfig(mergedConfig);
       updateData.config = assertSerializableConfig(encryptedConfig);

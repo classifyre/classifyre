@@ -37,10 +37,17 @@ const collectDefinedLeaves = (
 };
 
 describe("sanitizeTemplateConfig", () => {
-  const examplesByType = allInputExamples as Record<string, SourceExample[]>;
+  const examplesByType = allInputExamples as unknown as Record<
+    string,
+    SourceExample[]
+  >;
+  // AUGMENTATION templates are notebook fragments, not source configs — they
+  // carry no config to sanitize and are covered by the API's template tests.
   const allExamples = Object.entries(examplesByType).flatMap(
     ([sourceType, examples]) =>
-      examples.map((example, index) => ({ sourceType, example, index })),
+      sourceType === "AUGMENTATION"
+        ? []
+        : examples.map((example, index) => ({ sourceType, example, index })),
   );
 
   it("covers all examples from schema json", () => {

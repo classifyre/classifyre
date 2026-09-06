@@ -231,6 +231,8 @@ export function SharedSettingsNote() {
       Beyond the fields below, every source also has the settings shared by all
       of them: the{" "}
       <DocLink href="/sources/sampling/">sampling strategy</DocLink>, the{" "}
+      <DocLink href="/sources/augmentation/">augmentation notebook</DocLink>{" "}
+      that enriches assets after extraction, the{" "}
       <DocLink href="/detectors/">detectors</DocLink> to run, the{" "}
       <DocLink href="/sources/testing/">scan schedule</DocLink>, and the compute
       limits for its scan jobs.

@@ -166,6 +166,47 @@ def _asset_to_payload(asset: Any) -> dict[str, Any]:
     raise TypeError(f"Unsupported asset payload type: {type(asset)}")
 
 
+async def _flush_buffered_edges(source: Any, sink: Any) -> None:
+    """Emit edges buffered so far, without asking for end-of-run relationships.
+
+    Augmentation can produce an edge per asset; holding a whole scan's lineage
+    until the end is how a chatty notebook turns into an OOM. This drains only
+    what ``add_edge`` buffered — it must NOT call ``collect_relationships()``,
+    which is end-of-run by contract (an incomplete picture to draw conclusions
+    from mid-scan).
+    """
+    if not hasattr(sink, "emit_edges") or not hasattr(source, "drain_edges"):
+        return
+    try:
+        edges = source.drain_edges()
+    except Exception as drain_error:
+        logger.warning("Could not drain buffered edges (non-fatal): %s", drain_error)
+        return
+    if not edges:
+        return
+    report = sink.relationship_report if hasattr(sink, "relationship_report") else None
+    try:
+        result = await sink.emit_edges(edges)
+    except Exception as emit_error:
+        logger.warning(
+            "Buffered relationship emission failed, %d edge(s) lost (non-fatal): %s",
+            len(edges),
+            emit_error,
+        )
+        if report is not None:
+            report.record_lost(
+                len(edges),
+                f"{type(emit_error).__name__}: {emit_error}",
+            )
+        return
+    tally = result if isinstance(result, dict) else {}
+    if report is not None:
+        report.record_emitted(
+            emitted=(tally.get("emitted", len(edges)) or 0),
+            dropped=(tally.get("dropped", 0) or 0),
+        )
+
+
 async def _emit_relationships(source: Any, sink: Any, *, partial: bool = False) -> None:
     """Send everything the connector learned about how its assets relate.
 
@@ -275,6 +316,10 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
         # Sources such as SANDBOX use the same managed-job API base URL as the
         # REST output sink to list and stream their input content.
         os.environ["CLASSIFYRE_OUTPUT_REST_URL"] = args.output_rest_url
+
+    # The run's augmentation session, when the recipe enables it. Assigned
+    # before phase 2; every later use is None-guarded.
+    augmentation: Any = None
 
     try:
         try:
@@ -388,6 +433,18 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             payload_windows.rows_per_page,
                         )
                     source.attach_payload_windows(payload_windows)
+
+                    # Augmentation runs per asset, after extraction and before
+                    # detection. Built here so setup() (lookup tables, package
+                    # installs) happens once; attached to the source so tags
+                    # and edges land in their generic homes. None when the
+                    # recipe does not enable it — provably inert.
+                    from .augmentation.session import AugmentationSession
+
+                    augmentation = AugmentationSession.from_recipe(recipe, source)
+                    if augmentation is not None:
+                        source.attach_augmentation(augmentation)
+                        await augmentation.startup()
 
                     scan_cache = ScanCache(recipe, source, payload_windows=payload_windows)
                     if scan_cache.enabled:
@@ -519,6 +576,18 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                         ", ".join(sorted(plan.run_detector_keys)),
                                     )
 
+                                # Augmentation runs between the scan-cache plan
+                                # and detection: tags must exist before the tag
+                                # pass, metadata before DetectorScope metadata
+                                # predicates, links before the link detectors.
+                                # A skipped asset was augmented under this same
+                                # revision already, so it needs nothing here.
+                                if augmentation is not None:
+                                    await augmentation.augment(asset)
+                                    if augmentation.flush_requested:
+                                        augmentation.clear_flush_request()
+                                        await _flush_buffered_edges(source, sink)
+
                                 if hasattr(sink, "update_asset_status"):
                                     await sink.update_asset_status(asset_hash, "PROCESSING")
 
@@ -628,6 +697,8 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     )
 
                                 source.evict_asset_cache(asset_hash)
+                                if augmentation is not None:
+                                    augmentation.evict(asset)
                                 processed_count += 1
                             except Exception as exc:
                                 error_count += 1
@@ -653,6 +724,28 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         )
                         if hasattr(sink, "set_scan_cache_savings"):
                             sink.set_scan_cache_savings(skipped_assets, skipped_detector_runs)
+                        # finalize() runs once, now that every asset has been
+                        # seen — this is where "link two assets by a computed
+                        # hash" lands. Its edges join the end-of-run emission
+                        # below, like every other buffered edge.
+                        if augmentation is not None:
+                            await augmentation.finish()
+                            summary = augmentation.summary()
+                            logger.info(
+                                "Augmentation: %d asset(s) augmented, %d failed, "
+                                "%d tag(s) asserted, %d edge(s)%s",
+                                summary["assets_augmented"],
+                                summary["assets_failed"],
+                                summary["tags_asserted"],
+                                summary["edges"],
+                                (
+                                    f" (DISABLED mid-run: {summary['disable_reason']})"
+                                    if summary["disabled"]
+                                    else ""
+                                ),
+                            )
+                            if hasattr(sink, "set_augmentation_stats"):
+                                sink.set_augmentation_stats(summary)
                         if chunk_errors:
                             preview = "; ".join(chunk_errors[:3])
                             remaining = len(chunk_errors) - 3
@@ -724,6 +817,8 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             )
                     raise
                 finally:
+                    if augmentation is not None:
+                        augmentation.close()
                     if worker_pool is not None:
                         worker_pool.shutdown(wait=True)
 

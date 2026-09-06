@@ -80,6 +80,40 @@ def create_validation_schema_for_type(schema: dict, source_type: str) -> dict:
     }
 
 
+def validate_augmentation_templates(schema: dict, entries: list, errors: list) -> int:
+    """Validate AUGMENTATION notebook templates against AugmentationNotebook."""
+    notebook_schema = {
+        "$schema": schema.get("$schema", "http://json-schema.org/draft-07/schema#"),
+        "$ref": "#/definitions/AugmentationNotebook",
+        "definitions": schema.get("definitions", {}),
+    }
+    try:
+        validator = fastjsonschema.compile(notebook_schema)
+    except Exception as e:
+        errors.append(f"Failed to create validator for AUGMENTATION: {e}")
+        return 0
+    validated = 0
+    for idx, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            errors.append(f"AUGMENTATION[{idx}]: Example must be an object")
+            continue
+        if "name" not in entry:
+            errors.append(f"AUGMENTATION[{idx}]: Missing 'name' field")
+        if "description" not in entry:
+            errors.append(f"AUGMENTATION[{idx}]: Missing 'description' field")
+        if "notebook" not in entry:
+            errors.append(f"AUGMENTATION[{idx}]: Missing 'notebook' field")
+            continue
+        try:
+            validator(entry["notebook"])
+            validated += 1
+        except fastjsonschema.JsonSchemaException as e:
+            errors.append(f"AUGMENTATION[{idx}] ({entry.get('name', 'unnamed')}): {e.message}")
+        except Exception as e:
+            errors.append(f"AUGMENTATION[{idx}] ({entry.get('name', 'unnamed')}): Unexpected error: {e}")
+    return validated
+
+
 def validate_examples():
     """Validate all examples against the schema."""
     schema = load_schema()
@@ -90,6 +124,13 @@ def validate_examples():
     validated_examples = 0
 
     for source_type, example_list in examples.items():
+        if source_type == "AUGMENTATION":
+            if not isinstance(example_list, list):
+                errors.append(f"Invalid format for AUGMENTATION: expected array")
+                continue
+            total_examples += len(example_list)
+            validated_examples += validate_augmentation_templates(schema, example_list, errors)
+            continue
         if not isinstance(example_list, list):
             errors.append(f"Invalid format for {source_type}: expected array, got {type(example_list).__name__}")
             continue

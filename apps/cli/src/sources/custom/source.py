@@ -731,8 +731,14 @@ class CustomSource(BaseSource):
         return raw, self._mime_by_hash.get(asset_id, "application/octet-stream")
 
     def asset_tags(self, asset_hash: str) -> Mapping[str, str]:
-        """Tag-detector keys and values the notebook attached to this asset."""
-        return self._tags_by_hash.get(asset_hash, {})
+        """Tag-detector keys and values asserted about this asset.
+
+        Merges the connector notebook's tags with the augmentation notebook's:
+        a CUSTOM source can use both, and either alone must keep working.
+        """
+        merged = dict(super().asset_tags(asset_hash))
+        merged.update(self._tags_by_hash.get(asset_hash, {}))
+        return merged
 
     def evict_asset_cache(self, asset_hash: str) -> None:
         if not self._content_dir:

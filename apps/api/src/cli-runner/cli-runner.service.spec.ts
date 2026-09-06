@@ -1550,6 +1550,35 @@ describe('CliRunnerService', () => {
       expect(merged.detectors).toEqual([]);
     });
 
+    it('hydrates tag detectors for a known source with augmentation on', async () => {
+      // Without this the tag path is dead on both ends for a known source:
+      // the notebook asserts the tag, nothing resolves it, and every tag
+      // silently becomes a "matches no Tag detector" warning.
+      const { merged } = await hydrate({
+        type: 'POSTGRESQL',
+        detectors: [],
+        augmentation: { enabled: true, notebook: { revision: 1, cells: [] } },
+      });
+
+      expect(merged.detectors).toHaveLength(1);
+      expect(merged.detectors[0].config.custom_detector_key).toBe(
+        'cardholder_data',
+      );
+    });
+
+    it('still leaves a known source alone when augmentation is disabled', async () => {
+      const { merged, customDetectorsService } = await hydrate({
+        type: 'POSTGRESQL',
+        detectors: [],
+        augmentation: { enabled: false },
+      });
+
+      expect(
+        customDetectorsService.buildRuntimeTagDetectors,
+      ).not.toHaveBeenCalled();
+      expect(merged.detectors).toEqual([]);
+    });
+
     it('keeps built-in detectors alongside the tag detectors', async () => {
       const { merged } = await hydrate({
         type: 'CUSTOM',
@@ -1558,6 +1587,88 @@ describe('CliRunnerService', () => {
 
       expect(merged.detectors).toHaveLength(2);
       expect(merged.detectors[0].type).toBe('SECRETS');
+    });
+
+    it('sends the hydrated recipe to a preview_augment notebook job', async () => {
+      process.env.ENVIRONMENT = 'kubernetes';
+      const { service, customDetectorsService } = createService({
+        prismaSource: {
+          id: 'source-1',
+          config: {
+            type: 'POSTGRESQL',
+            detectors: [],
+            augmentation: {
+              enabled: true,
+              notebook: { revision: 1, cells: [] },
+            },
+          },
+        },
+        kubernetesCliJobService: { isEnabled: () => true },
+        customDetectorsService: {
+          buildRuntimeTagDetectors: jest.fn().mockResolvedValue([tagEntry]),
+        },
+      });
+      jest.spyOn(service as any, 'notebookInputFiles').mockResolvedValue([]);
+      const runJob = jest
+        .spyOn(service as any, 'runNotebookInKubernetes')
+        .mockResolvedValue({ payload: null, stderr: '', exitCode: 0 });
+
+      await service.runNotebookExecution({
+        sourceId: 'source-1',
+        request: { mode: 'preview_augment' },
+      });
+
+      expect(
+        customDetectorsService.buildRuntimeTagDetectors,
+      ).toHaveBeenCalled();
+      expect(runJob).toHaveBeenCalledWith(
+        'source-1',
+        expect.objectContaining({
+          recipe: expect.objectContaining({
+            detectors: [
+              expect.objectContaining({
+                config: expect.objectContaining({
+                  custom_detector_key: 'cardholder_data',
+                }),
+              }),
+            ],
+          }),
+        }),
+        undefined,
+        [],
+      );
+    });
+
+    it('leaves other notebook modes on the stored recipe', async () => {
+      process.env.ENVIRONMENT = 'kubernetes';
+      const { service, customDetectorsService } = createService({
+        prismaSource: {
+          id: 'source-1',
+          config: { type: 'POSTGRESQL', detectors: [] },
+        },
+        kubernetesCliJobService: { isEnabled: () => true },
+      });
+      jest.spyOn(service as any, 'notebookInputFiles').mockResolvedValue([]);
+      const runJob = jest
+        .spyOn(service as any, 'runNotebookInKubernetes')
+        .mockResolvedValue({ payload: null, stderr: '', exitCode: 0 });
+
+      await service.runNotebookExecution({
+        sourceId: 'source-1',
+        request: { mode: 'preview_extract' },
+      });
+
+      expect(
+        customDetectorsService.buildRuntimeTagDetectors,
+      ).not.toHaveBeenCalled();
+      expect(runJob).toHaveBeenCalledWith(
+        'source-1',
+        expect.objectContaining({
+          recipe: expect.objectContaining({ detectors: [] }),
+        }),
+        undefined,
+        [],
+      );
     });
   });
 });

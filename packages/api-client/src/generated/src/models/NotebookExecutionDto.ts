@@ -44,6 +44,12 @@ export interface NotebookExecutionDto {
      */
     mode: NotebookExecutionDtoModeEnum;
     /**
+     * Which notebook this execution ran.
+     * @type {string}
+     * @memberof NotebookExecutionDto
+     */
+    scope?: NotebookExecutionDtoScopeEnum;
+    /**
      * 
      * @type {string}
      * @memberof NotebookExecutionDto
@@ -107,9 +113,19 @@ export const NotebookExecutionDtoModeEnum = {
     Cell: 'CELL',
     All: 'ALL',
     TestConnection: 'TEST_CONNECTION',
-    PreviewExtract: 'PREVIEW_EXTRACT'
+    PreviewExtract: 'PREVIEW_EXTRACT',
+    PreviewAugment: 'PREVIEW_AUGMENT'
 } as const;
 export type NotebookExecutionDtoModeEnum = typeof NotebookExecutionDtoModeEnum[keyof typeof NotebookExecutionDtoModeEnum];
+
+/**
+ * @export
+ */
+export const NotebookExecutionDtoScopeEnum = {
+    Connector: 'CONNECTOR',
+    Augmentation: 'AUGMENTATION'
+} as const;
+export type NotebookExecutionDtoScopeEnum = typeof NotebookExecutionDtoScopeEnum[keyof typeof NotebookExecutionDtoScopeEnum];
 
 /**
  * @export
@@ -152,6 +168,7 @@ export function NotebookExecutionDtoFromJSONTyped(json: any, ignoreDiscriminator
         'sourceId': json['sourceId'],
         'revision': json['revision'],
         'mode': json['mode'],
+        'scope': json['scope'] == null ? undefined : json['scope'],
         'status': json['status'],
         'targetCellId': json['targetCellId'] == null ? undefined : json['targetCellId'],
         'outputs': json['outputs'] == null ? undefined : json['outputs'],
@@ -179,6 +196,7 @@ export function NotebookExecutionDtoToJSONTyped(value?: NotebookExecutionDto | n
         'sourceId': value['sourceId'],
         'revision': value['revision'],
         'mode': value['mode'],
+        'scope': value['scope'],
         'status': value['status'],
         'targetCellId': value['targetCellId'],
         'outputs': value['outputs'],
