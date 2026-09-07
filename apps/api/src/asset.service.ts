@@ -38,6 +38,7 @@ import {
 import { SearchAssetsChartsRequestDto } from './dto/search-assets-charts-request.dto';
 import { SearchAssetsChartsResponseDto } from './dto/search-assets-charts-response.dto';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
+import { CustomDetectorsService } from './custom-detectors.service';
 import {
   embeddingContentHash,
   normalizeEmbeddingText,
@@ -214,6 +215,10 @@ export class AssetService {
     // type-only one: a type-only import of an injected class makes Nest inject
     // undefined, which would silently stop cross-system lineage from stitching.
     @Optional() private readonly graph?: GraphService,
+    // TAG detectors are deliberately unselectable on a source, so the stored
+    // config can never name them. Without this the removed-detector cleanup
+    // below resolves every TAG finding at the end of the run that created it.
+    @Optional() private readonly customDetectors?: CustomDetectorsService,
   ) {}
 
   private async assertSourceAndRunner(sourceId: string, runnerId: string) {
@@ -1791,6 +1796,19 @@ export class AssetService {
     const asset = await this.prisma.asset.delete({
       where,
     });
+    // Edges are not foreign keys — an endpoint is a (type, id) pair, so nothing
+    // in the schema removes them when the asset goes. An edge left naming a
+    // deleted asset breaks the correlation review rebuild (it writes a lineage
+    // profile row per endpoint, and that row IS foreign-keyed), which is how
+    // seven orphans once 500'd the whole Duplicate Review page.
+    await this.prisma.edge.deleteMany({
+      where: {
+        OR: [
+          { fromType: 'asset', fromId: asset.id },
+          { toType: 'asset', toId: asset.id },
+        ],
+      },
+    });
     await this.correlationJobs?.scheduleFull('asset deleted');
     return asset;
   }
@@ -2539,6 +2557,27 @@ export class AssetService {
         select: { key: true },
       });
       for (const row of rows) keys.add(`${CUSTOM_KEY_PREFIX}${row.key}`);
+    }
+
+    // TAG detectors are global, not per-source: every active one runs wherever
+    // augmentation (or a CUSTOM connector) asserts its key. They belong in the
+    // configured set for the same reason the runner injects them into the
+    // recipe — otherwise each scan resolves its own TAG findings as "removed".
+    if (this.customDetectors) {
+      try {
+        const tags = await this.customDetectors.buildRuntimeTagDetectors();
+        for (const tag of tags ?? []) {
+          if (tag && typeof tag.key === 'string' && tag.key.trim()) {
+            keys.add(`${CUSTOM_KEY_PREFIX}${tag.key.trim()}`);
+          }
+        }
+      } catch (error) {
+        // Cleanup is a courtesy, not the scan: a detector listing failure must
+        // not fail ingestion. Worst case the next run retries the cleanup.
+        this.logger.warn(
+          `Skipping TAG detectors in removed-detector cleanup: ${String(error)}`,
+        );
+      }
     }
 
     return keys;

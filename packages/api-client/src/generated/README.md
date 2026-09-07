@@ -138,6 +138,7 @@ All URIs are relative to *http://localhost*
 *CasesApi* | [**casesControllerRemoveFinding**](docs/CasesApi.md#casescontrollerremovefinding) | **DELETE** /cases/{id}/findings/{caseFindingId} | Remove a finding from the case
 *CasesApi* | [**casesControllerUnlinkInquiry**](docs/CasesApi.md#casescontrollerunlinkinquiry) | **DELETE** /cases/{id}/inquiries/{inquiryId} | Unlink an inquiry from a case (the inquiry is untouched)
 *CasesApi* | [**casesControllerUpdate**](docs/CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case
+*CasesApi* | [**caseworkControllerSummary**](docs/CasesApi.md#caseworkcontrollersummary) | **GET** /casework/summary | Counts and recent activity across cases, inquiries and leads
 *ChatBotsApi* | [**chatBotsControllerCreate**](docs/ChatBotsApi.md#chatbotscontrollercreate) | **POST** /instance-settings/chat/bots | Create a chat bot
 *ChatBotsApi* | [**chatBotsControllerDiagnostics**](docs/ChatBotsApi.md#chatbotscontrollerdiagnostics) | **GET** /instance-settings/chat/bots/{id}/diagnostics | Chat bot diagnostics
 *ChatBotsApi* | [**chatBotsControllerList**](docs/ChatBotsApi.md#chatbotscontrollerlist) | **GET** /instance-settings/chat/bots | List chat bots
@@ -228,6 +229,7 @@ All URIs are relative to *http://localhost*
 *GlossaryApi* | [**glossaryControllerUpsert**](docs/GlossaryApi.md#glossarycontrollerupsert) | **POST** /glossary | Create or update a glossary term (operator)
 *GlossaryApi* | [**glossaryControllerVerify**](docs/GlossaryApi.md#glossarycontrollerverify) | **PATCH** /glossary/{id}/verify | Mark an agent-proposed term as verified
 *GraphApi* | [**graphControllerColumnLineage**](docs/GraphApi.md#graphcontrollercolumnlineage) | **POST** /graph/lineage/column | Trace one column back through the transformations that produced it
+*GraphApi* | [**graphControllerConstellationMap**](docs/GraphApi.md#graphcontrollerconstellationmap) | **GET** /graph/constellation | How this workspace\&#39;s sources connect
 *GraphApi* | [**graphControllerCreateManualEdge**](docs/GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type)
 *GraphApi* | [**graphControllerDeleteEdge**](docs/GraphApi.md#graphcontrollerdeleteedge) | **DELETE** /graph/edges/{id} | Delete an edge
 *GraphApi* | [**graphControllerExpand**](docs/GraphApi.md#graphcontrollerexpand) | **POST** /graph/expand | Expand the graph around a seed entity (recursive traversal)
@@ -267,7 +269,7 @@ All URIs are relative to *http://localhost*
 *NotebooksApi* | [**notebookControllerCancel**](docs/NotebooksApi.md#notebookcontrollercancel) | **POST** /notebook/executions/{executionId}/cancel | Stop a running execution
 *NotebooksApi* | [**notebookControllerCreateExecution**](docs/NotebooksApi.md#notebookcontrollercreateexecution) | **POST** /sources/{sourceId}/notebook/executions | Start a notebook execution
 *NotebooksApi* | [**notebookControllerExportPython**](docs/NotebooksApi.md#notebookcontrollerexportpython) | **GET** /sources/{sourceId}/notebook/export | The notebook as an ordinary Python module
-*NotebooksApi* | [**notebookControllerGet**](docs/NotebooksApi.md#notebookcontrollerget) | **GET** /sources/{sourceId}/notebook | Read a CUSTOM source\&#39;s notebook
+*NotebooksApi* | [**notebookControllerGet**](docs/NotebooksApi.md#notebookcontrollerget) | **GET** /sources/{sourceId}/notebook | Read a source\&#39;s notebook
 *NotebooksApi* | [**notebookControllerGetExecution**](docs/NotebooksApi.md#notebookcontrollergetexecution) | **GET** /notebook/executions/{executionId} | Poll one execution
 *NotebooksApi* | [**notebookControllerListExecutions**](docs/NotebooksApi.md#notebookcontrollerlistexecutions) | **GET** /sources/{sourceId}/notebook/executions | Recent executions for a source
 *NotebooksApi* | [**notebookControllerScaffold**](docs/NotebooksApi.md#notebookcontrollerscaffold) | **GET** /notebooks/scaffold | The starter cells and the functions a notebook must define
@@ -412,6 +414,14 @@ All URIs are relative to *http://localhost*
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
 - [CaseResponseDto](docs/CaseResponseDto.md)
 - [CaseTimelineResponseDto](docs/CaseTimelineResponseDto.md)
+- [CaseworkCaseDto](docs/CaseworkCaseDto.md)
+- [CaseworkCaseStatusBreakdownDto](docs/CaseworkCaseStatusBreakdownDto.md)
+- [CaseworkCasesDto](docs/CaseworkCasesDto.md)
+- [CaseworkInquiriesDto](docs/CaseworkInquiriesDto.md)
+- [CaseworkInquiryDto](docs/CaseworkInquiryDto.md)
+- [CaseworkInquiryStatusBreakdownDto](docs/CaseworkInquiryStatusBreakdownDto.md)
+- [CaseworkLeadsDto](docs/CaseworkLeadsDto.md)
+- [CaseworkSummaryDto](docs/CaseworkSummaryDto.md)
 - [ChatBotActivityEntryDto](docs/ChatBotActivityEntryDto.md)
 - [ChatBotDiagnosticsDto](docs/ChatBotDiagnosticsDto.md)
 - [ChatBotResponseDto](docs/ChatBotResponseDto.md)
@@ -425,6 +435,16 @@ All URIs are relative to *http://localhost*
 - [ColumnLineageDto](docs/ColumnLineageDto.md)
 - [ColumnLineageResponseDto](docs/ColumnLineageResponseDto.md)
 - [ColumnLineageStepDto](docs/ColumnLineageStepDto.md)
+- [ConstellationBoundaryAssetDto](docs/ConstellationBoundaryAssetDto.md)
+- [ConstellationBoundaryEdgeDto](docs/ConstellationBoundaryEdgeDto.md)
+- [ConstellationBundleDto](docs/ConstellationBundleDto.md)
+- [ConstellationClassCountsDto](docs/ConstellationClassCountsDto.md)
+- [ConstellationLinkDto](docs/ConstellationLinkDto.md)
+- [ConstellationResponseDto](docs/ConstellationResponseDto.md)
+- [ConstellationSeverityMixDto](docs/ConstellationSeverityMixDto.md)
+- [ConstellationSourceDto](docs/ConstellationSourceDto.md)
+- [ConstellationStatsDto](docs/ConstellationStatsDto.md)
+- [ConstellationTotalsDto](docs/ConstellationTotalsDto.md)
 - [CorrelationConfigResponseDto](docs/CorrelationConfigResponseDto.md)
 - [CorrelationGraphResponseDto](docs/CorrelationGraphResponseDto.md)
 - [CorrelationLabelWeightDto](docs/CorrelationLabelWeightDto.md)
@@ -492,6 +512,7 @@ All URIs are relative to *http://localhost*
 - [FindingsDiscoverySeverityBreakdownDto](docs/FindingsDiscoverySeverityBreakdownDto.md)
 - [FindingsDiscoveryStatsDto](docs/FindingsDiscoveryStatsDto.md)
 - [FindingsDiscoveryStatusBreakdownDto](docs/FindingsDiscoveryStatusBreakdownDto.md)
+- [FindingsDiscoveryStatusMixDto](docs/FindingsDiscoveryStatusMixDto.md)
 - [FindingsDiscoveryTopAssetDto](docs/FindingsDiscoveryTopAssetDto.md)
 - [FindingsDiscoveryTotalsDto](docs/FindingsDiscoveryTotalsDto.md)
 - [FindingsRankingDto](docs/FindingsRankingDto.md)

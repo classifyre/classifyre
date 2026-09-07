@@ -45,21 +45,21 @@ import "./landing.css";
 export const metadata: Metadata = {
   title: "The Open-Source Investigation Platform for Your Data",
   description:
-    "Classifyre scans the systems you already run, detects secrets, PII, and the signals you define, and works them like a detective — standing inquiries, ranked evidence, cases, and an AI autopilot. Free desktop app for macOS, Windows, and Linux, or a Helm chart on Kubernetes.",
+    "Classifyre reads the systems you already run, finds the signals you define — a company heading for insolvency, a shipment to the wrong address, a leaked credential — and follows them: lineage across sources, standing inquiries, ranked evidence, cases, and an AI autopilot. Free desktop app for macOS, Windows, and Linux, or a Helm chart on Kubernetes.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Classifyre | Every leak leaves a trail",
+    title: "Classifyre | Every trail leads somewhere",
     description:
-      "An open-source investigation platform. Detectors surface evidence, cases turn it into an investigation, and an AI autopilot works between scans. Runs on your laptop or your Kubernetes cluster.",
+      "An open-source investigation platform. Detectors and tags surface evidence, lineage connects it across sources, cases turn it into an investigation, and an AI autopilot works between scans. Runs on your laptop or your Kubernetes cluster.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Classifyre | Every leak leaves a trail",
+    title: "Classifyre | Every trail leads somewhere",
     description:
-      "Open-source data investigation: detectors, ranked evidence, cases, and an AI autopilot. Desktop app or Helm chart.",
+      "Open-source data investigation: detectors, lineage, ranked evidence, cases, and an AI autopilot. Desktop app or Helm chart.",
   },
 };
 
@@ -298,11 +298,11 @@ export default async function HomePage() {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     name: "Classifyre",
-    applicationCategory: "SecurityApplication",
+    applicationCategory: "BusinessApplication",
     operatingSystem: "macOS, Windows, Linux, Kubernetes",
     url: siteUrl,
     description:
-      "Classifyre is an open-source investigation platform: detectors surface evidence across modern source systems, findings become inquiries, fingerprints, and cases, and Harness AI works the investigation between scans. Available as a free desktop app for macOS, Windows, and Linux, and as a Helm chart for Kubernetes.",
+      "Classifyre is an open-source investigation platform: detectors and tags surface evidence across modern source systems, lineage connects it across them, findings become inquiries, duplicates, and cases, and Harness AI works the investigation between scans. Available as a free desktop app for macOS, Windows, and Linux, and as a Helm chart for Kubernetes.",
     offers: [
       {
         "@type": "Offer",
@@ -356,20 +356,19 @@ export default async function HomePage() {
                 id="hero-title"
                 className="font-hero text-[clamp(4.2rem,11vw,9rem)] font-normal uppercase leading-[0.86] tracking-[0.01em] text-white"
               >
-                <span className="block">Every leak</span>
+                <span className="block">Every trail</span>
                 <span className="block">
-                  leaves a{" "}
+                  leads{" "}
                   <span className="inline-block bg-accent px-[0.12em] text-black">
-                    trail.
+                    somewhere.
                   </span>
                 </span>
               </h1>
 
               <p className="max-w-2xl text-lg leading-8 text-white/78">
-                Classifyre scans the systems you already run and detects
-                secrets, PII, and the signals you define — then works them like
-                a detective, with an AI autopilot doing the legwork between
-                scans.
+                Classifyre reads the systems you already run and finds the
+                signals you define — then follows them across sources, like a
+                detective, with an AI autopilot doing the legwork between scans.
               </p>
 
               <div className="flex flex-wrap items-center gap-3">

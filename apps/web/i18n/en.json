@@ -226,7 +226,7 @@
     "name": "Name",
     "description": "Description",
     "created": "Created",
-    "severity": "Severity",
+    "severity": "Priority",
     "source": "Source",
     "sources": "Sources",
     "asset": "Asset",
@@ -887,7 +887,7 @@
     "title": "Findings",
     "totalFindings": "Total Findings",
     "findingsTrend": "Findings Trend",
-    "severityTimeline": "Severity timeline for the selected window.",
+    "severityTimeline": "Priority timeline for the selected window.",
     "noTrendData": "No trend data available for the selected scope.",
     "updatingChart": "Updating chart…",
     "search": "Search findings, detectors, assets, sources…",
@@ -912,7 +912,7 @@
       "asset": "Asset",
       "source": "Source",
       "matchedContent": "Matched Content",
-      "severity": "Severity",
+      "severity": "Priority",
       "status": "Status",
       "confidence": "Confidence",
       "detected": "Detected",
@@ -937,7 +937,7 @@
       "updateFinding": "Update {{count}} finding",
       "updateFindings": "Update {{count}} findings",
       "status": "Status",
-      "severity": "Severity",
+      "severity": "Priority",
       "comment": "Comment",
       "noChange": "No change",
       "commentPlaceholder": "Add a comment to all selected findings…"
@@ -1017,14 +1017,14 @@
       "HIGH": "High",
       "MEDIUM": "Medium",
       "LOW": "Low",
-      "INFO": "Info"
+      "INFO": "Routine"
     },
     "drawer": {
       "title": "Details",
       "description": "Review and adjust finding status, severity, and notes.",
       "closeAriaLabel": "Close details",
       "statusSectionLabel": "Status",
-      "severitySectionLabel": "Severity",
+      "severitySectionLabel": "Priority",
       "commentSectionLabel": "Comment",
       "commentPlaceholder": "Add a note to this finding…",
       "confidenceSectionLabel": "Confidence",
@@ -1139,10 +1139,10 @@
       "sourceTypeDesc": "The type of data source this asset belongs to",
       "detectorsDesc": "Active detectors that fired on this asset and their finding counts",
       "topFindingsDesc": "Most frequent finding types on this asset",
-      "severityDesc": "Highest severity finding and total findings count",
+      "severityDesc": "Highest-priority finding and total findings count",
       "statusMixDesc": "Breakdown of finding statuses on this asset"
     },
-    "searchSeverity": "Search severities...",
+    "searchSeverity": "Search priority...",
     "noSeveritiesFound": "No severities found",
     "searchDetectorTypes": "Search detector types...",
     "noDetectorTypesFound": "No detector types found",
@@ -1327,8 +1327,8 @@
       "methodSetupDesc": "Configure method-specific logic and detector identity.",
       "testScenarios": "Test scenarios",
       "testScenariosDesc": "Verify your detector works correctly.",
-      "patternSeverity": "Pattern & severity",
-      "patternSeverityDesc": "Tune severity, confidence, and language coverage.",
+      "patternSeverity": "Pattern & priority",
+      "patternSeverityDesc": "Tune priority, confidence, and language coverage.",
       "searchExamples": "Search examples by use-case or method",
       "catalogTitle": "Detector Catalog",
       "catalogSubtitle": "Pick method and starter",
@@ -1353,7 +1353,7 @@
       "languages": "Languages (comma separated)",
       "confidenceThreshold": "Confidence threshold",
       "maxFindings": "Max findings",
-      "severityThreshold": "Severity threshold",
+      "severityThreshold": "Priority threshold",
       "extractorEnabled": "Extractor enabled",
       "extractorFields": "Extractor fields",
       "extractorModel": "Extractor GLiNER model",
@@ -1444,13 +1444,13 @@
       "patternLabel": "Pattern",
       "patternPlaceholder": "e.g. ORD-\\d{4,8}",
       "patternDescriptionPlaceholder": "Human-readable description of what this pattern matches",
-      "severity": "Severity",
+      "severity": "Priority",
       "severityAuto": "Auto (high)",
       "severityCritical": "Critical",
       "severityHigh": "High",
       "severityMedium": "Medium",
       "severityLow": "Low",
-      "severityInfo": "Info",
+      "severityInfo": "Routine",
       "captureGroup": "Capture group",
       "captureGroupHint": "0 = whole match",
       "caseSensitive": "Case sensitive",
@@ -1483,11 +1483,11 @@
       "stepIdentityDesc": "Name, key, and status",
       "stepModel": "Model",
       "stepModelDesc": "HuggingFace model config",
-      "stepSeverity": "Severity map",
-      "stepSeverityDesc": "Label to severity mapping",
+      "stepSeverity": "Priority map",
+      "stepSeverityDesc": "Label to priority mapping",
       "identityTitle": "Detector identity",
       "modelTitle": "Model configuration",
-      "severityTitle": "Severity map",
+      "severityTitle": "Priority map",
       "name": "Name",
       "namePlaceholder": "e.g. Spam Classifier",
       "keyLabel": "Key",
@@ -1518,7 +1518,7 @@
       "nmsThresholdDefault": "model default",
       "minBoxArea": "Min box area (px²)",
       "minBoxAreaNoMin": "no minimum",
-      "severityMapHint": "Map predicted labels to severity levels. First matching rule wins. Unmatched labels receive info by default.",
+      "severityMapHint": "Map predicted labels to priority levels. First matching rule wins. Unmatched labels are routine by default.",
       "labelPattern": "label pattern (regex)",
       "addRule": "Add rule",
       "removeRule": "Remove rule",
@@ -1537,8 +1537,8 @@
       "stepPromptDesc": "System prompt and sampling",
       "stepLabels": "Labels",
       "stepLabelsDesc": "Classification taxonomy",
-      "stepSeverity": "Severity map",
-      "stepSeverityDesc": "Label to severity mapping",
+      "stepSeverity": "Priority map",
+      "stepSeverityDesc": "Label to priority mapping",
       "stepOutput": "Output fields",
       "stepOutputDesc": "Structured extraction",
       "identityTitle": "Detector identity",
@@ -1574,10 +1574,10 @@
       "addLabel": "Add label",
       "removeLabel": "Remove label",
       "multiLabel": "Allow multiple labels",
-      "severityTitle": "Severity map",
-      "severityMapHint": "Map predicted labels to severity levels. First matching rule wins; unmatched labels use the default severity.",
+      "severityTitle": "Priority map",
+      "severityMapHint": "Map predicted labels to priority levels. First matching rule wins; unmatched labels use the default priority.",
       "confidenceThreshold": "Confidence threshold",
-      "defaultSeverity": "Default severity",
+      "defaultSeverity": "Default priority",
       "labelPattern": "label pattern (regex)",
       "addRule": "Add rule",
       "removeRule": "Remove rule",
@@ -1670,8 +1670,8 @@
       "labelLabel": "Label",
       "labelPlaceholder": "e.g. Cardholder data",
       "labelHint": "Carried by every finding this detector produces. Defaults to the name.",
-      "severityLabel": "Severity",
-      "severityHint": "Every finding from this tag gets this severity. A tag is asserted, not inferred, so there is no confidence to derive one from.",
+      "severityLabel": "Priority",
+      "severityHint": "Every finding from this tag gets this priority. A tag is asserted, not inferred, so there is no confidence to derive one from.",
       "usageTitle": "Using it in a notebook",
       "usageHint": "Add this key to any asset your Custom connector yields. The value you pass becomes the finding's matched content.",
       "usageCopy": "Copy snippet",
@@ -1700,10 +1700,10 @@
       "processingStatus": "Processing status",
       "searchStatus": "Search status…",
       "noStatusesFound": "No statuses found",
-      "findingSeverity": "Finding severity",
+      "findingSeverity": "Finding priority",
       "findingStatus": "Finding status",
       "findingDetectorType": "Detector type",
-      "searchSeverity": "Search severity…",
+      "searchSeverity": "Search priority…",
       "noSeveritiesFound": "No severities found",
       "searchFindingStatus": "Search status…",
       "noFindingStatusesFound": "No statuses found",
@@ -1962,7 +1962,7 @@
     "columns": {
       "title": "Title",
       "status": "Status",
-      "severity": "Severity",
+      "severity": "Priority",
       "inquiries": "Inquiries",
       "updated": "Updated"
     },
@@ -1977,7 +1977,7 @@
       "HIGH": "High",
       "MEDIUM": "Medium",
       "LOW": "Low",
-      "INFO": "Info"
+      "INFO": "Routine"
     },
     "evidence": {
       "search": "Search evidence…",
@@ -2011,7 +2011,7 @@
         "findingLabel": "Finding",
         "detectorType": "Detector",
         "matchedContent": "Matched content",
-        "severity": "Severity",
+        "severity": "Priority",
         "note": "Note",
         "added": "Added",
         "attachedFindings": "Attached findings",
@@ -2021,12 +2021,12 @@
           "findingLabel": "Finding type that was detected",
           "detectorType": "Detector type that fired on this finding",
           "matchedContent": "Content snippet that triggered this finding",
-          "severity": "Risk level assigned to this finding",
+          "severity": "How much this finding matters to the investigation",
           "note": "Analyst note, click pencil to edit",
           "added": "When this finding was attached to the case",
           "sortByFinding": "Sort by finding type",
           "sortByDetector": "Sort by detector type",
-          "sortBySeverity": "Sort by severity",
+          "sortBySeverity": "Sort by priority",
           "sortByAdded": "Sort by date added"
         }
       }
@@ -2323,45 +2323,42 @@
   },
   "discovery": {
     "title": "Overview",
-    "securityBrief": "Security Brief",
-    "allFindings": "All findings",
+    "securityBrief": "Findings Brief",
     "allFindingsWithDays": "All findings · last {{days}} days",
-    "allFindingsToday": "All findings · today",
     "findingsToReview": "Findings to review",
-    "open": "Open",
-    "resolved": "Resolved",
-    "falsePositive": "False Positive",
-    "ignored": "Ignored",
+    "open": "open",
+    "resolved": "resolved",
+    "falsePositive": "not relevant",
+    "ignored": "set aside",
     "whatNeedsAttention": "What needs attention",
     "incoming": "Incoming",
     "newToday": "new today",
     "thisWeek": "this week",
     "thisMonth": "this month",
-    "basedOnTimestamps": "Based on detected timestamps",
-    "whereRiskClusters": "Where risk clusters",
-    "assetsWithMost": "Assets with the most findings",
+    "basedOnTimestamps": "Counted from detection timestamps",
+    "whereRiskClusters": "Busiest assets",
     "viewAll": "View all",
     "findingsLabel": "findings",
     "assetsLabel": "assets",
     "updatedLabel": "updated",
-    "firstScan": "Run your first scan to surface high-risk assets.",
+    "newLabel": "new",
+    "resolvedLabel": "resolved",
+    "firstScan": "Run your first scan to see what your sources contain.",
     "startScan": "Start a scan",
     "recentScans": "Recent Scans",
-    "last10Runs": "Last 10 runs",
+    "lastRuns": "Last {{count}} runs",
     "runningCount": "{{count}} running",
     "allScans": "All scans",
     "noScansYet": "No scans yet",
-    "resolutionSnapshot": "Resolution snapshot",
-    "reviewStatusMix": "Review status mix",
     "criticalFindings": "Critical findings",
     "highFindings": "High findings",
     "mediumFindings": "Medium findings",
     "lowFindings": "Low findings",
-    "infoFindings": "Info findings",
+    "infoFindings": "Routine findings",
     "noFindings": "No findings",
-    "requireReview": "{{count}} require immediate review",
+    "requireReview": "{{count}} · worth looking at first",
     "noFindingsInWindow": "No findings in selected window",
-    "currentHighest": "{{count}} {{level}} findings currently highest",
+    "currentHighest": "Highest present: {{level}} · {{count}} open",
     "retry": "Retry",
     "errorPrefix": "Error: {{message}}",
     "stats": {
@@ -2372,6 +2369,54 @@
       "never": "Not yet built",
       "refresh": "Rebuild statistics now"
     }
+  },
+  "casework": {
+    "title": "Casework",
+    "subtitle": "Cases and inquiries in flight",
+    "viewAll": "View all"
+  },
+  "connections": {
+    "title": "Connections",
+    "subtitle": "{{sources}} sources · {{connected}} connected assets · {{isolated}} unconnected",
+    "loading": "Loading the map…",
+    "building": "Building the map…",
+    "expanding": "Expanding source…",
+    "error": "Could not load the map",
+    "fit": "Fit to view",
+    "reload": "Reload",
+    "legend": "Legend",
+    "hint": "Double-click a source to expand it into its assets. Assets connected to nothing are not drawn — they are counted on their source.",
+    "source": "Source",
+    "pairing": "Pairing",
+    "asset": "Asset",
+    "totalAssets": "Assets",
+    "connectedAssets": "Connected",
+    "unconnected": "Unconnected",
+    "internalEdges": "Internal links",
+    "assetsInvolved": "Assets involved",
+    "expand": "Expand source",
+    "collapse": "Collapse source",
+    "openSource": "Open source in new tab",
+    "openAsset": "Open asset",
+    "traceLineage": "Trace lineage",
+    "duplicatePairs": "{{count}} duplicate pairs",
+    "reviewDuplicates": "Review duplicates",
+    "bundleLabel": "{{count}} linked assets",
+    "class": {
+      "FLOW": "Lineage",
+      "CONTAINMENT": "Contains",
+      "IDENTITY": "Same as",
+      "REFERENCE": "References",
+      "USAGE": "Used by"
+    },
+    "collapseAll": "Collapse all",
+    "linkTypes": "Link types",
+    "allLinkTypes": "All link types",
+    "searchLinkTypes": "Search link types…",
+    "noLinkTypes": "No link types found",
+    "notBuiltYet": "Connection map still building — counts appear once it lands.",
+    "browseAssets": "Browse all {{count}} assets",
+    "browseAllAssets": "Browse all assets"
   },
   "breadcrumb": {
     "home": "Home",
@@ -2510,7 +2555,7 @@
       "titlePlaceholder": "What is being investigated?",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Context, scope, what triggered this investigation…",
-      "severityLabel": "Severity",
+      "severityLabel": "Priority",
       "assigneeLabel": "Assignee",
       "assigneePlaceholder": "Who leads this case? (optional)",
       "drivingInquiries": "Driving inquiries",
@@ -3055,7 +3100,7 @@
       "caseTitle": "Title",
       "caseTitlePlaceholder": "e.g. Cross-source identity leak",
       "description": "Description",
-      "severity": "Severity",
+      "severity": "Priority",
       "pickCase": "Case",
       "pickCasePlaceholder": "Select a case…",
       "attachFindings": "Also attach the assets' findings",
@@ -3939,6 +3984,14 @@
       "failed": "Templates could not be loaded."
     }
   },
+  "augmentation": {
+    "docsLink": "How augmentation works",
+    "enableLabel": "Enable augmentation",
+    "intro": "A Python notebook that enriches every asset this source extracts — extra metadata, tags, links and lineage edges. Additive only: it cannot change what the connector extracted, drop an asset, or fail a scan.",
+    "runSample": "Run sample",
+    "saveSourceFirst": "Save this source once to start writing its augmentation notebook.",
+    "sectionTitle": "Augmentation"
+  },
   "review": {
     "title": "Duplicate review",
     "subtitle": "Assets that look like the same thing, grouped by why they matched.",
@@ -4255,5 +4308,224 @@
     },
     "backToPatterns": "Back to patterns",
     "backToPattern": "Back to pattern"
+  },
+  "seo": {
+    "site": {
+      "title": "Classifyre — Detection Platform for Unstructured Data",
+      "description": "Open source detection platform that scans Confluence, Jira, SharePoint, Notion, databases and file shares to surface PII, secrets, security issues and duplicates — then triages findings into investigations with an AI autopilot. Self-hosted, private by default.",
+      "keywords": "Classifyre, detection platform, PII detection, secrets scanning, unstructured data, DLP, data security, Confluence scanner, Jira scanner, SharePoint DLP, duplicate detection, entity resolution, AI autopilot, open source security",
+      "ogTitle": "Classifyre — Detection Platform for Unstructured Data",
+      "ogDescription": "Scan every source you already run, surface what matters, and investigate with an AI autopilot. Open source, self-hosted, private by default.",
+      "twitterTitle": "Classifyre — Detection Platform for Unstructured Data",
+      "twitterDescription": "Open source detection platform for PII, secrets, security and duplicates across all your unstructured data."
+    },
+    "workspaces": {
+      "title": "Workspaces",
+      "description": "Choose an isolated workspace to continue an investigation, or open a fresh case file. Each workspace has its own sources, scans and findings.",
+      "ogTitle": "Workspaces — Isolated Case Files | Classifyre",
+      "ogDescription": "Every workspace has its own sources, scans and findings — pick one to continue, or open a fresh case file."
+    },
+    "discovery": {
+      "title": "Overview — Security Brief & Workspace Health",
+      "description": "The workspace security brief: open vs resolved findings, risk clusters by asset and source, recent scan runs and resolution mix — your starting point after every scan.",
+      "ogTitle": "Overview — Security Brief | Classifyre",
+      "ogDescription": "Open findings, risk clusters, recent scans and resolution — the health of this workspace at a glance."
+    },
+    "findings": {
+      "title": "Findings — Triage Every Detection by Severity, Source & Detector",
+      "description": "Triage every detection in one place — filter by severity, status, confidence, source and detector. Track PII, secrets, security issues and custom detections from open to resolved across every scan.",
+      "ogTitle": "Findings — Triage Every Detection | Classifyre",
+      "ogDescription": "Filter by severity, status and source — review matched content, signals and history for every PII, secrets and security finding."
+    },
+    "findingDetail": {
+      "title": "Finding Details — Evidence, Risk & Review History",
+      "description": "Inspect a single finding with its matched content, signals, location, confidence and status history. Adjust severity, add triage notes and follow every touchpoint from detection to resolution.",
+      "ogTitle": "Finding Details — Evidence & Review History | Classifyre",
+      "ogDescription": "Matched content, signals, location and full status history for one detection — triage severity and track every review.",
+      "titleWithEntity": "{{name}} — Finding Details",
+      "descriptionWithEntity": "{{name}} — review the matched content, signals and full triage history for this detection."
+    },
+    "assets": {
+      "title": "Assets — All Ingested Documents & Source Content",
+      "description": "Browse every ingested asset across all connected sources. Search by source, detector and severity, see top findings per asset and expand text coverage and status mix.",
+      "ogTitle": "Assets — All Ingested Documents | Classifyre",
+      "ogDescription": "Every document, page and row ingested from Confluence, Jira, SharePoint and more — with detector coverage and finding breakdowns."
+    },
+    "assetDetail": {
+      "title": "Asset Details — Metadata, Source Properties & Findings",
+      "description": "Review an asset's metadata, source properties, extracted text and every finding it triggered. Jump to its source, timeline and lineage in one place.",
+      "ogTitle": "Asset Details — Metadata & Findings | Classifyre",
+      "ogDescription": "Source properties, extracted content and every PII, secrets or security finding for one ingested asset.",
+      "titleWithEntity": "{{name}} — Asset Details",
+      "descriptionWithEntity": "{{name}} — metadata, source properties and every finding this asset triggered."
+    },
+    "sources": {
+      "title": "Sources — Connected Data Connectors & Health",
+      "description": "Manage every connected source — Confluence, Jira, SharePoint, Notion, databases, file shares and sandboxes. Track health, last run stats, schedule and sampling at a glance.",
+      "ogTitle": "Sources — Connected Data Connectors | Classifyre",
+      "ogDescription": "Connect and monitor Confluence, Jira, SharePoint, databases and more — health, last scan and schedule for every source."
+    },
+    "sourceNew": {
+      "title": "Add New Source — Connect Confluence, Jira, SharePoint & More",
+      "description": "Connect a new data source in minutes. Configure connection, credentials, sampling and detectors, test the connection and start your first scan.",
+      "ogTitle": "Add New Source — Connect a Data System | Classifyre",
+      "ogDescription": "Step-by-step source setup: credentials, sampling, detectors and a live connection test."
+    },
+    "sourceDetail": {
+      "title": "Source Details — Health, Schedule & Recent Runs",
+      "description": "Operational overview for one source: last scan status and duration, schedule, required configuration, active detectors and the last three runs with findings and asset delta.",
+      "ogTitle": "Source Details — Health & Recent Runs | Classifyre",
+      "ogDescription": "Health, schedule, detector coverage and recent run outcomes for one connected source.",
+      "titleWithEntity": "{{name}} — Source Details",
+      "descriptionWithEntity": "{{name}} — health, schedule, detector coverage and the most recent runs."
+    },
+    "sourceEdit": {
+      "title": "Edit Source — Update Connection & Detector Settings",
+      "description": "Update this source's connection, sampling, schedule and detector thresholds. Test, save and re-scan without rebuilding the source.",
+      "ogTitle": "Edit Source — Update Connection & Detectors | Classifyre",
+      "ogDescription": "Modify credentials, sampling and detector configuration for an existing source."
+    },
+    "scans": {
+      "title": "Scans — Run History, Status & Duration",
+      "description": "See every scan run across all sources — by trigger, status and duration. Track pending, running, completed and failed runs and open any run for logs, assets and findings.",
+      "ogTitle": "Scans — Run History & Status | Classifyre",
+      "ogDescription": "All scan runs by trigger and status — duration, asset counts and findings for every source."
+    },
+    "scanDetail": {
+      "title": "Scan Details — Timeline, Progress & Asset Changes",
+      "description": "Track a single scan run from trigger to completion: progress, run timeline, asset delta, coverage gaps and per-asset outcomes with logs, findings and source context.",
+      "ogTitle": "Scan Details — Timeline & Asset Changes | Classifyre",
+      "ogDescription": "Progress, timeline and asset delta for one scan run — with logs, coverage and every finding it produced.",
+      "titleWithEntity": "{{name}} — Scan Details",
+      "descriptionWithEntity": "Scan run for {{name}} — progress, timeline, asset delta and coverage."
+    },
+    "detectors": {
+      "title": "Custom Detectors — Build, Train & Manage Detection Logic",
+      "description": "Browse and manage all custom detectors — regex rulesets, classifiers and entity extractors. Create, train with examples, test scenarios and see which sources use each detector.",
+      "ogTitle": "Custom Detectors — Detection Logic Catalog | Classifyre",
+      "ogDescription": "Regex, classifier and entity detectors you build yourself — training, testing and source usage in one catalog."
+    },
+    "detectorNew": {
+      "title": "New Detector — Create a Custom Ruleset, Classifier or Entity Detector",
+      "description": "Create a reusable custom detector from regex patterns, text classification or entity extraction. Define patterns, labels, severity and tests without code and deploy to any source.",
+      "ogTitle": "New Detector — Build Custom Detection | Classifyre",
+      "ogDescription": "Start from a template or from scratch — regex, classifier or GLiNER entity detector with tests and severity mapping."
+    },
+    "detectorDetail": {
+      "title": "Detector Details — Configuration, Training & Test Results",
+      "description": "Manage one custom detector's identity, patterns, model and training. Review sources using it, findings count, version, training history and test scenarios in one place.",
+      "ogTitle": "Detector Details — Configuration & Training | Classifyre",
+      "ogDescription": "Identity, validation, model settings and training history for one custom detector.",
+      "titleWithEntity": "{{name}} — Detector Details",
+      "descriptionWithEntity": "{{name}} — configuration, training history and test scenarios."
+    },
+    "investigations": {
+      "title": "Investigations — Cases, Inquiries & AI Autopilot",
+      "description": "Run investigations where findings become answers: inquiries watch for matches, fingerprints link duplicates across systems, and cases collect evidence, hypotheses and a conclusion — with or without the AI autopilot.",
+      "ogTitle": "Investigations — Cases & Inquiries | Classifyre",
+      "ogDescription": "Inquiries that watch for matches, duplicate fingerprints and evidence-backed cases — autopilot or manual."
+    },
+    "caseDetail": {
+      "title": "Case Details — Evidence Graph, Hypotheses & Timeline",
+      "description": "Investigate a case with its evidence graph, threads, chronology and case file. Link inquiries, pull matches, add hypotheses and capture a conclusion — or let the AI harness run on the case.",
+      "ogTitle": "Case Details — Evidence & Hypotheses | Classifyre",
+      "ogDescription": "Evidence graph, linked inquiries, hypotheses and activity timeline for one investigation case.",
+      "titleWithEntity": "{{name}} — Case Details",
+      "descriptionWithEntity": "{{name}} — evidence graph, hypotheses, linked inquiries and activity timeline."
+    },
+    "inquiryDetail": {
+      "title": "Inquiry Details — Saved Query, Matches & Linked Cases",
+      "description": "A saved inquiry that watches all findings matching its filters. Review live matches, see cases it drives, rescan for new hits and pull findings into a case as evidence.",
+      "ogTitle": "Inquiry Details — Matches & Cases | Classifyre",
+      "ogDescription": "Live matches for a saved finding query — plus cases it drives and one-click evidence pull.",
+      "titleWithEntity": "{{name}} — Inquiry Details",
+      "descriptionWithEntity": "{{name}} — live matches for this saved query and the cases it drives."
+    },
+    "inquiryNew": {
+      "title": "New Inquiry — Create a Saved Finding Query",
+      "description": "Create a saved inquiry that watches all future findings matching its filters — by source, detector, type and value. Preview live matches before saving.",
+      "ogTitle": "New Inquiry — Saved Finding Query | Classifyre",
+      "ogDescription": "Define a question that keeps answering — filters, preview and one-click case creation."
+    },
+    "caseNew": {
+      "title": "Open a Case — Collect Evidence & Hypotheses",
+      "description": "Open a new investigation case. Add a title, description, severity and driving inquiries — pull their live matches as initial evidence or start empty and attach findings later.",
+      "ogTitle": "Open a Case — New Investigation | Classifyre",
+      "ogDescription": "Title, severity, inquiries and evidence — start a new investigation case."
+    },
+    "duplicates": {
+      "title": "Duplicate Review — Find Copies Across All Sources",
+      "description": "Find assets that look like the same thing — grouped by shared fingerprint values and match reason. Review clusters, compare pairs, tune correlation and track every decision.",
+      "ogTitle": "Duplicate Review — Clusters & Pairs | Classifyre",
+      "ogDescription": "Near-duplicates by shared values and fingerprints — clusters, pairs and tuning for the whole workspace."
+    },
+    "duplicatesDecisions": {
+      "title": "Duplicate Decisions — Resolution History & Case Use",
+      "description": "Audit every duplicate decision — kept, dismissed or escalated — and see whether each was used in a case or an inquiry. The full history of duplicate review for this workspace.",
+      "ogTitle": "Duplicate Decisions — Resolution History | Classifyre",
+      "ogDescription": "Every duplicate decision taken and where it was used — cases and inquiries."
+    },
+    "duplicatePair": {
+      "title": "Duplicate Pair — Compare Two Assets Side by Side",
+      "description": "Why two assets matched: shared fingerprint values, similarity score and snippet comparison. Confirm as duplicate or dismiss — every decision is audited and can feed cases.",
+      "ogTitle": "Duplicate Pair — Why Two Assets Matched | Classifyre",
+      "ogDescription": "Shared values, similarity and evidence for one duplicate pair — confirm or dismiss."
+    },
+    "duplicatePattern": {
+      "title": "Duplicate Pattern — Clustered by Shared Reason",
+      "description": "One duplicate pattern and the asset cluster behind it: every pair that matched for the same shared value or fingerprint, grouped for bulk review and case action.",
+      "ogTitle": "Duplicate Pattern — Cluster by Reason | Classifyre",
+      "ogDescription": "All pairs that matched for the same shared value — review the cluster together."
+    },
+    "duplicateTune": {
+      "title": "Tuning — Weights, Thresholds & Fingerprint Health",
+      "description": "Tune duplicate detection: per-label weights, related and duplicate thresholds, default weight and semantic index health. Saving recomputes fingerprints for the whole workspace.",
+      "ogTitle": "Tuning — Duplicate Detection Settings | Classifyre",
+      "ogDescription": "Label weights, thresholds and index health for fingerprint-based duplicate detection."
+    },
+    "settings": {
+      "title": "Settings — Workspace, Region & Harness Configuration",
+      "description": "Configure this workspace: language and time defaults, instance version, AI providers, Harness autopilot, embedding, MCP servers and export/import. All settings are workspace-scoped.",
+      "ogTitle": "Settings — Workspace Configuration | Classifyre",
+      "ogDescription": "Region, AI providers, harness, embedding and data transfer — workspace settings in one place."
+    },
+    "notifications": {
+      "title": "Notifications — Alerts & System Signals",
+      "description": "All notifications for scans, findings, sources and system events — filtered by type and severity. Mark important, mark read and stay on top of critical signals.",
+      "ogTitle": "Notifications — Alerts & Signals | Classifyre",
+      "ogDescription": "Scan, finding, source and system notifications — importance and read state at a glance."
+    },
+    "glossary": {
+      "title": "Glossary — Canonical Vocabulary & Entity Map",
+      "description": "Canonical vocabulary shared by operators, cases and every AI Harness run. Add terms, aliases and entity types — person, organization, location — and verify what the autopilot should treat as ground truth.",
+      "ogTitle": "Glossary — Canonical Vocabulary | Classifyre",
+      "ogDescription": "Shared terms, aliases and entity annotations that operators, cases and the AI Harness all rely on."
+    },
+    "fingerprints": {
+      "title": "Fingerprints — Evidence Correlations & Shared Values",
+      "description": "Evidence fingerprints that connect assets sharing the same findings — emails, phones, identifiers and more. Search the graph, filter by source and exclude noise while duplicates recompute in the background.",
+      "ogTitle": "Fingerprints — Evidence Correlations | Classifyre",
+      "ogDescription": "Assets linked by shared finding values — fingerprints, graph and correlation tuning."
+    },
+    "harness": {
+      "title": "Harness AI — Autopilot Control Plane",
+      "description": "Autonomous control plane for the AI autopilot: agents that triage findings, build cases and draft hypotheses after every scan. Review activity, runs, memory, system brief and configuration.",
+      "ogTitle": "Harness AI — Autopilot Control Plane | Classifyre",
+      "ogDescription": "Agents, runs, memory and brief — the autopilot that turns findings into investigations."
+    },
+    "harnessProvider": {
+      "title": "AI Provider — Model, Credentials & Feature Assignment",
+      "description": "Manage one AI provider's endpoint, model, credentials, context size and feature assignment. Test connection and Harness capability, then assign to Assistant, Harness or detectors.",
+      "ogTitle": "AI Provider — Configuration | Classifyre",
+      "ogDescription": "Endpoint, model and credential for one Harness AI provider.",
+      "titleWithEntity": "{{name}} — AI Provider",
+      "descriptionWithEntity": "{{name}} — endpoint, model, credentials and feature assignment."
+    },
+    "docs": {
+      "title": "Documentation — Connect, Scan & Investigate with Classifyre",
+      "description": "Classifyre documentation — how the app works, section by section: connect Confluence, Jira, SharePoint and more, run scans, triage findings, dedupe assets and investigate with the AI autopilot.",
+      "ogTitle": "Documentation — Connect, Scan & Investigate | Classifyre",
+      "ogDescription": "Connect sources, scan them, review findings and investigate what matters — with an AI autopilot doing the legwork. Guides for every workflow."
+    }
   }
 }

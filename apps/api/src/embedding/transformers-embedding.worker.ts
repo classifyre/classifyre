@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { parentPort } from 'node:worker_threads';
 import { setPriority } from 'node:os';
 import path from 'node:path';
@@ -44,9 +45,34 @@ export function resolveModelSource(config: WorkerRequest['config']): {
 async function extractorFor(config: WorkerRequest['config']) {
   const key = JSON.stringify(config);
   if (extractorPromise && extractorKey === key) return extractorPromise;
+  // Two workspaces on different models alternate through this one child, so
+  // the pipeline being replaced here is replaced repeatedly. Dropping the
+  // reference does not free it: the weights and the onnxruntime session are
+  // native allocations the JS heap cannot see, so V8 feels no pressure and
+  // may never collect the wrapper that owns them. Every switch would leak a
+  // whole resident model.
+  const previous = extractorPromise;
+  if (previous) {
+    void previous
+      .then((extractor) => extractor?.dispose?.())
+      .catch(() => undefined);
+  }
   extractorKey = key;
   extractorPromise = (async () => {
     const { env, pipeline } = await import('@huggingface/transformers');
+    // Create it here rather than trusting the library to: transformers.js
+    // mkdirs lazily, relative to the process cwd, and reports the failure as a
+    // bare EACCES with no mention of which directory it wanted or why. Failing
+    // here instead names the path.
+    try {
+      fs.mkdirSync(config.cacheDir, { recursive: true });
+    } catch (error) {
+      throw new Error(
+        `Embedding model cache directory ${config.cacheDir} is not writable ` +
+          `(${error instanceof Error ? error.message : String(error)}). Set ` +
+          'EMBEDDING_CACHE_DIR to a writable path.',
+      );
+    }
     env.cacheDir = config.cacheDir;
     env.allowRemoteModels = config.allowRemoteModels;
     if (config.localModelPath) env.localModelPath = config.localModelPath;
@@ -104,8 +130,17 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
   }
 }
 
+// One inference at a time, whatever arrives. The parent already serialises
+// (EmbeddingProviderService.serialize), so this is defence in depth for the
+// paths that bypass it — the build smoke test, and any future caller that
+// forks this worker directly. Concurrent `Run()` calls are what turn a bounded
+// per-batch footprint back into an unbounded one.
+let inflight: Promise<void> = Promise.resolve();
 const onMessage = (request: WorkerRequest) => {
-  void handleRequest(request);
+  inflight = inflight.then(
+    () => handleRequest(request),
+    () => handleRequest(request),
+  );
 };
 if (parentPort) {
   parentPort.on('message', onMessage);

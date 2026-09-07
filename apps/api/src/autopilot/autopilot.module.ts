@@ -61,6 +61,7 @@ import { AutopilotController } from './autopilot.controller';
 import { AssistantCapabilityService } from './capability/assistant-capability.service';
 import { CorrelationReviewService } from '../correlation/review/correlation-review.service';
 import { InquiriesService } from '../inquiries.service';
+import { SourceGraphModule } from '../stats/source-graph.module';
 
 /**
  * Investigation autopilot: autonomous background agents that manage inquiries
@@ -71,6 +72,7 @@ import { InquiriesService } from '../inquiries.service';
 @Module({
   imports: [
     MatchingModule,
+    SourceGraphModule,
     CorrelationModule,
     CliRunnerModule,
     EmbeddingModule,

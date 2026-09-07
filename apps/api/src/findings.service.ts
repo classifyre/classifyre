@@ -1396,6 +1396,49 @@ export class FindingsService {
   }
 
   /**
+   * Rollup severity counts are keyed by the stored enum; the DTO is keyed by the
+   * lowercase buckets the UI draws. One place does the translation so the two
+   * paths cannot drift.
+   */
+  private toSeverityBreakdown(counts: Record<string, number>) {
+    return {
+      critical: counts.CRITICAL ?? 0,
+      high: counts.HIGH ?? 0,
+      medium: counts.MEDIUM ?? 0,
+      low: counts.LOW ?? 0,
+      info: counts.INFO ?? 0,
+    };
+  }
+
+  /**
+   * Review-state mix over the window, counted across every status.
+   *
+   * Deliberately a second read rather than a widening of the main one: `totals`
+   * must keep counting only what is still open, or the headline number changes
+   * meaning the moment someone resolves something.
+   */
+  private emptyStatusMix() {
+    return { total: 0, open: 0, falsePositive: 0, resolved: 0, ignored: 0 };
+  }
+
+  private accumulateStatusMix(
+    mix: ReturnType<FindingsService['emptyStatusMix']>,
+    status: string,
+    count: number,
+  ): void {
+    const key = (
+      {
+        [FindingStatus.FALSE_POSITIVE]: 'falsePositive',
+        [FindingStatus.RESOLVED]: 'resolved',
+        [FindingStatus.IGNORED]: 'ignored',
+      } as Record<string, 'falsePositive' | 'resolved' | 'ignored'>
+    )[status];
+    mix.total += count;
+    if (key) mix[key] += count;
+    else mix.open += count;
+  }
+
+  /**
    * Serve the discovery overview from the pre-aggregated rollup.
    *
    * Returns null when the rollup has not been built yet, so the caller runs the
@@ -1423,9 +1466,18 @@ export class FindingsService {
     const filters: RollupFilter = input.includeResolved
       ? {}
       : { status: ['OPEN'] };
-    const [severityTotals, activity, topAssetRows, recentRunsRaw, freshness] =
-      await Promise.all([
+    const [
+      severityTotals,
+      statusMixRows,
+      activity,
+      topAssetRows,
+      recentRunsRaw,
+      freshness,
+    ] = await Promise.all([
         this.stats.severityStatusTotals(input.windowStart, filters),
+        // Same rollup read, no status filter — this is the only way to get a
+        // truthful review-state mix while `totals` stays open-only.
+        this.stats.severityStatusTotals(input.windowStart, {}),
         this.stats.activity(
           input.todayStart,
           input.weekStart,
@@ -1445,6 +1497,8 @@ export class FindingsService {
             completedAt: true,
             durationMs: true,
             totalFindings: true,
+            findingsCreated: true,
+            findingsResolved: true,
             assetsCreated: true,
             assetsUpdated: true,
             errorMessage: true,
@@ -1461,6 +1515,11 @@ export class FindingsService {
         row.status,
         row.count,
       );
+    }
+
+    const statusMix = this.emptyStatusMix();
+    for (const row of statusMixRows) {
+      this.accumulateStatusMix(statusMix, row.status, row.count);
     }
 
     const assets = topAssetRows.length
@@ -1538,10 +1597,12 @@ export class FindingsService {
       windowDays: input.windowDays,
       includeResolved: input.includeResolved,
       totals: input.totals,
+      statusMix,
       activity,
-      topAssets: topAssets
-        .slice(0, 12)
-        .map(({ severityCounts: _drop, ...rest }) => rest),
+      topAssets: topAssets.slice(0, 12).map((asset) => ({
+        ...asset,
+        severityCounts: this.toSeverityBreakdown(asset.severityCounts),
+      })),
       recentRuns: recentRunsRaw.map((run) => ({
         id: run.id,
         status: run.status,
@@ -1551,6 +1612,8 @@ export class FindingsService {
         completedAt: run.completedAt ?? null,
         durationMs: run.durationMs ?? null,
         totalFindings: run.totalFindings,
+        findingsCreated: run.findingsCreated,
+        findingsResolved: run.findingsResolved,
         assetsCreated: run.assetsCreated,
         assetsUpdated: run.assetsUpdated,
         errorMessage: run.errorMessage ?? null,
@@ -1618,6 +1681,7 @@ export class FindingsService {
 
     const [
       findingGroups,
+      statusMixGroups,
       todayCount,
       weekCount,
       monthCount,
@@ -1627,6 +1691,13 @@ export class FindingsService {
       this.prisma.finding.groupBy({
         by: ['severity', 'status'],
         where: windowWhere,
+        _count: { _all: true },
+      }),
+      // Window without the status filter, so the review-state strip is honest
+      // while `totals` stays open-only. Mirrors the rollup path's second read.
+      this.prisma.finding.groupBy({
+        by: ['status'],
+        where: { detectedAt: { gte: windowStart } },
         _count: { _all: true },
       }),
       this.prisma.finding.count({
@@ -1660,6 +1731,8 @@ export class FindingsService {
           completedAt: true,
           durationMs: true,
           totalFindings: true,
+          findingsCreated: true,
+          findingsResolved: true,
           assetsCreated: true,
           assetsUpdated: true,
           errorMessage: true,
@@ -1704,6 +1777,11 @@ export class FindingsService {
           totals.byStatus.open += count;
           break;
       }
+    }
+
+    const statusMix = this.emptyStatusMix();
+    for (const group of statusMixGroups) {
+      this.accumulateStatusMix(statusMix, group.status, group._count._all);
     }
 
     const assetIds = assetCounts.map((item) => item.assetId);
@@ -1794,6 +1872,9 @@ export class FindingsService {
         totalFindings: item._count?._all ?? 0,
         highestSeverity: (highestSeverityByAsset.get(item.assetId) ||
           'INFO') as any,
+        severityCounts: this.toSeverityBreakdown(
+          severityCountsByAsset.get(item.assetId) ?? {},
+        ),
         lastDetectedAt: item._max?.detectedAt ?? null,
       };
     });
@@ -1830,6 +1911,8 @@ export class FindingsService {
       completedAt: run.completedAt ?? null,
       durationMs: run.durationMs ?? null,
       totalFindings: run.totalFindings,
+      findingsCreated: run.findingsCreated,
+      findingsResolved: run.findingsResolved,
       assetsCreated: run.assetsCreated,
       assetsUpdated: run.assetsUpdated,
       errorMessage: run.errorMessage ?? null,
@@ -1846,6 +1929,7 @@ export class FindingsService {
       windowDays,
       includeResolved,
       totals,
+      statusMix,
       activity: {
         today: todayCount,
         week: weekCount,

@@ -8,6 +8,9 @@ import {
   type Namespace,
 } from "@workspace/api-client";
 import { DYNAMIC_ID_SENTINEL } from "@/lib/dynamic-route";
+import { stripLocalePrefix } from "@/lib/locale-detection";
+import { withLocaleAndSlug } from "@/lib/ns-path";
+import { useLocale } from "@/lib/app-path";
 
 interface NamespaceContextValue {
   /** Active namespace slug from the route (e.g. "acme-corp"). */
@@ -53,7 +56,9 @@ export function NamespaceProvider({
       setEffectiveSlug(slug);
       return;
     }
-    const first = window.location.pathname.split("/").filter(Boolean)[0] ?? "";
+    // The locale segment, when present, sits ahead of the slug.
+    const { rest } = stripLocalePrefix(window.location.pathname);
+    const first = rest.split("/").filter(Boolean)[0] ?? "";
     const recovered = decodeURIComponent(first);
     setEffectiveSlug(recovered === DYNAMIC_ID_SENTINEL ? "" : recovered);
   }, [isStaticShell, pathname, slug]);
@@ -65,6 +70,8 @@ export function NamespaceProvider({
     setActiveNamespaceSlug(effectiveSlug || undefined);
     return () => setActiveNamespaceSlug(undefined);
   }, [effectiveSlug]);
+
+  const locale = useLocale();
 
   const [namespace, setNamespace] = React.useState<Namespace | null>(null);
 
@@ -99,10 +106,10 @@ export function NamespaceProvider({
       displayName: namespace?.name || effectiveSlug,
       nsHref: (path: string) => {
         const normalized = path.startsWith("/") ? path : `/${path}`;
-        return `/${effectiveSlug}${normalized === "/" ? "" : normalized}`;
+        return withLocaleAndSlug(normalized, effectiveSlug, locale);
       },
     }),
-    [effectiveSlug, namespace],
+    [effectiveSlug, namespace, locale],
   );
 
   // Match the prerendered desktop placeholder shell during hydration, then

@@ -103,6 +103,13 @@ view count and upload date, a database row's table and schema.
 > kind. Browse the **[Source Catalog](/sources/)** and open any source to see
 > its metadata.
 
+### The augmentation namespace
+
+Values an [augmentation notebook](/sources/augmentation/) stages land under a
+single reserved key — `metadata["augmentation"]` — alongside, never inside, the
+connector's own fields. That namespace is exempt from metadata validation, so
+enrichment can never read as contract drift.
+
 ---
 
 ## Why metadata matters

@@ -1317,27 +1317,37 @@ export class McpServerFactoryService {
    * which re-validates the whole config against the CUSTOM JSON Schema.
    */
   private registerNotebookTools(server: McpServerCompat) {
+    // Which notebook a tool addresses. Defaults to `connector` so every
+    // existing call keeps its meaning; `augmentation` addresses the per-asset
+    // enrichment notebook any source type may carry.
+    const scopeSchema = z
+      .enum(['connector', 'augmentation'])
+      .default('connector')
+      .describe(
+        'Which notebook: the CUSTOM source’s connector notebook, or the per-asset augmentation notebook.',
+      );
     server.registerTool(
       'get_notebook',
       {
         title: 'Get Notebook',
         description:
-          'Read a CUSTOM source’s notebook: cells, revision, variables, secret keys, packages, and local folders.',
+          'Read a source’s notebook: cells, revision, variables, secret keys, packages, and local folders.',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
         },
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
         },
       },
-      async ({ sourceId }) => {
-        const notebook = await this.notebookService.get(sourceId);
-        const optional = await this.notebookOptionalConfig(sourceId);
+      async ({ sourceId, scope = 'connector' }) => {
+        const notebook = await this.notebookService.get(sourceId, scope);
+        const section = await this.notebookConfigSection(sourceId, scope);
         return jsonResult({
           ...notebook,
-          packages: optional.packages ?? [],
-          localFolders: optional.local_folders ?? [],
+          packages: section.packages ?? [],
+          localFolders: section.local_folders ?? [],
         });
       },
     );
@@ -1350,6 +1360,7 @@ export class McpServerFactoryService {
           'Insert a new cell into a notebook. Appended at the end unless afterCellId is given.',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
           baseRevision: z.number().int().min(1),
           cellId: z
             .string()
@@ -1365,9 +1376,17 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async ({ sourceId, baseRevision, cellId, type, source, afterCellId }) => {
+      async ({
+        sourceId,
+        scope = 'connector',
+        baseRevision,
+        cellId,
+        type,
+        source,
+        afterCellId,
+      }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        const notebook = await this.notebookService.get(sourceId);
+        const notebook = await this.notebookService.get(sourceId, scope);
         const newCell = {
           id: cellId ?? `cell-${Date.now().toString(36)}`,
           type,
@@ -1388,10 +1407,14 @@ export class McpServerFactoryService {
           );
         }
         cells.splice(insertAt, 0, newCell);
-        const result = await this.notebookService.update(sourceId, {
-          baseRevision,
-          cells,
-        });
+        const result = await this.notebookService.update(
+          sourceId,
+          {
+            baseRevision,
+            cells,
+          },
+          scope,
+        );
         return jsonResult({ ...result, cellId: newCell.id });
       },
     );
@@ -1403,6 +1426,7 @@ export class McpServerFactoryService {
         description: 'Replace one cell’s source (and optionally its type).',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
           baseRevision: z.number().int().min(1),
           cellId: z.string(),
           source: z.string(),
@@ -1413,19 +1437,30 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async ({ sourceId, baseRevision, cellId, source, type }) => {
+      async ({
+        sourceId,
+        scope = 'connector',
+        baseRevision,
+        cellId,
+        source,
+        type,
+      }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        const notebook = await this.notebookService.get(sourceId);
+        const notebook = await this.notebookService.get(sourceId, scope);
         const index = notebook.cells.findIndex((cell) => cell.id === cellId);
         if (index === -1) {
           throw new NotFoundException(`No cell with id '${cellId}'.`);
         }
         const cells = [...notebook.cells];
         cells[index] = { ...cells[index], source, ...(type ? { type } : {}) };
-        const result = await this.notebookService.update(sourceId, {
-          baseRevision,
-          cells,
-        });
+        const result = await this.notebookService.update(
+          sourceId,
+          {
+            baseRevision,
+            cells,
+          },
+          scope,
+        );
         return jsonResult(result);
       },
     );
@@ -1437,6 +1472,7 @@ export class McpServerFactoryService {
         description: 'Remove one cell from a notebook.',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
           baseRevision: z.number().int().min(1),
           cellId: z.string(),
         },
@@ -1445,17 +1481,21 @@ export class McpServerFactoryService {
           destructiveHint: true,
         },
       },
-      async ({ sourceId, baseRevision, cellId }) => {
+      async ({ sourceId, scope = 'connector', baseRevision, cellId }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        const notebook = await this.notebookService.get(sourceId);
+        const notebook = await this.notebookService.get(sourceId, scope);
         if (!notebook.cells.some((cell) => cell.id === cellId)) {
           throw new NotFoundException(`No cell with id '${cellId}'.`);
         }
         const cells = notebook.cells.filter((cell) => cell.id !== cellId);
-        const result = await this.notebookService.update(sourceId, {
-          baseRevision,
-          cells,
-        });
+        const result = await this.notebookService.update(
+          sourceId,
+          {
+            baseRevision,
+            cells,
+          },
+          scope,
+        );
         return jsonResult(result);
       },
     );
@@ -1468,6 +1508,7 @@ export class McpServerFactoryService {
           'Replace the Python packages installed into the notebook’s run environment before any cell executes. Call list_notebook_runtime_packages first — the base image’s own dependencies do not need listing.',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
           packages: z.array(
             z.object({ name: z.string(), version: z.string().optional() }),
           ),
@@ -1477,10 +1518,10 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async ({ sourceId, packages }) => {
+      async ({ sourceId, scope = 'connector', packages }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.updateNotebookOptionalConfig(sourceId, { packages }),
+          await this.updateNotebookConfigSection(sourceId, scope, { packages }),
         );
       },
     );
@@ -1493,6 +1534,7 @@ export class McpServerFactoryService {
           'Replace the local folders a notebook reads with ctx.folder("name"). Desktop only — not available in Kubernetes deployments, where files are uploaded to the source instead (upload_notebook_file).',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
           folders: z.array(z.object({ name: z.string(), path: z.string() })),
         },
         annotations: {
@@ -1500,10 +1542,10 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async ({ sourceId, folders }) => {
+      async ({ sourceId, scope = 'connector', folders }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.updateNotebookOptionalConfig(sourceId, {
+          await this.updateNotebookConfigSection(sourceId, scope, {
             local_folders: folders,
           }),
         );
@@ -1603,10 +1645,17 @@ export class McpServerFactoryService {
       {
         title: 'Run Notebook',
         description:
-          'Start a notebook execution and return immediately — poll get_notebook_execution for the result. Modes: "cell" runs one cell (requires targetCellId), "test_connection" is the connection/auth smoke test, "preview_extract" samples a few assets end-to-end, "all" replays every cell in order (the closest thing to a full local test of the whole connector).',
+          'Start a notebook execution and return immediately — poll get_notebook_execution for the result. Modes: "cell" runs one cell (requires targetCellId), "test_connection" is the connection/auth smoke test, "preview_extract" samples a few assets end-to-end, "preview_augment" runs the augmentation notebook over a sample of real assets and reports per-asset diffs, "all" replays every cell in order (the closest thing to a full local test of the whole connector).',
         inputSchema: {
           sourceId: z.string().uuid(),
-          mode: z.enum(['cell', 'all', 'test_connection', 'preview_extract']),
+          scope: scopeSchema,
+          mode: z.enum([
+            'cell',
+            'all',
+            'test_connection',
+            'preview_extract',
+            'preview_augment',
+          ]),
           targetCellId: z
             .string()
             .optional()
@@ -1618,12 +1667,18 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async ({ sourceId, mode, targetCellId, maxAssets }) => {
+      async ({
+        sourceId,
+        scope = 'connector',
+        mode,
+        targetCellId,
+        maxAssets,
+      }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        const notebook = await this.notebookService.get(sourceId);
+        const notebook = await this.notebookService.get(sourceId, scope);
         const execution = await this.notebookExecutionService.create(
           sourceId,
-          { revision: notebook.revision, mode, targetCellId, maxAssets },
+          { revision: notebook.revision, mode, scope, targetCellId, maxAssets },
           'mcp',
         );
         return jsonResult(this.notebookExecutionService.toDto(execution));
@@ -1702,26 +1757,33 @@ export class McpServerFactoryService {
     );
   }
 
-  /** `optional.packages` / `optional.local_folders` live beside the notebook
-   * in source config, not inside it -- see the CustomOptional schema. */
-  private async notebookOptionalConfig(
+  /** Packages and local folders live beside their notebook in source config:
+   * `optional.*` for the connector (see the CustomOptional schema),
+   * `augmentation.*` for the augmentation notebook. */
+  private async notebookConfigSection(
     sourceId: string,
+    scope: 'connector' | 'augmentation' = 'connector',
   ): Promise<Record<string, any>> {
     const source = await this.requireSource(sourceId);
     const config = this.sourceService.decryptSourceConfig(source.config);
+    if (scope === 'augmentation') {
+      return ((config.augmentation ?? {}) as Record<string, any>) ?? {};
+    }
     return (config.optional ?? {}) as Record<string, any>;
   }
 
-  private async updateNotebookOptionalConfig(
+  private async updateNotebookConfigSection(
     sourceId: string,
+    scope: 'connector' | 'augmentation' = 'connector',
     patch: Record<string, unknown>,
   ) {
     const source = await this.requireSource(sourceId);
     const config = this.sourceService.decryptSourceConfig(source.config);
+    const key = scope === 'augmentation' ? 'augmentation' : 'optional';
     const merged = {
       ...config,
-      optional: {
-        ...((config.optional as Record<string, unknown>) ?? {}),
+      [key]: {
+        ...((config[key] as Record<string, unknown>) ?? {}),
         ...patch,
       },
     };
@@ -2622,9 +2684,17 @@ export class McpServerFactoryService {
       {
         title: 'Get Findings Discovery',
         description:
-          'Return discovery totals, activity, and top assets for findings.',
+          'Return discovery totals, review-state mix, activity, and top assets ' +
+          'for findings. Severity is a priority level, not a threat level — it says ' +
+          'how much a finding matters, not how dangerous it is.',
         inputSchema: {
-          windowDays: z.number().int().min(1).max(365).optional(),
+          // The rollup is keyed to these three windows and the HTTP DTO
+          // validates them; the MCP path bypasses that validator, so an
+          // arbitrary number here would silently produce a window nothing else
+          // in the product can reproduce.
+          windowDays: z
+            .union([z.literal(7), z.literal(30), z.literal(90)])
+            .optional(),
           includeResolved: z.boolean().optional(),
         },
         annotations: {

@@ -1,4 +1,5 @@
 import { type TranslationKey } from "@/i18n";
+import { STATUS_TONE } from "@/lib/status-tone";
 
 const CASE_STATUS_BADGE_LABELS = {
   OPEN: "cases.statusLabels.OPEN",
@@ -8,11 +9,10 @@ const CASE_STATUS_BADGE_LABELS = {
 } as const satisfies Record<string, TranslationKey>;
 
 const CASE_STATUS_BADGE_TONE = {
-  OPEN: "border-accent/30 bg-background text-accent",
-  IN_PROGRESS:
-    "border-orange-500/30 bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400",
-  CLOSED: "border-border bg-accent text-accent-foreground",
-  ARCHIVED: "border-border bg-muted text-muted-foreground",
+  OPEN: STATUS_TONE.active,
+  IN_PROGRESS: STATUS_TONE.progress,
+  CLOSED: STATUS_TONE.done,
+  ARCHIVED: STATUS_TONE.archived,
 } as const;
 
 type CaseStatusKey = keyof typeof CASE_STATUS_BADGE_LABELS;

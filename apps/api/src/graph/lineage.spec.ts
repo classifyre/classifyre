@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GraphService } from '../graph.service';
 import { PrismaService } from '../prisma.service';
+import { SourceGraphScheduler } from '../stats/source-graph-scheduler.service';
 
 /**
  * The behaviours that make lineage work, and that all failed silently before:
@@ -43,6 +44,12 @@ describe('GraphService lineage ingest', () => {
       providers: [
         GraphService,
         { provide: PrismaService, useValue: mockPrisma },
+        // Ingest asks for a connection-map rebuild; these tests assert on
+        // the SQL that reaches `edges`, not on that bookkeeping.
+        {
+          provide: SourceGraphScheduler,
+          useValue: { scheduleRebuild: jest.fn() },
+        },
       ],
     }).compile();
     service = module.get(GraphService);

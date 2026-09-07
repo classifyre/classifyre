@@ -96,6 +96,14 @@ export interface GraphCanvasProps {
   onNodeHover?: (node: GraphNodeDto | null) => void;
   /** Per-node visual extras (rings, dots, badges, fill) supplied by the view. */
   nodeDecorator?: NodeDecorator;
+  /**
+   * Rasterised source-type icons, keyed by source type.
+   *
+   * A cluster bubble that stands for a whole source is far easier to find on a
+   * busy map by its connector's mark than by reading five labels. Optional: a
+   * view that has no icons to offer draws the bubbles exactly as before.
+   */
+  sourceIcon?: (sourceType: string | undefined | null) => CanvasImageSource | null;
   /** Per-edge stroke override (e.g. similarity heat). */
   edgeStyle?: (edge: GraphEdgeDto) => EdgeStyleOverride | null;
   onNodeClick: (node: GraphNodeDto, shiftKey: boolean) => void;
@@ -126,6 +134,7 @@ export function GraphCanvas({
   hoverKey,
   onNodeHover,
   nodeDecorator,
+  sourceIcon,
   edgeStyle,
   onNodeClick,
   onNodeDoubleClick,
@@ -475,15 +484,43 @@ export function GraphCanvas({
           total: Object.values(meta.severityCounts).reduce((a, b) => a + b, 0),
         }));
 
+        // The connector's mark, when the bubble is big enough to carry one
+        // without crowding the count. Below ~30px radius the glyph would be
+        // under 10px and reads as noise, so the number keeps the whole circle.
+        const icon = sourceIcon?.(meta.dominantSourceType);
+        const iconSize = Math.round(r * 0.42);
+        const showIcon = Boolean(icon) && r >= 30;
+        const countOffset = showIcon ? Math.round(r * 0.26) : 0;
+
+        if (icon && showIcon) {
+          ctx.globalAlpha = (isDimmed ? 0.12 : 1) * 0.85;
+          ctx.drawImage(
+            icon,
+            x - iconSize / 2,
+            y - r * 0.52,
+            iconSize,
+            iconSize,
+          );
+          ctx.globalAlpha = isDimmed ? 0.12 : 1;
+        }
+
         ctx.fillStyle = colors.foreground;
         ctx.font = `bold ${Math.max(12, Math.round(r * 0.55))}px ${colors.fontMono}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(String(meta.assetCount || meta.size), x, y - (meta.findingCount > 0 ? 4 : 0));
+        ctx.fillText(
+          String(meta.assetCount || meta.size),
+          x,
+          y + countOffset - (meta.findingCount > 0 ? 4 : 0),
+        );
         if (meta.findingCount > 0) {
           ctx.fillStyle = sevColor ?? colors.mutedForeground;
           ctx.font = `bold 9.5px ${colors.fontMono}`;
-          ctx.fillText(`⚑ ${meta.findingCount}`, x, y + Math.max(10, r * 0.4));
+          ctx.fillText(
+            `⚑ ${meta.findingCount}`,
+            x,
+            y + countOffset + Math.max(10, r * 0.4),
+          );
         }
       } else if (isFinding) {
         const fillColor =
@@ -604,7 +641,7 @@ export function GraphCanvas({
   }, [
     nodes, edges, layout, simNodes, elementRef, transformRef,
     selection, mode, activeNodeKeys, path, hoverKey, nodeDecorator, edgeStyle,
-    connectSourceKey, isPinned,
+    connectSourceKey, isPinned, sourceIcon,
   ]);
 
   // ── Render loop (triggered by layout or panZoom changes) ────────────────

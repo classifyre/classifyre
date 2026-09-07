@@ -297,3 +297,106 @@ describe('NotebookService', () => {
     });
   });
 });
+
+describe('NotebookService augmentation scope', () => {
+  const AUGMENT_CELLS = [
+    {
+      id: 'enrich',
+      type: 'code' as const,
+      source: 'def augment(asset):\n    asset.set("join_key", "k")\n',
+    },
+  ];
+
+  function buildAugmentedService() {
+    const source = {
+      id: 'src-pg',
+      type: AssetType.POSTGRESQL,
+      config: {
+        type: 'POSTGRESQL',
+        required: { host: 'db.local' },
+        masked: { password: 'enc::v1::abc' },
+        augmentation: {
+          enabled: true,
+          notebook: { revision: 2, cells: AUGMENT_CELLS },
+          variables: { base_url: 'https://example.com' },
+          secrets: { api_token: 'enc::v1::def' },
+        },
+      },
+      runnerStatus: null,
+    };
+    const prisma = {
+      source: {
+        findUnique: jest.fn().mockResolvedValue(source),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ ...source, ...data }),
+          ),
+      },
+      notebookExecution: { findMany: jest.fn(), findUnique: jest.fn() },
+    };
+    const crypto = {
+      encryptMaskedConfig: jest.fn((value: Record<string, unknown>) => value),
+    };
+    return {
+      service: new NotebookService(prisma as never, crypto as never),
+      prisma,
+      crypto,
+    };
+  }
+
+  it('reads the augmentation notebook on a non-CUSTOM source', async () => {
+    const { service } = buildAugmentedService();
+    const notebook = await service.get('src-pg', 'augmentation');
+    expect(notebook.revision).toBe(2);
+    expect(notebook.cells).toHaveLength(1);
+    expect(notebook.variables).toEqual({ base_url: 'https://example.com' });
+    expect(notebook.secretKeys).toEqual(['api_token']);
+    expect(JSON.stringify(notebook)).not.toContain('enc::v1::def');
+  });
+
+  it('still rejects the connector scope on a non-CUSTOM source', async () => {
+    const { service } = buildAugmentedService();
+    await expect(service.get('src-pg', 'connector')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('saves the augmentation notebook without touching the source type', async () => {
+    const { service, prisma, crypto } = buildAugmentedService();
+    const result = await service.update(
+      'src-pg',
+      { baseRevision: 2, cells: AUGMENT_CELLS },
+      'augmentation',
+    );
+    expect(result).toEqual({ revision: 3 });
+    const saved = crypto.encryptMaskedConfig.mock.calls[0][0] as Record<
+      string,
+      any
+    >;
+    expect(saved.type).toBe('POSTGRESQL');
+    expect(saved.required).toEqual({ host: 'db.local' });
+    expect(saved.augmentation.notebook.revision).toBe(3);
+    expect(saved.augmentation.enabled).toBe(true);
+    expect(prisma.source.update).toHaveBeenCalled();
+  });
+
+  it('serves augmentation templates with augment() defined', () => {
+    const { service } = buildAugmentedService();
+    const templates = service.templates('augmentation');
+    expect(templates.length).toBeGreaterThan(1);
+    for (const template of templates) {
+      const code = template.cells.map((cell) => cell.source).join('\n');
+      expect(code).toContain('def augment(');
+    }
+    const names = templates.map((template) => template.name);
+    expect(names).toContain('Starter notebook');
+  });
+
+  it('scaffolds the augmentation starter', () => {
+    const { service } = buildAugmentedService();
+    const { cells } = service.scaffold('augmentation');
+    expect(cells.length).toBeGreaterThan(0);
+    expect(cells[0].type).toBe('markdown');
+  });
+});

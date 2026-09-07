@@ -8,9 +8,16 @@
  * sitemap routes 404 and robots.txt disallows everything.
  *
  * URL shapes live here and nowhere else. They must match the App Router tree
- * under `apps/web/app/[namespaceSlug]/(dashboard)` and the entity registry in
+ * under `apps/web/app/[locale]/[namespaceSlug]/(dashboard)` and the entity registry in
  * `apps/api/src/sitemap/sitemap.entities.ts`.
  */
+
+import {
+  DEFAULT_LOCALE,
+  LOCALES,
+  localePathPrefix,
+  type Locale,
+} from "./locale-detection";
 
 /** Entity kinds with a detail page. Mirrors the API's `SitemapEntityType`. */
 export const SITEMAP_ENTITY_TYPES = [
@@ -114,18 +121,29 @@ export const GLOBAL_STATIC_PATHS: ReadonlyArray<{
   { path: "/docs", changeFrequency: "weekly", priority: 0.7 },
 ];
 
-/** Paths crawlers should never spend budget on, or that leak nothing useful. */
-export const ROBOTS_DISALLOW = [
-  "/api/",
-  "/classifyre-usr/",
-  "/classifyre-cfg/",
-  "/remote/",
-  "/namespaces/",
+/**
+ * Paths crawlers should never spend budget on, or that leak nothing useful.
+ *
+ * The namespace-scoped patterns wildcard exactly one segment — the namespace
+ * slug — so each needs a sibling with an extra wildcard to also cover the
+ * locale-prefixed form (`/de/<ns>/settings/`).
+ */
+const NAMESPACE_SCOPED_DISALLOW = [
   "/*/settings/",
   "/*/notifications/",
   "/*/new/",
   "/*/edit/",
 ] as const;
+
+export const ROBOTS_DISALLOW: readonly string[] = [
+  "/api/",
+  "/classifyre-usr/",
+  "/classifyre-cfg/",
+  "/remote/",
+  "/namespaces/",
+  ...NAMESPACE_SCOPED_DISALLOW,
+  ...NAMESPACE_SCOPED_DISALLOW.map((pattern) => `/*${pattern}`),
+];
 
 export const DEFAULT_SITEMAP_CHUNK_SIZE = 10_000;
 const MIN_CHUNK_SIZE = 100;
@@ -204,12 +222,13 @@ export function appUrl(
   baseUrl: string,
   namespaceSlug: string | null,
   path: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const namespace = namespaceSlug
     ? `/${encodeURIComponent(namespaceSlug)}`
     : "";
   const suffix = path === "" || path === "/" ? "" : path;
-  return `${baseUrl}${namespace}${suffix}/`;
+  return `${baseUrl}${localePathPrefix(locale)}${namespace}${suffix}/`;
 }
 
 /** Absolute URL of an entity's detail page. */
@@ -218,8 +237,49 @@ export function entityUrl(
   namespaceSlug: string,
   type: SitemapEntityType,
   id: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
-  return appUrl(baseUrl, namespaceSlug, ENTITY_CONFIG[type].path(id));
+  return appUrl(baseUrl, namespaceSlug, ENTITY_CONFIG[type].path(id), locale);
+}
+
+export interface SitemapAlternate {
+  hreflang: string;
+  href: string;
+}
+
+/**
+ * `hreflang` alternates for one page.
+ *
+ * A page appears in the sitemap **once**, under its default-locale URL, with
+ * an alternate per locale plus `x-default` — not once per locale. That is the
+ * shape search engines expect, and it keeps the URL count independent of how
+ * many languages the app grows.
+ */
+export function localeAlternates(
+  baseUrl: string,
+  namespaceSlug: string | null,
+  path: string,
+): SitemapAlternate[] {
+  return [
+    ...LOCALES.map((locale) => ({
+      hreflang: locale,
+      href: appUrl(baseUrl, namespaceSlug, path, locale),
+    })),
+    {
+      hreflang: "x-default",
+      href: appUrl(baseUrl, namespaceSlug, path, DEFAULT_LOCALE),
+    },
+  ];
+}
+
+/** {@link localeAlternates} for an entity's detail page. */
+export function entityAlternates(
+  baseUrl: string,
+  namespaceSlug: string,
+  type: SitemapEntityType,
+  id: string,
+): SitemapAlternate[] {
+  return localeAlternates(baseUrl, namespaceSlug, ENTITY_CONFIG[type].path(id));
 }
 
 export function entityChangeFrequency(type: SitemapEntityType): ChangeFrequency {
@@ -320,6 +380,7 @@ export interface SitemapUrlEntry {
   lastModified?: string | null;
   changeFrequency?: ChangeFrequency;
   priority?: number;
+  alternates?: SitemapAlternate[];
 }
 
 export interface SitemapIndexEntry {
@@ -339,12 +400,17 @@ export function renderUrlSet(entries: SitemapUrlEntry[]): string {
       if (entry.priority !== undefined) {
         parts.push(`    <priority>${entry.priority.toFixed(1)}</priority>`);
       }
+      for (const alternate of entry.alternates ?? []) {
+        parts.push(
+          `    <xhtml:link rel="alternate" hreflang="${escapeXml(alternate.hreflang)}" href="${escapeXml(alternate.href)}" />`,
+        );
+      }
       return `  <url>\n${parts.join("\n")}\n  </url>`;
     })
     .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
 ${body}
 </urlset>
 `;

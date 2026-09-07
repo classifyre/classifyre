@@ -1,0 +1,180 @@
+---
+title: Augmentation Notebook Reference
+description: The augment() / setup() / finalize() contract, the asset and ctx surfaces, lazy payload per source family, the debugging loop, and troubleshooting.
+---
+
+import { Callout } from "nextra/components";
+
+# Augmentation Notebook Reference
+
+The complete augmentation contract. For what augmentation is and when to reach
+for it instead of a detector or a custom connector, start with
+**[Source Augmentation](/sources/augmentation/)**.
+
+The notebook shares its SDK with custom connectors — `Ref`, `flow`,
+`contains`, `references`, `same_as`, `uses`, `urn_for`, `FlowType` — so this
+page covers only what augmentation adds or changes, and cross-links the
+[Custom Connector Notebook Reference](/sources/custom-connectors/reference/)
+for the rest.
+
+Every name lives in one module, and is pre-bound in every cell whether or not
+you import it:
+
+```python
+from classifyre import (
+    ctx,                                             # AugmentContext: var, secret, state, source
+    Ref, FlowType, urn_for,                          # naming things
+    flow, contains, references, same_as, uses,       # relationships
+)
+```
+
+The editor's autocomplete is generated from this same SDK, so `ctx.` and
+`asset.` always offer what actually exists. If something here disagrees with
+what the editor shows, trust the editor.
+
+---
+
+## The three functions
+
+```python
+def setup():
+    """Once, before the first asset. Build lookup tables into ctx.state."""
+
+def augment(asset):
+    """Required. Enrich one asset; may yield relationship edges."""
+
+def finalize():
+    """Once, at the end. May yield edges; both sides are only known now."""
+```
+
+`setup()` and `finalize()` are optional; `augment(asset)` is required. With
+`max_workers > 1` each worker runs its own `setup()`, and `finalize()` runs on
+every worker — state in `ctx.state` is per worker, not global.
+
+---
+
+## Reading: the asset as the connector produced it
+
+```python
+asset.hash        # stable id, e.g. for Ref.asset(asset.hash)
+asset.id          # the connector's own id (external_id when known)
+asset.name        # "orders.csv", "PROD.PUBLIC.ORDERS", ...
+asset.kind        # file, table, page, message, ...
+asset.url         # external URL when the connector sets one
+asset.urn         # the connector's URN, or None
+asset.source_type # "POSTGRESQL", "S3_COMPATIBLE_STORAGE", ...
+asset.metadata    # read-only view of the connector's own metadata
+asset.ref         # Ref.asset(asset.hash), for edge builders
+asset.mime_type   # when known
+```
+
+---
+
+## Reading: lazy payload, paid only when called
+
+Each accessor fetches from the parent on first call and memoizes. "Payload" is
+not one shape — this table is where the unification happens:
+
+| Source family | `payload()` | `raw_pages()` / `rows()` |
+|---|---|---|
+| Object storage, files, Git, HF, local folder | the object's bytes | — |
+| SQL / tabular | `None` | one JSON record per row |
+| Elasticsearch / OpenSearch / Mongo / Neo4j / Kafka / Meilisearch | `None` | one JSON document per page |
+| API sources (Jira, Confluence, Slack, Notion, WordPress, …) | `None` | the original markup |
+| CUSTOM | `content_bytes`, when the notebook set it | the notebook's `content` |
+
+```python
+asset.payload()    # raw source bytes, or None for row-shaped sources
+asset.raw_pages()  # the connector's raw representation, page by page
+asset.rows()       # dict rows, when raw_pages() is JSON records; else empty
+asset.text()       # extracted text, whole (capped)
+asset.pages()      # extracted text, page by page
+```
+
+`rows()` parses `raw_pages()` — one JSON object, an array of objects, or
+JSON-lines per page — and yields dicts. Anything else yields nothing: this is
+empty, not an error, on sources with no record shape.
+
+---
+
+## Writing: additive only
+
+```python
+def augment(asset):
+    # Metadata — lands under metadata["augmentation"], never touching connector keys.
+    asset.set("join_key", "customer:acme-42")
+
+    # Tags — each key needs a Tag detector with the same key, or it is skipped
+    # with a warning.
+    asset.tag("legal_hold", "retained-pending-litigation")
+
+    # Links — untyped "related" edges by asset hash.
+    asset.link(other_hash)
+
+    # URN — kept only when the connector left it empty.
+    asset.set_urn(urn_for("snowflake", "acme", "PROD", "PUBLIC", "ORDERS"))
+
+    # Lineage — exactly as a custom connector yields it.
+    yield flow(
+        upstream=Ref.urn(urn_for("s3", "landing", "orders.csv")),
+        downstream=asset.ref,
+        type=FlowType.COPY,
+    )
+```
+
+`setup()` runs once before the first asset — build lookup tables into
+`ctx.state`. `finalize()` runs once at the end and may yield edges: this is
+where "link two assets by a computed hash" lands, since both sides are only
+known once every asset has been seen.
+
+---
+
+## `ctx`: configuration and run state
+
+Everything the connector context offers (`var`, `secret`, `files`, `folder`,
+`sampling`, `log`, …) works unchanged, plus:
+
+```python
+ctx.state   # your own dict — survives across assets in this run
+ctx.source  # {"type": "POSTGRESQL", "source_id": ...} — what you augment
+```
+
+Secrets live in the augmentation section (`ctx.secret("name")`), encrypted at
+rest and redacted from logs and cell output — the same guarantees as the
+connector's own credentials.
+
+---
+
+## Debugging loop
+
+1. Write helpers with `cell` / `all` — the augmentation vocabulary bound, no
+   asset, ordinary `print()` debugging.
+2. **Run sample** (`preview_augment`) — `setup()` / `augment()` / `finalize()`
+   over a random sample of real assets (default 5, max 25). The answer is a
+   per-asset diff: metadata added, tags asserted and whether each key matches
+   a live Tag detector, links added, edges yielded. Read-only: no sink, no run
+   record, no ingestion.
+3. Scan, then check the run summary's augmentation counters and the scan
+   warnings.
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Tag silently missing from findings | No Tag detector with that key | Create a Tag detector with the same key; the preview names unmatched keys |
+| Asset ingested unchanged + warning | The notebook raised, timed out, or the patch was malformed | Read the warning; fix the cell; re-run |
+| Warnings stop mid-run + "disabled" in summary | `max_consecutive_failures` tripped | Fix the systematic error (often a bad secret or import); re-run |
+| `payload()` is `None` | Row-shaped source — there are no bytes | Use `rows()` / `raw_pages()` instead |
+| `rows()` is empty | Raw pages are not JSON records (markup, text) | Use `raw_pages()` or `text()` instead |
+| Cache does not pick up a code edit | Stale scan cache | It invalidates automatically on revision change — check the notebook saved (revision bumped) |
+| Recipe too large error | Connector + augmentation notebooks exceed 128 KB compressed | Split cells or move bulk data into a notebook file |
+| `finalize()` sees half the assets | `max_workers > 1` shards state per worker | Keep `max_workers: 1` when `finalize()` needs global state |
+
+<Callout type="info">
+  Only `flow()` is lineage, and only it answers "what breaks if this changes".
+  `contains()`, `references()` and `same_as()` are not interchangeable with it —
+  the edge vocabulary is the same one custom connectors use, with the same
+  meanings.
+</Callout>

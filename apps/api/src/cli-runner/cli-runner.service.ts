@@ -347,6 +347,55 @@ export class CliRunnerService {
    * Invoked by the NamespaceWorkerManager inside the namespace's CLS context
    * (was onApplicationBootstrap, which ran without a tenant schema).
    */
+  /**
+   * Drop in-flight runners whose execution is gone, at any time — not only at
+   * startup.
+   *
+   * `reconcileOnStartup` does exactly the right check and does it exactly
+   * once. A Kubernetes Job can disappear long after boot (TTL cleanup, an
+   * evicted node, or the job finishing while this process was being
+   * redeployed), and nothing looked again. The runner row stayed `RUNNING`
+   * forever, and because the adaptive scheduler budgets on
+   * `source.runnerStatus`, each orphan permanently consumed a slot.
+   *
+   * Observed live: four sources marked RUNNING against **one** surviving Job,
+   * every slot taken, no source able to start, and no error anywhere — the
+   * namespace simply went quiet. Returns how many it retired so the caller can
+   * decide whether that was worth logging.
+   */
+  async reconcileStaleInFlight(): Promise<number> {
+    const inFlight = await this.prisma.runner.findMany({
+      where: { status: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] } },
+      select: {
+        id: true,
+        sourceId: true,
+        status: true,
+        executionMode: true,
+        jobName: true,
+        jobNamespace: true,
+      },
+    });
+
+    let retired = 0;
+    for (const runner of inFlight) {
+      if (await this.isRunnerExecutionActive(runner)) continue;
+      retired += 1;
+      await this.markRunnerAsOrphaned(
+        runner.id,
+        runner.sourceId,
+        'Runner was orphaned (its execution no longer exists)',
+      );
+    }
+    if (retired > 0) {
+      await this.reconcileRunningSources();
+      this.logger.warn(
+        `Retired ${retired} in-flight runner(s) whose execution had vanished; ` +
+          'they were holding scheduler capacity.',
+      );
+    }
+    return retired;
+  }
+
   async reconcileOnStartup(): Promise<void> {
     const inFlightRunners = await this.prisma.runner.findMany({
       where: {
@@ -905,13 +954,26 @@ export class CliRunnerService {
     // a notebook — Asset(tags={"<key>": "<value>"}) — and that key has to resolve
     // at scan time or the tag is dropped with a warning. Sending every active
     // one costs nothing: a tag detector loads no model and never reads content.
+    //
+    // Augmentation asserts tags on any source type, so the condition is CUSTOM
+    // *or* augmentation enabled. Without this the tag path is dead on both ends
+    // for a known source and every tag silently becomes a "matches no Tag
+    // detector" warning.
     const isCustomSource =
       String(recipe?.type || '')
         .trim()
         .toUpperCase() === 'CUSTOM';
-    const runtimeTagDetectors = isCustomSource
-      ? await this.customDetectorsService.buildRuntimeTagDetectors()
-      : [];
+    const augmentation = (recipe as Record<string, any> | null | undefined)?.[
+      'augmentation'
+    ];
+    const isAugmentationEnabled =
+      typeof augmentation === 'object' &&
+      augmentation !== null &&
+      (augmentation as Record<string, unknown>)['enabled'] === true;
+    const runtimeTagDetectors =
+      isCustomSource || isAugmentationEnabled
+        ? await this.customDetectorsService.buildRuntimeTagDetectors()
+        : [];
 
     // Merge all three sets, deduplicating by key (key-based wins over id-based).
     const seenKeys = new Set<string>();
@@ -1653,7 +1715,17 @@ export class CliRunnerService {
     }
 
     const decryptedConfig = this.toDecryptedRecipeConfig(source.config);
-    const request = { ...params.request, recipe: decryptedConfig };
+    // preview_augment reports whether each asserted tag matches a live Tag
+    // detector, so it needs the same hydrated recipe a scan gets. Other
+    // notebook modes never read detectors, and stay on the stored recipe.
+    const recipe =
+      String(params.request.mode || '') === 'preview_augment'
+        ? await this.hydrateCustomDetectorsForRun(
+            params.sourceId,
+            decryptedConfig,
+          )
+        : decryptedConfig;
+    const request = { ...params.request, recipe };
     const environment = process.env.ENVIRONMENT || 'development';
 
     // `validate` parses and contract-checks without running a cell, so nothing

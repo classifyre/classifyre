@@ -39,7 +39,6 @@ import {
   type StartRunnerDto,
 } from "@workspace/api-client";
 import {
-  Badge,
   Button,
   Checkbox,
   EmptyState,
@@ -68,6 +67,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  ToneBadge,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -660,7 +660,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
 
       {selectionCount > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[4px] border-2 border-accent/30 bg-background px-4 py-2.5">
-          <span className="font-mono text-xs text-accent">
+          <span className="font-mono text-xs text-accent-ink">
             {isAllSelected
               ? t("sources.bulkUpdate.allSelected", {
                   count: selectionCount.toLocaleString(),
@@ -888,14 +888,14 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-1.5">
                             <SourceTypeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                            <Badge variant="outline" className="rounded-[4px]">
+                            <ToneBadge tone="neutral">
                               {getSourceLabel(source.type)}
-                            </Badge>
+                            </ToneBadge>
                           </div>
                           {source.scheduleEnabled && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="flex items-center gap-1 text-[11px] text-[#4a7c00] font-medium cursor-default">
+                                <div className="flex cursor-default items-center gap-1 text-[11px] font-medium text-accent-ink">
                                   <CalendarClock className="h-3 w-3" />
                                   {formatCronSchedule(source.scheduleCron, t)}
                                 </div>
@@ -937,25 +937,18 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                       <TableCell className="py-3">
                         {runner ? (
                           <div className="flex flex-wrap gap-1.5">
+                            {/* "created" and "updated" are the same two states
+                                the assets table calls NEW and UPDATED — same
+                                tones, so the two pages agree. */}
                             {runner.assetsCreated > 0 && (
-                              <Badge
-                                variant="outline"
-                                className="gap-1 text-[11px]"
-                              >
-                                <span className="text-emerald-600">
-                                  +{runner.assetsCreated}
-                                </span>
-                              </Badge>
+                              <ToneBadge tone="fresh">
+                                +{runner.assetsCreated.toLocaleString()}
+                              </ToneBadge>
                             )}
                             {runner.assetsUpdated > 0 && (
-                              <Badge
-                                variant="outline"
-                                className="gap-1 text-[11px]"
-                              >
-                                <span className="text-blue-500">
-                                  ~{runner.assetsUpdated}
-                                </span>
-                              </Badge>
+                              <ToneBadge tone="changed">
+                                ~{runner.assetsUpdated.toLocaleString()}
+                              </ToneBadge>
                             )}
                             {runner.totalFindings > 0 && (
                               <Tooltip>
@@ -984,12 +977,12 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                             {runner.errorMessage && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Badge
-                                    variant="destructive"
-                                    className="text-[11px] cursor-default"
+                                  <ToneBadge
+                                    tone="error"
+                                    className="cursor-default"
                                   >
                                     {t("common.statusError")}
-                                  </Badge>
+                                  </ToneBadge>
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-[300px] break-words">
                                   {runner.errorMessage}

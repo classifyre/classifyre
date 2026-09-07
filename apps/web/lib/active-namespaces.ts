@@ -1,3 +1,5 @@
+import { stripLocalePrefix } from "@/lib/locale-detection";
+
 export const ACTIVE_NAMESPACES_STORAGE_KEY = "classifyre.active-namespaces.v1";
 
 export interface ActiveNamespace {
@@ -16,14 +18,18 @@ function namespaceRoot(slug: string): string {
   return `/${encodeURIComponent(slug)}`;
 }
 
+/**
+ * A tab href belongs to `slug` when the namespace is its first segment — after
+ * an optional locale prefix, so `/de/acme/findings` is still an `acme` tab and
+ * is not dropped as malformed on the next read.
+ */
 function isNamespaceHref(href: string, slug: string): boolean {
   const root = namespaceRoot(slug);
-  return (
-    href === root ||
-    href.startsWith(`${root}/`) ||
-    href.startsWith(`${root}?`) ||
-    href.startsWith(`${root}#`)
-  );
+  // Query and hash are not part of the path; drop them so the locale prefix
+  // can be stripped from the path alone.
+  const [path = ""] = href.split(/[?#]/);
+  const { rest } = stripLocalePrefix(path);
+  return rest === root || rest.startsWith(`${root}/`);
 }
 
 function parseActiveNamespace(value: unknown): ActiveNamespace | null {

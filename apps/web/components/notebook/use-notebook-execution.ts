@@ -109,7 +109,13 @@ export function useNotebookExecution(sourceId: string) {
   const run = React.useCallback(
     async (request: {
       revision: number;
-      mode: "cell" | "all" | "test_connection" | "preview_extract";
+      mode:
+        | "cell"
+        | "all"
+        | "test_connection"
+        | "preview_extract"
+        | "preview_augment";
+      scope?: "connector" | "augmentation";
       targetCellId?: string;
       maxAssets?: number;
     }) => {
@@ -248,10 +254,25 @@ export function summarizeExecution(
 
   const assets = record.outputs?.assets;
   if (Array.isArray(assets)) {
-    lines.push(
-      `extract() produced ${assets.length} asset(s).`,
-      assets.length > 0 ? clip(JSON.stringify(assets.slice(0, 3)), 1200) : "",
-    );
+    if (record.mode === "preview_augment") {
+      lines.push(`augment() ran over ${assets.length} real asset(s).`);
+      for (const sample of assets.slice(0, 5)) {
+        const entry = (sample ?? {}) as Record<string, unknown>;
+        const tags = entry.tags as Record<string, unknown> | undefined;
+        lines.push(
+          `- ${String(entry.name ?? entry.hash ?? "?")}: ` +
+            `metadata+${Object.keys((entry.metadataAdded ?? {}) as object).length}, ` +
+            `tags+${Object.keys(tags ?? {}).length}, ` +
+            `links+${((entry.linksAdded ?? []) as unknown[]).length}, ` +
+            `edges+${Number(entry.edges ?? 0)}`,
+        );
+      }
+    } else {
+      lines.push(
+        `extract() produced ${assets.length} asset(s).`,
+        assets.length > 0 ? clip(JSON.stringify(assets.slice(0, 3)), 1200) : "",
+      );
+    }
   }
 
   return lines.filter(Boolean).join("\n");

@@ -7,6 +7,7 @@ import {
   getRunnerStatusBadgeTone,
   isRunnerStatusRunning,
 } from "@/lib/runner-status-badge";
+import { statusBadgeClass } from "@/lib/status-tone";
 
 interface RunnerStatusBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   status?: string | null;
@@ -17,7 +18,8 @@ export function RunnerStatusBadge({ status, className, ...props }: RunnerStatusB
 
   return (
     <Badge
-      className={`rounded-[4px] border ${getRunnerStatusBadgeTone(status)} ${className || ""}`}
+      variant="outline"
+      className={`${statusBadgeClass} ${getRunnerStatusBadgeTone(status)} ${className || ""}`}
       {...props}
     >
       {isRunnerStatusRunning(status) && (
