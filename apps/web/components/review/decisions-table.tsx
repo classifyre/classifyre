@@ -247,7 +247,7 @@ export function DecisionsTable({ onChanged }: { onChanged: () => void }) {
 
       {selected.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[4px] border-2 border-accent/30 bg-background px-4 py-2.5">
-          <span className="font-mono text-xs text-accent">
+          <span className="font-mono text-xs text-accent-ink">
             {t("review.decisions.selected", { count: selected.length })}
           </span>
           <Button

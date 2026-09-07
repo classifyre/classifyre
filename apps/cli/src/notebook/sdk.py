@@ -88,6 +88,13 @@ class Asset:
     #: other source's lineage point here, and what lets your ``Ref.urn(...)``
     #: point there. Build one with ``urn_for(...)`` so the spelling matches.
     urn: str | None = None
+    #: Facts this connector already knows, keyed by the *key of a Tag detector*:
+    #: ``tags={"cardholder_data": "primary-account-numbers"}``. Each entry becomes
+    #: a finding on this asset with that detector's label and severity. Use it
+    #: when the source system already has the answer and running a classifier
+    #: over the content could only re-derive it less reliably. A key with no
+    #: matching Tag detector is reported as a scan warning and skipped.
+    tags: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.id = str(self.id).strip()
@@ -114,6 +121,55 @@ class Asset:
                 f"{type(self.content_bytes).__name__}); encode text first"
             )
         self.links = [str(link) for link in self.links if str(link).strip()]
+        self.tags = _normalize_tags(self.tags)
+
+
+def _normalize_tags(value: Any) -> dict[str, str]:
+    """Accept the two shapes an author reasonably writes, reject the rest.
+
+    A dict is the ordinary case. A sequence of pairs is accepted because it is
+    what someone reaches for to assert two values under one key, and silently
+    keeping only the last one would be worse than supporting it.
+    """
+    if not value:
+        return {}
+    if isinstance(value, Mapping):
+        items: Iterable[Any] = value.items()
+    elif isinstance(value, str | bytes):
+        raise TypeError(
+            "Asset.tags must be a dict of {detector key: value}, e.g. "
+            'tags={"cardholder_data": "primary-account-numbers"} -- got a string'
+        )
+    else:
+        try:
+            items = list(value)
+        except TypeError:
+            raise TypeError(
+                f"Asset.tags must be a dict of {{detector key: value}} (got {type(value).__name__})"
+            ) from None
+
+    tags: dict[str, str] = {}
+    for item in items:
+        if isinstance(item, Mapping):
+            pair: Any = (item.get("key"), item.get("value"))
+        else:
+            pair = item
+        try:
+            key, tag_value = pair
+        except (TypeError, ValueError):
+            raise TypeError(
+                f"Asset.tags entries must be (detector key, value) pairs; got {item!r}"
+            ) from None
+        key = str(key or "").strip()
+        tag_value = str("" if tag_value is None else tag_value).strip()
+        if not key or not tag_value:
+            continue
+        # Several values under one key are joined rather than dropped: two
+        # assertions about the same asset are both true, and keeping the last
+        # one silently would lose the other.
+        existing = tags.get(key)
+        tags[key] = f"{existing}, {tag_value}" if existing else tag_value
+    return tags
 
 
 def urn_for(platform: str, authority: str, *path: str) -> str:
@@ -196,6 +252,8 @@ class Context:
         self._offset = int(offset or 0)
         self._offset_consumed = False
         self._next_cursor: dict[str, Any] | None = None
+        self._partial_coverage: bool = False
+        self._partial_coverage_reason: str = ""
         self._logger = logger or print
         self._should_abort = should_abort or (lambda: False)
 
@@ -357,13 +415,49 @@ class Context:
     def set_cursor(self, cursor: Mapping[str, Any]) -> None:
         """Record where this run got to, for the next run to resume from.
 
-        Only meaningful under AUTOMATIC sampling; other strategies ignore it.
+        Honoured under every sampling strategy. It used to be kept only under
+        AUTOMATIC, which meant a connector that wanted run-to-run state had to
+        adopt a sampling strategy chosen for something else entirely -- and one
+        that changes deletion semantics, since under AUTOMATIC an absent asset
+        no longer implies a deleted one. Worse, the discard was silent: the call
+        succeeded, the notebook believed it had saved state, and the next run
+        started from nothing.
         """
         self._next_cursor = dict(cursor)
 
     @property
     def next_cursor(self) -> dict[str, Any] | None:
         return None if self._next_cursor is None else dict(self._next_cursor)
+
+    def set_partial_coverage(self, reason: str = "") -> None:
+        """Declare that this run looked at only part of the source.
+
+        Call it from any connector that chooses its own cohort -- a change
+        feed, a resumable sweep, a date window, an API with no "list
+        everything" operation. Absence from this run then proves nothing and
+        no asset is retired.
+
+        The sampling strategy cannot say this on a connector's behalf: it
+        describes what the runtime does with the stream you yield, not how much
+        of the source you decided to ask for. A cohort connector under
+        strategy=ALL is telling the platform it visited everything, and the
+        platform believes it -- every asset outside this run's cohort is marked
+        DELETED and its findings auto-resolved. On the Firmenbuch corpus that
+        was 51,860 assets and 208,639 findings, none of them actually gone.
+
+        Idempotent, and safe to call before you know how much you covered.
+        """
+        self._partial_coverage = True
+        if reason:
+            self._partial_coverage_reason = str(reason)
+
+    @property
+    def partial_coverage(self) -> bool:
+        return self._partial_coverage
+
+    @property
+    def partial_coverage_reason(self) -> str:
+        return self._partial_coverage_reason
 
     @property
     def should_abort(self) -> bool:

@@ -13,6 +13,7 @@ import {
   type CaseResponseDto,
 } from "@workspace/api-client";
 import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severity";
+import { cn } from "@workspace/ui/lib/utils";
 import {
   EmptyState,
   Input,
@@ -69,15 +70,32 @@ function getPageItems(current: number, total: number) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function CasesTable() {
+export interface CasesTableProps {
+  /**
+   * `full` is the investigations page: filters, pagination, the lot.
+   *
+   * `compact` is the dashboard card — the same table, the same badges, the same
+   * row click-through, with the filter bar and the pager dropped and the row
+   * count fixed. The dashboard used to hand-roll its own case list, which is
+   * how it ended up with a different status badge than the page it links to.
+   */
+  variant?: "full" | "compact";
+  /** Rows to show in `compact`. Ignored in `full`, which pages instead. */
+  limit?: number;
+}
+
+export function CasesTable({ variant = "full", limit = 6 }: CasesTableProps = {}) {
   const { t } = useTranslation();
   const router = useRouter();
+  const isCompact = variant === "compact";
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statuses, setStatuses] = useState<string[]>([]);
   const [severities, setSeverities] = useState<string[]>([]);
-  const [pageSize, setPageSize] = useState(String(DEFAULT_PAGE_SIZE));
+  const [pageSize, setPageSize] = useState(
+    String(isCompact ? limit : DEFAULT_PAGE_SIZE),
+  );
   const [page, setPage] = useState(1);
 
   const [data, setData] = useState<CaseResponseDto[]>([]);
@@ -172,8 +190,9 @@ export function CasesTable() {
   const showInitialLoading = isLoading && !initialized;
 
   return (
-    <div className="space-y-5">
+    <div className={isCompact ? "flex min-h-0 flex-1 flex-col" : "space-y-5"}>
       {/* ── Filter bar ── */}
+      {!isCompact && (
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[240px] flex-[1.6]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -249,6 +268,7 @@ export function CasesTable() {
           </span>
         )}
       </div>
+      )}
 
       {error && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
@@ -257,7 +277,11 @@ export function CasesTable() {
       )}
 
       {/* ── Table ── */}
-      <div className="relative min-h-[360px]">
+      <div
+        className={
+          isCompact ? "relative min-h-0 flex-1" : "relative min-h-[360px]"
+        }
+      >
         {showInitialLoading ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -270,7 +294,12 @@ export function CasesTable() {
             description={t("cases.noInvestigationsHint")}
           />
         ) : (
-          <div className="max-h-[70vh] overflow-auto rounded-[4px] bg-white dark:bg-card">
+          <div
+            className={cn(
+              "overflow-auto rounded-[4px] bg-white dark:bg-card",
+              isCompact ? "max-h-full" : "max-h-[70vh]",
+            )}
+          >
             <Table>
               <TableHeader className="sticky top-0 z-20 bg-white/95 dark:bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-card/80">
                 <TableRow>
@@ -395,6 +424,7 @@ export function CasesTable() {
       </div>
 
       {/* ── Footer: page size + pagination ── */}
+      {!isCompact && (
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t pt-3">
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
@@ -477,6 +507,7 @@ export function CasesTable() {
           </Pagination>
         )}
       </div>
+      )}
     </div>
   );
 }

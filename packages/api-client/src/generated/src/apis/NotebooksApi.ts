@@ -51,10 +51,12 @@ export interface NotebookControllerCreateExecutionRequest {
 
 export interface NotebookControllerExportPythonRequest {
     sourceId: string;
+    scope?: NotebookControllerExportPythonScopeEnum;
 }
 
 export interface NotebookControllerGetRequest {
     sourceId: string;
+    scope?: NotebookControllerGetScopeEnum;
 }
 
 export interface NotebookControllerGetExecutionRequest {
@@ -66,9 +68,18 @@ export interface NotebookControllerListExecutionsRequest {
     limit: string;
 }
 
+export interface NotebookControllerScaffoldRequest {
+    scope?: NotebookControllerScaffoldScopeEnum;
+}
+
+export interface NotebookControllerTemplatesRequest {
+    scope?: NotebookControllerTemplatesScopeEnum;
+}
+
 export interface NotebookControllerUpdateRequest {
     sourceId: string;
     updateNotebookDto: UpdateNotebookDto;
+    scope?: NotebookControllerUpdateScopeEnum;
 }
 
 /**
@@ -177,6 +188,10 @@ export class NotebooksApi extends runtime.BaseAPI {
 
         const queryParameters: any = {};
 
+        if (requestParameters['scope'] != null) {
+            queryParameters['scope'] = requestParameters['scope'];
+        }
+
         const headerParameters: runtime.HTTPHeaders = {};
 
 
@@ -202,7 +217,7 @@ export class NotebooksApi extends runtime.BaseAPI {
     }
 
     /**
-     * Read a CUSTOM source\'s notebook
+     * Read a source\'s notebook
      */
     async notebookControllerGetRaw(requestParameters: NotebookControllerGetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<NotebookDto>> {
         if (requestParameters['sourceId'] == null) {
@@ -213,6 +228,10 @@ export class NotebooksApi extends runtime.BaseAPI {
         }
 
         const queryParameters: any = {};
+
+        if (requestParameters['scope'] != null) {
+            queryParameters['scope'] = requestParameters['scope'];
+        }
 
         const headerParameters: runtime.HTTPHeaders = {};
 
@@ -231,7 +250,7 @@ export class NotebooksApi extends runtime.BaseAPI {
     }
 
     /**
-     * Read a CUSTOM source\'s notebook
+     * Read a source\'s notebook
      */
     async notebookControllerGet(requestParameters: NotebookControllerGetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<NotebookDto> {
         const response = await this.notebookControllerGetRaw(requestParameters, initOverrides);
@@ -326,8 +345,12 @@ export class NotebooksApi extends runtime.BaseAPI {
     /**
      * The starter cells and the functions a notebook must define
      */
-    async notebookControllerScaffoldRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<NotebookScaffoldDto>> {
+    async notebookControllerScaffoldRaw(requestParameters: NotebookControllerScaffoldRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<NotebookScaffoldDto>> {
         const queryParameters: any = {};
+
+        if (requestParameters['scope'] != null) {
+            queryParameters['scope'] = requestParameters['scope'];
+        }
 
         const headerParameters: runtime.HTTPHeaders = {};
 
@@ -347,16 +370,20 @@ export class NotebooksApi extends runtime.BaseAPI {
     /**
      * The starter cells and the functions a notebook must define
      */
-    async notebookControllerScaffold(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<NotebookScaffoldDto> {
-        const response = await this.notebookControllerScaffoldRaw(initOverrides);
+    async notebookControllerScaffold(requestParameters: NotebookControllerScaffoldRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<NotebookScaffoldDto> {
+        const response = await this.notebookControllerScaffoldRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
      * Worked notebooks an author can start from or borrow cells out of
      */
-    async notebookControllerTemplatesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<NotebookTemplateDto>>> {
+    async notebookControllerTemplatesRaw(requestParameters: NotebookControllerTemplatesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<NotebookTemplateDto>>> {
         const queryParameters: any = {};
+
+        if (requestParameters['scope'] != null) {
+            queryParameters['scope'] = requestParameters['scope'];
+        }
 
         const headerParameters: runtime.HTTPHeaders = {};
 
@@ -376,8 +403,8 @@ export class NotebooksApi extends runtime.BaseAPI {
     /**
      * Worked notebooks an author can start from or borrow cells out of
      */
-    async notebookControllerTemplates(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<NotebookTemplateDto>> {
-        const response = await this.notebookControllerTemplatesRaw(initOverrides);
+    async notebookControllerTemplates(requestParameters: NotebookControllerTemplatesRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<NotebookTemplateDto>> {
+        const response = await this.notebookControllerTemplatesRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -401,6 +428,10 @@ export class NotebooksApi extends runtime.BaseAPI {
         }
 
         const queryParameters: any = {};
+
+        if (requestParameters['scope'] != null) {
+            queryParameters['scope'] = requestParameters['scope'];
+        }
 
         const headerParameters: runtime.HTTPHeaders = {};
 
@@ -431,3 +462,44 @@ export class NotebooksApi extends runtime.BaseAPI {
     }
 
 }
+
+/**
+ * @export
+ */
+export const NotebookControllerExportPythonScopeEnum = {
+    Connector: 'connector',
+    Augmentation: 'augmentation'
+} as const;
+export type NotebookControllerExportPythonScopeEnum = typeof NotebookControllerExportPythonScopeEnum[keyof typeof NotebookControllerExportPythonScopeEnum];
+/**
+ * @export
+ */
+export const NotebookControllerGetScopeEnum = {
+    Connector: 'connector',
+    Augmentation: 'augmentation'
+} as const;
+export type NotebookControllerGetScopeEnum = typeof NotebookControllerGetScopeEnum[keyof typeof NotebookControllerGetScopeEnum];
+/**
+ * @export
+ */
+export const NotebookControllerScaffoldScopeEnum = {
+    Connector: 'connector',
+    Augmentation: 'augmentation'
+} as const;
+export type NotebookControllerScaffoldScopeEnum = typeof NotebookControllerScaffoldScopeEnum[keyof typeof NotebookControllerScaffoldScopeEnum];
+/**
+ * @export
+ */
+export const NotebookControllerTemplatesScopeEnum = {
+    Connector: 'connector',
+    Augmentation: 'augmentation'
+} as const;
+export type NotebookControllerTemplatesScopeEnum = typeof NotebookControllerTemplatesScopeEnum[keyof typeof NotebookControllerTemplatesScopeEnum];
+/**
+ * @export
+ */
+export const NotebookControllerUpdateScopeEnum = {
+    Connector: 'connector',
+    Augmentation: 'augmentation'
+} as const;
+export type NotebookControllerUpdateScopeEnum = typeof NotebookControllerUpdateScopeEnum[keyof typeof NotebookControllerUpdateScopeEnum];

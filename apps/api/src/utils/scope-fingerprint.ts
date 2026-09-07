@@ -16,6 +16,10 @@ const NON_SCOPE_SECTIONS = new Set([
   'detectors',
   'custom_detectors',
   'resources',
+  // Additive by construction: an augmentation notebook can only add metadata,
+  // tags, links, URNs and edges, never move which objects a scan visits.
+  // Leaving it in would force a conservative full rescan on every code edit.
+  'augmentation',
 ]);
 
 /** Recursively sort object keys so JSON.stringify is order-independent. */

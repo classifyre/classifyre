@@ -18,7 +18,16 @@ import {
 } from './dto/notebook.dto';
 
 export const REQUIRED_FUNCTIONS = ['test_connection', 'extract'];
-export const OPTIONAL_FUNCTIONS = ['discover', 'fetch_content'];
+export const OPTIONAL_FUNCTIONS = [
+  'discover',
+  'fetch_content',
+  'relationships',
+];
+
+export const AUGMENTATION_REQUIRED_FUNCTIONS = ['augment'];
+export const AUGMENTATION_OPTIONAL_FUNCTIONS = ['setup', 'finalize'];
+
+export type NotebookScope = 'connector' | 'augmentation';
 
 const STARTER_EXAMPLE_NAME = 'Starter notebook';
 
@@ -26,6 +35,25 @@ interface NotebookConfig {
   revision: number;
   cells: NotebookCellDto[];
 }
+
+interface ScopePaths {
+  notebook: string[];
+  variables: string[];
+  secrets: string[];
+}
+
+const SCOPE_PATHS: Record<NotebookScope, ScopePaths> = {
+  connector: {
+    notebook: ['required', 'notebook'],
+    variables: ['optional', 'variables'],
+    secrets: ['masked', 'secrets'],
+  },
+  augmentation: {
+    notebook: ['augmentation', 'notebook'],
+    variables: ['augmentation', 'variables'],
+    secrets: ['augmentation', 'secrets'],
+  },
+};
 
 @Injectable()
 export class NotebookService {
@@ -43,15 +71,25 @@ export class NotebookService {
    * keeps the scaffold and the contract from drifting: if the contract gains a
    * required function, the example gains a cell, and every surface follows.
    */
-  scaffold(): { cells: NotebookCellDto[] } {
-    const examples = this.customExamples();
+  scaffold(scope: NotebookScope = 'connector'): {
+    cells: NotebookCellDto[];
+  } {
+    // Normalized to one shape: the CUSTOM examples nest the notebook under
+    // config.required, the AUGMENTATION templates carry it at the top level.
+    const notebooks: Array<{ name?: string; notebook?: any }> =
+      scope === 'augmentation'
+        ? this.augmentationExamples()
+        : this.customExamples().map((entry) => ({
+            name: entry.name,
+            notebook: entry.config?.required?.notebook,
+          }));
     const starter =
-      examples.find((entry) => entry.name === STARTER_EXAMPLE_NAME) ??
-      examples[0];
-    const cells = starter?.config?.required?.notebook?.cells;
+      notebooks.find((entry) => entry.name === STARTER_EXAMPLE_NAME) ??
+      notebooks[0];
+    const cells = starter?.notebook?.cells;
     if (!Array.isArray(cells) || cells.length === 0) {
       throw new Error(
-        'all_input_examples.json has no CUSTOM starter notebook to scaffold from',
+        `all_input_examples.json has no ${scope === 'augmentation' ? 'AUGMENTATION' : 'CUSTOM'} starter notebook to scaffold from`,
       );
     }
     return { cells: cells as NotebookCellDto[] };
@@ -65,11 +103,20 @@ export class NotebookService {
    * the SDK gained a method. An example with no cells is skipped rather than
    * served -- an empty template in the picker is worse than a missing one.
    */
-  templates(): Array<{
+  templates(scope: NotebookScope = 'connector'): Array<{
     name: string;
     description: string;
     cells: NotebookCellDto[];
   }> {
+    if (scope === 'augmentation') {
+      return this.augmentationExamples()
+        .map((entry) => ({
+          name: String(entry.name ?? ''),
+          description: String(entry.description ?? ''),
+          cells: entry.notebook?.cells ?? [],
+        }))
+        .filter((entry) => entry.name && entry.cells.length > 0);
+    }
     return this.customExamples()
       .map((entry) => ({
         name: String(entry.name ?? ''),
@@ -93,7 +140,24 @@ export class NotebookService {
     return examples.CUSTOM ?? [];
   }
 
-  async getSource(sourceId: string) {
+  private augmentationExamples(): Array<{
+    name?: string;
+    description?: string;
+    notebook?: { revision?: number; cells?: NotebookCellDto[] };
+  }> {
+    const path = resolveSchemaFile(__dirname, 'all_input_examples.json');
+    const examples = JSON.parse(fs.readFileSync(path, 'utf8')) as Record<
+      string,
+      Array<{
+        name?: string;
+        description?: string;
+        notebook?: { revision?: number; cells?: NotebookCellDto[] };
+      }>
+    >;
+    return examples.AUGMENTATION ?? [];
+  }
+
+  async getSource(sourceId: string, scope: NotebookScope = 'connector') {
     const source = await this.prisma.source.findUnique({
       where: { id: sourceId },
       select: { id: true, type: true, config: true, runnerStatus: true },
@@ -101,31 +165,46 @@ export class NotebookService {
     if (!source) {
       throw new NotFoundException(`Source ${sourceId} not found`);
     }
-    if (source.type !== AssetType.CUSTOM) {
+    if (scope === 'connector' && source.type !== AssetType.CUSTOM) {
       throw new BadRequestException(
-        `Source ${sourceId} is a ${source.type} source; notebooks exist only on CUSTOM sources.`,
+        `Source ${sourceId} is a ${source.type} source; connector notebooks exist only on CUSTOM sources.`,
       );
     }
     return source;
   }
 
-  async get(sourceId: string) {
-    const source = await this.getSource(sourceId);
+  async get(sourceId: string, scope: NotebookScope = 'connector') {
+    const source = await this.getSource(sourceId, scope);
     const config = (source.config ?? {}) as Record<string, any>;
-    const notebook = this.readNotebook(config);
+    const notebook = this.readNotebook(config, scope);
 
     return {
       revision: notebook.revision,
       cells: notebook.cells,
-      variables: (config.optional?.variables ?? {}) as Record<string, string>,
+      variables: (this.atPath(config, SCOPE_PATHS[scope].variables) ??
+        {}) as Record<string, string>,
       // Secret values are write-only. Returning them would put every source's
       // credentials into any browser session that can open the editor.
-      secretKeys: Object.keys(config.masked?.secrets ?? {}).sort(),
+      secretKeys: Object.keys(
+        this.atPath(config, SCOPE_PATHS[scope].secrets) ?? {},
+      ).sort(),
     };
   }
 
-  private readNotebook(config: Record<string, any>): NotebookConfig {
-    const notebook = config?.required?.notebook ?? {};
+  private atPath(config: Record<string, any>, path: string[]): any {
+    let node: any = config;
+    for (const key of path) {
+      if (node === null || typeof node !== 'object') return undefined;
+      node = node[key];
+    }
+    return node;
+  }
+
+  private readNotebook(
+    config: Record<string, any>,
+    scope: NotebookScope = 'connector',
+  ): NotebookConfig {
+    const notebook = this.atPath(config, SCOPE_PATHS[scope].notebook) ?? {};
     return {
       revision: Number.isInteger(notebook.revision) ? notebook.revision : 1,
       cells: Array.isArray(notebook.cells) ? notebook.cells : [],
@@ -179,10 +258,14 @@ export class NotebookService {
    * this locking is contained to notebooks and the generic source update path
    * is untouched.
    */
-  async update(sourceId: string, dto: UpdateNotebookDto) {
-    const source = await this.getSource(sourceId);
+  async update(
+    sourceId: string,
+    dto: UpdateNotebookDto,
+    scope: NotebookScope = 'connector',
+  ) {
+    const source = await this.getSource(sourceId, scope);
     const config = structuredClone(source.config ?? {}) as Record<string, any>;
-    const current = this.readNotebook(config);
+    const current = this.readNotebook(config, scope);
 
     if (dto.baseRevision !== current.revision) {
       throw new ConflictException({
@@ -199,23 +282,45 @@ export class NotebookService {
     this.assertValidKeys(dto.secrets, 'Secret');
 
     const revision = current.revision + 1;
-    config.type = AssetType.CUSTOM;
-    config.required = {
-      ...(config.required ?? {}),
-      notebook: { revision, cells: dto.cells },
-    };
+    if (scope === 'connector') {
+      config.type = AssetType.CUSTOM;
+      config.required = {
+        ...(config.required ?? {}),
+        notebook: { revision, cells: dto.cells },
+      };
 
-    if (dto.variables) {
-      config.optional = {
-        ...(config.optional ?? {}),
-        variables: dto.variables,
-      };
-    }
-    if (dto.secrets) {
-      config.masked = {
-        ...(config.masked ?? {}),
-        secrets: this.mergeSecrets(config.masked?.secrets ?? {}, dto.secrets),
-      };
+      if (dto.variables) {
+        config.optional = {
+          ...(config.optional ?? {}),
+          variables: dto.variables,
+        };
+      }
+      if (dto.secrets) {
+        config.masked = {
+          ...(config.masked ?? {}),
+          secrets: this.mergeSecrets(config.masked?.secrets ?? {}, dto.secrets),
+        };
+      }
+    } else {
+      // Augmentation rides beside the connector config: enabling the switch
+      // here (a notebook with cells is plainly meant to run), but never
+      // touching the source type or the connector's own sections.
+      const augmentation =
+        typeof config.augmentation === 'object' && config.augmentation !== null
+          ? { ...(config.augmentation as Record<string, any>) }
+          : {};
+      augmentation.enabled = true;
+      augmentation.notebook = { revision, cells: dto.cells };
+      if (dto.variables) {
+        augmentation.variables = dto.variables;
+      }
+      if (dto.secrets) {
+        augmentation.secrets = this.mergeSecrets(
+          augmentation.secrets ?? {},
+          dto.secrets,
+        );
+      }
+      config.augmentation = augmentation;
     }
 
     await this.prisma.source.update({
@@ -261,8 +366,11 @@ export class NotebookService {
    * workflow.py` with no notebook runtime -- which is what makes "productize"
    * a download rather than a rewrite.
    */
-  async exportPython(sourceId: string): Promise<string> {
-    const { cells } = await this.get(sourceId);
+  async exportPython(
+    sourceId: string,
+    scope: NotebookScope = 'connector',
+  ): Promise<string> {
+    const { cells } = await this.get(sourceId, scope);
     const parts: string[] = [];
     for (const cell of cells) {
       if (cell.type === 'markdown') {

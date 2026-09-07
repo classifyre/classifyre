@@ -1,29 +1,29 @@
 ---
 title: Ranking & the Semantic Layer
-description: Why findings are ranked by importance, not just severity — the reasons vocabulary, near-duplicates, and when ranking recalculates.
+description: Why findings are ranked by importance, not just the priority a detector assigned — the reasons vocabulary, near-duplicates, and when ranking recalculates.
 ---
 
 # Ranking & the Semantic Layer
 
-A source can produce thousands of findings. Severity tells you how bad each one
-*would be if real* — it doesn't tell you which ones are genuine leads versus
+A source can produce thousands of findings. Priority tells you how much each one
+*would matter if real* — it doesn't tell you which ones are genuine leads versus
 noise. That's what ranking is for.
 
-> **Severity is not importance. Similarity is not proof.** These two rules
+> **Priority is not importance. Similarity is not proof.** These two rules
 > govern everything on this page.
 
 ---
 
 ## Importance: a second, independent score
 
-Alongside severity, every finding gets an **importance score** from 0 to 1,
+Alongside the priority its detector assigned, every finding gets an **importance score** from 0 to 1,
 built from meaning and context, not just detector type:
 
 - **Quality of the match** — a real, readable record, or an OCR fragment?
 - **Detector confidence** — how sure the detector was.
 - **Novelty** — an outlier in its neighbourhood, or one of many near-identical matches?
 - **Context** — how much genuine surrounding text supports the match.
-- **Severity** — still a factor, but one of several, not the deciding one.
+- **Priority** — still a factor, but one of several, not the deciding one.
 
 The result: a "Critical" finding repeated as boilerplate can rank *below* a
 "Medium" finding that's genuinely unusual and well-supported. Ranking sorts by
@@ -47,7 +47,7 @@ scored the way it did:
 | **Common value, not discriminating** | The value appears in so many assets it's not distinctive (a shared inbox, a boilerplate field). | Deprioritise — not pointing at anything specific. |
 | **Known test value** | Matches a documented test number or fixture (e.g. a payment-network test card). | Safe to ignore. |
 | **Repeated-digit pattern** | Digits dominated by repetition (`0000…`, `1111…`), typical of a placeholder. | Likely an artifact, not real data. |
-| **Severity noted separately** | A reminder of severity, shown but not used to inflate importance. | Read severity and importance separately. |
+| **Priority noted separately** | A reminder of the detector's priority, shown but not used to inflate importance. | Read priority and importance separately. |
 
 ---
 
@@ -68,7 +68,7 @@ scans finish landing, so importance scores reflect your current data, not a
 stale snapshot. If you want a fresh pass on demand — after a large bulk import,
 for example — you can trigger **Reindex** (re-read the content) and
 **Recalculate** (re-score importance) yourself from the Tune panel on the
-Fingerprints page.
+Duplicate review screens.
 
 ---
 
@@ -78,4 +78,4 @@ Ranked findings feed everything downstream: the [inquiries](/how-it-works/invest
 you watch, the [leads](/how-it-works/investigating/) proposed into a case, and
 what [Autopilot](/how-it-works/autopilot/) chooses to act on. Ranking is also
 distinct from — and complementary to — the shared-value correlation described
-in [Connections & Fingerprints](/how-it-works/connections-and-fingerprints/).
+in [Connections & Duplicates](/how-it-works/duplicates-and-similarity/).

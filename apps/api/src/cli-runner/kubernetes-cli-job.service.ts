@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
+import { gzipSync } from 'zlib';
 import type {
   BatchV1Api,
   CoreV1Api,
@@ -42,6 +43,11 @@ export interface NotebookInputFile {
   /** The name the notebook knows it by, and the name it lands under. */
   name: string;
 }
+
+// MAX_ARG_STRLEN: Linux allows one environment variable to be at most 32
+// pages. Over it, execve fails with E2BIG and the kernel's message —
+// "argument list too long" — mentions neither the variable nor its size.
+const MAX_ENV_VALUE_BYTES = 128 * 1024;
 
 const EVALUATION_INPUT_MOUNT_PATH = '/evaluation-input';
 
@@ -545,11 +551,31 @@ export class KubernetesCliJobService {
     }
 
     if (params.recipe) {
-      const recipeB64 = Buffer.from(
-        JSON.stringify(params.recipe, null, 2),
-        'utf8',
-      ).toString('base64');
-      envMap.set('RECIPE_B64', { name: 'RECIPE_B64', value: recipeB64 });
+      // The recipe carries the connector's whole notebook. Linux caps a SINGLE
+      // environment variable at MAX_ARG_STRLEN (128 KiB), and exceeding it does
+      // not fail at job creation — the pod starts and dies with
+      // `exec /bin/sh: argument list too long`, which names neither the
+      // variable nor the notebook. A 76 KB notebook, pretty-printed and
+      // base64-encoded, already sat at ~103 KB; one more shared cell crossed
+      // the line and made the source simply unrunnable.
+      //
+      // Gzip first (JSON + Python compresses ~4x), and drop the pretty-printing
+      // that only ever inflated a machine-read file.
+      const recipeJson = JSON.stringify(params.recipe);
+      const recipeB64 = gzipSync(Buffer.from(recipeJson, 'utf8')).toString(
+        'base64',
+      );
+      if (recipeB64.length > MAX_ENV_VALUE_BYTES) {
+        throw new Error(
+          `Recipe for source ${params.sourceId} is ${recipeB64.length} bytes ` +
+            `compressed, over the ${MAX_ENV_VALUE_BYTES}-byte limit for one ` +
+            'environment variable. The notebook is too large to hand to a CLI ' +
+            'job this way; split it or move bulk data into a notebook file. ' +
+            'When an augmentation notebook is attached, its cells count ' +
+            'toward the same budget as the connector notebook.',
+        );
+      }
+      envMap.set('RECIPE_GZ_B64', { name: 'RECIPE_GZ_B64', value: recipeB64 });
     }
     envMap.set('SOURCE_ID', { name: 'SOURCE_ID', value: params.sourceId });
 
@@ -772,7 +798,9 @@ export class KubernetesCliJobService {
     let command: string;
 
     if (mode === 'extract') {
-      prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
+      prelude.push(
+        'printf "%s" "$RECIPE_GZ_B64" | base64 -d | gzip -dc > /tmp/recipe.json',
+      );
       prelude.push('RUNNER_ID="${RUNNER_ID:-}"');
       prelude.push('SOURCE_ID="${SOURCE_ID:-}"');
       prelude.push(
@@ -794,7 +822,9 @@ export class KubernetesCliJobService {
       );
       command = '"$PYTHON_BIN" -m src.main notebook /tmp/notebook-request.json';
     } else if (mode === 'test') {
-      prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
+      prelude.push(
+        'printf "%s" "$RECIPE_GZ_B64" | base64 -d | gzip -dc > /tmp/recipe.json',
+      );
       prelude.push(
         'export CLASSIFYRE_OUTPUT_REST_URL="${CLASSIFYRE_OUTPUT_REST_URL:?API did not provide a namespaced callback URL}"',
       );

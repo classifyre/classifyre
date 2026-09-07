@@ -49,6 +49,12 @@ export interface RebuildIndexResponseDto {
      * @memberof RebuildIndexResponseDto
      */
     durationMs: number;
+    /**
+     * What this rebuild did NOT do. It re-derives the rollups from the correlation values, edges and clusters that are already stored — it does not re-fingerprint any asset. A weight or exclusion change is applied when a scan indexes an asset, so rebuilding after one leaves the queue unchanged and looks like the change did nothing. Use PUT /correlation/config (which queues a full recompute) for that.
+     * @type {string}
+     * @memberof RebuildIndexResponseDto
+     */
+    note: string;
 }
 
 /**
@@ -60,6 +66,7 @@ export function instanceOfRebuildIndexResponseDto(value: object): value is Rebui
     if (!('lineageCovered' in value) || value['lineageCovered'] === undefined) return false;
     if (!('hairballDemoted' in value) || value['hairballDemoted'] === undefined) return false;
     if (!('durationMs' in value) || value['durationMs'] === undefined) return false;
+    if (!('note' in value) || value['note'] === undefined) return false;
     return true;
 }
 
@@ -78,6 +85,7 @@ export function RebuildIndexResponseDtoFromJSONTyped(json: any, ignoreDiscrimina
         'lineageCovered': json['lineageCovered'],
         'hairballDemoted': json['hairballDemoted'],
         'durationMs': json['durationMs'],
+        'note': json['note'],
     };
 }
 
@@ -97,6 +105,7 @@ export function RebuildIndexResponseDtoToJSONTyped(value?: RebuildIndexResponseD
         'lineageCovered': value['lineageCovered'],
         'hairballDemoted': value['hairballDemoted'],
         'durationMs': value['durationMs'],
+        'note': value['note'],
     };
 }
 

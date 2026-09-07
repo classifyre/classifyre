@@ -452,12 +452,31 @@ export class AutoScheduleService {
     // yields to explicit intent. A busy instance simply gets fewer catch-up
     // runs, which is the correct trade — a source sweeping itself faster is
     // never worth delaying the schedule someone chose.
-    const inFlight = await this.prisma.source.count({
+    let inFlight = await this.prisma.source.count({
       where: {
         runnerStatus: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
       },
     });
     let budget = limit - inFlight;
+
+    if (budget <= 0) {
+      // Being at the cap is the one moment an orphan actually costs something,
+      // so it is the moment worth paying to check for one. A runner whose Job
+      // has vanished stays RUNNING forever otherwise, and since the budget is
+      // computed from `runnerStatus`, enough of them stop the namespace dead
+      // with nothing in any log to say why. Verified only here, so the ordinary
+      // tick keeps its single count query.
+      const retired = await this.cliRunner.reconcileStaleInFlight();
+      if (retired > 0) {
+        inFlight = await this.prisma.source.count({
+          where: {
+            runnerStatus: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
+          },
+        });
+        budget = limit - inFlight;
+      }
+    }
+
     if (budget <= 0) {
       // Logged rather than silent: "why has my catch-up sweep stalled" should
       // be answerable from the log without reading this code.

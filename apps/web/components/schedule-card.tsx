@@ -46,7 +46,7 @@ export type AutoScheduleStatus = {
 };
 
 const PHASE_TONE: Record<AutoSchedulePhase, string> = {
-  CATCH_UP: "border-accent/50 text-accent bg-accent/10",
+  CATCH_UP: "border-accent/50 text-accent-ink bg-accent/10",
   STEADY: "border-border/40 text-muted-foreground bg-foreground/5",
   BACKOFF: "border-destructive/40 text-destructive bg-destructive/10",
   PAUSED: "border-destructive/60 text-destructive bg-destructive/10",
@@ -296,7 +296,7 @@ export function ScheduleCard({
       {/* ── Header bar ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b-2 border-border bg-foreground text-primary-foreground">
         <div className="flex items-center gap-2">
-          <CalendarClock className="h-4 w-4 text-accent" />
+          <CalendarClock className="h-4 w-4 text-accent-ink" />
           <span className="text-xs font-mono uppercase tracking-[0.12em] font-bold">
             Ingestion Schedule
           </span>
@@ -308,7 +308,7 @@ export function ScheduleCard({
                   "h-5 px-1.5 text-[10px] font-mono uppercase tracking-wider",
                   autoStatus
                     ? PHASE_TONE[autoStatus.phase]
-                    : "border-accent/50 text-accent bg-accent/10",
+                    : "border-accent/50 text-accent-ink bg-accent/10",
                 )}
               >
                 {autoStatus ? PHASE_LABEL[autoStatus.phase] : "Automatic"}
@@ -317,7 +317,7 @@ export function ScheduleCard({
               value.cron && (
                 <Badge
                   variant="outline"
-                  className="h-5 px-1.5 text-[10px] font-mono border-accent/50 text-accent bg-accent/10 uppercase tracking-wider"
+                  className="h-5 px-1.5 text-[10px] font-mono border-accent/50 text-accent-ink bg-accent/10 uppercase tracking-wider"
                 >
                   Active
                 </Badge>

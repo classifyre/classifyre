@@ -129,16 +129,35 @@ export const NOTEBOOK_EXECUTION_MODES = [
   'all',
   'test_connection',
   'preview_extract',
+  'preview_augment',
 ] as const;
 
+export const NOTEBOOK_SCOPES = ['connector', 'augmentation'] as const;
+
 export class CreateNotebookExecutionDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     description:
-      'The revision to execute. Executions run a snapshot, never "whatever is in the database now".',
+      'The revision to execute. Executions run a snapshot, never "whatever is ' +
+      'in the database now". Either this or `baseRevision` is required — they ' +
+      'mean the same thing. The alias exists because the notebook PUT next to ' +
+      'this endpoint spells the same concept `baseRevision`, and sending that ' +
+      'name here used to be rejected with "Revision undefined is not the ' +
+      'current notebook revision": correct about the value, silent about the ' +
+      'field name that produced it.',
   })
+  @IsOptional()
   @IsInt()
   @Min(1)
-  revision!: number;
+  revision?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Alias of `revision`, matching the notebook PUT. Supply either one.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  baseRevision?: number;
 
   @ApiProperty({ enum: NOTEBOOK_EXECUTION_MODES })
   @IsIn(NOTEBOOK_EXECUTION_MODES)
@@ -157,6 +176,18 @@ export class CreateNotebookExecutionDto {
   @IsInt()
   @Min(1)
   maxAssets?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Which notebook to run. `connector` is the CUSTOM source\u2019s own ' +
+      'notebook; `augmentation` is the per-asset enrichment notebook any ' +
+      'source type may carry. Defaults to `connector`, so every existing ' +
+      'call keeps its meaning.',
+    enum: NOTEBOOK_SCOPES,
+  })
+  @IsOptional()
+  @IsIn(NOTEBOOK_SCOPES)
+  scope?: (typeof NOTEBOOK_SCOPES)[number];
 }
 
 export class NotebookExecutionDto {
@@ -169,8 +200,22 @@ export class NotebookExecutionDto {
   @ApiProperty()
   revision!: number;
 
-  @ApiProperty({ enum: ['CELL', 'ALL', 'TEST_CONNECTION', 'PREVIEW_EXTRACT'] })
+  @ApiProperty({
+    enum: [
+      'CELL',
+      'ALL',
+      'TEST_CONNECTION',
+      'PREVIEW_EXTRACT',
+      'PREVIEW_AUGMENT',
+    ],
+  })
   mode!: string;
+
+  @ApiPropertyOptional({
+    enum: ['CONNECTOR', 'AUGMENTATION'],
+    description: 'Which notebook this execution ran.',
+  })
+  scope?: string;
 
   @ApiProperty({
     enum: ['PENDING', 'RUNNING', 'SUCCESS', 'ERROR', 'CANCELLED', 'TIMEOUT'],

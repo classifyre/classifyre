@@ -65,6 +65,24 @@ export interface CustomDetectorResponseDto {
      */
     pipelineSchema: { [key: string]: any; };
     /**
+     * The engine this detector runs on (TAG, REGEX, LLM, GLINER2, TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION). Lifted out of pipelineSchema so a list response can be audited as it stands: the type and severity of twenty detectors used to mean introspecting twenty opaque pipeline blobs.
+     * @type {string}
+     * @memberof CustomDetectorResponseDto
+     */
+    detectorType: string | null;
+    /**
+     * Default severity of the findings this detector produces, where its engine has one. Null for engines that derive severity per label.
+     * @type {string}
+     * @memberof CustomDetectorResponseDto
+     */
+    severity: string | null;
+    /**
+     * Which dimension of this detector's findings carries the answer — `findingType` for classifiers (the predicted label IS the answer), `matchedContent` for TAG and REGEX (the type names the rule, the value is the answer). The same distinction /inquiries/match-options reports, repeated here so a detector audit and a question author see one story.
+     * @type {string}
+     * @memberof CustomDetectorResponseDto
+     */
+    answerDimension: string | null;
+    /**
      * AI provider credential ID backing this detector (LLM detectors only).
      * @type {string}
      * @memberof CustomDetectorResponseDto
@@ -152,6 +170,9 @@ export function instanceOfCustomDetectorResponseDto(value: object): value is Cus
     if (!('key' in value) || value['key'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('pipelineSchema' in value) || value['pipelineSchema'] === undefined) return false;
+    if (!('detectorType' in value) || value['detectorType'] === undefined) return false;
+    if (!('severity' in value) || value['severity'] === undefined) return false;
+    if (!('answerDimension' in value) || value['answerDimension'] === undefined) return false;
     if (!('isActive' in value) || value['isActive'] === undefined) return false;
     if (!('version' in value) || value['version'] === undefined) return false;
     if (!('findingsCount' in value) || value['findingsCount'] === undefined) return false;
@@ -179,6 +200,9 @@ export function CustomDetectorResponseDtoFromJSONTyped(json: any, ignoreDiscrimi
         'name': json['name'],
         'description': json['description'] == null ? undefined : json['description'],
         'pipelineSchema': json['pipelineSchema'],
+        'detectorType': json['detectorType'],
+        'severity': json['severity'],
+        'answerDimension': json['answerDimension'],
         'aiProviderConfigId': json['aiProviderConfigId'] == null ? undefined : json['aiProviderConfigId'],
         'isActive': json['isActive'],
         'version': json['version'],
@@ -211,6 +235,9 @@ export function CustomDetectorResponseDtoToJSONTyped(value?: CustomDetectorRespo
         'name': value['name'],
         'description': value['description'],
         'pipelineSchema': value['pipelineSchema'],
+        'detectorType': value['detectorType'],
+        'severity': value['severity'],
+        'answerDimension': value['answerDimension'],
         'aiProviderConfigId': value['aiProviderConfigId'],
         'isActive': value['isActive'],
         'version': value['version'],

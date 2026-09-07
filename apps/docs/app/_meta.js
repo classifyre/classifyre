@@ -8,6 +8,7 @@ export default {
   detectors: "Detectors",
   flow: "Scans",
   investigations: "Investigations",
+  duplicates: "Duplicate Review",
   notifications: "Notifications",
   "data-export": "Data Export",
   settings: "Settings",

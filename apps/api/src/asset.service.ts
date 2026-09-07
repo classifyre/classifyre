@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -37,6 +38,7 @@ import {
 import { SearchAssetsChartsRequestDto } from './dto/search-assets-charts-request.dto';
 import { SearchAssetsChartsResponseDto } from './dto/search-assets-charts-response.dto';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
+import { CustomDetectorsService } from './custom-detectors.service';
 import {
   embeddingContentHash,
   normalizeEmbeddingText,
@@ -78,6 +80,15 @@ const FINDING_CREATE_CHUNK = 500;
 
 /** Assets per prior-row lookup during ingestion (see call site). */
 const EXISTING_ASSET_LOOKUP_CHUNK = 1000;
+
+/** Distinct relationship errors kept on a run record. */
+const RELATIONSHIP_ERROR_CAP = 5;
+
+/** Per-error truncation, so one huge traceback cannot bloat the run row. */
+const RELATIONSHIP_ERROR_MAX_CHARS = 500;
+
+/** Duplicate asset ids named individually in a rejected bulk-ingest payload. */
+const DUPLICATE_REPORT_CAP = 5;
 
 const findingForAssetSelect = {
   id: true,
@@ -204,6 +215,10 @@ export class AssetService {
     // type-only one: a type-only import of an injected class makes Nest inject
     // undefined, which would silently stop cross-system lineage from stitching.
     @Optional() private readonly graph?: GraphService,
+    // TAG detectors are deliberately unselectable on a source, so the stored
+    // config can never name them. Without this the removed-detector cleanup
+    // below resolves every TAG finding at the end of the run that created it.
+    @Optional() private readonly customDetectors?: CustomDetectorsService,
   ) {}
 
   private async assertSourceAndRunner(sourceId: string, runnerId: string) {
@@ -413,6 +428,67 @@ export class AssetService {
     if (Object.keys(data).length === 0) return;
 
     await this.prisma.runner.update({ where: { id: runnerId }, data });
+  }
+
+  /**
+   * Record what happened to this run's lineage.
+   *
+   * Kept separate from the finalize transaction on purpose: the counts are
+   * reported by the CLI and must land even when the retirement pass below
+   * returns early (which it does for every sampling strategy but ALL). A run
+   * whose connector lost its edges is degraded regardless of how it sampled.
+   *
+   * Errors are truncated so a long scan that failed the same way on every pass
+   * cannot grow the run record without bound.
+   */
+  async recordRelationshipOutcome(
+    runnerId: string,
+    outcome: {
+      relationshipsEmitted?: number;
+      relationshipsFailed?: number;
+      relationshipsLost?: number;
+      relationshipsDropped?: number;
+      relationshipErrors?: string[];
+    },
+  ): Promise<{ failed: number; lost: number; errors: string[] }> {
+    const count = (value: unknown): number | undefined => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+      return Math.trunc(parsed);
+    };
+
+    const relationshipsEmitted = count(outcome.relationshipsEmitted);
+    const relationshipsFailed = count(outcome.relationshipsFailed);
+    const relationshipsLost = count(outcome.relationshipsLost);
+    const relationshipsDropped = count(outcome.relationshipsDropped);
+    const errors = (
+      Array.isArray(outcome.relationshipErrors)
+        ? outcome.relationshipErrors
+        : []
+    )
+      .filter((e): e is string => typeof e === 'string' && e.length > 0)
+      .slice(0, RELATIONSHIP_ERROR_CAP)
+      .map((e) => e.slice(0, RELATIONSHIP_ERROR_MAX_CHARS));
+
+    const data: Prisma.RunnerUpdateInput = {};
+    if (relationshipsEmitted !== undefined)
+      data.relationshipsEmitted = relationshipsEmitted;
+    if (relationshipsFailed !== undefined)
+      data.relationshipsFailed = relationshipsFailed;
+    if (relationshipsLost !== undefined)
+      data.relationshipsLost = relationshipsLost;
+    if (relationshipsDropped !== undefined)
+      data.relationshipsDropped = relationshipsDropped;
+
+    if (Object.keys(data).length > 0) {
+      await this.prisma.runner.update({ where: { id: runnerId }, data });
+    }
+
+    return {
+      failed: relationshipsFailed ?? 0,
+      lost: relationshipsLost ?? 0,
+      errors,
+    };
   }
 
   /**
@@ -1720,8 +1796,91 @@ export class AssetService {
     const asset = await this.prisma.asset.delete({
       where,
     });
+    // Edges are not foreign keys — an endpoint is a (type, id) pair, so nothing
+    // in the schema removes them when the asset goes. An edge left naming a
+    // deleted asset breaks the correlation review rebuild (it writes a lineage
+    // profile row per endpoint, and that row IS foreign-keyed), which is how
+    // seven orphans once 500'd the whole Duplicate Review page.
+    await this.prisma.edge.deleteMany({
+      where: {
+        OR: [
+          { fromType: 'asset', fromId: asset.id },
+          { toType: 'asset', toId: asset.id },
+        ],
+      },
+    });
     await this.correlationJobs?.scheduleFull('asset deleted');
     return asset;
+  }
+
+  /**
+   * Reject a payload that names the same asset twice, saying which one.
+   *
+   * The connector-facing id is `metadata.external_id` (a notebook's own
+   * `Asset(id=...)`); `hash` is what the database constrains. Both are
+   * reported, because the author can only act on the first and can only
+   * correlate logs by the second.
+   */
+  private assertNoDuplicateHashes(assets: Record<string, any>[]): void {
+    const firstIndexByHash = new Map<string, number>();
+    const duplicates = new Map<
+      string,
+      { externalId: string | null; name: string | null; count: number }
+    >();
+
+    assets.forEach((asset, index) => {
+      const hash = String(asset?.hash ?? '');
+      if (!hash) return;
+      const seenAt = firstIndexByHash.get(hash);
+      if (seenAt === undefined) {
+        firstIndexByHash.set(hash, index);
+        return;
+      }
+      const existing = duplicates.get(hash);
+      if (existing) {
+        existing.count += 1;
+        return;
+      }
+      const metadata = (asset?.metadata ?? {}) as Record<string, unknown>;
+      duplicates.set(hash, {
+        externalId:
+          typeof metadata.external_id === 'string'
+            ? metadata.external_id
+            : null,
+        name: typeof asset?.name === 'string' ? asset.name : null,
+        // The first occurrence plus this one.
+        count: 2,
+      });
+    });
+
+    if (duplicates.size === 0) return;
+
+    const described = [...duplicates.entries()]
+      .slice(0, DUPLICATE_REPORT_CAP)
+      .map(([hash, info]) => {
+        const label = info.externalId ?? info.name ?? '(unnamed)';
+        return `'${label}' (hash ${hash}, ${info.count} copies)`;
+      });
+    const more =
+      duplicates.size > DUPLICATE_REPORT_CAP
+        ? ` and ${duplicates.size - DUPLICATE_REPORT_CAP} more`
+        : '';
+
+    throw new ConflictException({
+      statusCode: 409,
+      error: 'Conflict',
+      message:
+        `This batch names the same asset more than once: ${described.join(', ')}${more}. ` +
+        'An asset id must be unique within a source, so give each object a ' +
+        'distinct id (or keep only the current one — for a superseded revision, ' +
+        'the first row of a newest-first manifest).',
+      duplicates: [...duplicates.entries()].map(([hash, info]) => ({
+        hash,
+        externalId: info.externalId,
+        name: info.name,
+        count: info.count,
+      })),
+    });
   }
 
   async bulkIngest(
@@ -1780,6 +1939,15 @@ export class AssetService {
     // grows without bound as a corpus grows — the same shape as the findings
     // query that was crashing the desktop API. `@@unique([sourceId, hash])`
     // makes the scoped lookup an index hit.
+    // Two rows with the same hash in one payload violate @@unique([sourceId,
+    // hash]) — but only after the transaction has begun, which surfaced as a
+    // bare `500 {"code":"P2002"}` naming neither the id nor the asset. The
+    // constraint text ("source_id, hash") stayed in the API log. One repeated
+    // id therefore destroyed a 1,140-asset run that had already spent minutes
+    // downloading real filings, and told the author nothing about which id to
+    // fix. Caught here instead, before any work, naming the duplicate.
+    this.assertNoDuplicateHashes(assets);
+
     const incomingHashes = Array.from(
       new Set(assets.map((asset) => String(asset.hash))),
     );
@@ -2389,6 +2557,27 @@ export class AssetService {
         select: { key: true },
       });
       for (const row of rows) keys.add(`${CUSTOM_KEY_PREFIX}${row.key}`);
+    }
+
+    // TAG detectors are global, not per-source: every active one runs wherever
+    // augmentation (or a CUSTOM connector) asserts its key. They belong in the
+    // configured set for the same reason the runner injects them into the
+    // recipe — otherwise each scan resolves its own TAG findings as "removed".
+    if (this.customDetectors) {
+      try {
+        const tags = await this.customDetectors.buildRuntimeTagDetectors();
+        for (const tag of tags ?? []) {
+          if (tag && typeof tag.key === 'string' && tag.key.trim()) {
+            keys.add(`${CUSTOM_KEY_PREFIX}${tag.key.trim()}`);
+          }
+        }
+      } catch (error) {
+        // Cleanup is a courtesy, not the scan: a detector listing failure must
+        // not fail ingestion. Worst case the next run retries the cleanup.
+        this.logger.warn(
+          `Skipping TAG detectors in removed-detector cleanup: ${String(error)}`,
+        );
+      }
     }
 
     return keys;

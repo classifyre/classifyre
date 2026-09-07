@@ -25,19 +25,32 @@ import type {
   AgentRunDto,
   AgentRunListResponseDto,
   AgentSystemBriefDto,
+  AgentUndoListDto,
   AgentUsageResponseDto,
+  AnnotateJournalDto,
   AutopilotStatsDto,
   CreateAgentMemoryDto,
   CreateMcpServerDto,
+  CreateSupervisorGoalDto,
   HarnessToolsResponseDto,
   McpServerResponseDto,
   McpServerTestResultDto,
+  RevertResultDto,
+  SupervisorCapabilityListDto,
+  SupervisorGoalDto,
+  SupervisorGoalListDto,
+  SupervisorJournalListDto,
+  SupervisorStateDto,
   TriggerAutopilotDto,
   TriggerAutopilotResponseDto,
   UpdateAgentConfigDto,
   UpdateAgentMemoryDto,
+  UpdateCapabilitiesDto,
   UpdateMcpServerDto,
+  UpdateSupervisorDto,
+  UpdateSupervisorGoalDto,
   UpdateSystemBriefDto,
+  WakeSupervisorDto,
 } from '../models/index';
 import {
     AgentActivityListResponseDtoFromJSON,
@@ -60,20 +73,38 @@ import {
     AgentRunListResponseDtoToJSON,
     AgentSystemBriefDtoFromJSON,
     AgentSystemBriefDtoToJSON,
+    AgentUndoListDtoFromJSON,
+    AgentUndoListDtoToJSON,
     AgentUsageResponseDtoFromJSON,
     AgentUsageResponseDtoToJSON,
+    AnnotateJournalDtoFromJSON,
+    AnnotateJournalDtoToJSON,
     AutopilotStatsDtoFromJSON,
     AutopilotStatsDtoToJSON,
     CreateAgentMemoryDtoFromJSON,
     CreateAgentMemoryDtoToJSON,
     CreateMcpServerDtoFromJSON,
     CreateMcpServerDtoToJSON,
+    CreateSupervisorGoalDtoFromJSON,
+    CreateSupervisorGoalDtoToJSON,
     HarnessToolsResponseDtoFromJSON,
     HarnessToolsResponseDtoToJSON,
     McpServerResponseDtoFromJSON,
     McpServerResponseDtoToJSON,
     McpServerTestResultDtoFromJSON,
     McpServerTestResultDtoToJSON,
+    RevertResultDtoFromJSON,
+    RevertResultDtoToJSON,
+    SupervisorCapabilityListDtoFromJSON,
+    SupervisorCapabilityListDtoToJSON,
+    SupervisorGoalDtoFromJSON,
+    SupervisorGoalDtoToJSON,
+    SupervisorGoalListDtoFromJSON,
+    SupervisorGoalListDtoToJSON,
+    SupervisorJournalListDtoFromJSON,
+    SupervisorJournalListDtoToJSON,
+    SupervisorStateDtoFromJSON,
+    SupervisorStateDtoToJSON,
     TriggerAutopilotDtoFromJSON,
     TriggerAutopilotDtoToJSON,
     TriggerAutopilotResponseDtoFromJSON,
@@ -82,10 +113,18 @@ import {
     UpdateAgentConfigDtoToJSON,
     UpdateAgentMemoryDtoFromJSON,
     UpdateAgentMemoryDtoToJSON,
+    UpdateCapabilitiesDtoFromJSON,
+    UpdateCapabilitiesDtoToJSON,
     UpdateMcpServerDtoFromJSON,
     UpdateMcpServerDtoToJSON,
+    UpdateSupervisorDtoFromJSON,
+    UpdateSupervisorDtoToJSON,
+    UpdateSupervisorGoalDtoFromJSON,
+    UpdateSupervisorGoalDtoToJSON,
     UpdateSystemBriefDtoFromJSON,
     UpdateSystemBriefDtoToJSON,
+    WakeSupervisorDtoFromJSON,
+    WakeSupervisorDtoToJSON,
 } from '../models/index';
 
 export interface AutopilotControllerCancelRunRequest {
@@ -186,6 +225,53 @@ export interface McpServersControllerTestRequest {
 export interface McpServersControllerUpdateRequest {
     id: string;
     updateMcpServerDto: UpdateMcpServerDto;
+}
+
+export interface SupervisorControllerAnnotateRequest {
+    id: string;
+    annotateJournalDto: AnnotateJournalDto;
+}
+
+export interface SupervisorControllerCreateGoalRequest {
+    createSupervisorGoalDto: CreateSupervisorGoalDto;
+}
+
+export interface SupervisorControllerDeleteGoalRequest {
+    id: string;
+}
+
+export interface SupervisorControllerGoalsRequest {
+    includeFinished: string;
+}
+
+export interface SupervisorControllerJournalRequest {
+    limit: string;
+    before: string;
+}
+
+export interface SupervisorControllerRevertRequest {
+    id: string;
+}
+
+export interface SupervisorControllerSetCapabilitiesRequest {
+    updateCapabilitiesDto: UpdateCapabilitiesDto;
+}
+
+export interface SupervisorControllerUndoLogRequest {
+    limit: string;
+}
+
+export interface SupervisorControllerUpdateRequest {
+    updateSupervisorDto: UpdateSupervisorDto;
+}
+
+export interface SupervisorControllerUpdateGoalRequest {
+    id: string;
+    updateSupervisorGoalDto: UpdateSupervisorGoalDto;
+}
+
+export interface SupervisorControllerWakeRequest {
+    wakeSupervisorDto: WakeSupervisorDto;
 }
 
 /**
@@ -1182,6 +1268,516 @@ export class AutopilotApi extends runtime.BaseAPI {
         return await response.value();
     }
 
+    /**
+     * Correct an entry. Read back on the next wake as authoritative.
+     */
+    async supervisorControllerAnnotateRaw(requestParameters: SupervisorControllerAnnotateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling supervisorControllerAnnotate().'
+            );
+        }
+
+        if (requestParameters['annotateJournalDto'] == null) {
+            throw new runtime.RequiredError(
+                'annotateJournalDto',
+                'Required parameter "annotateJournalDto" was null or undefined when calling supervisorControllerAnnotate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/supervisor/journal/{id}/note`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AnnotateJournalDtoToJSON(requestParameters['annotateJournalDto']),
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Correct an entry. Read back on the next wake as authoritative.
+     */
+    async supervisorControllerAnnotate(requestParameters: SupervisorControllerAnnotateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.supervisorControllerAnnotateRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * What the supervisor is allowed to do
+     */
+    async supervisorControllerCapabilitiesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SupervisorCapabilityListDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/supervisor/capabilities`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SupervisorCapabilityListDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * What the supervisor is allowed to do
+     */
+    async supervisorControllerCapabilities(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SupervisorCapabilityListDto> {
+        const response = await this.supervisorControllerCapabilitiesRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Set a goal
+     */
+    async supervisorControllerCreateGoalRaw(requestParameters: SupervisorControllerCreateGoalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SupervisorGoalDto>> {
+        if (requestParameters['createSupervisorGoalDto'] == null) {
+            throw new runtime.RequiredError(
+                'createSupervisorGoalDto',
+                'Required parameter "createSupervisorGoalDto" was null or undefined when calling supervisorControllerCreateGoal().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/supervisor/goals`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateSupervisorGoalDtoToJSON(requestParameters['createSupervisorGoalDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SupervisorGoalDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Set a goal
+     */
+    async supervisorControllerCreateGoal(requestParameters: SupervisorControllerCreateGoalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SupervisorGoalDto> {
+        const response = await this.supervisorControllerCreateGoalRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Delete a goal
+     */
+    async supervisorControllerDeleteGoalRaw(requestParameters: SupervisorControllerDeleteGoalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling supervisorControllerDeleteGoal().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/supervisor/goals/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Delete a goal
+     */
+    async supervisorControllerDeleteGoal(requestParameters: SupervisorControllerDeleteGoalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.supervisorControllerDeleteGoalRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Goals and tasks, including the charter
+     */
+    async supervisorControllerGoalsRaw(requestParameters: SupervisorControllerGoalsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SupervisorGoalListDto>> {
+        if (requestParameters['includeFinished'] == null) {
+            throw new runtime.RequiredError(
+                'includeFinished',
+                'Required parameter "includeFinished" was null or undefined when calling supervisorControllerGoals().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['includeFinished'] != null) {
+            queryParameters['includeFinished'] = requestParameters['includeFinished'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/supervisor/goals`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SupervisorGoalListDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Goals and tasks, including the charter
+     */
+    async supervisorControllerGoals(requestParameters: SupervisorControllerGoalsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SupervisorGoalListDto> {
+        const response = await this.supervisorControllerGoalsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * What it did, wake by wake
+     */
+    async supervisorControllerJournalRaw(requestParameters: SupervisorControllerJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SupervisorJournalListDto>> {
+        if (requestParameters['limit'] == null) {
+            throw new runtime.RequiredError(
+                'limit',
+                'Required parameter "limit" was null or undefined when calling supervisorControllerJournal().'
+            );
+        }
+
+        if (requestParameters['before'] == null) {
+            throw new runtime.RequiredError(
+                'before',
+                'Required parameter "before" was null or undefined when calling supervisorControllerJournal().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        if (requestParameters['before'] != null) {
+            queryParameters['before'] = requestParameters['before'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/supervisor/journal`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SupervisorJournalListDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * What it did, wake by wake
+     */
+    async supervisorControllerJournal(requestParameters: SupervisorControllerJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SupervisorJournalListDto> {
+        const response = await this.supervisorControllerJournalRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Revert one agent action
+     */
+    async supervisorControllerRevertRaw(requestParameters: SupervisorControllerRevertRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RevertResultDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling supervisorControllerRevert().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/supervisor/undo/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RevertResultDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Revert one agent action
+     */
+    async supervisorControllerRevert(requestParameters: SupervisorControllerRevertRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RevertResultDto> {
+        const response = await this.supervisorControllerRevertRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Switch capability groups off
+     */
+    async supervisorControllerSetCapabilitiesRaw(requestParameters: SupervisorControllerSetCapabilitiesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SupervisorCapabilityListDto>> {
+        if (requestParameters['updateCapabilitiesDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateCapabilitiesDto',
+                'Required parameter "updateCapabilitiesDto" was null or undefined when calling supervisorControllerSetCapabilities().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/supervisor/capabilities`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateCapabilitiesDtoToJSON(requestParameters['updateCapabilitiesDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SupervisorCapabilityListDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Switch capability groups off
+     */
+    async supervisorControllerSetCapabilities(requestParameters: SupervisorControllerSetCapabilitiesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SupervisorCapabilityListDto> {
+        const response = await this.supervisorControllerSetCapabilitiesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Supervisor state, budget and pacing
+     */
+    async supervisorControllerStateRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SupervisorStateDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/supervisor`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SupervisorStateDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Supervisor state, budget and pacing
+     */
+    async supervisorControllerState(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SupervisorStateDto> {
+        const response = await this.supervisorControllerStateRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Agent actions that can still be taken back
+     */
+    async supervisorControllerUndoLogRaw(requestParameters: SupervisorControllerUndoLogRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentUndoListDto>> {
+        if (requestParameters['limit'] == null) {
+            throw new runtime.RequiredError(
+                'limit',
+                'Required parameter "limit" was null or undefined when calling supervisorControllerUndoLog().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/supervisor/undo`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentUndoListDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Agent actions that can still be taken back
+     */
+    async supervisorControllerUndoLog(requestParameters: SupervisorControllerUndoLogRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentUndoListDto> {
+        const response = await this.supervisorControllerUndoLogRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Enable, pause, or re-budget the supervisor
+     */
+    async supervisorControllerUpdateRaw(requestParameters: SupervisorControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SupervisorStateDto>> {
+        if (requestParameters['updateSupervisorDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateSupervisorDto',
+                'Required parameter "updateSupervisorDto" was null or undefined when calling supervisorControllerUpdate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/supervisor`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateSupervisorDtoToJSON(requestParameters['updateSupervisorDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SupervisorStateDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Enable, pause, or re-budget the supervisor
+     */
+    async supervisorControllerUpdate(requestParameters: SupervisorControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SupervisorStateDto> {
+        const response = await this.supervisorControllerUpdateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Edit a goal
+     */
+    async supervisorControllerUpdateGoalRaw(requestParameters: SupervisorControllerUpdateGoalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SupervisorGoalDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling supervisorControllerUpdateGoal().'
+            );
+        }
+
+        if (requestParameters['updateSupervisorGoalDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateSupervisorGoalDto',
+                'Required parameter "updateSupervisorGoalDto" was null or undefined when calling supervisorControllerUpdateGoal().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/supervisor/goals/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateSupervisorGoalDtoToJSON(requestParameters['updateSupervisorGoalDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SupervisorGoalDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Edit a goal
+     */
+    async supervisorControllerUpdateGoal(requestParameters: SupervisorControllerUpdateGoalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SupervisorGoalDto> {
+        const response = await this.supervisorControllerUpdateGoalRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Wake the supervisor now
+     */
+    async supervisorControllerWakeRaw(requestParameters: SupervisorControllerWakeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['wakeSupervisorDto'] == null) {
+            throw new runtime.RequiredError(
+                'wakeSupervisorDto',
+                'Required parameter "wakeSupervisorDto" was null or undefined when calling supervisorControllerWake().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/supervisor/wake`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: WakeSupervisorDtoToJSON(requestParameters['wakeSupervisorDto']),
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Wake the supervisor now
+     */
+    async supervisorControllerWake(requestParameters: SupervisorControllerWakeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.supervisorControllerWakeRaw(requestParameters, initOverrides);
+    }
+
 }
 
 /**
@@ -1195,7 +1791,8 @@ export const AutopilotControllerGetUsageAgentKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT'
+    Chat: 'CHAT',
+    Supervisor: 'SUPERVISOR'
 } as const;
 export type AutopilotControllerGetUsageAgentKindEnum = typeof AutopilotControllerGetUsageAgentKindEnum[keyof typeof AutopilotControllerGetUsageAgentKindEnum];
 /**
@@ -1209,7 +1806,8 @@ export const AutopilotControllerListActivityAgentKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT'
+    Chat: 'CHAT',
+    Supervisor: 'SUPERVISOR'
 } as const;
 export type AutopilotControllerListActivityAgentKindEnum = typeof AutopilotControllerListActivityAgentKindEnum[keyof typeof AutopilotControllerListActivityAgentKindEnum];
 /**
@@ -1247,6 +1845,14 @@ export const AutopilotControllerListActivityActionEnum = {
     RecomputeCorrelation: 'RECOMPUTE_CORRELATION',
     TuneCorrelation: 'TUNE_CORRELATION',
     NotifyOperator: 'NOTIFY_OPERATOR',
+    SetGoal: 'SET_GOAL',
+    CommandAgent: 'COMMAND_AGENT',
+    ConfigureAgent: 'CONFIGURE_AGENT',
+    PurgeFindings: 'PURGE_FINDINGS',
+    PurgeAssets: 'PURGE_ASSETS',
+    ScheduleWake: 'SCHEDULE_WAKE',
+    WriteJournal: 'WRITE_JOURNAL',
+    RevertAction: 'REVERT_ACTION',
     NoAction: 'NO_ACTION'
 } as const;
 export type AutopilotControllerListActivityActionEnum = typeof AutopilotControllerListActivityActionEnum[keyof typeof AutopilotControllerListActivityActionEnum];
@@ -1299,7 +1905,8 @@ export const AutopilotControllerListRunsAgentKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT'
+    Chat: 'CHAT',
+    Supervisor: 'SUPERVISOR'
 } as const;
 export type AutopilotControllerListRunsAgentKindEnum = typeof AutopilotControllerListRunsAgentKindEnum[keyof typeof AutopilotControllerListRunsAgentKindEnum];
 /**
@@ -1325,6 +1932,7 @@ export const AutopilotControllerUpdateAgentKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT'
+    Chat: 'CHAT',
+    Supervisor: 'SUPERVISOR'
 } as const;
 export type AutopilotControllerUpdateAgentKindEnum = typeof AutopilotControllerUpdateAgentKindEnum[keyof typeof AutopilotControllerUpdateAgentKindEnum];

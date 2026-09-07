@@ -117,3 +117,28 @@ describe('computeScopeFingerprint', () => {
     );
   });
 });
+
+describe('augmentation', () => {
+  const base = {
+    type: 'LOCAL_FOLDER',
+    required: { path: '/data' },
+    masked: {},
+    sampling: { strategy: 'ALL', rows_per_page: 100 },
+  };
+
+  it('ignores the augmentation notebook', () => {
+    const augmented = {
+      ...base,
+      augmentation: {
+        enabled: true,
+        notebook: {
+          revision: 7,
+          cells: [{ id: 'nb', type: 'code', source: 'def augment(a): pass' }],
+        },
+      },
+    };
+    expect(computeScopeFingerprint('LOCAL_FOLDER', augmented)).toBe(
+      computeScopeFingerprint('LOCAL_FOLDER', base),
+    );
+  });
+});

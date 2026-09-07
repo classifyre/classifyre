@@ -27,6 +27,7 @@ from .protocol import (
     ExecutionRequest,
     ExecutionResponse,
     ExecutionStatus,
+    NotebookScope,
 )
 from .redact import RedactingStream, Redactor
 from .sdk import Context
@@ -71,10 +72,63 @@ def build_context(recipe: dict[str, Any], *, should_abort: Any = None) -> Contex
     )
 
 
+def build_augmentation_context(recipe: dict[str, Any], *, should_abort: Any = None) -> Context:
+    """The `ctx` an augmentation notebook sees while being authored.
+
+    Same source of truth as the scan-time context in
+    ``augmentation.runner.AugmentationRuntime``: variables/secrets from the
+    augmentation section, the run's sampling, and the source identity. An
+    author debugging helpers with `cell`/`all` gets the same `ctx` the scan
+    will hand `augment()` — minus the asset, which only exists per call.
+    """
+    from ..augmentation.sdk import AugmentContext
+
+    augmentation = _section(recipe, "augmentation")
+    folders: dict[str, str] = {}
+    declared = augmentation.get("local_folders")
+    if isinstance(declared, list):
+        for entry in declared:
+            if isinstance(entry, dict) and entry.get("name") and entry.get("path"):
+                folders[str(entry["name"])] = str(entry["path"])
+    return AugmentContext(
+        variables=_string_map(augmentation.get("variables")),
+        secrets=_string_map(augmentation.get("secrets")),
+        sampling=_section(recipe, "sampling"),
+        files_dir=os.environ.get(NOTEBOOK_FILES_DIR_ENV) or None,
+        folders=folders,
+        should_abort=should_abort,
+        source={
+            "type": str(recipe.get("type") or ""),
+            "source_id": recipe.get("source_id"),
+        },
+    )
+
+
+def _augmentation_notebook(recipe: dict[str, Any]) -> tuple[list[Any], Any]:
+    """Cells + revision of the recipe's augmentation notebook."""
+    augmentation = _section(recipe, "augmentation")
+    notebook = augmentation.get("notebook")
+    notebook = notebook if isinstance(notebook, dict) else {}
+    cells = notebook.get("cells") or []
+    return (cells if isinstance(cells, list) else [], notebook.get("revision"))
+
+
 def resolve_timeout(request: ExecutionRequest) -> int:
     limits = _section(request.recipe, "optional", "limits")
+    return _timeout_from_limits(limits)
+
+
+def _resolve_scope_timeout(limits: dict[str, Any]) -> int:
+    """Timeout from the active scope's limits (augmentation or connector)."""
+    return _timeout_from_limits(limits)
+
+
+def _timeout_from_limits(limits: Any) -> int:
     try:
-        return int(limits.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
+        return int(
+            (limits.get("timeout_seconds") if isinstance(limits, dict) else None)
+            or DEFAULT_TIMEOUT_SECONDS
+        )
     except (TypeError, ValueError):
         return DEFAULT_TIMEOUT_SECONDS
 
@@ -134,9 +188,59 @@ def run_request(raw_request: dict[str, Any]) -> ExecutionResponse:
     """Execute one notebook request."""
     request = ExecutionRequest.from_dict(raw_request)
     recipe = request.recipe
-    notebook = _section(recipe, "required", "notebook")
-    cells = notebook.get("cells") or []
-    revision = request.revision or notebook.get("revision")
+    scope = getattr(request, "scope", NotebookScope.CONNECTOR)
+    is_augmentation = (
+        scope is NotebookScope.AUGMENTATION or request.mode is ExecutionMode.PREVIEW_AUGMENT
+    )
+
+    # preview_augment needs the real connector, so it runs as its own flow
+    # rather than as an in-process cell replay.
+    if request.mode is ExecutionMode.PREVIEW_AUGMENT:
+        import asyncio
+
+        from ..augmentation.preview import MAX_PREVIEW_ASSETS, preview_augment
+
+        revision = request.revision or _augmentation_notebook(recipe)[1]
+        try:
+            return asyncio.run(
+                preview_augment(
+                    recipe,
+                    max_assets=max(1, min(MAX_PREVIEW_ASSETS, request.max_assets)),
+                    execution_id=request.execution_id,
+                    revision=revision,
+                )
+            )
+        except Exception as exc:
+            return ExecutionResponse.failure(
+                request.mode,
+                ExecutionError(type=type(exc).__name__, message=str(exc)),
+                execution_id=request.execution_id,
+                revision=revision,
+                target_cell_id=request.target_cell_id,
+            )
+
+    if is_augmentation:
+        # `cell` / `all` while writing helpers: same cells the scan runs, the
+        # augmentation namespace bound, no asset. Ordinary print() debugging.
+        from ..augmentation.contract import REQUIRED_FUNCTIONS as AUGMENTATION_REQUIRED
+        from ..augmentation.sdk import augmentation_namespace
+
+        cells, notebook_revision = _augmentation_notebook(recipe)
+        revision = request.revision or notebook_revision
+        context: Context = build_augmentation_context(recipe)
+        namespace_builder = augmentation_namespace
+        contract_required: Any = tuple(AUGMENTATION_REQUIRED)
+        declared_packages = _section(recipe, "augmentation").get("packages")
+        limits = _section(recipe, "augmentation", "limits")
+    else:
+        notebook = _section(recipe, "required", "notebook")
+        cells = notebook.get("cells") or []
+        revision = request.revision or notebook.get("revision")
+        context = build_context(recipe)
+        namespace_builder = None
+        contract_required = None
+        declared_packages = _section(recipe, "optional").get("packages")
+        limits = _section(recipe, "optional", "limits")
 
     redactor = Redactor.from_recipe(recipe)
     # stderr carries CLI logging straight into runner-log storage, so it is
@@ -152,7 +256,7 @@ def run_request(raw_request: dict[str, Any]) -> ExecutionResponse:
     # Before any cell: a connector's client library has to be importable by the
     # first line that imports it, and resolving on every Run would make the
     # editor feel broken.
-    install_report = install_packages(_section(recipe, "optional").get("packages"))
+    install_report = install_packages(declared_packages)
     if install_report.error:
         return ExecutionResponse.failure(
             request.mode,
@@ -165,19 +269,21 @@ def run_request(raw_request: dict[str, Any]) -> ExecutionResponse:
             target_cell_id=request.target_cell_id,
         )
 
-    timeout = resolve_timeout(request)
+    timeout = _resolve_scope_timeout(limits if isinstance(limits, dict) else {})
     _install_timeout(timeout)
     try:
         return execute_notebook(
             cells,
             mode=request.mode,
             target_cell_id=request.target_cell_id,
-            context=build_context(recipe),
+            context=context,
             redactor=redactor,
             max_output_bytes=request.max_output_bytes,
             max_assets=request.max_assets,
             execution_id=request.execution_id,
             revision=revision,
+            namespace_builder=namespace_builder,
+            contract_required=contract_required,
         )
     except _TimeoutError as exc:
         return ExecutionResponse.failure(

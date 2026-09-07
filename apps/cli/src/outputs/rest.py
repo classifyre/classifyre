@@ -12,7 +12,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry  # type: ignore[import-untyped]
 
 from ..pipeline.text_artifact import TextArtifact
-from .base import OutputRuntimeContext, OutputType
+from .base import OutputRuntimeContext, OutputType, RelationshipReport
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +189,17 @@ class FinalizeIngestRunRequest(BaseModel):
     # What the scan cache saved, so the run can report it.
     assets_skipped_cached: int | None = Field(None, serialization_alias="assetsSkippedCached")
     detector_runs_skipped: int | None = Field(None, serialization_alias="detectorRunsSkipped")
+    # What happened to this run's lineage. See outputs.base.RelationshipReport:
+    # a failed or lost relationship pass must downgrade the run, because a green
+    # run with no edges is indistinguishable from a green run with edges.
+    relationships_emitted: int | None = Field(None, serialization_alias="relationshipsEmitted")
+    relationships_failed: int | None = Field(None, serialization_alias="relationshipsFailed")
+    relationships_lost: int | None = Field(None, serialization_alias="relationshipsLost")
+    relationships_dropped: int | None = Field(None, serialization_alias="relationshipsDropped")
+    relationship_errors: list[str] | None = Field(None, serialization_alias="relationshipErrors")
+    # "This run covered a slice of the source." Suppresses retirement: absence
+    # from a cohort run is not evidence that an asset is gone.
+    partial_coverage: bool | None = Field(None, serialization_alias="partialCoverage")
 
 
 class UpdateRunnerStatusRequest(BaseModel):
@@ -236,10 +247,19 @@ class RestOutputSink:
         self._seen_hashes: set[str] = set()
         self._sampling_cursor: dict[str, Any] | None = None
         self._scan_cache_savings: tuple[int, int] | None = None
+        self._partial_coverage: bool = False
+        self._partial_coverage_reason: str = ""
+        self.relationship_report = RelationshipReport()
 
     def set_sampling_cursor(self, cursor: dict[str, Any] | None) -> None:
         """Record the AUTOMATIC sampling cursor to persist on finalize."""
         self._sampling_cursor = cursor
+
+    def set_partial_coverage(self, reason: str = "") -> None:
+        """Mark this run as having covered only part of the source."""
+        self._partial_coverage = True
+        if reason:
+            self._partial_coverage_reason = str(reason)
 
     def set_scan_cache_savings(self, assets_skipped: int, detector_runs_skipped: int) -> None:
         """Record what the scan cache saved, to report on finalize."""
@@ -332,12 +352,22 @@ class RestOutputSink:
         runner_id = self._require_runner_id()
 
         savings = self._scan_cache_savings
+        lineage = self.relationship_report
         payload = FinalizeIngestRunRequest(
             runner_id=runner_id,
             seen_hashes=sorted(self._seen_hashes),
             sampling_cursor=self._sampling_cursor,
             assets_skipped_cached=savings[0] if savings else None,
             detector_runs_skipped=savings[1] if savings else None,
+            # Sent even when zero: "this run emitted edges and lost none" is a
+            # different claim from "this run never reported on its lineage",
+            # and only the first should let a run finish as COMPLETED.
+            relationships_emitted=lineage.emitted,
+            relationships_failed=lineage.failed,
+            relationships_lost=lineage.lost,
+            relationships_dropped=lineage.dropped,
+            relationship_errors=lineage.errors or None,
+            partial_coverage=True if self._partial_coverage else None,
         )
         self._request_json(
             "POST",
@@ -371,7 +401,7 @@ class RestOutputSink:
                 update_error,
             )
 
-    async def emit_edges(self, edges: list[IngestEdge]) -> dict[str, int]:
+    async def emit_edges(self, edges: list[IngestEdge]) -> dict[str, Any]:
         """Bulk-upsert source-derived relationship edges to the investigation graph.
 
         Idempotent — safe to call repeatedly with overlapping data, which is
@@ -381,8 +411,15 @@ class RestOutputSink:
         against a URN whose asset has not been ingested yet, and ``dropped``
         thrown away because an endpoint could not be resolved at all. The caller
         logs it; a silent zero here used to be indistinguishable from success.
+
+        A chunk the API refused outright is counted under ``lost`` — those edges
+        were assembled and then could not be sent, which is a different failure
+        from an endpoint the API could not resolve. Booking them as ``dropped``
+        (the bucket that is "expected in small numbers") once hid a total
+        lineage loss behind a green run.
         """
-        totals = {"upserted": 0, "external": 0, "dropped": 0}
+        totals: dict[str, Any] = {"upserted": 0, "external": 0, "dropped": 0, "lost": 0}
+        errors: list[str] = []
         if not edges:
             return totals
 
@@ -397,15 +434,22 @@ class RestOutputSink:
                     payload.model_dump(mode="json", by_alias=True),
                 )
                 if isinstance(response, dict):
-                    for key in totals:
+                    for key in ("upserted", "external", "dropped"):
                         value = response.get(key)
                         if isinstance(value, int):
                             totals[key] += value
                 logger.debug("Emitted %d source-derived edges to graph", len(chunk))
             except Exception as exc:
-                # Edge emission is best-effort: log and continue.
-                totals["dropped"] += len(chunk)
+                # Edge emission is best-effort: log and continue — but a chunk
+                # the API rejected is lost, not dropped, so the run is
+                # downgraded rather than reporting an unqualified success.
+                totals["lost"] += len(chunk)
+                message = f"{type(exc).__name__}: {exc}"
+                if message not in errors:
+                    errors.append(message)
                 logger.warning("Failed to emit edges to graph: %s", exc)
+        if errors:
+            totals["errors"] = errors
         return totals
 
     async def register_discovered_assets(

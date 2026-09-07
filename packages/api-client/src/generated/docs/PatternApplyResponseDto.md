@@ -10,6 +10,7 @@ Name | Type
 `applied` | number
 `workRemaining` | number
 `exclusionRuleId` | string
+`exclusionRuleIds` | Array&lt;string&gt;
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "applied": null,
   "workRemaining": null,
   "exclusionRuleId": null,
+  "exclusionRuleIds": null,
 } satisfies PatternApplyResponseDto
 
 console.log(example)

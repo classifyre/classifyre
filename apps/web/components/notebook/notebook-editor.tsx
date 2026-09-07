@@ -28,11 +28,25 @@ import {
 // Re-exported so existing imports of the cell shape keep working.
 export type { NotebookCell } from "@/lib/notebook-cells";
 
+export type NotebookRunMode =
+  | "cell"
+  | "all"
+  | "test_connection"
+  | "preview_extract"
+  | "preview_augment";
+
 export interface NotebookEditorProps {
   sourceId: string;
   cells: NotebookCell[];
   revision: number;
   disabled?: boolean;
+  /**
+   * Which notebook this editor owns. The connector notebook on CUSTOM sources;
+   * the per-asset augmentation notebook everywhere else. Every server call —
+   * load, save, scaffold, templates, executions — carries it, so two editors
+   * for the two scopes can sit on one page without sharing state.
+   */
+  scope?: "connector" | "augmentation";
   /**
    * Lets the page reach the notebook the editor owns — the assistant applies
    * its cell edits through this. Kept imperative because the editor is the
@@ -69,12 +83,12 @@ export interface NotebookEditorHandle {
   setCells: (cells: NotebookCell[]) => void;
   /** Resolves once the execution reaches a terminal state. */
   run: (
-    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    mode: NotebookRunMode,
     targetCellId?: string,
   ) => Promise<ExecutionRecord | null>;
   /** The same run, rendered as text an assistant can read and act on. */
   runAndSummarize: (
-    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    mode: NotebookRunMode,
     targetCellId?: string,
   ) => Promise<string>;
   cancel: () => void;
@@ -87,6 +101,7 @@ export function NotebookEditor({
   cells: initialCells,
   revision: initialRevision,
   disabled = false,
+  scope = "connector",
   handleRef,
   onBusyChange,
   onRunCell,
@@ -136,6 +151,7 @@ export function NotebookEditor({
     try {
       const response = await api.notebooks.notebookControllerUpdate({
         sourceId,
+        scope,
         updateNotebookDto: {
           baseRevision: revisionRef.current,
           cells: cellsRef.current,
@@ -182,7 +198,7 @@ export function NotebookEditor({
     } finally {
       setSaving(false);
     }
-  }, [disabled, sourceId, onSaved, t]);
+  }, [disabled, sourceId, scope, onSaved, t]);
 
   // Autosave, debounced. Editing is continuous and saving is cheap; making the
   // author remember Cmd+S is how notebook work gets lost.
@@ -201,7 +217,7 @@ export function NotebookEditor({
    */
   const runMode = React.useCallback(
     async (
-      mode: "cell" | "all" | "test_connection" | "preview_extract",
+      mode: NotebookRunMode,
       targetCellId?: string,
     ): Promise<ExecutionRecord | null> => {
       const current = dirty ? await save() : revisionRef.current;
@@ -210,6 +226,7 @@ export function NotebookEditor({
         const started = await run({
           revision: current,
           mode,
+          scope,
           targetCellId,
           maxAssets: 10,
         });
@@ -221,7 +238,7 @@ export function NotebookEditor({
         return null;
       }
     },
-    [dirty, save, run, t],
+    [dirty, save, run, scope, t],
   );
 
   React.useEffect(() => {
@@ -247,13 +264,14 @@ export function NotebookEditor({
   const reload = React.useCallback(async () => {
     const fresh = (await api.notebooks.notebookControllerGet({
       sourceId,
+      scope,
     })) as unknown as { revision: number; cells: NotebookCell[] };
     setCells(fresh.cells);
     setRevision(fresh.revision);
     revisionRef.current = fresh.revision;
     setDirty(false);
     setConflict(null);
-  }, [sourceId]);
+  }, [sourceId, scope]);
 
   // -- execution results ---------------------------------------------------
 
@@ -328,7 +346,11 @@ export function NotebookEditor({
             size="sm"
             variant="ghost"
             onClick={() => {
-              window.location.href = `${window.location.pathname.replace(/\/$/, "")}/notebook/export`;
+              const base = window.location.pathname.replace(/\/$/, "");
+              window.location.href =
+                scope === "augmentation"
+                  ? `${base}/notebook/export?scope=augmentation`
+                  : `${base}/notebook/export`;
             }}
             disabled={disabled}
           >
@@ -399,6 +421,32 @@ export function NotebookEditor({
           </CardContent>
         </Card>
       )}
+
+      {/* Shown independently of `ok`: a warning never blocks a save, and the
+          one it exists for — a later cell silently replacing an earlier cell's
+          helper, because cells share one module namespace — leaves a notebook
+          that is perfectly valid and quietly broken at runtime. */}
+      {contract &&
+        Array.isArray(contract.warnings) &&
+        (contract.warnings as Array<{ message: string }>).length > 0 && (
+          <Card className="border-amber-500/30">
+            <CardContent className="flex items-start gap-3 pt-6">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  {t("notebook.contract.warningsTitle")}
+                </p>
+                <ul className="space-y-0.5 text-sm text-muted-foreground">
+                  {(contract.warnings as Array<{ message: string }>).map(
+                    (warning, index) => (
+                      <li key={index}>{warning.message}</li>
+                    ),
+                  )}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
       {verdict && (
         <Card

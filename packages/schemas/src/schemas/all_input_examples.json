@@ -603,6 +603,45 @@
           }
         ]
       }
+    },
+    {
+      "name": "Enrich with augmentation",
+      "description": "Attach an augmentation notebook to a PostgreSQL source: a join key, a tag, and a lineage edge per asset, without touching the connector.",
+      "config": {
+        "type": "POSTGRESQL",
+        "required": {
+          "host": "your-host",
+          "port": 5432
+        },
+        "masked": {
+          "username": "your-username",
+          "password": "your-password"
+        },
+        "optional": {},
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 50
+        },
+        "augmentation": {
+          "enabled": true,
+          "notebook": {
+            "revision": 1,
+            "cells": [
+              {
+                "id": "enrich",
+                "type": "code",
+                "source": "from classifyre import FlowType, Ref, flow, urn_for\n\n\ndef augment(asset):\n    customer = asset.metadata.get(\"customer_id\")\n    if customer:\n        asset.set(\"join_key\", f\"customer:{customer}\")\n    if asset.metadata.get(\"under_review\"):\n        asset.tag(\"legal_hold\", \"retained-pending-litigation\")\n    yield flow(\n        upstream=Ref.urn(\n            urn_for(\"postgres\", \"warehouse\", asset.metadata.get(\"table\", \"orders\"))\n        ),\n        downstream=asset.ref,\n        type=FlowType.COPY,\n    )\n"
+              }
+            ]
+          },
+          "variables": {},
+          "secrets": {},
+          "packages": [],
+          "limits": {
+            "per_asset_timeout_seconds": 30
+          }
+        }
+      }
     }
   ],
   "MYSQL": [
@@ -3887,6 +3926,158 @@
           "strategy": "ALL",
           "rows_per_page": 100
         }
+      }
+    },
+    {
+      "name": "Tagging what you already know",
+      "description": "Records facts the source system already holds -- a classification, a legal hold -- as findings, without running any classifier over the content. Each key is the key of a Tag detector.",
+      "config": {
+        "type": "CUSTOM",
+        "required": {
+          "notebook": {
+            "revision": 1,
+            "cells": [
+              {
+                "id": "intro",
+                "type": "markdown",
+                "source": "# Tagging what you already know\n\nSome facts do not need detecting. The system you are reading from already knows\nthat a table holds cardholder data, that a folder is under legal hold, that a\ndataset came from a regulated jurisdiction. Running a classifier over the\ncontent to re-derive that can only lose information.\n\n`Asset.tags` records those facts directly. Each key is the **key of a Tag\ndetector**; the value is what you are asserting:\n\n    yield Asset(id=\"accounts\", tags={\"cardholder_data\": \"primary-account-numbers\"})\n\nEach entry becomes a finding on the asset, carrying that detector's label and\nseverity, and behaves like any other finding from there: it shows on the asset,\nfilters by severity, and can be cited in a case.\n\n**Before this runs**, create the Tag detector: *Detectors -> New -> Tag*. The key\nyou give it is the key you write here. A tag whose key matches no Tag detector is\nreported as a scan warning and skipped -- so if a tag does not appear, check the\nscan log for the key.\n\nReach for a tag when the source already has the answer. Reach for a Regex,\nGLiNER2 or AI detector when the answer is in the content and has to be found.\n"
+              },
+              {
+                "id": "imports",
+                "type": "code",
+                "source": "from classifyre import Asset, ctx\n"
+              },
+              {
+                "id": "test-connection",
+                "type": "code",
+                "source": "def test_connection() -> dict:\n    return {\"status\": \"SUCCESS\", \"message\": \"Ready.\"}\n"
+              },
+              {
+                "id": "extract",
+                "type": "code",
+                "source": "#: Stand-in for whatever catalog you actually read from.\nTABLES = [\n    {\n        \"id\": \"prod.payments.transactions\",\n        \"name\": \"transactions\",\n        \"sample\": \"card_last4,amount,captured_at\\n4242,240.00,2026-08-01\\n\",\n        \"classification\": \"cardholder-data\",\n        \"legal_hold\": True,\n    },\n    {\n        \"id\": \"prod.analytics.daily_active\",\n        \"name\": \"daily_active\",\n        \"sample\": \"day,users\\n2026-08-01,18422\\n\",\n        \"classification\": None,\n        \"legal_hold\": False,\n    },\n]\n\n\ndef extract():\n    for table in TABLES:\n        if ctx.should_abort:\n            break\n\n        # Build the tags from what the catalog already told you. Each key is a\n        # Tag detector's key; skip a key rather than asserting an empty value.\n        tags = {}\n        if table[\"classification\"]:\n            tags[\"cardholder_data\"] = table[\"classification\"]\n        if table[\"legal_hold\"]:\n            tags[\"legal_hold\"] = \"retained-pending-litigation\"\n\n        yield Asset(\n            id=table[\"id\"],\n            name=table[\"name\"],\n            content=table[\"sample\"],\n            kind=\"table\",\n            tags=tags,\n        )\n"
+              }
+            ]
+          }
+        },
+        "masked": {
+          "secrets": {}
+        },
+        "optional": {
+          "variables": {},
+          "limits": {
+            "timeout_seconds": 900
+          }
+        },
+        "sampling": {
+          "strategy": "ALL",
+          "rows_per_page": 100
+        }
+      }
+    }
+  ],
+  "AUGMENTATION":   [
+    {
+      "name": "Starter notebook",
+      "description": "The minimum an augmentation needs: setup/augment/finalize with a first cell documenting the whole API. Edit augment() to enrich.",
+      "notebook": {
+        "revision": 1,
+        "cells": [
+          {
+            "id": "intro",
+            "type": "markdown",
+            "source": "# Source augmentation\n\nThis notebook runs **per asset**, after this source's own connector extracted it\nand before detectors see it. It may only **add** — metadata, tags, links, a URN,\nand relationship edges. It cannot change what the connector extracted, cannot\ndrop an asset, and cannot fail a scan: any error degrades to a scan warning and\nthe asset proceeds as if augmentation were disabled.\n\nThe notebook must define `augment(asset)`. It may also define `setup()` (once,\nbefore the first asset — build lookup tables into `ctx.state`) and `finalize()`\n(once, at the end — may yield edges between assets that are only both known now).\n\nReading the asset (as the connector produced it):\n\n- `asset.hash`, `asset.id`, `asset.name`, `asset.kind`, `asset.url`, `asset.urn`\n- `asset.metadata` — read-only view of the connector's own metadata\n- `asset.ref` — `Ref.asset(asset.hash)`, for edge builders\n\nLazy payload (fetched only when called — `payload()` on a warehouse re-reads\nthe row, so call it only when the extracted text is not enough):\n\n- `asset.payload()` — raw source bytes (file-shaped sources) or `None`\n- `asset.raw_pages()` — the connector's own raw representation, page by page\n- `asset.rows()` — dict rows, when the raw representation is JSON records\n- `asset.text()` / `asset.pages()` — extracted text, whole or page by page\n\nWriting (additive only):\n\n- `asset.set(\"join_key\", key)` — lands under `metadata[\"augmentation\"]`\n- `asset.tag(\"legal_hold\", \"retained-pending-litigation\")` — needs a Tag\n  detector with that key, or the tag is skipped with a warning\n- `asset.link(other_hash)` — an untyped \"related\" link\n- `asset.set_urn(urn_for(\"snowflake\", \"acme\", \"PROD\", \"PUBLIC\", \"ORDERS\"))` —\n  only when the connector left the URN empty\n- `yield flow(upstream=Ref.urn(...), downstream=asset.ref, type=FlowType.COPY)` —\n  typed lineage, exactly as a CUSTOM connector yields it\n\nConfiguration comes from `ctx`:\n\n- `ctx.var(\"name\")` / `ctx.secret(\"name\")` — Variables / Secrets below\n- `ctx.state` — your own dict, survives across assets in this run\n- `ctx.source` — `{\"type\": \"POSTGRESQL\", ...}`, the source you augment\n"
+          },
+          {
+            "id": "scaffold",
+            "type": "code",
+            "source": "from classifyre import FlowType, Ref, ctx, flow, urn_for\n\n\ndef setup():\n    \"\"\"Once, before the first asset. Build lookup tables into ctx.state.\"\"\"\n    ctx.state[\"seen\"] = 0\n\n\ndef augment(asset):\n    \"\"\"Enrich one asset. May also yield relationship edges.\"\"\"\n    ctx.state[\"seen\"] = ctx.state.get(\"seen\", 0) + 1\n    asset.set(\"augmented\", True)\n\n\ndef finalize():\n    \"\"\"Once, at the end. May yield edges now that every asset has been seen.\"\"\"\n    return\n    yield  # makes this a generator without yielding anything\n"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Tag from what you already know",
+      "description": "Assert a fact the source system already knows as a tag. Each key needs a Tag detector with the same key.",
+      "notebook": {
+        "revision": 1,
+        "cells": [
+          {
+            "id": "tag-known-fact",
+            "type": "code",
+            "source": "from classifyre import ctx\n\n\ndef augment(asset):\n    \"\"\"Tag assets the source already knows are under litigation hold.\"\"\"\n    hold_list = ctx.var(\"legal_hold_ids\", \"\").split(\",\")\n    if asset.id in [entry.strip() for entry in hold_list if entry.strip()]:\n        asset.tag(\"legal_hold\", \"retained-pending-litigation\")\n"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Compute a join key",
+      "description": "Precompute a normalized join key into metadata so detectors and downstream joins can match across systems.",
+      "notebook": {
+        "revision": 1,
+        "cells": [
+          {
+            "id": "join-key",
+            "type": "code",
+            "source": "import re\n\n\ndef _normalize(value):\n    return re.sub(r\"[^a-z0-9]+\", \"-\", str(value or \"\").lower()).strip(\"-\")\n\n\ndef augment(asset):\n    \"\"\"Derive a stable join key from the connector's own metadata.\"\"\"\n    customer = asset.metadata.get(\"customer_id\") or asset.metadata.get(\"email\")\n    if customer:\n        asset.set(\"join_key\", f\"customer:{_normalize(customer)}\")\n"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Link to an asset in another source by URN",
+      "description": "Draw a lineage edge from an asset another source owns to this one.",
+      "notebook": {
+        "revision": 1,
+        "cells": [
+          {
+            "id": "link-by-urn",
+            "type": "code",
+            "source": "from classifyre import FlowType, Ref, flow, urn_for\n\n\ndef augment(asset):\n    \"\"\"This warehouse table is copied from an S3 object the S3 source scans.\"\"\"\n    table = asset.metadata.get(\"table_name\")\n    if table:\n        upstream = Ref.urn(urn_for(\"s3\", ctx.var(\"landing_bucket\", \"landing\"), table))\n        yield flow(upstream=upstream, downstream=asset.ref, type=FlowType.COPY)\n"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Look a value up in an external API",
+      "description": "Enrich from another system at scan time, with a setup()-built session and secrets kept out of the notebook.",
+      "notebook": {
+        "revision": 1,
+        "cells": [
+          {
+            "id": "external-lookup",
+            "type": "code",
+            "source": "import requests\nfrom classifyre import ctx\n\n\ndef setup():\n    session = requests.Session()\n    session.headers[\"Authorization\"] = f\"Bearer {ctx.secret('enrichment_api_token')}\"\n    ctx.state[\"session\"] = session\n    ctx.state[\"base_url\"] = ctx.var(\"enrichment_base_url\")\n\n\ndef augment(asset):\n    \"\"\"Attach the owning team's name from the service catalog.\"\"\"\n    session = ctx.state.get(\"session\")\n    owner_id = asset.metadata.get(\"owner_id\")\n    if not session or not owner_id:\n        return\n    response = session.get(\n        f\"{ctx.state['base_url']}/owners/{owner_id}\", timeout=10\n    )\n    if response.ok:\n        asset.set(\"owner_team\", response.json().get(\"team\", \"unknown\"))\n"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Derive metadata from the raw payload",
+      "description": "Read the source value — not the extracted text — when the answer is in the raw representation. Lazy: paid only when called.",
+      "notebook": {
+        "revision": 1,
+        "cells": [
+          {
+            "id": "raw-payload",
+            "type": "code",
+            "source": "def augment(asset):\n    \"\"\"Count line items in the raw row without re-running extraction.\"\"\"\n    rows = list(asset.rows())\n    if rows:\n        asset.set(\"line_item_count\", len(rows))\n        currencies = {row.get(\"currency\") for row in rows if row.get(\"currency\")}\n        if len(currencies) > 1:\n            asset.tag(\"multi_currency\", \",\".join(sorted(currencies)))\n"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Link assets to each other by a computed hash",
+      "description": "Pair assets both sides of a computed key. Needs finalize(): both sides are only known once every asset has been seen.",
+      "notebook": {
+        "revision": 1,
+        "cells": [
+          {
+            "id": "pair-by-hash",
+            "type": "code",
+            "source": "from classifyre import references\n\n\ndef setup():\n    ctx.state[\"by_order\"] = {}\n\n\ndef augment(asset):\n    \"\"\"Index every asset by its order id for finalize() to pair up.\"\"\"\n    order_id = asset.metadata.get(\"order_id\")\n    if order_id:\n        ctx.state[\"by_order\"].setdefault(str(order_id), []).append(asset.ref)\n\n\ndef finalize():\n    \"\"\"Link invoice and shipment assets sharing an order id.\"\"\"\n    groups = ctx.state.get(\"by_order\", {})\n    for refs in groups.values():\n        if len(refs) > 1:\n            first, *rest = refs\n            for other in rest:\n                yield references(first, other)\n"
+          }
+        ]
       }
     }
   ]

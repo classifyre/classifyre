@@ -49,6 +49,7 @@ import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
 import { AutopilotService } from './autopilot/autopilot.service';
 import { GraphService } from './graph.service';
+import { summarizeNotebook } from './utils/notebook-summary';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
@@ -1088,21 +1089,33 @@ export class McpServerFactoryService {
       'get_source',
       {
         title: 'Get Source',
-        description: 'Fetch a single source by ID.',
+        description:
+          "Fetch a single source by ID. A CUSTOM source's notebook cells are " +
+          'summarised rather than inlined — the whole connector program would ' +
+          'otherwise land in context on every read. Pass include_notebook when ' +
+          'you actually need the code, or use get_notebook.',
         inputSchema: {
           id: z.string().uuid(),
+          include_notebook: z
+            .boolean()
+            .optional()
+            .describe(
+              'Inline the notebook cells instead of just { revision, cellCount }',
+            ),
         },
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
         },
       },
-      async ({ id }) => {
+      async ({ id, include_notebook }) => {
         const source = await this.sourceService.source({ id });
         if (!source) {
           throw new NotFoundException(`Source with ID ${id} not found`);
         }
-        return jsonResult(source);
+        return jsonResult(
+          include_notebook === true ? source : summarizeNotebook(source),
+        );
       },
     );
 
@@ -1304,27 +1317,37 @@ export class McpServerFactoryService {
    * which re-validates the whole config against the CUSTOM JSON Schema.
    */
   private registerNotebookTools(server: McpServerCompat) {
+    // Which notebook a tool addresses. Defaults to `connector` so every
+    // existing call keeps its meaning; `augmentation` addresses the per-asset
+    // enrichment notebook any source type may carry.
+    const scopeSchema = z
+      .enum(['connector', 'augmentation'])
+      .default('connector')
+      .describe(
+        'Which notebook: the CUSTOM source’s connector notebook, or the per-asset augmentation notebook.',
+      );
     server.registerTool(
       'get_notebook',
       {
         title: 'Get Notebook',
         description:
-          'Read a CUSTOM source’s notebook: cells, revision, variables, secret keys, packages, and local folders.',
+          'Read a source’s notebook: cells, revision, variables, secret keys, packages, and local folders.',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
         },
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
         },
       },
-      async ({ sourceId }) => {
-        const notebook = await this.notebookService.get(sourceId);
-        const optional = await this.notebookOptionalConfig(sourceId);
+      async ({ sourceId, scope = 'connector' }) => {
+        const notebook = await this.notebookService.get(sourceId, scope);
+        const section = await this.notebookConfigSection(sourceId, scope);
         return jsonResult({
           ...notebook,
-          packages: optional.packages ?? [],
-          localFolders: optional.local_folders ?? [],
+          packages: section.packages ?? [],
+          localFolders: section.local_folders ?? [],
         });
       },
     );
@@ -1337,6 +1360,7 @@ export class McpServerFactoryService {
           'Insert a new cell into a notebook. Appended at the end unless afterCellId is given.',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
           baseRevision: z.number().int().min(1),
           cellId: z
             .string()
@@ -1352,9 +1376,17 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async ({ sourceId, baseRevision, cellId, type, source, afterCellId }) => {
+      async ({
+        sourceId,
+        scope = 'connector',
+        baseRevision,
+        cellId,
+        type,
+        source,
+        afterCellId,
+      }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        const notebook = await this.notebookService.get(sourceId);
+        const notebook = await this.notebookService.get(sourceId, scope);
         const newCell = {
           id: cellId ?? `cell-${Date.now().toString(36)}`,
           type,
@@ -1375,10 +1407,14 @@ export class McpServerFactoryService {
           );
         }
         cells.splice(insertAt, 0, newCell);
-        const result = await this.notebookService.update(sourceId, {
-          baseRevision,
-          cells,
-        });
+        const result = await this.notebookService.update(
+          sourceId,
+          {
+            baseRevision,
+            cells,
+          },
+          scope,
+        );
         return jsonResult({ ...result, cellId: newCell.id });
       },
     );
@@ -1390,6 +1426,7 @@ export class McpServerFactoryService {
         description: 'Replace one cell’s source (and optionally its type).',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
           baseRevision: z.number().int().min(1),
           cellId: z.string(),
           source: z.string(),
@@ -1400,19 +1437,30 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async ({ sourceId, baseRevision, cellId, source, type }) => {
+      async ({
+        sourceId,
+        scope = 'connector',
+        baseRevision,
+        cellId,
+        source,
+        type,
+      }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        const notebook = await this.notebookService.get(sourceId);
+        const notebook = await this.notebookService.get(sourceId, scope);
         const index = notebook.cells.findIndex((cell) => cell.id === cellId);
         if (index === -1) {
           throw new NotFoundException(`No cell with id '${cellId}'.`);
         }
         const cells = [...notebook.cells];
         cells[index] = { ...cells[index], source, ...(type ? { type } : {}) };
-        const result = await this.notebookService.update(sourceId, {
-          baseRevision,
-          cells,
-        });
+        const result = await this.notebookService.update(
+          sourceId,
+          {
+            baseRevision,
+            cells,
+          },
+          scope,
+        );
         return jsonResult(result);
       },
     );
@@ -1424,6 +1472,7 @@ export class McpServerFactoryService {
         description: 'Remove one cell from a notebook.',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
           baseRevision: z.number().int().min(1),
           cellId: z.string(),
         },
@@ -1432,17 +1481,21 @@ export class McpServerFactoryService {
           destructiveHint: true,
         },
       },
-      async ({ sourceId, baseRevision, cellId }) => {
+      async ({ sourceId, scope = 'connector', baseRevision, cellId }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        const notebook = await this.notebookService.get(sourceId);
+        const notebook = await this.notebookService.get(sourceId, scope);
         if (!notebook.cells.some((cell) => cell.id === cellId)) {
           throw new NotFoundException(`No cell with id '${cellId}'.`);
         }
         const cells = notebook.cells.filter((cell) => cell.id !== cellId);
-        const result = await this.notebookService.update(sourceId, {
-          baseRevision,
-          cells,
-        });
+        const result = await this.notebookService.update(
+          sourceId,
+          {
+            baseRevision,
+            cells,
+          },
+          scope,
+        );
         return jsonResult(result);
       },
     );
@@ -1455,6 +1508,7 @@ export class McpServerFactoryService {
           'Replace the Python packages installed into the notebook’s run environment before any cell executes. Call list_notebook_runtime_packages first — the base image’s own dependencies do not need listing.',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
           packages: z.array(
             z.object({ name: z.string(), version: z.string().optional() }),
           ),
@@ -1464,10 +1518,10 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async ({ sourceId, packages }) => {
+      async ({ sourceId, scope = 'connector', packages }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.updateNotebookOptionalConfig(sourceId, { packages }),
+          await this.updateNotebookConfigSection(sourceId, scope, { packages }),
         );
       },
     );
@@ -1480,6 +1534,7 @@ export class McpServerFactoryService {
           'Replace the local folders a notebook reads with ctx.folder("name"). Desktop only — not available in Kubernetes deployments, where files are uploaded to the source instead (upload_notebook_file).',
         inputSchema: {
           sourceId: z.string().uuid(),
+          scope: scopeSchema,
           folders: z.array(z.object({ name: z.string(), path: z.string() })),
         },
         annotations: {
@@ -1487,10 +1542,10 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async ({ sourceId, folders }) => {
+      async ({ sourceId, scope = 'connector', folders }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.updateNotebookOptionalConfig(sourceId, {
+          await this.updateNotebookConfigSection(sourceId, scope, {
             local_folders: folders,
           }),
         );
@@ -1590,10 +1645,17 @@ export class McpServerFactoryService {
       {
         title: 'Run Notebook',
         description:
-          'Start a notebook execution and return immediately — poll get_notebook_execution for the result. Modes: "cell" runs one cell (requires targetCellId), "test_connection" is the connection/auth smoke test, "preview_extract" samples a few assets end-to-end, "all" replays every cell in order (the closest thing to a full local test of the whole connector).',
+          'Start a notebook execution and return immediately — poll get_notebook_execution for the result. Modes: "cell" runs one cell (requires targetCellId), "test_connection" is the connection/auth smoke test, "preview_extract" samples a few assets end-to-end, "preview_augment" runs the augmentation notebook over a sample of real assets and reports per-asset diffs, "all" replays every cell in order (the closest thing to a full local test of the whole connector).',
         inputSchema: {
           sourceId: z.string().uuid(),
-          mode: z.enum(['cell', 'all', 'test_connection', 'preview_extract']),
+          scope: scopeSchema,
+          mode: z.enum([
+            'cell',
+            'all',
+            'test_connection',
+            'preview_extract',
+            'preview_augment',
+          ]),
           targetCellId: z
             .string()
             .optional()
@@ -1605,12 +1667,18 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async ({ sourceId, mode, targetCellId, maxAssets }) => {
+      async ({
+        sourceId,
+        scope = 'connector',
+        mode,
+        targetCellId,
+        maxAssets,
+      }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        const notebook = await this.notebookService.get(sourceId);
+        const notebook = await this.notebookService.get(sourceId, scope);
         const execution = await this.notebookExecutionService.create(
           sourceId,
-          { revision: notebook.revision, mode, targetCellId, maxAssets },
+          { revision: notebook.revision, mode, scope, targetCellId, maxAssets },
           'mcp',
         );
         return jsonResult(this.notebookExecutionService.toDto(execution));
@@ -1689,26 +1757,33 @@ export class McpServerFactoryService {
     );
   }
 
-  /** `optional.packages` / `optional.local_folders` live beside the notebook
-   * in source config, not inside it -- see the CustomOptional schema. */
-  private async notebookOptionalConfig(
+  /** Packages and local folders live beside their notebook in source config:
+   * `optional.*` for the connector (see the CustomOptional schema),
+   * `augmentation.*` for the augmentation notebook. */
+  private async notebookConfigSection(
     sourceId: string,
+    scope: 'connector' | 'augmentation' = 'connector',
   ): Promise<Record<string, any>> {
     const source = await this.requireSource(sourceId);
     const config = this.sourceService.decryptSourceConfig(source.config);
+    if (scope === 'augmentation') {
+      return ((config.augmentation ?? {}) as Record<string, any>) ?? {};
+    }
     return (config.optional ?? {}) as Record<string, any>;
   }
 
-  private async updateNotebookOptionalConfig(
+  private async updateNotebookConfigSection(
     sourceId: string,
+    scope: 'connector' | 'augmentation' = 'connector',
     patch: Record<string, unknown>,
   ) {
     const source = await this.requireSource(sourceId);
     const config = this.sourceService.decryptSourceConfig(source.config);
+    const key = scope === 'augmentation' ? 'augmentation' : 'optional';
     const merged = {
       ...config,
-      optional: {
-        ...((config.optional as Record<string, unknown>) ?? {}),
+      [key]: {
+        ...((config[key] as Record<string, unknown>) ?? {}),
         ...patch,
       },
     };
@@ -1837,7 +1912,7 @@ export class McpServerFactoryService {
       {
         title: 'Create Custom Detector',
         description:
-          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, or OBJECT_DETECTION. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt.',
+          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, or TAG. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={"<key>": "<value>"}), and it is not selectable on a source.',
         inputSchema: {
           key: z.string().optional(),
           name: z.string(),
@@ -1850,7 +1925,7 @@ export class McpServerFactoryService {
               'AI provider credential ID. Required for LLM (AI) detectors.',
             ),
           pipeline_schema: jsonObjectSchema.describe(
-            'Pipeline schema. GLiNER2 example: { type: "GLINER2", entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } } }. LLM (AI) example: { type: "LLM", system_prompt: "Classify the sentiment of the text.", labels: [{ name: "good" }, { name: "bad" }, { name: "violent" }], severity_map: [{ pattern: "violent", severity: "critical" }], output_fields: [{ name: "language", type: "string" }] }',
+            'Pipeline schema. GLiNER2 example: { type: "GLINER2", entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } } }. LLM (AI) example: { type: "LLM", system_prompt: "Classify the sentiment of the text.", labels: [{ name: "good" }, { name: "bad" }, { name: "violent" }], severity_map: [{ pattern: "violent", severity: "critical" }], output_fields: [{ name: "language", type: "string" }] }. TAG example: { type: "TAG", label: "Cardholder data", severity: "high" }',
           ),
           isActive: z.boolean().optional(),
         },
@@ -2609,9 +2684,17 @@ export class McpServerFactoryService {
       {
         title: 'Get Findings Discovery',
         description:
-          'Return discovery totals, activity, and top assets for findings.',
+          'Return discovery totals, review-state mix, activity, and top assets ' +
+          'for findings. Severity is a priority level, not a threat level — it says ' +
+          'how much a finding matters, not how dangerous it is.',
         inputSchema: {
-          windowDays: z.number().int().min(1).max(365).optional(),
+          // The rollup is keyed to these three windows and the HTTP DTO
+          // validates them; the MCP path bypasses that validator, so an
+          // arbitrary number here would silently produce a window nothing else
+          // in the product can reproduce.
+          windowDays: z
+            .union([z.literal(7), z.literal(30), z.literal(90)])
+            .optional(),
           includeResolved: z.boolean().optional(),
         },
         annotations: {
@@ -2654,6 +2737,86 @@ export class McpServerFactoryService {
       async ({ source_id }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.sourceService.purgeFindings(source_id));
+      },
+    );
+
+    server.registerTool(
+      'purge_source_assets',
+      {
+        title: 'Purge Source Assets',
+        description:
+          'Permanently delete assets of a source, and with them every finding, ' +
+          'extraction, correlation value and chunk derived from those assets. ' +
+          'Heavier than purge_source_findings: it removes the ingested material ' +
+          'itself, so the source must be re-scanned before anything from it can be ' +
+          'examined again. Correlation fingerprints are recomputed afterwards.\n\n' +
+          'With no filter this deletes EVERY asset of the source. The filters exist ' +
+          'for the case a scan can never resolve on its own: when a connector narrows ' +
+          'its scope, the assets it used to produce are stranded, because retirement ' +
+          'requires a run that saw the whole scope and found them gone — and a ' +
+          'rotating-sample connector never has one. ALWAYS call once with dry_run ' +
+          'first and report what it matched before deleting.',
+        inputSchema: {
+          source_id: z.string().describe('Source whose assets to purge'),
+          confirm: z
+            .literal(true)
+            .describe('Must be true — acknowledges the purge is irreversible'),
+          external_id_prefix: z
+            .string()
+            .optional()
+            .describe(
+              "Only assets whose connector-assigned id (metadata.external_id) starts with this, e.g. 'fin-'",
+            ),
+          asset_kind: z
+            .string()
+            .optional()
+            .describe(
+              'Only assets of this catalog kind: record | document | page | file | table',
+            ),
+          name_prefix: z
+            .string()
+            .optional()
+            .describe('Only assets whose display name starts with this'),
+          urn_prefix: z
+            .string()
+            .optional()
+            .describe('Only assets whose URN starts with this'),
+          not_scanned_since: z
+            .string()
+            .optional()
+            .describe(
+              'ISO-8601 timestamp; only assets last scanned before it, plus assets never scanned',
+            ),
+          dry_run: z
+            .boolean()
+            .optional()
+            .describe('Report what matches and delete nothing'),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+        },
+      },
+      async ({
+        source_id,
+        external_id_prefix,
+        asset_kind,
+        name_prefix,
+        urn_prefix,
+        not_scanned_since,
+        dry_run,
+      }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.sourceService.purgeAssets(source_id, {
+            externalIdPrefix: external_id_prefix,
+            assetKind: asset_kind,
+            namePrefix: name_prefix,
+            urnPrefix: urn_prefix,
+            notScannedSince: not_scanned_since,
+            dryRun: dry_run === true,
+          }),
+        );
       },
     );
   }

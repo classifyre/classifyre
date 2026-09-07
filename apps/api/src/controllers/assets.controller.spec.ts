@@ -15,6 +15,11 @@ describe('SourceAssetsController', () => {
     finalizeIngestRun: jest.fn(),
     recordScanCacheSavings: jest.fn(),
     recordRunSamplingCursor: jest.fn().mockResolvedValue(undefined),
+    recordRelationshipOutcome: jest.fn().mockResolvedValue({
+      failed: 0,
+      lost: 0,
+      errors: [],
+    }),
   };
   const sourceService = {
     source: jest.fn(),

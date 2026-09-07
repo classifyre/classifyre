@@ -3,6 +3,7 @@
 import * as React from "react";
 import type { JSONSchema7 } from "json-schema";
 import { JsonSchemaForm, type JsonSchemaFormHandle } from "./json-schema-form";
+import type { AugmentationEditorHandle } from "./notebook/augmentation-config";
 import { getSourceSchema, type SourceType } from "@/lib/schema-loader";
 import type { DetectorConfigInput } from "./source-scan-config";
 import type { AutoScheduleStatus, ScheduleValue } from "./schedule-card";
@@ -63,6 +64,8 @@ interface SourceFormProps {
   onNotebookBusyChange?: (busy: boolean) => void;
   /** CUSTOM: a cell's play button. Validates and saves before it runs. */
   onRunCell?: (cellId: string) => void;
+  /** Augmentation: a cell's play button. Validates and saves before it runs. */
+  onAugmentationRunCell?: (cellId: string) => void;
   /** CUSTOM: anchors for the page's stepper. */
   customSectionRef?: (id: CustomSectionId, element: HTMLElement | null) => void;
 }
@@ -84,15 +87,19 @@ export interface SourceFormHandle extends JsonSchemaFormHandle {
   /**
    * Runs the notebook. The caller is expected to have validated and saved
    * first — running an unsaved notebook would execute the stored revision.
+   * The augmentation scope addresses the per-asset enrichment notebook any
+   * source type may carry.
    */
   runNotebook: (
-    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    mode: "cell" | "all" | "test_connection" | "preview_extract" | "preview_augment",
     targetCellId?: string,
+    scope?: "connector" | "augmentation",
   ) => Promise<void>;
   /** The same run, rendered as text the assistant can read and act on. */
   runNotebookAndSummarize: (
-    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    mode: "cell" | "all" | "test_connection" | "preview_extract" | "preview_augment",
     targetCellId?: string,
+    scope?: "connector" | "augmentation",
   ) => Promise<string>;
   cancelNotebook: () => void;
   /** Applies the assistant's cell edits. Returns what it actually changed. */
@@ -127,6 +134,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       onFilesChange,
       onNotebookBusyChange,
       onRunCell,
+      onAugmentationRunCell,
       customSectionRef,
     },
     ref,
@@ -136,6 +144,10 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
     // Whichever notebook is mounted (draft or saved editor) installs itself
     // here, so the page above never has to know which one that is.
     const notebookRef = React.useRef<NotebookEditorHandle | null>(null);
+    // The augmentation editor's handle, mounted from the schema form's
+    // augmentation block on every source type.
+    const augmentationNotebookRef =
+      React.useRef<AugmentationEditorHandle | null>(null);
     const schema = getSourceSchema(sourceType);
     const isCustom = sourceType === "CUSTOM";
 
@@ -314,13 +326,23 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       ref,
       () => ({
         getSchema: () => enhancedSchema,
-        runNotebook: async (mode, targetCellId) => {
-          await notebookRef.current?.run(mode, targetCellId);
+        runNotebook: async (mode, targetCellId, scope) => {
+          const handle =
+            scope === "augmentation"
+              ? augmentationNotebookRef.current
+              : notebookRef.current;
+          await handle?.run(mode, targetCellId);
         },
-        runNotebookAndSummarize: async (mode, targetCellId) =>
-          (await notebookRef.current?.runAndSummarize(mode, targetCellId)) ??
+        runNotebookAndSummarize: async (mode, targetCellId, scope) =>
+          (await (scope === "augmentation"
+            ? augmentationNotebookRef.current
+            : notebookRef.current
+          )?.runAndSummarize(mode, targetCellId)) ??
           "There is no notebook on this source to run.",
-        cancelNotebook: () => notebookRef.current?.cancel(),
+        cancelNotebook: () => {
+          notebookRef.current?.cancel();
+          augmentationNotebookRef.current?.cancel();
+        },
         getNotebookContext: () => {
           const cells = isCustom ? notebookRef.current?.getCells() : null;
           if (!cells) {
@@ -406,6 +428,10 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       <JsonSchemaForm
         ref={formRef}
         schema={enhancedSchema}
+        sourceId={sourceId}
+        augmentationEditorRef={augmentationNotebookRef}
+        onAugmentationRunCell={onAugmentationRunCell}
+        onAugmentationBusyChange={onNotebookBusyChange}
         defaultValues={formDefaultValues}
         includeSchemaDefaults={mode === "create"}
         onSubmit={handleSubmit}

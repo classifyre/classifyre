@@ -17,6 +17,7 @@ import { CorrelationLockService } from './correlation-lock.service';
 import { CorrelationReviewIndexService } from './review/correlation-review-index.service';
 import { CorrelationReviewService } from './review/correlation-review.service';
 import { CorrelationReviewController } from './review/correlation-review.controller';
+import { SourceGraphModule } from '../stats/source-graph.module';
 
 /**
  * Deterministic asset correlation / duplicate detection. Derives evidence
@@ -26,7 +27,7 @@ import { CorrelationReviewController } from './review/correlation-review.control
  * mutations keep their normal CaseActivity audit trail. PgBossModule is global.
  */
 @Module({
-  imports: [MatchingModule],
+  imports: [MatchingModule, SourceGraphModule],
   controllers: [CorrelationController, CorrelationReviewController],
   providers: [
     PrismaService,

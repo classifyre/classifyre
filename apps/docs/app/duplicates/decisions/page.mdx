@@ -1,0 +1,121 @@
+---
+title: Decisions
+description: The record of what you judged and what became of it — filtering, reopening, turning confirmed duplicates into cases and inquiries, and the undo log.
+---
+
+# Decisions
+
+A queue on its own is write-only: you judge a pair and it disappears. That makes
+the judgement worthless five minutes later — you can't check it, change your
+mind, or act on it.
+
+**Decisions** is the other half.
+
+---
+
+## What's in the table
+
+Every verdict ever recorded, newest first.
+
+| Column | Meaning |
+|---|---|
+| **Pair** | Both asset names. Click to reopen the pair screen. |
+| **Decision** | Duplicate · Not a duplicate · Unsure · Split |
+| **Score** | The match weight **you saw when you decided**, and the score **now** |
+| **Pattern** | Which pattern it belonged to at the time |
+| **Used in** | The case or inquiry it went to — or *not used yet* |
+| **Decided** | When, and by **you** or by an **agent** |
+
+Two of those deserve a note.
+
+### Score then, and score now
+
+A verdict stores the score it was made against. If the pair has since been
+materially re-scored — because weights changed, an exclusion was added, or new
+findings appeared — the row is marked **Re-scored since you decided. Worth
+another look.**
+
+This is the honest handling of a real problem: the standing judgement was made
+about a different number. It isn't discarded (that would throw away real work),
+but it isn't presented as current either.
+
+### You, or an agent
+
+Agent decisions are stamped and counted separately, everywhere. An agent
+clearing the safe band must never make the queue look like a person worked
+through it. See [AI Agents & Duplicates](/duplicates/ai-agents/).
+
+---
+
+## Went nowhere yet
+
+The filter that earns this screen its place.
+
+> **Went nowhere yet** = pairs confirmed as duplicates that were never taken into
+> a case or an inquiry.
+
+This is the common outcome, and a deliberate one — during a review pass you're
+judging, not investigating. But those confirmed duplicates are **ready-made
+evidence**: someone already looked at each one and said yes. Coming back to this
+list a day later is the cheapest way to start a real investigation.
+
+---
+
+## Acting on decisions in bulk
+
+Select any number of rows, then:
+
+| Action | What it does |
+|---|---|
+| **Add to case** | Every selected pair's assets become evidence in a new or existing [case](/investigations/cases/). Optionally attaches their findings too. |
+| **Open inquiry** | Creates one [inquiry](/investigations/inquiry/) watching for the signature these pairs share — the labels that matched, scoped to the sources they came from. |
+| **Reopen** | Removes the verdicts and returns the pairs to the queue. |
+
+Once a pair goes to a case or inquiry, its row shows the destination, so **Used
+in** doubles as a record of follow-through.
+
+### Reopen, and what it undoes
+
+Reopen removes the verdict. For **Not a duplicate** and **Split** it also
+un-suppresses the pair, and the neighbourhood is re-clustered immediately — so
+those two assets can be joined again if the evidence still supports it.
+
+Reopening a **Confirm** or an **Unsure** only puts the pair back in the queue;
+neither of those changed clustering in the first place.
+
+---
+
+## The undo log
+
+Reachable from the pattern screen. Every action — a single verdict, a bulk
+confirm, a split, an exclusion — is written as one entry with what it touched, so
+the log reads as a list of decisions rather than a list of 840 rows.
+
+Undoing an entry removes its verdicts. For a **split** it also re-derives the
+link from the evidence as it stands *now* and re-clusters — which is the correct
+behaviour, not a restore of an old snapshot: if the evidence has changed and the
+pair should no longer be linked at all, replaying the old link would be wrong.
+For an **exclusion** it removes the rule that was written.
+
+> **Undo is not unbounded time travel.** Once the review index has been rebuilt
+> — after any scan or recompute — the pairs a batch referred to may have been
+> re-scored or re-clustered, and replaying the batch might not restore what you
+> saw. Those entries are shown greyed out rather than offered and then failing
+> quietly. Undo within the same working session.
+
+For anything older, **Reopen** from this screen is the reliable route: it works
+off the current state rather than trying to replay a past one.
+
+---
+
+## Which verdicts change what
+
+| Verdict | Records a judgement | Stops later scans re-joining the pair | Re-clusters immediately |
+|---|---|---|---|
+| **Confirm** | Yes | No — it agrees with the engine | No |
+| **Not a duplicate** | Yes | **Yes** | On reopen |
+| **Split** | Yes | **Yes** | **Yes** |
+| **Unsure** | Yes | No — explicitly not a decision | No |
+
+This is why *unsure* is safe to use freely, and why *not a duplicate* and *split*
+are the two that genuinely change the shape of your data.

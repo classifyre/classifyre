@@ -4,7 +4,7 @@ import { nsPath } from "@/lib/ns-path";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative } from "@/lib/date";
-import { Filter, Loader2, Search } from "lucide-react";
+import { Filter, Loader2, Search, Sparkles } from "lucide-react";
 import {
   api,
   RunnerAssetStatusEnum,
@@ -44,12 +44,15 @@ import {
   MultiSelectItem,
   MultiSelectTrigger,
   MultiSelectValue,
+  ToneBadge,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  type StatusTone,
 } from "@workspace/ui/components";
 import { AssetKindBadge } from "./asset-kind-badge";
+import { useCustomDetectorNames } from "@/hooks/use-custom-detector-names";
 import { CsvExportButton, filtersToSearchParams } from "./csv-export-button";
 import { useTranslation } from "../hooks/use-translation";
 import type { TranslationKey } from "../i18n";
@@ -79,10 +82,27 @@ const DEFAULT_DRAFT: FilterDraft = {
   statuses: [],
 };
 
-const STATUS_COLORS: Record<RunnerAssetStatusValue, string> = {
+/**
+ * Processing state → the shared status scale.
+ *
+ * These were inline styles derived from raw tokens, and `PROCESSED` used
+ * `--accent` — #b7ff00, a background colour, painted as text on a white row at
+ * 1.21:1. Same tones as the runner badge now: a scan that is RUNNING and an
+ * asset that is PROCESSING are the same state at two grains, so they are the
+ * same colour.
+ */
+const STATUS_TONE_BY_ASSET_STATUS: Record<RunnerAssetStatusValue, StatusTone> = {
+  PENDING: "idle",
+  PROCESSING: "active",
+  PROCESSED: "done",
+  ERROR: "error",
+};
+
+/** Filter-dropdown swatches: the tone's ink, as a standalone colour. */
+const STATUS_DOT_COLORS: Record<RunnerAssetStatusValue, string> = {
   PENDING: "var(--muted-foreground)",
-  PROCESSING: "var(--chart-4)",
-  PROCESSED: "var(--accent)",
+  PROCESSING: "var(--accent-ink)",
+  PROCESSED: "var(--accent-ink)",
   ERROR: "var(--destructive)",
 };
 
@@ -170,12 +190,34 @@ function SeverityBreakdown({
   );
 }
 
+/**
+ * A detector bucket's display name.
+ *
+ * The rollup keys custom detectors as `CUSTOM:<key>`; everything else is the
+ * bare detector enum. Rows written before that change carry a plain `CUSTOM`,
+ * which is exactly the uninformative label this exists to replace — there is
+ * nothing to resolve it to, so it keeps the generic name until the asset is
+ * rescanned.
+ */
+function detectorDisplayName(
+  bucket: string,
+  resolveCustomName: (key: string) => string,
+): { label: string; isCustom: boolean } {
+  if (bucket.startsWith("CUSTOM:")) {
+    const key = bucket.slice("CUSTOM:".length);
+    return { label: resolveCustomName(key), isCustom: true };
+  }
+  return { label: formatEnumLabel(bucket), isCustom: false };
+}
+
 function DetectorBreakdown({
   byDetector,
   t,
+  resolveCustomName,
 }: {
   byDetector: Record<string, Record<string, number>> | null | undefined;
   t: (key: TranslationKey) => string;
+  resolveCustomName: (key: string) => string;
 }) {
   if (!byDetector || typeof byDetector !== "object") return null;
 
@@ -202,12 +244,24 @@ function DetectorBreakdown({
           if (typeof count !== "number" || count <= 0) return [];
           return [{ sev, count }];
         });
+        const { label, isCustom } = detectorDisplayName(
+          detector,
+          resolveCustomName,
+        );
         return (
           <span
             key={detector}
-            className="inline-flex items-center gap-1.5 rounded-[3px] border border-border/60 bg-background px-2 py-0.5 text-[11px]"
+            className="inline-flex max-w-[220px] items-center gap-1.5 rounded-[3px] border border-border/60 bg-background px-2 py-0.5 text-[11px]"
           >
-            <span className="font-mono font-medium">{detector}</span>
+            {isCustom && (
+              <Sparkles
+                aria-hidden
+                className="h-2.5 w-2.5 shrink-0 text-accent-ink"
+              />
+            )}
+            <span className="truncate font-mono font-medium" title={label}>
+              {label}
+            </span>
             <span className="text-muted-foreground">·</span>
             <span className="tabular-nums text-muted-foreground">{total}</span>
             {severityChips.map(({ sev, count }) => (
@@ -247,6 +301,7 @@ export function RunnerAssetsTable({
 }) {
   const { t } = useTranslation();
   const router = useRouter();
+  const resolveCustomName = useCustomDetectorNames();
 
   const [searchInput, setSearchInput] = useState("");
   const [draft, setDraft] = useState<FilterDraft>(DEFAULT_DRAFT);
@@ -393,7 +448,7 @@ export function RunnerAssetsTable({
                     <span className="inline-flex items-center gap-2">
                       <span
                         className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: STATUS_COLORS[status] }}
+                        style={{ backgroundColor: STATUS_DOT_COLORS[status] }}
                       />
                       {RUNNER_ASSET_STATUS_LABELS[status]
                         ? t(RUNNER_ASSET_STATUS_LABELS[status]!)
@@ -473,6 +528,7 @@ export function RunnerAssetsTable({
                       item={item}
                       onAssetClick={(id) => router.push(nsPath(`/assets/${id}`))}
                       t={t}
+                      resolveCustomName={resolveCustomName}
                     />
                   ))}
                 </TableBody>
@@ -578,10 +634,12 @@ function RunnerAssetRow({
   item,
   onAssetClick,
   t,
+  resolveCustomName,
 }: {
   item: RunnerAssetItemDto;
   onAssetClick: (assetId: string) => void;
   t: (key: TranslationKey) => string;
+  resolveCustomName: (key: string) => string;
 }) {
   const highestSeverity = getHighestSeverityFromMap(item.findingsBySeverity);
   const totalFindings =
@@ -620,25 +678,18 @@ function RunnerAssetRow({
       </TableCell>
 
       <TableCell>
-        <span
-          className="inline-flex items-center gap-1.5 rounded-[4px] border px-2 py-0.5 text-[11px] font-mono uppercase tracking-[0.08em]"
-          style={{
-            color: STATUS_COLORS[item.status as keyof typeof STATUS_COLORS],
-            borderColor: `${STATUS_COLORS[item.status as keyof typeof STATUS_COLORS]}55`,
-            backgroundColor: `${STATUS_COLORS[item.status as keyof typeof STATUS_COLORS]}14`,
-          }}
+        <ToneBadge
+          dot
+          tone={
+            STATUS_TONE_BY_ASSET_STATUS[
+              item.status as RunnerAssetStatusValue
+            ] ?? "idle"
+          }
         >
-          <span
-            className="h-1.5 w-1.5 rounded-full"
-            style={{
-              backgroundColor:
-                STATUS_COLORS[item.status as keyof typeof STATUS_COLORS],
-            }}
-          />
           {RUNNER_ASSET_STATUS_LABELS[item.status]
             ? t(RUNNER_ASSET_STATUS_LABELS[item.status]!)
             : formatEnumLabel(item.status)}
-        </span>
+        </ToneBadge>
         {item.errorMessage && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -682,7 +733,11 @@ function RunnerAssetRow({
 
       <TableCell className="min-w-[160px]">
         <SeverityBreakdown bySeverity={item.findingsBySeverity} />
-        <DetectorBreakdown byDetector={item.findingsByDetector} t={t} />
+        <DetectorBreakdown
+          byDetector={item.findingsByDetector}
+          t={t}
+          resolveCustomName={resolveCustomName}
+        />
       </TableCell>
 
       <TableCell>

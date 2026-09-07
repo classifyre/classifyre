@@ -26,6 +26,7 @@ import type {
   CaseListResponseDto,
   CaseResponseDto,
   CaseTimelineResponseDto,
+  CaseworkSummaryDto,
   CloseCaseDto,
   CloseCaseResponseDto,
   CreateCaseDto,
@@ -65,6 +66,8 @@ import {
     CaseResponseDtoToJSON,
     CaseTimelineResponseDtoFromJSON,
     CaseTimelineResponseDtoToJSON,
+    CaseworkSummaryDtoFromJSON,
+    CaseworkSummaryDtoToJSON,
     CloseCaseDtoFromJSON,
     CloseCaseDtoToJSON,
     CloseCaseResponseDtoFromJSON,
@@ -1421,6 +1424,37 @@ export class CasesApi extends runtime.BaseAPI {
      */
     async casesControllerUpdate(requestParameters: CasesControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseResponseDto> {
         const response = await this.casesControllerUpdateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * What is being investigated right now, for the workspace dashboard. Grouped counts plus the five most recent cases and the five inquiries with the most unseen matches — no scan over findings.
+     * Counts and recent activity across cases, inquiries and leads
+     */
+    async caseworkControllerSummaryRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseworkSummaryDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/casework/summary`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseworkSummaryDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * What is being investigated right now, for the workspace dashboard. Grouped counts plus the five most recent cases and the five inquiries with the most unseen matches — no scan over findings.
+     * Counts and recent activity across cases, inquiries and leads
+     */
+    async caseworkControllerSummary(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseworkSummaryDto> {
+        const response = await this.caseworkControllerSummaryRaw(initOverrides);
         return await response.value();
     }
 

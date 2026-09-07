@@ -1,0 +1,23 @@
+-- `correlation_pair_staging` holds the pairwise-overlap aggregation for exactly
+-- one in-flight correlation recompute. `CorrelationService.stagePairAggregates`
+-- fills it with an INSERT ... SELECT, the scoring loop streams it back out into
+-- `edges`, and the recompute truncates it before returning. It is derived data,
+-- rebuilt from `asset_correlation_values` on every run, read by nothing else in
+-- the codebase, and deliberately excluded from namespace export.
+--
+-- UNLOGGED keeps it out of the WAL. A full recompute stages millions of rows
+-- (12.8M on one namespace here), and every one of them was being journalled —
+-- and shipped to any replica — for a table whose entire contents are discarded
+-- seconds later.
+--
+-- What UNLOGGED gives up is that the table is emptied after an unclean Postgres
+-- shutdown, and is not replicated to physical standbys. Both are free here: the
+-- only reader is the single advisory-lock-holding recompute that wrote it, and
+-- a Postgres crash has already destroyed that recompute anyway. An empty table
+-- afterwards is the desired end state, not a loss — `sweepStagingResidue` would
+-- otherwise have to clear it on the next pass.
+--
+-- SET UNLOGGED rewrites the heap under an AccessExclusiveLock. That is cheap
+-- because the table is transient by construction: it is empty between
+-- recomputes, and anything a killed run left behind is scratch either way.
+ALTER TABLE "correlation_pair_staging" SET UNLOGGED;

@@ -24,7 +24,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -73,6 +73,22 @@ class CustomSourceError(RuntimeError):
 class CustomSource(BaseSource):
     source_type = "custom"
 
+    # A notebook connector re-yields its whole cohort every run, and until this
+    # was turned on every re-yielded asset was re-detected from scratch: the
+    # Firmenbuch AI-analysis source spent 68 minutes per run re-reading 326
+    # filings that had not changed since the run before, and the PDF source 67
+    # minutes re-converting 672 documents. Detection, not fetching, is where a
+    # notebook run's time goes, and that is exactly what the cache skips.
+    SUPPORTS_SCAN_CACHE = True
+
+    # "metadata", not "content": the strength of that mode depends on the
+    # checksum being a real content digest rather than a proxy, and here it is —
+    # `_to_scan_result` hashes the full text (plus the raw bytes when the
+    # notebook fetched a file), the resolved metadata and the tags. There is no
+    # mtime/size stand-in to be fooled by, so an unchanged checksum is proof and
+    # nothing has to be re-read to establish it.
+    SCAN_CACHE_VERIFY = "metadata"
+
     def __init__(
         self,
         recipe: dict[str, Any],
@@ -90,6 +106,7 @@ class CustomSource(BaseSource):
         self._id_by_hash: dict[str, str] = {}
         self._url_by_hash: dict[str, str] = {}
         self._mime_by_hash: dict[str, str] = {}
+        self._tags_by_hash: dict[str, dict[str, str]] = {}
         self._stats = {"produced": 0, "seen": 0}
         self._packages_installed = False
 
@@ -367,6 +384,11 @@ class CustomSource(BaseSource):
                     "seen": int(frame.get("seen") or 0),
                 }
                 self._record_cursor(cursor_key, skip, frame)
+                if frame.get("partialCoverage"):
+                    self.declare_partial_coverage(
+                        str(frame.get("partialCoverageReason") or "")
+                        or "the notebook called ctx.set_partial_coverage()"
+                    )
                 break
 
             if frame_type != "item":
@@ -430,13 +452,24 @@ class CustomSource(BaseSource):
         return 0, max_assets, None, "window"
 
     def _record_cursor(self, key: str | None, offset: int, frame: dict[str, Any]) -> None:
-        if key is None:
-            return
-        # A cursor the notebook set itself wins: it knows its own pagination
-        # better than a positional offset does.
+        # A cursor the notebook set itself is explicit intent and is honoured
+        # under EVERY sampling strategy.
+        #
+        # This used to sit behind `if key is None: return`, and `key` is only
+        # set for AUTOMATIC sampling — so on a source sampling ALL (the default,
+        # and what every non-paginating connector uses) `ctx.set_cursor()` was
+        # accepted by the SDK, written by the notebook, and then dropped on the
+        # floor without a word. Any connector keeping run-to-run state that way
+        # silently restarted from nothing on every run: a resumable walk never
+        # advanced, and accumulated counts were rebuilt from one run's data and
+        # written back smaller.
         notebook_cursor = frame.get("cursor")
         if isinstance(notebook_cursor, dict) and notebook_cursor:
             self.set_next_sampling_cursor(notebook_cursor)
+            return
+        # The positional fallback stays AUTOMATIC-only: it is derived from this
+        # run's offset and page size, which mean nothing under other strategies.
+        if key is None:
             return
         self.record_automatic_offset(
             key, prev_offset=offset, fetched=int(frame.get("produced") or 0)
@@ -501,6 +534,20 @@ class CustomSource(BaseSource):
         self._id_by_hash[asset_hash] = asset_id
         self._url_by_hash[asset_hash] = external_url
 
+        # Facts the notebook asserted, keyed by Tag detector key. Held here
+        # rather than on the result because they are not part of the asset the
+        # API stores: the pipeline turns them into findings.
+        tags = data.get("tags")
+        tags = (
+            {str(key): str(value) for key, value in tags.items() if str(key) and str(value)}
+            if isinstance(tags, dict)
+            else {}
+        )
+        if tags:
+            self._tags_by_hash[asset_hash] = tags
+        else:
+            self._tags_by_hash.pop(asset_hash, None)
+
         # The notebook links assets by *its* ids; the graph needs hashes.
         links = [self.generate_hash_id(str(link)) for link in data.get("links") or []]
 
@@ -515,7 +562,26 @@ class CustomSource(BaseSource):
             "metadata": metadata,
             "content_length": len(content),
             "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            # Tags belong in the checksum: they are the only part of a tagged
+            # asset that can change while its content does not, and leaving them
+            # out would let the scan cache skip the asset and never surface the
+            # new tag.
+            "tags": dict(sorted(tags.items())),
         }
+
+        # For a fetched file the text hashed above is what the parser
+        # *extracted*, so two different documents that extract to the same text
+        # would collide -- not good enough for metadata-mode cache
+        # verification. The bytes are already in hand, so hash them too.
+        #
+        # Added to the dict rather than declared inside it, so an asset that
+        # carries no bytes keeps the exact checksum basis it had before this
+        # key existed. Changing the basis re-checksums the whole corpus once
+        # (every asset reads as 'updated' and every cache entry misses), and
+        # there is no reason to pay that for the text-only assets -- which here
+        # are the companies and the people, i.e. almost all of them.
+        if raw_bytes is not None:
+            checksum_basis["content_bytes_sha256"] = hashlib.sha256(raw_bytes).hexdigest()
 
         # Normalized here rather than trusted as typed: a notebook can write
         # any string, and a URN spelled differently from the one the owning
@@ -581,6 +647,15 @@ class CustomSource(BaseSource):
             return
         self._mime_by_hash[asset_hash] = mime_type or "application/octet-stream"
 
+    def declares_relationships(self) -> bool:
+        """Whether the notebook defines ``relationships()`` at all.
+
+        Lets the runner tell "this connector has no lineage to declare" from
+        "this connector tried to declare lineage and produced none", which are
+        the same empty list and very different facts.
+        """
+        return self._notebook_defines("relationships")
+
     async def collect_relationships(self) -> list[Any]:
         """Typed relationships the notebook declared.
 
@@ -595,11 +670,13 @@ class CustomSource(BaseSource):
         """
         if not self._notebook_defines("relationships"):
             return []
-        try:
-            payloads = self._call("relationships") or []
-        except Exception as exc:
-            logger.warning("Notebook relationships() failed (non-fatal): %s", exc)
-            return []
+        # Deliberately NOT caught here. Swallowing it made a notebook whose
+        # relationships() raised — `Ref.id()` instead of `Ref.asset()` was the
+        # real case — produce 920 assets, zero edges, and a COMPLETED run whose
+        # only trace of the failure was a warning in a Kubernetes job log. The
+        # caller (`main._emit_relationships`) keeps the run alive; what it no
+        # longer does is keep the run *quiet*.
+        payloads = self._call("relationships") or []
 
         edges: list[Any] = []
         for payload in payloads:
@@ -652,6 +729,16 @@ class CustomSource(BaseSource):
         except OSError:
             return None
         return raw, self._mime_by_hash.get(asset_id, "application/octet-stream")
+
+    def asset_tags(self, asset_hash: str) -> Mapping[str, str]:
+        """Tag-detector keys and values asserted about this asset.
+
+        Merges the connector notebook's tags with the augmentation notebook's:
+        a CUSTOM source can use both, and either alone must keep working.
+        """
+        merged = dict(super().asset_tags(asset_hash))
+        merged.update(self._tags_by_hash.get(asset_hash, {}))
+        return merged
 
     def evict_asset_cache(self, asset_hash: str) -> None:
         if not self._content_dir:

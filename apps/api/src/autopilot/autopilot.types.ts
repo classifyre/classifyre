@@ -30,6 +30,15 @@ export interface AutopilotJob {
   agentKinds?: Array<
     'INQUIRY' | 'CASE' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION'
   >;
+  /**
+   * The supervisor asked for these agents to run now.
+   *
+   * Read with `agentKinds`. Unlike `manual` it does NOT bypass the per-agent
+   * enable flags: an operator switching an agent off outranks an agent deciding
+   * it should run. It only bypasses the timing policy — gates, minimum gap —
+   * because deciding when work happens is what the supervisor is for.
+   */
+  commanded?: boolean;
   /** Focus the case agent on one case (full case detail in context). */
   caseId?: string;
   /**
