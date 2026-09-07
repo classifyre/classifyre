@@ -274,7 +274,13 @@ export class EmbeddingQueueService {
     );
     rt.workerRegistered = true;
     this.logger.log(
-      `Registered persistent embedding worker for space ${rt.spaceId} (batch=${this.cfg.batchSize}, global concurrency=${this.cfg.workerConcurrency})`,
+      `Registered persistent embedding worker for space ${rt.spaceId} ` +
+        // Named separately because reading `batch=32` as the inference batch
+        // is what sent an OOM investigation after thread pools and memory
+        // limits for a week. The fetch is jobs; inference is rows, bounded
+        // again by EMBEDDING_MAX_BATCH_CHARS once chunks are long.
+        `(fetch=${this.cfg.batchSize} jobs x ${this.cfg.queueBatchSize} chunks, ` +
+        `inference<=${this.cfg.batchSize} rows, group concurrency=${this.cfg.workerConcurrency})`,
     );
     if (this.cfg.autoBackfill) {
       const ctx = rt.ctx;

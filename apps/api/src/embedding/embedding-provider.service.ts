@@ -7,6 +7,7 @@ import {
 import { fork, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { EmbeddingConfigService } from './embedding-config.service';
+import { planInferenceBatches } from './embedding-batching';
 import {
   resolvedFromEnv,
   // A value import, not `import type`: `emitDecoratorMetadata` writes
@@ -52,6 +53,24 @@ const MAX_CONSECUTIVE_WORKER_FAILURES = 3;
 const BREAKER_BASE_COOLDOWN_MS = 60_000;
 const BREAKER_MAX_COOLDOWN_MS = 15 * 60_000;
 
+/**
+ * How long one inference call may occupy the queue before it is abandoned.
+ *
+ * Serialising local inference is what makes the memory bound a ceiling rather
+ * than a per-caller quota, but it also means one stuck call stops embedding
+ * for the whole process instead of for one caller. The child dying is already
+ * handled — 'exit' rejects everything in flight — but a child that hangs
+ * without exiting emits nothing at all, and onnxruntime does hang under memory
+ * pressure (the SIGTRAP-in-BFCArena aborts seen on desktop are the same
+ * pressure, one step further along).
+ *
+ * Ten minutes is far longer than any bounded batch legitimately takes and
+ * still well inside pg-boss's one-hour job expiry, so a wedged child surfaces
+ * as a failed batch that retries rather than as embedding silently stopping
+ * forever.
+ */
+const INFERENCE_TIMEOUT_MS = 10 * 60_000;
+
 /** Cooldown after `trips` consecutive breaker trips, doubling to a ceiling. */
 /**
  * Base URL an OpenAI-compatible embeddings client should be pointed at.
@@ -96,6 +115,8 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
   private breakerTrips = 0;
   /** Injectable clock so the backoff can be tested without waiting minutes. */
   private now: () => number = () => Date.now();
+  /** Tail of the local-inference queue; see {@link serialize}. */
+  private inferenceQueue: Promise<void> = Promise.resolve();
   private requestErrorCount = 0;
   /**
    * Native aborts of the forked inference child, cumulative for this process.
@@ -297,10 +318,77 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
         'Cooldown elapsed; probing the Transformers.js worker again',
       );
     }
+    // Bounded, then serialised. Both are needed: the bound caps what ONE
+    // inference call may allocate, the queue stops N callers from each
+    // allocating that much at the same time in the one child process.
+    const batches = planInferenceBatches(texts, {
+      maxRows: cfg.batchSize,
+      maxPaddedChars: this.config.maxBatchChars,
+    });
+    return this.serialize(async () => {
+      const vectors: number[][] = [];
+      for (const batch of batches) {
+        vectors.push(...(await this.sendBatch(batch, cfg)));
+      }
+      return vectors;
+    });
+  }
+
+  /**
+   * Run local inference one call at a time, process-wide.
+   *
+   * There is a single forked child for the whole process, and it answers
+   * messages concurrently — every message it receives starts its own
+   * `extractor()` call, so two callers mean two simultaneous onnxruntime
+   * `Run()`s and twice the native peak. The callers are genuinely concurrent:
+   * every namespace registers its own embedding queue and up to
+   * MAX_CONCURRENT_NAMESPACE_JOBS of them hold a worker slot at once, with
+   * interactive query embedding arriving on top of that.
+   *
+   * Serialising here is what makes the ceiling a ceiling rather than a
+   * per-caller quota. It costs nothing in throughput: the child cannot
+   * actually run two batches in parallel any faster than two in sequence,
+   * since both contend for the same intra-op thread pool.
+   */
+  private serialize<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.inferenceQueue.then(operation, operation);
+    // Chained off the settled result so one failure does not poison the queue
+    // for every request behind it.
+    this.inferenceQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  private sendBatch(
+    texts: string[],
+    cfg: ResolvedEmbeddingConfig,
+  ): Promise<number[][]> {
     const worker = this.ensureWorker();
     const id = ++this.sequence;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        if (!this.pending.delete(id)) return;
+        reject(
+          new Error(
+            `Embedding worker did not answer batch ${id} (${texts.length} texts) within ${INFERENCE_TIMEOUT_MS / 60_000} minutes`,
+          ),
+        );
+      }, INFERENCE_TIMEOUT_MS);
+      // Never hold the process open for a timer that only guards a background
+      // batch; shutdown must not wait ten minutes for it.
+      timer.unref?.();
+      const settle =
+        <T>(handler: (value: T) => void) =>
+        (value: T) => {
+          clearTimeout(timer);
+          handler(value);
+        };
+      this.pending.set(id, {
+        resolve: settle(resolve),
+        reject: settle(reject),
+      });
       worker.send({
         id,
         texts,
