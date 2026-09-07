@@ -1,7 +1,4 @@
 import { ConstellationService } from './constellation.service';
-import type { PrismaService } from './prisma.service';
-import type { SourceGraphService } from './stats/source-graph.service';
-import type { SourceGraphScheduler } from './stats/source-graph-scheduler.service';
 
 /**
  * The bug these cover: every source on the dashboard reported 0 assets, 0
@@ -36,26 +33,37 @@ describe('ConstellationService source counts', () => {
           { sourceId: 's1', severity: 'LOW', _count: { _all: 3 } },
         ]),
       },
-    }) as unknown as PrismaService;
+    }) satisfies Record<string, unknown>;
 
   const scheduler = {
     scheduleRebuild: jest.fn().mockResolvedValue(undefined),
-  } as unknown as SourceGraphScheduler;
+  };
+
+  /**
+   * Hand a mock literal to the constructor without widening the local binding
+   * to the service type. `expect(prisma.asset.groupBy)` on a value typed as
+   * the real `PrismaService` reads a *method*, which trips
+   * `@typescript-eslint/unbound-method`; the literal's own `jest.Mock` type
+   * asserts cleanly, so the cast belongs at the injection site instead.
+   */
+  const asService = <T>(mock: unknown): T => mock as T;
 
   beforeEach(() => jest.clearAllMocks());
 
   it('sizes sources from live counts when the rollup has never been built', async () => {
     const sourceGraph = {
-      getFreshness: jest
-        .fn()
-        .mockResolvedValue({ refreshedAt: null, durationMs: null, isBuilt: false }),
+      getFreshness: jest.fn().mockResolvedValue({
+        refreshedAt: null,
+        durationMs: null,
+        isBuilt: false,
+      }),
       readMap: jest.fn(),
-    } as unknown as SourceGraphService;
+    };
 
     const result = await new ConstellationService(
-      makePrisma(),
-      sourceGraph,
-      scheduler,
+      asService(makePrisma()),
+      asService(sourceGraph),
+      asService(scheduler),
     ).getMap();
 
     const alpha = result.sources.find((s) => s.id === 's1')!;
@@ -95,13 +103,13 @@ describe('ConstellationService source counts', () => {
         boundary: [],
         bundles: [],
       }),
-    } as unknown as SourceGraphService;
+    };
 
     const prisma = makePrisma();
     const result = await new ConstellationService(
-      prisma,
-      sourceGraph,
-      scheduler,
+      asService(prisma),
+      asService(sourceGraph),
+      asService(scheduler),
     ).getMap();
 
     // s1 is in the rollup and keeps its graph-shaped numbers.
@@ -122,9 +130,11 @@ describe('ConstellationService source counts', () => {
 
   it('does not count live at all when every source is in the rollup', async () => {
     const sourceGraph = {
-      getFreshness: jest
-        .fn()
-        .mockResolvedValue({ refreshedAt: new Date(), durationMs: 1, isBuilt: true }),
+      getFreshness: jest.fn().mockResolvedValue({
+        refreshedAt: new Date(),
+        durationMs: 1,
+        isBuilt: true,
+      }),
       readMap: jest.fn().mockResolvedValue({
         nodes: sources.map((s) => ({
           sourceId: s.id,
@@ -138,10 +148,14 @@ describe('ConstellationService source counts', () => {
         boundary: [],
         bundles: [],
       }),
-    } as unknown as SourceGraphService;
+    };
 
     const prisma = makePrisma();
-    await new ConstellationService(prisma, sourceGraph, scheduler).getMap();
+    await new ConstellationService(
+      asService(prisma),
+      asService(sourceGraph),
+      asService(scheduler),
+    ).getMap();
     expect(prisma.asset.groupBy).not.toHaveBeenCalled();
     expect(prisma.finding.groupBy).not.toHaveBeenCalled();
   });

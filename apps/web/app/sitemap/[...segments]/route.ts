@@ -4,7 +4,9 @@ import {
   appUrl,
   entityChangeFrequency,
   entityPriority,
+  entityAlternates,
   entityUrl,
+  localeAlternates,
   isSitemapEnabled,
   parseChildSitemapPath,
   renderUrlSet,
@@ -85,6 +87,7 @@ async function buildEntries(
       lastModified,
       changeFrequency: page.changeFrequency,
       priority: page.priority,
+      alternates: localeAlternates(baseUrl, null, page.path),
     }));
   }
 
@@ -100,6 +103,7 @@ async function buildEntries(
       lastModified: namespace.updatedAt,
       changeFrequency: page.changeFrequency,
       priority: page.priority,
+      alternates: localeAlternates(baseUrl, namespace.slug, page.path),
     }));
   }
 
@@ -121,6 +125,12 @@ async function buildEntries(
     lastModified: entry.lastModified,
     changeFrequency,
     priority,
+    alternates: entityAlternates(
+      baseUrl,
+      namespace.slug,
+      target.type,
+      entry.id,
+    ),
   }));
 }
 

@@ -10,10 +10,12 @@ import {
 } from "@workspace/api-client";
 import { setDateFormattingPreferences } from "@/lib/date";
 import {
+  localeToLanguage,
   resolveLanguage,
   resolveTimeFormat,
   resolveTimezone,
   type LanguageSetting,
+  type Locale,
   type ResolvedLanguage,
   type ResolvedTimeFormat,
   type TimeFormatSetting,
@@ -96,10 +98,20 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
 const InstanceSettingsContext =
   React.createContext<InstanceSettingsContextValue | null>(null);
 
+/**
+ * The static export ships one tree per locale but has no rewrites to route
+ * between them, so on desktop the URL is always the default locale's and the
+ * cookie stays the only way to pick a language.
+ */
+const isDesktopBuild = process.env.NEXT_PUBLIC_DESKTOP_BUILD === "true";
+
 export function InstanceSettingsProvider({
   children,
+  routeLocale,
 }: {
   children: React.ReactNode;
+  /** Locale from the URL. Authoritative wherever locale routing is live. */
+  routeLocale?: Locale;
 }) {
   const [settings, setSettings] =
     React.useState<InstanceSettingsResponse>(DEFAULT_SETTINGS);
@@ -167,12 +179,19 @@ export function InstanceSettingsProvider({
 
   // ─── Resolution ──────────────────────────────────────────────────
 
+  // Precedence: URL prefix, then the per-user cookie, then the instance
+  // setting, then AUTOMATIC browser detection. The URL wins because it is what
+  // decides `<html lang>` and the server-rendered metadata — letting the
+  // cookie override it would render German copy on an English URL.
   const effectiveLanguageSetting: LanguageSetting =
     languageOverride ?? (settings.language as LanguageSetting);
 
   const resolvedLanguage = React.useMemo<ResolvedLanguage>(
-    () => resolveLanguage(effectiveLanguageSetting),
-    [effectiveLanguageSetting],
+    () =>
+      routeLocale && !isDesktopBuild
+        ? localeToLanguage(routeLocale)
+        : resolveLanguage(effectiveLanguageSetting),
+    [routeLocale, effectiveLanguageSetting],
   );
 
   const resolvedTimeFormat = React.useMemo<ResolvedTimeFormat>(
@@ -198,6 +217,8 @@ export function InstanceSettingsProvider({
   // — including the workspace directory, which sits outside every namespace.
   // Fetch only once a tenant is in the route (and refetch when it changes),
   // otherwise the request 404s as `Unknown namespace 'instance-settings'`.
+  // `namespaceSlugFromPath` skips a leading locale segment itself, so
+  // `/de/acme/settings` still resolves the `acme` tenant.
   const namespaceSlug = namespaceSlugFromPath(usePathname());
 
   React.useEffect(() => {

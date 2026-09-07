@@ -76,7 +76,7 @@ export interface FindingsDiscoveryTopAssetDto {
      */
     highestSeverity: FindingsDiscoveryTopAssetDtoHighestSeverityEnum;
     /**
-     * Importance mix of this asset's findings. Already computed to rank the list, so it costs nothing to return and lets the caller draw a per-asset bar.
+     * Priority mix of this asset's findings. Already computed to rank the list, so it costs nothing to return and lets the caller draw a per-asset bar.
      * @type {FindingsDiscoverySeverityBreakdownDto}
      * @memberof FindingsDiscoveryTopAssetDto
      */
