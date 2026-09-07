@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GraphService } from './graph.service';
 import { PrismaService } from './prisma.service';
+import { SourceGraphScheduler } from './stats/source-graph-scheduler.service';
 
 describe('GraphService', () => {
   let service: GraphService;
@@ -20,6 +21,12 @@ describe('GraphService', () => {
       providers: [
         GraphService,
         { provide: PrismaService, useValue: mockPrisma },
+        // The map rebuild is fire-and-forget bookkeeping; these tests are
+        // about what lands in `edges`.
+        {
+          provide: SourceGraphScheduler,
+          useValue: { scheduleRebuild: jest.fn() },
+        },
       ],
     }).compile();
     service = module.get<GraphService>(GraphService);

@@ -5285,6 +5285,29 @@
         ]
       }
     },
+    "/casework/summary": {
+      "get": {
+        "description": "What is being investigated right now, for the workspace dashboard. Grouped counts plus the five most recent cases and the five inquiries with the most unseen matches — no scan over findings.",
+        "operationId": "CaseworkController_summary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseworkSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Counts and recent activity across cases, inquiries and leads",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
     "/inquiries": {
       "post": {
         "operationId": "InquiriesController_create",
@@ -6032,6 +6055,29 @@
         "summary": "Unlink evidence or finding from a thread",
         "tags": [
           "threads"
+        ]
+      }
+    },
+    "/graph/constellation": {
+      "get": {
+        "description": "One bubble per source, one line per source pairing split by edge class, and the assets whose edges actually leave their own source. Assets connected to nothing are never returned — they are a count on their source, which is what keeps this response the same size on a workspace with two thousand assets and one with two million. There is no limit parameter and nothing is truncated: a pairing carrying an unusual number of boundary assets folds into a bundle that expands on demand. Served from a pre-aggregated map; when that has never been built the sources come back empty-handed and a rebuild is queued.",
+        "operationId": "GraphController_constellationMap",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConstellationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "How this workspace's sources connect",
+        "tags": [
+          "graph"
         ]
       }
     },
@@ -15301,6 +15347,34 @@
           "byStatus"
         ]
       },
+      "FindingsDiscoveryStatusMixDto": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "number"
+          },
+          "falsePositive": {
+            "type": "number"
+          },
+          "resolved": {
+            "type": "number"
+          },
+          "ignored": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number",
+            "description": "Sum of the four buckets — findings of any status in the window."
+          }
+        },
+        "required": [
+          "open",
+          "falsePositive",
+          "resolved",
+          "ignored",
+          "total"
+        ]
+      },
       "FindingsDiscoveryActivityDto": {
         "type": "object",
         "properties": {
@@ -15358,6 +15432,14 @@
               "INFO"
             ]
           },
+          "severityCounts": {
+            "description": "Importance mix of this asset's findings. Already computed to rank the list, so it costs nothing to return and lets the caller draw a per-asset bar.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FindingsDiscoverySeverityBreakdownDto"
+              }
+            ]
+          },
           "lastDetectedAt": {
             "format": "date-time",
             "type": "string",
@@ -15369,7 +15451,8 @@
           "assetName",
           "assetType",
           "totalFindings",
-          "highestSeverity"
+          "highestSeverity",
+          "severityCounts"
         ]
       },
       "DiscoveryRunSourceDto": {
@@ -15436,7 +15519,16 @@
             "nullable": true
           },
           "totalFindings": {
-            "type": "number"
+            "type": "number",
+            "description": "The source's open finding set as of this run — NOT what the run discovered. Use findingsCreated for that."
+          },
+          "findingsCreated": {
+            "type": "number",
+            "description": "Findings this run raised that did not exist before."
+          },
+          "findingsResolved": {
+            "type": "number",
+            "description": "Findings this run resolved because they were gone."
           },
           "assetsCreated": {
             "type": "number"
@@ -15464,6 +15556,8 @@
           "triggerType",
           "triggeredAt",
           "totalFindings",
+          "findingsCreated",
+          "findingsResolved",
           "assetsCreated",
           "assetsUpdated"
         ]
@@ -15484,6 +15578,9 @@
           },
           "totals": {
             "$ref": "#/components/schemas/FindingsDiscoveryTotalsDto"
+          },
+          "statusMix": {
+            "$ref": "#/components/schemas/FindingsDiscoveryStatusMixDto"
           },
           "activity": {
             "$ref": "#/components/schemas/FindingsDiscoveryActivityDto"
@@ -15508,6 +15605,7 @@
           "windowDays",
           "includeResolved",
           "totals",
+          "statusMix",
           "activity",
           "topAssets",
           "recentRuns",
@@ -17915,6 +18013,208 @@
           "truncated"
         ]
       },
+      "CaseworkCaseStatusBreakdownDto": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "number"
+          },
+          "inProgress": {
+            "type": "number"
+          },
+          "closed": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "open",
+          "inProgress",
+          "closed",
+          "archived"
+        ]
+      },
+      "CaseworkCaseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "CLOSED",
+              "ARCHIVED"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ],
+            "description": "How important this case is to the investigation — an importance ranking, not a threat level."
+          },
+          "evidenceCount": {
+            "type": "number"
+          },
+          "inquiryCount": {
+            "type": "number"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "severity",
+          "evidenceCount",
+          "inquiryCount",
+          "updatedAt"
+        ]
+      },
+      "CaseworkCasesDto": {
+        "type": "object",
+        "properties": {
+          "byStatus": {
+            "$ref": "#/components/schemas/CaseworkCaseStatusBreakdownDto"
+          },
+          "total": {
+            "type": "number"
+          },
+          "recent": {
+            "description": "The five most recently touched cases, newest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseworkCaseDto"
+            }
+          }
+        },
+        "required": [
+          "byStatus",
+          "total",
+          "recent"
+        ]
+      },
+      "CaseworkInquiryStatusBreakdownDto": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "active",
+          "archived"
+        ]
+      },
+      "CaseworkInquiryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "matchCount": {
+            "type": "number"
+          },
+          "newMatchCount": {
+            "type": "number",
+            "description": "Matches that appeared since the inquiry was last viewed."
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "matchCount",
+          "newMatchCount",
+          "updatedAt"
+        ]
+      },
+      "CaseworkInquiriesDto": {
+        "type": "object",
+        "properties": {
+          "byStatus": {
+            "$ref": "#/components/schemas/CaseworkInquiryStatusBreakdownDto"
+          },
+          "total": {
+            "type": "number"
+          },
+          "newMatchTotal": {
+            "type": "number",
+            "description": "Sum of newMatchCount across every inquiry — the single number that says whether anything has moved since you last looked."
+          },
+          "withNewMatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseworkInquiryDto"
+            }
+          }
+        },
+        "required": [
+          "byStatus",
+          "total",
+          "newMatchTotal",
+          "withNewMatches"
+        ]
+      },
+      "CaseworkLeadsDto": {
+        "type": "object",
+        "properties": {
+          "proposed": {
+            "type": "number",
+            "description": "Leads proposed and not yet accepted or dismissed."
+          }
+        },
+        "required": [
+          "proposed"
+        ]
+      },
+      "CaseworkSummaryDto": {
+        "type": "object",
+        "properties": {
+          "cases": {
+            "$ref": "#/components/schemas/CaseworkCasesDto"
+          },
+          "inquiries": {
+            "$ref": "#/components/schemas/CaseworkInquiriesDto"
+          },
+          "leads": {
+            "$ref": "#/components/schemas/CaseworkLeadsDto"
+          }
+        },
+        "required": [
+          "cases",
+          "inquiries",
+          "leads"
+        ]
+      },
       "CreateInquiryDto": {
         "type": "object",
         "properties": {
@@ -18976,6 +19276,375 @@
         "required": [
           "targetType",
           "targetId"
+        ]
+      },
+      "ConstellationSeverityMixDto": {
+        "type": "object",
+        "properties": {
+          "critical": {
+            "type": "number"
+          },
+          "high": {
+            "type": "number"
+          },
+          "medium": {
+            "type": "number"
+          },
+          "low": {
+            "type": "number"
+          },
+          "info": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "critical",
+          "high",
+          "medium",
+          "low",
+          "info"
+        ]
+      },
+      "ConstellationSourceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "JIRA",
+              "CONFLUENCE",
+              "CROWD",
+              "BITBUCKET",
+              "SERVICEDESK",
+              "XRAY",
+              "GOOGLE_DRIVE",
+              "GOOGLE_SHEETS",
+              "GOOGLE_DOCS",
+              "GOOGLE_SLIDES",
+              "WORDPRESS",
+              "SLACK",
+              "S3_COMPATIBLE_STORAGE",
+              "AZURE_BLOB_STORAGE",
+              "GOOGLE_CLOUD_STORAGE",
+              "POSTGRESQL",
+              "MYSQL",
+              "MSSQL",
+              "ORACLE",
+              "HIVE",
+              "DATABRICKS",
+              "SNOWFLAKE",
+              "MONGODB",
+              "NEO4J",
+              "SQLITE",
+              "NOTION",
+              "POWERBI",
+              "TABLEAU",
+              "EMAIL",
+              "YOUTUBE",
+              "REDDIT",
+              "DELTA_LAKE",
+              "ICEBERG",
+              "KAFKA",
+              "ELASTICSEARCH",
+              "OPENSEARCH",
+              "MEILISEARCH",
+              "LOCAL_FOLDER",
+              "MICROSOFT_365",
+              "GOOGLE_WORKSPACE",
+              "DROPBOX",
+              "HUGGING_FACE",
+              "GIT",
+              "SANDBOX",
+              "CUSTOM"
+            ]
+          },
+          "assetCount": {
+            "type": "number",
+            "description": "Every asset of this source."
+          },
+          "connectedAssetCount": {
+            "type": "number",
+            "description": "Assets touched by at least one edge. The bubble is sized by this."
+          },
+          "isolatedAssetCount": {
+            "type": "number",
+            "description": "Assets with no edge of any class. Never drawn — shown as a count under the bubble, which is what keeps this response independent of corpus size."
+          },
+          "internalEdgeCount": {
+            "type": "number",
+            "description": "Edges with both endpoints inside this source."
+          },
+          "findingCount": {
+            "type": "number"
+          },
+          "severityCounts": {
+            "$ref": "#/components/schemas/ConstellationSeverityMixDto"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "assetCount",
+          "connectedAssetCount",
+          "isolatedAssetCount",
+          "internalEdgeCount",
+          "findingCount",
+          "severityCounts"
+        ]
+      },
+      "ConstellationClassCountsDto": {
+        "type": "object",
+        "properties": {
+          "flow": {
+            "type": "number",
+            "description": "Lineage. The class that says data moved."
+          },
+          "containment": {
+            "type": "number",
+            "description": "Structural containment — archive members, attachments."
+          },
+          "identity": {
+            "type": "number",
+            "description": "The same thing seen twice."
+          },
+          "reference": {
+            "type": "number",
+            "description": "Meaning and navigation. Propagates nothing."
+          },
+          "usage": {
+            "type": "number",
+            "description": "Who touched it."
+          }
+        },
+        "required": [
+          "flow",
+          "containment",
+          "identity",
+          "reference",
+          "usage"
+        ]
+      },
+      "ConstellationLinkDto": {
+        "type": "object",
+        "properties": {
+          "sourceAId": {
+            "type": "string"
+          },
+          "sourceBId": {
+            "type": "string"
+          },
+          "total": {
+            "type": "number",
+            "description": "Edges across this pairing, all classes."
+          },
+          "byClass": {
+            "$ref": "#/components/schemas/ConstellationClassCountsDto"
+          },
+          "assetCount": {
+            "type": "number",
+            "description": "Distinct assets participating, on either side."
+          },
+          "duplicatePairCount": {
+            "type": "number",
+            "description": "Duplicate pairs the review index found across this pairing. Zero when the duplicate index has never been built — absence of evidence, not evidence of absence."
+          }
+        },
+        "required": [
+          "sourceAId",
+          "sourceBId",
+          "total",
+          "byClass",
+          "assetCount",
+          "duplicatePairCount"
+        ]
+      },
+      "ConstellationBoundaryEdgeDto": {
+        "type": "object",
+        "properties": {
+          "peerSourceId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The source on the far side, or null when the far end is external."
+          },
+          "relationClass": {
+            "type": "string",
+            "enum": [
+              "FLOW",
+              "CONTAINMENT",
+              "IDENTITY",
+              "REFERENCE",
+              "USAGE"
+            ]
+          },
+          "edgeCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "relationClass",
+          "edgeCount"
+        ]
+      },
+      "ConstellationBoundaryAssetDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "assetName": {
+            "type": "string"
+          },
+          "assetType": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConstellationBoundaryEdgeDto"
+            }
+          }
+        },
+        "required": [
+          "assetId",
+          "assetName",
+          "assetType",
+          "sourceId",
+          "edges"
+        ]
+      },
+      "ConstellationBundleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable id, derived from the source pairing."
+          },
+          "sourceAId": {
+            "type": "string"
+          },
+          "sourceBId": {
+            "type": "string",
+            "nullable": true
+          },
+          "assetCount": {
+            "type": "number",
+            "description": "Boundary assets folded into this bundle."
+          },
+          "edgeCount": {
+            "type": "number",
+            "description": "Edges those assets carry across the pairing."
+          }
+        },
+        "required": [
+          "id",
+          "sourceAId",
+          "assetCount",
+          "edgeCount"
+        ]
+      },
+      "ConstellationTotalsDto": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "number"
+          },
+          "assets": {
+            "type": "number"
+          },
+          "connectedAssets": {
+            "type": "number"
+          },
+          "isolatedAssets": {
+            "type": "number"
+          },
+          "crossSourceLinks": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sources",
+          "assets",
+          "connectedAssets",
+          "isolatedAssets",
+          "crossSourceLinks"
+        ]
+      },
+      "ConstellationStatsDto": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "isBuilt": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "rollup",
+              "live"
+            ],
+            "description": "rollup: served from the pre-aggregated map. live: the map has not been built for this workspace yet, so only the source list is populated and a rebuild has been queued."
+          }
+        },
+        "required": [
+          "isBuilt",
+          "source"
+        ]
+      },
+      "ConstellationResponseDto": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConstellationSourceDto"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConstellationLinkDto"
+            }
+          },
+          "boundaryAssets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConstellationBoundaryAssetDto"
+            }
+          },
+          "bundles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConstellationBundleDto"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ConstellationTotalsDto"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/ConstellationStatsDto"
+          }
+        },
+        "required": [
+          "sources",
+          "links",
+          "boundaryAssets",
+          "bundles",
+          "totals",
+          "stats"
         ]
       },
       "LineageGraphDto": {

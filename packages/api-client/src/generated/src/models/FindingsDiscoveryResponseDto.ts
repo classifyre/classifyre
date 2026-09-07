@@ -41,6 +41,13 @@ import {
     FindingsDiscoveryTopAssetDtoToJSON,
     FindingsDiscoveryTopAssetDtoToJSONTyped,
 } from './FindingsDiscoveryTopAssetDto';
+import type { FindingsDiscoveryStatusMixDto } from './FindingsDiscoveryStatusMixDto';
+import {
+    FindingsDiscoveryStatusMixDtoFromJSON,
+    FindingsDiscoveryStatusMixDtoFromJSONTyped,
+    FindingsDiscoveryStatusMixDtoToJSON,
+    FindingsDiscoveryStatusMixDtoToJSONTyped,
+} from './FindingsDiscoveryStatusMixDto';
 import type { FindingsDiscoveryActivityDto } from './FindingsDiscoveryActivityDto';
 import {
     FindingsDiscoveryActivityDtoFromJSON,
@@ -73,6 +80,12 @@ export interface FindingsDiscoveryResponseDto {
      * @memberof FindingsDiscoveryResponseDto
      */
     totals: FindingsDiscoveryTotalsDto;
+    /**
+     * 
+     * @type {FindingsDiscoveryStatusMixDto}
+     * @memberof FindingsDiscoveryResponseDto
+     */
+    statusMix: FindingsDiscoveryStatusMixDto;
     /**
      * 
      * @type {FindingsDiscoveryActivityDto}
@@ -118,6 +131,7 @@ export function instanceOfFindingsDiscoveryResponseDto(value: object): value is 
     if (!('windowDays' in value) || value['windowDays'] === undefined) return false;
     if (!('includeResolved' in value) || value['includeResolved'] === undefined) return false;
     if (!('totals' in value) || value['totals'] === undefined) return false;
+    if (!('statusMix' in value) || value['statusMix'] === undefined) return false;
     if (!('activity' in value) || value['activity'] === undefined) return false;
     if (!('topAssets' in value) || value['topAssets'] === undefined) return false;
     if (!('recentRuns' in value) || value['recentRuns'] === undefined) return false;
@@ -138,6 +152,7 @@ export function FindingsDiscoveryResponseDtoFromJSONTyped(json: any, ignoreDiscr
         'windowDays': json['windowDays'],
         'includeResolved': json['includeResolved'],
         'totals': FindingsDiscoveryTotalsDtoFromJSON(json['totals']),
+        'statusMix': FindingsDiscoveryStatusMixDtoFromJSON(json['statusMix']),
         'activity': FindingsDiscoveryActivityDtoFromJSON(json['activity']),
         'topAssets': ((json['topAssets'] as Array<any>).map(FindingsDiscoveryTopAssetDtoFromJSON)),
         'recentRuns': ((json['recentRuns'] as Array<any>).map(DiscoveryRecentRunDtoFromJSON)),
@@ -159,6 +174,7 @@ export function FindingsDiscoveryResponseDtoToJSONTyped(value?: FindingsDiscover
         'windowDays': value['windowDays'],
         'includeResolved': value['includeResolved'],
         'totals': FindingsDiscoveryTotalsDtoToJSON(value['totals']),
+        'statusMix': FindingsDiscoveryStatusMixDtoToJSON(value['statusMix']),
         'activity': FindingsDiscoveryActivityDtoToJSON(value['activity']),
         'topAssets': ((value['topAssets'] as Array<any>).map(FindingsDiscoveryTopAssetDtoToJSON)),
         'recentRuns': ((value['recentRuns'] as Array<any>).map(DiscoveryRecentRunDtoToJSON)),

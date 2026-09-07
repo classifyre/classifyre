@@ -19,6 +19,7 @@ import type {
   BulkIngestEdgesResponseDto,
   ColumnLineageDto,
   ColumnLineageResponseDto,
+  ConstellationResponseDto,
   CreateManualEdgeDto,
   EdgeDetailDto,
   ExpandGraphDto,
@@ -38,6 +39,8 @@ import {
     ColumnLineageDtoToJSON,
     ColumnLineageResponseDtoFromJSON,
     ColumnLineageResponseDtoToJSON,
+    ConstellationResponseDtoFromJSON,
+    ConstellationResponseDtoToJSON,
     CreateManualEdgeDtoFromJSON,
     CreateManualEdgeDtoToJSON,
     EdgeDetailDtoFromJSON,
@@ -134,6 +137,37 @@ export class GraphApi extends runtime.BaseAPI {
      */
     async graphControllerColumnLineage(requestParameters: GraphControllerColumnLineageRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ColumnLineageResponseDto> {
         const response = await this.graphControllerColumnLineageRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * One bubble per source, one line per source pairing split by edge class, and the assets whose edges actually leave their own source. Assets connected to nothing are never returned — they are a count on their source, which is what keeps this response the same size on a workspace with two thousand assets and one with two million. There is no limit parameter and nothing is truncated: a pairing carrying an unusual number of boundary assets folds into a bundle that expands on demand. Served from a pre-aggregated map; when that has never been built the sources come back empty-handed and a rebuild is queued.
+     * How this workspace\'s sources connect
+     */
+    async graphControllerConstellationMapRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ConstellationResponseDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/graph/constellation`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ConstellationResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * One bubble per source, one line per source pairing split by edge class, and the assets whose edges actually leave their own source. Assets connected to nothing are never returned — they are a count on their source, which is what keeps this response the same size on a workspace with two thousand assets and one with two million. There is no limit parameter and nothing is truncated: a pairing carrying an unusual number of boundary assets folds into a bundle that expands on demand. Served from a pre-aggregated map; when that has never been built the sources come back empty-handed and a rebuild is queued.
+     * How this workspace\'s sources connect
+     */
+    async graphControllerConstellationMap(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ConstellationResponseDto> {
+        const response = await this.graphControllerConstellationMapRaw(initOverrides);
         return await response.value();
     }
 

@@ -26,6 +26,7 @@ import { McpClientService } from '../autopilot/mcp-client/mcp-client.service';
 import { PgStreamService } from '../export/pg-stream.service';
 import { DataTransferWorker } from '../data-transfer/data-transfer.worker';
 import { FindingStatsWorker } from '../stats/finding-stats.worker';
+import { SourceGraphWorker } from '../stats/source-graph.worker';
 import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { NotificationEventsGateway } from '../websocket/notification-events.gateway';
 import {
@@ -76,6 +77,7 @@ export class NamespaceWorkerManager
     private readonly pgStream: PgStreamService,
     private readonly dataTransfer: DataTransferWorker,
     private readonly findingStats: FindingStatsWorker,
+    private readonly sourceGraph: SourceGraphWorker,
     private readonly runnerEvents: RunnerEventsGateway,
     private readonly notificationEvents: NotificationEventsGateway,
     private readonly leadership: WorkerLeadershipService,
@@ -196,6 +198,7 @@ export class NamespaceWorkerManager
         await this.embedding.registerForNamespace();
         await this.dataTransfer.registerForNamespace();
         await this.findingStats.registerForNamespace();
+        await this.sourceGraph.registerForNamespace();
         this.dataTransfer.schedulePurge(e.schemaName);
         await this.mcpClient
           .refresh()
