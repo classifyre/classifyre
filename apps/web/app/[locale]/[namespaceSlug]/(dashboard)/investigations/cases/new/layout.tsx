@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { isLocale } from "@/lib/locale-detection";
-import { sectionMetadata } from "@/lib/seo-metadata";
+import { sectionMetadata, NO_INDEX } from "@/lib/seo-metadata";
 
 export async function generateMetadata({
   params,
@@ -11,10 +11,11 @@ export async function generateMetadata({
   const { locale, namespaceSlug } = await params;
   if (!isLocale(locale)) return {};
   return {
-    ...(await sectionMetadata(locale, "seo.sources", {
+    ...(await sectionMetadata(locale, "seo.caseNew", {
       namespaceSlug,
-      path: "/sources",
+      path: "/investigations/cases/new",
     })),
+    robots: NO_INDEX,
   };
 }
 

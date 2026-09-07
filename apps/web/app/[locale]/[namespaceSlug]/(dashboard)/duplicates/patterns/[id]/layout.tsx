@@ -1,19 +1,24 @@
 import type { Metadata } from "next";
-import enTranslations from "@/i18n/en";
-import { translate } from "@/i18n";
+
 import { dynamicIdParams } from "@/lib/dynamic-route";
+import { isLocale } from "@/lib/locale-detection";
+import { sectionMetadata } from "@/lib/seo-metadata";
 
-export const metadata: Metadata = {
-  title: translate(enTranslations, "seo.duplicatePattern.title"),
-  description: translate(enTranslations, "seo.duplicatePattern.description"),
-  openGraph: {
-    title: translate(enTranslations, "seo.duplicatePattern.ogTitle"),
-    description: translate(enTranslations, "seo.duplicatePattern.ogDescription"),
-  },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; namespaceSlug: string; id: string }>;
+}): Promise<Metadata> {
+  const { locale, namespaceSlug, id } = await params;
+  if (!isLocale(locale)) return {};
+  return {
+    ...(await sectionMetadata(locale, "seo.duplicatePattern", {
+      namespaceSlug,
+      path: `/duplicates/patterns/${id}`,
+    })),
+  };
+}
 
-// Static export: one placeholder shell for this dynamic segment. The page reads
-// the real pattern key from the URL at runtime via .
 export function generateStaticParams() {
   return dynamicIdParams();
 }

@@ -4321,7 +4321,9 @@
     },
     "workspaces": {
       "title": "Workspaces",
-      "description": "Choose an isolated workspace to continue an investigation, or open a fresh case file. Each workspace has its own sources, scans and findings."
+      "description": "Choose an isolated workspace to continue an investigation, or open a fresh case file. Each workspace has its own sources, scans and findings.",
+      "ogTitle": "Workspaces — Isolated Case Files | Classifyre",
+      "ogDescription": "Every workspace has its own sources, scans and findings — pick one to continue, or open a fresh case file."
     },
     "discovery": {
       "title": "Overview — Security Brief & Workspace Health",
@@ -4340,8 +4342,8 @@
       "description": "Inspect a single finding with its matched content, signals, location, confidence and status history. Adjust severity, add triage notes and follow every touchpoint from detection to resolution.",
       "ogTitle": "Finding Details — Evidence & Review History | Classifyre",
       "ogDescription": "Matched content, signals, location and full status history for one detection — triage severity and track every review.",
-      "titleWithEntity": "{{entity}} — Finding Details",
-      "descriptionWithEntity": "{{entity}} — {{type}} detection ({{severity}}). Review matched content, signals and triage history."
+      "titleWithEntity": "{{name}} — Finding Details",
+      "descriptionWithEntity": "{{name}} — review the matched content, signals and full triage history for this detection."
     },
     "assets": {
       "title": "Assets — All Ingested Documents & Source Content",
@@ -4355,7 +4357,7 @@
       "ogTitle": "Asset Details — Metadata & Findings | Classifyre",
       "ogDescription": "Source properties, extracted content and every PII, secrets or security finding for one ingested asset.",
       "titleWithEntity": "{{name}} — Asset Details",
-      "descriptionWithEntity": "{{name}} — {{type}} from {{source}}. Review metadata, source properties and related findings."
+      "descriptionWithEntity": "{{name}} — metadata, source properties and every finding this asset triggered."
     },
     "sources": {
       "title": "Sources — Connected Data Connectors & Health",
@@ -4375,7 +4377,7 @@
       "ogTitle": "Source Details — Health & Recent Runs | Classifyre",
       "ogDescription": "Health, schedule, detector coverage and recent run outcomes for one connected source.",
       "titleWithEntity": "{{name}} — Source Details",
-      "descriptionWithEntity": "{{name}} — {{type}} source. Health, schedule, detector coverage and recent runs."
+      "descriptionWithEntity": "{{name}} — health, schedule, detector coverage and the most recent runs."
     },
     "sourceEdit": {
       "title": "Edit Source — Update Connection & Detector Settings",
@@ -4394,8 +4396,8 @@
       "description": "Track a single scan run from trigger to completion: progress, run timeline, asset delta, coverage gaps and per-asset outcomes with logs, findings and source context.",
       "ogTitle": "Scan Details — Timeline & Asset Changes | Classifyre",
       "ogDescription": "Progress, timeline and asset delta for one scan run — with logs, coverage and every finding it produced.",
-      "titleWithEntity": "{{source}} Run — Scan Details",
-      "descriptionWithEntity": "Scan run for {{source}} — progress, timeline, asset delta and coverage."
+      "titleWithEntity": "{{name}} — Scan Details",
+      "descriptionWithEntity": "Scan run for {{name}} — progress, timeline, asset delta and coverage."
     },
     "detectors": {
       "title": "Custom Detectors — Build, Train & Manage Detection Logic",
@@ -4415,7 +4417,7 @@
       "ogTitle": "Detector Details — Configuration & Training | Classifyre",
       "ogDescription": "Identity, validation, model settings and training history for one custom detector.",
       "titleWithEntity": "{{name}} — Detector Details",
-      "descriptionWithEntity": "{{name}} — {{method}} detector. Configuration, training history and test scenarios."
+      "descriptionWithEntity": "{{name}} — configuration, training history and test scenarios."
     },
     "investigations": {
       "title": "Investigations — Cases, Inquiries & AI Autopilot",
@@ -4428,16 +4430,16 @@
       "description": "Investigate a case with its evidence graph, threads, chronology and case file. Link inquiries, pull matches, add hypotheses and capture a conclusion — or let the AI harness run on the case.",
       "ogTitle": "Case Details — Evidence & Hypotheses | Classifyre",
       "ogDescription": "Evidence graph, linked inquiries, hypotheses and activity timeline for one investigation case.",
-      "titleWithEntity": "{{title}} — Case Details",
-      "descriptionWithEntity": "{{title}} — {{status}} case with {{inquiries}} inquiries. Evidence graph, hypotheses and timeline."
+      "titleWithEntity": "{{name}} — Case Details",
+      "descriptionWithEntity": "{{name}} — evidence graph, hypotheses, linked inquiries and activity timeline."
     },
     "inquiryDetail": {
       "title": "Inquiry Details — Saved Query, Matches & Linked Cases",
       "description": "A saved inquiry that watches all findings matching its filters. Review live matches, see cases it drives, rescan for new hits and pull findings into a case as evidence.",
       "ogTitle": "Inquiry Details — Matches & Cases | Classifyre",
       "ogDescription": "Live matches for a saved finding query — plus cases it drives and one-click evidence pull.",
-      "titleWithEntity": "{{title}} — Inquiry Details",
-      "descriptionWithEntity": "{{title}} — inquiry watching {{scope}}. Live matches and linked cases."
+      "titleWithEntity": "{{name}} — Inquiry Details",
+      "descriptionWithEntity": "{{name}} — live matches for this saved query and the cases it drives."
     },
     "inquiryNew": {
       "title": "New Inquiry — Create a Saved Finding Query",
@@ -4452,8 +4454,7 @@
       "ogDescription": "Title, severity, inquiries and evidence — start a new investigation case."
     },
     "duplicates": {
-      "titleTemplate": "%s · Duplicate Review",
-      "defaultTitle": "Duplicate Review — Find Copies Across All Sources",
+      "title": "Duplicate Review — Find Copies Across All Sources",
       "description": "Find assets that look like the same thing — grouped by shared fingerprint values and match reason. Review clusters, compare pairs, tune correlation and track every decision.",
       "ogTitle": "Duplicate Review — Clusters & Pairs | Classifyre",
       "ogDescription": "Near-duplicates by shared values and fingerprints — clusters, pairs and tuning for the whole workspace."
@@ -4518,7 +4519,7 @@
       "ogTitle": "AI Provider — Configuration | Classifyre",
       "ogDescription": "Endpoint, model and credential for one Harness AI provider.",
       "titleWithEntity": "{{name}} — AI Provider",
-      "descriptionWithEntity": "{{name}} — {{provider}} / {{model}}. Credentials, context and feature assignment."
+      "descriptionWithEntity": "{{name}} — endpoint, model, credentials and feature assignment."
     },
     "docs": {
       "title": "Documentation — Connect, Scan & Investigate with Classifyre",

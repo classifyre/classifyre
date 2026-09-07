@@ -21,6 +21,13 @@ const isFile = (p: string): boolean => {
   }
 };
 
+/**
+ * The static export emits one tree per locale (`en/`, `de/`) and nothing at the
+ * root, so the SPA shell lives under the default locale. Mirrors
+ * `DEFAULT_LOCALE` in `apps/web/lib/locale-detection.ts`.
+ */
+export const DEFAULT_LOCALE = 'en';
+
 /** What {@link resolveRequestPath} decided to do with a request. */
 export type ResolvedRequest =
   | { kind: 'file'; filePath: string }
@@ -82,6 +89,22 @@ export function resolveRequestPath(
   pathname: string,
 ): ResolvedRequest {
   const rawPath = decodeURIComponent(pathname).replace(/^\/+/, '');
+  return resolveUnderRoot(resolvedRoot, rawPath, true);
+}
+
+/**
+ * `retryUnderLocale` is what keeps desktop URLs free of a language segment.
+ * The export emits every page under `en/` and `de/` (see `app/[locale]` in the
+ * web app), but the app's own deep links, the tray and the workspace list all
+ * address pages the way the server deployment does — `app://classifyre/acme/…`.
+ * Anything that fails to resolve at the root is therefore retried once under
+ * the default locale before falling back to the shell.
+ */
+function resolveUnderRoot(
+  resolvedRoot: string,
+  rawPath: string,
+  retryUnderLocale: boolean,
+): ResolvedRequest {
   const filePath = path.resolve(resolvedRoot, rawPath);
 
   // Reject path traversal outside the web root.
@@ -105,13 +128,22 @@ export function resolveRequestPath(
   // or data file (has an extension) return 404 rather than the overview HTML —
   // serving HTML in place of an RSC payload would make Next render the wrong
   // route.
+  if (retryUnderLocale && rawPath.split('/')[0] !== DEFAULT_LOCALE) {
+    const underLocale = resolveUnderRoot(
+      resolvedRoot,
+      rawPath ? `${DEFAULT_LOCALE}/${rawPath}` : DEFAULT_LOCALE,
+      false,
+    );
+    if (underLocale.kind === 'file') return underLocale;
+  }
+
   const lastSegment = rawPath.split('/').filter(Boolean).pop() ?? '';
   return lastSegment.includes('.') ? { kind: 'notFound' } : { kind: 'shell' };
 }
 
 export function registerAppProtocol(staticDir: string): void {
   const resolvedRoot = path.resolve(staticDir);
-  const rootIndex = path.join(resolvedRoot, 'index.html');
+  const rootIndex = path.join(resolvedRoot, DEFAULT_LOCALE, 'index.html');
   const serve = (filePath: string) => net.fetch(`file://${filePath}`);
 
   protocol.handle('app', (request) => {

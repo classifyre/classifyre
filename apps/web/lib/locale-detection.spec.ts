@@ -1,4 +1,19 @@
+import fs from "node:fs";
+import path from "node:path";
+
+import { localeSwitchHref } from "./app-path";
+
 import {
+  DEFAULT_LOCALE,
+  LOCALES,
+  isLocale,
+  languageToLocale,
+  localeHtmlLang,
+  localeOpenGraph,
+  localePathPrefix,
+  localeToLanguage,
+  stripLocalePrefix,
+  withLocalePrefix,
   resolveLocaleTag,
   detectBrowserLanguage,
   resolveLanguage,
@@ -253,5 +268,139 @@ describe("language cookie", () => {
     expect(getLanguageOverride()).toBe("GERMAN");
     clearLanguageOverride();
     expect(getLanguageOverride()).toBeNull();
+  });
+});
+
+// ─── URL locale prefixes ────────────────────────────────────────────
+
+describe("locale ↔ language", () => {
+  it("round-trips every locale", () => {
+    for (const locale of LOCALES) {
+      expect(languageToLocale(localeToLanguage(locale))).toBe(locale);
+    }
+  });
+
+  it("recognises exactly the supported locales", () => {
+    expect(LOCALES.every(isLocale)).toBe(true);
+    expect(isLocale("fr")).toBe(false);
+    expect(isLocale("EN")).toBe(false);
+    expect(isLocale(undefined)).toBe(false);
+  });
+
+  it("carries a tag for every locale", () => {
+    for (const locale of LOCALES) {
+      expect(localeHtmlLang(locale)).toBeTruthy();
+      expect(localeOpenGraph(locale)).toMatch(/^[a-z]{2}_[A-Z]{2}$/);
+    }
+  });
+});
+
+describe("localePathPrefix", () => {
+  it("leaves the default locale unprefixed", () => {
+    expect(localePathPrefix(DEFAULT_LOCALE)).toBe("");
+    expect(localePathPrefix("de")).toBe("/de");
+  });
+});
+
+describe("stripLocalePrefix / withLocalePrefix", () => {
+  it("treats an unprefixed path as the default locale", () => {
+    expect(stripLocalePrefix("/acme/findings")).toEqual({
+      locale: DEFAULT_LOCALE,
+      rest: "/acme/findings",
+    });
+    expect(stripLocalePrefix("/")).toEqual({
+      locale: DEFAULT_LOCALE,
+      rest: "/",
+    });
+  });
+
+  it("splits a locale prefix off", () => {
+    expect(stripLocalePrefix("/de/acme/findings")).toEqual({
+      locale: "de",
+      rest: "/acme/findings",
+    });
+    expect(stripLocalePrefix("/de")).toEqual({ locale: "de", rest: "/" });
+  });
+
+  it("does not mistake a namespace that merely starts with a locale", () => {
+    // `en` and `de` are reserved slugs, but `england` and `dev` are not.
+    expect(stripLocalePrefix("/england/findings")).toEqual({
+      locale: DEFAULT_LOCALE,
+      rest: "/england/findings",
+    });
+    expect(stripLocalePrefix("/dev/findings")).toEqual({
+      locale: DEFAULT_LOCALE,
+      rest: "/dev/findings",
+    });
+  });
+
+  it("replaces an existing prefix rather than doubling it", () => {
+    expect(withLocalePrefix("de", "/de/acme")).toBe("/de/acme");
+    expect(withLocalePrefix("en", "/de/acme")).toBe("/acme");
+    expect(withLocalePrefix("de", "/acme")).toBe("/de/acme");
+    expect(withLocalePrefix("de", "/")).toBe("/de");
+    expect(withLocalePrefix("en", "/")).toBe("/");
+  });
+
+  it("round-trips every locale through both directions", () => {
+    for (const locale of LOCALES) {
+      const prefixed = withLocalePrefix(locale, "/acme/findings");
+      expect(stripLocalePrefix(prefixed)).toEqual({
+        locale,
+        rest: "/acme/findings",
+      });
+    }
+  });
+});
+
+describe("next.config.mjs locale table", () => {
+  // The Next CLI loads next.config.mjs before any TypeScript path alias
+  // exists, so it re-declares the locale list. Pin the copies together.
+  const config = fs.readFileSync(
+    path.join(__dirname, "..", "next.config.mjs"),
+    "utf8",
+  );
+
+  it("lists the same locales as this module", () => {
+    const match = /const LOCALES = \[([^\]]*)\];/.exec(config);
+    expect(match).not.toBeNull();
+    const configured = (match?.[1] ?? "")
+      .split(",")
+      .map((value) => value.trim().replace(/^["']|["']$/g, ""))
+      .filter(Boolean);
+    expect(configured).toEqual([...LOCALES]);
+  });
+
+  it("uses the same default locale", () => {
+    expect(config).toContain(`const DEFAULT_LOCALE = "${DEFAULT_LOCALE}";`);
+  });
+});
+
+// ─── Language switcher target ───────────────────────────────────────
+
+describe("localeSwitchHref", () => {
+  it("swaps the prefix on the page the user is looking at", () => {
+    expect(localeSwitchHref("/acme/findings", "GERMAN")).toBe(
+      "/de/acme/findings",
+    );
+    expect(localeSwitchHref("/de/acme/findings", "ENGLISH")).toBe(
+      "/acme/findings",
+    );
+  });
+
+  it("is idempotent for the language already in the URL", () => {
+    expect(localeSwitchHref("/de/acme", "GERMAN")).toBe("/de/acme");
+    expect(localeSwitchHref("/acme", "ENGLISH")).toBe("/acme");
+  });
+
+  it("keeps the query string and hash", () => {
+    expect(
+      localeSwitchHref("/acme/findings", "GERMAN", "?severity=high#f-1"),
+    ).toBe("/de/acme/findings?severity=high#f-1");
+  });
+
+  it("handles the workspace directory at the root", () => {
+    expect(localeSwitchHref("/", "GERMAN")).toBe("/de");
+    expect(localeSwitchHref("/de", "ENGLISH")).toBe("/");
   });
 });

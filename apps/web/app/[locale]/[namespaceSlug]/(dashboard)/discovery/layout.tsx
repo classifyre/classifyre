@@ -1,15 +1,22 @@
 import type { Metadata } from "next";
-import enTranslations from "@/i18n/en";
-import { translate } from "@/i18n";
 
-export const metadata: Metadata = {
-  title: translate(enTranslations, "seo.discovery.title"),
-  description: translate(enTranslations, "seo.discovery.description"),
-  openGraph: {
-    title: translate(enTranslations, "seo.discovery.ogTitle"),
-    description: translate(enTranslations, "seo.discovery.ogDescription"),
-  },
-};
+import { isLocale } from "@/lib/locale-detection";
+import { sectionMetadata } from "@/lib/seo-metadata";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; namespaceSlug: string }>;
+}): Promise<Metadata> {
+  const { locale, namespaceSlug } = await params;
+  if (!isLocale(locale)) return {};
+  return {
+    ...(await sectionMetadata(locale, "seo.discovery", {
+      namespaceSlug,
+      path: "/discovery",
+    })),
+  };
+}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;

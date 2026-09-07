@@ -33,6 +33,7 @@ import {
 import { AssistantFab } from "./assistant-workflow-provider";
 import { DemoModeBanner, DemoModeHeaderBadge } from "./demo-mode-badge";
 import { DocumentTitleUpdater } from "./document-title-updater";
+import { stripLocalePrefix } from "@/lib/locale-detection";
 import { AiHealthProvider, AiHealthFixButton } from "./ai-health";
 import { LanguageSwitcher } from "./language-switcher";
 import { useTranslation } from "@/hooks/use-translation";
@@ -133,11 +134,12 @@ export function DashboardLayout({
   const [findingAssetCrumbs, setFindingAssetCrumbs] = React.useState<
     Record<string, FindingAssetCrumb>
   >({});
-  // Route segments AFTER the leading `[namespaceSlug]` segment, so breadcrumbs
-  // and dynamic-label resolution operate on the real app path (e.g. sources,
-  // assets/:id) and never treat the namespace slug as a route.
+  // Route segments AFTER the optional `[locale]` and the `[namespaceSlug]`
+  // segment, so breadcrumbs and dynamic-label resolution operate on the real
+  // app path (e.g. sources, assets/:id) and never treat the locale or the
+  // namespace slug as a route.
   const segments = React.useMemo(
-    () => pathname.split("/").filter(Boolean).slice(1),
+    () => stripLocalePrefix(pathname).rest.split("/").filter(Boolean).slice(1),
     [pathname],
   );
 
@@ -303,92 +305,93 @@ export function DashboardLayout({
       <SidebarProvider>
         <AiHealthProvider>
           {/* Mounted here (not in the root layout) so the document title can
-              name the active workspace. */}
-          <DocumentTitleUpdater />
-          <AppSidebar />
-          <SidebarInset className="min-w-0 overflow-x-clip">
-            <ActiveNamespaceTabs />
-            <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
-              <div className="flex min-w-0 items-center gap-2">
-                <SidebarTrigger className="-ml-1 size-7" />
-                <Separator orientation="vertical" className="mr-2 h-4" />
-                <Breadcrumb className="min-w-0">
-                  {/* Nowrap so a squeezed header truncates the trail instead
+              name the active workspace. Wraps the page so a detail route can
+              contribute its entity name via `useEntityDocumentTitle`. */}
+          <DocumentTitleUpdater>
+            <AppSidebar />
+            <SidebarInset className="min-w-0 overflow-x-clip">
+              <ActiveNamespaceTabs />
+              <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+                <div className="flex min-w-0 items-center gap-2">
+                  <SidebarTrigger className="-ml-1 size-7" />
+                  <Separator orientation="vertical" className="mr-2 h-4" />
+                  <Breadcrumb className="min-w-0">
+                    {/* Nowrap so a squeezed header truncates the trail instead
                       of stacking it into a second row and overflowing h-16. */}
-                  <BreadcrumbList className="flex-nowrap">
-                    <BreadcrumbItem>
-                      <BreadcrumbLink asChild>
-                        <Link href={nsHref("/")}>{t("breadcrumb.home")}</Link>
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    {breadcrumbs.map((crumb) => (
-                      <React.Fragment key={crumb.href}>
-                        <BreadcrumbSeparator
-                          className={
-                            crumb.alwaysVisible || crumb.isCurrent
-                              ? ""
-                              : "hidden sm:block"
-                          }
-                        />
-                        <BreadcrumbItem
-                          className={
-                            crumb.isCurrent || crumb.alwaysVisible
-                              ? ""
-                              : "hidden sm:inline-flex"
-                          }
-                        >
-                          {crumb.isCurrent ? (
-                            shouldUseTooltip(crumb.label) ? (
+                    <BreadcrumbList className="flex-nowrap">
+                      <BreadcrumbItem>
+                        <BreadcrumbLink asChild>
+                          <Link href={nsHref("/")}>{t("breadcrumb.home")}</Link>
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      {breadcrumbs.map((crumb) => (
+                        <React.Fragment key={crumb.href}>
+                          <BreadcrumbSeparator
+                            className={
+                              crumb.alwaysVisible || crumb.isCurrent
+                                ? ""
+                                : "hidden sm:block"
+                            }
+                          />
+                          <BreadcrumbItem
+                            className={
+                              crumb.isCurrent || crumb.alwaysVisible
+                                ? ""
+                                : "hidden sm:inline-flex"
+                            }
+                          >
+                            {crumb.isCurrent ? (
+                              shouldUseTooltip(crumb.label) ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <BreadcrumbPage className="max-w-[220px] truncate">
+                                      {crumb.label}
+                                    </BreadcrumbPage>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" sideOffset={6}>
+                                    {crumb.label}
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <BreadcrumbPage className="max-w-[220px] truncate">
+                                  {crumb.label}
+                                </BreadcrumbPage>
+                              )
+                            ) : shouldUseTooltip(crumb.label) ? (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <BreadcrumbPage className="max-w-[220px] truncate">
-                                    {crumb.label}
-                                  </BreadcrumbPage>
+                                  <BreadcrumbLink asChild>
+                                    <Link
+                                      href={crumb.href}
+                                      className="inline-block max-w-[180px] truncate"
+                                    >
+                                      {crumb.label}
+                                    </Link>
+                                  </BreadcrumbLink>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" sideOffset={6}>
                                   {crumb.label}
                                 </TooltipContent>
                               </Tooltip>
                             ) : (
-                              <BreadcrumbPage className="max-w-[220px] truncate">
-                                {crumb.label}
-                              </BreadcrumbPage>
-                            )
-                          ) : shouldUseTooltip(crumb.label) ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <BreadcrumbLink asChild>
-                                  <Link
-                                    href={crumb.href}
-                                    className="inline-block max-w-[180px] truncate"
-                                  >
-                                    {crumb.label}
-                                  </Link>
-                                </BreadcrumbLink>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" sideOffset={6}>
-                                {crumb.label}
-                              </TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            <BreadcrumbLink asChild>
-                              <Link href={crumb.href}>{crumb.label}</Link>
-                            </BreadcrumbLink>
-                          )}
-                        </BreadcrumbItem>
-                      </React.Fragment>
-                    ))}
-                  </BreadcrumbList>
-                </Breadcrumb>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <AiHealthFixButton />
-                {demoMode && <DemoModeHeaderBadge />}
-                <LanguageSwitcher />
-                <ThemeToggle />
-                <NotificationCenter />
-                <DesktopNotificationsBridge />
-                {/*
+                              <BreadcrumbLink asChild>
+                                <Link href={crumb.href}>{crumb.label}</Link>
+                              </BreadcrumbLink>
+                            )}
+                          </BreadcrumbItem>
+                        </React.Fragment>
+                      ))}
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <AiHealthFixButton />
+                  {demoMode && <DemoModeHeaderBadge />}
+                  <LanguageSwitcher />
+                  <ThemeToggle />
+                  <NotificationCenter />
+                  <DesktopNotificationsBridge />
+                  {/*
                   A plain <a>, not next/link: the documentation is a separate
                   Next app (apps/docs) exported into apps/web/public/docs, so
                   /docs is static files rather than a route in this router — a
@@ -398,36 +401,37 @@ export function DashboardLayout({
                   own window (see setWindowOpenHandler in
                   apps/desktop/src/main/index.ts).
                 */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  asChild
-                  className="relative rounded-[4px] border-2 border-transparent hover:border-border"
-                >
-                  <a href="/docs/" target="_blank" rel="noopener noreferrer">
-                    <BookOpen className="h-5 w-5" />
-                    <span className="sr-only">{t("nav.documentation")}</span>
-                  </a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  asChild
-                  className="relative rounded-[4px] border-2 border-transparent hover:border-border"
-                >
-                  <Link href={nsHref("/settings")}>
-                    <Settings className="h-5 w-5" />
-                    <span className="sr-only">Settings</span>
-                  </Link>
-                </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    asChild
+                    className="relative rounded-[4px] border-2 border-transparent hover:border-border"
+                  >
+                    <a href="/docs/" target="_blank" rel="noopener noreferrer">
+                      <BookOpen className="h-5 w-5" />
+                      <span className="sr-only">{t("nav.documentation")}</span>
+                    </a>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    asChild
+                    className="relative rounded-[4px] border-2 border-transparent hover:border-border"
+                  >
+                    <Link href={nsHref("/settings")}>
+                      <Settings className="h-5 w-5" />
+                      <span className="sr-only">Settings</span>
+                    </Link>
+                  </Button>
+                </div>
+              </header>
+              {demoMode && <DemoModeBanner />}
+              <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 pt-2">
+                {children}
               </div>
-            </header>
-            {demoMode && <DemoModeBanner />}
-            <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 pt-2">
-              {children}
-            </div>
-          </SidebarInset>
-          <AssistantFab />
+            </SidebarInset>
+            <AssistantFab />
+          </DocumentTitleUpdater>
         </AiHealthProvider>
       </SidebarProvider>
     </ServerConfigContext.Provider>

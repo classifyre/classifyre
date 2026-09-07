@@ -151,3 +151,64 @@ describe("i18n key parity", () => {
     );
   });
 });
+
+/**
+ * Placeholders `entityMetadata()` supplies. A `*WithEntity` template that asks
+ * for anything else renders the literal `{{method}}` on the page, because
+ * `translate()` falls back to `` `{{${paramKey}}}` `` for a missing param.
+ */
+const ENTITY_TEMPLATE_PARAMS = new Set(["name"]);
+
+function seoLeaves(file: JsonObject): Array<[string, string]> {
+  const seo = file["seo"];
+  if (typeof seo !== "object" || seo === null) {
+    throw new Error("no seo namespace");
+  }
+  return collectPaths(seo as JsonObject).map((path) => {
+    let value: JsonValue = seo as JsonObject;
+    for (const part of path.split(".")) {
+      value = (value as JsonObject)[part] as JsonValue;
+    }
+    return [path, value as string];
+  });
+}
+
+describe("seo namespace", () => {
+  it("is actually translated into German, not copied from English", () => {
+    // Scoped to `seo.*`: ~400 keys elsewhere are legitimately identical proper
+    // nouns ("Confluence", "MCP"), but SEO copy is prose and never is.
+    const enLeaves = new Map(seoLeaves(en as unknown as JsonObject));
+    const untranslated = seoLeaves(de as unknown as JsonObject)
+      .filter(([path, value]) => enLeaves.get(path) === value)
+      .map(([path]) => path);
+
+    expect(untranslated).toEqual([]);
+  });
+
+  it.each([
+    ["en.json", en],
+    ["de.json", de],
+  ])("%s only asks for placeholders the code supplies", (_name, file) => {
+    const offenders = seoLeaves(file as unknown as JsonObject)
+      .filter(([path]) => path.endsWith("WithEntity"))
+      .flatMap(([path, value]) => {
+        const asked = [...value.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]!);
+        const unknown = asked.filter((p) => !ENTITY_TEMPLATE_PARAMS.has(p));
+        return unknown.length > 0 ? [`${path}: ${unknown.join(", ")}`] : [];
+      });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it.each([
+    ["en.json", en],
+    ["de.json", de],
+  ])("%s gives every *WithEntity template a placeholder", (_name, file) => {
+    const holeless = seoLeaves(file as unknown as JsonObject)
+      .filter(([path]) => path.endsWith("WithEntity"))
+      .filter(([, value]) => !/\{\{name\}\}/.test(value))
+      .map(([path]) => path);
+
+    expect(holeless).toEqual([]);
+  });
+});

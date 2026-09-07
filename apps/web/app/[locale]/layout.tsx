@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import {
   Archivo_Black,
   IBM_Plex_Mono,
@@ -9,8 +10,8 @@ import {
 import "@workspace/ui/globals.css";
 import { Providers } from "@/components/providers";
 import { ANALYTICS_CONFIG_PATH } from "@/lib/analytics-config";
-import enTranslations from "@/i18n/en";
-import { translate } from "@/i18n";
+import { isLocale, LOCALES, localeHtmlLang } from "@/lib/locale-detection";
+import { siteMetadata } from "@/lib/seo-metadata";
 
 // Desktop is a static export with no server to serve the runtime config, and
 // ships without analytics anyway.
@@ -40,61 +41,40 @@ const fontHero = League_Gothic({
   variable: "--font-hero",
 });
 
-const siteUrl =
-  process.env.PUBLIC_BASE_URL ??
-  process.env.SITEMAP_BASE_URL ??
-  "https://classifyre.com";
+/**
+ * Emit one tree per locale. The server build needs this so the `beforeFiles`
+ * rewrite has something to hit; the desktop static export needs it so both
+ * language shells ship.
+ */
+export function generateStaticParams() {
+  return LOCALES.map((locale) => ({ locale }));
+}
 
-export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
-  title: {
-    template: `%s | ${translate(enTranslations, "app.name")}`,
-    default: translate(enTranslations, "seo.site.title"),
-  },
-  description: translate(enTranslations, "seo.site.description"),
-  keywords: translate(enTranslations, "seo.site.keywords").split(", "),
-  authors: [{ name: "Classifyre", url: siteUrl }],
-  creator: "Classifyre",
-  publisher: "Classifyre",
-  category: "Technology",
-  alternates: {
-    canonical: "/",
-  },
-  openGraph: {
-    type: "website",
-    locale: "en_US",
-    siteName: translate(enTranslations, "app.name"),
-    title: translate(enTranslations, "seo.site.ogTitle"),
-    description: translate(enTranslations, "seo.site.ogDescription"),
-    url: "/",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: translate(enTranslations, "seo.site.twitterTitle"),
-    description: translate(enTranslations, "seo.site.twitterDescription"),
-    creator: "@classifyre",
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-      "max-video-preview": -1,
-    },
-  },
-  manifest: "/manifest.json",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!isLocale(locale)) return {};
+  return siteMetadata(locale);
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
+  params,
 }: Readonly<{
   children: React.ReactNode;
+  params: Promise<{ locale: string }>;
 }>) {
+  const { locale } = await params;
+  // Anything that is not a locale reached this tree through a bad URL, not
+  // through the rewrite; 404 rather than silently rendering English under a
+  // nonsense prefix.
+  if (!isLocale(locale)) notFound();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={localeHtmlLang(locale)} suppressHydrationWarning>
       <body
         className={`${fontSerif.variable} ${fontSans.variable} ${fontMono.variable} ${fontHero.variable} font-sans antialiased`}
       >
@@ -107,7 +87,7 @@ export default function RootLayout({
             a small same-origin script that must run before hydration so the
             PostHog provider sees its config on first effect. */}
         {!isDesktopBuild && <script src={ANALYTICS_CONFIG_PATH} />}
-        <Providers>{children}</Providers>
+        <Providers locale={locale}>{children}</Providers>
       </body>
     </html>
   );

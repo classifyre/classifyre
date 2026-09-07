@@ -25,6 +25,7 @@ import {
 } from "@workspace/api-client";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
+import { useEntityDocumentTitle } from "@/components/document-title-updater";
 import { useFormatDuration } from "@/hooks/use-format-duration";
 import { RunnerAssetsTable } from "@/components/runner-assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
@@ -311,18 +312,9 @@ export default function RunnerDetailPage() {
   const SourceTypeIcon = getSourceIcon(sourceType);
   const sourceDetailsId = runner?.sourceId || runner?.source?.id;
 
-  useEffect(() => {
-    if (sourceName && runner) {
-      document.title = `${t("seo.scanDetail.titleWithEntity", { source: sourceName })} | ${t("app.name")}`;
-      const meta = document.querySelector('meta[name="description"]');
-      if (meta) {
-        meta.setAttribute(
-          "content",
-          t("seo.scanDetail.descriptionWithEntity", { source: sourceName }),
-        );
-      }
-    }
-  }, [sourceName, runner, t]);
+  useEntityDocumentTitle(
+    sourceName && runner ? t("scans.sourceRun", { source: sourceName }) : null,
+  );
 
   if (loading && !runner) {
     return (

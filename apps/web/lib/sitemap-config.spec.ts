@@ -4,7 +4,9 @@ import {
   appUrl,
   childSitemapUrl,
   entitySitemapFile,
+  entityAlternates,
   entityUrl,
+  localeAlternates,
   isSitemapEnabled,
   parseChildSitemapPath,
   renderRobots,
@@ -106,6 +108,32 @@ describe("sitemap-config", () => {
       expect(appUrl(base, "acme", "/findings")).toBe(`${base}/acme/findings/`);
     });
 
+    it("leaves the default locale unprefixed and prefixes the others", () => {
+      expect(appUrl(base, "acme", "/findings", "en")).toBe(
+        `${base}/acme/findings/`,
+      );
+      expect(appUrl(base, "acme", "/findings", "de")).toBe(
+        `${base}/de/acme/findings/`,
+      );
+      expect(appUrl(base, null, "", "de")).toBe(`${base}/de/`);
+      expect(entityUrl(base, "acme", "finding", "f1", "de")).toBe(
+        `${base}/de/acme/findings/f1/`,
+      );
+    });
+
+    it("advertises one alternate per locale plus x-default", () => {
+      expect(localeAlternates(base, "acme", "/findings")).toEqual([
+        { hreflang: "en", href: `${base}/acme/findings/` },
+        { hreflang: "de", href: `${base}/de/acme/findings/` },
+        { hreflang: "x-default", href: `${base}/acme/findings/` },
+      ]);
+      expect(entityAlternates(base, "acme", "case", "c1")).toEqual([
+        { hreflang: "en", href: `${base}/acme/investigations/c1/` },
+        { hreflang: "de", href: `${base}/de/acme/investigations/c1/` },
+        { hreflang: "x-default", href: `${base}/acme/investigations/c1/` },
+      ]);
+    });
+
     it("routes every entity type to its namespaced detail page", () => {
       expect(entityUrl(base, "acme", "finding", "f1")).toBe(
         `${base}/acme/findings/f1/`,
@@ -185,6 +213,27 @@ describe("sitemap-config", () => {
       );
     });
 
+    it("declares the xhtml namespace and emits hreflang alternates", () => {
+      const xml = renderUrlSet([
+        {
+          url: "https://x.test/acme/findings/",
+          alternates: [
+            { hreflang: "en", href: "https://x.test/acme/findings/" },
+            { hreflang: "de", href: "https://x.test/de/acme/findings/" },
+            { hreflang: "x-default", href: "https://x.test/acme/findings/" },
+          ],
+        },
+      ]);
+
+      expect(xml).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
+      expect(xml).toContain(
+        '<xhtml:link rel="alternate" hreflang="de" href="https://x.test/de/acme/findings/" />',
+      );
+      expect(xml.match(/<xhtml:link/g)).toHaveLength(3);
+      // One <url> per page, not one per locale.
+      expect(xml.match(/<url>/g)).toHaveLength(1);
+    });
+
     it("normalises index lastmod to ISO-8601", () => {
       const xml = renderSitemapIndex([
         { url: "https://x.test/sitemap/pages.xml", lastModified: "2026-05-06" },
@@ -212,6 +261,18 @@ describe("sitemap-config", () => {
       expect(body).toContain("Sitemap: https://demo.classifyre.com/sitemap.xml");
       expect(body).toContain("Disallow: /api/");
       expect(body).toContain("Disallow: /*/settings/");
+    });
+
+    it("covers the locale-prefixed form of every namespace-scoped rule", () => {
+      process.env.SITEMAP_ENABLED = "true";
+      const body = renderRobots("https://demo.classifyre.com");
+
+      // `/*/settings/` wildcards one segment (the namespace slug) and so does
+      // not reach `/de/<ns>/settings/`.
+      for (const suffix of ["settings", "notifications", "new", "edit"]) {
+        expect(body).toContain(`Disallow: /*/${suffix}/`);
+        expect(body).toContain(`Disallow: /*/*/${suffix}/`);
+      }
     });
 
     it("blocks everything when the hostname cannot be resolved", () => {

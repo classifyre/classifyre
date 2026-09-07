@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import enTranslations from "@/i18n/en";
-import { translate } from "@/i18n";
+import { isLocale } from "@/lib/locale-detection";
+import { sectionMetadata } from "@/lib/seo-metadata";
 
 import {
   Badge,
@@ -13,17 +13,19 @@ import {
   CardTitle,
 } from "@workspace/ui/components";
 
-export const metadata: Metadata = {
-  title: translate(enTranslations, "seo.docs.title"),
-  description: translate(enTranslations, "seo.docs.description"),
-  alternates: {
-    canonical: "/docs/",
-  },
-  openGraph: {
-    title: translate(enTranslations, "seo.docs.ogTitle"),
-    description: translate(enTranslations, "seo.docs.ogDescription"),
-  },
-};
+// Only this page's *metadata* is localized. Its body copy and every link
+// below point into `public/docs` — the bundled Nextra site (apps/docs), which
+// is a separate app with no i18n of its own — so translating the landing page
+// while it links into an English-only manual would be worse than not.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!isLocale(locale)) return {};
+  return sectionMetadata(locale, "seo.docs", { path: "/docs" });
+}
 
 const docSections = [
   {
