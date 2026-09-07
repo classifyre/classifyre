@@ -1,16 +1,23 @@
 import type { Metadata } from "next";
-import enTranslations from "@/i18n/en";
-import { translate } from "@/i18n";
-import { dynamicIdParams } from "@/lib/dynamic-route";
 
-export const metadata: Metadata = {
-  title: translate(enTranslations, "seo.duplicatePair.title"),
-  description: translate(enTranslations, "seo.duplicatePair.description"),
-  openGraph: {
-    title: translate(enTranslations, "seo.duplicatePair.ogTitle"),
-    description: translate(enTranslations, "seo.duplicatePair.ogDescription"),
-  },
-};
+import { dynamicIdParams } from "@/lib/dynamic-route";
+import { isLocale } from "@/lib/locale-detection";
+import { sectionMetadata } from "@/lib/seo-metadata";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; namespaceSlug: string; id: string }>;
+}): Promise<Metadata> {
+  const { locale, namespaceSlug, id } = await params;
+  if (!isLocale(locale)) return {};
+  return {
+    ...(await sectionMetadata(locale, "seo.duplicatePair", {
+      namespaceSlug,
+      path: `/duplicates/pairs/${id}`,
+    })),
+  };
+}
 
 export function generateStaticParams() {
   return dynamicIdParams();

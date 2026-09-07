@@ -74,6 +74,7 @@ import { getSourceIcon } from "@/lib/source-type-icon";
 import { RunnerStatusBadge } from "@/components/runner-status-badge";
 import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
 import { useTranslation } from "@/hooks/use-translation";
+import { useEntityDocumentTitle } from "@/components/document-title-updater";
 import { useFormatDuration } from "@/hooks/use-format-duration";
 import { summarizeTextCoverage } from "@/lib/text-coverage";
 
@@ -426,21 +427,7 @@ export default function SourceViewPage() {
     },
   ];
 
-  useEffect(() => {
-    if (source?.name) {
-      document.title = `${t("seo.sourceDetail.titleWithEntity", { name: source.name })} | ${t("app.name")}`;
-      const meta = document.querySelector('meta[name="description"]');
-      if (meta) {
-        meta.setAttribute(
-          "content",
-          t("seo.sourceDetail.descriptionWithEntity", {
-            name: source.name,
-            type: source.type ?? "",
-          }),
-        );
-      }
-    }
-  }, [source?.name, source?.type, t]);
+  useEntityDocumentTitle(source?.name);
 
   if (isLoading) {
     return (

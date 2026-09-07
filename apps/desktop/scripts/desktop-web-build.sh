@@ -90,6 +90,9 @@ fi
 
 echo "[desktop-web-build] Building Next.js with DESKTOP_BUILD=true…"
 cd "$WEB_DIR"
-DESKTOP_BUILD=true bun run build
+# NEXT_PUBLIC_ variant so client components can see it too: locale routing is
+# server-side rewrites, which a static export does not have, so the language
+# cookie stays authoritative on desktop.
+DESKTOP_BUILD=true NEXT_PUBLIC_DESKTOP_BUILD=true bun run build
 
 echo "[desktop-web-build] Done. Output in $WEB_DIR/out/"

@@ -1,33 +1,22 @@
 import type { Metadata } from "next";
-import enTranslations from "@/i18n/en";
-import { translate } from "@/i18n";
-import { dynamicIdParams } from "@/lib/dynamic-route";
 
-export async function generateMetadata({ params }: { params: Promise<Record<string, string>> }): Promise<Metadata> {
-  const resolved = await params;
-  const entityId = resolved["id"] ?? resolved["id"] ?? "";
-  const isPlaceholder = !entityId || entityId === "__id__" || entityId === "placeholder";
-  if (isPlaceholder) {
-    return {
-      title: translate(enTranslations, "seo.caseDetail.title"),
-      description: translate(enTranslations, "seo.caseDetail.description"),
-      openGraph: {
-        title: translate(enTranslations, "seo.caseDetail.ogTitle"),
-        description: translate(enTranslations, "seo.caseDetail.ogDescription"),
-      },
-    };
-  }
-  // Entity-specific title/description. At build time this is the short id;
-  // in a server-rendered request the same branch can be expanded to fetch
-  // the real name (asset name, source name, finding snippet) via the API.
-  return {
-    title: translate(enTranslations, "seo.caseDetail.titleWithEntity", { entity: entityId, name: entityId, title: entityId }),
-    description: translate(enTranslations, "seo.caseDetail.descriptionWithEntity", { entity: entityId, name: entityId, title: entityId, type: "", severity: "", source: "" }),
-    openGraph: {
-      title: translate(enTranslations, "seo.caseDetail.titleWithEntity", { entity: entityId, name: entityId, title: entityId }),
-      description: translate(enTranslations, "seo.caseDetail.descriptionWithEntity", { entity: entityId, name: entityId, title: entityId, type: "", severity: "", source: "" }),
-    },
-  };
+import { dynamicIdParams } from "@/lib/dynamic-route";
+import { isLocale } from "@/lib/locale-detection";
+import { entityMetadata } from "@/lib/seo-metadata";
+import { seoEntityName } from "@/lib/seo-entity";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; namespaceSlug: string; id: string }>;
+}): Promise<Metadata> {
+  const { locale, namespaceSlug, id } = await params;
+  if (!isLocale(locale)) return {};
+  const name = await seoEntityName("case", namespaceSlug, id);
+  return entityMetadata(locale, "seo.caseDetail", name, {
+    namespaceSlug,
+    path: `/investigations/${id}`,
+  });
 }
 
 export function generateStaticParams() {

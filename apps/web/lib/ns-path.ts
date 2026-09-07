@@ -3,16 +3,35 @@
 import * as React from "react";
 import { getActiveNamespaceSlug } from "@workspace/api-client";
 import { useOptionalNamespace } from "@/components/namespace-provider";
+import { currentLocale, useLocale } from "@/lib/app-path";
+import {
+  DEFAULT_LOCALE,
+  withLocalePrefix,
+  type Locale,
+} from "@/lib/locale-detection";
 
-function withSlug(path: string, slug: string | undefined): string {
-  if (!slug || !path.startsWith("/")) return path;
-  if (path === `/${slug}` || path.startsWith(`/${slug}/`)) return path;
-  return `/${slug}${path === "/" ? "" : path}`;
+/**
+ * The single place an app path gains its `/<locale>/<slug>` prefix. `nsPath`,
+ * `useNsPath` and `nsHref` (in `components/namespace-provider.tsx`) are the
+ * only three entry points, so ~210 call sites inherit both prefixes from here.
+ */
+export function withLocaleAndSlug(
+  path: string,
+  slug: string | undefined,
+  locale: Locale,
+): string {
+  if (!path.startsWith("/")) return path;
+  const scoped =
+    !slug || path === `/${slug}` || path.startsWith(`/${slug}/`)
+      ? path
+      : `/${slug}${path === "/" ? "" : path}`;
+  return locale === DEFAULT_LOCALE ? scoped : withLocalePrefix(locale, scoped);
 }
 
 /**
  * Prefix an absolute app path with the active namespace slug so links stay
- * inside the current workspace.
+ * inside the current workspace, and with the active locale so they stay in the
+ * current language.
  *
  * **Event handlers only.** It resolves the slug from module state / the browser
  * URL, which is authoritative once the app is running but NOT during
@@ -24,15 +43,20 @@ function withSlug(path: string, slug: string | undefined): string {
  * when it is already namespace-prefixed.
  */
 export function nsPath(path: string): string {
-  return withSlug(path, getActiveNamespaceSlug());
+  return withLocaleAndSlug(path, getActiveNamespaceSlug(), currentLocale());
 }
 
 /**
- * Render-safe {@link nsPath}: takes the slug from the namespace React context,
- * which is per-request and therefore correct under concurrent server rendering.
- * Use this for every path built during render.
+ * Render-safe {@link nsPath}: takes the slug from the namespace React context
+ * and the locale from the route, both of which are per-request and therefore
+ * correct under concurrent server rendering. Use this for every path built
+ * during render.
  */
 export function useNsPath(): (path: string) => string {
   const slug = useOptionalNamespace()?.slug;
-  return React.useCallback((path: string) => withSlug(path, slug), [slug]);
+  const locale = useLocale();
+  return React.useCallback(
+    (path: string) => withLocaleAndSlug(path, slug, locale),
+    [slug, locale],
+  );
 }

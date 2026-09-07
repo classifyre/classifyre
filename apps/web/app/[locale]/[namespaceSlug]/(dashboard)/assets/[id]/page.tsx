@@ -33,6 +33,7 @@ import { AssetKindBadge } from "@/components/asset-kind-badge";
 import { formatAssetKind } from "@/lib/asset-kind";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { useTranslation } from "@/hooks/use-translation";
+import { useEntityDocumentTitle } from "@/components/document-title-updater";
 
 /**
  * Column names off an asset's normalized metadata.
@@ -150,23 +151,7 @@ export default function AssetDetailPage() {
     };
   }, [assetDetails?.id]);
 
-  useEffect(() => {
-    if (assetLabel && assetLabel !== assetId) {
-      document.title = `${t("seo.assetDetail.titleWithEntity", { name: assetLabel })} | ${t("app.name")}`;
-      const meta = document.querySelector('meta[name="description"]');
-      if (meta) {
-        const desc = t("seo.assetDetail.descriptionWithEntity", {
-          name: assetLabel,
-          type: assetDetails?.assetType ?? "",
-          source: sourceLabel,
-        });
-        meta.setAttribute("content", desc);
-      }
-    } else if (assetId) {
-      // Fallback to id-based title for crawlers/static export before data loads
-      document.title = `${t("seo.assetDetail.titleWithEntity", { name: assetId })} | ${t("app.name")}`;
-    }
-  }, [assetLabel, assetId, assetDetails?.assetType, sourceLabel, t]);
+  useEntityDocumentTitle(assetLabel !== assetId ? assetLabel : null);
 
   if (loading) {
     return (
