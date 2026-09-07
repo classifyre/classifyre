@@ -32,7 +32,7 @@ describe('AutoScheduleService', () => {
     instanceSettings: { findUnique: jest.fn() },
   };
   const pgBoss = { getBossAsync: jest.fn() };
-  const cliRunner = { startRun: jest.fn() };
+  const cliRunner = { startRun: jest.fn(), reconcileStaleInFlight: jest.fn() };
   const notifications = { create: jest.fn() };
 
   const service = new AutoScheduleService(
@@ -73,6 +73,7 @@ describe('AutoScheduleService', () => {
     prisma.source.updateMany.mock.calls.at(-1)![0].data;
 
   beforeEach(() => {
+    cliRunner.reconcileStaleInFlight.mockResolvedValue(0);
     jest.clearAllMocks();
     prisma.source.updateMany.mockResolvedValue({ count: 1 });
   });
@@ -535,6 +536,35 @@ describe('AutoScheduleService', () => {
       });
       await service.resetToCatchUp('s1', 'detector changed');
       expect(prisma.source.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('orphaned runners at the cap', () => {
+    // A Job can vanish long after startup (TTL cleanup, an evicted node, a
+    // redeploy during a run) and `reconcileOnStartup` never looks again. The
+    // budget is computed from source.runnerStatus, so each orphan takes a slot
+    // for good. Observed live: four sources RUNNING against one surviving Job,
+    // every slot held, nothing able to start and no error anywhere.
+    it('reconciles stale in-flight runners before yielding, then re-checks', async () => {
+      prisma.source.count
+        .mockResolvedValueOnce(2)   // at the cap
+        .mockResolvedValueOnce(0);  // after the orphans are retired
+      cliRunner.reconcileStaleInFlight.mockResolvedValue(2);
+      prisma.source.findMany.mockResolvedValue([]);
+
+      await service.tick();
+
+      expect(cliRunner.reconcileStaleInFlight).toHaveBeenCalledTimes(1);
+      expect(prisma.source.count).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not pay for the check when there is budget to spare', async () => {
+      prisma.source.count.mockResolvedValue(0);
+      prisma.source.findMany.mockResolvedValue([]);
+
+      await service.tick();
+
+      expect(cliRunner.reconcileStaleInFlight).not.toHaveBeenCalled();
     });
   });
 });
