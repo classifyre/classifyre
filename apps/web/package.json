@@ -11,11 +11,12 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "codegen": "echo 'API client code generation moved to @workspace/api-client'",
-    "test": "bun run test:component",
+    "test": "bun run test:unit && bun run test:component",
     "test:component": "playwright test -c playwright-ct.config.ts",
     "test:component:ui": "playwright test -c playwright-ct.config.ts --ui",
     "test:e2e": "bun run test:component",
-    "test:i18n": "node_modules/.bin/jest lib/i18n-keys.spec.ts --no-coverage"
+    "test:i18n": "node_modules/.bin/jest lib/i18n-keys.spec.ts --no-coverage",
+    "test:unit": "jest --no-coverage"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

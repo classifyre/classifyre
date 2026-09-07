@@ -15433,7 +15433,7 @@
             ]
           },
           "severityCounts": {
-            "description": "Importance mix of this asset's findings. Already computed to rank the list, so it costs nothing to return and lets the caller draw a per-asset bar.",
+            "description": "Priority mix of this asset's findings. Already computed to rank the list, so it costs nothing to return and lets the caller draw a per-asset bar.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/FindingsDiscoverySeverityBreakdownDto"
@@ -18063,7 +18063,7 @@
               "LOW",
               "INFO"
             ],
-            "description": "How important this case is to the investigation — an importance ranking, not a threat level."
+            "description": "How much this case matters — a priority level, not a threat level. Distinct from a finding's importance score, which is the ranking pass's output."
           },
           "evidenceCount": {
             "type": "number"

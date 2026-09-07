@@ -9,8 +9,16 @@ import { DemoModeBlockedDialog } from "@/components/demo-mode-blocked-dialog";
 import { InstanceSettingsProvider } from "@/components/instance-settings-provider";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { ActiveNamespacesProvider } from "@/components/active-namespaces-provider";
+import type { Locale } from "@/lib/locale-detection";
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  locale,
+}: {
+  children: React.ReactNode;
+  /** Route locale, so language resolution starts from the URL. */
+  locale: Locale;
+}) {
   return (
     <PostHogProvider>
       <NextThemesProvider
@@ -21,7 +29,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         enableColorScheme
       >
         <ActiveNamespacesProvider>
-          <InstanceSettingsProvider>
+          <InstanceSettingsProvider routeLocale={locale}>
             <AssistantWorkflowProvider>
               {children}
               <DemoModeBlockedDialog />

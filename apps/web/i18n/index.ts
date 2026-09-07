@@ -1,5 +1,6 @@
 import enTranslations from "./en";
 import deTranslations from "./de";
+import { localeToLanguage, type Locale } from "@/lib/locale-detection";
 
 type Translations = typeof enTranslations;
 
@@ -10,6 +11,24 @@ const translationMap: Record<string, Translations> = {
 
 export function getTranslationsForLanguage(language: string): Translations {
   return translationMap[language] ?? enTranslations;
+}
+
+/** Translations for a URL locale segment (`"en"` / `"de"`). */
+export function getTranslationsForLocale(locale: Locale): Translations {
+  return getTranslationsForLanguage(localeToLanguage(locale));
+}
+
+/**
+ * Translate a key in a route locale. This is what server components (every
+ * `generateMetadata`) use, so no metadata file has to reach for `@/i18n/en`
+ * and hardwire English.
+ */
+export function translateFor(
+  locale: Locale,
+  key: string,
+  params?: Record<string, string | number>,
+): string {
+  return translate(getTranslationsForLocale(locale), key, params);
 }
 
 type PathsOf<T, Prefix extends string = ""> = {

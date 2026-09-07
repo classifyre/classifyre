@@ -14,7 +14,7 @@ import { HealthMonitor } from './health-monitor.js';
 import { ProcessManager, type ApiHealthEvent } from './process-manager.js';
 import { registerIpcHandlers } from './ipc-handlers.js';
 import { registerNotificationHandlers } from './notification-service.js';
-import { registerAppProtocol } from './protocol-handler.js';
+import { DEFAULT_LOCALE, registerAppProtocol } from './protocol-handler.js';
 import { SettingsManager } from './settings-manager.js';
 import { UpdateChecker } from './update-checker.js';
 import { getLogFilePath, initFileLogging } from './logger.js';
@@ -102,9 +102,11 @@ function appUrl(route = ''): string {
       ? `http://localhost:3000/${normalized}`
       : 'http://localhost:3000';
   }
+  // The export has no root index.html any more: every page lives under a
+  // locale segment (see DEFAULT_LOCALE in protocol-handler.ts).
   return normalized
     ? `app://classifyre/${normalized}`
-    : 'app://classifyre/index.html';
+    : `app://classifyre/${DEFAULT_LOCALE}/index.html`;
 }
 
 function showMainWindow(): void {

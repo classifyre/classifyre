@@ -4308,5 +4308,224 @@
     },
     "backToPatterns": "Zurück zu den Mustern",
     "backToPattern": "Zurück zum Muster"
+  },
+  "seo": {
+    "site": {
+      "title": "Classifyre — Erkennungsplattform für unstrukturierte Daten",
+      "description": "Open-Source-Erkennungsplattform, die Confluence, Jira, SharePoint, Notion, Datenbanken und Dateifreigaben durchsucht, um personenbezogene Daten, Geheimnisse, Sicherheitsprobleme und Duplikate aufzudecken — und Funde anschließend mit einem KI-Autopiloten zu Ermittlungen triagiert. Selbst gehostet, standardmäßig privat.",
+      "keywords": "Classifyre, Erkennungsplattform, PII-Erkennung, Secrets-Scanning, unstrukturierte Daten, DLP, Datensicherheit, Confluence-Scanner, Jira-Scanner, SharePoint-DLP, Duplikaterkennung, Entitätsauflösung, KI-Autopilot, Open-Source-Sicherheit",
+      "ogTitle": "Classifyre — Erkennungsplattform für unstrukturierte Daten",
+      "ogDescription": "Durchsuchen Sie jede Quelle, die Sie ohnehin betreiben, decken Sie das Wesentliche auf und ermitteln Sie mit einem KI-Autopiloten. Open Source, selbst gehostet, standardmäßig privat.",
+      "twitterTitle": "Classifyre — Erkennungsplattform für unstrukturierte Daten",
+      "twitterDescription": "Open-Source-Erkennungsplattform für personenbezogene Daten, Geheimnisse, Sicherheit und Duplikate in all Ihren unstrukturierten Daten."
+    },
+    "workspaces": {
+      "title": "Arbeitsbereiche",
+      "description": "Wählen Sie einen isolierten Arbeitsbereich, um eine Ermittlung fortzusetzen, oder legen Sie eine neue Fallakte an. Jeder Arbeitsbereich hat eigene Quellen, Scans und Funde.",
+      "ogTitle": "Arbeitsbereiche — isolierte Fallakten | Classifyre",
+      "ogDescription": "Jeder Arbeitsbereich hat eigene Quellen, Scans und Funde — wählen Sie einen aus oder legen Sie eine neue Fallakte an."
+    },
+    "discovery": {
+      "title": "Übersicht — Sicherheitslage & Zustand des Arbeitsbereichs",
+      "description": "Die Sicherheitslage des Arbeitsbereichs: offene und erledigte Funde, Risikocluster nach Asset und Quelle, jüngste Scanläufe und Verteilung der Erledigungen — Ihr Ausgangspunkt nach jedem Scan.",
+      "ogTitle": "Übersicht — Sicherheitslage | Classifyre",
+      "ogDescription": "Offene Funde, Risikocluster, jüngste Scans und Erledigungen — der Zustand dieses Arbeitsbereichs auf einen Blick."
+    },
+    "findings": {
+      "title": "Funde — jede Erkennung nach Schweregrad, Quelle & Detektor triagieren",
+      "description": "Triagieren Sie jede Erkennung an einem Ort — filtern Sie nach Schweregrad, Status, Konfidenz, Quelle und Detektor. Verfolgen Sie personenbezogene Daten, Geheimnisse, Sicherheitsprobleme und eigene Erkennungen von offen bis erledigt über alle Scans hinweg.",
+      "ogTitle": "Funde — jede Erkennung triagieren | Classifyre",
+      "ogDescription": "Nach Schweregrad, Status und Quelle filtern — Trefferinhalt, Signale und Verlauf zu jedem Fund prüfen."
+    },
+    "findingDetail": {
+      "title": "Fund-Details — Belege, Risiko & Prüfverlauf",
+      "description": "Untersuchen Sie einen einzelnen Fund mit Trefferinhalt, Signalen, Fundort, Konfidenz und Statusverlauf. Passen Sie den Schweregrad an, ergänzen Sie Triage-Notizen und verfolgen Sie jeden Schritt von der Erkennung bis zur Erledigung.",
+      "ogTitle": "Fund-Details — Belege & Prüfverlauf | Classifyre",
+      "ogDescription": "Trefferinhalt, Signale, Fundort und vollständiger Statusverlauf einer Erkennung — Schweregrad triagieren und jede Prüfung nachvollziehen.",
+      "titleWithEntity": "{{name}} — Fund-Details",
+      "descriptionWithEntity": "{{name}} — Trefferinhalt, Signale und vollständiger Triage-Verlauf dieser Erkennung."
+    },
+    "assets": {
+      "title": "Assets — alle erfassten Dokumente & Quellinhalte",
+      "description": "Durchsuchen Sie jedes erfasste Asset aus allen angebundenen Quellen. Suchen Sie nach Quelle, Detektor und Schweregrad, sehen Sie die wichtigsten Funde je Asset sowie Textabdeckung und Statusverteilung.",
+      "ogTitle": "Assets — alle erfassten Dokumente | Classifyre",
+      "ogDescription": "Jedes Dokument, jede Seite und jede Zeile aus Confluence, Jira, SharePoint und mehr — mit Detektorabdeckung und Fundverteilung."
+    },
+    "assetDetail": {
+      "title": "Asset-Details — Metadaten, Quelleigenschaften & Funde",
+      "description": "Prüfen Sie Metadaten, Quelleigenschaften, extrahierten Text und jeden Fund eines Assets. Springen Sie an einem Ort zu Quelle, Zeitachse und Herkunft.",
+      "ogTitle": "Asset-Details — Metadaten & Funde | Classifyre",
+      "ogDescription": "Quelleigenschaften, extrahierte Inhalte und jeder Fund zu personenbezogenen Daten, Geheimnissen oder Sicherheit für ein erfasstes Asset.",
+      "titleWithEntity": "{{name}} — Asset-Details",
+      "descriptionWithEntity": "{{name}} — Metadaten, Quelleigenschaften und jeder Fund, den dieses Asset ausgelöst hat."
+    },
+    "sources": {
+      "title": "Quellen — angebundene Konnektoren & Zustand",
+      "description": "Verwalten Sie jede angebundene Quelle — Confluence, Jira, SharePoint, Notion, Datenbanken, Dateifreigaben und Sandboxes. Zustand, Kennzahlen des letzten Laufs, Zeitplan und Stichprobenumfang auf einen Blick.",
+      "ogTitle": "Quellen — angebundene Konnektoren | Classifyre",
+      "ogDescription": "Confluence, Jira, SharePoint, Datenbanken und mehr anbinden und überwachen — Zustand, letzter Scan und Zeitplan jeder Quelle."
+    },
+    "sourceNew": {
+      "title": "Neue Quelle anlegen — Confluence, Jira, SharePoint & mehr anbinden",
+      "description": "Binden Sie eine neue Datenquelle in wenigen Minuten an. Konfigurieren Sie Verbindung, Zugangsdaten, Stichproben und Detektoren, testen Sie die Verbindung und starten Sie Ihren ersten Scan.",
+      "ogTitle": "Neue Quelle anlegen — ein Datensystem anbinden | Classifyre",
+      "ogDescription": "Quelleinrichtung Schritt für Schritt: Zugangsdaten, Stichproben, Detektoren und ein Live-Verbindungstest."
+    },
+    "sourceDetail": {
+      "title": "Quellendetails — Zustand, Zeitplan & jüngste Läufe",
+      "description": "Betriebsübersicht einer Quelle: Status und Dauer des letzten Scans, Zeitplan, erforderliche Konfiguration, aktive Detektoren und die letzten drei Läufe mit Funden und Asset-Differenz.",
+      "ogTitle": "Quellendetails — Zustand & jüngste Läufe | Classifyre",
+      "ogDescription": "Zustand, Zeitplan, Detektorabdeckung und Ergebnisse der letzten Läufe einer angebundenen Quelle.",
+      "titleWithEntity": "{{name}} — Quellendetails",
+      "descriptionWithEntity": "{{name}} — Zustand, Zeitplan, Detektorabdeckung und die jüngsten Läufe."
+    },
+    "sourceEdit": {
+      "title": "Quelle bearbeiten — Verbindung & Detektoreinstellungen ändern",
+      "description": "Ändern Sie Verbindung, Stichproben, Zeitplan und Detektorschwellen dieser Quelle. Testen, speichern und erneut scannen, ohne die Quelle neu aufzubauen.",
+      "ogTitle": "Quelle bearbeiten — Verbindung & Detektoren ändern | Classifyre",
+      "ogDescription": "Zugangsdaten, Stichproben und Detektorkonfiguration einer bestehenden Quelle anpassen."
+    },
+    "scans": {
+      "title": "Scans — Laufhistorie, Status & Dauer",
+      "description": "Sehen Sie jeden Scanlauf über alle Quellen hinweg — nach Auslöser, Status und Dauer. Verfolgen Sie ausstehende, laufende, abgeschlossene und fehlgeschlagene Läufe und öffnen Sie jeden Lauf für Protokolle, Assets und Funde.",
+      "ogTitle": "Scans — Laufhistorie & Status | Classifyre",
+      "ogDescription": "Alle Scanläufe nach Auslöser und Status — Dauer, Asset-Zahlen und Funde jeder Quelle."
+    },
+    "scanDetail": {
+      "title": "Scan-Details — Zeitachse, Fortschritt & Asset-Änderungen",
+      "description": "Verfolgen Sie einen einzelnen Scanlauf vom Auslöser bis zum Abschluss: Fortschritt, Zeitachse, Asset-Differenz, Abdeckungslücken und Ergebnisse je Asset mit Protokollen, Funden und Quellkontext.",
+      "ogTitle": "Scan-Details — Zeitachse & Asset-Änderungen | Classifyre",
+      "ogDescription": "Fortschritt, Zeitachse und Asset-Differenz eines Scanlaufs — mit Protokollen, Abdeckung und jedem erzeugten Fund.",
+      "titleWithEntity": "{{name}} — Scan-Details",
+      "descriptionWithEntity": "Scanlauf für {{name}} — Fortschritt, Zeitachse, Asset-Differenz und Abdeckung."
+    },
+    "detectors": {
+      "title": "Eigene Detektoren — Erkennungslogik bauen, trainieren & verwalten",
+      "description": "Durchsuchen und verwalten Sie alle eigenen Detektoren — Regex-Regelwerke, Klassifikatoren und Entitätsextraktoren. Anlegen, mit Beispielen trainieren, Szenarien testen und sehen, welche Quellen welchen Detektor nutzen.",
+      "ogTitle": "Eigene Detektoren — Katalog der Erkennungslogik | Classifyre",
+      "ogDescription": "Selbst gebaute Regex-, Klassifikator- und Entitätsdetektoren — Training, Tests und Quellennutzung in einem Katalog."
+    },
+    "detectorNew": {
+      "title": "Neuer Detektor — eigenes Regelwerk, Klassifikator oder Entitätsdetektor anlegen",
+      "description": "Erstellen Sie einen wiederverwendbaren eigenen Detektor aus Regex-Mustern, Textklassifikation oder Entitätsextraktion. Definieren Sie Muster, Labels, Schweregrad und Tests ohne Code und setzen Sie ihn für jede Quelle ein.",
+      "ogTitle": "Neuer Detektor — eigene Erkennung bauen | Classifyre",
+      "ogDescription": "Aus einer Vorlage oder von Grund auf — Regex-, Klassifikator- oder GLiNER-Entitätsdetektor mit Tests und Schweregradzuordnung."
+    },
+    "detectorDetail": {
+      "title": "Detektordetails — Konfiguration, Training & Testergebnisse",
+      "description": "Verwalten Sie Identität, Muster, Modell und Training eines eigenen Detektors. Prüfen Sie an einem Ort die nutzenden Quellen, die Anzahl der Funde, die Version, den Trainingsverlauf und die Testszenarien.",
+      "ogTitle": "Detektordetails — Konfiguration & Training | Classifyre",
+      "ogDescription": "Identität, Validierung, Modelleinstellungen und Trainingsverlauf eines eigenen Detektors.",
+      "titleWithEntity": "{{name}} — Detektordetails",
+      "descriptionWithEntity": "{{name}} — Konfiguration, Trainingsverlauf und Testszenarien."
+    },
+    "investigations": {
+      "title": "Ermittlungen — Fälle, Anfragen & KI-Autopilot",
+      "description": "Führen Sie Ermittlungen, in denen aus Funden Antworten werden: Anfragen wachen über Treffer, Fingerabdrücke verknüpfen Duplikate systemübergreifend, und Fälle sammeln Belege, Hypothesen und ein Fazit — mit oder ohne KI-Autopilot.",
+      "ogTitle": "Ermittlungen — Fälle & Anfragen | Classifyre",
+      "ogDescription": "Anfragen, die auf Treffer achten, Duplikat-Fingerabdrücke und belegte Fälle — automatisch oder manuell."
+    },
+    "caseDetail": {
+      "title": "Falldetails — Belegdiagramm, Hypothesen & Zeitachse",
+      "description": "Untersuchen Sie einen Fall mit Belegdiagramm, Diskussionssträngen, Chronologie und Fallakte. Verknüpfen Sie Anfragen, ziehen Sie Treffer heran, ergänzen Sie Hypothesen und halten Sie ein Fazit fest — oder lassen Sie das KI-Harness auf dem Fall laufen.",
+      "ogTitle": "Falldetails — Belege & Hypothesen | Classifyre",
+      "ogDescription": "Belegdiagramm, verknüpfte Anfragen, Hypothesen und Aktivitätsverlauf eines Ermittlungsfalls.",
+      "titleWithEntity": "{{name}} — Falldetails",
+      "descriptionWithEntity": "{{name}} — Belegdiagramm, Hypothesen, verknüpfte Anfragen und Zeitachse."
+    },
+    "inquiryDetail": {
+      "title": "Anfragedetails — gespeicherte Abfrage, Treffer & verknüpfte Fälle",
+      "description": "Eine gespeicherte Anfrage, die alle Funde beobachtet, die ihren Filtern entsprechen. Prüfen Sie laufende Treffer, sehen Sie die getriebenen Fälle, suchen Sie erneut nach neuen Treffern und übernehmen Sie Funde als Belege in einen Fall.",
+      "ogTitle": "Anfragedetails — Treffer & Fälle | Classifyre",
+      "ogDescription": "Laufende Treffer einer gespeicherten Fundabfrage — samt getriebener Fälle und Belegübernahme mit einem Klick.",
+      "titleWithEntity": "{{name}} — Anfragedetails",
+      "descriptionWithEntity": "{{name}} — laufende Treffer dieser gespeicherten Abfrage und die Fälle, die sie treibt."
+    },
+    "inquiryNew": {
+      "title": "Neue Anfrage — gespeicherte Fundabfrage anlegen",
+      "description": "Legen Sie eine gespeicherte Anfrage an, die alle künftigen Funde beobachtet, die ihren Filtern entsprechen — nach Quelle, Detektor, Typ und Wert. Sehen Sie laufende Treffer schon vor dem Speichern.",
+      "ogTitle": "Neue Anfrage — gespeicherte Fundabfrage | Classifyre",
+      "ogDescription": "Formulieren Sie eine Frage, die weiter antwortet — Filter, Vorschau und Fallanlage mit einem Klick."
+    },
+    "caseNew": {
+      "title": "Fall eröffnen — Belege & Hypothesen sammeln",
+      "description": "Eröffnen Sie einen neuen Ermittlungsfall. Ergänzen Sie Titel, Beschreibung, Schweregrad und treibende Anfragen — übernehmen Sie deren laufende Treffer als erste Belege oder beginnen Sie leer und hängen Sie Funde später an.",
+      "ogTitle": "Fall eröffnen — neue Ermittlung | Classifyre",
+      "ogDescription": "Titel, Schweregrad, Anfragen und Belege — starten Sie einen neuen Ermittlungsfall."
+    },
+    "duplicates": {
+      "title": "Duplikatprüfung — Kopien über alle Quellen hinweg finden",
+      "description": "Finden Sie Assets, die dasselbe zu sein scheinen — gruppiert nach gemeinsamen Fingerabdruckwerten und Trefferbegründung. Prüfen Sie Cluster, vergleichen Sie Paare, justieren Sie die Korrelation und verfolgen Sie jede Entscheidung.",
+      "ogTitle": "Duplikatprüfung — Cluster & Paare | Classifyre",
+      "ogDescription": "Beinahe-Duplikate nach gemeinsamen Werten und Fingerabdrücken — Cluster, Paare und Justierung für den gesamten Arbeitsbereich."
+    },
+    "duplicatesDecisions": {
+      "title": "Duplikatentscheidungen — Verlauf & Verwendung in Fällen",
+      "description": "Prüfen Sie jede Duplikatentscheidung — behalten, verworfen oder eskaliert — und sehen Sie, ob sie in einem Fall oder einer Anfrage verwendet wurde. Der vollständige Verlauf der Duplikatprüfung dieses Arbeitsbereichs.",
+      "ogTitle": "Duplikatentscheidungen — Verlauf | Classifyre",
+      "ogDescription": "Jede getroffene Duplikatentscheidung und wo sie verwendet wurde — Fälle und Anfragen."
+    },
+    "duplicatePair": {
+      "title": "Duplikatpaar — zwei Assets nebeneinander vergleichen",
+      "description": "Warum zwei Assets zusammenpassen: gemeinsame Fingerabdruckwerte, Ähnlichkeitswert und Textvergleich. Als Duplikat bestätigen oder verwerfen — jede Entscheidung wird protokolliert und kann in Fälle einfließen.",
+      "ogTitle": "Duplikatpaar — warum zwei Assets zusammenpassen | Classifyre",
+      "ogDescription": "Gemeinsame Werte, Ähnlichkeit und Belege eines Duplikatpaars — bestätigen oder verwerfen."
+    },
+    "duplicatePattern": {
+      "title": "Duplikatmuster — nach gemeinsamer Begründung gruppiert",
+      "description": "Ein Duplikatmuster und das dahinterliegende Asset-Cluster: jedes Paar, das aufgrund desselben gemeinsamen Werts oder Fingerabdrucks zusammenpasst — gruppiert für Sammelprüfung und Fallaktion.",
+      "ogTitle": "Duplikatmuster — Cluster nach Begründung | Classifyre",
+      "ogDescription": "Alle Paare, die aufgrund desselben gemeinsamen Werts zusammenpassen — das Cluster gemeinsam prüfen."
+    },
+    "duplicateTune": {
+      "title": "Justierung — Gewichte, Schwellen & Fingerabdruckzustand",
+      "description": "Justieren Sie die Duplikaterkennung: Gewichte je Label, Schwellen für verwandt und Duplikat, Standardgewicht und Zustand des semantischen Index. Beim Speichern werden die Fingerabdrücke des gesamten Arbeitsbereichs neu berechnet.",
+      "ogTitle": "Justierung — Einstellungen der Duplikaterkennung | Classifyre",
+      "ogDescription": "Label-Gewichte, Schwellen und Indexzustand für die fingerabdruckbasierte Duplikaterkennung."
+    },
+    "settings": {
+      "title": "Einstellungen — Arbeitsbereich, Region & Harness-Konfiguration",
+      "description": "Konfigurieren Sie diesen Arbeitsbereich: Sprache und Zeitvorgaben, Instanzversion, KI-Anbieter, Harness-Autopilot, Embedding, MCP-Server sowie Export und Import. Alle Einstellungen gelten je Arbeitsbereich.",
+      "ogTitle": "Einstellungen — Konfiguration des Arbeitsbereichs | Classifyre",
+      "ogDescription": "Region, KI-Anbieter, Harness, Embedding und Datentransfer — die Einstellungen des Arbeitsbereichs an einem Ort."
+    },
+    "notifications": {
+      "title": "Benachrichtigungen — Warnungen & Systemsignale",
+      "description": "Alle Benachrichtigungen zu Scans, Funden, Quellen und Systemereignissen — gefiltert nach Typ und Schweregrad. Als wichtig oder gelesen markieren und kritische Signale im Blick behalten.",
+      "ogTitle": "Benachrichtigungen — Warnungen & Signale | Classifyre",
+      "ogDescription": "Benachrichtigungen zu Scans, Funden, Quellen und System — Wichtigkeit und Lesestatus auf einen Blick."
+    },
+    "glossary": {
+      "title": "Glossar — verbindliches Vokabular & Entitätskarte",
+      "description": "Verbindliches Vokabular für Bearbeitende, Fälle und jeden Lauf des KI-Harness. Ergänzen Sie Begriffe, Aliasse und Entitätstypen — Person, Organisation, Ort — und legen Sie fest, was der Autopilot als gesichert behandeln soll.",
+      "ogTitle": "Glossar — verbindliches Vokabular | Classifyre",
+      "ogDescription": "Gemeinsame Begriffe, Aliasse und Entitätsangaben, auf die sich Bearbeitende, Fälle und das KI-Harness stützen."
+    },
+    "fingerprints": {
+      "title": "Fingerabdrücke — Belegkorrelationen & gemeinsame Werte",
+      "description": "Beleg-Fingerabdrücke verbinden Assets, die dieselben Funde teilen — E-Mail-Adressen, Telefonnummern, Kennungen und mehr. Durchsuchen Sie das Diagramm, filtern Sie nach Quelle und blenden Sie Rauschen aus, während Duplikate im Hintergrund neu berechnet werden.",
+      "ogTitle": "Fingerabdrücke — Belegkorrelationen | Classifyre",
+      "ogDescription": "Assets, die durch gemeinsame Fundwerte verbunden sind — Fingerabdrücke, Diagramm und Korrelationsjustierung."
+    },
+    "harness": {
+      "title": "Harness KI — Steuerungsebene des Autopiloten",
+      "description": "Autonome Steuerungsebene des KI-Autopiloten: Agenten, die Funde triagieren, Fälle aufbauen und nach jedem Scan Hypothesen entwerfen. Prüfen Sie Aktivität, Läufe, Gedächtnis, Systemlage und Konfiguration.",
+      "ogTitle": "Harness KI — Steuerungsebene des Autopiloten | Classifyre",
+      "ogDescription": "Agenten, Läufe, Gedächtnis und Lagebild — der Autopilot, der aus Funden Ermittlungen macht."
+    },
+    "harnessProvider": {
+      "title": "KI-Anbieter — Modell, Zugangsdaten & Funktionszuweisung",
+      "description": "Verwalten Sie Endpunkt, Modell, Zugangsdaten, Kontextgröße und Funktionszuweisung eines KI-Anbieters. Testen Sie Verbindung und Harness-Fähigkeit und weisen Sie ihn dann dem Assistenten, dem Harness oder Detektoren zu.",
+      "ogTitle": "KI-Anbieter — Konfiguration | Classifyre",
+      "ogDescription": "Endpunkt, Modell und Zugangsdaten eines Harness-KI-Anbieters.",
+      "titleWithEntity": "{{name}} — KI-Anbieter",
+      "descriptionWithEntity": "{{name}} — Endpunkt, Modell, Zugangsdaten und Funktionszuweisung."
+    },
+    "docs": {
+      "title": "Dokumentation — mit Classifyre anbinden, scannen & ermitteln",
+      "description": "Die Classifyre-Dokumentation — wie die Anwendung Abschnitt für Abschnitt funktioniert: Confluence, Jira, SharePoint und mehr anbinden, Scans ausführen, Funde triagieren, Assets entdoppeln und mit dem KI-Autopiloten ermitteln.",
+      "ogTitle": "Dokumentation — anbinden, scannen & ermitteln | Classifyre",
+      "ogDescription": "Quellen anbinden, scannen, Funde prüfen und dem Wesentlichen nachgehen — mit einem KI-Autopiloten, der die Laufarbeit übernimmt. Anleitungen für jeden Arbeitsablauf."
+    }
   }
 }
