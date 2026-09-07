@@ -294,6 +294,11 @@ SCAN_CACHE_ELIGIBLE_SOURCE_TYPES: frozenset[str] = frozenset(
         "google_workspace",
         "microsoft_365",
         "email",
+        # A notebook connector's checksum is a real content digest, not a
+        # proxy: `CustomSource._to_scan_result` hashes the full text (plus the
+        # raw bytes when the notebook fetched a file), the resolved metadata
+        # and the tags. There is no mtime/size stand-in to be fooled by.
+        "custom",
     }
 )
 
