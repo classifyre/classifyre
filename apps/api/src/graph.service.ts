@@ -1,10 +1,12 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
+import { SourceGraphScheduler } from './stats/source-graph-scheduler.service';
 import { resolveEdgeClass } from './graph/edge-class';
 import { tryNormalizeUrn } from './graph/urn';
 import {
@@ -244,7 +246,14 @@ function rewriteGraph(
 
 @Injectable()
 export class GraphService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(GraphService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    // Value import, not `import type` — a type-only import of an injected class
+    // leaves Nest with no metadata to resolve and injects undefined silently.
+    private readonly sourceGraphScheduler: SourceGraphScheduler,
+  ) {}
 
   // ─── Edge inference ──────────────────────────────────────────────
 
@@ -264,6 +273,7 @@ export class GraphService {
     await this.createReferenceEdges(assetsWithLinks);
 
     const edgeCount = await this.prisma.edge.count();
+    await this.sourceGraphScheduler.scheduleRebuild('edges rebuilt');
     return { edgeCount };
   }
 
@@ -441,9 +451,16 @@ export class GraphService {
           { type: EXTERNAL_NODE, id: normalized, external: true };
     };
 
-    const rows: Prisma.Sql[] = [];
+    // Keyed by the unique constraint's own tuple. Postgres refuses an
+    // `ON CONFLICT DO UPDATE` whose VALUES list names the same conflict
+    // target twice ("command cannot affect row a second time", SQLSTATE
+    // 21000) and it fails the WHOLE statement, so one repeated edge inside a
+    // batch used to lose every other edge in that batch. The last occurrence
+    // wins, matching the re-ingest semantics of the upsert itself.
+    const rows = new Map<string, Prisma.Sql>();
     let external = 0;
     let dropped = 0;
+    let duplicates = 0;
 
     for (const e of edges) {
       const from = endpointOf(e.fromType, e.fromId, e.fromHash, e.fromUrn);
@@ -470,7 +487,11 @@ export class GraphService {
       // inside a VALUES list as `text`, so without these the numeric and
       // timestamp columns fail the insert outright — and the enum columns
       // would too.
-      rows.push(Prisma.sql`(
+      const conflictKey = `${from.type}\u0000${from.id}\u0000${to.type}\u0000${to.id}\u0000${e.relationType}`;
+      if (rows.has(conflictKey)) duplicates += 1;
+      rows.set(
+        conflictKey,
+        Prisma.sql`(
         ${from.type}::text, ${from.id}::text, ${to.type}::text, ${to.id}::text,
         ${e.relationType}::text,
         ${e.confidence ?? 1}::numeric(3,2),
@@ -482,10 +503,18 @@ export class GraphService {
         ${e.evidence ? JSON.stringify(e.evidence) : null}::jsonb,
         ${via ? 'asset' : null}::text, ${via ?? null}::text,
         now()::timestamp(3)
-      )`);
+      )`,
+      );
     }
 
-    if (rows.length === 0) return { upserted: 0, external, dropped };
+    if (duplicates > 0) {
+      this.logger.debug(
+        `${duplicates} edge(s) in this batch repeated a (from, to, relation) ` +
+          'already present in the same batch; the last one won.',
+      );
+    }
+
+    if (rows.size === 0) return { upserted: 0, external, dropped };
 
     // Raw upsert rather than createMany({ skipDuplicates }): skipping a
     // duplicate silently discards the re-ingest, so a changed confidence, a
@@ -501,7 +530,7 @@ export class GraphService {
         "relation_class", "granularity", "method",
         "field_mappings", "evidence", "via_type", "via_id", "last_seen_at"
       )
-      SELECT gen_random_uuid(), v.* FROM (VALUES ${Prisma.join(rows)}) AS v
+      SELECT gen_random_uuid(), v.* FROM (VALUES ${Prisma.join([...rows.values()])}) AS v
       ON CONFLICT ("from_type", "from_id", "to_type", "to_id", "relation_type")
       DO UPDATE SET
         "confidence"     = EXCLUDED."confidence",
@@ -518,6 +547,13 @@ export class GraphService {
           ELSE EXCLUDED."origin"
         END
     `);
+
+    // The connection map is keyed on these edges; a batch that changed any of
+    // them makes it stale. Coalesced upstream, so a scan emitting relationships
+    // for an hour produces a trickle of rebuilds rather than one per batch.
+    if (upserted > 0) {
+      await this.sourceGraphScheduler.scheduleRebuild('edges ingested');
+    }
 
     return { upserted, external, dropped };
   }

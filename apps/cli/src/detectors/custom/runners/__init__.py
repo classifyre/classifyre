@@ -26,6 +26,7 @@ from ._image_classification import ImageClassificationRunner
 from ._llm import LLMRunner
 from ._object_detection import ObjectDetectionRunner
 from ._regex import RegexRunner, _load_regex_engine
+from ._tag import TagRunner
 from ._text_classification import TextClassificationRunner, _chunk_text
 
 __all__ = [
@@ -39,6 +40,7 @@ __all__ = [
     "LLMRunner",
     "ObjectDetectionRunner",
     "RegexRunner",
+    "TagRunner",
     "TextClassificationRunner",
     "_apply_classification_validation",
     "_apply_entity_validation",

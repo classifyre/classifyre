@@ -119,32 +119,44 @@ describe('FindingsService', () => {
   });
 
   it('ranks discovery top assets by severity before total findings', async () => {
-    mockPrismaService.finding.groupBy
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          assetId: 'asset-low',
-          _count: { _all: 5 },
-          _max: { detectedAt: new Date('2026-02-20T00:00:00.000Z') },
-        },
-        {
-          assetId: 'asset-critical',
-          _count: { _all: 1 },
-          _max: { detectedAt: new Date('2026-02-20T00:00:00.000Z') },
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          assetId: 'asset-low',
-          severity: Severity.LOW,
-          _count: { _all: 5 },
-        },
-        {
-          assetId: 'asset-critical',
-          severity: Severity.CRITICAL,
-          _count: { _all: 1 },
-        },
-      ]);
+    // Dispatch on `by` rather than call order: the live discovery path issues
+    // several groupBys in one Promise.all, and keying on position means adding
+    // one silently hands another query's rows to the wrong reader.
+    mockPrismaService.finding.groupBy.mockImplementation((args: {
+      by: string[];
+    }) => {
+      const by = args.by.join(',');
+      if (by === 'severity,status') return Promise.resolve([]);
+      if (by === 'status')
+        return Promise.resolve([
+          { status: FindingStatus.OPEN, _count: { _all: 6 } },
+          { status: FindingStatus.RESOLVED, _count: { _all: 2 } },
+          { status: FindingStatus.FALSE_POSITIVE, _count: { _all: 1 } },
+        ]);
+      if (by === 'assetId')
+        return Promise.resolve([
+          {
+            assetId: 'asset-low',
+            _count: { _all: 5 },
+            _max: { detectedAt: new Date('2026-02-20T00:00:00.000Z') },
+          },
+          {
+            assetId: 'asset-critical',
+            _count: { _all: 1 },
+            _max: { detectedAt: new Date('2026-02-20T00:00:00.000Z') },
+          },
+        ]);
+      if (by === 'assetId,severity')
+        return Promise.resolve([
+          { assetId: 'asset-low', severity: Severity.LOW, _count: { _all: 5 } },
+          {
+            assetId: 'asset-critical',
+            severity: Severity.CRITICAL,
+            _count: { _all: 1 },
+          },
+        ]);
+      return Promise.resolve([]);
+    });
 
     mockPrismaService.finding.count.mockResolvedValue(0);
     mockPrismaService.runner.findMany.mockResolvedValue([]);
@@ -174,5 +186,48 @@ describe('FindingsService', () => {
     expect(result.topAssets).toHaveLength(2);
     expect(result.topAssets[0]?.assetId).toBe('asset-critical');
     expect(result.topAssets[1]?.assetId).toBe('asset-low');
+    // Ranking data survives to the response now; the canvas rail draws a bar
+    // from it, and it was already computed to do the sort above.
+    expect(result.topAssets[0]?.severityCounts).toEqual({
+      critical: 1,
+      high: 0,
+      medium: 0,
+      low: 0,
+      info: 0,
+    });
+  });
+
+  // `totals` counts only OPEN findings, so it can never describe review state.
+  // statusMix is a second, unfiltered read for exactly that reason — without it
+  // the dashboard's resolved and false-positive counts are structurally zero.
+  it('counts review state without the open-only filter totals applies', async () => {
+    mockPrismaService.finding.groupBy.mockImplementation((args: {
+      by: string[];
+    }) => {
+      const by = args.by.join(',');
+      if (by === 'status')
+        return Promise.resolve([
+          { status: FindingStatus.OPEN, _count: { _all: 6 } },
+          { status: FindingStatus.RESOLVED, _count: { _all: 2 } },
+          { status: FindingStatus.FALSE_POSITIVE, _count: { _all: 1 } },
+          { status: FindingStatus.IGNORED, _count: { _all: 3 } },
+        ]);
+      return Promise.resolve([]);
+    });
+    mockPrismaService.finding.count.mockResolvedValue(0);
+    mockPrismaService.runner.findMany.mockResolvedValue([]);
+    mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+    const result = await service.getDiscoveryOverview({ windowDays: 30 });
+
+    expect(result.statusMix).toEqual({
+      total: 12,
+      open: 6,
+      resolved: 2,
+      falsePositive: 1,
+      ignored: 3,
+    });
+    // The headline number keeps its open-only meaning.
+    expect(result.totals.byStatus.resolved).toBe(0);
   });
 });

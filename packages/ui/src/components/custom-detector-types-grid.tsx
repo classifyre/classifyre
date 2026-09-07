@@ -6,6 +6,7 @@ import {
   Brain,
   Image,
   ScanSearch,
+  Tag,
   ArrowRight,
 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -20,7 +21,8 @@ type DetectorKind =
   | "llm"
   | "text_classification"
   | "image_classification"
-  | "object_detection";
+  | "object_detection"
+  | "tag";
 
 const DETECTOR_ICONS: Record<
   DetectorKind,
@@ -32,6 +34,7 @@ const DETECTOR_ICONS: Record<
   text_classification: Brain,
   image_classification: Image,
   object_detection: ScanSearch,
+  tag: Tag,
 };
 
 const DETECTOR_DATA: Record<
@@ -92,6 +95,14 @@ const DETECTOR_DATA: Record<
     tags: ["Bounding boxes", "Object labels", "Severity map"],
     slug: "object-detection",
   },
+  tag: {
+    title: "Tag",
+    tagline: "Manual, no classification",
+    description:
+      "A placeholder for a fact you already know. It runs nothing and reads no content: a Custom connector notebook applies it by key with Asset(tags={\"key\": \"value\"}), and the value becomes a finding. Use it when the source system already has the answer and a classifier could only re-derive it less reliably.",
+    tags: ["Manual", "Custom sources", "No model"],
+    slug: "tag",
+  },
 };
 
 const GENERAL_KINDS: DetectorKind[] = ["gliner2", "regex", "llm"];
@@ -100,6 +111,9 @@ const TRANSFORMER_KINDS: DetectorKind[] = [
   "image_classification",
   "object_detection",
 ];
+// Its own group on purpose: a tag is not an engine, and sitting it beside the
+// six that are invites picking it for an ordinary source.
+const MANUAL_KINDS: DetectorKind[] = ["tag"];
 
 // ---------------------------------------------------------------------------
 // Card
@@ -244,6 +258,26 @@ export function CustomDetectorTypesGrid({
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {TRANSFORMER_KINDS.map((kind) => (
+            <DetectorMethodCard
+              key={kind}
+              kind={kind}
+              href={makeHref(DETECTOR_DATA[kind].slug)}
+              variant={variant}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Manual group — not an engine */}
+      <div>
+        <div className="mb-3 flex items-center gap-3">
+          <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+            Manual
+          </div>
+          <div className="flex-1 border-t border-border" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {MANUAL_KINDS.map((kind) => (
             <DetectorMethodCard
               key={kind}
               kind={kind}

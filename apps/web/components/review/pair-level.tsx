@@ -4,7 +4,11 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
-import { api, type ReviewPairResponseDto } from "@workspace/api-client";
+import {
+  api,
+  type ReviewPairResponseDto,
+  type ReviewSamplePairDto,
+} from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { PanelCard, microLabelClass } from "@/components/panel-card";
@@ -18,7 +22,16 @@ import { RejectDialog } from "./reject-dialog";
 import { PairComparison } from "./pair-comparison";
 import { PairValuesTable } from "./pair-values-table";
 import { PairEgoGraph } from "./pair-ego-graph";
-import { encodePatternKey, score2 } from "./review-format";
+import {
+  encodePairId,
+  encodePatternKey,
+  fmt,
+  score2,
+  type Cutoffs,
+} from "./review-format";
+
+const pairKey = (aId: string, bId: string): string =>
+  aId <= bId ? `${aId}|${bId}` : `${bId}|${aId}`;
 
 export interface PairLevelHandle {
   confirm: () => void;
@@ -44,9 +57,10 @@ export const PairLevel = React.forwardRef<
     aId: string;
     bId: string;
     hairball: boolean;
+    cutoffs: Cutoffs;
     onDecided: () => void;
   }
->(function PairLevel({ aId, bId, hairball, onDecided }, ref) {
+>(function PairLevel({ aId, bId, hairball, cutoffs, onDecided }, ref) {
   const { t } = useTranslation();
   const router = useRouter();
   const nsPath = useNsPath();
@@ -56,6 +70,12 @@ export const PairLevel = React.forwardRef<
   const [busy, setBusy] = React.useState(false);
   const [caseOpen, setCaseOpen] = React.useState(false);
   const [rejectOpen, setRejectOpen] = React.useState(false);
+  // The rest of this pattern's backlog, so a decision can move to the next one.
+  const [queue, setQueue] = React.useState<ReviewSamplePairDto[]>([]);
+  const [remaining, setRemaining] = React.useState<number | null>(null);
+  // Pairs settled in this sitting. The server does not know about them until
+  // the optimistic writes land, so the queue is filtered against this instead.
+  const decidedRef = React.useRef<Set<string>>(new Set());
 
   /** Back means the pattern this pair came from, not browser history. */
   const goBack = React.useCallback(() => {
@@ -89,12 +109,81 @@ export const PairLevel = React.forwardRef<
     };
   }, [aId, bId, t]);
 
+  /**
+   * The rest of the backlog this pair came from.
+   *
+   * Without it a "queue" was a single form: every decision left the reviewer
+   * on the pair they had just settled, and the only way to the next one was
+   * back out to the pattern and in again. That is the same dead end the canvas
+   * had, one level down — a screen with no next step. The sample endpoint
+   * already returns undecided pairs strongest-first under the same cutoffs the
+   * pattern list uses, so the queue is the list the reviewer was looking at.
+   */
+  React.useEffect(() => {
+    const patternKey = pair?.patternKey;
+    if (!patternKey) return;
+    let active = true;
+    api.correlationReview
+      .correlationReviewControllerSample({
+        patternKey,
+        n: "25",
+        min: String(cutoffs.review),
+        max: String(cutoffs.merge),
+      })
+      .then((s) => {
+        if (!active) return;
+        // Verdicts are written optimistically, so a refetch can still be
+        // holding pairs this session has already settled. Filtering by what
+        // was decided here is what keeps the queue from handing the same pair
+        // back one step later.
+        setQueue(
+          s.pairs.filter((p) => !decidedRef.current.has(pairKey(p.aId, p.bId))),
+        );
+        setRemaining(
+          Math.max(0, s.undecidedTotal - decidedRef.current.size),
+        );
+      })
+      .catch(() => {
+        // A queue we could not load is not a reason to break the pair screen;
+        // the actions still work, they just stop advancing.
+        if (active) setQueue([]);
+      });
+    return () => {
+      active = false;
+    };
+    // Deliberately not keyed on the pair: advancing must not refetch the queue
+    // it is walking, or every step reshuffles the order under the reviewer.
+  }, [pair?.patternKey, cutoffs.review, cutoffs.merge]);
+
+  /**
+   * Move to the next undecided pair, or back to the pattern when there is none.
+   *
+   * `replace`, not `push`: the pair just decided is gone from the queue, and
+   * leaving it in history means Back walks the reviewer through a trail of
+   * decisions they have already made.
+   */
+  const advance = React.useCallback(() => {
+    decidedRef.current.add(pairKey(aId, bId));
+    const [next, ...rest] = queue.filter(
+      (p) => !decidedRef.current.has(pairKey(p.aId, p.bId)),
+    );
+    if (!next) {
+      toast.info(t("review.pair.queueClear"));
+      goBack();
+      return;
+    }
+    setQueue(rest);
+    setRemaining((n) => (n == null ? null : Math.max(0, n - 1)));
+    router.replace(nsPath(`/duplicates/pairs/${encodePairId(next.aId, next.bId)}`));
+  }, [queue, aId, bId, router, nsPath, goBack, t]);
+
   const decide = React.useCallback(
     async (verdict: "CONFIRMED" | "REJECTED" | "UNSURE", message: string) => {
       setBusy(true);
       // Move on first; reconcile behind. The reviewer is already reading the
       // next pair by the time the write lands.
       onDecided();
+      advance();
       try {
         await api.correlationReview.correlationReviewControllerRecordVerdicts({
           recordVerdictDto: { pairs: [{ aId, bId }], verdict },
@@ -106,7 +195,7 @@ export const PairLevel = React.forwardRef<
         setBusy(false);
       }
     },
-    [aId, bId, onDecided, t],
+    [aId, bId, onDecided, advance, t],
   );
 
   const split = React.useCallback(async () => {
@@ -115,12 +204,13 @@ export const PairLevel = React.forwardRef<
       await api.correlationReview.correlationReviewControllerSplit({ aId, bId });
       toast.success(t("review.actions.splitDone"));
       onDecided();
+      advance();
     } catch {
       toast.error(t("review.actions.failed"));
     } finally {
       setBusy(false);
     }
-  }, [aId, bId, onDecided, t]);
+  }, [aId, bId, onDecided, advance, t]);
 
   const createInquiry = React.useCallback(async () => {
     if (!pair) return;
@@ -245,10 +335,16 @@ export const PairLevel = React.forwardRef<
               {score2(pair.weighted)}
             </p>
             {/* Only claim a position when there is a queue to be positioned
-                in. A deep link opens one pair with no sample loaded, and
+                in. A deep link opens one pair before the sample lands, and
                 "1 of 1" would imply the pattern held a single pair. */}
             <p className="mt-1 font-mono text-[11px] text-muted-foreground">
               {pair.patternKey}
+              {remaining != null && remaining > 0 ? (
+                <>
+                  {" · "}
+                  {t("review.pair.remaining", { count: fmt(remaining) })}
+                </>
+              ) : null}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1.5">
@@ -345,7 +441,10 @@ export const PairLevel = React.forwardRef<
         onOpenChange={setRejectOpen}
         aId={pair.a.id}
         bId={pair.b.id}
-        onRejected={onDecided}
+        onRejected={() => {
+          onDecided();
+          advance();
+        }}
       />
 
       <FingerprintsCaseDialog

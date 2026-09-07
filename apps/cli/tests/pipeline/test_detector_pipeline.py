@@ -703,3 +703,86 @@ async def test_pipeline_detector_error_in_scan_stats() -> None:
     assert asset.scan_stats.errors is not None
     assert any("detector crashed" in e for e in asset.scan_stats.errors)
     assert asset.findings == []
+
+
+# ── Tags: findings a connector asserted rather than a detector found ─────────
+
+
+class TaggingSource(DummySource):
+    """A source that carries tags, the way a CUSTOM connector notebook does."""
+
+    def __init__(self, recipe: dict[str, Any], tags: dict[str, dict[str, str]]) -> None:
+        super().__init__(recipe, content="")
+        self._tags = tags
+
+    def asset_tags(self, asset_hash: str) -> dict[str, str]:
+        return self._tags.get(asset_hash, {})
+
+
+def make_tag_detector(key: str, name: str, label: str, severity: str = "high"):
+    from src.detectors.custom.detector import CustomDetector
+    from src.models.generated_detectors import CustomDetectorConfig, TagPipelineSchema
+
+    return CustomDetector(
+        CustomDetectorConfig(
+            custom_detector_key=key,
+            name=name,
+            pipeline_schema=TagPipelineSchema(label=label, severity=severity),
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_tags_become_findings() -> None:
+    source = TaggingSource({"type": "DUMMY"}, {"1": {"cardholder_data": "pan"}})
+    detector = make_tag_detector("cardholder_data", "Cardholder Data", "Cardholder data")
+
+    pipeline = DetectorPipeline(detectors=[detector], source=source, runner_id="runner-tag")
+    results = await pipeline.process([make_asset()])
+
+    findings = results[0].findings or []
+    assert len(findings) == 1
+    assert findings[0].finding_type == "tag:Cardholder data"
+    assert findings[0].matched_content == "pan"
+    assert findings[0].severity == Severity.high
+    assert findings[0].custom_detector_key == "cardholder_data"
+    assert DetectorType.CUSTOM in (results[0].scan_stats.detectors_run or [])
+
+
+@pytest.mark.asyncio
+async def test_tag_detector_never_runs_on_content() -> None:
+    source = TaggingSource({"type": "DUMMY"}, {})
+    detector = make_tag_detector("legal_hold", "Legal Hold", "Legal hold")
+
+    pipeline = DetectorPipeline(detectors=[detector], source=source, runner_id="runner-tag")
+    results = await pipeline.process([make_asset()])
+
+    assert not (results[0].findings or [])
+
+
+@pytest.mark.asyncio
+async def test_unknown_tag_key_warns_and_is_skipped() -> None:
+    # A typo in a notebook must be visible: silence looks like the feature not
+    # working, and there is nothing else to tell the author the key was wrong.
+    source = TaggingSource({"type": "DUMMY"}, {"1": {"cardholderdata": "pan"}})
+    detector = make_tag_detector("cardholder_data", "Cardholder Data", "Cardholder data")
+
+    pipeline = DetectorPipeline(detectors=[detector], source=source, runner_id="runner-tag")
+    results = await pipeline.process([make_asset()])
+
+    assert not (results[0].findings or [])
+    warnings = results[0].scan_stats.warnings or []
+    assert any("cardholderdata" in warning for warning in warnings)
+    assert any("cardholder_data" in warning for warning in warnings)
+
+
+@pytest.mark.asyncio
+async def test_sources_without_tags_are_unaffected() -> None:
+    source = DummySource({"type": "DUMMY"}, content="hello world")
+    detector = RecordingDetector(["text/plain"])
+
+    pipeline = DetectorPipeline(detectors=[detector], source=source, runner_id="runner-1")
+    results = await pipeline.process([make_asset()])
+
+    assert len(results[0].findings or []) == 1
+    assert detector.seen == ["hello world"]

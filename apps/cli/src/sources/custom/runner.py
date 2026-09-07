@@ -212,6 +212,8 @@ class NotebookRuntime:
             "aborted": _aborted(),
             "cursor": self.context.next_cursor,
             "offsetHandledByNotebook": self.context.offset_consumed,
+            "partialCoverage": self.context.partial_coverage,
+            "partialCoverageReason": self.context.partial_coverage_reason,
         }
 
     def _extract_reservoir(self, size: int) -> dict[str, Any]:
@@ -249,6 +251,8 @@ class NotebookRuntime:
             "seen": seen,
             "aborted": _aborted(),
             "cursor": self.context.next_cursor,
+            "partialCoverage": self.context.partial_coverage,
+            "partialCoverageReason": self.context.partial_coverage_reason,
         }
 
     def relationships(self) -> list[dict[str, Any]]:

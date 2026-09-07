@@ -1460,10 +1460,44 @@
       "required": ["pattern", "severity"],
       "additionalProperties": false
     },
+    "DetectorScope": {
+      "title": "DetectorScope",
+      "type": "object",
+      "description": "Restricts which of a source's assets this detector runs on.\n\nA custom detector is attached to a SOURCE, so without this it runs on every asset that source produces. For an expensive engine that is not a tuning problem but a design problem: attaching an LLM detector to a documents source meant one model call per filed PDF and per raw XML blob \u2014 3 to 25 seconds each, on inputs the model had no business reading \u2014 and the run spent its entire life in the detector pool. The only workaround was splitting one source in two, which is a defensible architecture but was forced rather than chosen.\n\nEvery field is optional and they AND together; an empty scope runs everywhere, which is the previous behaviour.",
+      "properties": {
+        "asset_kinds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["record", "document", "page", "file", "table"]
+          },
+          "description": "Catalog kinds this detector applies to. [\"record\"] is the natural expression of \"run on the derived summaries, not on the source documents they came from\"."
+        },
+        "content_types": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "MIME types or prefixes (application/pdf, text/). Narrower than the engine's own supported types, never wider: a detector still never sees content its runner cannot read."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Asset-metadata equality predicate, e.g. {\"doc_type\": \"jab\"}. Every named key must be present on the asset and equal (compared as strings, so 4 and \"4\" match). A key the asset does not carry excludes it \u2014 an absent field is not a match."
+        }
+      },
+      "additionalProperties": false
+    },
     "GLiNER2PipelineSchema": {
       "title": "GLiNER2PipelineSchema",
       "type": "object",
       "properties": {
+        "scope": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorScope" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
         "type": {
           "type": "string",
           "enum": ["GLINER2"],
@@ -1494,6 +1528,14 @@
       "title": "RegexPipelineSchema",
       "type": "object",
       "properties": {
+        "scope": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorScope" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
         "type": {
           "type": "string",
           "enum": ["REGEX"],
@@ -1614,6 +1656,14 @@
       "type": "object",
       "description": "AI detector pipeline. Sends content to a configured LLM provider with a system prompt, classifies it against a label set, and extracts structured fields. Predicted labels become findings (severity via severity_map); extracted fields are stored in finding metadata and extracted_data.",
       "properties": {
+        "scope": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorScope" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
         "type": {
           "type": "string",
           "enum": ["LLM"],
@@ -1700,7 +1750,7 @@
           "minimum": 0,
           "maximum": 1,
           "default": 0.5,
-          "description": "Minimum model confidence to report a label as a finding (0-1)."
+          "description": "Minimum model confidence to report a label as a finding (0-1). Applied BEFORE the finding is recorded, so anything below it leaves no trace but a count in the run log \u2014 and a systematically under-confident model (free routers are) then looks like a model that never answered. The finding already carries the confidence, so 0 records every answer and lets you filter downstream."
         },
         "output_fields": {
           "type": "array",
@@ -1737,6 +1787,14 @@
       "type": "object",
       "description": "Text classification pipeline using a HuggingFace fine-tuned model. Runs a single model; create multiple custom detectors to run multiple classifiers.",
       "properties": {
+        "scope": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorScope" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
         "type": {
           "type": "string",
           "enum": ["TEXT_CLASSIFICATION"],
@@ -1816,6 +1874,14 @@
       "type": "object",
       "description": "Image classification pipeline using a HuggingFace vision model. Runs a single model; create multiple custom detectors to run multiple classifiers.",
       "properties": {
+        "scope": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorScope" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
         "type": {
           "type": "string",
           "enum": ["IMAGE_CLASSIFICATION"],
@@ -1875,6 +1941,14 @@
       "type": "object",
       "description": "Object detection pipeline using a HuggingFace model. Runs a single detector; create multiple custom detectors to run multiple detection models.",
       "properties": {
+        "scope": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorScope" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
         "type": {
           "type": "string",
           "enum": ["OBJECT_DETECTION"],
@@ -1934,6 +2008,37 @@
       "required": ["model"],
       "additionalProperties": false
     },
+    "TagPipelineSchema": {
+      "title": "TagPipelineSchema",
+      "type": "object",
+      "description": "A placeholder detector that runs no classification and never reads content. It exists only to give a manual assertion a stable identity. A CUSTOM connector notebook applies it by the detector's key: Asset(tags={\"<detector key>\": \"<value>\"}). Not selectable in a source's detector list.",
+      "properties": {
+        "scope": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorScope" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["TAG"],
+          "default": "TAG"
+        },
+        "label": {
+          "type": "string",
+          "description": "Label carried by every finding this detector produces (finding_type is 'tag:<label>'). Defaults to the detector's name when omitted."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low", "info"],
+          "default": "medium",
+          "description": "Severity assigned to every finding this detector produces. There is no confidence to derive it from: a tag is asserted, not inferred."
+        }
+      },
+      "additionalProperties": false
+    },
     "AnyPipelineSchema": {
       "title": "AnyPipelineSchema",
       "oneOf": [
@@ -1954,6 +2059,9 @@
         },
         {
           "$ref": "#/definitions/ObjectDetectionPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/TagPipelineSchema"
         }
       ],
       "discriminator": {

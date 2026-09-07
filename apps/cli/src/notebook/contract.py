@@ -33,6 +33,10 @@ DUPLICATE_CELL_ID = "duplicate_cell_id"
 EMPTY_NOTEBOOK = "empty_notebook"
 NOT_A_FUNCTION = "not_a_function"
 
+#: A later cell rebinds a name an earlier cell defined. A warning, never a
+#: violation: shadowing is legal Python and occasionally deliberate.
+SHADOWED_DEFINITION = "shadowed_definition"
+
 
 @dataclass(frozen=True)
 class ContractViolation:
@@ -50,6 +54,9 @@ class ContractViolation:
 class ContractReport:
     violations: tuple[ContractViolation, ...] = ()
     defined_functions: frozenset[str] = field(default_factory=frozenset)
+    #: Things worth knowing that are not contract failures. Kept out of
+    #: ``violations`` so ``ok`` is unchanged and a save is never blocked by one.
+    warnings: tuple[ContractViolation, ...] = ()
 
     @property
     def ok(self) -> bool:
@@ -67,6 +74,7 @@ class ContractReport:
         return {
             "ok": self.ok,
             "violations": [violation.to_dict() for violation in self.violations],
+            "warnings": [warning.to_dict() for warning in self.warnings],
             "definedFunctions": sorted(self.defined_functions),
         }
 
@@ -119,6 +127,62 @@ def _top_level_names(tree: ast.Module) -> set[str]:
     return names
 
 
+def _shadowed_definitions(tree: ast.Module, module: ModuleSource) -> list[ContractViolation]:
+    """Names a later cell rebinds after an earlier cell defined them.
+
+    Cells look like separate files and are not: they are concatenated into ONE
+    module, so a private helper in the third cell silently replaces an
+    identically named helper in the first. That is legal Python and occasionally
+    deliberate, so it is a warning rather than a violation — but it is also a
+    failure mode with no other symptom. A `_local()` in a GISA cell replaced the
+    `_local()` the Firmenbuch cell above it depended on; the cohort feed then
+    died at runtime with `_local() missing 1 required positional argument`, and
+    the run still went green on a two-seed fallback.
+
+    Only reported when the two definitions are in DIFFERENT cells. Redefining a
+    name further down the same cell is ordinary code the author can see.
+    """
+    first_cell: dict[str, str | None] = {}
+    shadowed: list[ContractViolation] = []
+
+    for node in tree.body:
+        name: str | None
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            name = node.name
+        elif isinstance(node, ast.Assign):
+            targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
+            name = targets[0] if len(targets) == 1 else None
+        else:
+            name = None
+        if name is None:
+            continue
+
+        cell_id, cell_line = module.locate(node.lineno)
+        if name not in first_cell:
+            first_cell[name] = cell_id
+            continue
+        origin = first_cell[name]
+        if origin is None or cell_id is None or origin == cell_id:
+            continue
+        shadowed.append(
+            ContractViolation(
+                kind=SHADOWED_DEFINITION,
+                message=(
+                    f"'{name}' was already defined in cell '{origin}'. Notebook cells "
+                    f"share one module namespace, so this replaces that one for the "
+                    f"whole notebook -- including for code in '{origin}' that calls it. "
+                    f"Rename one of them (a per-cell prefix works well) if they are "
+                    f"meant to be different."
+                ),
+                cell_id=cell_id,
+                line=cell_line,
+            )
+        )
+        first_cell[name] = cell_id
+
+    return shadowed
+
+
 def validate_module(
     module: ModuleSource,
     *,
@@ -148,6 +212,7 @@ def validate_module(
     functions = _top_level_functions(tree)
     names = _top_level_names(tree)
     violations: list[ContractViolation] = []
+    warnings = _shadowed_definitions(tree, module)
 
     for name in required:
         if name in functions:
@@ -176,6 +241,7 @@ def validate_module(
     return ContractReport(
         violations=tuple(violations),
         defined_functions=frozenset(functions),
+        warnings=tuple(warnings),
     )
 
 
@@ -213,4 +279,5 @@ def validate_notebook(
     return ContractReport(
         violations=tuple(duplicates) + report.violations,
         defined_functions=report.defined_functions,
+        warnings=report.warnings,
     )

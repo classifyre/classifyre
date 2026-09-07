@@ -1,14 +1,20 @@
 ---
 title: Findings & Results
-description: What a detector produces — the anatomy of a finding, severity levels, confidence scores, and the status and history lifecycle that tracks issues across scans.
+description: What a detector produces — the anatomy of a finding, priority levels, confidence scores, and the status and history lifecycle that tracks findings across scans.
 ---
 
 # Findings & Results
 
 A **finding** is the result a detector yields: one signal, raised on one asset.
 It's the unit you triage, filter, and investigate. This page covers everything a
-finding carries — its fields, its severity, its confidence, and how it lives
+finding carries — its fields, its priority, its confidence, and how it lives
 across repeated scans.
+
+Almost every finding is *detected* — a detector read the content and judged it.
+One kind is *asserted* instead: a [Tag](/detectors/custom-detectors/tag/) records
+a fact a [Custom connector](/sources/custom-connectors/) already knew, without
+reading anything. Once raised, the two are the same object and share everything
+below.
 
 ---
 
@@ -22,7 +28,7 @@ Every finding records *what* was found, *where*, *how sure* the detector is, and
 | **Detector** | Which detector raised it — a pre-built type, or your custom detector's name. |
 | **Finding type** | The specific signal, e.g. an API key, a credit-card number, a policy match. |
 | **Category** | The broad family the signal belongs to (secrets, PII, security, …). |
-| **Severity** | How serious it is — Critical to Info (see below). |
+| **Priority** | How much it matters — Critical to Routine (see below). Stored as `severity`. |
 | **Confidence** | How sure the detector is, from 0 to 1 (see below). |
 | **Matched content** | The exact text or value that matched. |
 | **Redacted content** | A safe-to-show version with the sensitive part masked. |
@@ -41,39 +47,51 @@ item, in which source, produced it.
 
 ---
 
-## Severity levels
+## Priority levels
 
-Every finding is assigned a **severity** by the detector, based on what matched.
-Severity is how you focus on what matters first — you can sort and filter by it
+Every finding is assigned a **priority** by the detector, based on what matched.
+Priority is how you focus on what matters first — you can sort and filter by it
 everywhere.
 
-| Severity | Meaning | Example |
+Priority is not a danger scale. A finding is critical because it is important to
+the question you are asking, not because it is hazardous — a company approaching
+insolvency, a shipment routed to the wrong address, and a leaked credential can
+all be critical, for entirely different reasons.
+
+| Priority | Meaning | Example |
 |---|---|---|
-| **Critical** | Immediate risk — act now | A live credential or active malware signature |
-| **High** | Significant risk — address soon | Personal data exposed in a public location |
-| **Medium** | Moderate risk or policy deviation | A questionable pattern worth reviewing |
-| **Low** | Minor issue or informational | A weak signal, low blast radius |
-| **Info** | No direct risk, worth recording | A noted observation for completeness |
+| **Critical** | Central to the question — look here first | A company entering insolvency proceedings; a live credential |
+| **High** | Strongly relevant — worth acting on | A shipment addressed outside its expected region |
+| **Medium** | Relevant, or a deviation worth reviewing | A value outside its usual range |
+| **Low** | Weak signal, or context rather than a lead | A near-match on a watched term |
+| **Routine** | Recorded for completeness | A tag applied by a custom detector |
 
 ```mermaid
 graph LR
-    Critical["Critical"] --> High["High"] --> Medium["Medium"] --> Low["Low"] --> Info["Info"]
+    Critical["Critical"] --> High["High"] --> Medium["Medium"] --> Low["Low"] --> Routine["Routine"]
 ```
+
+> The stored values are unchanged: the API, CLI, MCP tools and exports still use
+> `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` and `INFO`, on a field named `severity`.
+> Only what those levels *mean*, and the words the app shows for them, changed —
+> there is no `ROUTINE` value to send.
 
 ---
 
 ## Confidence
 
-Alongside severity, each finding carries a **confidence** score from **0 to 1**
+Alongside priority, each finding carries a **confidence** score from **0 to 1**
 showing how certain the detector is about the match:
 
 - **1.0** — the detector is fully confident (typical of exact pattern matches).
+  A tag finding is always 1.0: it was asserted, not inferred, so there is nothing
+  for a score to express.
 - **Lower scores** — the signal is more ambiguous and may deserve a human check.
 
-Severity and confidence answer different questions: severity is *how bad is it if
-real?*, confidence is *how likely is it real?* A high-severity, low-confidence
-finding is worth a quick look; a high-severity, high-confidence one is worth
-acting on.
+Priority and confidence answer different questions: priority is *how much does
+this matter?*, confidence is *how likely is it real?* A high-priority,
+low-confidence finding is worth a quick look; a high-priority, high-confidence
+one is worth acting on.
 
 ---
 
@@ -87,9 +105,9 @@ Classifyre tracks the **same** finding over time and updates its **status** and
 stateDiagram-v2
     direction LR
     [*] --> OPEN: First detected
-    OPEN --> RESOLVED: Fixed (manual or auto)
-    OPEN --> FALSE_POSITIVE: Reviewed — not a real issue
-    OPEN --> IGNORED: Accepted risk
+    OPEN --> RESOLVED: Dealt with (manual or auto)
+    OPEN --> FALSE_POSITIVE: Reviewed — not relevant
+    OPEN --> IGNORED: Set aside deliberately
     RESOLVED --> OPEN: Reappeared in a later scan
 ```
 
@@ -97,10 +115,10 @@ stateDiagram-v2
 
 | Status | Meaning |
 |---|---|
-| **Open** | Newly detected, not yet reviewed. |
-| **False positive** | Reviewed and judged incorrect. |
-| **Resolved** | The underlying issue is fixed. |
-| **Ignored** | Acknowledged and accepted as a risk. |
+| **Open** | Newly detected, not yet reviewed. Shown as *open*. |
+| **False positive** | Reviewed and judged not relevant to the question. Shown as *not relevant*. |
+| **Resolved** | Dealt with — the thing it pointed at is settled. Shown as *resolved*. |
+| **Ignored** | Seen and deliberately parked. Shown as *set aside*. |
 
 ### History recorded automatically
 
@@ -112,7 +130,7 @@ Each finding keeps a timeline of what happened to it:
 | **Re-detected** | Still present in a later scan |
 | **Resolved** | No longer present after a scan (auto), or marked by you |
 | **Re-opened** | Returned after having been resolved |
-| **Status / severity changed** | You updated it manually |
+| **Status / priority changed** | You updated it manually |
 
 > **Your decisions stick.** When you mark something a false positive, ignored, or
 > resolved, later scans respect that — your manual judgement is never silently
@@ -127,7 +145,7 @@ working them:
 
 - **[Investigations](/investigations/)** — group related findings into
   inquiries and cases with hypotheses and evidence.
-- **[Fingerprints](/investigations/fingerprints/)** — connect findings that
+- **[Duplicate review](/duplicates/)** — connect findings that
   share identity into duplicate and similarity clusters.
 - **[Autopilot](/investigations/autopilot/)** — let AI agents open inquiries,
   build cases, and draft hypotheses from new findings automatically.

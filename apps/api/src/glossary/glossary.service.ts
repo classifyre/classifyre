@@ -33,9 +33,36 @@ export type GlossaryLookupHit = {
   notes: string | null;
   origin: string;
   verified: boolean;
-  matchType: 'exact' | 'alias' | 'semantic';
+  matchType: 'exact' | 'alias' | 'partial' | 'semantic';
   similarity?: number;
 };
+
+/** How many candidates a lookup reads before ranking cuts to `limit`. */
+const LEXICAL_OVERFETCH = 5;
+
+/** Hard ceiling on that over-fetch, so a one-letter query stays bounded. */
+const LEXICAL_FETCH_CAP = 200;
+
+/**
+ * Which tier a lexical hit belongs to, and how it sorts.
+ *
+ * Four tiers, in the order a reader expects and the old code did not provide:
+ * an exact term, then an exact ALIAS, then a prefix, then a substring anywhere.
+ * Matching used to be substring-based with a flat alphabetical order, so `GES`
+ * returned Geschäftsführer and Gesellschafter ahead of GmbH — whose alias is
+ * literally `GES`, the register's own legal-form code for it.
+ */
+function lexicalRank(
+  needle: string,
+  term: string,
+  hasExactAlias: boolean,
+): { matchType: GlossaryLookupHit['matchType']; order: number } {
+  const candidate = term.toLowerCase();
+  if (candidate === needle) return { matchType: 'exact', order: 0 };
+  if (hasExactAlias) return { matchType: 'alias', order: 1 };
+  if (candidate.startsWith(needle)) return { matchType: 'partial', order: 2 };
+  return { matchType: 'partial', order: 3 };
+}
 
 /**
  * Shared investigation vocabulary. Operators curate terms in the UI; agents
@@ -435,6 +462,8 @@ export class GlossaryService {
     const limit = this.toInt(limitInput, 10, 50) || 10;
     const trimmed = query.trim();
     if (!trimmed) return [];
+    const needle = trimmed.toLowerCase();
+
     const aliasRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
       SELECT DISTINCT gt.id
       FROM glossary_terms gt
@@ -442,22 +471,46 @@ export class GlossaryService {
       WHERE lower(alias) = lower(${trimmed})
       LIMIT ${limit}
     `;
+    const exactAliasIds = new Set(aliasRows.map((row) => row.id));
+
+    // Fetch more than `limit` so ranking has something to rank. Ordering by
+    // term alphabetically and cutting at `limit` in SQL is what buried the
+    // exact hit: 'GES' — the register's own legal-form code for a GmbH — is a
+    // prefix of Geschäftsführer and Gesellschafter, so both sorted ahead of the
+    // term whose ALIAS is exactly 'GES'. In a domain built on two- and
+    // three-letter register codes that is not an edge case.
     const lexical = await this.prisma.glossaryTerm.findMany({
       where: {
         OR: [
-          { term: { equals: trimmed, mode: 'insensitive' } },
           { term: { contains: trimmed, mode: 'insensitive' } },
-          { id: { in: aliasRows.map((row) => row.id) } },
+          { id: { in: [...exactAliasIds] } },
         ],
       },
-      take: limit,
+      take: Math.min(limit * LEXICAL_OVERFETCH, LEXICAL_FETCH_CAP),
       orderBy: { term: 'asc' },
     });
-    const hits: GlossaryLookupHit[] = lexical.map((term) => ({
-      ...this.toDto(term),
-      matchType:
-        term.term.toLowerCase() === trimmed.toLowerCase() ? 'exact' : 'alias',
-    }));
+
+    const hits: GlossaryLookupHit[] = lexical
+      .map((term) => {
+        const dto = this.toDto(term);
+        const rank = lexicalRank(needle, term.term, exactAliasIds.has(term.id));
+        return {
+          hit: { ...dto, matchType: rank.matchType },
+          order: rank.order,
+        };
+      })
+      // Exact term, then exact alias, then prefix, then substring — and
+      // shortest first inside a tier, so a code resolves to the entry it names
+      // rather than to the longest word it happens to be embedded in.
+      .sort(
+        (a, b) =>
+          a.order - b.order ||
+          a.hit.term.length - b.hit.term.length ||
+          a.hit.term.localeCompare(b.hit.term),
+      )
+      .slice(0, limit)
+      .map((ranked) => ranked.hit);
+
     const seen = new Set(hits.map((hit) => hit.id));
 
     if (hits.length < limit) {

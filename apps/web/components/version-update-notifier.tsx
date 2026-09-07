@@ -69,7 +69,7 @@ export function VersionSidebarNotifier() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button className="flex w-full items-center gap-2 rounded-[4px] px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-          <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent" />
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent-ink" />
           <span className="font-mono text-[11px] text-sidebar-foreground">
             {t("settings.version.updateAvailable")}
           </span>
@@ -162,7 +162,7 @@ export function VersionSettingsSection() {
       {release && (
         <div className="rounded-[4px] border-2 border-accent bg-muted p-4">
           <div className="flex items-start gap-3">
-            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent-ink" />
             <div className="min-w-0 flex-1 space-y-3">
               <div>
                 <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground">

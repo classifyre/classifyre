@@ -205,6 +205,39 @@ export class RunnerDto {
   detectorRunsSkipped: number;
 
   @ApiProperty({
+    default: 0,
+    description: 'Relationship edges this run emitted and the API resolved.',
+  })
+  relationshipsEmitted: number;
+
+  @ApiProperty({
+    default: 0,
+    description:
+      "Relationship passes that raised inside the connector's own code. " +
+      'Counts passes, not edges — a pass that failed never got to say how ' +
+      'many edges it would have produced. Any non-zero value makes the run ' +
+      'WARNING: lineage can otherwise be entirely absent from a green run.',
+  })
+  relationshipsFailed: number;
+
+  @ApiProperty({
+    default: 0,
+    description:
+      'Edges the connector assembled and could not send. Also makes the run ' +
+      'WARNING.',
+  })
+  relationshipsLost: number;
+
+  @ApiProperty({
+    default: 0,
+    description:
+      'Edges accepted with an endpoint that could not be resolved. Routinely ' +
+      'the other half of a cross-source edge that has not been ingested yet, ' +
+      'so this never downgrades a run on its own.',
+  })
+  relationshipsDropped: number;
+
+  @ApiProperty({
     required: false,
     nullable: true,
     description:

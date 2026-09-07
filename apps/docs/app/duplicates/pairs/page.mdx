@@ -1,0 +1,247 @@
+---
+title: Reviewing a Pair
+description: Level 3 of duplicate review — match weight, the score breakdown, the values behind a match, the cluster graph, the four verdicts, and the keyboard shortcuts.
+---
+
+# Reviewing a Pair
+
+The screen where the decision actually gets made. It shows two assets, the
+evidence for and against them being the same thing, and five ways to act.
+
+---
+
+## Match weight
+
+The large number at the top.
+
+> **Match weight** is the share of the two assets' available weighted evidence
+> that actually matched, from 0 to 1.
+
+It's not a percentage of similarity and it's not a confidence. It's a ratio:
+*of all the weighted values these two assets have between them, how much found a
+partner on the other side?*
+
+That framing matters when you compare two pairs:
+
+- A pair at **0.90** has almost nothing that doesn't match.
+- A pair at **0.45** matched something real, but half its evidence disagrees.
+- A pair at **0.45** made of one shared IBAN is a much stronger claim than a
+  pair at **0.45** made of six shared country codes — which is exactly what the
+  breakdown below is for.
+
+Next to it sits the **lineage chip** ([shared upstream / no path /
+unknown](/sources/lineage/)) and, if the pair was already judged, the standing
+verdict — plus a note if it has been **re-scored since**, which means the
+judgement was made about a different number and is worth another look.
+
+---
+
+## Why it scored *n* — the breakdown
+
+A waterfall chart, one bar per label. Two things make it trustworthy:
+
+**The bars add up to the number above them.** Nothing is hidden in a blend. If
+the total didn't match the headline, that's the one thing this screen must never
+do, so the arithmetic is built to make it impossible.
+
+**Evidence *against* is inside the sum, not omitted.** Each label shows:
+
+| Part | Meaning |
+|---|---|
+| **Potential** | What this label could have contributed if everything matched |
+| **For** | What it actually contributed |
+| **Against** | The gap — the values present on one side that found no partner |
+
+A label sitting on only one of the two assets produces a full positive
+potential bar and an equal negative one. That is the honest way to show
+disagreement: as weight that was available and went unclaimed, in the same units
+as the weight that matched.
+
+A dashed **Perfect match** reference line marks the total available weight,
+normally 1. If it sits somewhere else, the label profiles and the scorer have
+drifted apart (usually mid-recompute) and the line moves visibly rather than the
+discrepancy being absorbed in silence.
+
+For **similar spelling** pairs the bars are sums of spelling-similarity scores
+rather than counts of whole shared values, and the chart says so.
+
+> **"This pair was scored before the breakdown was recorded."** An older pair
+> from before this data existed. It reappears after the next scan. The score
+> itself is still valid.
+
+---
+
+## The values behind this match
+
+The table underneath: **the actual values**, side by side.
+
+| Column | Meaning |
+|---|---|
+| **Label** | `email`, `iban`, `person`, … |
+| **Contributed** | How much of the score this label carried, with its weight |
+| **Shared values** | The values genuinely present on both sides |
+| *(A side / B side)* | What each asset had, so you can see what *didn't* match |
+
+This is the evidence. Everything above it is a summary of this table.
+
+Two habits worth building:
+
+- **Read the shared values before the score.** One shared account number beats
+  five shared common words, whatever the arithmetic says.
+- **Use "Where else this value appears".** A value that shows up in four hundred
+  assets isn't identifying this pair — it's boilerplate, and the right response
+  is an [exclusion](/duplicates/tuning/#exclusions), not a verdict.
+
+---
+
+## This cluster — the neighbourhood graph
+
+A small graph of the cluster these two sit in, with both under review
+highlighted. It exists to answer one question: **is this pair holding together
+something that shouldn't be together?**
+
+The **cut point** is marked: the weakest link whose removal would split the
+cluster in two. Its score tells you how real the split would be — a *low* score
+on the cut point means one weak match is chaining two groups, and cutting it is
+obvious; a *high* score means it's a genuine judgement call.
+
+If no single link holds the cluster together, there's nothing to cut, and the
+**Split** action is disabled with a note saying so.
+
+---
+
+## The five actions
+
+### Confirm
+
+*These two are the same thing.* Recorded as a duplicate, reversible from the
+undo log, and listed in [Decisions](/duplicates/decisions/) where you can push it
+into a case or an inquiry.
+
+Confirm doesn't merge or delete anything. Classifyre records judgements; it never
+edits your source systems.
+
+### Not a duplicate
+
+*These two are different things.* The negative verdict, sitting right next to the
+positive one — because without it the only way to disagree was "unsure", which
+means something different and produces a worse record.
+
+Rejecting also **suppresses** the pair: later scans will not rejoin these two into
+a cluster.
+
+Choosing it opens **What made these match**, which is the point. A rejection on
+its own changes nothing about the matcher — the next scan produces the same pair
+from the same evidence. So the dialog names the label carrying most of the score,
+shows the values that matched, and tells you **how many other pairs the same
+combination produced.** That last number is what turns one rejection into a
+decision worth taking: it's the difference between dismissing one bad match and
+stopping four hundred.
+
+It then offers three ways out:
+
+| Choice | Effect |
+|---|---|
+| **Lower "*label*" weight** | Drops that label's weight by one and re-scores everything |
+| **Stop matching on these values** | Writes an [exclusion](/duplicates/tuning/#exclusions) for that label |
+| **Just reject** | Records the verdict and nothing more |
+
+The two fixes are only offered when **one label genuinely dominates**. On an even
+split there's nothing to single out, and suggesting a weight change would be
+advice to break the labels that were doing their job.
+
+### Split the cluster here
+
+*These two shouldn't be in the same cluster.* Cuts the link and re-clusters the
+neighbourhood immediately.
+
+**Available only when there is a single link to cut** — that is, when the cluster
+graph found a cut point. If the two are held together through several routes,
+cutting one edge changes nothing, and the button is disabled rather than
+pretending otherwise.
+
+The verdict is what makes it stick: cluster building consults recorded splits on
+every later pass, so the next scan cannot quietly rejoin what you separated.
+
+Afterwards the app tells you what **actually** happened. Two assets inside a
+larger cluster can remain joined through a third member — and saying "split" when
+they're still together would be a lie you'd only discover later.
+
+> **Split vs. Not a duplicate.** *Not a duplicate* is a statement about the two
+> assets. *Split* is a statement about the cluster's shape — usually what you
+> want on a [chain](/duplicates/patterns/#cluster-shapes) whose ends drifted
+> apart.
+
+### Unsure, next
+
+*I can't tell.* A first-class button, not a way out.
+
+Forcing a binary decision on a genuinely ambiguous pair produces bad records, and
+the fix costs more than the decision saved. So "unsure" is a real verdict that
+routes the pair to a second look.
+
+It has a second job: **the count of unsure verdicts is a signal about your
+cutoffs.** A pile of them means the review band is sitting where the evidence
+doesn't separate, and the answer is on the [tuning](/duplicates/tuning/) screen,
+not in the queue.
+
+Unlike *not a duplicate* and *split*, unsure does **not** suppress anything —
+it's explicitly not a decision about the assets.
+
+### Add to case / Create inquiry
+
+Where a confirmed duplicate goes next.
+
+- **Add to case** — both assets (optionally with their findings) become evidence
+  in a new or existing [case](/investigations/cases/), with the normal case
+  activity trail.
+- **Create inquiry** — opens an [inquiry](/investigations/inquiry/) pre-filled
+  from *this* match: the labels that made it match, scoped to the sources it came
+  from. It keeps watching for the same signature instead of starting from a blank
+  form.
+
+---
+
+## The queue advances
+
+Every verdict moves you to the next undecided pair in the same pattern,
+strongest first, under the same cutoffs and lineage filter you were using. When
+the pattern is clear you're returned to it with a note.
+
+The subtitle under the score shows **how many are left in this pattern**, so the
+queue has a visible end.
+
+Decisions are applied **optimistically**: you're already reading the next pair by
+the time the write lands. If a write fails you're told and the pair comes back —
+nothing is lost quietly.
+
+---
+
+## Keyboard shortcuts
+
+The whole point of a queue is throughput, and at a round trip per verdict you
+feel every one of them. The shortcuts map one-to-one onto the buttons in the
+action bar — nothing is hidden behind a key that isn't also visible on screen.
+
+| Key | Action |
+|---|---|
+| <kbd>c</kbd> | Confirm |
+| <kbd>r</kbd> | Not a duplicate (opens the cause dialog) |
+| <kbd>x</kbd> | Split the cluster here |
+| <kbd>u</kbd> | Unsure, next |
+| <kbd>e</kbd> | Add to case |
+| <kbd>i</kbd> | Create inquiry |
+| <kbd>Esc</kbd> | Back to the pattern |
+
+They're scoped to the pair screen only, and they're inert while you're typing in
+a field or when a modifier key is held. There are no shortcuts on the list
+screens, deliberately: a legend advertising keys that do nothing is worse than no
+legend.
+
+A comfortable pace with these is roughly a pair every few seconds on clear-cut
+matches. If you're spending a minute per pair, that's a signal — go back to the
+[pattern](/duplicates/patterns/) and look for the rule instead.
+
+---
+
+Next: [Decisions](/duplicates/decisions/) — what happens to everything you just judged.

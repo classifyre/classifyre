@@ -8,6 +8,7 @@ import { api } from "@workspace/api-client";
 import { PipelineDetectorEditor } from "@/components/pipeline-detector-editor";
 import { RegexDetectorEditor } from "@/components/regex-detector-editor";
 import { LLMDetectorEditor } from "@/components/llm-detector-editor";
+import { TagDetectorEditor } from "@/components/tag-detector-editor";
 import {
   TransformerDetectorEditor,
   type TransformerPipelineType,
@@ -134,6 +135,8 @@ export function DetectorCreatorForm({
           ? "Build a regex pattern detector. Define precise pattern-matching rules — fast, deterministic, zero ML overhead."
           : selectedKind === "llm"
             ? "Build an AI detector. Write a prompt, define labels and extraction fields, and a configured LLM provider classifies and extracts from content."
+            : selectedKind === "tag"
+              ? "Create a tag. It runs no classification and reads no content — it only names a fact a Custom connector notebook already knows, so that fact becomes a finding. Tags are not selectable on a source; every Custom connector can use every active tag by its key."
             : isTransformerKind(selectedKind)
               ? (() => {
                   const labels: Record<TransformerDetectorKind, string> = {
@@ -246,6 +249,16 @@ export function DetectorCreatorForm({
       {/* Phase 2: AI (LLM) form with stepper */}
       {selectedKind === "llm" && (
         <LLMDetectorEditor
+          mode="create"
+          submitLabel={t("detectors.create")}
+          isSubmitting={isSaving}
+          onSubmit={handleCreate}
+        />
+      )}
+
+      {/* Phase 2: Tag placeholder — one step, no pipeline to configure */}
+      {selectedKind === "tag" && (
+        <TagDetectorEditor
           mode="create"
           submitLabel={t("detectors.create")}
           isSubmitting={isSaving}

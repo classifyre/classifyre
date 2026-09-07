@@ -77,14 +77,23 @@ def _interactive_shell() -> Any | None:
     return shell
 
 
-def _prepare_namespace(shell: Any | None, context: Context) -> dict[str, Any]:
+def _prepare_namespace(
+    shell: Any | None,
+    context: Context,
+    namespace_builder: Callable[[Any], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """The globals every cell shares.
 
     With IPython the shell *owns* its namespace -- it keeps `_`, `Out`, `In` and
     the display cache in there -- so the notebook's names are merged into it
     rather than replacing it. Swapping the dict out breaks the display hook.
+
+    ``namespace_builder`` selects the vocabulary: the connector namespace by
+    default, the augmentation one when an augmentation notebook is being
+    debugged with no asset in scope.
     """
-    injected = namespace(context)
+    builder = namespace_builder or namespace
+    injected = builder(context)
     if shell is None:
         return injected
     shell.user_ns.update(injected)
@@ -412,8 +421,15 @@ def execute_notebook(
     execution_id: str | None = None,
     revision: int | None = None,
     on_asset: Callable[[Any], None] | None = None,
+    namespace_builder: Callable[[Any], dict[str, Any]] | None = None,
+    contract_required: Iterable[str] | None = None,
 ) -> ExecutionResponse:
-    """Replay the notebook and report what the requested mode produced."""
+    """Replay the notebook and report what the requested mode produced.
+
+    ``namespace_builder`` / ``contract_required`` select the vocabulary being
+    debugged: connector defaults, or the augmentation namespace and its
+    ``augment()`` contract when the author is writing helpers with no asset.
+    """
     context = context or Context()
     redactor = redactor or Redactor()
     module = to_module_source(cells)
@@ -428,7 +444,9 @@ def execute_notebook(
     )
 
     if mode is ExecutionMode.VALIDATE:
-        report = validate_module(module)
+        report = validate_module(
+            module, required=contract_required or ("test_connection", "extract")
+        )
         response.status = ExecutionStatus.SUCCESS if report.ok else ExecutionStatus.ERROR
         response.contract = report.to_dict()
         if not report.ok:
@@ -446,7 +464,9 @@ def execute_notebook(
     # able to run a cell while extract() is still half-written. The modes that
     # actually call those functions do check.
     if mode in CONTRACT_MODES:
-        report = validate_module(module)
+        report = validate_module(
+            module, required=contract_required or ("test_connection", "extract")
+        )
         if not report.ok:
             response.status = ExecutionStatus.ERROR
             response.contract = report.to_dict()
@@ -468,7 +488,7 @@ def execute_notebook(
 
     _configure_matplotlib()
     shell = _interactive_shell()
-    globals_ = _prepare_namespace(shell, context)
+    globals_ = _prepare_namespace(shell, context, namespace_builder)
 
     try:
         for cell in to_run:

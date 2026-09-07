@@ -10,6 +10,7 @@ All URIs are relative to *http://localhost*
 | [**correlationReviewControllerDecisions**](CorrelationReviewApi.md#correlationreviewcontrollerdecisions) | **GET** /correlation/review/decisions | What has been decided, and what became of it |
 | [**correlationReviewControllerDecisionsToCase**](CorrelationReviewApi.md#correlationreviewcontrollerdecisionstocase) | **POST** /correlation/review/decisions/case | Take decided pairs into a case as evidence |
 | [**correlationReviewControllerDecisionsToInquiry**](CorrelationReviewApi.md#correlationreviewcontrollerdecisionstoinquiry) | **POST** /correlation/review/decisions/inquiry | Open an inquiry that keeps watching for what these pairs had in common |
+| [**correlationReviewControllerExclusionCandidates**](CorrelationReviewApi.md#correlationreviewcontrollerexclusioncandidates) | **GET** /correlation/review/patterns/{patternKey}/exclusion-candidates | The values inside a near-duplicate text group, and their reach |
 | [**correlationReviewControllerPair**](CorrelationReviewApi.md#correlationreviewcontrollerpair) | **GET** /correlation/review/pairs/{aId}/{bId} | Level 3: one pair — comparison, match-weight decomposition, local graph, lineage evidence |
 | [**correlationReviewControllerPortfolio**](CorrelationReviewApi.md#correlationreviewcontrollerportfolio) | **GET** /correlation/review/portfolio | Level 1: work remaining, the pattern queue, and the source meta-graph |
 | [**correlationReviewControllerPreview**](CorrelationReviewApi.md#correlationreviewcontrollerpreview) | **POST** /correlation/review/patterns/{patternKey}/preview | What a bulk action would do. Read-only — nothing is applied. |
@@ -442,6 +443,73 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## correlationReviewControllerExclusionCandidates
+
+> PatternExclusionCandidatesResponseDto correlationReviewControllerExclusionCandidates(patternKey)
+
+The values inside a near-duplicate text group, and their reach
+
+What an exclusion on this pattern would actually stop matching. Empty for any pattern whose rule kind is not EXCLUSION — the other kinds have no template to read values out of. Read-only.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CorrelationReviewApi,
+} from '@workspace/api-client';
+import type { CorrelationReviewControllerExclusionCandidatesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CorrelationReviewApi();
+
+  const body = {
+    // string
+    patternKey: patternKey_example,
+  } satisfies CorrelationReviewControllerExclusionCandidatesRequest;
+
+  try {
+    const data = await api.correlationReviewControllerExclusionCandidates(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **patternKey** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**PatternExclusionCandidatesResponseDto**](PatternExclusionCandidatesResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
 - **Accept**: `application/json`
 
 

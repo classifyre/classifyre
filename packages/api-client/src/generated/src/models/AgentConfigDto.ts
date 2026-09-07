@@ -201,7 +201,8 @@ export const AgentConfigDtoKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT'
+    Chat: 'CHAT',
+    Supervisor: 'SUPERVISOR'
 } as const;
 export type AgentConfigDtoKindEnum = typeof AgentConfigDtoKindEnum[keyof typeof AgentConfigDtoKindEnum];
 
@@ -249,7 +250,8 @@ export const AgentConfigDtoRunsAfterEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT'
+    Chat: 'CHAT',
+    Supervisor: 'SUPERVISOR'
 } as const;
 export type AgentConfigDtoRunsAfterEnum = typeof AgentConfigDtoRunsAfterEnum[keyof typeof AgentConfigDtoRunsAfterEnum];
 

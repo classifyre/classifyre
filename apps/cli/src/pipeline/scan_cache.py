@@ -144,7 +144,28 @@ def _content_shape(recipe: dict[str, Any]) -> dict[str, Any]:
         "strategy": sampling.get("strategy"),
         "rows_per_page": sampling.get("rows_per_page"),
         "include_column_names": sampling.get("include_column_names"),
+        # A cached asset is skipped before augmentation would run, so editing
+        # the augmentation notebook would silently not re-augment anything.
+        # Folding the augmentation revision into the content shape changes
+        # every detector fingerprint when the code changes, which re-runs the
+        # asset in full — the same invalidation a detector edit gets.
+        "augmentation": _augmentation_shape(recipe),
     }
+
+
+def _augmentation_shape(recipe: dict[str, Any]) -> dict[str, Any]:
+    """What about the augmentation notebook decides cached results are stale."""
+    section = recipe.get("augmentation")
+    section = section if isinstance(section, dict) else {}
+    if not section.get("enabled", False):
+        return {"enabled": False}
+    notebook = section.get("notebook")
+    notebook = notebook if isinstance(notebook, dict) else {}
+    try:
+        revision = int(notebook.get("revision") or 0)
+    except (TypeError, ValueError):
+        revision = 0
+    return {"enabled": True, "revision": revision}
 
 
 @dataclass(frozen=True)

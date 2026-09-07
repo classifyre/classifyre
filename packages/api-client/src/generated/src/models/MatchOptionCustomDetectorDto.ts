@@ -31,7 +31,59 @@ export interface MatchOptionCustomDetectorDto {
      * @memberof MatchOptionCustomDetectorDto
      */
     name: string;
+    /**
+     * Which dimension of this detector's findings carries the ANSWER, and so which matcher dimension a question about it should use.
+     * 
+     * The two are not interchangeable and the difference is invisible from the finding DTO. A TAG detector puts its label in `findingType` (`tag:Shell-company risk`) and its verdict in `matchedContent` (`hoch (5/12): amtswegig gelöscht; …`), so `findingValueRegex` is right. An LLM detector is the other way round: the answer IS the type (`insolvenzgefahr_hoch`) and the value is prose reasoning, so the same matcher matches nothing. Two questions sat at zero for hours for exactly this reason, and an inquiry with a wrong matcher looks identical to an inquiry with nothing to match.
+     * @type {string}
+     * @memberof MatchOptionCustomDetectorDto
+     */
+    answerDimension: MatchOptionCustomDetectorDtoAnswerDimensionEnum;
+    /**
+     * The matcher field to fill in for this detector — the actionable form of answerDimension.
+     * @type {string}
+     * @memberof MatchOptionCustomDetectorDto
+     */
+    suggestedMatcher: MatchOptionCustomDetectorDtoSuggestedMatcherEnum;
+    /**
+     * Finding types this detector has actually produced (capped). For an answerDimension of `findingType`, these are the values to put in `findingTypes`.
+     * @type {Array<string>}
+     * @memberof MatchOptionCustomDetectorDto
+     */
+    findingTypes: Array<string>;
+    /**
+     * Open findings this detector currently has.
+     * @type {number}
+     * @memberof MatchOptionCustomDetectorDto
+     */
+    openFindings: number;
+    /**
+     * Pipeline engine (TAG, LLM, REGEX, GLINER2, …), which is what decides answerDimension.
+     * @type {string}
+     * @memberof MatchOptionCustomDetectorDto
+     */
+    pipelineType?: string | null;
 }
+
+
+/**
+ * @export
+ */
+export const MatchOptionCustomDetectorDtoAnswerDimensionEnum = {
+    FindingType: 'findingType',
+    MatchedContent: 'matchedContent'
+} as const;
+export type MatchOptionCustomDetectorDtoAnswerDimensionEnum = typeof MatchOptionCustomDetectorDtoAnswerDimensionEnum[keyof typeof MatchOptionCustomDetectorDtoAnswerDimensionEnum];
+
+/**
+ * @export
+ */
+export const MatchOptionCustomDetectorDtoSuggestedMatcherEnum = {
+    FindingTypes: 'findingTypes',
+    FindingValueRegex: 'findingValueRegex'
+} as const;
+export type MatchOptionCustomDetectorDtoSuggestedMatcherEnum = typeof MatchOptionCustomDetectorDtoSuggestedMatcherEnum[keyof typeof MatchOptionCustomDetectorDtoSuggestedMatcherEnum];
+
 
 /**
  * Check if a given object implements the MatchOptionCustomDetectorDto interface.
@@ -39,6 +91,10 @@ export interface MatchOptionCustomDetectorDto {
 export function instanceOfMatchOptionCustomDetectorDto(value: object): value is MatchOptionCustomDetectorDto {
     if (!('key' in value) || value['key'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
+    if (!('answerDimension' in value) || value['answerDimension'] === undefined) return false;
+    if (!('suggestedMatcher' in value) || value['suggestedMatcher'] === undefined) return false;
+    if (!('findingTypes' in value) || value['findingTypes'] === undefined) return false;
+    if (!('openFindings' in value) || value['openFindings'] === undefined) return false;
     return true;
 }
 
@@ -54,6 +110,11 @@ export function MatchOptionCustomDetectorDtoFromJSONTyped(json: any, ignoreDiscr
         
         'key': json['key'],
         'name': json['name'],
+        'answerDimension': json['answerDimension'],
+        'suggestedMatcher': json['suggestedMatcher'],
+        'findingTypes': json['findingTypes'],
+        'openFindings': json['openFindings'],
+        'pipelineType': json['pipelineType'] == null ? undefined : json['pipelineType'],
     };
 }
 
@@ -70,6 +131,11 @@ export function MatchOptionCustomDetectorDtoToJSONTyped(value?: MatchOptionCusto
         
         'key': value['key'],
         'name': value['name'],
+        'answerDimension': value['answerDimension'],
+        'suggestedMatcher': value['suggestedMatcher'],
+        'findingTypes': value['findingTypes'],
+        'openFindings': value['openFindings'],
+        'pipelineType': value['pipelineType'],
     };
 }
 

@@ -356,7 +356,7 @@ export function CaseTimeline({ caseId }: { caseId: string }) {
               onClick={() => setFilter(key)}
               className={`rounded-[4px] border-2 px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-wide transition-colors ${
                 filter === key
-                  ? "border-accent bg-accent/10 text-accent"
+                  ? "border-accent bg-accent/10 text-accent-ink"
                   : "border-border text-muted-foreground hover:border-foreground/30"
               }`}
             >

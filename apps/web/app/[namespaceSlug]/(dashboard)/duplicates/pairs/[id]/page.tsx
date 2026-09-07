@@ -13,12 +13,15 @@ export default function PairPage() {
 
   return (
     <DuplicatesShell active="queue" bare>
-      {({ portfolio, refresh }) =>
+      {({ portfolio, cutoffs, refresh }) =>
         pair ? (
           <PairLevel
             aId={pair.aId}
             bId={pair.bId}
             hairball={portfolio.lineageHairball}
+            // The queue this pair sits in is the one the pattern list showed,
+            // so it has to be bounded by the same cutoffs.
+            cutoffs={cutoffs}
             onDecided={refresh}
           />
         ) : null

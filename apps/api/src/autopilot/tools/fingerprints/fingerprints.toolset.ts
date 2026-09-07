@@ -13,6 +13,7 @@ import {
 } from '../../../correlation/correlation.service';
 import { DuplicatesFinderAgentService } from '../../../correlation/duplicates-finder-agent.service';
 import { DecisionApplierService } from '../../decision-applier.service';
+import { AI_ACTOR } from '../../autopilot.constants';
 import type { Tool, ToolGate } from '../tool.types';
 
 // Sourced from the engine rather than restated, so a new correlation edge type
@@ -300,6 +301,111 @@ export class FingerprintsToolset {
           return { mode, entityType: 'case', entityId: caseId };
         },
         handler: async (input) => this.review.decisionsToCase(input as never),
+      },
+      {
+        name: 'fingerprints.exclusion_candidates',
+        description:
+          'For a duplicate-review pattern marked EXCLUSION (shared template text), the values inside that template and how many assets hold each. `pairsDriven` is the number that matters: matches the template causes in OTHER patterns. Returns nothing for any other rule kind. Read this before proposing an exclusion — the pattern row alone does not name what is excludable.',
+        inputSchema: {
+          type: 'object',
+          properties: { patternKey: { type: 'string' } },
+          required: ['patternKey'],
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async (input) =>
+          this.review.exclusionCandidates(String(input.patternKey)),
+      },
+      {
+        name: 'fingerprints.exclude_pattern_values',
+        description:
+          "Stop matching on specific values inside a template, and record the pattern's own pairs as not-duplicates. Takes value hashes from fingerprints.exclusion_candidates — a hash that is not in the index is ignored. This is the fix for a boilerplate pattern: its own pairs come from repeated text and survive, what disappears are the shared-value matches the template drives elsewhere. Affects scoring instance-wide and re-scores the corpus, so it is gated like any other correlation tuning.",
+        inputSchema: {
+          type: 'object',
+          properties: {
+            patternKey: { type: 'string' },
+            valueHashes: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                'From fingerprints.exclusion_candidates. Exclude the widest-reaching values, not every value in the group.',
+            },
+          },
+          required: ['patternKey', 'valueHashes'],
+          additionalProperties: false,
+        },
+        // Preserve the hash array verbatim.
+        lenientInput: false,
+        sideEffect: 'mutate',
+        domain: 'system',
+        decisionAction: AgentDecisionAction.TUNE_CORRELATION,
+        // The same gate as fingerprints.tune_config, because it is the same
+        // class of change: an instance-wide rule about what may match. In
+        // suggest mode it becomes a proposal an operator approves rather than
+        // something an agent applies to everyone's scoring on its own.
+        resolveGate: (_input, tc): Promise<ToolGate> =>
+          Promise.resolve({
+            mode: this.applier.effectiveMode(
+              AiManagementMode.INHERIT,
+              tc.ctx.settings.autopilotConfigEnabled,
+            ),
+            entityType: 'system',
+          }),
+        handler: async (input) =>
+          this.review.applyPattern(
+            String(input.patternKey),
+            {
+              // Assets that matched on shared template text are not the same
+              // thing, and REJECTED is also the verdict that stops later scans
+              // re-clustering them. An agent may not pick this: a bulk CONFIRM
+              // over a whole pattern is not a decision anything here can justify.
+              verdict: 'REJECTED',
+              excludeValueHashes: (input.valueHashes as string[]) ?? [],
+            },
+            // Stamped, so these land in the decisions ledger and the undo log as
+            // agent work. "Pairs remaining" is only a count of human work
+            // because every agent-reachable write path says so.
+            AI_ACTOR,
+          ),
+      },
+      {
+        name: 'fingerprints.decisions_to_inquiry',
+        description:
+          'Open an inquiry that keeps watching for whatever these confirmed duplicate pairs had in common — the labels that matched, scoped to the sources they came from. Use when a duplicate pattern is recurring rather than historical, so it is monitored instead of re-reviewed. The verdicts are stamped with the inquiry, which is what makes the decisions view show follow-through.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            pairs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  aId: { type: 'string' },
+                  bId: { type: 'string' },
+                },
+                required: ['aId', 'bId'],
+                additionalProperties: false,
+              },
+            },
+            title: { type: 'string' },
+          },
+          required: ['pairs'],
+          additionalProperties: false,
+        },
+        lenientInput: false,
+        sideEffect: 'mutate',
+        domain: 'inquiry',
+        decisionAction: AgentDecisionAction.CREATE_INQUIRY,
+        resolveGate: (_input, tc): Promise<ToolGate> =>
+          Promise.resolve({
+            mode: this.applier.effectiveMode(
+              AiManagementMode.INHERIT,
+              tc.ctx.settings.autopilotInquiryEnabled,
+            ),
+            entityType: 'inquiry',
+          }),
+        handler: async (input) =>
+          this.review.decisionsToInquiry(input as never),
       },
       {
         name: 'fingerprints.match_cause',

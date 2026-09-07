@@ -54,6 +54,49 @@ function assertValidRegexAll(dto: InquiryMatchersDto): void {
   assertValidRegex(dto.findingValueRegex);
 }
 
+/** Finding types listed per custom detector in the match-options response. */
+const MATCH_OPTION_TYPE_CAP = 25;
+
+/** The pipeline engine a custom detector runs on, or null if unreadable. */
+function pipelineTypeOf(pipelineSchema: unknown): string | null {
+  if (!pipelineSchema || typeof pipelineSchema !== 'object') return null;
+  const type = (pipelineSchema as Record<string, unknown>).type;
+  return typeof type === 'string' && type.length > 0 ? type : null;
+}
+
+/**
+ * Which dimension of a detector's findings carries the answer.
+ *
+ * This is a property of the ENGINE, not of the data, which is why it can be
+ * answered from the pipeline schema and does not need a statistical guess:
+ *
+ *   TAG    findingType = `tag:<label>` (the question), matchedContent = the
+ *          verdict `hoch (5/12): amtswegig gelöscht; …` (the ANSWER).
+ *   REGEX  findingType names the rule; matchedContent is what matched.
+ *   LLM /  the predicted label IS the finding type (`insolvenzgefahr_hoch`)
+ *   classifiers  and matchedContent is the model's prose reasoning.
+ *
+ * Getting it backwards produces zero matches and no error — an inquiry with a
+ * wrong matcher and an inquiry with nothing to match look identical. Switching
+ * one question from `findingValueRegex` to `findingTypes` took it from 0 to 50
+ * matches instantly.
+ */
+function answerDimensionFor(
+  pipelineType: string | null,
+): 'findingType' | 'matchedContent' {
+  switch ((pipelineType ?? '').toUpperCase()) {
+    case 'LLM':
+    case 'TEXT_CLASSIFICATION':
+    case 'IMAGE_CLASSIFICATION':
+    case 'OBJECT_DETECTION':
+      return 'findingType';
+    // TAG, REGEX, GLINER2 and anything unrecognised: the type names the rule
+    // or the label, and the extracted value is what the reader wants.
+    default:
+      return 'matchedContent';
+  }
+}
+
 @Injectable()
 export class InquiriesService {
   constructor(
@@ -194,25 +237,36 @@ export class InquiriesService {
   async matchOptions(sourceIds?: string[]): Promise<MatchOptionsResponseDto> {
     const scopedSources =
       sourceIds && sourceIds.length > 0 ? sourceIds : undefined;
-    const [sources, customDetectors, typeRows] = await Promise.all([
-      this.prisma.source.findMany({
-        select: { id: true, name: true, type: true },
-        orderBy: { name: 'asc' },
-      }),
-      this.prisma.customDetector.findMany({
-        where: { isActive: true },
-        select: { key: true, name: true },
-        orderBy: { name: 'asc' },
-      }),
-      this.prisma.finding.groupBy({
-        by: ['findingType', 'detectorType'],
-        where: {
-          status: 'OPEN',
-          ...(scopedSources ? { sourceId: { in: scopedSources } } : {}),
-        },
-        _count: { _all: true },
-      }),
-    ]);
+    const findingScope = {
+      status: 'OPEN' as const,
+      ...(scopedSources ? { sourceId: { in: scopedSources } } : {}),
+    };
+    const [sources, customDetectors, typeRows, customTypeRows] =
+      await Promise.all([
+        this.prisma.source.findMany({
+          select: { id: true, name: true, type: true },
+          orderBy: { name: 'asc' },
+        }),
+        this.prisma.customDetector.findMany({
+          where: { isActive: true },
+          select: { key: true, name: true, pipelineSchema: true },
+          orderBy: { name: 'asc' },
+        }),
+        this.prisma.finding.groupBy({
+          by: ['findingType', 'detectorType'],
+          where: findingScope,
+          _count: { _all: true },
+        }),
+        // Which finding types each custom detector actually emits. This is what
+        // makes the answer-dimension hint actionable: for an LLM detector the
+        // author can put these straight into `findingTypes`, instead of writing
+        // a value regex that matches nothing.
+        this.prisma.finding.groupBy({
+          by: ['customDetectorKey', 'findingType'],
+          where: { ...findingScope, detectorType: 'CUSTOM' },
+          _count: { _all: true },
+        }),
+      ]);
 
     const findingTypes = typeRows
       .map((r) => ({
@@ -222,13 +276,41 @@ export class InquiriesService {
       }))
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 
+    const observed = new Map<string, Array<{ type: string; count: number }>>();
+    for (const row of customTypeRows) {
+      if (!row.customDetectorKey) continue;
+      const list = observed.get(row.customDetectorKey) ?? [];
+      list.push({ type: row.findingType, count: row._count._all });
+      observed.set(row.customDetectorKey, list);
+    }
+
     return {
       sources: sources.map((s) => ({
         id: s.id,
         name: s.name,
         type: String(s.type),
       })),
-      customDetectors,
+      customDetectors: customDetectors.map((d) => {
+        const types = (observed.get(d.key) ?? []).sort(
+          (a, b) => b.count - a.count || a.type.localeCompare(b.type),
+        );
+        const pipelineType = pipelineTypeOf(d.pipelineSchema);
+        const answerDimension = answerDimensionFor(pipelineType);
+        return {
+          key: d.key,
+          name: d.name,
+          pipelineType,
+          answerDimension,
+          suggestedMatcher:
+            answerDimension === 'findingType'
+              ? ('findingTypes' as const)
+              : ('findingValueRegex' as const),
+          findingTypes: types
+            .slice(0, MATCH_OPTION_TYPE_CAP)
+            .map((t) => t.type),
+          openFindings: types.reduce((sum, t) => sum + t.count, 0),
+        };
+      }),
       findingTypes,
     };
   }

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AssetService } from './asset.service';
 import { PrismaService } from './prisma.service';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
+import { CustomDetectorsService } from './custom-detectors.service';
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import {
@@ -12,6 +13,7 @@ import {
   Severity,
 } from '@prisma/client';
 import {
+  ConflictException,
   NotFoundException,
   BadRequestException,
   ServiceUnavailableException,
@@ -47,6 +49,10 @@ describe('AssetService', () => {
       updateMany: jest.fn(),
       findUnique: jest.fn(),
       deleteMany: jest.fn(),
+      delete: jest.fn(),
+    },
+    edge: {
+      deleteMany: jest.fn(),
     },
     finding: {
       findMany: jest.fn(),
@@ -74,6 +80,10 @@ describe('AssetService', () => {
     createFromIngestion: jest.fn(),
   };
 
+  const mockCustomDetectorsService = {
+    buildRuntimeTagDetectors: jest.fn(),
+  };
+
   const mockEmbeddingService = {
     semanticAssetIds: jest.fn(),
   };
@@ -94,6 +104,10 @@ describe('AssetService', () => {
         {
           provide: CustomDetectorExtractionsService,
           useValue: mockCustomDetectorExtractionsService,
+        },
+        {
+          provide: CustomDetectorsService,
+          useValue: mockCustomDetectorsService,
         },
         { provide: EmbeddingService, useValue: mockEmbeddingService },
         { provide: QueryEmbeddingService, useValue: mockQueryEmbeddingService },
@@ -117,6 +131,7 @@ describe('AssetService', () => {
     mockPrismaService.$queryRaw.mockResolvedValue([]);
     mockInquiryMatching.watchersForFindings.mockResolvedValue(new Map());
     mockCorrelationJobs.scheduleFull.mockResolvedValue(undefined);
+    mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue([]);
   });
 
   it('should be defined', () => {
@@ -890,6 +905,79 @@ describe('AssetService', () => {
       await expect(service.bulkIngest(sourceId, runnerId, [])).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    // A company filing a *correction* for a financial year it has already filed
+    // produces two manifest rows whose ids collide, and `@@unique([source_id,
+    // hash])` then fails — inside a transaction, after minutes of real network
+    // work. The answer was `500 {"code":"P2002"}` naming neither the id nor the
+    // asset, with "Unique constraint failed on the fields: (source_id, hash)"
+    // left behind in the API log. One repeated id destroyed a 1,140-asset run
+    // and told the author nothing about what to change.
+    describe('duplicate asset ids in one payload', () => {
+      it('rejects before any work, naming the connector-facing id', async () => {
+        await expect(
+          service.bulkIngest(sourceId, runnerId, [
+            {
+              hash: 'h1',
+              name: 'Jahresabschluss 2024',
+              metadata: { external_id: 'fin-352695w-2024' },
+            },
+            {
+              hash: 'h1',
+              name: 'Jahresabschluss 2024 (Berichtigung)',
+              metadata: { external_id: 'fin-352695w-2024' },
+            },
+          ]),
+        ).rejects.toThrow(ConflictException);
+
+        // Rejected before the prior-row lookup, so nothing is downloaded or
+        // written on the way to the error.
+        expect(mockPrismaService.asset.findMany).not.toHaveBeenCalled();
+      });
+
+      it('puts the id, the hash and the copy count in the message', async () => {
+        expect.assertions(4);
+        try {
+          await service.bulkIngest(sourceId, runnerId, [
+            { hash: 'h1', metadata: { external_id: 'fin-352695w-2024' } },
+            { hash: 'h1', metadata: { external_id: 'fin-352695w-2024' } },
+            { hash: 'h1', metadata: { external_id: 'fin-352695w-2024' } },
+          ]);
+        } catch (error) {
+          const body = (error as ConflictException).getResponse() as {
+            message: string;
+            duplicates: Array<{
+              hash: string;
+              externalId: string;
+              count: number;
+            }>;
+          };
+          expect(body.message).toContain('fin-352695w-2024');
+          expect(body.message).toContain('3 copies');
+          expect(body.duplicates).toHaveLength(1);
+          expect(body.duplicates[0]).toMatchObject({
+            hash: 'h1',
+            externalId: 'fin-352695w-2024',
+            count: 3,
+          });
+        }
+      });
+
+      it('falls back to the asset name when there is no external id', async () => {
+        expect.assertions(1);
+        try {
+          await service.bulkIngest(sourceId, runnerId, [
+            { hash: 'h1', name: 'Jahresabschluss 2024' },
+            { hash: 'h1', name: 'Jahresabschluss 2024' },
+          ]);
+        } catch (error) {
+          const body = (error as ConflictException).getResponse() as {
+            message: string;
+          };
+          expect(body.message).toContain('Jahresabschluss 2024');
+        }
+      });
     });
 
     // The API repeatedly died with "Ineffective mark-compacts near heap limit"
@@ -2646,6 +2734,19 @@ describe('AssetService', () => {
         expect(findingUpdate).not.toHaveBeenCalled();
       });
 
+      it('keeps TAG findings the source config cannot name', async () => {
+        // TAG detectors are deliberately unselectable, so the stored recipe
+        // never lists them. Without the global lookup this cleanup resolves
+        // the finding in the same run that created it.
+        mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue([
+          { key: 'email-conduct-screen' },
+        ]);
+        const result = await runCleanup({ detectors: [] }, [openFinding()]);
+
+        expect(result.resolvedForRemovedDetectors).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
       it('does nothing when the source opts out via the flag', async () => {
         const result = await runCleanup(
           {
@@ -3299,6 +3400,28 @@ describe('AssetService', () => {
             expect.not.objectContaining({ payloadCursor: expect.anything() }),
           ],
         });
+      });
+    });
+  });
+
+  describe('deleteAsset', () => {
+    // An edge endpoint is a (type, id) pair, not a foreign key, so deleting an
+    // asset used to leave edges pointing at nothing — and the correlation
+    // review rebuild, which DOES foreign-key its lineage rows, then failed
+    // with P2003 for the whole namespace.
+    it('removes the edges that named the asset', async () => {
+      mockPrismaService.asset.delete.mockResolvedValue({ id: 'a1' });
+      mockPrismaService.edge.deleteMany.mockResolvedValue({ count: 3 });
+
+      await service.deleteAsset({ id: 'a1' });
+
+      expect(mockPrismaService.edge.deleteMany).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { fromType: 'asset', fromId: 'a1' },
+            { toType: 'asset', toId: 'a1' },
+          ],
+        },
       });
     });
   });

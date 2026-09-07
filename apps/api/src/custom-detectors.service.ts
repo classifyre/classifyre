@@ -138,6 +138,32 @@ function normalizeHeaderCell(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, '_');
 }
 
+/**
+ * Which dimension of a detector's findings carries the answer.
+ *
+ * A property of the ENGINE, not of the data. A TAG detector's finding type is
+ * the label it asserts (`tag:Shell-company risk`) and its matched content is
+ * the verdict (`hoch (5/12): amtswegig gelöscht; …`) — the answer. A classifier
+ * is the other way round: the predicted label IS the finding type and the value
+ * is prose reasoning. Written here and in `inquiries.service.ts` against the
+ * same list, because a detector audit and a question author must not disagree
+ * about it — getting it backwards produces zero matches and no error.
+ */
+function answerDimensionFor(
+  pipelineType: string | null,
+): 'findingType' | 'matchedContent' | null {
+  if (!pipelineType) return null;
+  switch (pipelineType.toUpperCase()) {
+    case 'LLM':
+    case 'TEXT_CLASSIFICATION':
+    case 'IMAGE_CLASSIFICATION':
+    case 'OBJECT_DETECTION':
+      return 'findingType';
+    default:
+      return 'matchedContent';
+  }
+}
+
 @Injectable()
 export class CustomDetectorsService {
   private readonly logger = new Logger(CustomDetectorsService.name);
@@ -588,11 +614,13 @@ export class CustomDetectorsService {
     const incoming = input.pipelineSchema;
     const schemaType = (incoming.type as string | undefined) ?? 'GLINER2';
 
-    // Transformer and LLM pipeline types store config directly in pipeline_schema —
-    // don't merge GLINER2 defaults (entities/classification/validation) on top.
+    // Transformer, LLM and TAG pipeline types store config directly in
+    // pipeline_schema — don't merge GLINER2 defaults (entities/classification/
+    // validation) on top.
     if (
       CustomDetectorsService.TRANSFORMER_PIPELINE_TYPES.has(schemaType) ||
-      schemaType === 'LLM'
+      schemaType === 'LLM' ||
+      schemaType === CustomDetectorsService.TAG_PIPELINE_TYPE
     ) {
       const config: JsonRecord = {
         custom_detector_key: input.key,
@@ -624,6 +652,23 @@ export class CustomDetectorsService {
 
     return config;
   }
+
+  /**
+   * The placeholder engine. A TAG detector runs nothing and reads no content:
+   * it exists to give an assertion a CUSTOM connector notebook makes — via
+   * `Asset(tags={"<key>": "<value>"})` — a stable identity, label and severity.
+   * It is deliberately not selectable in a source's detector list; the runner
+   * hydration adds every active one to a CUSTOM source's recipe instead.
+   */
+  static readonly TAG_PIPELINE_TYPE = 'TAG';
+
+  private static readonly SEVERITY_LEVELS = [
+    'critical',
+    'high',
+    'medium',
+    'low',
+    'info',
+  ];
 
   private static readonly TRANSFORMER_PIPELINE_TYPES = new Set([
     'TEXT_CLASSIFICATION',
@@ -702,6 +747,7 @@ export class CustomDetectorsService {
       'TEXT_CLASSIFICATION',
       'IMAGE_CLASSIFICATION',
       'OBJECT_DETECTION',
+      CustomDetectorsService.TAG_PIPELINE_TYPE,
     ];
     if (!validTypes.includes(schemaType)) {
       throw new BadRequestException(
@@ -737,6 +783,29 @@ export class CustomDetectorsService {
       throw new BadRequestException(
         'chunk_overlap must be smaller than chunk_size',
       );
+    }
+
+    if (schemaType === CustomDetectorsService.TAG_PIPELINE_TYPE) {
+      if (
+        schema.label !== undefined &&
+        (typeof schema.label !== 'string' || schema.label.trim().length === 0)
+      ) {
+        throw new BadRequestException(
+          'TAG pipeline schema label must be a non-empty string',
+        );
+      }
+      if (
+        schema.severity !== undefined &&
+        (typeof schema.severity !== 'string' ||
+          !CustomDetectorsService.SEVERITY_LEVELS.includes(schema.severity))
+      ) {
+        throw new BadRequestException(
+          `TAG pipeline schema severity must be one of: ${CustomDetectorsService.SEVERITY_LEVELS.join(', ')}`,
+        );
+      }
+      // Returns before the GLINER2 fall-through below: a tag detector has no
+      // entities and no classification tasks, and never will.
+      return;
     }
 
     if (schemaType === 'REGEX') {
@@ -902,12 +971,25 @@ export class CustomDetectorsService {
     usage?: DetectorUsageStats,
   ): CustomDetectorResponseDto {
     const latestRun = detector.trainingRuns?.[0] ?? null;
+    const pipelineSchema = asRecord((detector as any).pipelineSchema);
+    const detectorType =
+      typeof pipelineSchema.type === 'string' && pipelineSchema.type
+        ? pipelineSchema.type
+        : null;
     return {
       id: detector.id,
       key: detector.key,
       name: detector.name,
       description: detector.description,
-      pipelineSchema: asRecord((detector as any).pipelineSchema),
+      pipelineSchema,
+      // Lifted out of the pipeline blob so `GET /custom-detectors | jq` is an
+      // audit rather than the first of twenty round-trips.
+      detectorType,
+      severity:
+        typeof pipelineSchema.severity === 'string'
+          ? pipelineSchema.severity
+          : null,
+      answerDimension: answerDimensionFor(detectorType),
       aiProviderConfigId: (detector as any).aiProviderConfigId ?? null,
       isActive: detector.isActive,
       version: detector.version,
@@ -1477,7 +1559,10 @@ export class CustomDetectorsService {
    *   not unconfigure it, and it must not block saving an unrelated field;
    * - entries pointing at a detector that no longer exists are dropped, so a
    *   config left stale by an out-of-band delete repairs itself on next save
-   *   instead of rejecting every subsequent update.
+   *   instead of rejecting every subsequent update;
+   * - TAG detectors are dropped: they are never selectable on a source (the
+   *   runner adds every active one to a CUSTOM recipe anyway), so a selection
+   *   naming one is stale config from before the detector was converted.
    */
   async resolveDetectorSelections(
     selections: unknown,
@@ -1498,12 +1583,15 @@ export class CustomDetectorsService {
       return { ids: [], dropped: [] };
     }
 
-    const rows = await this.prisma.customDetector.findMany({
+    const allRows = await this.prisma.customDetector.findMany({
       where: {
         OR: [{ id: { in: normalized } }, { key: { in: normalized } }],
       },
-      select: { id: true, key: true },
+      select: { id: true, key: true, pipelineSchema: true },
     });
+    const rows = allRows.filter(
+      (row) => !CustomDetectorsService.isTagDetector(row),
+    );
     const byId = new Map(rows.map((row) => [row.id, row.id]));
     const byKey = new Map(rows.map((row) => [row.key, row.id]));
 
@@ -1559,10 +1647,16 @@ export class CustomDetectorsService {
         .map((entry) => customDetectorKeyOf(entry))
         .filter((key): key is string => Boolean(key));
       if (keys.length > 0) {
-        const rows = await this.prisma.customDetector.findMany({
+        const allRows = await this.prisma.customDetector.findMany({
           where: { OR: [{ key: { in: keys } }, { id: { in: keys } }] },
-          select: { id: true, key: true },
+          select: { id: true, key: true, pipelineSchema: true },
         });
+        // A TAG detector is never chosen on a source, so an entry naming one is
+        // stale config. Treating it as unknown drops it, and the runner adds
+        // every active tag detector to a CUSTOM recipe regardless.
+        const rows = allRows.filter(
+          (row) => !CustomDetectorsService.isTagDetector(row),
+        );
         const keyById = new Map(rows.map((row) => [row.id, row.key]));
         const knownKeys = new Set(rows.map((row) => row.key));
         const kept: unknown[] = [];
@@ -1684,6 +1778,52 @@ export class CustomDetectorsService {
     );
     return entries.filter((entry): entry is NonNullable<typeof entry> =>
       Boolean(entry),
+    );
+  }
+
+  /**
+   * Every active TAG detector, as recipe entries.
+   *
+   * Tag detectors are not selectable on a source, so nothing in the stored
+   * config can name them. A CUSTOM connector applies one by writing its key in
+   * a notebook — `Asset(tags={"<key>": "<value>"})` — and the key has to resolve
+   * at scan time or the tag is silently lost. Sending all of them costs
+   * nothing: a tag detector loads no model and never runs on content.
+   */
+  async buildRuntimeTagDetectors(): Promise<
+    Array<{
+      id: string;
+      key: string;
+      name: string;
+      detector: {
+        type: 'CUSTOM';
+        enabled: true;
+        config: Record<string, unknown>;
+      };
+    }>
+  > {
+    const rows = await this.prisma.customDetector.findMany({
+      where: { isActive: true },
+    });
+    const tagRows = rows.filter(
+      (row) =>
+        asRecord((row as any).pipelineSchema).type ===
+        CustomDetectorsService.TAG_PIPELINE_TYPE,
+    );
+    const entries = await Promise.all(
+      tagRows.map((row) => this.toRuntimeEntry(row)),
+    );
+    return entries.filter((entry): entry is NonNullable<typeof entry> =>
+      Boolean(entry),
+    );
+  }
+
+  /** Whether a detector row is a TAG placeholder rather than a real engine. */
+  static isTagDetector(row: { pipelineSchema?: unknown } | null): boolean {
+    if (!row) return false;
+    return (
+      asRecord((row as any).pipelineSchema).type ===
+      CustomDetectorsService.TAG_PIPELINE_TYPE
     );
   }
 

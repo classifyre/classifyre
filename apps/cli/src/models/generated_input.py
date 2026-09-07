@@ -2552,365 +2552,6 @@ class TableauOptional(BaseModel):
     extraction: TableauOptionalExtraction | None = None
 
 
-class CoreInput(BaseModel):
-    type: AssetType
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class EmailInput(CoreInput):
-    type: Literal['EMAIL'] = Field(..., description='Type of the asset or source')
-    required: EmailRequired
-    masked: EmailMasked
-    optional: EmailOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class S3CompatibleStorageInput(CoreInput):
-    type: Literal['S3_COMPATIBLE_STORAGE'] = Field(
-        ..., description='Type of the asset or source'
-    )
-    required: S3CompatibleStorageRequired
-    masked: S3CompatibleStorageMasked | None = None
-    optional: S3CompatibleStorageOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class LocalFolderInput(CoreInput):
-    type: Literal['LOCAL_FOLDER'] = Field(
-        ..., description='Type of the asset or source'
-    )
-    required: LocalFolderRequired
-    masked: LocalFolderMasked | None = None
-    optional: LocalFolderOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class SandboxInput(CoreInput):
-    type: Literal['SANDBOX'] = Field(..., description='Type of the asset or source')
-    required: SandboxRequired
-    masked: SandboxMasked | None = None
-    optional: SandboxOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class AzureBlobStorageInput(CoreInput):
-    type: Literal['AZURE_BLOB_STORAGE'] = Field(
-        ..., description='Type of the asset or source'
-    )
-    required: AzureBlobStorageRequired
-    masked: AzureBlobStorageMasked | None = None
-    optional: AzureBlobStorageOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class GoogleCloudStorageInput(CoreInput):
-    type: Literal['GOOGLE_CLOUD_STORAGE'] = Field(
-        ..., description='Type of the asset or source'
-    )
-    required: GoogleCloudStorageRequired
-    masked: GoogleCloudStorageMasked | None = None
-    optional: GoogleCloudStorageOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class WordPressInput(CoreInput):
-    type: Literal['WORDPRESS'] = Field(..., description='Type of the asset or source')
-    required: WordPressRequired
-    masked: WordPressMasked
-    optional: WordPressOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class PostgreSQLInput(CoreInput):
-    type: Literal['POSTGRESQL'] = Field(..., description='Type of the asset or source')
-    required: PostgreSQLRequired
-    masked: PostgreSQLMasked
-    optional: PostgreSQLOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class MySQLInput(CoreInput):
-    type: Literal['MYSQL'] = Field(..., description='Type of the asset or source')
-    required: MySQLRequired
-    masked: MySQLMasked
-    optional: MySQLOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class MSSQLInput(CoreInput):
-    type: Literal['MSSQL'] = Field(..., description='Type of the asset or source')
-    required: MSSQLRequired
-    masked: MSSQLMasked
-    optional: MSSQLOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class OracleInput(CoreInput):
-    type: Literal['ORACLE'] = Field(..., description='Type of the asset or source')
-    required: OracleRequired
-    masked: OracleMasked
-    optional: OracleOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class HiveInput(CoreInput):
-    type: Literal['HIVE'] = Field(..., description='Type of the asset or source')
-    required: HiveRequired
-    masked: HiveMasked
-    optional: HiveOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class DatabricksInput(CoreInput):
-    type: Literal['DATABRICKS'] = Field(..., description='Type of the asset or source')
-    required: PersonalAccessToken | ServicePrincipalOAuthM2M | AzureServicePrincipal = (
-        Field(..., title='DatabricksRequired')
-    )
-    masked: DatabricksMaskedPat | DatabricksMaskedServicePrincipal = Field(
-        ..., title='DatabricksMasked'
-    )
-    optional: DatabricksOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class SnowflakeInput(CoreInput):
-    type: Literal['SNOWFLAKE'] = Field(..., description='Type of the asset or source')
-    required: (
-        SnowflakeRequiredDefaultAuthenticator
-        | SnowflakeRequiredExternalBrowserAuthenticator
-        | SnowflakeRequiredKeyPairAuthenticator
-        | SnowflakeRequiredOauthAuthenticatorToken
-    ) = Field(..., title='SnowflakeRequired')
-    masked: (
-        SnowflakeMaskedDefaultAuthenticator
-        | SnowflakeMaskedExternalBrowserAuthenticator
-        | SnowflakeMaskedKeyPairAuthenticator
-        | SnowflakeMaskedOauthAuthenticatorToken
-    ) = Field(..., title='SnowflakeMasked')
-    optional: SnowflakeOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class MongoDBInput(CoreInput):
-    type: Literal['MONGODB'] = Field(..., description='Type of the asset or source')
-    required: MongoDBRequiredAtlas | MongoDBRequiredOnPrem = Field(
-        ..., title='MongoDBRequired'
-    )
-    masked: MongoDBMaskedUsernamePassword | MongoDBMaskedNone = Field(
-        ..., title='MongoDBMasked'
-    )
-    optional: MongoDBOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
 class Neo4jRequired(BaseModel):
     """
     Neo4j connection endpoint. Accepts bolt://, neo4j://, or neo4j+s:// URIs.
@@ -3015,79 +2656,6 @@ class Neo4jOptional(BaseModel):
     )
     connection: Neo4jOptionalConnection | None = None
     scope: Neo4jOptionalScope | None = None
-
-
-class Neo4jInput(CoreInput):
-    type: Literal['NEO4J'] = Field(..., description='Type of the asset or source')
-    required: Neo4jRequired
-    masked: Neo4jMaskedUsernamePassword | Neo4jMaskedNone = Field(
-        ..., title='Neo4jMasked'
-    )
-    optional: Neo4jOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class PowerBIInput(CoreInput):
-    type: Literal['POWERBI'] = Field(..., description='Type of the asset or source')
-    required: PowerBIRequiredServicePrincipal | PowerBIRequiredAccessToken = Field(
-        ..., title='PowerBIRequired'
-    )
-    masked: PowerBIMaskedClientSecret | PowerBIMaskedAccessToken = Field(
-        ..., title='PowerBIMasked'
-    )
-    optional: PowerBIOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class TableauInput(CoreInput):
-    type: Literal['TABLEAU'] = Field(..., description='Type of the asset or source')
-    required: TableauRequiredUsernamePassword | TableauRequiredPersonalAccessToken = (
-        Field(..., title='TableauRequired')
-    )
-    masked: TableauMaskedUsernamePassword | TableauMaskedPersonalAccessToken = Field(
-        ..., title='TableauMasked'
-    )
-    optional: TableauOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
 
 
 class ConfluenceRequired(BaseModel):
@@ -3483,69 +3051,6 @@ class Type22(StrEnum):
     CUSTOM = 'CUSTOM'
 
 
-class ConfluenceInput(CoreInput):
-    type: Literal['CONFLUENCE'] = Field(..., description='Type of the asset or source')
-    required: ConfluenceRequired
-    masked: ConfluenceMasked
-    optional: ConfluenceOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class JiraInput(CoreInput):
-    type: Literal['JIRA'] = Field(..., description='Type of the asset or source')
-    required: JiraRequired
-    masked: JiraMasked
-    optional: JiraOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class ServiceDeskInput(CoreInput):
-    type: Literal['SERVICEDESK'] = Field(..., description='Type of the asset or source')
-    required: ServiceDeskRequired
-    masked: ServiceDeskMasked
-    optional: ServiceDeskOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
 class SQLiteRequired(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -3578,31 +3083,6 @@ class SQLiteOptional(BaseModel):
         extra='forbid',
     )
     scope: SQLiteOptionalScope | None = None
-
-
-class SQLiteInput(CoreInput):
-    type: Literal['SQLITE'] = Field(..., description='Type of the asset or source')
-    required: SQLiteRequired
-    masked: dict[str, Any] | None = Field(
-        None,
-        description='SQLite has no credentials; this section is intentionally empty.',
-        max_length=0,
-    )
-    optional: SQLiteOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
 
 
 class NotionRequired(BaseModel):
@@ -3716,27 +3196,6 @@ class NotionOptional(BaseModel):
     connection: NotionOptionalConnection | None = None
     scope: NotionOptionalScope | None = None
     content: NotionOptionalContent | None = None
-
-
-class NotionInput(CoreInput):
-    type: Literal['NOTION'] = Field(..., description='Type of the asset or source')
-    required: NotionRequired
-    masked: NotionMasked
-    optional: NotionOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
 
 
 class KafkaSecurityProtocol(StrEnum):
@@ -3953,38 +3412,6 @@ class KafkaOptional(BaseModel):
     scope: KafkaOptionalScope | None = None
 
 
-class KafkaInput(CoreInput):
-    type: Literal['KAFKA'] = Field(..., description='Type of the asset or source')
-    required: (
-        NoAuthentication
-        | SASLUsernamePassword
-        | ClientCertificateMTLS
-        | KafkaRESTProxyUsernamePassword
-    ) = Field(..., title='KafkaRequired')
-    masked: (
-        NoAuthentication1
-        | SASLUsernamePassword1
-        | ClientCertificateMTLS1
-        | KafkaRESTProxyUsernamePassword1
-        | None
-    ) = Field(None, title='KafkaMasked')
-    optional: KafkaOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
 class NoAuthentication2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -4093,64 +3520,12 @@ class ElasticsearchOptional(BaseModel):
     scope: SearchEngineOptionalScope | None = None
 
 
-class ElasticsearchInput(CoreInput):
-    type: Literal['ELASTICSEARCH'] = Field(
-        ..., description='Type of the asset or source'
-    )
-    required: NoAuthentication2 | BasicUsernamePassword | APIKeyBearerToken = Field(
-        ..., title='ElasticsearchRequired'
-    )
-    masked: NoAuthentication3 | BasicUsernamePassword1 | APIKeyBearerToken1 | None = (
-        Field(None, title='ElasticsearchMasked')
-    )
-    optional: ElasticsearchOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
 class OpenSearchOptional(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     connection: SearchEngineOptionalConnection | None = None
     scope: SearchEngineOptionalScope | None = None
-
-
-class OpenSearchInput(CoreInput):
-    type: Literal['OPENSEARCH'] = Field(..., description='Type of the asset or source')
-    required: NoAuthentication2 | BasicUsernamePassword | APIKeyBearerToken = Field(
-        ..., title='OpenSearchRequired'
-    )
-    masked: NoAuthentication3 | BasicUsernamePassword1 | APIKeyBearerToken1 | None = (
-        Field(None, title='OpenSearchMasked')
-    )
-    optional: OpenSearchOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
 
 
 class NoAuthentication4(BaseModel):
@@ -4217,31 +3592,6 @@ class MeilisearchOptional(BaseModel):
     )
     connection: SearchEngineOptionalConnection | None = None
     scope: MeilisearchOptionalScope | None = None
-
-
-class MeilisearchInput(CoreInput):
-    type: Literal['MEILISEARCH'] = Field(..., description='Type of the asset or source')
-    required: NoAuthentication4 | APIKeyBearerToken2 = Field(
-        ..., title='MeilisearchRequired'
-    )
-    masked: NoAuthentication5 | APIKeyBearerToken3 | None = Field(
-        None, title='MeilisearchMasked'
-    )
-    optional: MeilisearchOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
 
 
 class LakehouseStorageConnection(BaseModel):
@@ -4454,37 +3804,6 @@ class Microsoft365Optional(BaseModel):
     extraction: Microsoft365OptionalExtraction | None = None
 
 
-class Microsoft365Input(CoreInput):
-    type: Literal['MICROSOFT_365'] = Field(
-        ..., description='Type of the asset or source'
-    )
-    required: (
-        Microsoft365RequiredClientSecret
-        | Microsoft365RequiredCertificate
-        | Microsoft365RequiredManagedIdentity
-    ) = Field(..., title='Microsoft365Required')
-    masked: (
-        Microsoft365MaskedClientSecret
-        | Microsoft365MaskedCertificate
-        | Microsoft365MaskedManagedIdentity
-    ) = Field(..., title='Microsoft365Masked')
-    optional: Microsoft365Optional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
 class GoogleWorkspaceRequiredServiceAccount(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -4601,33 +3920,6 @@ class GoogleWorkspaceOptional(BaseModel):
     scope: GoogleWorkspaceOptionalScope | None = None
     connection: GoogleWorkspaceOptionalConnection | None = None
     extraction: GoogleWorkspaceOptionalExtraction | None = None
-
-
-class GoogleWorkspaceInput(CoreInput):
-    type: Literal['GOOGLE_WORKSPACE'] = Field(
-        ..., description='Type of the asset or source'
-    )
-    required: GoogleWorkspaceRequiredServiceAccount | GoogleWorkspaceRequiredOAuth = (
-        Field(..., title='GoogleWorkspaceRequired')
-    )
-    masked: GoogleWorkspaceMaskedServiceAccount | GoogleWorkspaceMaskedOAuth = Field(
-        ..., title='GoogleWorkspaceMasked'
-    )
-    optional: GoogleWorkspaceOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
 
 
 class DropboxOAuthRefreshTokenRecommended(BaseModel):
@@ -4840,33 +4132,6 @@ class DropboxOptional(BaseModel):
     connection: DropboxOptionalConnection | None = None
 
 
-class DropboxInput(CoreInput):
-    type: Literal['DROPBOX'] = Field(..., description='Type of the asset or source')
-    required: (
-        DropboxOAuthRefreshTokenRecommended
-        | DropboxOAuthWithPKCENoAppSecret
-        | DropboxAccessTokenShortLivedTestingOnly
-    ) = Field(..., title='DropboxRequired')
-    masked: DropboxMaskedOAuth | DropboxMaskedOAuthPkce | DropboxMaskedAccessToken = (
-        Field(..., title='DropboxMasked')
-    )
-    optional: DropboxOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
 class HuggingFaceRepoType(StrEnum):
     """
     Repository kind on the Hub. Datasets hold the data files (parquet, csv, images, audio); models hold weights and configuration; spaces hold app source code.
@@ -5011,29 +4276,6 @@ class HuggingFaceOptional(BaseModel):
     )
     scope: HuggingFaceOptionalScope | None = None
     connection: HuggingFaceOptionalConnection | None = None
-
-
-class HuggingFaceInput(CoreInput):
-    type: Literal['HUGGING_FACE'] = Field(
-        ..., description='Type of the asset or source'
-    )
-    required: HuggingFaceRequired
-    masked: HuggingFaceMasked
-    optional: HuggingFaceOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
 
 
 class SlackOptionalAttachments(BaseModel):
@@ -5265,27 +4507,6 @@ class GitOptional(BaseModel):
     connection: GitOptionalConnection | None = None
 
 
-class GitInput(CoreInput):
-    type: Literal['GIT'] = Field(..., description='Type of the asset or source')
-    required: GitRequired
-    masked: GitMasked | None = None
-    optional: GitOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
 class NotebookCodeCell(BaseModel):
     """
     A Python cell. Must remain valid standard Python -- IPython magics (%time, !pip) are rejected.
@@ -5452,50 +4673,115 @@ class NotebookLocalFolder(BaseModel):
     )
 
 
-class YouTubeInput(CoreInput):
-    type: Literal['YOUTUBE'] = Field(..., description='Type of the asset or source')
-    required: YouTubeRequired
-    masked: YouTubeMasked | None = None
-    optional: YouTubeOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
+class AugmentationNotebook(BaseModel):
+    """
+    Cells run in document order in one fresh process per run, before the first asset is augmented. There is no persistent kernel: state is rebuilt from the current cell sources every time. The assembled code cells must define augment(asset); setup() and finalize() are optional.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
     )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    revision: int | None = Field(
+        1,
+        description='Monotonic revision, bumped on every save. Used for optimistic locking so two editors cannot silently overwrite each other, and folded into the scan-cache signature so a code change re-augments cached assets.',
+        ge=1,
     )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    cells: list[NotebookCodeCell | NotebookMarkdownCell] = Field(
+        ...,
+        description='Ordered notebook cells. The assembled code cells must define augment(asset). Capped at 50 cells so the augmentation recipe keeps headroom inside the 128 KB RECIPE_GZ_B64 budget next to a CUSTOM connector notebook that may already be large.',
+        max_length=50,
+        min_length=1,
     )
 
 
-class RedditInput(CoreInput):
-    type: Literal['REDDIT'] = Field(..., description='Type of the asset or source')
-    required: (
-        RedditRequiredReadOnly | RedditRequiredScript | RedditRequiredRefreshToken
-    ) = Field(..., title='RedditRequired')
-    masked: RedditMaskedReadOnly | RedditMaskedScript | RedditMaskedRefreshToken = (
-        Field(..., title='RedditMasked')
+class AugmentationLimits(BaseModel):
+    """
+    Bounds applied to every augmentation execution and scan.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
     )
-    optional: RedditOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
+    timeout_seconds: int | None = Field(
+        900,
+        description='Kill an augmentation execution that runs longer than this. Cells cannot be interrupted from inside Python, so this is the real stop button.',
+        ge=10,
+        le=86400,
     )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    per_asset_timeout_seconds: int | None = Field(
+        30,
+        description='Kill a single augment(asset) call that runs longer than this. The asset proceeds as if augmentation were disabled and a scan warning is recorded.',
+        ge=1,
+        le=600,
     )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    max_payload_bytes: int | None = Field(
+        33554432,
+        description='Largest lazy payload (asset.payload()/asset.text()) served to the augmentation child per asset. Larger payloads resolve to an empty value rather than failing the scan.',
+        ge=1024,
+        le=134217728,
     )
+    max_output_bytes: int | None = Field(
+        2097152,
+        description='Total serialized cell output kept per execution. Larger outputs are truncated rather than stored.',
+        ge=1024,
+        le=52428800,
+    )
+    max_workers: int | None = Field(
+        1,
+        description='Augmentation child processes augmenting assets in parallel. Raise for CPU-bound augment() bodies; the default of 1 keeps asset order deterministic.',
+        ge=1,
+        le=8,
+    )
+    max_consecutive_failures: int | None = Field(
+        10,
+        description='Circuit breaker: after this many consecutive per-asset failures the session disables itself for the rest of the run and warns once, so a systematically broken notebook cannot drown the run log one warning per asset.',
+        ge=1,
+        le=1000,
+    )
+
+
+class AugmentationConfig(BaseModel):
+    """
+    Optional Python notebook that enriches every asset this source extracts — extra metadata, tags, links, URN and relationship edges — after extraction and before detection. Additive only: it cannot change what the connector extracted, cannot drop an asset, and cannot fail a scan. Disabled unless enabled is true.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    enabled: bool | None = Field(
+        False,
+        description='Master switch. Absent or false means provably inert: not even a child process is started.',
+    )
+    notebook: AugmentationNotebook | None = None
+    variables: (
+        dict[constr(pattern=r'^[A-Za-z_][A-Za-z0-9_]{0,62}$'), Variables] | None
+    ) = Field(
+        {},
+        description='Non-secret values the notebook reads with ctx.var("name"), such as a lookup-table URL. Stored in clear text. Keys must be valid Python identifiers.',
+        max_length=64,
+        validate_default=True,
+    )
+    secrets: dict[constr(pattern=r'^[A-Za-z_][A-Za-z0-9_]{0,62}$'), Secrets] | None = (
+        Field(
+            {},
+            description='Secret values the notebook reads with ctx.secret("name"). Encrypted at rest and redacted from logs and cell output. Keys must be valid Python identifiers.',
+            max_length=64,
+            validate_default=True,
+        )
+    )
+    packages: list[NotebookPackage] | None = Field(
+        [],
+        description="Python packages installed into the run environment before any cell executes. Installed with uv; the base image's own dependencies are always present and do not need listing.",
+        max_length=50,
+        validate_default=True,
+    )
+    local_folders: list[NotebookLocalFolder] | None = Field(
+        [],
+        description='Desktop only. Folders on this machine the notebook reads with ctx.folder("name"). Not available in Kubernetes deployments, where files are uploaded to the source instead.',
+        max_length=10,
+        validate_default=True,
+    )
+    limits: AugmentationLimits | None = None
 
 
 class SlackOptional(BaseModel):
@@ -5506,6 +4792,25 @@ class SlackOptional(BaseModel):
     time_range: SlackOptionalTimeRange | None = None
     ingestion: SlackOptionalIngestion | None = None
     attachments: SlackOptionalAttachments | None = None
+
+
+class CoreInput(BaseModel):
+    type: AssetType
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
 
 
 class SlackInput(CoreInput):
@@ -5527,6 +4832,553 @@ class SlackInput(CoreInput):
         True,
         description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
     )
+    augmentation: AugmentationConfig | None = None
+
+
+class EmailInput(CoreInput):
+    type: Literal['EMAIL'] = Field(..., description='Type of the asset or source')
+    required: EmailRequired
+    masked: EmailMasked
+    optional: EmailOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class S3CompatibleStorageInput(CoreInput):
+    type: Literal['S3_COMPATIBLE_STORAGE'] = Field(
+        ..., description='Type of the asset or source'
+    )
+    required: S3CompatibleStorageRequired
+    masked: S3CompatibleStorageMasked | None = None
+    optional: S3CompatibleStorageOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class LocalFolderInput(CoreInput):
+    type: Literal['LOCAL_FOLDER'] = Field(
+        ..., description='Type of the asset or source'
+    )
+    required: LocalFolderRequired
+    masked: LocalFolderMasked | None = None
+    optional: LocalFolderOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class SandboxInput(CoreInput):
+    type: Literal['SANDBOX'] = Field(..., description='Type of the asset or source')
+    required: SandboxRequired
+    masked: SandboxMasked | None = None
+    optional: SandboxOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class AzureBlobStorageInput(CoreInput):
+    type: Literal['AZURE_BLOB_STORAGE'] = Field(
+        ..., description='Type of the asset or source'
+    )
+    required: AzureBlobStorageRequired
+    masked: AzureBlobStorageMasked | None = None
+    optional: AzureBlobStorageOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class GoogleCloudStorageInput(CoreInput):
+    type: Literal['GOOGLE_CLOUD_STORAGE'] = Field(
+        ..., description='Type of the asset or source'
+    )
+    required: GoogleCloudStorageRequired
+    masked: GoogleCloudStorageMasked | None = None
+    optional: GoogleCloudStorageOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class WordPressInput(CoreInput):
+    type: Literal['WORDPRESS'] = Field(..., description='Type of the asset or source')
+    required: WordPressRequired
+    masked: WordPressMasked
+    optional: WordPressOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class PostgreSQLInput(CoreInput):
+    type: Literal['POSTGRESQL'] = Field(..., description='Type of the asset or source')
+    required: PostgreSQLRequired
+    masked: PostgreSQLMasked
+    optional: PostgreSQLOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class MySQLInput(CoreInput):
+    type: Literal['MYSQL'] = Field(..., description='Type of the asset or source')
+    required: MySQLRequired
+    masked: MySQLMasked
+    optional: MySQLOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class MSSQLInput(CoreInput):
+    type: Literal['MSSQL'] = Field(..., description='Type of the asset or source')
+    required: MSSQLRequired
+    masked: MSSQLMasked
+    optional: MSSQLOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class OracleInput(CoreInput):
+    type: Literal['ORACLE'] = Field(..., description='Type of the asset or source')
+    required: OracleRequired
+    masked: OracleMasked
+    optional: OracleOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class HiveInput(CoreInput):
+    type: Literal['HIVE'] = Field(..., description='Type of the asset or source')
+    required: HiveRequired
+    masked: HiveMasked
+    optional: HiveOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class DatabricksInput(CoreInput):
+    type: Literal['DATABRICKS'] = Field(..., description='Type of the asset or source')
+    required: PersonalAccessToken | ServicePrincipalOAuthM2M | AzureServicePrincipal = (
+        Field(..., title='DatabricksRequired')
+    )
+    masked: DatabricksMaskedPat | DatabricksMaskedServicePrincipal = Field(
+        ..., title='DatabricksMasked'
+    )
+    optional: DatabricksOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class SnowflakeInput(CoreInput):
+    type: Literal['SNOWFLAKE'] = Field(..., description='Type of the asset or source')
+    required: (
+        SnowflakeRequiredDefaultAuthenticator
+        | SnowflakeRequiredExternalBrowserAuthenticator
+        | SnowflakeRequiredKeyPairAuthenticator
+        | SnowflakeRequiredOauthAuthenticatorToken
+    ) = Field(..., title='SnowflakeRequired')
+    masked: (
+        SnowflakeMaskedDefaultAuthenticator
+        | SnowflakeMaskedExternalBrowserAuthenticator
+        | SnowflakeMaskedKeyPairAuthenticator
+        | SnowflakeMaskedOauthAuthenticatorToken
+    ) = Field(..., title='SnowflakeMasked')
+    optional: SnowflakeOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class MongoDBInput(CoreInput):
+    type: Literal['MONGODB'] = Field(..., description='Type of the asset or source')
+    required: MongoDBRequiredAtlas | MongoDBRequiredOnPrem = Field(
+        ..., title='MongoDBRequired'
+    )
+    masked: MongoDBMaskedUsernamePassword | MongoDBMaskedNone = Field(
+        ..., title='MongoDBMasked'
+    )
+    optional: MongoDBOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class Neo4jInput(CoreInput):
+    type: Literal['NEO4J'] = Field(..., description='Type of the asset or source')
+    required: Neo4jRequired
+    masked: Neo4jMaskedUsernamePassword | Neo4jMaskedNone = Field(
+        ..., title='Neo4jMasked'
+    )
+    optional: Neo4jOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class PowerBIInput(CoreInput):
+    type: Literal['POWERBI'] = Field(..., description='Type of the asset or source')
+    required: PowerBIRequiredServicePrincipal | PowerBIRequiredAccessToken = Field(
+        ..., title='PowerBIRequired'
+    )
+    masked: PowerBIMaskedClientSecret | PowerBIMaskedAccessToken = Field(
+        ..., title='PowerBIMasked'
+    )
+    optional: PowerBIOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class TableauInput(CoreInput):
+    type: Literal['TABLEAU'] = Field(..., description='Type of the asset or source')
+    required: TableauRequiredUsernamePassword | TableauRequiredPersonalAccessToken = (
+        Field(..., title='TableauRequired')
+    )
+    masked: TableauMaskedUsernamePassword | TableauMaskedPersonalAccessToken = Field(
+        ..., title='TableauMasked'
+    )
+    optional: TableauOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class ConfluenceInput(CoreInput):
+    type: Literal['CONFLUENCE'] = Field(..., description='Type of the asset or source')
+    required: ConfluenceRequired
+    masked: ConfluenceMasked
+    optional: ConfluenceOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class JiraInput(CoreInput):
+    type: Literal['JIRA'] = Field(..., description='Type of the asset or source')
+    required: JiraRequired
+    masked: JiraMasked
+    optional: JiraOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class ServiceDeskInput(CoreInput):
+    type: Literal['SERVICEDESK'] = Field(..., description='Type of the asset or source')
+    required: ServiceDeskRequired
+    masked: ServiceDeskMasked
+    optional: ServiceDeskOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class SQLiteInput(CoreInput):
+    type: Literal['SQLITE'] = Field(..., description='Type of the asset or source')
+    required: SQLiteRequired
+    masked: dict[str, Any] | None = Field(
+        None,
+        description='SQLite has no credentials; this section is intentionally empty.',
+        max_length=0,
+    )
+    optional: SQLiteOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class NotionInput(CoreInput):
+    type: Literal['NOTION'] = Field(..., description='Type of the asset or source')
+    required: NotionRequired
+    masked: NotionMasked
+    optional: NotionOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
 
 
 class DeltaLakeOptional(BaseModel):
@@ -5556,6 +5408,7 @@ class DeltaLakeInput(CoreInput):
         True,
         description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
     )
+    augmentation: AugmentationConfig | None = None
 
 
 class IcebergOptional(BaseModel):
@@ -5585,6 +5438,254 @@ class IcebergInput(CoreInput):
         True,
         description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
     )
+    augmentation: AugmentationConfig | None = None
+
+
+class KafkaInput(CoreInput):
+    type: Literal['KAFKA'] = Field(..., description='Type of the asset or source')
+    required: (
+        NoAuthentication
+        | SASLUsernamePassword
+        | ClientCertificateMTLS
+        | KafkaRESTProxyUsernamePassword
+    ) = Field(..., title='KafkaRequired')
+    masked: (
+        NoAuthentication1
+        | SASLUsernamePassword1
+        | ClientCertificateMTLS1
+        | KafkaRESTProxyUsernamePassword1
+        | None
+    ) = Field(None, title='KafkaMasked')
+    optional: KafkaOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class ElasticsearchInput(CoreInput):
+    type: Literal['ELASTICSEARCH'] = Field(
+        ..., description='Type of the asset or source'
+    )
+    required: NoAuthentication2 | BasicUsernamePassword | APIKeyBearerToken = Field(
+        ..., title='ElasticsearchRequired'
+    )
+    masked: NoAuthentication3 | BasicUsernamePassword1 | APIKeyBearerToken1 | None = (
+        Field(None, title='ElasticsearchMasked')
+    )
+    optional: ElasticsearchOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class OpenSearchInput(CoreInput):
+    type: Literal['OPENSEARCH'] = Field(..., description='Type of the asset or source')
+    required: NoAuthentication2 | BasicUsernamePassword | APIKeyBearerToken = Field(
+        ..., title='OpenSearchRequired'
+    )
+    masked: NoAuthentication3 | BasicUsernamePassword1 | APIKeyBearerToken1 | None = (
+        Field(None, title='OpenSearchMasked')
+    )
+    optional: OpenSearchOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class MeilisearchInput(CoreInput):
+    type: Literal['MEILISEARCH'] = Field(..., description='Type of the asset or source')
+    required: NoAuthentication4 | APIKeyBearerToken2 = Field(
+        ..., title='MeilisearchRequired'
+    )
+    masked: NoAuthentication5 | APIKeyBearerToken3 | None = Field(
+        None, title='MeilisearchMasked'
+    )
+    optional: MeilisearchOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class Microsoft365Input(CoreInput):
+    type: Literal['MICROSOFT_365'] = Field(
+        ..., description='Type of the asset or source'
+    )
+    required: (
+        Microsoft365RequiredClientSecret
+        | Microsoft365RequiredCertificate
+        | Microsoft365RequiredManagedIdentity
+    ) = Field(..., title='Microsoft365Required')
+    masked: (
+        Microsoft365MaskedClientSecret
+        | Microsoft365MaskedCertificate
+        | Microsoft365MaskedManagedIdentity
+    ) = Field(..., title='Microsoft365Masked')
+    optional: Microsoft365Optional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class GoogleWorkspaceInput(CoreInput):
+    type: Literal['GOOGLE_WORKSPACE'] = Field(
+        ..., description='Type of the asset or source'
+    )
+    required: GoogleWorkspaceRequiredServiceAccount | GoogleWorkspaceRequiredOAuth = (
+        Field(..., title='GoogleWorkspaceRequired')
+    )
+    masked: GoogleWorkspaceMaskedServiceAccount | GoogleWorkspaceMaskedOAuth = Field(
+        ..., title='GoogleWorkspaceMasked'
+    )
+    optional: GoogleWorkspaceOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class DropboxInput(CoreInput):
+    type: Literal['DROPBOX'] = Field(..., description='Type of the asset or source')
+    required: (
+        DropboxOAuthRefreshTokenRecommended
+        | DropboxOAuthWithPKCENoAppSecret
+        | DropboxAccessTokenShortLivedTestingOnly
+    ) = Field(..., title='DropboxRequired')
+    masked: DropboxMaskedOAuth | DropboxMaskedOAuthPkce | DropboxMaskedAccessToken = (
+        Field(..., title='DropboxMasked')
+    )
+    optional: DropboxOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class HuggingFaceInput(CoreInput):
+    type: Literal['HUGGING_FACE'] = Field(
+        ..., description='Type of the asset or source'
+    )
+    required: HuggingFaceRequired
+    masked: HuggingFaceMasked
+    optional: HuggingFaceOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class GitInput(CoreInput):
+    type: Literal['GIT'] = Field(..., description='Type of the asset or source')
+    required: GitRequired
+    masked: GitMasked | None = None
+    optional: GitOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
 
 
 class CustomOptional(BaseModel):
@@ -5633,6 +5734,55 @@ class CustomInput(CoreInput):
         True,
         description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
     )
+    augmentation: AugmentationConfig | None = None
+
+
+class YouTubeInput(CoreInput):
+    type: Literal['YOUTUBE'] = Field(..., description='Type of the asset or source')
+    required: YouTubeRequired
+    masked: YouTubeMasked | None = None
+    optional: YouTubeOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class RedditInput(CoreInput):
+    type: Literal['REDDIT'] = Field(..., description='Type of the asset or source')
+    required: (
+        RedditRequiredReadOnly | RedditRequiredScript | RedditRequiredRefreshToken
+    ) = Field(..., title='RedditRequired')
+    masked: RedditMaskedReadOnly | RedditMaskedScript | RedditMaskedRefreshToken = (
+        Field(..., title='RedditMasked')
+    )
+    optional: RedditOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
 
 
 class SourceInput(

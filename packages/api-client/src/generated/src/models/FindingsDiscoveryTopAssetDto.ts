@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { FindingsDiscoverySeverityBreakdownDto } from './FindingsDiscoverySeverityBreakdownDto';
+import {
+    FindingsDiscoverySeverityBreakdownDtoFromJSON,
+    FindingsDiscoverySeverityBreakdownDtoFromJSONTyped,
+    FindingsDiscoverySeverityBreakdownDtoToJSON,
+    FindingsDiscoverySeverityBreakdownDtoToJSONTyped,
+} from './FindingsDiscoverySeverityBreakdownDto';
+
 /**
  * 
  * @export
@@ -68,6 +76,12 @@ export interface FindingsDiscoveryTopAssetDto {
      */
     highestSeverity: FindingsDiscoveryTopAssetDtoHighestSeverityEnum;
     /**
+     * Importance mix of this asset's findings. Already computed to rank the list, so it costs nothing to return and lets the caller draw a per-asset bar.
+     * @type {FindingsDiscoverySeverityBreakdownDto}
+     * @memberof FindingsDiscoveryTopAssetDto
+     */
+    severityCounts: FindingsDiscoverySeverityBreakdownDto;
+    /**
      * 
      * @type {Date}
      * @memberof FindingsDiscoveryTopAssetDto
@@ -98,6 +112,7 @@ export function instanceOfFindingsDiscoveryTopAssetDto(value: object): value is 
     if (!('assetType' in value) || value['assetType'] === undefined) return false;
     if (!('totalFindings' in value) || value['totalFindings'] === undefined) return false;
     if (!('highestSeverity' in value) || value['highestSeverity'] === undefined) return false;
+    if (!('severityCounts' in value) || value['severityCounts'] === undefined) return false;
     return true;
 }
 
@@ -119,6 +134,7 @@ export function FindingsDiscoveryTopAssetDtoFromJSONTyped(json: any, ignoreDiscr
         'sourceType': json['sourceType'] == null ? undefined : json['sourceType'],
         'totalFindings': json['totalFindings'],
         'highestSeverity': json['highestSeverity'],
+        'severityCounts': FindingsDiscoverySeverityBreakdownDtoFromJSON(json['severityCounts']),
         'lastDetectedAt': json['lastDetectedAt'] == null ? undefined : (new Date(json['lastDetectedAt'])),
     };
 }
@@ -142,6 +158,7 @@ export function FindingsDiscoveryTopAssetDtoToJSONTyped(value?: FindingsDiscover
         'sourceType': value['sourceType'],
         'totalFindings': value['totalFindings'],
         'highestSeverity': value['highestSeverity'],
+        'severityCounts': FindingsDiscoverySeverityBreakdownDtoToJSON(value['severityCounts']),
         'lastDetectedAt': value['lastDetectedAt'] == null ? value['lastDetectedAt'] : value['lastDetectedAt'].toISOString(),
     };
 }

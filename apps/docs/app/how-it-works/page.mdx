@@ -29,9 +29,9 @@ graph TD
     Assets --> Findings["Findings<br/>sensitive matches"]
     Findings --> Ranking["Ranking<br/>importance score"]
     Ranking --> Inquiries["Inquiries<br/>standing questions"]
-    Ranking --> Fingerprints["Fingerprints<br/>shared-value links"]
+    Ranking --> Duplicates["Duplicate review<br/>shared-value links"]
     Inquiries --> Cases["Cases<br/>the investigation case file"]
-    Fingerprints --> Cases
+    Duplicates --> Cases
     Glossary["Glossary"] -.-> Cases
     Autopilot["Autopilot"] -.-> Ranking
     Autopilot -.-> Cases
@@ -48,21 +48,21 @@ out of your control; Classifyre reads it in place.
 **2. Scan it.** A scan crawls the source and registers every document or file
 as an **asset**, with metadata like owner, location, and last-changed date.
 
-**3. Detect.** **Detectors** — pattern rules, ML models, or AI-based custom
-detectors — read each asset and raise a **finding** whenever something's worth
-a look, each carrying a **severity** (how bad if real) and a **confidence**
-(how sure the detector is).
+**3. Detect.** **Detectors** — pattern rules, ML models, tags, or AI-based
+custom detectors — read each asset and raise a **finding** whenever something's
+worth a look, each carrying a **priority** (how much it matters, shown in the
+API as `severity`) and a **confidence** (how sure the detector is).
 
-**4. Rank.** Severity alone doesn't say what to look at *first*. A ranking
+**4. Rank.** Priority alone doesn't say what to look at *first*. A ranking
 pass scores each finding's **importance** — how much it looks like a genuine
-lead, independent of severity — using signals like recurrence across
-documents, context quality, and whether it looks like test data. See
-[Ranking & the Semantic Layer](/how-it-works/ranking-and-semantics/).
+lead, independent of the priority the detector assigned — using signals like
+recurrence across documents, context quality, and whether it looks like test
+data. See [Ranking & the Semantic Layer](/how-it-works/ranking-and-semantics/).
 
 **5. Watch and connect.** **Inquiries** are saved questions that keep watching
-for matching findings; **fingerprints** link assets sharing concrete values
+for matching findings; **duplicate matching** links assets sharing concrete values
 like an email or ID — revealing when the same record shows up in several
-systems. See [Connections & Fingerprints](/how-it-works/connections-and-fingerprints/).
+systems. See [Connections & Duplicates](/how-it-works/duplicates-and-similarity/).
 
 **6. Investigate.** A **case** is where the real work happens. Promising
 findings arrive as **leads** — a triage queue you accept into **evidence** or
@@ -84,10 +84,16 @@ logging why, and always subject to the supervision level you choose. See
 
 Two ideas run through the whole product:
 
-- **Severity is not importance.** Severity says how bad a match would be *if
-  real*. Ranking says how much this finding, in context, looks like a genuine
-  lead. A "critical" finding repeated as boilerplate everywhere isn't where
-  you start.
+- **Priority is not importance.** Priority is what the detector asserted about
+  a match — how much this kind of thing matters to you. Ranking says how much
+  this particular finding, in context, looks like a genuine lead. A "critical"
+  finding repeated as boilerplate everywhere isn't where you start.
+
+  Priority is *not* a danger scale. A finding is critical because it is
+  important to the question you are asking — a company approaching insolvency,
+  a shipment routed to the wrong address, a credential where it should not be
+  — not because it is dangerous. The stored values are still
+  `CRITICAL … INFO`; only what they mean changed.
 - **Similarity is not proof.** Two things looking alike — semantically or by
   shared values — is a reason to *look*, not to *conclude*. Every automated
   suggestion, from a ranked finding to an Autopilot-proposed lead, is a
@@ -101,8 +107,8 @@ Two ideas run through the whole product:
 |---|---|
 | [A Tour of the App](/how-it-works/in-the-app/) | Every screen in the app, what it's for, and where to learn more. |
 | [From Documents to Findings](/how-it-works/documents-to-findings/) | Sources, scans, assets, detectors. |
-| [Ranking & the Semantic Layer](/how-it-works/ranking-and-semantics/) | Importance vs severity, recalibration. |
-| [Connections & Fingerprints](/how-it-works/connections-and-fingerprints/) | Shared-value correlation vs semantic similarity. |
+| [Ranking & the Semantic Layer](/how-it-works/ranking-and-semantics/) | Importance vs priority, recalibration. |
+| [Connections & Duplicates](/how-it-works/duplicates-and-similarity/) | Shared-value matching vs semantic similarity, and what lineage adds. |
 | [Leads, Evidence & Events](/how-it-works/investigating/) | Ranked finding to case conclusion. |
 | [Glossary & Shared Vocabulary](/how-it-works/glossary/) | Shared vocabulary for people and AI. |
 | [Autopilot & AI Assistance](/how-it-works/autopilot/) | What the AI agents do, and how to supervise them. |

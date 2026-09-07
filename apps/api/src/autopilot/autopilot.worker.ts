@@ -22,6 +22,7 @@ import { AgentAuditService } from './audit/agent-audit.service';
 import { AgentLoggerService } from './audit/agent-logger.service';
 import { AgentSearchService } from './search/agent-search.service';
 import { HarnessService } from './harness/harness.service';
+import { SupervisorService } from './supervisor/supervisor.service';
 import { AgentRunCancelledError } from './agent-runtime';
 import { AgentConfigService } from './harness/agent-config.service';
 import {
@@ -63,8 +64,10 @@ interface CycleInput {
   trigger: string;
   manual: boolean;
   instruction: string | null;
-  /** Run exactly these pipeline agents (in canonical order), bypassing enable-flags. */
+  /** Run exactly these pipeline agents, in canonical order. */
   only?: AgentKind[] | null;
+  /** The supervisor asked for this cycle: bypasses timing, not enable flags. */
+  commanded?: boolean;
   /** Case-focused run: the case agent works on exactly this case. */
   caseId?: string | null;
   /** Coalesced batch: every source scanned since the last corpus cycle. */
@@ -107,6 +110,7 @@ function isProviderLevelFailure(error: unknown): boolean {
  */
 function cycleTrigger(cycle: CycleInput): CycleTrigger {
   if (cycle.manual) return 'manual';
+  if (cycle.commanded) return 'commanded';
   if (cycle.expressReason) return 'express';
   return 'scan';
 }
@@ -149,6 +153,7 @@ export class AutopilotWorker {
     private readonly harness: HarnessService,
     private readonly embeddings: EmbeddingQueueService,
     private readonly agents: AgentConfigService,
+    private readonly supervisor: SupervisorService,
   ) {}
 
   /**
@@ -270,6 +275,7 @@ export class AutopilotWorker {
       ).filter((k) => typeof k === 'string' && k in AgentKind);
       const only: AgentKind[] | null = requested.length > 0 ? requested : null;
       const corpus = data?.corpus === true;
+      const commanded = data?.commanded === true;
       if (!sourceId && !manual && !only && !corpus) continue;
       // Per-namespace pg-boss (schema pgboss_<slug>) guarantees a job can only
       // be dequeued by its own namespace's worker, so the previous
@@ -281,6 +287,7 @@ export class AutopilotWorker {
         runnerId,
         manual,
         only,
+        commanded,
         corpus,
         expressReason,
         heartbeat: data?.heartbeat === true,
@@ -292,11 +299,13 @@ export class AutopilotWorker {
             : `scan:${sourceId}:${runnerId ?? 'none'}`,
         trigger: manual
           ? 'manual'
-          : expressReason
-            ? 'express'
-            : corpus
-              ? 'corpus'
-              : 'scan_completed',
+          : commanded
+            ? 'supervisor'
+            : expressReason
+              ? 'express'
+              : corpus
+                ? 'corpus'
+                : 'scan_completed',
       });
     }
   }
@@ -432,6 +441,23 @@ export class AutopilotWorker {
         ? `${batchSources.length} newly scanned source(s)`
         : 'all sources';
 
+    // One row per cycle, not one per scan. A corpus cycle already coalesces a
+    // burst of source completions, so publishing here gives the supervisor the
+    // batch as a single fact — which is the shape it can act on, and the shape
+    // that does not exhaust its context on a busy instance.
+    if (batchSources.length > 0) {
+      await this.supervisor.publish({
+        type: 'scan_completed',
+        summary:
+          `${batchSources.length} source(s) finished scanning: ` +
+          `${batchSources
+            .slice(0, 5)
+            .map((b) => b.name)
+            .join(', ')}${batchSources.length > 5 ? ', …' : ''}`,
+        payload: { sourceIds: batchSources.map((b) => b.id) },
+      });
+    }
+
     const scope: CycleScope = {
       batchSources: cycle.corpus ? batchSources : undefined,
       evidenceAnalysisPending,
@@ -554,7 +580,25 @@ export class AutopilotWorker {
           // continuing only spends more calls into a rate limit — abort, and
           // let pg-boss retry the cycle once the provider recovers. Anything
           // else belongs to this agent alone.
-          if (isProviderLevelFailure(error)) throw error;
+          if (isProviderLevelFailure(error)) {
+            await this.supervisor.publish({
+              type: 'provider_error',
+              severity: 'error',
+              summary:
+                `${kind} could not reach the AI provider, so the rest of its chain ` +
+                `was abandoned: ${error instanceof Error ? error.message : String(error)}`,
+              payload: { agentKind: kind },
+            });
+            throw error;
+          }
+          await this.supervisor.publish({
+            type: 'agent_failed',
+            severity: 'warn',
+            summary: `${kind} failed on its own logic: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+            payload: { agentKind: kind },
+          });
           this.logger.warn(
             `Autopilot ${kind} failed; continuing its chain — ${error instanceof Error ? error.message : String(error)}`,
           );
@@ -693,6 +737,16 @@ export class AutopilotWorker {
         run.id,
         `Cycle finished: ${formatSummary(summary)}`,
       );
+      // The supervisor's digest carries the one-line outcome and nothing else.
+      // Its own runs are excluded: an agent narrating itself back to itself is
+      // a loop, not an observation.
+      if (agentKind !== AgentKind.SUPERVISOR) {
+        await this.supervisor.publish({
+          type: 'agent_finished',
+          summary: `${agentKind}: ${formatSummary(summary)}`,
+          payload: { agentKind, runId: run.id, applied: summary.applied },
+        });
+      }
       this.logger.log(
         `${agentKind} agent run ${run.id} completed: ${formatSummary(summary)}`,
       );

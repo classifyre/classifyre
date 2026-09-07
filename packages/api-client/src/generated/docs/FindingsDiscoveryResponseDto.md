@@ -9,6 +9,7 @@ Name | Type
 `windowDays` | number
 `includeResolved` | boolean
 `totals` | [FindingsDiscoveryTotalsDto](FindingsDiscoveryTotalsDto.md)
+`statusMix` | [FindingsDiscoveryStatusMixDto](FindingsDiscoveryStatusMixDto.md)
 `activity` | [FindingsDiscoveryActivityDto](FindingsDiscoveryActivityDto.md)
 `topAssets` | [Array&lt;FindingsDiscoveryTopAssetDto&gt;](FindingsDiscoveryTopAssetDto.md)
 `recentRuns` | [Array&lt;DiscoveryRecentRunDto&gt;](DiscoveryRecentRunDto.md)
@@ -24,6 +25,7 @@ const example = {
   "windowDays": null,
   "includeResolved": null,
   "totals": null,
+  "statusMix": null,
   "activity": null,
   "topAssets": null,
   "recentRuns": null,

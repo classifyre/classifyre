@@ -26,6 +26,7 @@ import { api, type AiProviderConfigResponseDto } from "@workspace/api-client";
 import { AiProviderForm } from "@/components/ai-provider-form";
 import { VerticalCustomDetectorStepperNav } from "@/components/custom-detector-stepper";
 import { useTranslation } from "@/hooks/use-translation";
+import { preserveDetectorScope } from "@/lib/detector-scope";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -345,7 +346,10 @@ export const LLMDetectorEditor = React.forwardRef<
       description: form.description,
       isActive: form.isActive,
       aiProviderConfigId: form.aiProviderConfigId,
-      pipelineSchema: buildPipelineSchema(form),
+      pipelineSchema: preserveDetectorScope(
+        initialPipelineSchema,
+        buildPipelineSchema(form),
+      ),
     });
   }
 

@@ -21,9 +21,13 @@ const PIPELINE_REQUIREMENTS = [
   'GLINER2 → entities{<label>:{description}} and/or classification{<task>:{labels[]}}',
   'LLM → system_prompt + labels[] (and an aiProviderConfigId; never provider_runtime)',
   'TEXT_CLASSIFICATION / IMAGE_CLASSIFICATION / OBJECT_DETECTION → model (HuggingFace id; IMAGE_CLASSIFICATION has a default)',
+  'TAG → not authorable here: a TAG detector runs nothing and only records a fact a CUSTOM connector notebook asserts, so it can never find anything you have not already been told',
 ].join('; ');
 
-/** Pipeline engines the agent may author, used for the examples filter enum. */
+/** Pipeline engines the agent may author, used for the examples filter enum.
+ * TAG is deliberately absent: it detects nothing, and only a human writing a
+ * CUSTOM connector notebook can supply the value that makes it produce a
+ * finding. */
 const PIPELINE_TYPES = [
   'REGEX',
   'GLINER2',

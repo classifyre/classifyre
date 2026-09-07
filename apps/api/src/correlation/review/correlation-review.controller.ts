@@ -9,10 +9,12 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AllowInDemoMode } from '../../demo-mode.decorator';
 import { CorrelationReviewService } from './correlation-review.service';
 import {
   PatternActionDto,
   PatternApplyResponseDto,
+  PatternExclusionCandidatesResponseDto,
   PatternPreviewResponseDto,
   RecordVerdictDto,
   RecordVerdictResponseDto,
@@ -254,6 +256,7 @@ export class CorrelationReviewController {
 
   @Post('patterns/:patternKey/preview')
   @HttpCode(HttpStatus.OK)
+  @AllowInDemoMode()
   @ApiOperation({
     summary: 'What a bulk action would do. Read-only — nothing is applied.',
   })
@@ -263,6 +266,20 @@ export class CorrelationReviewController {
     @Body() dto: PatternActionDto,
   ): Promise<PatternPreviewResponseDto> {
     return this.review.previewPattern(patternKey, dto);
+  }
+
+  @Get('patterns/:patternKey/exclusion-candidates')
+  @AllowInDemoMode()
+  @ApiOperation({
+    summary: 'The values inside a near-duplicate text group, and their reach',
+    description:
+      'What an exclusion on this pattern would actually stop matching. Empty for any pattern whose rule kind is not EXCLUSION — the other kinds have no template to read values out of. Read-only.',
+  })
+  @ApiResponse({ status: 200, type: PatternExclusionCandidatesResponseDto })
+  async exclusionCandidates(
+    @Param('patternKey') patternKey: string,
+  ): Promise<PatternExclusionCandidatesResponseDto> {
+    return this.review.exclusionCandidates(patternKey);
   }
 
   @Post('patterns/:patternKey/apply')

@@ -5,6 +5,7 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**graphControllerColumnLineage**](GraphApi.md#graphcontrollercolumnlineage) | **POST** /graph/lineage/column | Trace one column back through the transformations that produced it |
+| [**graphControllerConstellationMap**](GraphApi.md#graphcontrollerconstellationmap) | **GET** /graph/constellation | How this workspace\&#39;s sources connect |
 | [**graphControllerCreateManualEdge**](GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type) |
 | [**graphControllerDeleteEdge**](GraphApi.md#graphcontrollerdeleteedge) | **DELETE** /graph/edges/{id} | Delete an edge |
 | [**graphControllerExpand**](GraphApi.md#graphcontrollerexpand) | **POST** /graph/expand | Expand the graph around a seed entity (recursive traversal) |
@@ -73,6 +74,65 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## graphControllerConstellationMap
+
+> ConstellationResponseDto graphControllerConstellationMap()
+
+How this workspace\&#39;s sources connect
+
+One bubble per source, one line per source pairing split by edge class, and the assets whose edges actually leave their own source. Assets connected to nothing are never returned — they are a count on their source, which is what keeps this response the same size on a workspace with two thousand assets and one with two million. There is no limit parameter and nothing is truncated: a pairing carrying an unusual number of boundary assets folds into a bundle that expands on demand. Served from a pre-aggregated map; when that has never been built the sources come back empty-handed and a rebuild is queued.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GraphApi,
+} from '@workspace/api-client';
+import type { GraphControllerConstellationMapRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GraphApi();
+
+  try {
+    const data = await api.graphControllerConstellationMap();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**ConstellationResponseDto**](ConstellationResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
 - **Accept**: `application/json`
 
 

@@ -7,9 +7,11 @@
 Name | Type
 ------------ | -------------
 `revision` | number
+`baseRevision` | number
 `mode` | string
 `targetCellId` | string
 `maxAssets` | number
+`scope` | string
 
 ## Example
 
@@ -19,9 +21,11 @@ import type { CreateNotebookExecutionDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "revision": null,
+  "baseRevision": null,
   "mode": null,
   "targetCellId": null,
   "maxAssets": null,
+  "scope": null,
 } satisfies CreateNotebookExecutionDto
 
 console.log(example)

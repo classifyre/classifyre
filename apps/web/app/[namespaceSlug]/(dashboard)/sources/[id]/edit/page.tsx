@@ -67,7 +67,7 @@ import {
   listSourceFiles,
   uploadSourceFile,
 } from "@/lib/source-files-api";
-import { Eye, Play } from "lucide-react";
+import { Eye, FlaskConical, Play } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 
 const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
@@ -129,6 +129,10 @@ export default function EditSourcePage() {
         setIsLoading(true);
         const data = await api.sources.sourcesControllerGetSource({
           id: sourceId,
+          // The editor is the one caller that genuinely needs the cells
+          // inlined. Everyone else gets `{ revision, cellCount }` — the whole
+          // connector program is many kilobytes and most reads discard it.
+          include: "notebook",
         });
         if (!data) {
           throw new Error("Source not found");
@@ -902,12 +906,13 @@ function SourceEditStepperContent({
    * version, which is worse than refusing.
    */
   const saveThenRun = (
-    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    mode: "cell" | "all" | "test_connection" | "preview_extract" | "preview_augment",
     targetCellId?: string,
+    scope?: "connector" | "augmentation",
   ) =>
     withValidFormData(async (data) => {
       await onSave(data);
-      await sourceFormRef.current?.runNotebook(mode, targetCellId);
+      await sourceFormRef.current?.runNotebook(mode, targetCellId, scope);
     });
 
   return (
@@ -955,6 +960,9 @@ function SourceEditStepperContent({
                   onFilesChange={onUploadedFilesChange}
                   onNotebookBusyChange={setNotebookBusy}
                   onRunCell={(cellId) => void saveThenRun("cell", cellId)}
+                  onAugmentationRunCell={(cellId) =>
+                    void saveThenRun("cell", cellId, "augmentation")
+                  }
                   customSectionRef={(id, element) => {
                     if (element) customSectionsRef.current.set(id, element);
                     else customSectionsRef.current.delete(id);
@@ -1018,30 +1026,44 @@ function SourceEditStepperContent({
             disabled={!hasRequiredFiles}
             className="mt-0"
             extraActions={
-              isCustom ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void saveThenRun("all")}
-                    disabled={isSavingConfig || isTestingConfig || notebookBusy}
-                    data-testid="notebook-run-all"
-                  >
-                    <Play className="mr-2 h-4 w-4" />
-                    {t("notebook.runAll")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void saveThenRun("preview_extract")}
-                    disabled={isSavingConfig || isTestingConfig || notebookBusy}
-                    data-testid="notebook-preview"
-                  >
-                    <Eye className="mr-2 h-4 w-4" />
-                    {t("notebook.previewExtract")}
-                  </Button>
-                </>
-              ) : null
+              <>
+                {isCustom ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void saveThenRun("all")}
+                      disabled={isSavingConfig || isTestingConfig || notebookBusy}
+                      data-testid="notebook-run-all"
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      {t("notebook.runAll")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void saveThenRun("preview_extract")}
+                      disabled={isSavingConfig || isTestingConfig || notebookBusy}
+                      data-testid="notebook-preview"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      {t("notebook.previewExtract")}
+                    </Button>
+                  </>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    void saveThenRun("preview_augment", undefined, "augmentation")
+                  }
+                  disabled={isSavingConfig || isTestingConfig || notebookBusy}
+                  data-testid="augmentation-run-sample"
+                >
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                  {t("augmentation.runSample")}
+                </Button>
+              </>
             }
           />
         </div>

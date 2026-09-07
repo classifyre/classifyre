@@ -29,11 +29,37 @@ import {
 import { InternalOnly } from '../internal-only.decorator';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
+import { ConstellationService } from '../constellation.service';
+import { ConstellationResponseDto } from '../dto/constellation.dto';
 
 @ApiTags('graph')
 @Controller('graph')
 export class GraphController {
-  constructor(private readonly graphService: GraphService) {}
+  constructor(
+    private readonly graphService: GraphService,
+    private readonly constellation: ConstellationService,
+  ) {}
+
+  @AllowInDemoMode()
+  @ReadOnlyEndpoint()
+  @Get('constellation')
+  @ApiOperation({
+    summary: 'How this workspace\'s sources connect',
+    description:
+      'One bubble per source, one line per source pairing split by edge class, ' +
+      'and the assets whose edges actually leave their own source. ' +
+      'Assets connected to nothing are never returned — they are a count on ' +
+      'their source, which is what keeps this response the same size on a ' +
+      'workspace with two thousand assets and one with two million. There is ' +
+      'no limit parameter and nothing is truncated: a pairing carrying an ' +
+      'unusual number of boundary assets folds into a bundle that expands on ' +
+      'demand. Served from a pre-aggregated map; when that has never been ' +
+      'built the sources come back empty-handed and a rebuild is queued.',
+  })
+  @ApiResponse({ status: 200, type: ConstellationResponseDto })
+  async constellationMap(): Promise<ConstellationResponseDto> {
+    return this.constellation.getMap();
+  }
 
   @AllowInDemoMode()
   @ReadOnlyEndpoint()

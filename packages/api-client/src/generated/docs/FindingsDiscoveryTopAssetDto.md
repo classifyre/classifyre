@@ -14,6 +14,7 @@ Name | Type
 `sourceType` | string
 `totalFindings` | number
 `highestSeverity` | string
+`severityCounts` | [FindingsDiscoverySeverityBreakdownDto](FindingsDiscoverySeverityBreakdownDto.md)
 `lastDetectedAt` | Date
 
 ## Example
@@ -31,6 +32,7 @@ const example = {
   "sourceType": null,
   "totalFindings": null,
   "highestSeverity": null,
+  "severityCounts": null,
   "lastDetectedAt": null,
 } satisfies FindingsDiscoveryTopAssetDto
 

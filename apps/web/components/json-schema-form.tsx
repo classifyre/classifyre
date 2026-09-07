@@ -76,6 +76,11 @@ import {
   type ScheduleValue,
 } from "@/components/schedule-card";
 import { SamplingCard, type SamplingValue } from "@/components/sampling-card";
+import {
+  AugmentationAccordionBody,
+  type AugmentationEditorHandle,
+  type AugmentationValue,
+} from "@/components/notebook/augmentation-config";
 
 const LONG_TEXT_THRESHOLD = 120;
 
@@ -609,17 +614,34 @@ function collectDefaults(schema: JSONSchema7): unknown {
   // react-hook-form crash (Cannot read properties of undefined (reading 'mount')).
 
   if (isObjectSchema(schema) && schema.properties) {
+    const required = schema.required || [];
     const obj: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(schema.properties)) {
-      const defaults = collectDefaults(value as JSONSchema7);
-      if (defaults !== undefined) {
-        obj[key] = defaults;
+      const propSchema = value as JSONSchema7;
+      const defaults = collectDefaults(propSchema);
+      if (defaults === undefined) continue;
+      // A property that isn't required here is free to stay unset, so only
+      // seed it when its own synthesized default satisfies ITS required
+      // fields too -- an optional "notebook" object whose required "cells"
+      // array has no default would otherwise fail validation the moment
+      // this partial default gets set. A required property is always kept:
+      // the caller's explicit overrides (name/type/sampling, ...) are
+      // expected to complete it, not the schema defaults alone.
+      if (!required.includes(key) && !satisfiesOwnRequired(propSchema, defaults)) {
+        continue;
       }
+      obj[key] = defaults;
     }
     return Object.keys(obj).length > 0 ? obj : undefined;
   }
 
   return undefined;
+}
+
+function satisfiesOwnRequired(schema: JSONSchema7, value: unknown): boolean {
+  if (!isPlainObject(value)) return true;
+  const required = schema.required || [];
+  return required.every((key) => value[key] !== undefined);
 }
 
 function mergeDefaults(
@@ -2197,6 +2219,14 @@ export interface JsonSchemaFormProps {
   cancelLabel?: string;
   showCancel?: boolean;
   disabled?: boolean;
+  /** Present on the edit page; the augmentation editor needs it for executions. */
+  sourceId?: string;
+  /** Receives the augmentation editor's handle so the page can run it. */
+  augmentationEditorRef?: React.RefObject<AugmentationEditorHandle | null>;
+  /** A cell's play button inside the augmentation editor. */
+  onAugmentationRunCell?: (cellId: string) => void;
+  /** Told when the augmentation editor starts/stops executing. */
+  onAugmentationBusyChange?: (busy: boolean) => void;
   assistantSourceType?: string;
   schedule?: ScheduleValue;
   onScheduleChange?: (value: ScheduleValue) => void;
@@ -2274,6 +2304,10 @@ export const JsonSchemaForm = React.forwardRef<
     cancelLabel,
     showCancel = true,
     disabled = false,
+    sourceId,
+    augmentationEditorRef,
+    onAugmentationRunCell,
+    onAugmentationBusyChange,
     assistantSourceType,
     schedule,
     autoScheduleStatus,
@@ -2412,6 +2446,7 @@ export const JsonSchemaForm = React.forwardRef<
   const maskedBlock = getBlockEntry(["masked", "masked_fields"]);
   const optionalBlock = getBlockEntry(["optional", "optional_fields"]);
   const samplingBlock = getBlockEntry(["sampling"]);
+  const augmentationBlock = getBlockEntry(["augmentation"]);
   const resourcesBlock = getBlockEntry(["resources"]);
 
   // Detect coupled auth: both required and masked are parallel oneOf unions where
@@ -2491,6 +2526,7 @@ export const JsonSchemaForm = React.forwardRef<
       maskedBlock?.key,
       optionalBlock?.key,
       samplingBlock?.key,
+      augmentationBlock?.key,
       resourcesBlock?.key,
     ].filter(Boolean) as string[],
   );
@@ -2952,6 +2988,31 @@ export const JsonSchemaForm = React.forwardRef<
                 isTabular={isTabular}
                 disabled={disabled}
               />
+            )}
+          />
+        )}
+
+        {augmentationBlock && (
+          <FormField
+            control={form.control}
+            name={augmentationBlock.key}
+            render={({ field }) => (
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="augmentation" className="border-none">
+                  <AccordionTrigger className="py-2 text-sm font-medium">
+                    {t("augmentation.sectionTitle")}
+                  </AccordionTrigger>
+                  <AugmentationAccordionBody
+                    sourceId={sourceId}
+                    value={field.value as AugmentationValue | undefined}
+                    onChange={field.onChange}
+                    disabled={disabled}
+                    editorRef={augmentationEditorRef}
+                    onBusyChange={onAugmentationBusyChange}
+                    onRunCell={onAugmentationRunCell}
+                  />
+                </AccordionItem>
+              </Accordion>
             )}
           />
         )}

@@ -102,7 +102,8 @@ export const UpdateMcpServerDtoAgentKindsEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT'
+    Chat: 'CHAT',
+    Supervisor: 'SUPERVISOR'
 } as const;
 export type UpdateMcpServerDtoAgentKindsEnum = typeof UpdateMcpServerDtoAgentKindsEnum[keyof typeof UpdateMcpServerDtoAgentKindsEnum];
 

@@ -149,6 +149,30 @@ export interface RunnerDto {
      */
     detectorRunsSkipped: number;
     /**
+     * Relationship edges this run emitted and the API resolved.
+     * @type {number}
+     * @memberof RunnerDto
+     */
+    relationshipsEmitted: number;
+    /**
+     * Relationship passes that raised inside the connector's own code. Counts passes, not edges — a pass that failed never got to say how many edges it would have produced. Any non-zero value makes the run WARNING: lineage can otherwise be entirely absent from a green run.
+     * @type {number}
+     * @memberof RunnerDto
+     */
+    relationshipsFailed: number;
+    /**
+     * Edges the connector assembled and could not send. Also makes the run WARNING.
+     * @type {number}
+     * @memberof RunnerDto
+     */
+    relationshipsLost: number;
+    /**
+     * Edges accepted with an endpoint that could not be resolved. Routinely the other half of a cross-source edge that has not been ingested yet, so this never downgrades a run on its own.
+     * @type {number}
+     * @memberof RunnerDto
+     */
+    relationshipsDropped: number;
+    /**
      * Fingerprint of the scope-determining config this run covered. Runs sharing a fingerprint are directly comparable.
      * @type {string}
      * @memberof RunnerDto
@@ -275,6 +299,10 @@ export function instanceOfRunnerDto(value: object): value is RunnerDto {
     if (!('assetsOutOfScope' in value) || value['assetsOutOfScope'] === undefined) return false;
     if (!('assetsSkippedCached' in value) || value['assetsSkippedCached'] === undefined) return false;
     if (!('detectorRunsSkipped' in value) || value['detectorRunsSkipped'] === undefined) return false;
+    if (!('relationshipsEmitted' in value) || value['relationshipsEmitted'] === undefined) return false;
+    if (!('relationshipsFailed' in value) || value['relationshipsFailed'] === undefined) return false;
+    if (!('relationshipsLost' in value) || value['relationshipsLost'] === undefined) return false;
+    if (!('relationshipsDropped' in value) || value['relationshipsDropped'] === undefined) return false;
     if (!('totalFindings' in value) || value['totalFindings'] === undefined) return false;
     if (!('findingsCreated' in value) || value['findingsCreated'] === undefined) return false;
     if (!('findingsResolved' in value) || value['findingsResolved'] === undefined) return false;
@@ -312,6 +340,10 @@ export function RunnerDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean):
         'assetsOutOfScope': json['assetsOutOfScope'],
         'assetsSkippedCached': json['assetsSkippedCached'],
         'detectorRunsSkipped': json['detectorRunsSkipped'],
+        'relationshipsEmitted': json['relationshipsEmitted'],
+        'relationshipsFailed': json['relationshipsFailed'],
+        'relationshipsLost': json['relationshipsLost'],
+        'relationshipsDropped': json['relationshipsDropped'],
         'scopeFingerprint': json['scopeFingerprint'] == null ? undefined : json['scopeFingerprint'],
         'totalFindings': json['totalFindings'],
         'findingsCreated': json['findingsCreated'],
@@ -357,6 +389,10 @@ export function RunnerDtoToJSONTyped(value?: RunnerDto | null, ignoreDiscriminat
         'assetsOutOfScope': value['assetsOutOfScope'],
         'assetsSkippedCached': value['assetsSkippedCached'],
         'detectorRunsSkipped': value['detectorRunsSkipped'],
+        'relationshipsEmitted': value['relationshipsEmitted'],
+        'relationshipsFailed': value['relationshipsFailed'],
+        'relationshipsLost': value['relationshipsLost'],
+        'relationshipsDropped': value['relationshipsDropped'],
         'scopeFingerprint': value['scopeFingerprint'],
         'totalFindings': value['totalFindings'],
         'findingsCreated': value['findingsCreated'],

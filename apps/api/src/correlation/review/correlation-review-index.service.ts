@@ -235,20 +235,46 @@ export class CorrelationReviewIndexService {
     const roots = await this.upstreamRoots();
     const computedAt = new Date();
 
+    // An edge endpoint is not proof that the asset still exists. `edges` is
+    // polymorphic (an endpoint can be an unresolved external URN), so it
+    // carries no foreign key and nothing removes an edge when the asset it
+    // names is deleted. `asset_lineage_profiles.asset_id` DOES have one, so a
+    // single stale edge made this whole rebuild fail with
+    // `P2003 asset_lineage_profiles_asset_id_fkey` — permanently, for the
+    // entire namespace, behind "An unexpected database error occurred".
+    //
+    // Filtering here rather than only fixing the delete path is deliberate:
+    // this heals estates already carrying stale edges, whatever produced them.
     const ids = Array.from(degree.keys());
-    const rows = ids.map((assetId) => {
-      const root = uf.find(assetId);
-      return {
-        assetId,
-        degree: degree.get(assetId) ?? 0,
-        // A component that swallows the corpus explains nothing, so it is
-        // recorded as no component at all rather than as a shared origin.
-        componentId: hairball && sizes.get(root) === largest ? null : root,
-        componentSize: sizes.get(root) ?? 1,
-        upstreamRoots: roots.get(assetId) ?? [],
-        computedAt,
-      };
-    });
+    const live = new Set(
+      (
+        await this.prisma.asset.findMany({
+          where: { id: { in: ids } },
+          select: { id: true },
+        })
+      ).map((a) => a.id),
+    );
+    if (live.size < ids.length) {
+      this.logger.warn(
+        `${ids.length - live.size} lineage edge endpoint(s) name assets that no ` +
+          'longer exist; skipping them. Edges outlive the assets they point at.',
+      );
+    }
+    const rows = ids
+      .filter((assetId) => live.has(assetId))
+      .map((assetId) => {
+        const root = uf.find(assetId);
+        return {
+          assetId,
+          degree: degree.get(assetId) ?? 0,
+          // A component that swallows the corpus explains nothing, so it is
+          // recorded as no component at all rather than as a shared origin.
+          componentId: hairball && sizes.get(root) === largest ? null : root,
+          componentSize: sizes.get(root) ?? 1,
+          upstreamRoots: roots.get(assetId) ?? [],
+          computedAt,
+        };
+      });
 
     // Truncate and repopulate together. Split apart, a failure between them
     // leaves every asset looking like it has no lineage at all, which the 2x2

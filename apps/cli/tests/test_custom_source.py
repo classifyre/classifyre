@@ -174,6 +174,49 @@ def test_checksum_changes_when_content_changes(source) -> None:
     assert first.checksum != second.checksum
 
 
+# -- tags --------------------------------------------------------------------
+
+
+TAGGING_NOTEBOOK = """from classifyre import Asset
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS", "message": "Ready."}
+
+
+def extract():
+    yield Asset(
+        id="tbl-1",
+        name="transactions",
+        content="card_last4,amount",
+        kind="table",
+        tags={"cardholder_data": "primary-account-numbers"},
+    )
+"""
+
+
+def test_tags_reach_the_source_from_the_notebook(source) -> None:
+    instance = source(build_recipe(TAGGING_NOTEBOOK))
+    asset = collect(instance)[0]
+    assert instance.asset_tags(asset.hash) == {"cardholder_data": "primary-account-numbers"}
+
+
+def test_an_untagged_asset_reports_no_tags(source) -> None:
+    instance = source()
+    asset = collect(instance)[0]
+    assert instance.asset_tags(asset.hash) == {}
+
+
+def test_checksum_changes_when_only_a_tag_changes(source) -> None:
+    # Without tags in the checksum the scan cache skips the asset and the new
+    # tag never becomes a finding -- the whole feature silently stops working.
+    first = collect(source(build_recipe(TAGGING_NOTEBOOK)))[0]
+    changed = TAGGING_NOTEBOOK.replace("primary-account-numbers", "tokenized-pan")
+    second = collect(source(build_recipe(changed)))[0]
+    assert first.hash == second.hash
+    assert first.checksum != second.checksum
+
+
 # -- content -----------------------------------------------------------------
 
 
@@ -203,6 +246,78 @@ def test_latest_strategy_is_bounded_by_the_page_size(source) -> None:
     recipe = build_recipe(counting_notebook(25))
     recipe["sampling"] = {"strategy": "LATEST", "rows_per_page": 10}
     assert len(collect(source(recipe))) == 10
+
+
+PARTIAL_COVERAGE_NOTEBOOK = """from classifyre import Asset, ctx
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS"}
+
+
+def extract():
+    ctx.set_partial_coverage("walks one slice of the register per run")
+    yield Asset(id="rec-1", name="Record 1", content="body")
+"""
+
+
+def test_a_cohort_connector_can_declare_partial_coverage(source) -> None:
+    """Absence must stop implying deletion when the run only looked at a slice.
+
+    Under strategy=ALL the platform retires every asset a run did not see. A
+    connector that chooses its own cohort each run never sees the rest of the
+    source, and the sampling strategy cannot say so on its behalf -- it
+    describes what the runtime does with the stream, not how much of the source
+    was asked for.
+    """
+    instance = source(build_recipe(PARTIAL_COVERAGE_NOTEBOOK))
+    assert instance.partial_coverage is False
+    collect(instance)
+    assert instance.partial_coverage is True
+    assert "one slice" in instance.partial_coverage_reason
+
+
+def test_an_ordinary_connector_does_not_declare_partial_coverage(source) -> None:
+    instance = source()
+    collect(instance)
+    assert instance.partial_coverage is False
+
+
+def test_the_custom_source_opts_into_the_scan_cache(source) -> None:
+    """A notebook re-yields its whole cohort every run.
+
+    Without the cache every re-yielded asset is re-detected from scratch: the
+    Firmenbuch AI source burned 68 minutes a run re-analysing 326 unchanged
+    filings, and the PDF source 67 minutes re-converting 672 unchanged
+    documents. Detection is where a notebook run's time goes.
+    """
+    instance = source()
+    assert instance.SUPPORTS_SCAN_CACHE is True
+    # metadata mode is only sound because the checksum is a real content
+    # digest; see the class comment.
+    assert instance.scan_cache_verification_mode() == "metadata"
+
+
+def test_the_checksum_covers_fetched_bytes(source) -> None:
+    """Two files whose extracted text matches must not share a checksum.
+
+    The text in the checksum is what the parser produced, not what was
+    fetched — so without the raw-byte digest a metadata-mode cache could skip a
+    genuinely different document.
+    """
+    notebook = """from classifyre import Asset
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS"}
+
+
+def extract():
+    yield Asset(id="doc", name="doc", content_bytes=BYTES, mime_type="text/plain")
+"""
+    first = collect(source(build_recipe(notebook.replace("BYTES", "b'alpha'"))))
+    second = collect(source(build_recipe(notebook.replace("BYTES", "b'beta '"))))
+    assert first[0].checksum != second[0].checksum
 
 
 def test_max_assets_limit_is_enforced(source) -> None:

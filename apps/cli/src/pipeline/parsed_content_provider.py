@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
 from ..sources.base import BaseSource
@@ -67,7 +67,21 @@ class ParsedContentProvider:
             yield page
 
     async def fetch_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
+        # Augmentation may already have fetched these bytes (asset.payload()).
+        # Reuse them instead of re-downloading: the memo is run-scoped and
+        # bounded, and evicted with the asset at the end of processing.
+        peek = getattr(self._source, "peek_augmentation_bytes", None)
+        if callable(peek):
+            try:
+                memoized = peek(asset_id)
+            except Exception:
+                memoized = None
+            if memoized is not None:
+                return memoized
         return await self._source.fetch_content_bytes(asset_id)
+
+    def asset_tags(self, asset_hash: str) -> Mapping[str, str]:
+        return self._source.asset_tags(asset_hash)
 
     def enrich_finding_location(
         self,

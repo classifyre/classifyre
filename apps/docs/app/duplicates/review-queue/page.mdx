@@ -1,0 +1,178 @@
+---
+title: The Review Queue
+description: Level 1 of duplicate review — pairs remaining, the duplicate rate, the score distribution and its two cutoffs, the pattern list, and where duplicates come from.
+---
+
+# The Review Queue
+
+The first screen of **Duplicate review**. It answers one question — *how much
+work is there, and which part of it is worth doing first?* — and hands you off
+to a pattern.
+
+The layout is constant across every section: **the work on the left, the
+instruments on the right.** Moving between sections never rearranges the page
+under you.
+
+---
+
+## Pairs remaining
+
+The headline number, and the one everything else is measured against.
+
+> **Pairs remaining** = matched pairs inside your review band that nobody has
+> decided yet.
+
+Three things are worth knowing about it:
+
+- It counts **pairs**, not clusters or assets. A pair is one decision.
+- It only counts what's **inside the band** — see [cutoffs](#the-two-cutoffs)
+  below. Move a cutoff and this number moves with it.
+- Decisions taken by an **agent are counted separately**, so an agent clearing
+  the safe band can't make the queue look like a person worked through it. See
+  [AI Agents & Duplicates](/duplicates/ai-agents/).
+
+Underneath it sits the **duplicate rate**.
+
+> **Duplicate rate** = assets appearing in at least one matched pair ÷ all
+> assets in the workspace.
+
+A count of clusters means nothing without a denominator. "4,100 duplicate
+clusters" sounds alarming until you learn it's out of two million assets — or
+terrifying when it's out of nine thousand. The rate is the honest version, and
+it's the number to quote to anyone who didn't run the scan.
+
+---
+
+## Where the matches stand
+
+A three-part strip that splits every matched pair into the bands your cutoffs
+define:
+
+| Band | Meaning | What you do |
+|---|---|---|
+| **Above your merge cutoff** | Strong enough that a person adds nothing | Nothing — treat as duplicates |
+| **Needs your review** | The actual queue | Work it, pattern by pattern |
+| **Below your review cutoff** | Too little in common to matter | Nothing — treated as rejected |
+
+The shape of this strip is diagnostic on its own:
+
+- **Almost everything above the merge cutoff** — the matcher is being generous,
+  or you have a genuine mass-duplication problem. Check a few pairs before
+  believing it.
+- **Almost everything below the review cutoff** — the matcher is being strict,
+  or your detectors aren't producing the kind of concrete values that make good
+  evidence.
+- **A fat middle** — normal, and what the queue is for.
+
+---
+
+## Score distribution and the two cutoffs
+
+The histogram shows how many pairs fall at each match weight from 0 to 1, in
+twenty bars. Two draggable cutoffs sit on it.
+
+| Cutoff | Question it answers |
+|---|---|
+| **review** | Below this, is it even worth looking at? |
+| **merge** | Above this, do I still need to look at all? |
+
+### Reading the shape
+
+A healthy distribution usually has **two humps and a valley** — a mass of weak
+coincidental matches at the low end, a mass of real duplicates near the top, and
+a thin middle. **Put your cutoffs in the valley.** If there's no valley, the two
+populations aren't separable by score alone, and the work is genuinely per-pair.
+
+### Dragging is free; saving is not
+
+Dragging a cutoff recomputes **every number on the page instantly** and costs no
+round trip — the histogram data needed for the arithmetic is already in your
+browser. While you're dragging, the page reads **Unsaved — this view only**.
+
+**Saving** the cutoffs is a different act. It writes them into the matcher's
+configuration and **re-scores the whole corpus**, which changes what gets stored
+as a duplicate everywhere in the product. Explore freely; save deliberately.
+
+---
+
+## Work by pattern
+
+The pattern list is the actual work queue. Every match is filed under the
+**reason** it matched, which is what makes a corpus of 18,000 pairs navigable —
+it's usually five or six patterns.
+
+Each row shows:
+
+| Column | Meaning |
+|---|---|
+| **Labels** | The values that matched — `email + person`, and so on |
+| **Family** | [Which engine](/duplicates/how-matching-works/) produced it |
+| **Rule** | What kind of decision this is — see [Patterns](/duplicates/patterns/#what-kind-of-decision-is-this) |
+| **Left** | Undecided pairs *inside the current band* |
+| **Clusters** | How many clusters those pairs touch (an estimate — see below) |
+| **avg** | Average match weight in the pattern |
+
+### How the list is ordered
+
+Not by size, and not by score. Both of those sort badly:
+
+- **By volume**, unfixable noise floats to the top.
+- **By score**, the easy work ends up last.
+
+So patterns are ranked by **how much work one decision settles** — the number of
+undecided pairs multiplied by how far a single decision reaches (pairs per
+cluster), lifted for patterns holding matches lineage can't explain. Work top-down
+and you clear the most backlog per decision.
+
+> **Why the cluster count is an estimate.** A cluster can have pairs in several
+> score bins, so the bins can't simply be added without counting it twice. The
+> number is an upper bound and the app labels it as one rather than quietly
+> presenting it as exact.
+
+### `misc` and `+N`
+
+Two bits of housekeeping you'll see in pattern names:
+
+- **`+N`** — a pattern key names at most three labels, then collapses the rest.
+  `email+person+phone+2` matched on five labels. The full set is on the pattern
+  page.
+- **`misc` / `Everything else`** — patterns with only a handful of pairs are
+  folded into a remainder bucket per family. A pattern is something you write one
+  rule for; a "pattern" of two pairs is just two pairs.
+
+---
+
+## Where duplicates come from
+
+A small graph in the instrument rail whose **nodes are systems, not assets**.
+This distinction is the whole point of the tile:
+
+- **Concentrated between two systems** → a real, findable cause. Usually an
+  integration that re-imports instead of updating, or two pipelines writing the
+  same thing.
+- **Concentrated inside one system** → that system's own ingestion or
+  deduplication, not an integration.
+- **Spread evenly across everything** → more often points at **the matcher**
+  than at the data. Go to [Tuning](/duplicates/tuning/) rather than the queue.
+
+Click a system to narrow the entire page — headline, patterns, histogram — to
+pairs touching it. Click several to ask "these two systems". *Touching* means
+either side counts: restricting to pairs wholly inside a selection would hide
+exactly the cross-system pairs the tile is pointing at.
+
+**Reset** clears the filter.
+
+---
+
+## Empty queue?
+
+| What you see | Why | Fix |
+|---|---|---|
+| "No assets have been matched to each other yet" | Nothing has been scanned, or nothing shares values | Run a scan; check your [detectors](/detectors/) produce concrete values |
+| Everything decided | You finished. Congratulations. | Widen the band, or go to [Decisions](/duplicates/decisions/) |
+| Empty, but you know there are duplicates | The workspace was scanned before the review index existed | Press **Rebuild** in [Tuning](/duplicates/tuning/) |
+| Empty under a source filter | That system has no matched pairs | Clear the filter |
+
+---
+
+Next: [Patterns](/duplicates/patterns/) — what a pattern is and how to settle one.

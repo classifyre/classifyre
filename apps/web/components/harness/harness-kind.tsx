@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   BellRing,
+  Compass,
   Copy,
   FlaskConical,
   FolderSearch,
@@ -21,6 +22,7 @@ const KIND_ICON: Record<string, LucideIcon> = {
   ESCALATION: BellRing,
   DREAM: Moon,
   DUPLICATES: Copy,
+  SUPERVISOR: Compass,
 };
 
 /** Icon for an agent kind / mission. */

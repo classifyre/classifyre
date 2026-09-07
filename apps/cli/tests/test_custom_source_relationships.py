@@ -136,3 +136,73 @@ class TestAdapterTranslation:
         # Untouched: hashing a URN would destroy the one thing that resolves it.
         urn = Ref.urn("s3://bucket/key.csv")
         assert resolve(fake, urn) == urn
+
+
+# ── Cross-cell shadowing, and the Ref that does not exist ────────────────────
+#
+# Two silent failures from one real notebook, both found only in a Kubernetes
+# job log after runs that reported COMPLETED.
+
+
+def test_a_later_cell_redefining_a_helper_is_warned_about() -> None:
+    """Cells look like separate files and are not — they are one module.
+
+    A private ``_local()`` in a GISA cell replaced the identically named helper
+    in the ``hvd-client`` cell above it. The cohort feed then died at runtime
+    with ``_local() missing 1 required positional argument`` and the run still
+    went green on a two-seed fallback.
+    """
+    report = validate_notebook(
+        [
+            {
+                "id": "hvd-client",
+                "source": "def _local(a, b):\n    return a\n\ndef test_connection():\n    return True\n",
+            },
+            {
+                "id": "gisa-client",
+                "source": "def _local(x):\n    return x\n\ndef extract(ctx):\n    return []\n",
+            },
+        ]
+    )
+
+    # A warning, never a violation: shadowing is legal Python and a save must
+    # not be blocked by it.
+    assert report.ok is True
+    assert [w.kind for w in report.warnings] == ["shadowed_definition"]
+    warning = report.warnings[0]
+    assert warning.cell_id == "gisa-client"
+    assert "'_local'" in warning.message
+    assert "hvd-client" in warning.message
+    assert "warnings" in report.to_dict()
+
+
+def test_redefining_inside_one_cell_is_not_warned_about() -> None:
+    report = validate_notebook(
+        [
+            {
+                "id": "only",
+                "source": (
+                    "def helper():\n    return 1\n\n"
+                    "def helper():\n    return 2\n\n"
+                    "def test_connection():\n    return True\n\n"
+                    "def extract(ctx):\n    return []\n"
+                ),
+            }
+        ]
+    )
+
+    assert report.ok is True
+    assert report.warnings == ()
+
+
+def test_a_wrong_ref_constructor_says_what_to_write_instead() -> None:
+    """``Ref.id(...)`` is the natural guess and does not exist."""
+    from src.graph.edges import Ref
+
+    with pytest.raises(AttributeError) as excinfo:
+        Ref.id("winkk")  # type: ignore[attr-defined]
+
+    message = str(excinfo.value)
+    assert "Ref.asset(" in message
+    assert "Ref.urn(" in message
+    assert "Ref.finding(" in message

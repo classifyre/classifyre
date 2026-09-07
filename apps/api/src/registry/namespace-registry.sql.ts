@@ -70,7 +70,26 @@ export const PUBLIC_SEARCH_PATH_OPTION = '-c search_path=public';
  * registry reads/writes hit `public` even if the process URL carried a schema.
  */
 export function publicConnectionString(): string {
-  const raw = new URL(process.env.DATABASE_URL ?? '');
+  const configured = process.env.DATABASE_URL ?? '';
+  let raw: URL;
+  try {
+    raw = new URL(configured);
+  } catch {
+    // This runs in a field initialiser on several services, so it fires during
+    // Nest's DI graph construction. Nest routes a constructor throw through
+    // ExceptionsZone, which logs it and calls process.exit(1) — and a caller
+    // that passed `logger: false` (the OpenAPI spec generator did) sees a bare
+    // exit code and no message at all. Naming the variable here is the
+    // difference between "codegen failed, exit 1" and a fixable diagnosis.
+    throw new Error(
+      configured
+        ? `DATABASE_URL is not a valid connection URL (${JSON.stringify(configured)}). ` +
+            'Expected something like postgresql://user:pass@host:5432/db.'
+        : 'DATABASE_URL is not set. Every process that builds the Nest DI graph ' +
+            'needs it, including scripts that never open a connection — see ' +
+            'scripts/generate-openapi-spec.ts for the placeholder such a script should set.',
+    );
+  }
   raw.searchParams.delete('schema');
   return raw.toString();
 }

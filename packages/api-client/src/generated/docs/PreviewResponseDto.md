@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `total` | number
 `sample` | [Array&lt;InquiryMatchDto&gt;](InquiryMatchDto.md)
+`diagnostics` | [Array&lt;PreviewDiagnosticDto&gt;](PreviewDiagnosticDto.md)
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { PreviewResponseDto } from '@workspace/api-client'
 const example = {
   "total": null,
   "sample": null,
+  "diagnostics": null,
 } satisfies PreviewResponseDto
 
 console.log(example)
