@@ -614,17 +614,34 @@ function collectDefaults(schema: JSONSchema7): unknown {
   // react-hook-form crash (Cannot read properties of undefined (reading 'mount')).
 
   if (isObjectSchema(schema) && schema.properties) {
+    const required = schema.required || [];
     const obj: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(schema.properties)) {
-      const defaults = collectDefaults(value as JSONSchema7);
-      if (defaults !== undefined) {
-        obj[key] = defaults;
+      const propSchema = value as JSONSchema7;
+      const defaults = collectDefaults(propSchema);
+      if (defaults === undefined) continue;
+      // A property that isn't required here is free to stay unset, so only
+      // seed it when its own synthesized default satisfies ITS required
+      // fields too -- an optional "notebook" object whose required "cells"
+      // array has no default would otherwise fail validation the moment
+      // this partial default gets set. A required property is always kept:
+      // the caller's explicit overrides (name/type/sampling, ...) are
+      // expected to complete it, not the schema defaults alone.
+      if (!required.includes(key) && !satisfiesOwnRequired(propSchema, defaults)) {
+        continue;
       }
+      obj[key] = defaults;
     }
     return Object.keys(obj).length > 0 ? obj : undefined;
   }
 
   return undefined;
+}
+
+function satisfiesOwnRequired(schema: JSONSchema7, value: unknown): boolean {
+  if (!isPlainObject(value)) return true;
+  const required = schema.required || [];
+  return required.every((key) => value[key] !== undefined);
 }
 
 function mergeDefaults(

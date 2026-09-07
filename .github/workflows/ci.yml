@@ -170,6 +170,16 @@ jobs:
           sudo apt-get install -y postgresql-server-dev-18
           echo "PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config" >> "$GITHUB_ENV"
 
+      - name: Install libicu60 (embedded-postgres runtime dependency)
+        # @embedded-postgres/linux-x64's initdb binary is linked against ICU 60.
+        # ubuntu-24.04 runners no longer ship libicu60 in any apt repo, so pull
+        # the package directly from the Ubuntu archive (last published for bionic).
+        if: success() || failure()
+        shell: bash
+        run: |
+          curl -fsSL http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu60_60.2-3ubuntu3.2_amd64.deb -o "$RUNNER_TEMP/libicu60.deb"
+          sudo dpkg -i "$RUNNER_TEMP/libicu60.deb"
+
       - name: Unit tests
         if: success() || failure()
         run: bun run test
