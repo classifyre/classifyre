@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 
 export type EmbeddingProviderKind = 'transformers-js' | 'openai-compatible';
 
@@ -10,6 +12,33 @@ export type EmbeddingProviderKind = 'transformers-js' | 'openai-compatible';
 function defaultIntraOpThreads(): number {
   const available = os.availableParallelism?.() ?? os.cpus().length;
   return Math.max(1, Math.min(4, Math.floor(available / 2)));
+}
+
+/**
+ * Where transformers.js may download and keep model weights.
+ *
+ * This used to be the relative `.cache/transformers`, which resolves against
+ * the process's working directory. In a container that directory is the
+ * application root, mounted read-only and owned by root while the process runs
+ * as a non-root uid — so every single embed request failed with
+ * `EACCES: permission denied, mkdir '.cache'`. The queue kept draining and
+ * re-queuing, the corpus stayed at zero vectors, and nothing above the worker
+ * log said why.
+ *
+ * A relative path is the wrong shape for this regardless: the cache has to
+ * outlive a working directory the operator never chose. Prefer an explicitly
+ * mounted cache, fall back to the temp directory, which is writable by
+ * definition — a re-download after a restart is a cost, not a failure.
+ */
+function defaultCacheDir(): string {
+  const preferred = '/var/cache/classifyre/embeddings';
+  try {
+    fs.mkdirSync(preferred, { recursive: true });
+    fs.accessSync(preferred, fs.constants.W_OK);
+    return preferred;
+  } catch {
+    return path.join(os.tmpdir(), 'classifyre', 'transformers');
+  }
 }
 
 function integerEnv(name: string, fallback: number, min: number, max: number) {
@@ -41,7 +70,36 @@ export class EmbeddingConfigService {
   readonly dimensions = integerEnv('EMBEDDING_DIMENSIONS', 384, 1, 2000);
   readonly pooling = process.env.EMBEDDING_POOLING ?? 'mean';
   readonly normalize = booleanEnv('EMBEDDING_NORMALIZE', true);
+  /**
+   * Rows handed to one inference call.
+   *
+   * This is NOT pg-boss's fetch size, though it was used as both until the
+   * worker started dying: a handler invocation fetches `batchSize` jobs, each
+   * carrying up to `queueBatchSize` chunks, and every one of those chunks used
+   * to reach the model in a single call. See {@link maxBatchChars}.
+   */
   readonly batchSize = integerEnv('EMBEDDING_BATCH_SIZE', 32, 1, 256);
+  /**
+   * Ceiling on `rows x longest text` within one inference call.
+   *
+   * The memory an inference call needs is not the row count: transformers.js
+   * pads every row in a batch to the longest one present, so an attention
+   * tensor costs `rows x heads x seq x seq x 4` bytes. 32 rows of 1200 chars
+   * and 32 rows of 60 chars differ by 400x in footprint while looking
+   * identical to any row-count limit.
+   *
+   * 64,000 keeps a full 32-row batch of ~2,000-character chunks (the shape a
+   * real corpus produces) at a few hundred MB of native allocation, and
+   * automatically narrows the batch when chunks are longer. Raise it only with
+   * the worker's memory limit raised alongside, and remember the allocation is
+   * native — `--max-old-space-size` does not bound it.
+   */
+  readonly maxBatchChars = integerEnv(
+    'EMBEDDING_MAX_BATCH_CHARS',
+    64_000,
+    512,
+    10_000_000,
+  );
   /**
    * Chunk texts packed into a single queue job.
    *
@@ -55,10 +113,16 @@ export class EmbeddingConfigService {
    * it never catches up.
    *
    * Packing chunks into one job divides the row count by this factor and takes
-   * the sort back to something trivial. It changes nothing about the work: the
-   * same chunks are embedded, by the same provider, in the same inference
-   * batches (see batchSize) — there is simply one queue row per group instead
-   * of one per chunk.
+   * the sort back to something trivial. There is one queue row per group
+   * instead of one per chunk.
+   *
+   * This used to claim it changed nothing about the work — that the chunks
+   * still reached the model "in the same inference batches (see batchSize)".
+   * They did not. Nothing re-split them, so a handler fetching `batchSize`
+   * jobs passed `batchSize x queueBatchSize` chunks to one inference call and
+   * the two knobs multiplied into an unbounded native allocation. The split is
+   * real now — see {@link batchSize} and {@link maxBatchChars} — so this
+   * factor is once again purely about queue-row count.
    */
   readonly queueBatchSize = integerEnv(
     'EMBEDDING_QUEUE_BATCH_SIZE',
@@ -106,7 +170,7 @@ export class EmbeddingConfigService {
 
   readonly dtype = process.env.EMBEDDING_DTYPE ?? 'q8';
   readonly device = process.env.EMBEDDING_DEVICE ?? 'cpu';
-  readonly cacheDir = process.env.EMBEDDING_CACHE_DIR ?? '.cache/transformers';
+  readonly cacheDir = process.env.EMBEDDING_CACHE_DIR ?? defaultCacheDir();
   readonly localModelPath = process.env.EMBEDDING_LOCAL_MODEL_PATH;
   readonly allowRemoteModels = booleanEnv(
     'EMBEDDING_ALLOW_REMOTE_MODELS',

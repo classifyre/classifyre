@@ -1,21 +1,28 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../lib/utils";
+import { STATUS_TONE, statusBadgeClass } from "../lib/status-tone";
 import { CheckCircle2, AlertCircle, XCircle, Clock } from "lucide-react";
 
+/**
+ * A finding's review state.
+ *
+ * Borderless tinted rectangles here, bordered pills everywhere else, made two
+ * status columns in the SAME table (assets: "Status" and "Review mix") look
+ * like unrelated widgets. These now wear `statusBadgeClass` and draw their
+ * colour from the shared tone scale, so a finding's OPEN and a case's OPEN are
+ * finally the same green.
+ */
 const statusBadgeVariants = cva(
-  "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs font-medium",
+  `inline-flex items-center gap-1 px-2 py-0.5 ${statusBadgeClass}`,
   {
     variants: {
       status: {
-        new: "bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-        open: "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300",
-        resolved:
-          "bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
-        false_positive:
-          "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400",
-        ignored:
-          "bg-stone-50 text-stone-400 dark:bg-stone-800/50 dark:text-stone-500",
+        new: STATUS_TONE.progress,
+        open: STATUS_TONE.active,
+        resolved: STATUS_TONE.done,
+        false_positive: STATUS_TONE.idle,
+        ignored: STATUS_TONE.archived,
       },
     },
     defaultVariants: {

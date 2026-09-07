@@ -252,6 +252,8 @@ class Context:
         self._offset = int(offset or 0)
         self._offset_consumed = False
         self._next_cursor: dict[str, Any] | None = None
+        self._partial_coverage: bool = False
+        self._partial_coverage_reason: str = ""
         self._logger = logger or print
         self._should_abort = should_abort or (lambda: False)
 
@@ -413,13 +415,49 @@ class Context:
     def set_cursor(self, cursor: Mapping[str, Any]) -> None:
         """Record where this run got to, for the next run to resume from.
 
-        Only meaningful under AUTOMATIC sampling; other strategies ignore it.
+        Honoured under every sampling strategy. It used to be kept only under
+        AUTOMATIC, which meant a connector that wanted run-to-run state had to
+        adopt a sampling strategy chosen for something else entirely -- and one
+        that changes deletion semantics, since under AUTOMATIC an absent asset
+        no longer implies a deleted one. Worse, the discard was silent: the call
+        succeeded, the notebook believed it had saved state, and the next run
+        started from nothing.
         """
         self._next_cursor = dict(cursor)
 
     @property
     def next_cursor(self) -> dict[str, Any] | None:
         return None if self._next_cursor is None else dict(self._next_cursor)
+
+    def set_partial_coverage(self, reason: str = "") -> None:
+        """Declare that this run looked at only part of the source.
+
+        Call it from any connector that chooses its own cohort -- a change
+        feed, a resumable sweep, a date window, an API with no "list
+        everything" operation. Absence from this run then proves nothing and
+        no asset is retired.
+
+        The sampling strategy cannot say this on a connector's behalf: it
+        describes what the runtime does with the stream you yield, not how much
+        of the source you decided to ask for. A cohort connector under
+        strategy=ALL is telling the platform it visited everything, and the
+        platform believes it -- every asset outside this run's cohort is marked
+        DELETED and its findings auto-resolved. On the Firmenbuch corpus that
+        was 51,860 assets and 208,639 findings, none of them actually gone.
+
+        Idempotent, and safe to call before you know how much you covered.
+        """
+        self._partial_coverage = True
+        if reason:
+            self._partial_coverage_reason = str(reason)
+
+    @property
+    def partial_coverage(self) -> bool:
+        return self._partial_coverage
+
+    @property
+    def partial_coverage_reason(self) -> str:
+        return self._partial_coverage_reason
 
     @property
     def should_abort(self) -> bool:

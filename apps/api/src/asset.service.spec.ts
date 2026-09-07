@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AssetService } from './asset.service';
 import { PrismaService } from './prisma.service';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
+import { CustomDetectorsService } from './custom-detectors.service';
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import {
@@ -48,6 +49,10 @@ describe('AssetService', () => {
       updateMany: jest.fn(),
       findUnique: jest.fn(),
       deleteMany: jest.fn(),
+      delete: jest.fn(),
+    },
+    edge: {
+      deleteMany: jest.fn(),
     },
     finding: {
       findMany: jest.fn(),
@@ -75,6 +80,10 @@ describe('AssetService', () => {
     createFromIngestion: jest.fn(),
   };
 
+  const mockCustomDetectorsService = {
+    buildRuntimeTagDetectors: jest.fn(),
+  };
+
   const mockEmbeddingService = {
     semanticAssetIds: jest.fn(),
   };
@@ -95,6 +104,10 @@ describe('AssetService', () => {
         {
           provide: CustomDetectorExtractionsService,
           useValue: mockCustomDetectorExtractionsService,
+        },
+        {
+          provide: CustomDetectorsService,
+          useValue: mockCustomDetectorsService,
         },
         { provide: EmbeddingService, useValue: mockEmbeddingService },
         { provide: QueryEmbeddingService, useValue: mockQueryEmbeddingService },
@@ -118,6 +131,7 @@ describe('AssetService', () => {
     mockPrismaService.$queryRaw.mockResolvedValue([]);
     mockInquiryMatching.watchersForFindings.mockResolvedValue(new Map());
     mockCorrelationJobs.scheduleFull.mockResolvedValue(undefined);
+    mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue([]);
   });
 
   it('should be defined', () => {
@@ -2720,6 +2734,19 @@ describe('AssetService', () => {
         expect(findingUpdate).not.toHaveBeenCalled();
       });
 
+      it('keeps TAG findings the source config cannot name', async () => {
+        // TAG detectors are deliberately unselectable, so the stored recipe
+        // never lists them. Without the global lookup this cleanup resolves
+        // the finding in the same run that created it.
+        mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue([
+          { key: 'email-conduct-screen' },
+        ]);
+        const result = await runCleanup({ detectors: [] }, [openFinding()]);
+
+        expect(result.resolvedForRemovedDetectors).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
       it('does nothing when the source opts out via the flag', async () => {
         const result = await runCleanup(
           {
@@ -3373,6 +3400,28 @@ describe('AssetService', () => {
             expect.not.objectContaining({ payloadCursor: expect.anything() }),
           ],
         });
+      });
+    });
+  });
+
+  describe('deleteAsset', () => {
+    // An edge endpoint is a (type, id) pair, not a foreign key, so deleting an
+    // asset used to leave edges pointing at nothing — and the correlation
+    // review rebuild, which DOES foreign-key its lineage rows, then failed
+    // with P2003 for the whole namespace.
+    it('removes the edges that named the asset', async () => {
+      mockPrismaService.asset.delete.mockResolvedValue({ id: 'a1' });
+      mockPrismaService.edge.deleteMany.mockResolvedValue({ count: 3 });
+
+      await service.deleteAsset({ id: 'a1' });
+
+      expect(mockPrismaService.edge.deleteMany).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { fromType: 'asset', fromId: 'a1' },
+            { toType: 'asset', toId: 'a1' },
+          ],
+        },
       });
     });
   });

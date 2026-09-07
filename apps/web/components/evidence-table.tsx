@@ -818,7 +818,7 @@ export function EvidenceTable({
                                 <TooltipTrigger asChild>
                                   <button
                                     onClick={() => onAddFindings?.(e.entityId)}
-                                    className="inline-flex items-center gap-0.5 rounded-[3px] border border-dashed border-accent/40 px-1.5 py-0.5 font-mono text-[10px] text-accent transition-colors hover:border-accent hover:bg-accent/5"
+                                    className="inline-flex items-center gap-0.5 rounded-[3px] border border-dashed border-accent/40 px-1.5 py-0.5 font-mono text-[10px] text-accent-ink transition-colors hover:border-accent hover:bg-accent/5"
                                   >
                                     <Plus className="h-2.5 w-2.5" />
                                     {availableCount}
@@ -892,7 +892,7 @@ export function EvidenceTable({
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-7 gap-1.5 rounded-[4px] border-dashed border-accent/40 font-mono text-[11px] text-accent hover:border-accent hover:bg-accent/5"
+                                    className="h-7 gap-1.5 rounded-[4px] border-dashed border-accent/40 font-mono text-[11px] text-accent-ink hover:border-accent hover:bg-accent/5"
                                     onClick={() => onAddFindings?.(e.entityId)}
                                   >
                                     <Plus className="h-3 w-3" />

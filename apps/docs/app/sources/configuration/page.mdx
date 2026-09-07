@@ -110,6 +110,16 @@ constrained infrastructure — Classifyre sizes sensible defaults automatically.
 
 ---
 
+## Augmentation (shared)
+
+Every source also accepts an **augmentation** block: an optional Python notebook
+that enriches each asset after extraction and before detection — extra metadata,
+tags, links, a URN, and relationship edges. Additive only: it cannot change what
+the connector extracted, drop an asset, or fail a scan. See
+**[Source Augmentation](/sources/augmentation/)**.
+
+---
+
 ## How it all fits together
 
 ```mermaid

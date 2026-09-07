@@ -14,6 +14,8 @@ Name | Type
 `completedAt` | Date
 `durationMs` | number
 `totalFindings` | number
+`findingsCreated` | number
+`findingsResolved` | number
 `assetsCreated` | number
 `assetsUpdated` | number
 `errorMessage` | string
@@ -34,6 +36,8 @@ const example = {
   "completedAt": null,
   "durationMs": null,
   "totalFindings": null,
+  "findingsCreated": null,
+  "findingsResolved": null,
   "assetsCreated": null,
   "assetsUpdated": null,
   "errorMessage": null,

@@ -257,6 +257,14 @@ export type {
   UpdateCaseDto,
   CaseResponseDto,
   CaseListResponseDto,
+  CaseworkSummaryDto,
+  CaseworkCasesDto,
+  CaseworkCaseDto,
+  CaseworkCaseStatusBreakdownDto,
+  CaseworkInquiriesDto,
+  CaseworkInquiryDto,
+  CaseworkInquiryStatusBreakdownDto,
+  CaseworkLeadsDto,
   CaseEvidenceDto,
   CaseFindingDto,
   CaseLinkedInquiryDto,
@@ -291,6 +299,16 @@ export type {
   GraphNodeDto,
   GraphEdgeDto,
   GraphResponseDto,
+  ConstellationResponseDto,
+  ConstellationSourceDto,
+  ConstellationLinkDto,
+  ConstellationClassCountsDto,
+  ConstellationBoundaryAssetDto,
+  ConstellationBoundaryEdgeDto,
+  ConstellationBundleDto,
+  ConstellationSeverityMixDto,
+  ConstellationTotalsDto,
+  ConstellationStatsDto,
   RebuildEdgesResponseDto,
   CreateManualEdgeDto,
   UpdateEdgeDto,
@@ -395,6 +413,7 @@ export type {
   FindingsDiscoverySeverityBreakdownDto,
   FindingsDiscoveryStatsDto,
   FindingsDiscoveryStatusBreakdownDto,
+  FindingsDiscoveryStatusMixDto,
   FindingsDiscoveryTopAssetDto,
   FindingsDiscoveryTotalsDto,
   SearchFindingsRequestDto,
@@ -1216,6 +1235,14 @@ const RESERVED_ROUTE_PREFIXES = new Set([
 ]);
 
 /**
+ * Locale segments the web app may put ahead of the namespace
+ * (`/de/acme/findings`). Mirrors `LOCALES` in
+ * `apps/web/lib/locale-detection.ts`; a workspace can never be named one of
+ * these, so a leading locale is unambiguous.
+ */
+const LOCALE_PREFIXES = new Set(["en", "de"]);
+
+/**
  * The namespace slug encoded in an app pathname, or undefined when the path is
  * outside any namespace (landing page, `/namespaces/<id>/settings`, a file such
  * as the desktop shell's `/index.html`).
@@ -1223,7 +1250,11 @@ const RESERVED_ROUTE_PREFIXES = new Set([
 export function namespaceSlugFromPath(
   pathname: string | null | undefined,
 ): string | undefined {
-  const first = pathname?.split("/").filter(Boolean)[0];
+  const segments = pathname?.split("/").filter(Boolean) ?? [];
+  // A locale prefix sits ahead of the tenant; skipping it (rather than
+  // bailing out) is what keeps every API call under `/de/…` scoped correctly.
+  const first =
+    segments[0] && LOCALE_PREFIXES.has(segments[0]) ? segments[1] : segments[0];
   if (!first) return undefined;
   const decoded = decodeURIComponent(first);
   if (RESERVED_ROUTE_PREFIXES.has(decoded)) return undefined;

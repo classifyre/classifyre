@@ -1,0 +1,72 @@
+---
+title: The Connection Map
+description: The map on your Discovery dashboard — what a bubble is, why unconnected assets are not drawn, what the five kinds of link mean, and how to open a source or trace a single asset.
+---
+
+# The Connection Map
+
+The third row of [Discovery](/how-it-works/in-the-app/) is a map of how your
+sources connect to one another. It answers a question no list can: *is anything
+here actually joined up, and where?*
+
+## What a bubble is
+
+One bubble per **source**. Its size is how many of that source's assets are
+connected to something — not how many assets it has. The ring around it is the
+[priority](/how-it-works/) mix of that source's open findings, and the number
+inside is the connected asset count.
+
+Underneath each bubble is a muted count of **unconnected** assets: ones with no
+link of any kind. Those are never drawn.
+
+That is deliberate, and it is what makes the map usable at any size. A corpus of
+two million assets still produces a dozen bubbles, because the map is keyed by
+source rather than by asset. Drawing a dot for every isolated asset would bury
+the structure you came to look at under the material that has none.
+
+## The five kinds of link
+
+A line between two bubbles is every edge running between those two sources. Its
+thickness is the number of edges; its colour is whichever kind dominates. Use
+the chips above the map to show one kind at a time.
+
+| Link | What it means |
+|---|---|
+| **Lineage** | Data moved. This is the only kind that says one thing came *from* another. |
+| **Contains** | Structure — an archive member, an attachment, a table in a schema. |
+| **Same as** | The same thing seen twice, in two systems. |
+| **References** | A mention, a foreign key, a link. Carries meaning, moves nothing. |
+| **Used by** | Someone or something touched it. |
+
+Selecting a line breaks it down by kind, and shows how many **duplicate pairs**
+the [review queue](/duplicates/) has found across that pairing — with a shortcut
+into it, filtered to those two sources.
+
+## Opening a source
+
+Double-click a bubble (or use **Open this source** in the panel) to replace it
+with its own assets and their internal links. Double-click again to close it.
+
+The members are fetched at that moment rather than shipped with the map, which
+is why the dashboard's first paint does not get slower as a source grows.
+
+## Assets that reach across sources
+
+An asset whose links leave its own source is drawn on its own, sitting between
+its bubble and whatever it reaches — so a cross-source path is visible without
+opening anything.
+
+When a pairing carries more of these than can be read individually, they collapse
+into a single labelled node: *"1,204 linked assets"*. Nothing is discarded; the
+map is simply a level coarser there, and the node opens like any other.
+
+Selecting one of these assets offers **Trace lineage**, which opens the full
+[lineage view](/sources/lineage/) for it — the same walk the `get_asset_lineage`
+tool performs.
+
+## How fresh it is
+
+The map is served from a pre-aggregated index rebuilt in the background whenever
+edges change, coalesced so a scan emitting relationships for an hour produces a
+trickle of rebuilds rather than one per batch. Until a workspace's first build
+finishes, the bubbles appear without counts and the map says it is building.

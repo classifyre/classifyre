@@ -49,6 +49,12 @@ export interface CreateNotebookExecutionDto {
      * @memberof CreateNotebookExecutionDto
      */
     maxAssets?: number;
+    /**
+     * Which notebook to run. `connector` is the CUSTOM source’s own notebook; `augmentation` is the per-asset enrichment notebook any source type may carry. Defaults to `connector`, so every existing call keeps its meaning.
+     * @type {string}
+     * @memberof CreateNotebookExecutionDto
+     */
+    scope?: CreateNotebookExecutionDtoScopeEnum;
 }
 
 
@@ -59,9 +65,19 @@ export const CreateNotebookExecutionDtoModeEnum = {
     Cell: 'cell',
     All: 'all',
     TestConnection: 'test_connection',
-    PreviewExtract: 'preview_extract'
+    PreviewExtract: 'preview_extract',
+    PreviewAugment: 'preview_augment'
 } as const;
 export type CreateNotebookExecutionDtoModeEnum = typeof CreateNotebookExecutionDtoModeEnum[keyof typeof CreateNotebookExecutionDtoModeEnum];
+
+/**
+ * @export
+ */
+export const CreateNotebookExecutionDtoScopeEnum = {
+    Connector: 'connector',
+    Augmentation: 'augmentation'
+} as const;
+export type CreateNotebookExecutionDtoScopeEnum = typeof CreateNotebookExecutionDtoScopeEnum[keyof typeof CreateNotebookExecutionDtoScopeEnum];
 
 
 /**
@@ -87,6 +103,7 @@ export function CreateNotebookExecutionDtoFromJSONTyped(json: any, ignoreDiscrim
         'mode': json['mode'],
         'targetCellId': json['targetCellId'] == null ? undefined : json['targetCellId'],
         'maxAssets': json['maxAssets'] == null ? undefined : json['maxAssets'],
+        'scope': json['scope'] == null ? undefined : json['scope'],
     };
 }
 
@@ -106,6 +123,7 @@ export function CreateNotebookExecutionDtoToJSONTyped(value?: CreateNotebookExec
         'mode': value['mode'],
         'targetCellId': value['targetCellId'],
         'maxAssets': value['maxAssets'],
+        'scope': value['scope'],
     };
 }
 

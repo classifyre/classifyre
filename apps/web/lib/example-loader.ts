@@ -15,7 +15,28 @@ export interface SourceExample {
   config: Record<string, unknown>;
 }
 
+export interface AugmentationTemplate {
+  name: string;
+  description: string;
+  notebook: {
+    revision?: number;
+    cells: Array<{ id: string; type: string; source: string }>;
+  };
+}
+
 export function getSourceExamples(sourceType: SourceType): SourceExample[] {
-  const examplesByType = all_input_examples as Record<string, SourceExample[]>;
+  // AUGMENTATION templates are notebook fragments, not source configs — they
+  // are read by getAugmentationTemplates, not here.
+  const examplesByType = {
+    ...(all_input_examples as unknown as Record<string, SourceExample[]>),
+  };
+  delete (examplesByType as Record<string, unknown>)["AUGMENTATION"];
   return examplesByType[sourceType] || [];
+}
+
+export function getAugmentationTemplates(): AugmentationTemplate[] {
+  const examples = all_input_examples as unknown as {
+    AUGMENTATION?: AugmentationTemplate[];
+  };
+  return examples.AUGMENTATION ?? [];
 }

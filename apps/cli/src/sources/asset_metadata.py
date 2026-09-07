@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 _CATALOG_KEY = "x-asset-metadata"
 
+#: Metadata keys the platform itself reserves, outside any source's catalog.
+#: Augmentation writes only inside ``metadata["augmentation"]``; without this
+#: exemption ``validate_metadata`` would treat that namespace as contract drift
+#: — and raise under pytest / ``CLASSIFYRE_STRICT_METADATA``.
+RESERVED_METADATA_KEYS = frozenset({"augmentation"})
+
 ResolvedField = dict[str, Any]  # {name, type, description, required}
 
 
@@ -144,7 +150,7 @@ def validate_metadata(
     present_non_null = {key for key, value in data.items() if value is not None}
 
     is_open = is_open_kind(source_type, asset_kind)
-    undeclared = [] if is_open else sorted(set(data) - declared)
+    undeclared = [] if is_open else sorted(set(data) - declared - RESERVED_METADATA_KEYS)
     missing_required = sorted(required - present_non_null)
 
     if undeclared or missing_required:

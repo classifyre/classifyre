@@ -132,6 +132,7 @@ model NotebookExecution {
   sourceId     String                  @map("source_id")
   revision     Int
   mode         NotebookExecutionMode
+  scope        NotebookScope           @default(CONNECTOR)
   targetCellId String?                 @map("target_cell_id")
   status       NotebookExecutionStatus @default(PENDING)
   // The cells as they were when this execution was requested.
@@ -160,6 +161,12 @@ enum NotebookExecutionMode {
   ALL
   TEST_CONNECTION
   PREVIEW_EXTRACT
+  PREVIEW_AUGMENT
+}
+
+enum NotebookScope {
+  CONNECTOR
+  AUGMENTATION
 }
 
 enum NotebookExecutionStatus {
@@ -1482,6 +1489,10 @@ model CorrelationConfig {
 // INSERT ... SELECT so the heavy intermediate state lives in Postgres
 // (work_mem / on-disk temp files), never in the API process's heap. Rows are
 // scoped by run_id and deleted once that run's edges have been written.
+//
+// This table is UNLOGGED (see migration 20260907120000). Prisma has no way to
+// express that, so it lives only in the migration — do not recreate this model
+// from an introspection or the WAL exemption is silently lost.
 model CorrelationPairStaging {
   id             BigInt  @id @default(autoincrement())
   runId          String  @map("run_id")
@@ -1785,6 +1796,9 @@ model Case {
   @@index([status])
   @@index([severity])
   @@index([createdAt])
+  // Both the case list and the casework summary order by this; without it every
+  // read of either sorts the whole table.
+  @@index([updatedAt])
   @@map("cases")
 }
 
@@ -1830,6 +1844,9 @@ model CaseLead {
 
   @@unique([caseId, findingId])
   @@index([caseId, status])
+  // The dashboard counts leads awaiting review across every case, which the
+  // composite index above cannot serve without a case id to lead on.
+  @@index([status])
   @@map("case_leads")
 }
 
@@ -2986,4 +3003,96 @@ model FindingStatFirstAssetDaily {
   @@id([day, assetId, severity, status])
   @@index([day])
   @@map("finding_stats_first_asset_daily")
+}
+
+// ── Source connection map ───────────────────────────────────────────────────
+//
+// The workspace dashboard opens on a map of how sources connect: one bubble per
+// source, one line per source pairing, and the assets that reach outside their
+// own source drawn individually because they are the whole point of looking.
+//
+// It is a rollup for the same reason the finding stats are. Answering "how many
+// edges run between these two sources" from `edges` means joining it to `assets`
+// twice across the whole corpus, and the dashboard asks on every visit. This
+// grain answers it with a seek.
+//
+// The grain is also what keeps the response small: a workspace with two million
+// assets across twelve sources still returns twelve bubbles and a few dozen
+// links, because the payload is keyed by source rather than by asset. Assets
+// with no edges at all never appear — they are a count on their source's bubble
+// and nothing more.
+
+/// One row per source: its size and its position in the connection graph.
+model SourceGraphNode {
+  sourceId String @id @map("source_id")
+  /// Every asset of the source, connected or not.
+  assetCount Int @map("asset_count")
+  /// Assets touched by at least one edge of any class. The bubble is sized by
+  /// this, and `assetCount - connectedAssetCount` is the muted "unconnected"
+  /// caption under it.
+  connectedAssetCount Int @map("connected_asset_count")
+  /// Edges whose two endpoints are both inside this source.
+  internalEdgeCount Int @map("internal_edge_count")
+  findingCount      Int @map("finding_count")
+  /// Priority mix of this source's findings, as {CRITICAL: n, ...}. Drives
+  /// the ring around the bubble.
+  severityCounts Json @map("severity_counts") @db.JsonB
+
+  @@map("source_graph_nodes")
+}
+
+/// One row per unordered source pair per edge class. `sourceAId == sourceBId`
+/// for edges that stay inside a source, which is what `internalEdgeCount`
+/// above is derived from.
+///
+/// Split by class rather than totalled because the classes answer different
+/// questions — FLOW is lineage, IDENTITY is the same thing seen twice,
+/// REFERENCE propagates nothing — and the canvas lets you filter to one.
+model SourceGraphLink {
+  sourceAId     String    @map("source_a_id")
+  sourceBId     String    @map("source_b_id")
+  relationClass EdgeClass @map("relation_class")
+  edgeCount     Int       @map("edge_count")
+  /// Distinct assets participating in this pairing, on either side.
+  assetCount Int @map("asset_count")
+
+  @@id([sourceAId, sourceBId, relationClass])
+  @@index([sourceAId])
+  @@map("source_graph_links")
+}
+
+/// The assets the map draws individually: the ones whose edges leave their own
+/// source, or point at an `external` endpoint nothing has scanned yet.
+///
+/// Materialised so serving them is an indexed read rather than a scan looking
+/// for boundary crossings.
+///
+/// `peerSourceId` holds the literal `external` rather than NULL for an
+/// unresolved endpoint. It is part of the primary key, and Postgres treats
+/// NULLs as distinct — so a nullable column here would silently permit
+/// duplicate rows for the same asset, which is exactly what the rebuild's
+/// ON CONFLICT relies on catching. Source ids are UUIDs, so the sentinel
+/// cannot collide with a real one.
+model SourceGraphBoundaryAsset {
+  assetId       String    @map("asset_id")
+  sourceId      String    @map("source_id")
+  peerSourceId  String    @map("peer_source_id")
+  relationClass EdgeClass @map("relation_class")
+  edgeCount     Int       @map("edge_count")
+
+  @@id([assetId, peerSourceId, relationClass])
+  @@index([sourceId])
+  @@map("source_graph_boundary_assets")
+}
+
+/// Freshness of the map, so the UI can say how old it is and queue a rebuild —
+/// the same contract `finding_stats_state` provides for the overview numbers.
+model SourceGraphState {
+  id          String    @id @default("singleton")
+  refreshedAt DateTime? @map("refreshed_at")
+  durationMs  Int?      @map("duration_ms")
+  isBuilt     Boolean   @default(false) @map("is_built")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("source_graph_state")
 }

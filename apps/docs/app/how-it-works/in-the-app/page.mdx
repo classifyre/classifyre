@@ -27,14 +27,23 @@ addressing works, and what governance the enterprise offering adds.
 
 ## Discovery
 
-**Your at-a-glance overview.** Discovery is the landing dashboard: total
-findings over the last 7, 30, or 90 days, broken down by severity and status,
-plus the assets carrying the most risk and the most recent scan runs. Use it to
-answer *"how are we doing?"* in ten seconds, then click any number to jump
-straight to the filtered detail view behind it.
+**Your at-a-glance overview.** Discovery is the landing dashboard, in three
+rows:
 
-> Severity counts, status counts, and top assets are all clickable — Discovery
-> is a launchpad, not just a report.
+- **The brief** — total findings over the last 7, 30, or 90 days, what needs
+  attention broken down by priority, and what has arrived today, this week and
+  this month. Review state (open, resolved, not relevant, set aside) is a single
+  muted line: it is bookkeeping, not the headline.
+- **Casework and recent scans** — the cases and inquiries in flight, how many
+  matches appeared since you last looked, and the last ten runs.
+- **[Connections](/how-it-works/connection-map/)** — a map of how your sources
+  connect to each other.
+
+Use it to answer *"what is going on?"* in ten seconds, then click any number to
+jump straight to the filtered detail view behind it.
+
+> Priority counts, review counts, cases and top assets are all clickable —
+> Discovery is a launchpad, not just a report.
 
 ## Sources
 
@@ -69,8 +78,9 @@ Learn more: **[Assets & Metadata](/sources/assets-and-metadata/)**.
 ## Findings
 
 **The signals worth acting on.** Whenever a detector spots something — a leaked
-secret, personal data, a policy violation — it raises a finding with a severity
-and a confidence. This screen is where you triage: filter by severity, source,
+secret, personal data, a tagged term, a value out of range — it raises a
+finding with a priority and a confidence. This screen is where you triage:
+filter by priority, source,
 or status, and resolve, ignore, or mark false positive in bulk. Your decisions
 stick across future scans.
 
@@ -135,7 +145,7 @@ or detector before turning it on for real.
 
 **The events worth telling you about.** Failed scans, sudden spikes or drops in
 findings, recoveries, and first-scan completions land here (and in the bell at
-the top right). Filter by severity or type, mark items important, and jump
+the top right). Filter by priority or type, mark items important, and jump
 straight to the affected scan or finding.
 
 Learn more: **[Notifications](/notifications/)**.

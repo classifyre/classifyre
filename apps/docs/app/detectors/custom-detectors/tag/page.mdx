@@ -10,18 +10,20 @@ import { Callout } from "nextra/components"
 # Tag
 
 <Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
-  Manual · Custom sources · No model
+  Manual · Notebooks · No model
 </Badge>
 
 A Tag detector runs nothing. It loads no model, reads no content, and can never
 find anything on its own. It exists to give a fact you already know a stable
-identity — a key, a label, a severity — so that a
-[Custom connector](/sources/custom-connectors/) can record it and have it behave
-like any other finding.
+identity — a key, a label, a severity — so that a notebook can record it and
+have it behave like any other finding. Two notebooks can apply one: a
+[Custom connector](/sources/custom-connectors/) in `extract()`, and an
+[augmentation notebook](/sources/augmentation/) on any source in `augment()`.
 
 <Callout type="info">
-  A Tag detector is only usable from a **Custom (notebook) connector**. It does
-  not appear in a source's detector list, and nothing else can trigger it.
+  A Tag detector is only usable from a notebook — a Custom connector or an
+  augmentation. It does not appear in a source's detector list, and nothing
+  else can trigger it.
 </Callout>
 
 <Separator className="my-6" />
@@ -92,8 +94,12 @@ def extract():
 | Confidence | Always `1.0` — a tag is asserted, not inferred. |
 
 There is no step where you add the detector to a source. Every **active** Tag
-detector is available to every Custom connector automatically, so a new tag needs
-no source change.
+detector is available to every Custom connector automatically — and to every
+source with augmentation enabled, since the scan hydrates them there too — so a
+new tag needs no source change. In an augmentation notebook the call reads
+`asset.tag("cardholder_data", table.classification)` instead of filling
+`Asset(tags=...)`, but the key, the finding, and the warning for an unmatched
+key are the same.
 
 <Callout type="warning">
   A tag whose key matches no Tag detector is reported as a **scan warning** and

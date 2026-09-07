@@ -63,7 +63,16 @@ export const RESERVED_PREFIXES = new Set<string>([
  * no schema. Extensions (`sitemap.xml`, `robots.txt`) need no entry: SLUG_RE
  * already rejects dots.
  */
-export const RESERVED_WEB_PREFIXES = new Set<string>(['sitemap']);
+export const RESERVED_WEB_PREFIXES = new Set<string>([
+  'sitemap',
+  // Locale prefixes: the web app serves `/de/<namespace>/…`, so a workspace
+  // named after a locale would be shadowed by the language route. Mirrors
+  // `LOCALES` in `apps/web/lib/locale-detection.ts`. Web-only for the same
+  // reason as `sitemap`: on the API `/en` and `/de` must keep going through
+  // namespace resolution rather than bypassing it.
+  'en',
+  'de',
+]);
 
 /** True when `slug` collides with a reserved API or web route segment. */
 export function isReservedSlug(slug: string): boolean {

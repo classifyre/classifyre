@@ -10,6 +10,7 @@ Name | Type
 `sourceId` | string
 `revision` | number
 `mode` | string
+`scope` | string
 `status` | string
 `targetCellId` | string
 `outputs` | object
@@ -31,6 +32,7 @@ const example = {
   "sourceId": null,
   "revision": null,
   "mode": null,
+  "scope": null,
   "status": null,
   "targetCellId": null,
   "outputs": null,

@@ -32,9 +32,11 @@ interface NotebookTemplate {
 export function TemplatePicker({
   onInsert,
   disabled = false,
+  scope = "connector",
 }: {
   onInsert: (cells: NotebookCell[]) => void;
   disabled?: boolean;
+  scope?: "connector" | "augmentation";
 }) {
   const { t } = useTranslation();
   const [templates, setTemplates] = React.useState<NotebookTemplate[] | null>(
@@ -49,9 +51,9 @@ export function TemplatePicker({
     if (templates || loading) return;
     setLoading(true);
     try {
-      const result = (await api.notebooks.notebookControllerTemplates()) as
-        | NotebookTemplate[]
-        | undefined;
+      const result = (await api.notebooks.notebookControllerTemplates({
+        scope,
+      })) as NotebookTemplate[] | undefined;
       setTemplates(result ?? []);
       setFailed(false);
     } catch {
@@ -59,7 +61,7 @@ export function TemplatePicker({
     } finally {
       setLoading(false);
     }
-  }, [templates, loading]);
+  }, [templates, loading, scope]);
 
   return (
     <DropdownMenu onOpenChange={(open) => open && void load()}>

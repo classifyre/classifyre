@@ -350,6 +350,7 @@ describe('KubernetesCliJobService', () => {
       '--detectors-file /tmp/evaluation-detectors.json',
     );
     expect(command).not.toContain('RECIPE_B64');
+    expect(command).not.toContain('RECIPE_GZ_B64');
   });
 
   it('transports evaluation input via an init-container and emptyDir volume', async () => {

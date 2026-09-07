@@ -34,7 +34,6 @@ import {
 } from "@workspace/api-client";
 import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severity";
 import {
-  Badge,
   Button,
   EmptyState,
   Input,
@@ -64,9 +63,11 @@ import {
   MultiSelectItem,
   MultiSelectTrigger,
   MultiSelectValue,
+  ToneBadge,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  type StatusTone,
 } from "@workspace/ui/components";
 import { getSourceIcon } from "../lib/source-type-icon";
 import { AssetKindBadge } from "./asset-kind-badge";
@@ -119,13 +120,6 @@ const DEFAULT_SORT: SortDraft = {
   order: SearchAssetsSortOrderEnum.Desc,
 };
 
-const STATUS_LABELS: Record<SearchAssetFindingDtoStatusEnum, string> = {
-  [SearchAssetFindingDtoStatusEnum.Open]: "Open",
-  [SearchAssetFindingDtoStatusEnum.FalsePositive]: "False Positive",
-  [SearchAssetFindingDtoStatusEnum.Resolved]: "Resolved",
-  [SearchAssetFindingDtoStatusEnum.Ignored]: "Ignored",
-};
-
 const SEVERITY_ORDER: Record<string, number> = {
   CRITICAL: 5,
   HIGH: 4,
@@ -175,14 +169,19 @@ function getHighestSeverity(findings: SearchAssetFindingDto[]): string | null {
   }, firstFinding.severity);
 }
 
-const statusVariant: Record<
-  AssetListItemDtoStatusEnum,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  NEW: "default",
-  UPDATED: "secondary",
-  UNCHANGED: "outline",
-  DELETED: "destructive",
+/**
+ * Asset status → the shared status scale.
+ *
+ * These were raw `Badge` variants, which meant NEW rendered as the *default*
+ * badge: acid-green fill, 2px black border, hard drop shadow — the loudest
+ * object on the page, sitting in a column next to two other status pills drawn
+ * three other ways.
+ */
+const ASSET_STATUS_TONE: Record<AssetListItemDtoStatusEnum, StatusTone> = {
+  NEW: "fresh",
+  UPDATED: "changed",
+  UNCHANGED: "idle",
+  DELETED: "error",
 };
 
 const EMPTY_ASSET_STATUSES: AssetStatusFilterValue[] = [];
@@ -200,14 +199,6 @@ function formatEnumLabel(value: string) {
     .split("_")
     .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
     .join(" ");
-}
-
-function severityColor(severity: string) {
-  const key =
-    severity.toUpperCase() as keyof typeof FINDING_SEVERITY_COLOR_BY_ENUM;
-  return (
-    FINDING_SEVERITY_COLOR_BY_ENUM[key] ?? FINDING_SEVERITY_COLOR_BY_ENUM.INFO
-  );
 }
 
 function toStatusBadgeValue(status: string) {
@@ -882,7 +873,7 @@ export function AssetsTable({
                     <span
                       className="h-2 w-2 rounded-full"
                       style={{
-                        backgroundColor: `var(--${status === "NEW" ? "accent" : status === "UPDATED" ? "chart-4" : "muted-foreground"})`,
+                        backgroundColor: `var(--${status === "NEW" ? "chart-4" : status === "UPDATED" ? "accent-ink" : "muted-foreground"})`,
                       }}
                     />
                     {formatEnumLabel(status)}
@@ -1141,9 +1132,9 @@ export function AssetsTable({
                         </TableCell>
 
                         <TableCell>
-                          <Badge variant="outline">
+                          <ToneBadge tone="neutral">
                             {formatEnumLabel(asset.sourceType)}
-                          </Badge>
+                          </ToneBadge>
                         </TableCell>
 
                         <TableCell>
@@ -1151,13 +1142,13 @@ export function AssetsTable({
                         </TableCell>
 
                         <TableCell>
-                          <Badge
-                            variant={statusVariant[asset.status] || "outline"}
+                          <ToneBadge
+                            tone={ASSET_STATUS_TONE[asset.status] ?? "idle"}
                           >
                             {t(
                               `sources.asset${asset.status.charAt(0) + asset.status.slice(1).toLowerCase()}` as TranslationKey,
                             )}
-                          </Badge>
+                          </ToneBadge>
                         </TableCell>
 
                         <TableCell>
@@ -1224,12 +1215,9 @@ export function AssetsTable({
                                 </StatusBadge>
                               ))}
                               {statusCounts.length > 2 && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[11px]"
-                                >
-                                  +{statusCounts.length - 2} more
-                                </Badge>
+                                <ToneBadge tone="neutral">
+                                  +{statusCounts.length - 2}
+                                </ToneBadge>
                               )}
                             </div>
                           )}

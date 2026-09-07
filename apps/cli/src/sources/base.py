@@ -78,6 +78,8 @@ class BaseSource(ABC):
         # before the override hook so subclasses can consult it there if needed.
         self._sampling_cursor: dict[str, Any] = self._load_sampling_cursor()
         self._next_sampling_cursor: dict[str, Any] | None = None
+        self._partial_coverage: bool = False
+        self._partial_coverage_reason: str = ""
         self._sampling_cursor_lock = threading.Lock()
         self._apply_initial_sampling_override(normalized_recipe)
         recipe.clear()
@@ -94,6 +96,19 @@ class BaseSource(ABC):
         # Set by main.py for API runs (see attach_payload_windows). None means
         # payloads stream whole.
         self._payload_windows: Any = None
+        # Set by main.py when the recipe enables augmentation (see
+        # attach_augmentation). None means provably inert: no child process,
+        # no tags, no per-asset work.
+        self._augmentation_session: Any = None
+        # Tags the augmentation notebook asserted, by asset hash. Read by the
+        # pipeline's tag pass from worker threads, so guarded by a lock.
+        self._augmentation_tags: dict[str, dict[str, str]] = {}
+        self._augmentation_tags_lock = threading.Lock()
+        # Bytes augmentation already fetched, by asset hash, so the pipeline
+        # does not re-download them. Bounded by the augmentation memo policy;
+        # dropped by forget_augmentation_bytes() at the end of each asset.
+        self._augmentation_bytes: dict[str, tuple[bytes, str]] = {}
+        self._augmentation_bytes_lock = threading.Lock()
 
     def _apply_initial_sampling_override(self, recipe: dict[str, Any]) -> None:
         pass
@@ -136,6 +151,28 @@ class BaseSource(ABC):
         cursor.
         """
         return self._next_sampling_cursor
+
+    def declare_partial_coverage(self, reason: str = "") -> None:
+        """Say that this run looked at only part of the source.
+
+        Retirement is driven by absence: under strategy=ALL an asset missing
+        from the run is taken to be gone from the source. That inference is
+        only sound if the run actually visited everything, and a connector that
+        picks its own cohort each run -- a change feed, a resumable sweep, a
+        date window -- never does. Raising this turns the inference off for the
+        run.
+        """
+        self._partial_coverage = True
+        if reason and not self._partial_coverage_reason:
+            self._partial_coverage_reason = str(reason)
+
+    @property
+    def partial_coverage(self) -> bool:
+        return bool(getattr(self, "_partial_coverage", False))
+
+    @property
+    def partial_coverage_reason(self) -> str:
+        return str(getattr(self, "_partial_coverage_reason", ""))
 
     def sampling_window_size(self, default: int = 100) -> int:
         """The per-run AUTOMATIC slice size (``rows_per_page``)."""
@@ -379,6 +416,47 @@ class BaseSource(ABC):
         """
         self._payload_windows = store
 
+    def attach_augmentation(self, session: Any) -> None:
+        """Give this source the run's augmentation session.
+
+        Set by ``main.py`` before phase 2, when the recipe enables it. Absent
+        means provably inert: ``asset_tags()`` returns nothing and no per-asset
+        work happens — so a source, a test or a local run that never attaches
+        one is unaffected.
+        """
+        self._augmentation_session = session
+
+    @property
+    def augmentation_session(self) -> Any:
+        """The run's augmentation session, or None when augmentation is off."""
+        return self._augmentation_session
+
+    def record_augmentation_tags(self, asset_hash: str, tags: Mapping[str, str]) -> None:
+        """Remember tags the augmentation notebook asserted about one asset."""
+        if not asset_hash or not tags:
+            return
+        with self._augmentation_tags_lock:
+            merged = dict(self._augmentation_tags.get(asset_hash, {}))
+            merged.update(tags)
+            self._augmentation_tags[asset_hash] = merged
+
+    def remember_augmentation_bytes(self, asset_hash: str, raw: bytes, mime: str) -> None:
+        """Keep bytes augmentation already fetched, for the pipeline to reuse."""
+        if not asset_hash or not raw:
+            return
+        with self._augmentation_bytes_lock:
+            self._augmentation_bytes[asset_hash] = (raw, mime)
+
+    def peek_augmentation_bytes(self, asset_hash: str) -> tuple[bytes, str] | None:
+        """Bytes augmentation fetched for this asset, if it fetched any."""
+        with self._augmentation_bytes_lock:
+            return self._augmentation_bytes.get(asset_hash)
+
+    def forget_augmentation_bytes(self, asset_hash: str) -> None:
+        """Drop one asset's memoized bytes. Called at the end of each asset."""
+        with self._augmentation_bytes_lock:
+            self._augmentation_bytes.pop(asset_hash, None)
+
     def iter_asset_pages(
         self,
         file_bytes: bytes | Any,
@@ -494,13 +572,15 @@ class BaseSource(ABC):
         return None
 
     def asset_tags(self, asset_hash: str) -> Mapping[str, str]:
-        """Facts this source asserted about an asset, keyed by Tag detector key.
+        """Facts asserted about an asset, keyed by Tag detector key.
 
-        Only the CUSTOM source has these: a connector notebook is the one place
-        that can know something the content does not say. Every other source
-        returns nothing, and the pipeline skips the tag pass entirely.
+        Two producers: the CUSTOM connector notebook (held by that subclass)
+        and the augmentation notebook (held here, for every source type). With
+        neither, this returns nothing and the pipeline skips the tag pass
+        entirely.
         """
-        return {}
+        with self._augmentation_tags_lock:
+            return dict(self._augmentation_tags.get(asset_hash, {}))
 
     def enrich_finding_location(
         self,

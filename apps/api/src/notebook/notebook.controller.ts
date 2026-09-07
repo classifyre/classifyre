@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -10,12 +11,15 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
 import {
+  AUGMENTATION_OPTIONAL_FUNCTIONS,
+  AUGMENTATION_REQUIRED_FUNCTIONS,
   NotebookService,
   OPTIONAL_FUNCTIONS,
   REQUIRED_FUNCTIONS,
+  type NotebookScope,
 } from './notebook.service';
 import { NotebookExecutionService } from './notebook-execution.service';
 import {
@@ -41,11 +45,22 @@ export class NotebookController {
     summary: 'The starter cells and the functions a notebook must define',
   })
   @ApiResponse({ status: 200, type: NotebookScaffoldDto })
-  scaffold(): NotebookScaffoldDto {
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: ['connector', 'augmentation'],
+  })
+  scaffold(@Query('scope') scope?: NotebookScope): NotebookScaffoldDto {
+    const resolved = this.resolveScope(scope);
+    const isAugmentation = resolved === 'augmentation';
     return {
-      ...this.notebooks.scaffold(),
-      requiredFunctions: REQUIRED_FUNCTIONS,
-      optionalFunctions: OPTIONAL_FUNCTIONS,
+      ...this.notebooks.scaffold(resolved),
+      requiredFunctions: isAugmentation
+        ? AUGMENTATION_REQUIRED_FUNCTIONS
+        : REQUIRED_FUNCTIONS,
+      optionalFunctions: isAugmentation
+        ? AUGMENTATION_OPTIONAL_FUNCTIONS
+        : OPTIONAL_FUNCTIONS,
     };
   }
 
@@ -54,15 +69,28 @@ export class NotebookController {
     summary: 'Worked notebooks an author can start from or borrow cells out of',
   })
   @ApiResponse({ status: 200, type: [NotebookTemplateDto] })
-  templates(): NotebookTemplateDto[] {
-    return this.notebooks.templates();
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: ['connector', 'augmentation'],
+  })
+  templates(@Query('scope') scope?: NotebookScope): NotebookTemplateDto[] {
+    return this.notebooks.templates(this.resolveScope(scope));
   }
 
   @Get('sources/:sourceId/notebook')
-  @ApiOperation({ summary: "Read a CUSTOM source's notebook" })
+  @ApiOperation({ summary: "Read a source's notebook" })
   @ApiResponse({ status: 200, type: NotebookDto })
-  get(@Param('sourceId') sourceId: string) {
-    return this.notebooks.get(sourceId);
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: ['connector', 'augmentation'],
+  })
+  get(
+    @Param('sourceId') sourceId: string,
+    @Query('scope') scope?: NotebookScope,
+  ) {
+    return this.notebooks.get(sourceId, this.resolveScope(scope));
   }
 
   @Put('sources/:sourceId/notebook')
@@ -73,8 +101,17 @@ export class NotebookController {
   })
   @ApiResponse({ status: 200, type: UpdateNotebookResponseDto })
   @ApiResponse({ status: 409, description: 'The notebook has moved on' })
-  update(@Param('sourceId') sourceId: string, @Body() dto: UpdateNotebookDto) {
-    return this.notebooks.update(sourceId, dto);
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: ['connector', 'augmentation'],
+  })
+  update(
+    @Param('sourceId') sourceId: string,
+    @Body() dto: UpdateNotebookDto,
+    @Query('scope') scope?: NotebookScope,
+  ) {
+    return this.notebooks.update(sourceId, dto, this.resolveScope(scope));
   }
 
   @Get('sources/:sourceId/notebook/export')
@@ -83,15 +120,32 @@ export class NotebookController {
     description:
       'Uses the `# %%` convention, so the result runs under plain `python workflow.py` with no notebook runtime.',
   })
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: ['connector', 'augmentation'],
+  })
   async exportPython(
     @Param('sourceId') sourceId: string,
     @Res() reply: FastifyReply,
+    @Query('scope') scope?: NotebookScope,
   ): Promise<void> {
-    const source = await this.notebooks.exportPython(sourceId);
+    const source = await this.notebooks.exportPython(
+      sourceId,
+      this.resolveScope(scope),
+    );
     void reply
       .header('Content-Type', 'text/x-python; charset=utf-8')
       .header('Content-Disposition', 'attachment; filename="workflow.py"')
       .send(source);
+  }
+
+  private resolveScope(scope?: string): NotebookScope {
+    if (scope === undefined || scope === 'connector') return 'connector';
+    if (scope === 'augmentation') return 'augmentation';
+    throw new BadRequestException(
+      `Unknown notebook scope '${scope}'. Expected 'connector' or 'augmentation'.`,
+    );
   }
 
   @Post('sources/:sourceId/notebook/executions')

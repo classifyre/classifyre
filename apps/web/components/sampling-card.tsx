@@ -109,7 +109,7 @@ export function SamplingCard({
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-border bg-foreground text-primary-foreground">
-        <Database className="h-4 w-4 text-accent" />
+        <Database className="h-4 w-4 text-accent-ink" />
         <span className="text-xs font-mono uppercase tracking-[0.12em] font-bold">
           {t("sources.sampling.title")}
         </span>

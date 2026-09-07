@@ -79,6 +79,12 @@ export interface FinalizeIngestRunDto {
      * @memberof FinalizeIngestRunDto
      */
     relationshipErrors?: Array<string>;
+    /**
+     * The connector covered only a slice of the source this run, so absence from seenHashes proves nothing and no asset is retired. Set it when the connector chooses its own cohort — a change feed, a resumable sweep, a date window — which the sampling strategy cannot express: strategy=ALL describes what the RUNTIME does with the stream, not how much of the source the connector decided to ask for.
+     * @type {boolean}
+     * @memberof FinalizeIngestRunDto
+     */
+    partialCoverage?: boolean;
 }
 
 /**
@@ -110,6 +116,7 @@ export function FinalizeIngestRunDtoFromJSONTyped(json: any, ignoreDiscriminator
         'relationshipsLost': json['relationshipsLost'] == null ? undefined : json['relationshipsLost'],
         'relationshipsDropped': json['relationshipsDropped'] == null ? undefined : json['relationshipsDropped'],
         'relationshipErrors': json['relationshipErrors'] == null ? undefined : json['relationshipErrors'],
+        'partialCoverage': json['partialCoverage'] == null ? undefined : json['partialCoverage'],
     };
 }
 
@@ -134,6 +141,7 @@ export function FinalizeIngestRunDtoToJSONTyped(value?: FinalizeIngestRunDto | n
         'relationshipsLost': value['relationshipsLost'],
         'relationshipsDropped': value['relationshipsDropped'],
         'relationshipErrors': value['relationshipErrors'],
+        'partialCoverage': value['partialCoverage'],
     };
 }
 

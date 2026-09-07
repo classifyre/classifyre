@@ -64,7 +64,32 @@ api:
     TEMP_DIR: /tmp
     RUNNER_LOGS_DIR: /tmp/classifyre/runner-logs
     MAX_RUNNERS_PER_SOURCE: "5"
-    MAX_CONCURRENT_RUNNERS: "2"
+    # Two different caps, and only the second one gates adaptive scheduling:
+    #   MAX_CONCURRENT_RUNNERS      - hard instance-wide cap in CliRunnerService;
+    #                                 QUEUES what is over it.
+    #   AUTO_SCHEDULE_MAX_CONCURRENT - what the AUTO scheduler will let be in
+    #                                 flight before it declines to start more.
+    #                                 Defaults to 2, and nothing sets it.
+    # Raising only the first left the scheduler still logging "cap 2" and
+    # holding overdue sources back with slots free.
+    #
+    # Four, not two: the register sweep is bounded by ingest+detection
+    # throughput rather than by any external API, and the k3d node sits around
+    # 23% CPU with two scans in flight.
+    MAX_CONCURRENT_RUNNERS: "4"
+    AUTO_SCHEDULE_MAX_CONCURRENT: "4"
+    # Politeness on a shared node, NOT a memory fix. This was halved from 4 as
+    # an OOM mitigation on the theory that each namespace forks its own
+    # onnxruntime and four of them were stacking up. That theory was wrong on
+    # both counts: EmbeddingProviderService is a singleton owning exactly ONE
+    # forked child for the whole process, and only one namespace here has
+    # embeddings enabled at all (firmenbuch-test-2, via a DB override — this
+    # values file sets api.embedding.enabled=false, which a workspace row
+    # overrides). The pod was dying on a single 2,000-row inference call; see
+    # worker.resources below. Thread count is a CPU knob — keep it modest so
+    # background embedding does not starve the API, and do not expect it to
+    # bound memory.
+    EMBEDDING_INTRA_OP_THREADS: "2"
     DEMO_MODE: "false"
 
   extraVolumeMounts:
@@ -316,7 +341,40 @@ worker:
       memory: 256Mi
     limits:
       cpu: "2"
-      memory: 4Gi
+      # 6Gi, and this is not the lever. The pod was OOMKilled (exit 137) at
+      # 4Gi, 6Gi AND 8Gi. Sampled from the cgroup at 8Gi:
+      #
+      #   12:59:19   729 MB   <- flat baseline for minutes
+      #   12:59:48  5041 MB
+      #   13:00:43  8190 MB   <- hit the 8192 cap exactly, still climbing
+      #
+      # 729 MB to the ceiling in 85 seconds, whatever the ceiling is. Root
+      # cause, found 2026-09-07 and fixed in EmbeddingProviderService: the
+      # queue handler flattened one pg-boss fetch — EMBEDDING_BATCH_SIZE=32
+      # jobs x EMBEDDING_QUEUE_BATCH_SIZE=64 chunks — into a single
+      # ~2,000-row inference call. transformers.js tokenizes with
+      # `padding: true`, so a batch pads to its longest row and one attention
+      # tensor costs rows x heads x seq x seq x 4: at 2,000 rows of ~300
+      # tokens on MiniLM-L6 that is 8.6 GB, for one tensor. pg-boss agreed —
+      # all eight of those batches were still `active` when their containers
+      # died, one per container lifetime; none ever completed.
+      #
+      # It was never about namespace count: one namespace has embeddings on,
+      # and there is one forked onnxruntime for the whole process. Inference
+      # is now bounded by rows AND by rows x longest-text
+      # (EMBEDDING_MAX_BATCH_CHARS, default 64,000) and serialised across
+      # callers, which puts the peak in the low hundreds of MB.
+      #
+      # 6Gi rather than 8Gi because the ceiling was never what saved the pod:
+      # a higher one only lets a runaway take more of the single 16Gi node
+      # before it dies, competing with Postgres for the page cache it already
+      # lacks.
+      #
+      # worker.maxOldSpaceSizeMb is not the lever either: the JS heap sat at
+      # 391 Mi while the pod died. The allocation is native and V8 flags
+      # cannot bound it; raising the cap only lets V8 compete for the same
+      # budget.
+      memory: 6Gi
 
 frontend:
   # Web is not deployed in-cluster for local dev — run it directly on your

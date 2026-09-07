@@ -544,7 +544,7 @@ client = ApiClient(
 | `ctx.page_size` | The configured rows-per-page. |
 | `ctx.sampling` | The whole sampling config. |
 | `ctx.cursor` | What the previous run recorded. Empty on the first run. |
-| `ctx.set_cursor(dict)` | Record where this run got to, for the next one. |
+| `ctx.set_cursor(dict)` | Record where this run got to, for the next one. Kept under every sampling strategy — use it for any run-to-run state, not just pagination. |
 | `ctx.should_abort` | `True` once the run has been asked to stop. |
 | `ctx.log(*parts)` | Write to the scan log. |
 | `ctx.now()` | Current UTC time. |

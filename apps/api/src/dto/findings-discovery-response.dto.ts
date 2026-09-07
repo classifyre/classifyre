@@ -79,6 +79,13 @@ export class FindingsDiscoveryTopAssetDto {
   @ApiProperty({ enum: Severity })
   highestSeverity: Severity;
 
+  @ApiProperty({
+    type: FindingsDiscoverySeverityBreakdownDto,
+    description:
+      'Priority mix of this asset\'s findings. Already computed to rank the list, so it costs nothing to return and lets the caller draw a per-asset bar.',
+  })
+  severityCounts: FindingsDiscoverySeverityBreakdownDto;
+
   @ApiProperty({ required: false, nullable: true })
   lastDetectedAt?: Date | null;
 }
@@ -116,8 +123,17 @@ export class DiscoveryRecentRunDto {
   @ApiProperty({ required: false, nullable: true })
   durationMs?: number | null;
 
-  @ApiProperty()
+  @ApiProperty({
+    description:
+      "The source's open finding set as of this run — NOT what the run discovered. Use findingsCreated for that.",
+  })
   totalFindings: number;
+
+  @ApiProperty({ description: 'Findings this run raised that did not exist before.' })
+  findingsCreated: number;
+
+  @ApiProperty({ description: 'Findings this run resolved because they were gone.' })
+  findingsResolved: number;
 
   @ApiProperty()
   assetsCreated: number;
@@ -169,6 +185,20 @@ export class FindingsDiscoveryRefreshResponseDto {
   isBuilt: boolean;
 }
 
+/**
+ * Review-state mix over the same window, counted WITHOUT the status filter that
+ * `totals` applies.
+ *
+ * `totals.byStatus` cannot answer this: the overview defaults to
+ * `includeResolved: false`, so it only ever counts OPEN rows and the other three
+ * buckets are structurally zero. Keeping them separate means the headline number
+ * keeps its "still open" meaning while the review-state strip tells the truth.
+ */
+export class FindingsDiscoveryStatusMixDto extends FindingsDiscoveryStatusBreakdownDto {
+  @ApiProperty({ description: 'Sum of the four buckets — findings of any status in the window.' })
+  total: number;
+}
+
 export class FindingsDiscoveryResponseDto {
   @ApiProperty({ enum: [7, 30, 90] })
   windowDays: number;
@@ -178,6 +208,9 @@ export class FindingsDiscoveryResponseDto {
 
   @ApiProperty({ type: FindingsDiscoveryTotalsDto })
   totals: FindingsDiscoveryTotalsDto;
+
+  @ApiProperty({ type: FindingsDiscoveryStatusMixDto })
+  statusMix: FindingsDiscoveryStatusMixDto;
 
   @ApiProperty({ type: FindingsDiscoveryActivityDto })
   activity: FindingsDiscoveryActivityDto;

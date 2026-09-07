@@ -226,7 +226,7 @@
     "name": "Name",
     "description": "Beschreibung",
     "created": "Erstellt",
-    "severity": "Schweregrad",
+    "severity": "Priorität",
     "source": "Quelle",
     "sources": "Quellen",
     "asset": "Asset",
@@ -887,7 +887,7 @@
     "title": "Befunde",
     "totalFindings": "Befunde Gesamt",
     "findingsTrend": "Befund-Trend",
-    "severityTimeline": "Schweregrad-Verlauf für das gewählte Zeitfenster.",
+    "severityTimeline": "Prioritätsverlauf für das gewählte Zeitfenster.",
     "noTrendData": "Keine Trenddaten für den gewählten Bereich verfügbar.",
     "updatingChart": "Diagramm wird aktualisiert…",
     "search": "Befunde, Erkennungsregeln, Assets, Quellen suchen…",
@@ -912,7 +912,7 @@
       "asset": "Asset",
       "source": "Quelle",
       "matchedContent": "Erkannter Inhalt",
-      "severity": "Schweregrad",
+      "severity": "Priorität",
       "status": "Status",
       "confidence": "Konfidenz",
       "detected": "Erkannt",
@@ -937,7 +937,7 @@
       "updateFinding": "{{count}} Befund aktualisieren",
       "updateFindings": "{{count}} Befunde aktualisieren",
       "status": "Status",
-      "severity": "Schweregrad",
+      "severity": "Priorität",
       "comment": "Kommentar",
       "noChange": "Keine Änderung",
       "commentPlaceholder": "Kommentar zu allen ausgewählten Befunden hinzufügen…"
@@ -1017,14 +1017,14 @@
       "HIGH": "Hoch",
       "MEDIUM": "Mittel",
       "LOW": "Niedrig",
-      "INFO": "Info"
+      "INFO": "Routine"
     },
     "drawer": {
       "title": "Details",
       "description": "Befundstatus, Schweregrad und Notizen prüfen und anpassen.",
       "closeAriaLabel": "Details schließen",
       "statusSectionLabel": "Status",
-      "severitySectionLabel": "Schweregrad",
+      "severitySectionLabel": "Priorität",
       "commentSectionLabel": "Kommentar",
       "commentPlaceholder": "Notiz zu diesem Befund hinzufügen…",
       "confidenceSectionLabel": "Konfidenz",
@@ -1139,10 +1139,10 @@
       "sourceTypeDesc": "Der Typ der Datenquelle, zu der dieses Asset gehört",
       "detectorsDesc": "Aktive Detektoren, die auf dieses Asset angesprochen haben, und ihre Befundanzahl",
       "topFindingsDesc": "Häufigste Befundtypen für dieses Asset",
-      "severityDesc": "Höchster Schweregrad und Gesamtzahl der Befunde",
+      "severityDesc": "Befund mit der höchsten Priorität und Gesamtzahl der Befunde",
       "statusMixDesc": "Aufschlüsselung der Befundstatus für dieses Asset"
     },
-    "searchSeverity": "Schweregrade suchen...",
+    "searchSeverity": "Priorität suchen...",
     "noSeveritiesFound": "Keine Schweregrade gefunden",
     "searchDetectorTypes": "Erkennungstypen suchen...",
     "noDetectorTypesFound": "Keine Erkennungstypen gefunden",
@@ -1327,8 +1327,8 @@
       "methodSetupDesc": "Methodenspezifische Logik und Erkennungsidentität konfigurieren.",
       "testScenarios": "Testszenarien",
       "testScenariosDesc": "Sicherstellen, dass die Erkennungsregel korrekt funktioniert.",
-      "patternSeverity": "Muster & Schweregrad",
-      "patternSeverityDesc": "Schweregrad, Konfidenz und Sprachabdeckung anpassen.",
+      "patternSeverity": "Muster & Priorität",
+      "patternSeverityDesc": "Priorität, Konfidenz und Sprachabdeckung anpassen.",
       "searchExamples": "Beispiele nach Anwendungsfall oder Methode suchen",
       "catalogTitle": "Detektor-Katalog",
       "catalogSubtitle": "Methode und Starter wählen",
@@ -1353,7 +1353,7 @@
       "languages": "Sprachen (kommagetrennt)",
       "confidenceThreshold": "Konfidenzschwellenwert",
       "maxFindings": "Maximale Befunde",
-      "severityThreshold": "Schweregradsschwellenwert",
+      "severityThreshold": "Prioritätsschwelle",
       "extractorEnabled": "Extraktor aktiviert",
       "extractorFields": "Extraktorfelder",
       "extractorModel": "Extraktor-GLiNER-Modell",
@@ -1444,13 +1444,13 @@
       "patternLabel": "Muster",
       "patternPlaceholder": "z.B. ORD-\\d{4,8}",
       "patternDescriptionPlaceholder": "Beschreibung dessen, was dieses Muster erkennt",
-      "severity": "Schweregrad",
+      "severity": "Priorität",
       "severityAuto": "Auto (hoch)",
       "severityCritical": "Kritisch",
       "severityHigh": "Hoch",
       "severityMedium": "Mittel",
       "severityLow": "Niedrig",
-      "severityInfo": "Info",
+      "severityInfo": "Routine",
       "captureGroup": "Erfassungsgruppe",
       "captureGroupHint": "0 = gesamter Treffer",
       "caseSensitive": "Groß-/Kleinschreibung",
@@ -1483,11 +1483,11 @@
       "stepIdentityDesc": "Name, Schlüssel und Status",
       "stepModel": "Modell",
       "stepModelDesc": "HuggingFace-Modellkonfiguration",
-      "stepSeverity": "Schweregrad-Karte",
-      "stepSeverityDesc": "Label zu Schweregrad Zuordnung",
+      "stepSeverity": "Prioritäts-Zuordnung",
+      "stepSeverityDesc": "Label-zu-Priorität-Zuordnung",
       "identityTitle": "Detektor-Identität",
       "modelTitle": "Modellkonfiguration",
-      "severityTitle": "Schweregrad-Karte",
+      "severityTitle": "Prioritäts-Zuordnung",
       "name": "Name",
       "namePlaceholder": "z.B. Spam-Klassifikator",
       "keyLabel": "Schlüssel",
@@ -1518,7 +1518,7 @@
       "nmsThresholdDefault": "Modellstandard",
       "minBoxArea": "Minimale Box-Fläche (px²)",
       "minBoxAreaNoMin": "kein Minimum",
-      "severityMapHint": "Vorhergesagte Labels Schweregraden zuordnen. Die erste passende Regel gewinnt. Nicht zugeordnete Labels erhalten standardmäßig info.",
+      "severityMapHint": "Vorhergesagte Labels Prioritätsstufen zuordnen. Die erste passende Regel gewinnt. Nicht zugeordnete Labels sind standardmäßig Routine.",
       "labelPattern": "Label-Muster (Regex)",
       "addRule": "Regel hinzufügen",
       "removeRule": "Regel entfernen",
@@ -1537,8 +1537,8 @@
       "stepPromptDesc": "System-Prompt und Sampling",
       "stepLabels": "Labels",
       "stepLabelsDesc": "Klassifikations-Taxonomie",
-      "stepSeverity": "Schweregrad-Zuordnung",
-      "stepSeverityDesc": "Label-zu-Schweregrad-Zuordnung",
+      "stepSeverity": "Prioritäts-Zuordnung",
+      "stepSeverityDesc": "Label-zu-Priorität-Zuordnung",
       "stepOutput": "Ausgabefelder",
       "stepOutputDesc": "Strukturierte Extraktion",
       "identityTitle": "Detektor-Identität",
@@ -1574,10 +1574,10 @@
       "addLabel": "Label hinzufügen",
       "removeLabel": "Label entfernen",
       "multiLabel": "Mehrere Labels zulassen",
-      "severityTitle": "Schweregrad-Zuordnung",
-      "severityMapHint": "Vorhergesagte Labels Schweregraden zuordnen. Die erste passende Regel gewinnt; nicht zugeordnete Labels verwenden den Standard-Schweregrad.",
+      "severityTitle": "Prioritäts-Zuordnung",
+      "severityMapHint": "Vorhergesagte Labels Prioritätsstufen zuordnen. Die erste passende Regel gewinnt; nicht zugeordnete Labels verwenden die Standard-Priorität.",
       "confidenceThreshold": "Konfidenzschwelle",
-      "defaultSeverity": "Standard-Schweregrad",
+      "defaultSeverity": "Standard-Priorität",
       "labelPattern": "Label-Muster (Regex)",
       "addRule": "Regel hinzufügen",
       "removeRule": "Regel entfernen",
@@ -1670,8 +1670,8 @@
       "labelLabel": "Label",
       "labelPlaceholder": "z. B. Karteninhaberdaten",
       "labelHint": "Wird von jedem Fund dieses Detektors getragen. Standard ist der Name.",
-      "severityLabel": "Schweregrad",
-      "severityHint": "Jeder Fund dieses Tags erhält diesen Schweregrad. Ein Tag wird behauptet, nicht abgeleitet — es gibt keine Konfidenz, aus der sich einer ergeben könnte.",
+      "severityLabel": "Priorität",
+      "severityHint": "Jeder Fund dieses Tags erhält diese Priorität. Ein Tag wird behauptet, nicht abgeleitet — es gibt keine Konfidenz, aus der sich eine ergeben könnte.",
       "usageTitle": "Verwendung im Notebook",
       "usageHint": "Fügen Sie diesen Schlüssel jedem Asset hinzu, das Ihr Custom-Connector liefert. Der übergebene Wert wird zum Treffer-Inhalt des Funds.",
       "usageCopy": "Snippet kopieren",
@@ -1700,10 +1700,10 @@
       "processingStatus": "Verarbeitungsstatus",
       "searchStatus": "Status suchen…",
       "noStatusesFound": "Keine Status gefunden",
-      "findingSeverity": "Befund-Schweregrad",
+      "findingSeverity": "Befund-Priorität",
       "findingStatus": "Befundstatus",
       "findingDetectorType": "Erkennungstyp",
-      "searchSeverity": "Schweregrad suchen…",
+      "searchSeverity": "Priorität suchen…",
       "noSeveritiesFound": "Keine Schweregrade gefunden",
       "searchFindingStatus": "Status suchen…",
       "noFindingStatusesFound": "Keine Status gefunden",
@@ -1962,7 +1962,7 @@
     "columns": {
       "title": "Titel",
       "status": "Status",
-      "severity": "Schweregrad",
+      "severity": "Priorität",
       "inquiries": "Anfragen",
       "updated": "Aktualisiert"
     },
@@ -1977,7 +1977,7 @@
       "HIGH": "Hoch",
       "MEDIUM": "Mittel",
       "LOW": "Niedrig",
-      "INFO": "Info"
+      "INFO": "Routine"
     },
     "evidence": {
       "search": "Beweise suchen…",
@@ -2011,7 +2011,7 @@
         "findingLabel": "Befund",
         "detectorType": "Detektor",
         "matchedContent": "Treffer-Inhalt",
-        "severity": "Schweregrad",
+        "severity": "Priorität",
         "note": "Notiz",
         "added": "Hinzugefügt",
         "attachedFindings": "Angehängte Befunde",
@@ -2021,12 +2021,12 @@
           "findingLabel": "Erkannter Befundtyp",
           "detectorType": "Detektortyp, der diesen Befund ausgelöst hat",
           "matchedContent": "Inhaltsfragment, das diesen Befund ausgelöst hat",
-          "severity": "Risikoniveau dieses Befunds",
+          "severity": "Wie wichtig dieser Befund für die Untersuchung ist",
           "note": "Analystennotiz, Stift klicken zum Bearbeiten",
           "added": "Wann dieser Befund dem Fall hinzugefügt wurde",
           "sortByFinding": "Nach Befundtyp sortieren",
           "sortByDetector": "Nach Detektortyp sortieren",
-          "sortBySeverity": "Nach Schweregrad sortieren",
+          "sortBySeverity": "Nach Priorität sortieren",
           "sortByAdded": "Nach Hinzufügedatum sortieren"
         }
       }
@@ -2323,55 +2323,100 @@
   },
   "discovery": {
     "title": "Übersicht",
-    "securityBrief": "Sicherheitsübersicht",
-    "allFindings": "Alle Befunde",
+    "securityBrief": "Befundübersicht",
     "allFindingsWithDays": "Alle Befunde · letzte {{days}} Tage",
-    "allFindingsToday": "Alle Befunde · heute",
     "findingsToReview": "Zu prüfende Befunde",
-    "open": "Offen",
-    "resolved": "Behoben",
-    "falsePositive": "Falsch-Positiv",
-    "ignored": "Ignoriert",
+    "open": "offen",
+    "resolved": "erledigt",
+    "falsePositive": "nicht relevant",
+    "ignored": "zurückgestellt",
     "whatNeedsAttention": "Was Aufmerksamkeit erfordert",
     "incoming": "Eingehend",
     "newToday": "heute neu",
     "thisWeek": "diese Woche",
     "thisMonth": "diesen Monat",
-    "basedOnTimestamps": "Basierend auf Erkennungszeitpunkten",
-    "whereRiskClusters": "Wo Risiken konzentriert sind",
-    "assetsWithMost": "Assets mit den meisten Befunden",
+    "basedOnTimestamps": "Gezählt nach Erkennungszeitpunkt",
+    "whereRiskClusters": "Aktivste Assets",
     "viewAll": "Alle anzeigen",
     "findingsLabel": "Befunde",
     "assetsLabel": "Assets",
     "updatedLabel": "aktualisiert",
-    "firstScan": "Ersten Scan starten, um risikoreiche Assets zu finden.",
+    "newLabel": "neu",
+    "resolvedLabel": "erledigt",
+    "firstScan": "Ersten Scan starten, um zu sehen, was Ihre Quellen enthalten.",
     "startScan": "Scan starten",
     "recentScans": "Letzte Scans",
-    "last10Runs": "Letzte 10 Läufe",
+    "lastRuns": "Letzte {{count}} Läufe",
     "runningCount": "{{count}} laufend",
     "allScans": "Alle Scans",
     "noScansYet": "Noch keine Scans",
-    "resolutionSnapshot": "Auflösungsübersicht",
-    "reviewStatusMix": "Statusmix prüfen",
     "criticalFindings": "Kritische Befunde",
     "highFindings": "Hohe Befunde",
     "mediumFindings": "Mittlere Befunde",
     "lowFindings": "Niedrige Befunde",
-    "infoFindings": "Info-Befunde",
+    "infoFindings": "Routine-Befunde",
     "noFindings": "Keine Befunde",
-    "requireReview": "{{count}} erfordern sofortige Prüfung",
+    "requireReview": "{{count}} · zuerst ansehen",
     "noFindingsInWindow": "Keine Befunde im gewählten Zeitraum",
-    "currentHighest": "{{count}} {{level}} Befunde aktuell am höchsten",
+    "currentHighest": "Höchste Stufe: {{level}} · {{count}} offen",
     "retry": "Erneut versuchen",
     "errorPrefix": "Fehler: {{message}}",
     "stats": {
       "building": "Index wird erstellt…",
-      "buildingHint": "Diese Zahlen wurden direkt aus allen Funden gezählt – exakt, aber langsam. Eine Neuberechnung des vorab aggregierten Index läuft im Hintergrund; danach lädt diese Seite sofort.",
+      "buildingHint": "Diese Zahlen wurden direkt aus allen Befunden gezählt – exakt, aber langsam. Eine Neuberechnung des vorab aggregierten Index läuft im Hintergrund; danach lädt diese Seite sofort.",
       "updated": "Aktualisiert {{when}}",
-      "updatedHint": "Aus einem vorab aggregierten Index gelesen, der sich automatisch aktualisiert, sobald neue Funde eintreffen – deshalb lädt diese Seite sofort, statt Millionen Zeilen zu zählen.",
+      "updatedHint": "Aus einem vorab aggregierten Index gelesen, der sich automatisch aktualisiert, sobald neue Befunde eintreffen – deshalb lädt diese Seite sofort, statt Millionen Zeilen zu zählen.",
       "never": "Noch nicht erstellt",
       "refresh": "Statistiken jetzt neu berechnen"
     }
+  },
+  "casework": {
+    "title": "Fallarbeit",
+    "subtitle": "Laufende Fälle und Anfragen",
+    "viewAll": "Alle anzeigen"
+  },
+  "connections": {
+    "title": "Verbindungen",
+    "subtitle": "{{sources}} Quellen · {{connected}} verbundene Assets · {{isolated}} ohne Verbindung",
+    "loading": "Karte wird geladen…",
+    "building": "Karte wird erstellt…",
+    "expanding": "Quelle wird ausgeklappt…",
+    "error": "Karte konnte nicht geladen werden",
+    "fit": "Einpassen",
+    "reload": "Neu laden",
+    "legend": "Legende",
+    "hint": "Doppelklick auf eine Quelle klappt sie in ihre Assets auf. Assets ohne jede Verbindung werden nicht gezeichnet — sie werden an ihrer Quelle gezählt.",
+    "source": "Quelle",
+    "pairing": "Paarung",
+    "asset": "Asset",
+    "totalAssets": "Assets",
+    "connectedAssets": "Verbunden",
+    "unconnected": "Ohne Verbindung",
+    "internalEdges": "Interne Verbindungen",
+    "assetsInvolved": "Beteiligte Assets",
+    "expand": "Quelle ausklappen",
+    "collapse": "Quelle einklappen",
+    "openSource": "Quelle in neuem Tab öffnen",
+    "openAsset": "Asset öffnen",
+    "traceLineage": "Herkunft verfolgen",
+    "duplicatePairs": "{{count}} Duplikat-Paare",
+    "reviewDuplicates": "Duplikate prüfen",
+    "bundleLabel": "{{count}} verknüpfte Assets",
+    "class": {
+      "FLOW": "Herkunft",
+      "CONTAINMENT": "Enthält",
+      "IDENTITY": "Identisch mit",
+      "REFERENCE": "Verweist auf",
+      "USAGE": "Genutzt von"
+    },
+    "collapseAll": "Alle einklappen",
+    "linkTypes": "Verbindungsarten",
+    "allLinkTypes": "Alle Verbindungsarten",
+    "searchLinkTypes": "Verbindungsarten suchen…",
+    "noLinkTypes": "Keine Verbindungsarten gefunden",
+    "notBuiltYet": "Verbindungskarte wird noch erstellt — Zahlen erscheinen danach.",
+    "browseAssets": "Alle {{count}} Assets ansehen",
+    "browseAllAssets": "Alle Assets ansehen"
   },
   "breadcrumb": {
     "home": "Startseite",
@@ -2510,7 +2555,7 @@
       "titlePlaceholder": "Was wird untersucht?",
       "descriptionLabel": "Beschreibung",
       "descriptionPlaceholder": "Kontext, Umfang, was diese Untersuchung ausgelöst hat…",
-      "severityLabel": "Schweregrad",
+      "severityLabel": "Priorität",
       "assigneeLabel": "Zugewiesen an",
       "assigneePlaceholder": "Wer leitet diesen Fall? (optional)",
       "drivingInquiries": "Treibende Anfragen",
@@ -3055,7 +3100,7 @@
       "caseTitle": "Titel",
       "caseTitlePlaceholder": "z. B. Quellenübergreifendes Identitätsleck",
       "description": "Beschreibung",
-      "severity": "Schweregrad",
+      "severity": "Priorität",
       "pickCase": "Fall",
       "pickCasePlaceholder": "Fall auswählen…",
       "attachFindings": "Auch die Funde der Assets anhängen",
@@ -3939,6 +3984,14 @@
       "failed": "Vorlagen konnten nicht geladen werden."
     }
   },
+  "augmentation": {
+    "docsLink": "So funktioniert Augmentation",
+    "enableLabel": "Augmentation aktivieren",
+    "intro": "Ein Python-Notebook, das jedes Asset dieser Quelle anreichert — zusätzliche Metadaten, Tags, Links und Herkunftskanten. Nur hinzufügend: Es kann weder ändern, was der Konnektor extrahiert hat, noch ein Asset verwerfen oder einen Scan fehlschlagen lassen.",
+    "runSample": "Stichprobe ausführen",
+    "saveSourceFirst": "Speichern Sie diese Quelle einmal, um mit dem Augmentation-Notebook zu beginnen.",
+    "sectionTitle": "Augmentierung"
+  },
   "review": {
     "title": "Dublettenprüfung",
     "subtitle": "Assets, die dasselbe zu sein scheinen — gruppiert danach, warum sie zusammenpassen.",
@@ -4255,5 +4308,224 @@
     },
     "backToPatterns": "Zurück zu den Mustern",
     "backToPattern": "Zurück zum Muster"
+  },
+  "seo": {
+    "site": {
+      "title": "Classifyre — Erkennungsplattform für unstrukturierte Daten",
+      "description": "Open-Source-Erkennungsplattform, die Confluence, Jira, SharePoint, Notion, Datenbanken und Dateifreigaben durchsucht, um personenbezogene Daten, Geheimnisse, Sicherheitsprobleme und Duplikate aufzudecken — und Funde anschließend mit einem KI-Autopiloten zu Ermittlungen triagiert. Selbst gehostet, standardmäßig privat.",
+      "keywords": "Classifyre, Erkennungsplattform, PII-Erkennung, Secrets-Scanning, unstrukturierte Daten, DLP, Datensicherheit, Confluence-Scanner, Jira-Scanner, SharePoint-DLP, Duplikaterkennung, Entitätsauflösung, KI-Autopilot, Open-Source-Sicherheit",
+      "ogTitle": "Classifyre — Erkennungsplattform für unstrukturierte Daten",
+      "ogDescription": "Durchsuchen Sie jede Quelle, die Sie ohnehin betreiben, decken Sie das Wesentliche auf und ermitteln Sie mit einem KI-Autopiloten. Open Source, selbst gehostet, standardmäßig privat.",
+      "twitterTitle": "Classifyre — Erkennungsplattform für unstrukturierte Daten",
+      "twitterDescription": "Open-Source-Erkennungsplattform für personenbezogene Daten, Geheimnisse, Sicherheit und Duplikate in all Ihren unstrukturierten Daten."
+    },
+    "workspaces": {
+      "title": "Arbeitsbereiche",
+      "description": "Wählen Sie einen isolierten Arbeitsbereich, um eine Ermittlung fortzusetzen, oder legen Sie eine neue Fallakte an. Jeder Arbeitsbereich hat eigene Quellen, Scans und Funde.",
+      "ogTitle": "Arbeitsbereiche — isolierte Fallakten | Classifyre",
+      "ogDescription": "Jeder Arbeitsbereich hat eigene Quellen, Scans und Funde — wählen Sie einen aus oder legen Sie eine neue Fallakte an."
+    },
+    "discovery": {
+      "title": "Übersicht — Sicherheitslage & Zustand des Arbeitsbereichs",
+      "description": "Die Sicherheitslage des Arbeitsbereichs: offene und erledigte Funde, Risikocluster nach Asset und Quelle, jüngste Scanläufe und Verteilung der Erledigungen — Ihr Ausgangspunkt nach jedem Scan.",
+      "ogTitle": "Übersicht — Sicherheitslage | Classifyre",
+      "ogDescription": "Offene Funde, Risikocluster, jüngste Scans und Erledigungen — der Zustand dieses Arbeitsbereichs auf einen Blick."
+    },
+    "findings": {
+      "title": "Funde — jede Erkennung nach Schweregrad, Quelle & Detektor triagieren",
+      "description": "Triagieren Sie jede Erkennung an einem Ort — filtern Sie nach Schweregrad, Status, Konfidenz, Quelle und Detektor. Verfolgen Sie personenbezogene Daten, Geheimnisse, Sicherheitsprobleme und eigene Erkennungen von offen bis erledigt über alle Scans hinweg.",
+      "ogTitle": "Funde — jede Erkennung triagieren | Classifyre",
+      "ogDescription": "Nach Schweregrad, Status und Quelle filtern — Trefferinhalt, Signale und Verlauf zu jedem Fund prüfen."
+    },
+    "findingDetail": {
+      "title": "Fund-Details — Belege, Risiko & Prüfverlauf",
+      "description": "Untersuchen Sie einen einzelnen Fund mit Trefferinhalt, Signalen, Fundort, Konfidenz und Statusverlauf. Passen Sie den Schweregrad an, ergänzen Sie Triage-Notizen und verfolgen Sie jeden Schritt von der Erkennung bis zur Erledigung.",
+      "ogTitle": "Fund-Details — Belege & Prüfverlauf | Classifyre",
+      "ogDescription": "Trefferinhalt, Signale, Fundort und vollständiger Statusverlauf einer Erkennung — Schweregrad triagieren und jede Prüfung nachvollziehen.",
+      "titleWithEntity": "{{name}} — Fund-Details",
+      "descriptionWithEntity": "{{name}} — Trefferinhalt, Signale und vollständiger Triage-Verlauf dieser Erkennung."
+    },
+    "assets": {
+      "title": "Assets — alle erfassten Dokumente & Quellinhalte",
+      "description": "Durchsuchen Sie jedes erfasste Asset aus allen angebundenen Quellen. Suchen Sie nach Quelle, Detektor und Schweregrad, sehen Sie die wichtigsten Funde je Asset sowie Textabdeckung und Statusverteilung.",
+      "ogTitle": "Assets — alle erfassten Dokumente | Classifyre",
+      "ogDescription": "Jedes Dokument, jede Seite und jede Zeile aus Confluence, Jira, SharePoint und mehr — mit Detektorabdeckung und Fundverteilung."
+    },
+    "assetDetail": {
+      "title": "Asset-Details — Metadaten, Quelleigenschaften & Funde",
+      "description": "Prüfen Sie Metadaten, Quelleigenschaften, extrahierten Text und jeden Fund eines Assets. Springen Sie an einem Ort zu Quelle, Zeitachse und Herkunft.",
+      "ogTitle": "Asset-Details — Metadaten & Funde | Classifyre",
+      "ogDescription": "Quelleigenschaften, extrahierte Inhalte und jeder Fund zu personenbezogenen Daten, Geheimnissen oder Sicherheit für ein erfasstes Asset.",
+      "titleWithEntity": "{{name}} — Asset-Details",
+      "descriptionWithEntity": "{{name}} — Metadaten, Quelleigenschaften und jeder Fund, den dieses Asset ausgelöst hat."
+    },
+    "sources": {
+      "title": "Quellen — angebundene Konnektoren & Zustand",
+      "description": "Verwalten Sie jede angebundene Quelle — Confluence, Jira, SharePoint, Notion, Datenbanken, Dateifreigaben und Sandboxes. Zustand, Kennzahlen des letzten Laufs, Zeitplan und Stichprobenumfang auf einen Blick.",
+      "ogTitle": "Quellen — angebundene Konnektoren | Classifyre",
+      "ogDescription": "Confluence, Jira, SharePoint, Datenbanken und mehr anbinden und überwachen — Zustand, letzter Scan und Zeitplan jeder Quelle."
+    },
+    "sourceNew": {
+      "title": "Neue Quelle anlegen — Confluence, Jira, SharePoint & mehr anbinden",
+      "description": "Binden Sie eine neue Datenquelle in wenigen Minuten an. Konfigurieren Sie Verbindung, Zugangsdaten, Stichproben und Detektoren, testen Sie die Verbindung und starten Sie Ihren ersten Scan.",
+      "ogTitle": "Neue Quelle anlegen — ein Datensystem anbinden | Classifyre",
+      "ogDescription": "Quelleinrichtung Schritt für Schritt: Zugangsdaten, Stichproben, Detektoren und ein Live-Verbindungstest."
+    },
+    "sourceDetail": {
+      "title": "Quellendetails — Zustand, Zeitplan & jüngste Läufe",
+      "description": "Betriebsübersicht einer Quelle: Status und Dauer des letzten Scans, Zeitplan, erforderliche Konfiguration, aktive Detektoren und die letzten drei Läufe mit Funden und Asset-Differenz.",
+      "ogTitle": "Quellendetails — Zustand & jüngste Läufe | Classifyre",
+      "ogDescription": "Zustand, Zeitplan, Detektorabdeckung und Ergebnisse der letzten Läufe einer angebundenen Quelle.",
+      "titleWithEntity": "{{name}} — Quellendetails",
+      "descriptionWithEntity": "{{name}} — Zustand, Zeitplan, Detektorabdeckung und die jüngsten Läufe."
+    },
+    "sourceEdit": {
+      "title": "Quelle bearbeiten — Verbindung & Detektoreinstellungen ändern",
+      "description": "Ändern Sie Verbindung, Stichproben, Zeitplan und Detektorschwellen dieser Quelle. Testen, speichern und erneut scannen, ohne die Quelle neu aufzubauen.",
+      "ogTitle": "Quelle bearbeiten — Verbindung & Detektoren ändern | Classifyre",
+      "ogDescription": "Zugangsdaten, Stichproben und Detektorkonfiguration einer bestehenden Quelle anpassen."
+    },
+    "scans": {
+      "title": "Scans — Laufhistorie, Status & Dauer",
+      "description": "Sehen Sie jeden Scanlauf über alle Quellen hinweg — nach Auslöser, Status und Dauer. Verfolgen Sie ausstehende, laufende, abgeschlossene und fehlgeschlagene Läufe und öffnen Sie jeden Lauf für Protokolle, Assets und Funde.",
+      "ogTitle": "Scans — Laufhistorie & Status | Classifyre",
+      "ogDescription": "Alle Scanläufe nach Auslöser und Status — Dauer, Asset-Zahlen und Funde jeder Quelle."
+    },
+    "scanDetail": {
+      "title": "Scan-Details — Zeitachse, Fortschritt & Asset-Änderungen",
+      "description": "Verfolgen Sie einen einzelnen Scanlauf vom Auslöser bis zum Abschluss: Fortschritt, Zeitachse, Asset-Differenz, Abdeckungslücken und Ergebnisse je Asset mit Protokollen, Funden und Quellkontext.",
+      "ogTitle": "Scan-Details — Zeitachse & Asset-Änderungen | Classifyre",
+      "ogDescription": "Fortschritt, Zeitachse und Asset-Differenz eines Scanlaufs — mit Protokollen, Abdeckung und jedem erzeugten Fund.",
+      "titleWithEntity": "{{name}} — Scan-Details",
+      "descriptionWithEntity": "Scanlauf für {{name}} — Fortschritt, Zeitachse, Asset-Differenz und Abdeckung."
+    },
+    "detectors": {
+      "title": "Eigene Detektoren — Erkennungslogik bauen, trainieren & verwalten",
+      "description": "Durchsuchen und verwalten Sie alle eigenen Detektoren — Regex-Regelwerke, Klassifikatoren und Entitätsextraktoren. Anlegen, mit Beispielen trainieren, Szenarien testen und sehen, welche Quellen welchen Detektor nutzen.",
+      "ogTitle": "Eigene Detektoren — Katalog der Erkennungslogik | Classifyre",
+      "ogDescription": "Selbst gebaute Regex-, Klassifikator- und Entitätsdetektoren — Training, Tests und Quellennutzung in einem Katalog."
+    },
+    "detectorNew": {
+      "title": "Neuer Detektor — eigenes Regelwerk, Klassifikator oder Entitätsdetektor anlegen",
+      "description": "Erstellen Sie einen wiederverwendbaren eigenen Detektor aus Regex-Mustern, Textklassifikation oder Entitätsextraktion. Definieren Sie Muster, Labels, Schweregrad und Tests ohne Code und setzen Sie ihn für jede Quelle ein.",
+      "ogTitle": "Neuer Detektor — eigene Erkennung bauen | Classifyre",
+      "ogDescription": "Aus einer Vorlage oder von Grund auf — Regex-, Klassifikator- oder GLiNER-Entitätsdetektor mit Tests und Schweregradzuordnung."
+    },
+    "detectorDetail": {
+      "title": "Detektordetails — Konfiguration, Training & Testergebnisse",
+      "description": "Verwalten Sie Identität, Muster, Modell und Training eines eigenen Detektors. Prüfen Sie an einem Ort die nutzenden Quellen, die Anzahl der Funde, die Version, den Trainingsverlauf und die Testszenarien.",
+      "ogTitle": "Detektordetails — Konfiguration & Training | Classifyre",
+      "ogDescription": "Identität, Validierung, Modelleinstellungen und Trainingsverlauf eines eigenen Detektors.",
+      "titleWithEntity": "{{name}} — Detektordetails",
+      "descriptionWithEntity": "{{name}} — Konfiguration, Trainingsverlauf und Testszenarien."
+    },
+    "investigations": {
+      "title": "Ermittlungen — Fälle, Anfragen & KI-Autopilot",
+      "description": "Führen Sie Ermittlungen, in denen aus Funden Antworten werden: Anfragen wachen über Treffer, Fingerabdrücke verknüpfen Duplikate systemübergreifend, und Fälle sammeln Belege, Hypothesen und ein Fazit — mit oder ohne KI-Autopilot.",
+      "ogTitle": "Ermittlungen — Fälle & Anfragen | Classifyre",
+      "ogDescription": "Anfragen, die auf Treffer achten, Duplikat-Fingerabdrücke und belegte Fälle — automatisch oder manuell."
+    },
+    "caseDetail": {
+      "title": "Falldetails — Belegdiagramm, Hypothesen & Zeitachse",
+      "description": "Untersuchen Sie einen Fall mit Belegdiagramm, Diskussionssträngen, Chronologie und Fallakte. Verknüpfen Sie Anfragen, ziehen Sie Treffer heran, ergänzen Sie Hypothesen und halten Sie ein Fazit fest — oder lassen Sie das KI-Harness auf dem Fall laufen.",
+      "ogTitle": "Falldetails — Belege & Hypothesen | Classifyre",
+      "ogDescription": "Belegdiagramm, verknüpfte Anfragen, Hypothesen und Aktivitätsverlauf eines Ermittlungsfalls.",
+      "titleWithEntity": "{{name}} — Falldetails",
+      "descriptionWithEntity": "{{name}} — Belegdiagramm, Hypothesen, verknüpfte Anfragen und Zeitachse."
+    },
+    "inquiryDetail": {
+      "title": "Anfragedetails — gespeicherte Abfrage, Treffer & verknüpfte Fälle",
+      "description": "Eine gespeicherte Anfrage, die alle Funde beobachtet, die ihren Filtern entsprechen. Prüfen Sie laufende Treffer, sehen Sie die getriebenen Fälle, suchen Sie erneut nach neuen Treffern und übernehmen Sie Funde als Belege in einen Fall.",
+      "ogTitle": "Anfragedetails — Treffer & Fälle | Classifyre",
+      "ogDescription": "Laufende Treffer einer gespeicherten Fundabfrage — samt getriebener Fälle und Belegübernahme mit einem Klick.",
+      "titleWithEntity": "{{name}} — Anfragedetails",
+      "descriptionWithEntity": "{{name}} — laufende Treffer dieser gespeicherten Abfrage und die Fälle, die sie treibt."
+    },
+    "inquiryNew": {
+      "title": "Neue Anfrage — gespeicherte Fundabfrage anlegen",
+      "description": "Legen Sie eine gespeicherte Anfrage an, die alle künftigen Funde beobachtet, die ihren Filtern entsprechen — nach Quelle, Detektor, Typ und Wert. Sehen Sie laufende Treffer schon vor dem Speichern.",
+      "ogTitle": "Neue Anfrage — gespeicherte Fundabfrage | Classifyre",
+      "ogDescription": "Formulieren Sie eine Frage, die weiter antwortet — Filter, Vorschau und Fallanlage mit einem Klick."
+    },
+    "caseNew": {
+      "title": "Fall eröffnen — Belege & Hypothesen sammeln",
+      "description": "Eröffnen Sie einen neuen Ermittlungsfall. Ergänzen Sie Titel, Beschreibung, Schweregrad und treibende Anfragen — übernehmen Sie deren laufende Treffer als erste Belege oder beginnen Sie leer und hängen Sie Funde später an.",
+      "ogTitle": "Fall eröffnen — neue Ermittlung | Classifyre",
+      "ogDescription": "Titel, Schweregrad, Anfragen und Belege — starten Sie einen neuen Ermittlungsfall."
+    },
+    "duplicates": {
+      "title": "Duplikatprüfung — Kopien über alle Quellen hinweg finden",
+      "description": "Finden Sie Assets, die dasselbe zu sein scheinen — gruppiert nach gemeinsamen Fingerabdruckwerten und Trefferbegründung. Prüfen Sie Cluster, vergleichen Sie Paare, justieren Sie die Korrelation und verfolgen Sie jede Entscheidung.",
+      "ogTitle": "Duplikatprüfung — Cluster & Paare | Classifyre",
+      "ogDescription": "Beinahe-Duplikate nach gemeinsamen Werten und Fingerabdrücken — Cluster, Paare und Justierung für den gesamten Arbeitsbereich."
+    },
+    "duplicatesDecisions": {
+      "title": "Duplikatentscheidungen — Verlauf & Verwendung in Fällen",
+      "description": "Prüfen Sie jede Duplikatentscheidung — behalten, verworfen oder eskaliert — und sehen Sie, ob sie in einem Fall oder einer Anfrage verwendet wurde. Der vollständige Verlauf der Duplikatprüfung dieses Arbeitsbereichs.",
+      "ogTitle": "Duplikatentscheidungen — Verlauf | Classifyre",
+      "ogDescription": "Jede getroffene Duplikatentscheidung und wo sie verwendet wurde — Fälle und Anfragen."
+    },
+    "duplicatePair": {
+      "title": "Duplikatpaar — zwei Assets nebeneinander vergleichen",
+      "description": "Warum zwei Assets zusammenpassen: gemeinsame Fingerabdruckwerte, Ähnlichkeitswert und Textvergleich. Als Duplikat bestätigen oder verwerfen — jede Entscheidung wird protokolliert und kann in Fälle einfließen.",
+      "ogTitle": "Duplikatpaar — warum zwei Assets zusammenpassen | Classifyre",
+      "ogDescription": "Gemeinsame Werte, Ähnlichkeit und Belege eines Duplikatpaars — bestätigen oder verwerfen."
+    },
+    "duplicatePattern": {
+      "title": "Duplikatmuster — nach gemeinsamer Begründung gruppiert",
+      "description": "Ein Duplikatmuster und das dahinterliegende Asset-Cluster: jedes Paar, das aufgrund desselben gemeinsamen Werts oder Fingerabdrucks zusammenpasst — gruppiert für Sammelprüfung und Fallaktion.",
+      "ogTitle": "Duplikatmuster — Cluster nach Begründung | Classifyre",
+      "ogDescription": "Alle Paare, die aufgrund desselben gemeinsamen Werts zusammenpassen — das Cluster gemeinsam prüfen."
+    },
+    "duplicateTune": {
+      "title": "Justierung — Gewichte, Schwellen & Fingerabdruckzustand",
+      "description": "Justieren Sie die Duplikaterkennung: Gewichte je Label, Schwellen für verwandt und Duplikat, Standardgewicht und Zustand des semantischen Index. Beim Speichern werden die Fingerabdrücke des gesamten Arbeitsbereichs neu berechnet.",
+      "ogTitle": "Justierung — Einstellungen der Duplikaterkennung | Classifyre",
+      "ogDescription": "Label-Gewichte, Schwellen und Indexzustand für die fingerabdruckbasierte Duplikaterkennung."
+    },
+    "settings": {
+      "title": "Einstellungen — Arbeitsbereich, Region & Harness-Konfiguration",
+      "description": "Konfigurieren Sie diesen Arbeitsbereich: Sprache und Zeitvorgaben, Instanzversion, KI-Anbieter, Harness-Autopilot, Embedding, MCP-Server sowie Export und Import. Alle Einstellungen gelten je Arbeitsbereich.",
+      "ogTitle": "Einstellungen — Konfiguration des Arbeitsbereichs | Classifyre",
+      "ogDescription": "Region, KI-Anbieter, Harness, Embedding und Datentransfer — die Einstellungen des Arbeitsbereichs an einem Ort."
+    },
+    "notifications": {
+      "title": "Benachrichtigungen — Warnungen & Systemsignale",
+      "description": "Alle Benachrichtigungen zu Scans, Funden, Quellen und Systemereignissen — gefiltert nach Typ und Schweregrad. Als wichtig oder gelesen markieren und kritische Signale im Blick behalten.",
+      "ogTitle": "Benachrichtigungen — Warnungen & Signale | Classifyre",
+      "ogDescription": "Benachrichtigungen zu Scans, Funden, Quellen und System — Wichtigkeit und Lesestatus auf einen Blick."
+    },
+    "glossary": {
+      "title": "Glossar — verbindliches Vokabular & Entitätskarte",
+      "description": "Verbindliches Vokabular für Bearbeitende, Fälle und jeden Lauf des KI-Harness. Ergänzen Sie Begriffe, Aliasse und Entitätstypen — Person, Organisation, Ort — und legen Sie fest, was der Autopilot als gesichert behandeln soll.",
+      "ogTitle": "Glossar — verbindliches Vokabular | Classifyre",
+      "ogDescription": "Gemeinsame Begriffe, Aliasse und Entitätsangaben, auf die sich Bearbeitende, Fälle und das KI-Harness stützen."
+    },
+    "fingerprints": {
+      "title": "Fingerabdrücke — Belegkorrelationen & gemeinsame Werte",
+      "description": "Beleg-Fingerabdrücke verbinden Assets, die dieselben Funde teilen — E-Mail-Adressen, Telefonnummern, Kennungen und mehr. Durchsuchen Sie das Diagramm, filtern Sie nach Quelle und blenden Sie Rauschen aus, während Duplikate im Hintergrund neu berechnet werden.",
+      "ogTitle": "Fingerabdrücke — Belegkorrelationen | Classifyre",
+      "ogDescription": "Assets, die durch gemeinsame Fundwerte verbunden sind — Fingerabdrücke, Diagramm und Korrelationsjustierung."
+    },
+    "harness": {
+      "title": "Harness KI — Steuerungsebene des Autopiloten",
+      "description": "Autonome Steuerungsebene des KI-Autopiloten: Agenten, die Funde triagieren, Fälle aufbauen und nach jedem Scan Hypothesen entwerfen. Prüfen Sie Aktivität, Läufe, Gedächtnis, Systemlage und Konfiguration.",
+      "ogTitle": "Harness KI — Steuerungsebene des Autopiloten | Classifyre",
+      "ogDescription": "Agenten, Läufe, Gedächtnis und Lagebild — der Autopilot, der aus Funden Ermittlungen macht."
+    },
+    "harnessProvider": {
+      "title": "KI-Anbieter — Modell, Zugangsdaten & Funktionszuweisung",
+      "description": "Verwalten Sie Endpunkt, Modell, Zugangsdaten, Kontextgröße und Funktionszuweisung eines KI-Anbieters. Testen Sie Verbindung und Harness-Fähigkeit und weisen Sie ihn dann dem Assistenten, dem Harness oder Detektoren zu.",
+      "ogTitle": "KI-Anbieter — Konfiguration | Classifyre",
+      "ogDescription": "Endpunkt, Modell und Zugangsdaten eines Harness-KI-Anbieters.",
+      "titleWithEntity": "{{name}} — KI-Anbieter",
+      "descriptionWithEntity": "{{name}} — Endpunkt, Modell, Zugangsdaten und Funktionszuweisung."
+    },
+    "docs": {
+      "title": "Dokumentation — mit Classifyre anbinden, scannen & ermitteln",
+      "description": "Die Classifyre-Dokumentation — wie die Anwendung Abschnitt für Abschnitt funktioniert: Confluence, Jira, SharePoint und mehr anbinden, Scans ausführen, Funde triagieren, Assets entdoppeln und mit dem KI-Autopiloten ermitteln.",
+      "ogTitle": "Dokumentation — anbinden, scannen & ermitteln | Classifyre",
+      "ogDescription": "Quellen anbinden, scannen, Funde prüfen und dem Wesentlichen nachgehen — mit einem KI-Autopiloten, der die Laufarbeit übernimmt. Anleitungen für jeden Arbeitsablauf."
+    }
   }
 }
