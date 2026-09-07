@@ -78,6 +78,33 @@ const NEIGHBORHOOD_PAGE_SIZE = 2000;
  */
 const RECALIBRATE_REFRESH_BATCHES = 20;
 
+/**
+ * How many vectors an HNSW search may consider before anything else filters.
+ *
+ * A semantic search wants "the nearest N rows that also satisfy X". Written
+ * literally — join and filter inside the `ORDER BY ... LIMIT` — that is a trap,
+ * because `hnsw.iterative_scan = strict_order` keeps pulling more of the graph
+ * until LIMIT rows SURVIVE the filter. When the filter is selective the scan
+ * degenerates into a near-full traversal.
+ *
+ * Measured on firmenbuch-test-2 (84k assets, 40,518 vectors): only 2,003 of
+ * those vectors belong to an asset chunk — the rest are finding and glossary
+ * embeddings sharing the space. Asking for 1,000 asset-chunk candidates made
+ * the index scan read 19,733 rows and still return only 929, at 107 seconds.
+ * Bounding the vector search first and joining afterwards read exactly 1,000
+ * and took 15. The failure gets worse as more content is embedded, since every
+ * non-matching vector dilutes the space further.
+ *
+ * The trade is recall: the survivors of a fixed candidate set can be fewer than
+ * the caller asked for. Over-fetching by 5x absorbs that — near neighbours of a
+ * chunk query are overwhelmingly chunks themselves (58% survived in the same
+ * measurement, against the 4.9% base rate) — and a bounded, slightly shorter
+ * result beats an exact one nobody waits for.
+ */
+function candidateBudget(limit: number): number {
+  return Math.max(limit * 5, 200);
+}
+
 @Injectable()
 export class EmbeddingService {
   private readonly logger = new Logger(EmbeddingService.name);
@@ -843,6 +870,7 @@ export class EmbeddingService {
     // the index and silently falls back to a sequential scan.
     const vecType = Prisma.raw(vectorCast(space.dim).type);
     const queryVector = JSON.stringify(vector);
+    const candidateLimit = candidateBudget(limit);
     const statusScope = statusFilter
       ? Prisma.sql`AND f.status = ANY(${statusFilter}::"FindingStatus"[])`
       : includeResolved
@@ -852,19 +880,33 @@ export class EmbeddingService {
       await tx.$executeRaw(
         Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.cfg.hnswEfSearch}`),
       );
+      // Safe here only because nothing filters ABOVE the ORDER BY ... LIMIT:
+      // the scan stops at exactly `candidateLimit` rows. Move a join or a
+      // WHERE back into that subquery and strict_order will traverse the graph
+      // until that many rows survive it instead — see candidateBudget. The
+      // neighborhood query above keeps its filters above the LIMIT on purpose
+      // and therefore uses relaxed_order, which is the setting that pattern
+      // needs.
       await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = strict_order`;
       return tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
-        SELECT f.id, 1 - (
-          ce.vec::public.${vecType}(${dim}) <=>
-          ${queryVector}::public.${vecType}(${dim})
-        ) AS score
-        FROM content_embeddings ce
-        JOIN findings f ON f.embed_content_hash = ce.content_hash
-        WHERE ce.space_id = ${this.spaceIdLiteral(space.id)}
-          AND (${sourceFilter}::text[] IS NULL OR f.source_id = ANY(${sourceFilter}::text[]))
+        WITH nearest AS (
+          SELECT ce.content_hash, 1 - (
+            ce.vec::public.${vecType}(${dim}) <=>
+            ${queryVector}::public.${vecType}(${dim})
+          ) AS score
+          FROM content_embeddings ce
+          WHERE ce.space_id = ${this.spaceIdLiteral(space.id)}
+          ORDER BY ce.vec::public.${vecType}(${dim}) <=>
+            ${queryVector}::public.${vecType}(${dim})
+          LIMIT ${candidateLimit}
+        )
+        SELECT f.id, MAX(n.score) AS score
+        FROM nearest n
+        JOIN findings f ON f.embed_content_hash = n.content_hash
+        WHERE (${sourceFilter}::text[] IS NULL OR f.source_id = ANY(${sourceFilter}::text[]))
           ${statusScope}
-        ORDER BY ce.vec::public.${vecType}(${dim}) <=>
-          ${queryVector}::public.${vecType}(${dim})
+        GROUP BY f.id
+        ORDER BY score DESC
         LIMIT ${limit}
       `);
     });
@@ -897,7 +939,7 @@ export class EmbeddingService {
         `Query vector has ${queryVector.length} dimensions; active space requires ${space.dim}`,
       );
     }
-    const candidateLimit = Math.max(limit * 5, 200);
+    const candidateLimit = candidateBudget(limit);
     const dim = Prisma.raw(String(space.dim));
     // Must match the expression ensureHnswIndex built, or the planner ignores
     // the index and silently falls back to a sequential scan.
@@ -907,25 +949,32 @@ export class EmbeddingService {
       await tx.$executeRaw(
         Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.cfg.hnswEfSearch}`),
       );
+      // Safe here only because nothing filters ABOVE the ORDER BY ... LIMIT:
+      // the scan stops at exactly `candidateLimit` rows. Move a join or a
+      // WHERE back into that subquery and strict_order will traverse the graph
+      // until that many rows survive it instead — see candidateBudget. The
+      // neighborhood query above keeps its filters above the LIMIT on purpose
+      // and therefore uses relaxed_order, which is the setting that pattern
+      // needs.
       await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = strict_order`;
       return tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
-        WITH ranked_chunks AS (
-          SELECT ac.asset_id AS id,
+        WITH nearest AS (
+          SELECT ce.content_hash,
             1 - (
               ce.vec::public.${vecType}(${dim}) <=>
               ${vector}::public.${vecType}(${dim})
             ) AS score
           FROM content_embeddings ce
-          JOIN asset_chunks ac ON ac.content_hash = ce.content_hash
           WHERE ce.space_id = ${this.spaceIdLiteral(space.id)}
-            AND (${sourceId ?? null}::text IS NULL OR ac.source_id = ${sourceId ?? null})
           ORDER BY ce.vec::public.${vecType}(${dim}) <=>
             ${vector}::public.${vecType}(${dim})
           LIMIT ${candidateLimit}
         )
-        SELECT id, MAX(score) AS score
-        FROM ranked_chunks
-        GROUP BY id
+        SELECT ac.asset_id AS id, MAX(n.score) AS score
+        FROM nearest n
+        JOIN asset_chunks ac ON ac.content_hash = n.content_hash
+        WHERE (${sourceId ?? null}::text IS NULL OR ac.source_id = ${sourceId ?? null})
+        GROUP BY ac.asset_id
         ORDER BY score DESC
         LIMIT ${limit}
       `);

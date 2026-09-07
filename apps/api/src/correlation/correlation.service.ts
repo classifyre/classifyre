@@ -1097,6 +1097,7 @@ export class CorrelationService {
     // files on disk), not the API process's heap, so no value is excluded
     // from scoring and nothing is lost.
     const runId = randomUUID();
+    await this.sweepStagingResidue();
     try {
       await this.stagePairAggregates(runId, touchedIds, workingIds, cfg, full);
 
@@ -1250,8 +1251,13 @@ export class CorrelationService {
         affectedAssetIds: Array.from(affected),
       };
     } finally {
-      // Scratch rows for this run are no longer needed either way.
-      await this.prisma.correlationPairStaging.deleteMany({ where: { runId } });
+      // Scratch rows for this run are no longer needed either way. TRUNCATE
+      // rather than DELETE: the table only ever holds this run's rows (the
+      // sweep above guarantees it), and a full recompute stages millions of
+      // them — deleting leaves that many dead tuples for autovacuum to chase
+      // and never returns the space to the OS, so the scratch table only grows
+      // across recomputes. TRUNCATE releases it immediately.
+      await this.prisma.$executeRaw`TRUNCATE TABLE correlation_pair_staging`;
     }
   }
 
@@ -1325,6 +1331,48 @@ export class CorrelationService {
       });
     }
     return map;
+  }
+
+  /**
+   * Drop scratch rows stranded by an earlier recompute that was killed before
+   * it could clean up after itself.
+   *
+   * `stagePairAggregates` tags its rows with a `runId` generated per
+   * invocation and the `finally` below clears them, so on any ordinary path —
+   * success or thrown error — the table is empty between recomputes. A SIGKILL
+   * is the exception: an OOM kill, a pod eviction or a node drain takes the
+   * process down without running `finally`, and because `runId` was a fresh
+   * UUID that lived only in that process's memory, nothing afterwards can ever
+   * match those rows again. They are unreachable and permanent. On an instance
+   * whose worker was in an OOM-restart loop this accumulated 37 stranded runs
+   * and 50M rows — 17 GB, two thirds of the database — while the correlation
+   * output it had been derived from was a few hundred MB of edges.
+   *
+   * Sweeping wholesale is safe: every entry point into `recompute` runs inside
+   * `CorrelationLockService`, a namespace-scoped session advisory lock shared
+   * by every API and worker replica, so at this instant no other recompute for
+   * this namespace exists anywhere in the cluster. Nothing else in the
+   * codebase reads this table, and the current run has not staged anything
+   * yet — so every row present belongs to a run that will never come back.
+   */
+  private async sweepStagingResidue(): Promise<void> {
+    const stranded = await this.prisma.correlationPairStaging.findFirst({
+      select: { runId: true },
+    });
+    if (!stranded) return;
+
+    // reltuples is the planner's estimate, free to read; COUNT(*) here would
+    // scan the very table whose size is the problem.
+    const [row] = await this.prisma.$queryRaw<Array<{ estimate: bigint }>>`
+      SELECT GREATEST(reltuples, 0)::bigint AS estimate
+      FROM pg_class WHERE oid = 'correlation_pair_staging'::regclass
+    `;
+    await this.prisma.$executeRaw`TRUNCATE TABLE correlation_pair_staging`;
+    this.logger.warn(
+      `Swept ~${row?.estimate ?? 0} correlation staging row(s) stranded by a ` +
+        `previous recompute that was killed mid-pass (e.g. run ${stranded.runId}). ` +
+        `Repeated sweeps mean recomputes keep dying — check the worker for OOM kills.`,
+    );
   }
 
   /**

@@ -53,10 +53,13 @@ describe('embedding worker breaker', () => {
       pending: new Map(),
       sequence: 0,
       requestErrorCount: 0,
+      // Field initialisers never run for an Object.create() instance, and
+      // embedLocal serialises through this one.
+      inferenceQueue: Promise.resolve(),
       // embedLocal only needs a worker object it can `send` to; the real
       // resolution path is driven by `succeed()` below.
       ensureWorker: () => ({ send: (m: { id: number }) => sent.push(m.id) }),
-      config: { model: 'm', revision: 'r' },
+      config: { model: 'm', revision: 'r', maxBatchChars: 64_000 },
     });
 
     const fail = (times = 1) => {

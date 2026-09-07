@@ -1489,6 +1489,10 @@ model CorrelationConfig {
 // INSERT ... SELECT so the heavy intermediate state lives in Postgres
 // (work_mem / on-disk temp files), never in the API process's heap. Rows are
 // scoped by run_id and deleted once that run's edges have been written.
+//
+// This table is UNLOGGED (see migration 20260907120000). Prisma has no way to
+// express that, so it lives only in the migration — do not recreate this model
+// from an introspection or the WAL exemption is silently lost.
 model CorrelationPairStaging {
   id             BigInt  @id @default(autoincrement())
   runId          String  @map("run_id")

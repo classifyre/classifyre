@@ -12,8 +12,9 @@ import { EmbeddingQueueService } from './embedding-queue.service';
  * drain rate was 64 jobs/hour against millions pending, and jobs were being
  * deleted unprocessed when they aged past their 24h retention.
  *
- * Grouping divides the row count without changing the work: the same chunks
- * are embedded, by the same provider, in the same inference batches.
+ * Grouping divides the row count. It does NOT bound inference: the handler
+ * flattens the whole fetch into one provider call, which is why the inference
+ * batch has to be bounded separately — see embedding-batching.spec.ts.
  */
 describe('embedding queue batching', () => {
   function harness(queueBatchSize = 4) {
