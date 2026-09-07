@@ -42,6 +42,8 @@ import {
     TableHead,
     TableHeader,
     TableRow,
+    ToneBadge,
+    statusBadgeClass,
 } from "@workspace/ui/components";
 import {formatDate, formatRelative} from "@/lib/date";
 import {detectorCatalogStatusLabel, detectorCatalogStatusToRunnerStatus, isVisualDetector,} from "@/lib/custom-detector-badge";
@@ -474,8 +476,13 @@ export function CustomDetectorsTable() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
+                                            {/* Was the runner tones applied on top of Badge's
+                                                default variant, so the tone's background fought a
+                                                2px black border and a drop shadow. Same tone, the
+                                                shared chrome. */}
                                             <Badge
-                                                className={`rounded-[4px] border text-[10px] ${getRunnerStatusBadgeTone(
+                                                variant="outline"
+                                                className={`${statusBadgeClass} ${getRunnerStatusBadgeTone(
                                                     detectorCatalogStatusToRunnerStatus(row.isActive),
                                                 )}`}
                                             >
@@ -490,18 +497,18 @@ export function CustomDetectorsTable() {
                                                 {row.recentSourceNames.length > 0 ? (
                                                     <div className="flex flex-wrap gap-1">
                                                         {row.recentSourceNames.slice(0, 2).map((name) => (
-                                                            <Badge
+                                                            <ToneBadge
                                                                 key={`${row.id}-${name}`}
-                                                                variant="outline"
-                                                                className="text-[10px]"
+                                                                tone="neutral"
+                                                                className="max-w-[140px] truncate"
                                                             >
                                                                 {name}
-                                                            </Badge>
+                                                            </ToneBadge>
                                                         ))}
                                                         {row.recentSourceNames.length > 2 ? (
-                                                            <Badge variant="outline" className="text-[10px]">
+                                                            <ToneBadge tone="neutral">
                                                                 +{row.recentSourceNames.length - 2}
-                                                            </Badge>
+                                                            </ToneBadge>
                                                         ) : null}
                                                     </div>
                                                 ) : (

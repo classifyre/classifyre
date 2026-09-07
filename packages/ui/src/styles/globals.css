@@ -31,6 +31,13 @@
   /* Accent — acid green */
   --accent: #b7ff00;
   --accent-foreground: #0a0a0a;
+  /* Accent as INK, not as a surface.
+     #b7ff00 scores 1.21:1 on white: it is a background colour that happens to
+     be green, and every `text-accent` on a light panel was invisible. This is
+     the same hue carried down to 6.1:1 on card white, so "running", "open" and
+     every other accent-coloured label stays readable in light mode while the
+     dark theme keeps the acid green it was designed around. */
+  --accent-ink: #4d6b00;
 
   --destructive: #ff2b2b;
   --destructive-foreground: #ffffff;
@@ -82,6 +89,8 @@
 
   --accent: #b7ff00;
   --accent-foreground: #0a0a0a;
+  /* On near-black the acid green is already the readable choice. */
+  --accent-ink: #b7ff00;
 
   --destructive: #ff2b2b;
   --destructive-foreground: #ffffff;
@@ -124,6 +133,7 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-ink: var(--accent-ink);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -162,6 +172,39 @@
 }
 
 @layer utilities {
+  /*
+   * A tooltip inverts the page: `bg-foreground` with `text-background`. Its
+   * children, however, keep resolving the page's tokens — so every
+   * `text-muted-foreground` caption inside a tooltip painted #3a3a3a on a
+   * #0a0a0a ground in light mode, i.e. invisible. Callers had been papering
+   * over it one at a time with `/70` opacity, which does not help: the base
+   * colour is the problem.
+   *
+   * Remapping the tokens on the tooltip surface itself fixes every tooltip at
+   * once, including ones not yet written, because `text-muted-foreground`
+   * compiles to `var(--muted-foreground)` and simply picks up the value scoped
+   * here. The dimmed tones are the ink at partial alpha rather than a mix
+   * toward the ground, so they stay correct whichever way the theme flips.
+   *
+   * `display: contents` is load-bearing twice over. It keeps the wrapper out of
+   * the layout, so tooltip content lays out exactly as it did before — and,
+   * more importantly, it means the element redefining `--foreground` is NOT the
+   * element painting `bg-foreground`. Putting these on the tooltip itself
+   * inverts its own ground: `bg-foreground` would resolve the value being
+   * written here and the tooltip would come out page-coloured.
+   *
+   * Everything derives from `--background`, which is not redefined, and the
+   * dimmed tones are the ink at partial alpha rather than a mix toward the
+   * ground — so they stay correct whichever way the theme flips.
+   */
+  .tooltip-surface {
+    display: contents;
+    --foreground: var(--background);
+    --muted-foreground: color-mix(in srgb, var(--background) 72%, transparent);
+    --border: color-mix(in srgb, var(--background) 28%, transparent);
+    --destructive: color-mix(in srgb, #ff5f5f 78%, var(--background));
+  }
+
   /* Adaptive brutalist card border: 2px solid border + offset shadow,
      both driven by --color-border so they flip automatically in dark mode. */
   .panel-card {

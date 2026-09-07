@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Maximize2, RotateCw } from "lucide-react";
+import { ChevronsDownUp, Loader2, Maximize2, RotateCw } from "lucide-react";
 import {
   api,
   type ConstellationLinkDto,
@@ -12,11 +12,19 @@ import {
   type GraphNodeDto,
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
-import { cn } from "@workspace/ui/lib/utils";
+import {
+  MultiSelect,
+  MultiSelectContent,
+  MultiSelectGroup,
+  MultiSelectItem,
+  MultiSelectTrigger,
+  MultiSelectValue,
+} from "@workspace/ui/components/multi-select";
 import { GraphCanvas } from "@/components/graph-explorer/graph-canvas";
 import { useForceLayout } from "@/components/graph-explorer/use-force-layout";
 import { usePanZoom } from "@/components/graph-explorer/use-pan-zoom";
 import { useContainerSize } from "@/components/graph-explorer/use-container-size";
+import { useSourceIconSprites } from "@/components/graph-explorer/use-source-icon-sprites";
 import { fanPositions, nodesBBox } from "@/components/graph-explorer/graph-utils";
 import {
   isClusterNode,
@@ -112,11 +120,20 @@ function sourceBubble(
   source: ConstellationResponseDto["sources"][number],
   label: string,
 ): ClusterNode {
+  // How big the source is, not how much of it is wired up.
+  //
+  // This used to be `connectedAssetCount`, which drew a source holding 500
+  // assets as a bubble labelled "3" — and a source whose assets are all
+  // unconnected as a bubble labelled "0", next to bundle lines proving it is
+  // connected to something. `ClusterMeta.assetCount` means "assets among the
+  // members" everywhere else in the graph explorer, and a source's members are
+  // all of its assets. Connectivity is what the *edges* say, and the rail
+  // breaks it down.
   const meta: ClusterMeta = {
     id: source.id,
     memberKeys: [],
-    size: source.connectedAssetCount,
-    assetCount: source.connectedAssetCount,
+    size: source.assetCount,
+    assetCount: source.assetCount,
     findingCount: source.findingCount,
     severityCounts: {
       CRITICAL: source.severityCounts.critical,
@@ -347,6 +364,31 @@ export function ConnectionsCanvas({
   const panZoom = usePanZoom();
   const layout = useForceLayout(nodes, edges, size, seedOverrides.current);
 
+  // Bubbles carry their connector's mark. The colour is baked into the sprite,
+  // so it is read from the live theme rather than hard-coded — the map is drawn
+  // on --card, and the foreground flips with the theme.
+  const sourceTypes = React.useMemo(
+    () => (map?.sources ?? []).map((source) => source.type),
+    [map],
+  );
+  const [iconColor, setIconColor] = React.useState("#0a0a0a");
+  React.useEffect(() => {
+    const read = () =>
+      setIconColor(
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--foreground")
+          .trim() || "#0a0a0a",
+      );
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
+  const sprites = useSourceIconSprites(sourceTypes, iconColor);
+
   const zoomToFit = React.useCallback(() => {
     const bbox = nodesBBox(layout.simNodes.values());
     if (bbox) panZoom.fitBBox(bbox);
@@ -401,6 +443,19 @@ export function ConnectionsCanvas({
     [expanded, layout.simNodes],
   );
 
+  /**
+   * Put every source back in its bubble.
+   *
+   * Expanding is one double-click; collapsing was one double-click *per source*
+   * on a node you then had to find again among its own fanned-out assets. This
+   * is the way back.
+   */
+  const collapseAll = React.useCallback(() => {
+    setExpanded(new Map());
+    seedOverrides.current.clear();
+    setSelection(null);
+  }, []);
+
   const selectedNode = React.useMemo(
     () =>
       selection?.type === "node"
@@ -416,13 +471,19 @@ export function ConnectionsCanvas({
     [selection, edges],
   );
 
-  const toggleClass = (cls: ClassName) =>
-    setActiveClasses((prev) => {
-      const next = new Set(prev);
-      if (next.has(cls) && next.size > 1) next.delete(cls);
-      else next.add(cls);
-      return next;
-    });
+  /**
+   * Clearing the last class would draw a map with no lines on it, which is not
+   * a filter anybody means to apply — an empty selection reads as "no filter"
+   * and puts every class back.
+   */
+  const setClasses = (values: string[]) => {
+    const chosen = values.filter((v): v is ClassName =>
+      (CLASS_ORDER as readonly string[]).includes(v),
+    );
+    setActiveClasses(new Set(chosen.length > 0 ? chosen : CLASS_ORDER));
+  };
+
+  const allClassesActive = activeClasses.size === CLASS_ORDER.length;
 
   const isBuilding = map?.stats.source === "live";
 
@@ -444,36 +505,65 @@ export function ConnectionsCanvas({
           </p>
         </div>
 
-        <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          {CLASS_ORDER.map((cls) => {
-            const on = activeClasses.has(cls);
-            return (
-              <button
-                key={cls}
-                type="button"
-                onClick={() => toggleClass(cls)}
-                aria-pressed={on}
-                className={cn(
-                  "inline-flex cursor-pointer items-center gap-1.5 rounded-[4px] border-2 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em] transition-colors",
-                  on
-                    ? "border-border bg-secondary/40 text-foreground"
-                    : "border-border/40 text-muted-foreground/60 hover:text-muted-foreground",
-                )}
-              >
-                <span
-                  aria-hidden
-                  className="h-2 w-2 rounded-[1px]"
-                  style={{
-                    backgroundColor: on
-                      ? EDGE_CLASS_STYLE[cls]?.color
-                      : "transparent",
-                    border: `1px solid ${EDGE_CLASS_STYLE[cls]?.color}`,
-                  }}
-                />
-                {t(CLASS_LABEL_KEY[cls])}
-              </button>
-            );
-          })}
+        {/* Five toggle chips took more width than the title and still gave no
+            hint that they were one control. One multi-select says so, starts
+            with everything on, and collapses to "All link types" until it is
+            actually filtering. */}
+        <div className="ml-auto flex items-center gap-1.5">
+          <MultiSelect
+            values={[...activeClasses]}
+            onValuesChange={setClasses}
+          >
+            <MultiSelectTrigger className="h-7 w-[200px] rounded-[4px] border-2 border-border bg-background font-mono text-[10px] uppercase tracking-[0.1em]">
+              {allClassesActive ? (
+                <span className="min-w-0 truncate text-foreground">
+                  {t("connections.allLinkTypes")}
+                </span>
+              ) : (
+                <MultiSelectValue placeholder={t("connections.linkTypes")} />
+              )}
+            </MultiSelectTrigger>
+            <MultiSelectContent
+              search={{
+                placeholder: t("connections.searchLinkTypes"),
+                emptyMessage: t("connections.noLinkTypes"),
+              }}
+            >
+              <MultiSelectGroup>
+                {CLASS_ORDER.map((cls) => (
+                  <MultiSelectItem
+                    key={cls}
+                    value={cls}
+                    badgeLabel={t(CLASS_LABEL_KEY[cls])}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className="h-2.5 w-2.5 rounded-[1px]"
+                        style={{
+                          backgroundColor: EDGE_CLASS_STYLE[cls]?.color,
+                          border: `1px solid ${EDGE_CLASS_STYLE[cls]?.color}`,
+                        }}
+                      />
+                      {t(CLASS_LABEL_KEY[cls])}
+                    </span>
+                  </MultiSelectItem>
+                ))}
+              </MultiSelectGroup>
+            </MultiSelectContent>
+          </MultiSelect>
+
+          {expanded.size > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 rounded-[4px] border-2 px-2 font-mono text-[10px] uppercase tracking-[0.1em]"
+              onClick={collapseAll}
+            >
+              <ChevronsDownUp className="mr-1 h-3 w-3" />
+              {t("connections.collapseAll")}
+            </Button>
+          )}
           <Button
             size="icon"
             variant="ghost"
@@ -516,6 +606,7 @@ export function ConnectionsCanvas({
           <GraphCanvas
             nodes={nodes}
             edges={edges}
+            sourceIcon={sprites.get}
             layout={layout}
             panZoom={panZoom}
             selection={selection}
@@ -553,6 +644,8 @@ export function ConnectionsCanvas({
           expandedSources={expanded}
           activeClasses={activeClasses}
           onExpandSource={(id) => void expandSource(id)}
+          onCollapseAll={collapseAll}
+          isBuilt={map?.stats.isBuilt ?? true}
         />
       </div>
     </PanelCard>

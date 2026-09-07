@@ -3,9 +3,15 @@
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import type { FindingsDiscoveryTopAssetDto } from "@workspace/api-client";
-import { Button, SeverityBadge } from "@workspace/ui/components";
+import {
+  Button,
+  SeverityBadge,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components";
 import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-severity";
-import { formatRelative } from "@/lib/date";
+import { formatDate, formatRelative } from "@/lib/date";
 import { nsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
@@ -78,12 +84,14 @@ export function BusiestAssets({
           : null;
         const level = toPriorityLevel(asset.highestSeverity);
         const accent = FINDING_SEVERITY_COLOR_BY_LEVEL[level];
-        return (
+        const origin =
+          asset.sourceName || asset.sourceType || asset.assetType || "—";
+        const row = (
           <button
             key={asset.assetId}
             type="button"
             onClick={() => router.push(nsPath(`/assets/${asset.assetId}`))}
-            className="flex w-full min-w-0 cursor-pointer items-start justify-between gap-3 rounded-[4px] border-2 bg-white px-3 py-2 text-left transition-all hover:-translate-y-px hover:bg-white dark:bg-background dark:hover:bg-secondary/40"
+            className="flex w-full min-w-0 cursor-pointer items-start justify-between gap-2 overflow-hidden rounded-[4px] border-2 bg-white px-3 py-2 text-left transition-all hover:-translate-y-px hover:bg-white dark:bg-background dark:hover:bg-secondary/40"
             style={{
               borderColor: `${accent}33`,
               boxShadow: `3px 3px 0 0 ${accent}33`,
@@ -101,29 +109,28 @@ export function BusiestAssets({
                   {asset.assetName}
                 </span>
               </div>
-              <div className="mt-1 flex items-center gap-2 pl-6 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-                <span className="truncate">
-                  {asset.sourceName ||
-                    asset.sourceType ||
-                    asset.assetType ||
-                    "—"}
-                </span>
-                <span className="shrink-0 text-border">·</span>
-                <span className="shrink-0">
+              {/* Three facts on a 280px rail. They used to sit on one nowrap
+                  line separated by dots, which meant the dots and the timestamp
+                  overlapped the badge as soon as a source had a real name. The
+                  count and the age are fixed-width and hold the right; only the
+                  source name, which is the one that varies, is allowed to
+                  truncate — and the tooltip carries all three in full. */}
+              <div className="mt-1 flex items-baseline gap-2 pl-6 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                <span className="min-w-0 flex-1 truncate">{origin}</span>
+                <span className="shrink-0 whitespace-nowrap">
                   <span className="font-semibold text-foreground">
-                    {asset.totalFindings}
+                    {asset.totalFindings.toLocaleString()}
                   </span>{" "}
                   {t("discovery.findingsLabel")}
                 </span>
-                {lastSeen && (
-                  <>
-                    <span className="shrink-0 text-border">·</span>
-                    <span className="shrink-0">{lastSeen}</span>
-                  </>
-                )}
               </div>
+              {lastSeen && (
+                <div className="pl-6 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
+                  {lastSeen}
+                </div>
+              )}
             </div>
-            <div className="mt-0.5 flex shrink-0 items-center gap-2">
+            <div className="mt-0.5 flex shrink-0 flex-col items-end gap-1">
               <SeverityBadge severity={level}>
                 {t(
                   `findings.severityLabels.${level.toUpperCase()}` as TranslationKey,
@@ -132,6 +139,24 @@ export function BusiestAssets({
               <ArrowRight className="h-3 w-3 text-muted-foreground/50" />
             </div>
           </button>
+        );
+        return (
+          <Tooltip key={asset.assetId}>
+            <TooltipTrigger asChild>{row}</TooltipTrigger>
+            <TooltipContent side="left" className="max-w-[260px]">
+              <div className="font-semibold break-words">{asset.assetName}</div>
+              <div className="break-words text-muted-foreground">{origin}</div>
+              <div className="text-muted-foreground">
+                {asset.totalFindings.toLocaleString()}{" "}
+                {t("discovery.findingsLabel")}
+              </div>
+              {asset.lastDetectedAt && (
+                <div className="text-muted-foreground">
+                  {formatDate(asset.lastDetectedAt)}
+                </div>
+              )}
+            </TooltipContent>
+          </Tooltip>
         );
       })}
     </div>

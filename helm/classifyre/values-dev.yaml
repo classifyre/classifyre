@@ -64,11 +64,28 @@ api:
     TEMP_DIR: /tmp
     RUNNER_LOGS_DIR: /tmp/classifyre/runner-logs
     MAX_RUNNERS_PER_SOURCE: "5"
+    # Two different caps, and only the second one gates adaptive scheduling:
+    #   MAX_CONCURRENT_RUNNERS      - hard instance-wide cap in CliRunnerService;
+    #                                 QUEUES what is over it.
+    #   AUTO_SCHEDULE_MAX_CONCURRENT - what the AUTO scheduler will let be in
+    #                                 flight before it declines to start more.
+    #                                 Defaults to 2, and nothing sets it.
+    # Raising only the first left the scheduler still logging "cap 2" and
+    # holding overdue sources back with slots free.
+    #
     # Four, not two: the register sweep is bounded by ingest+detection
     # throughput rather than by any external API, and the k3d node sits around
-    # 23% CPU with two scans in flight. Six AUTO sources sharing two slots made
-    # the register wait behind whichever long job held one.
+    # 23% CPU with two scans in flight.
     MAX_CONCURRENT_RUNNERS: "4"
+    AUTO_SCHEDULE_MAX_CONCURRENT: "4"
+    # Embedding memory scales with the number of NAMESPACES, not with the size
+    # of any one corpus: the worker hosts every namespace, and each one with an
+    # active embedding space forks its own onnxruntime runtime — own model, own
+    # arenas, own intra-op thread pool. Four namespaces x 4 threads was OOMKilling
+    # the pod (exit 137) at both 4Gi and 6Gi, while the JS heap sat at 391Mi —
+    # the allocation is native, so `--max-old-space-size` cannot bound it.
+    # Halving the thread pool halves the arena footprint of all four.
+    EMBEDDING_INTRA_OP_THREADS: "2"
     DEMO_MODE: "false"
 
   extraVolumeMounts:
@@ -320,7 +337,11 @@ worker:
       memory: 256Mi
     limits:
       cpu: "2"
-      memory: 4Gi
+      # 6Gi, not 4: the worker was OOMKilled (exit 137) ~40s after start once
+      # embeddings actually began running. Every batch used to fail instantly
+      # on EACCES (journal §11.6e), so this limit had never been sized for the
+      # onnxruntime arenas of a working embedding pass. Node has ~7Gi spare.
+      memory: 6Gi
 
 frontend:
   # Web is not deployed in-cluster for local dev — run it directly on your

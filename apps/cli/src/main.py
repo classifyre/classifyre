@@ -138,13 +138,25 @@ def load_recipe(recipe_path: str) -> dict[str, Any]:
 def _compute_findings_counts(
     findings: list[Any],
 ) -> tuple[int, dict[str, int], dict[str, dict[str, int]]]:
-    """Return (total, by_severity, by_detector) counts from a findings list."""
+    """Return (total, by_severity, by_detector) counts from a findings list.
+
+    Custom detectors are bucketed by their own key, not by the bare ``CUSTOM``
+    enum. Every user-authored detector used to collapse into one row reading
+    "CUSTOM 2", which says nothing about which of them fired -- and the whole
+    point of a custom detector is that the user named it. The key is prefixed so
+    the reader can tell a detector bucket from a built-in one and resolve it to
+    a title, and so rows written before this change (plain ``CUSTOM``) still
+    render sensibly.
+    """
     by_severity: dict[str, int] = {}
     by_detector: dict[str, dict[str, int]] = {}
 
     for f in findings:
         severity = str(getattr(f, "severity", None) or "UNKNOWN")
         detector = str(getattr(f, "detector_type", None) or "UNKNOWN")
+        custom_key = getattr(f, "custom_detector_key", None)
+        if detector == "CUSTOM" and custom_key:
+            detector = f"CUSTOM:{custom_key}"
 
         by_severity[severity] = by_severity.get(severity, 0) + 1
 

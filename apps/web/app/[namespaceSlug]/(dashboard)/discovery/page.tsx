@@ -22,16 +22,17 @@ import {
   Telescope,
   XCircle,
 } from "lucide-react";
-import {
-  api,
-  type CaseworkSummaryDto,
-  type FindingsDiscoveryResponseDto,
-} from "@workspace/api-client";
+import { api, type FindingsDiscoveryResponseDto } from "@workspace/api-client";
 import { useRouter } from "next/navigation";
 import { cn } from "@workspace/ui/lib/utils";
 import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-severity";
 import { formatRelative } from "@/lib/date";
-import { PanelCard } from "@/components/panel-card";
+import {
+  CardFootnote,
+  FootnoteDot,
+  PanelCard,
+  panelHeadingClass,
+} from "@/components/panel-card";
 import { useTranslation } from "@/hooks/use-translation";
 import { StatsFreshness } from "@/components/stats-freshness";
 import { CaseworkCard } from "@/components/discovery/casework-card";
@@ -43,6 +44,9 @@ type DiscoveryWindowDays = 7 | 30 | 90;
 type RecentRun = FindingsDiscoveryResponseDto["recentRuns"][number];
 
 const severityLevels = ["critical", "high", "medium", "low", "info"] as const;
+
+/** Rows the Recent Scans panel draws. The endpoint returns ten; see below. */
+const RECENT_RUNS_SHOWN = 5;
 
 /**
  * Card background for the "what needs attention" panel.
@@ -62,7 +66,7 @@ function RunStatusIcon({ status }: { status: string }) {
       return (
         <Spinner
           size="sm"
-          className="gap-0 text-accent [&_svg]:size-3.5"
+          className="gap-0 text-accent-ink [&_svg]:size-3.5"
           data-icon="inline-start"
         />
       );
@@ -107,11 +111,15 @@ function RunCard({ run, onClick }: { run: RecentRun; onClick: () => void }) {
       onClick={onClick}
       className={cn(
         "w-full text-left rounded-[4px] border-2 px-3 py-2.5 transition-all cursor-pointer hover:-translate-y-px",
+        // A run card is a status, so it is coloured like one — same scale as
+        // the status badges. The old "running" state was --accent text on
+        // --background: acid green on near-white, 1.2:1, invisible in light
+        // mode and only ever legible because dark mode inverts the ground.
         isRunning
-          ? "border-accent/30 bg-background hover:bg-accent/10"
+          ? "border-accent-ink/40 bg-accent/10 hover:bg-accent/20 dark:bg-accent/5 dark:hover:bg-accent/10"
           : hasError
-            ? "border-destructive/30 bg-destructive/5 hover:bg-destructive/10"
-            : "border-border bg-background hover:bg-secondary/40",
+            ? "border-destructive/40 bg-destructive/10 hover:bg-destructive/15"
+            : "border-border/70 bg-background hover:bg-secondary/40",
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -121,7 +129,7 @@ function RunCard({ run, onClick }: { run: RecentRun; onClick: () => void }) {
             className={cn(
               "text-[11px] font-mono uppercase tracking-[0.1em] truncate",
               isRunning
-                ? "text-accent"
+                ? "text-accent-ink font-semibold"
                 : hasError
                   ? "text-destructive"
                   : "text-foreground",
@@ -212,7 +220,6 @@ export default function DiscoveryPage() {
   const [overview, setOverview] = useState<FindingsDiscoveryResponseDto | null>(
     null,
   );
-  const [casework, setCasework] = useState<CaseworkSummaryDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -227,22 +234,13 @@ export default function DiscoveryPage() {
       try {
         setIsLoading(true);
         setError(null);
-        // Casework is a handful of grouped counts and never fails the page: an
-        // overview that renders without it is still useful, one that renders
-        // without findings is not.
-        const [response, caseworkSummary] = await Promise.all([
-          api.findings.findingsControllerGetDiscoveryOverview({
+        // Casework is no longer fetched here: the card renders CasesTable,
+        // which loads its own rows.
+        const response =
+          await api.findings.findingsControllerGetDiscoveryOverview({
             windowDays: windowDaysValue,
-          }),
-          api.cases
-            .caseworkControllerSummary()
-            .catch((err: unknown) => {
-              console.error("Failed to fetch casework summary:", err);
-              return null;
-            }),
-        ]);
+          });
         setOverview(response);
-        setCasework(caseworkSummary);
       } catch (err) {
         console.error("Failed to fetch discovery overview:", err);
         setError(
@@ -334,6 +332,23 @@ export default function DiscoveryPage() {
   const totalFindings = totals?.total ?? 0;
   const recentRuns = overview?.recentRuns ?? [];
   const runningCount = recentRuns.filter((r) => r.status === "RUNNING").length;
+  /**
+   * Ten runs is a scrolling wall; five is a glance. But a plain "latest five"
+   * hides the one row that is actually live — a run triggered an hour ago is
+   * still running while five newer ones have finished — so running runs are
+   * lifted to the top and the rest fill in behind them by recency. The endpoint
+   * keeps returning ten: the extra five are what makes the lift possible.
+   */
+  const visibleRuns = [...recentRuns]
+    .sort((a, b) => {
+      const liveA = a.status === "RUNNING" ? 0 : 1;
+      const liveB = b.status === "RUNNING" ? 0 : 1;
+      if (liveA !== liveB) return liveA - liveB;
+      return (
+        new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime()
+      );
+    })
+    .slice(0, RECENT_RUNS_SHOWN);
 
   if (isLoading) {
     return (
@@ -357,7 +372,7 @@ export default function DiscoveryPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
-              Overview
+              {t("discovery.title")}
             </h1>
             <p className="text-destructive">
               {t("discovery.errorPrefix", { message: error })}
@@ -392,14 +407,17 @@ export default function DiscoveryPage() {
   const attentionLabel = attentionLabelBySeverity[attentionLevel];
   const attentionSummary =
     attentionLevel === "critical" || attentionLevel === "high"
-      ? t("discovery.requireReview", { count: criticalHigh })
+      ? t("discovery.requireReview", { count: criticalHigh.toLocaleString() })
       : attentionLevel === "none"
         ? t("discovery.noFindingsInWindow")
         : t("discovery.currentHighest", {
-            count: attentionCount,
-            // The translated word, not the enum key — otherwise the German
-            // string renders half in English.
-            level: attentionLabel.toLocaleLowerCase(),
+            count: attentionCount.toLocaleString(),
+            // The bare severity word, not `attentionLabel` — that one is
+            // "Medium findings", which rendered as "medium findings findings
+            // currently highest" (and the same duplication in German).
+            level: t(
+              `findings.severityLabels.${attentionLevel.toUpperCase()}` as TranslationKey,
+            ),
           });
 
   return (
@@ -461,29 +479,25 @@ export default function DiscoveryPage() {
               {t("discovery.findingsToReview")}
             </span>
           </div>
-          {/* Review state is bookkeeping, not the headline — one muted line,
+          {/* Review state is bookkeeping, not the headline — one dense line,
               each segment filtering the findings list. */}
-          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <CardFootnote>
             {reviewStates.map(({ status, label, value }, index) => (
-              <span key={status} className="flex items-center gap-3">
-                {index > 0 && (
-                  <span aria-hidden className="text-muted-foreground/40">
-                    ·
-                  </span>
-                )}
+              <span key={status} className="flex items-center gap-2">
+                {index > 0 && <FootnoteDot />}
                 <button
                   type="button"
                   onClick={() => router.push(nsPath(`/findings?status=${status}`))}
-                  className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+                  className="cursor-pointer whitespace-nowrap transition-colors hover:text-foreground"
                 >
-                  <span className="font-semibold text-foreground/70">
+                  <span className="font-semibold tabular-nums text-foreground/75">
                     {value.toLocaleString()}
                   </span>{" "}
                   {label}
                 </button>
               </span>
             ))}
-          </div>
+          </CardFootnote>
         </PanelCard>
 
         {/* ── SEVERITY BREAKDOWN ─── */}
@@ -503,7 +517,7 @@ export default function DiscoveryPage() {
                 className="text-3xl font-bold block leading-tight"
                 style={{ fontFamily: "var(--font-hero)" }}
               >
-                {attentionCount}
+                {attentionCount.toLocaleString()}
               </span>
             </div>
           </div>
@@ -533,18 +547,14 @@ export default function DiscoveryPage() {
                     className="text-2xl font-bold"
                     style={{ fontFamily: "var(--font-hero)" }}
                   >
-                    {severityCounts[sev]}
+                    {severityCounts[sev].toLocaleString()}
                   </span>
                   <ArrowRight className="h-3 w-3 opacity-0 group-hover/sev:opacity-100 transition-opacity" />
                 </div>
               </button>
             ))}
           </div>
-          <div className="mt-4 pt-3 border-t border-white/20">
-            <p className="text-[10px] text-white/70 font-mono uppercase tracking-[0.15em]">
-              {attentionSummary}
-            </p>
-          </div>
+          <CardFootnote tone="inverted">{attentionSummary}</CardFootnote>
         </PanelCard>
 
         {/* ── ACTIVITY: Today/Week/Month ─── */}
@@ -589,26 +599,32 @@ export default function DiscoveryPage() {
               </div>
             </div>
           </div>
-          <p className="text-[10px] text-accent/40 uppercase tracking-[0.15em] font-mono mt-2">
+          <CardFootnote
+            tone="inverted"
+            className="border-accent/25 text-accent/55"
+          >
             {t("discovery.basedOnTimestamps")}
-          </p>
+          </CardFootnote>
         </PanelCard>
 
         {/* ── CASEWORK ─── */}
-        <CaseworkCard summary={casework} isLoading={isLoading} />
+        <CaseworkCard />
 
         {/* ── RECENT RUNS ─── */}
         <PanelCard className="flex flex-col sm:col-span-2 xl:col-span-4">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <h3 className="font-serif text-lg font-black uppercase tracking-[0.06em] text-foreground">
-                {t("discovery.recentScans")}
-              </h3>
-              <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-[0.15em]">
-                {t("discovery.last10Runs")}
+              <h3 className={panelHeadingClass}>{t("discovery.recentScans")}</h3>
+              <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground font-mono uppercase tracking-[0.15em]">
+                {t("discovery.lastRuns", { count: RECENT_RUNS_SHOWN })}
                 {runningCount > 0 && (
-                  <span className="ml-2 text-accent">
-                    · {t("discovery.runningCount", { count: runningCount })}
+                  <span className="inline-flex items-center gap-1 rounded-[3px] border border-accent-ink/40 bg-accent/10 px-1.5 py-px font-semibold text-accent-ink dark:bg-accent/5">
+                    <Spinner
+                      size="sm"
+                      className="gap-0 [&_svg]:size-2.5"
+                      data-icon="inline-start"
+                    />
+                    {t("discovery.runningCount", { count: runningCount })}
                   </span>
                 )}
               </p>
@@ -617,9 +633,9 @@ export default function DiscoveryPage() {
               {t("discovery.allScans")} <ArrowRight className="h-3 w-3" />
             </NavButton>
           </div>
-          {recentRuns.length > 0 ? (
+          {visibleRuns.length > 0 ? (
             <div className="space-y-1.5 flex-1">
-              {recentRuns.map((run) => (
+              {visibleRuns.map((run) => (
                 <RunCard
                   key={run.id}
                   run={run}

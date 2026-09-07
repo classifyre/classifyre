@@ -6,6 +6,7 @@ import {
   getCaseStatusBadgeLabel,
   getCaseStatusBadgeTone,
 } from "@/lib/case-status-badge";
+import { statusBadgeClass } from "@/lib/status-tone";
 
 interface CaseStatusBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   status?: string | null;
@@ -16,7 +17,8 @@ export function CaseStatusBadge({ status, className, ...props }: CaseStatusBadge
 
   return (
     <Badge
-      className={`rounded-[4px] border ${getCaseStatusBadgeTone(status)} ${className ?? ""}`}
+      variant="outline"
+      className={`${statusBadgeClass} ${getCaseStatusBadgeTone(status)} ${className ?? ""}`}
       {...props}
     >
       {t(getCaseStatusBadgeLabel(status))}
