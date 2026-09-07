@@ -70,11 +70,23 @@ export interface DiscoveryRecentRunDto {
      */
     durationMs?: number | null;
     /**
-     * 
+     * The source's open finding set as of this run — NOT what the run discovered. Use findingsCreated for that.
      * @type {number}
      * @memberof DiscoveryRecentRunDto
      */
     totalFindings: number;
+    /**
+     * Findings this run raised that did not exist before.
+     * @type {number}
+     * @memberof DiscoveryRecentRunDto
+     */
+    findingsCreated: number;
+    /**
+     * Findings this run resolved because they were gone.
+     * @type {number}
+     * @memberof DiscoveryRecentRunDto
+     */
+    findingsResolved: number;
     /**
      * 
      * @type {number}
@@ -136,6 +148,8 @@ export function instanceOfDiscoveryRecentRunDto(value: object): value is Discove
     if (!('triggerType' in value) || value['triggerType'] === undefined) return false;
     if (!('triggeredAt' in value) || value['triggeredAt'] === undefined) return false;
     if (!('totalFindings' in value) || value['totalFindings'] === undefined) return false;
+    if (!('findingsCreated' in value) || value['findingsCreated'] === undefined) return false;
+    if (!('findingsResolved' in value) || value['findingsResolved'] === undefined) return false;
     if (!('assetsCreated' in value) || value['assetsCreated'] === undefined) return false;
     if (!('assetsUpdated' in value) || value['assetsUpdated'] === undefined) return false;
     return true;
@@ -159,6 +173,8 @@ export function DiscoveryRecentRunDtoFromJSONTyped(json: any, ignoreDiscriminato
         'completedAt': json['completedAt'] == null ? undefined : (new Date(json['completedAt'])),
         'durationMs': json['durationMs'] == null ? undefined : json['durationMs'],
         'totalFindings': json['totalFindings'],
+        'findingsCreated': json['findingsCreated'],
+        'findingsResolved': json['findingsResolved'],
         'assetsCreated': json['assetsCreated'],
         'assetsUpdated': json['assetsUpdated'],
         'errorMessage': json['errorMessage'] == null ? undefined : json['errorMessage'],
@@ -185,6 +201,8 @@ export function DiscoveryRecentRunDtoToJSONTyped(value?: DiscoveryRecentRunDto |
         'completedAt': value['completedAt'] == null ? value['completedAt'] : value['completedAt'].toISOString(),
         'durationMs': value['durationMs'],
         'totalFindings': value['totalFindings'],
+        'findingsCreated': value['findingsCreated'],
+        'findingsResolved': value['findingsResolved'],
         'assetsCreated': value['assetsCreated'],
         'assetsUpdated': value['assetsUpdated'],
         'errorMessage': value['errorMessage'],

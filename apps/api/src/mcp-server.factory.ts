@@ -2684,9 +2684,17 @@ export class McpServerFactoryService {
       {
         title: 'Get Findings Discovery',
         description:
-          'Return discovery totals, activity, and top assets for findings.',
+          'Return discovery totals, review-state mix, activity, and top assets ' +
+          'for findings. Severity is a priority level, not a threat level — it says ' +
+          'how much a finding matters, not how dangerous it is.',
         inputSchema: {
-          windowDays: z.number().int().min(1).max(365).optional(),
+          // The rollup is keyed to these three windows and the HTTP DTO
+          // validates them; the MCP path bypasses that validator, so an
+          // arbitrary number here would silently produce a window nothing else
+          // in the product can reproduce.
+          windowDays: z
+            .union([z.literal(7), z.literal(30), z.literal(90)])
+            .optional(),
           includeResolved: z.boolean().optional(),
         },
         annotations: {

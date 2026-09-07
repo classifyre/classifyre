@@ -1,7 +1,7 @@
 "use client";
 
 import { nsPath } from "@/lib/ns-path";
-import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   Button,
   Select,
@@ -9,7 +9,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  SeverityBadge,
   Spinner,
   Tooltip,
   TooltipContent,
@@ -20,20 +19,23 @@ import {
   CheckCircle2,
   CircleDashed,
   Loader2,
-  Shield,
+  Telescope,
   XCircle,
 } from "lucide-react";
-import { api, type FindingsDiscoveryResponseDto } from "@workspace/api-client";
+import {
+  api,
+  type CaseworkSummaryDto,
+  type FindingsDiscoveryResponseDto,
+} from "@workspace/api-client";
 import { useRouter } from "next/navigation";
 import { cn } from "@workspace/ui/lib/utils";
 import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-severity";
 import { formatRelative } from "@/lib/date";
-import {
-  PanelCard,
-  panelInsetCardClass,
-} from "@/components/panel-card";
+import { PanelCard } from "@/components/panel-card";
 import { useTranslation } from "@/hooks/use-translation";
 import { StatsFreshness } from "@/components/stats-freshness";
+import { CaseworkCard } from "@/components/discovery/casework-card";
+import { ConnectionsCanvas } from "@/components/discovery/connections-canvas";
 import type { TranslationKey } from "@/i18n";
 
 type DiscoveryWindowDays = 7 | 30 | 90;
@@ -42,35 +44,17 @@ type RecentRun = FindingsDiscoveryResponseDto["recentRuns"][number];
 
 const severityLevels = ["critical", "high", "medium", "low", "info"] as const;
 
-const severityAccentColor: Record<
-  (typeof severityLevels)[number] | "none",
-  string
-> = {
-  critical: "#ff2b2b",
-  high: "#d97706",
-  medium: "#a16207",
-  low: "#0369a1",
-  info: "#4b5563",
-  none: "#111827",
-};
+/**
+ * Card background for the "what needs attention" panel.
+ *
+ * The swatches, badges and this background all read as the same scale, so they
+ * all come from FINDING_SEVERITY_COLOR_BY_LEVEL; only the empty state, which has
+ * no level, needs a colour of its own.
+ */
+const attentionBackground = (
+  level: (typeof severityLevels)[number] | "none",
+): string => (level === "none" ? "#111827" : FINDING_SEVERITY_COLOR_BY_LEVEL[level]);
 
-
-function toSeverityBadgeValue(
-  severity?: string | null,
-): "critical" | "high" | "medium" | "low" | "info" {
-  switch ((severity || "").toUpperCase()) {
-    case "CRITICAL":
-      return "critical";
-    case "HIGH":
-      return "high";
-    case "MEDIUM":
-      return "medium";
-    case "LOW":
-      return "low";
-    default:
-      return "info";
-  }
-}
 
 function RunStatusIcon({ status }: { status: string }) {
   switch (status) {
@@ -151,14 +135,34 @@ function RunCard({ run, onClick }: { run: RecentRun; onClick: () => void }) {
         </span>
       </div>
       <div className="mt-1 flex items-center gap-3 text-[10px] font-mono text-muted-foreground uppercase tracking-[0.1em]">
-        {run.totalFindings > 0 && (
+        {run.findingsCreated > 0 && (
           <span>
+            +
             <span className="text-foreground font-semibold">
-              {run.totalFindings}
+              {run.findingsCreated}
             </span>{" "}
-            {runCardT("discovery.findingsLabel")}
+            {runCardT("discovery.newLabel")}
           </span>
         )}
+        {run.findingsResolved > 0 && (
+          <span>
+            −
+            <span className="text-foreground font-semibold">
+              {run.findingsResolved}
+            </span>{" "}
+            {runCardT("discovery.resolvedLabel")}
+          </span>
+        )}
+        {run.findingsCreated === 0 &&
+          run.findingsResolved === 0 &&
+          run.totalFindings > 0 && (
+            <span>
+              <span className="text-foreground font-semibold">
+                {run.totalFindings}
+              </span>{" "}
+              {runCardT("discovery.findingsLabel")}
+            </span>
+          )}
         {run.assetsCreated > 0 && (
           <span>
             +
@@ -208,6 +212,7 @@ export default function DiscoveryPage() {
   const [overview, setOverview] = useState<FindingsDiscoveryResponseDto | null>(
     null,
   );
+  const [casework, setCasework] = useState<CaseworkSummaryDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -222,11 +227,22 @@ export default function DiscoveryPage() {
       try {
         setIsLoading(true);
         setError(null);
-        const response =
-          await api.findings.findingsControllerGetDiscoveryOverview({
+        // Casework is a handful of grouped counts and never fails the page: an
+        // overview that renders without it is still useful, one that renders
+        // without findings is not.
+        const [response, caseworkSummary] = await Promise.all([
+          api.findings.findingsControllerGetDiscoveryOverview({
             windowDays: windowDaysValue,
-          });
+          }),
+          api.cases
+            .caseworkControllerSummary()
+            .catch((err: unknown) => {
+              console.error("Failed to fetch casework summary:", err);
+              return null;
+            }),
+        ]);
         setOverview(response);
+        setCasework(caseworkSummary);
       } catch (err) {
         console.error("Failed to fetch discovery overview:", err);
         setError(
@@ -286,12 +302,34 @@ export default function DiscoveryPage() {
     low: 0,
     info: 0,
   };
-  const statusCounts = totals?.byStatus ?? {
+  // `totals.byStatus` only ever counts OPEN rows (the overview filters to it),
+  // so the review-state strip reads `statusMix`, which is counted across every
+  // status over the same window.
+  const statusMix = overview?.statusMix ?? {
+    total: 0,
     open: 0,
     falsePositive: 0,
     resolved: 0,
     ignored: 0,
   };
+  const reviewStates = [
+    { status: "OPEN", label: t("discovery.open"), value: statusMix.open },
+    {
+      status: "RESOLVED",
+      label: t("discovery.resolved"),
+      value: statusMix.resolved,
+    },
+    {
+      status: "FALSE_POSITIVE",
+      label: t("discovery.falsePositive"),
+      value: statusMix.falsePositive,
+    },
+    {
+      status: "IGNORED",
+      label: t("discovery.ignored"),
+      value: statusMix.ignored,
+    },
+  ].filter((state, index) => index === 0 || state.value > 0);
   const newActivity = overview?.activity ?? { today: 0, week: 0, month: 0 };
   const totalFindings = totals?.total ?? 0;
   const recentRuns = overview?.recentRuns ?? [];
@@ -339,7 +377,7 @@ export default function DiscoveryPage() {
     severityLevels.find((severity) => severityCounts[severity] > 0) ?? "none";
   const attentionCount =
     attentionLevel === "none" ? 0 : severityCounts[attentionLevel];
-  const attentionCardBackground = severityAccentColor[attentionLevel];
+  const attentionCardBackground = attentionBackground(attentionLevel);
   const attentionLabelBySeverity: Record<
     (typeof severityLevels)[number] | "none",
     string
@@ -359,7 +397,9 @@ export default function DiscoveryPage() {
         ? t("discovery.noFindingsInWindow")
         : t("discovery.currentHighest", {
             count: attentionCount,
-            level: attentionLevel,
+            // The translated word, not the enum key — otherwise the German
+            // string renders half in English.
+            level: attentionLabel.toLocaleLowerCase(),
           });
 
   return (
@@ -374,7 +414,7 @@ export default function DiscoveryPage() {
         <PanelCard className="flex flex-col justify-between sm:col-span-2 sm:p-8 xl:col-span-5 xl:row-span-2">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Shield className="h-4 w-4 text-foreground" />
+              <Telescope className="h-4 w-4 text-foreground" />
               <span className="text-[11px] uppercase tracking-[0.25em] text-muted-foreground font-mono font-semibold">
                 {t("discovery.securityBrief")}
               </span>
@@ -421,24 +461,27 @@ export default function DiscoveryPage() {
               {t("discovery.findingsToReview")}
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-2 mt-4 sm:grid-cols-4">
-            {[
-              { label: t("discovery.open"), value: statusCounts.open },
-              { label: t("discovery.resolved"), value: statusCounts.resolved },
-              {
-                label: t("discovery.falsePositive"),
-                value: statusCounts.falsePositive,
-              },
-              { label: t("discovery.ignored"), value: statusCounts.ignored },
-            ].map(({ label, value }) => (
-              <div key={label} className={`${panelInsetCardClass} min-w-0`}>
-                <span className="text-[9px] leading-tight uppercase tracking-[0.15em] text-muted-foreground font-mono block sm:text-[10px] sm:tracking-[0.2em]">
+          {/* Review state is bookkeeping, not the headline — one muted line,
+              each segment filtering the findings list. */}
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+            {reviewStates.map(({ status, label, value }, index) => (
+              <span key={status} className="flex items-center gap-3">
+                {index > 0 && (
+                  <span aria-hidden className="text-muted-foreground/40">
+                    ·
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => router.push(nsPath(`/findings?status=${status}`))}
+                  className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+                >
+                  <span className="font-semibold text-foreground/70">
+                    {value.toLocaleString()}
+                  </span>{" "}
                   {label}
-                </span>
-                <span className="font-serif text-lg font-black text-foreground sm:text-xl">
-                  {value}
-                </span>
-              </div>
+                </button>
+              </span>
             ))}
           </div>
         </PanelCard>
@@ -551,102 +594,8 @@ export default function DiscoveryPage() {
           </p>
         </PanelCard>
 
-        {/* ── TOP ASSETS ─── */}
-        <PanelCard className="flex flex-col sm:col-span-2 xl:col-span-8 overflow-hidden">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="min-w-0">
-              <h3 className="font-serif text-lg font-black uppercase tracking-[0.06em] text-foreground">
-                {t("discovery.whereRiskClusters")}
-              </h3>
-              <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-[0.15em]">
-                {t("discovery.assetsWithMost")}
-              </p>
-            </div>
-            <NavButton onClick={() => router.push(nsPath("/assets"))}>
-              {t("discovery.viewAll")} <ArrowRight className="h-3 w-3" />
-            </NavButton>
-          </div>
-          {topAssets.length > 0 ? (
-            <div className="grid gap-1.5 flex-1">
-              {topAssets.slice(0, 5).map((asset, i) => {
-                const lastSeen = asset.lastDetectedAt
-                  ? formatRelative(asset.lastDetectedAt)
-                  : null;
-                const sevKey = toSeverityBadgeValue(asset.highestSeverity);
-                const accent = severityAccentColor[sevKey];
-                return (
-                  <button
-                    key={asset.assetId}
-                    type="button"
-                    onClick={() => router.push(nsPath(`/assets/${asset.assetId}`))}
-                    className="flex w-full min-w-0 cursor-pointer items-start justify-between gap-3 rounded-[4px] border-2 bg-white px-3 py-2 text-left transition-all hover:-translate-y-px hover:bg-white dark:bg-background dark:hover:bg-secondary/40"
-                    style={{
-                      borderColor: `${accent}33`,
-                      boxShadow: `3px 3px 0 0 ${accent}33`,
-                    }}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 leading-none">
-                        <span
-                          className="shrink-0 w-4 font-serif text-lg font-black tabular-nums"
-                          style={{ color: `${accent}99` }}
-                        >
-                          {i + 1}
-                        </span>
-                        <span className="truncate text-xs font-bold text-foreground">
-                          {asset.assetName}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1 pl-6 text-[10px] font-mono text-muted-foreground uppercase tracking-[0.1em]">
-                        <span className="truncate">
-                          {asset.sourceName ||
-                            asset.sourceType ||
-                            asset.assetType ||
-                            "—"}
-                        </span>
-                        <span className="shrink-0 text-border">·</span>
-                        <span className="shrink-0">
-                          <span className="text-foreground font-semibold">
-                            {asset.totalFindings}
-                          </span>{" "}
-                          {t("discovery.findingsLabel")}
-                        </span>
-                        {lastSeen && (
-                          <>
-                            <span className="shrink-0 text-border">·</span>
-                            <span className="shrink-0">{lastSeen}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 mt-0.5">
-                      <SeverityBadge severity={sevKey}>
-                        {asset.highestSeverity}
-                      </SeverityBadge>
-                      <ArrowRight className="h-3 w-3 text-muted-foreground/50" />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex flex-1 items-center justify-center border-2 border-dashed border-border/40 px-4 py-6 text-center rounded-[4px]">
-              <div>
-                <p className="text-sm text-muted-foreground font-mono uppercase tracking-[0.15em]">
-                  {t("discovery.firstScan")}
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => router.push(nsPath("/scans"))}
-                  className="mt-3 border-2 border-border text-foreground rounded-[4px] font-mono uppercase tracking-[0.1em]"
-                >
-                  {t("discovery.startScan")}
-                </Button>
-              </div>
-            </div>
-          )}
-        </PanelCard>
+        {/* ── CASEWORK ─── */}
+        <CaseworkCard summary={casework} isLoading={isLoading} />
 
         {/* ── RECENT RUNS ─── */}
         <PanelCard className="flex flex-col sm:col-span-2 xl:col-span-4">
@@ -697,42 +646,8 @@ export default function DiscoveryPage() {
           )}
         </PanelCard>
 
-        {/* ── RESOLUTION SNAPSHOT ─── */}
-        <PanelCard className="flex flex-col justify-between sm:col-span-2 xl:col-span-12">
-          <span className="text-[11px] uppercase tracking-[0.25em] text-muted-foreground font-mono font-semibold mb-4 block">
-            {t("discovery.resolutionSnapshot")}
-          </span>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              { label: t("discovery.open"), value: statusCounts.open },
-              { label: t("discovery.resolved"), value: statusCounts.resolved },
-              {
-                label: t("discovery.falsePositive"),
-                value: statusCounts.falsePositive,
-              },
-              { label: t("discovery.ignored"), value: statusCounts.ignored },
-            ].map(({ label, value }) => (
-              <div key={label} className={panelInsetCardClass}>
-                <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono block">
-                  {label}
-                </span>
-                <span
-                  className="text-2xl font-bold block text-foreground"
-                  style={{ fontFamily: "var(--font-hero)" }}
-                >
-                  {value}
-                </span>
-              </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => router.push(nsPath("/findings"))}
-            className="mt-4 text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 cursor-pointer font-mono uppercase tracking-[0.15em]"
-          >
-            {t("discovery.reviewStatusMix")} <ArrowRight className="h-3 w-3" />
-          </button>
-        </PanelCard>
+        {/* ── CONNECTIONS ─── */}
+        <ConnectionsCanvas topAssets={topAssets} />
       </div>
 
     </div>

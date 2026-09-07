@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
+import { SourceGraphScheduler } from './stats/source-graph-scheduler.service';
 import { resolveEdgeClass } from './graph/edge-class';
 import { tryNormalizeUrn } from './graph/urn';
 import {
@@ -247,7 +248,12 @@ function rewriteGraph(
 export class GraphService {
   private readonly logger = new Logger(GraphService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Value import, not `import type` — a type-only import of an injected class
+    // leaves Nest with no metadata to resolve and injects undefined silently.
+    private readonly sourceGraphScheduler: SourceGraphScheduler,
+  ) {}
 
   // ─── Edge inference ──────────────────────────────────────────────
 
@@ -267,6 +273,7 @@ export class GraphService {
     await this.createReferenceEdges(assetsWithLinks);
 
     const edgeCount = await this.prisma.edge.count();
+    await this.sourceGraphScheduler.scheduleRebuild('edges rebuilt');
     return { edgeCount };
   }
 
@@ -540,6 +547,13 @@ export class GraphService {
           ELSE EXCLUDED."origin"
         END
     `);
+
+    // The connection map is keyed on these edges; a batch that changed any of
+    // them makes it stale. Coalesced upstream, so a scan emitting relationships
+    // for an hour produces a trickle of rebuilds rather than one per batch.
+    if (upserted > 0) {
+      await this.sourceGraphScheduler.scheduleRebuild('edges ingested');
+    }
 
     return { upserted, external, dropped };
   }

@@ -59,6 +59,7 @@ describe('NamespaceWorkerManager teardown isolation', () => {
       stopForSchema: asyncNoop,
     },
     findingStats: { registerForNamespace: asyncNoop },
+    sourceGraph: { registerForNamespace: asyncNoop },
     runnerEvents: { stopForSchema: noop },
     notificationEvents: { stopForSchema: noop },
     // Never the leader in these tests, so start() takes the branch that skips
@@ -91,6 +92,7 @@ describe('NamespaceWorkerManager teardown isolation', () => {
       d.pgStream as never,
       d.dataTransfer as never,
       d.findingStats as never,
+      d.sourceGraph as never,
       d.runnerEvents as never,
       d.notificationEvents as never,
       d.leadership as never,

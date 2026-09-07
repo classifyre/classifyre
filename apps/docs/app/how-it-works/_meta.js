@@ -5,6 +5,7 @@ export default {
   "documents-to-findings": "From Documents to Findings",
   "ranking-and-semantics": "Ranking & the Semantic Layer",
   "duplicates-and-similarity": "Connections & Duplicates",
+  "connection-map": "The Connection Map",
   investigating: "Leads, Evidence & Events",
   glossary: "Glossary & Shared Vocabulary",
   autopilot: "Autopilot & AI Assistance",
