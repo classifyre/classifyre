@@ -51,6 +51,13 @@ const emptySeverityMix = () => ({
 
 const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
+/** What a source looks like when counted live instead of read from the rollup. */
+interface LiveSourceCounts {
+  assetCount: number;
+  findingCount: number;
+  severityCounts: ReturnType<typeof emptySeverityMix>;
+}
+
 /**
  * Assembles the workspace connection map from the source-graph rollup.
  *
@@ -86,30 +93,45 @@ export class ConstellationService {
     ]);
 
     if (!freshness.isBuilt) {
-      // Nothing to draw yet. Return the sources so the canvas can show the
-      // bubbles greyed out while the first build runs, rather than an empty
-      // panel that reads as "you have no sources".
+      // Nothing graph-shaped to draw yet. The sources still come back, and they
+      // come back with real sizes: reporting `assetCount: 0` for a source
+      // holding forty thousand assets is not "no data yet", it is a wrong
+      // number, and a bubble labelled 0 next to a panel reading "0 connected,
+      // 0 unconnected, 0 findings" is indistinguishable from an empty
+      // workspace. The two counts that do not need the rollup — how many assets
+      // a source has and how many open findings sit on them — are two indexed
+      // GROUP BYs returning one row per source, so they are cheap enough to
+      // answer live. Everything that genuinely needs the edge rollup
+      // (connected, internal, the links themselves) stays zero, and `isBuilt`
+      // tells the client to render those as unknown rather than as none.
       await this.scheduler.scheduleRebuild('constellation requested before first build');
+      const live = await this.liveSourceCounts();
       return {
-        sources: sources.map((s) => ({
-          id: s.id,
-          name: s.name,
-          type: s.type,
-          assetCount: 0,
-          connectedAssetCount: 0,
-          isolatedAssetCount: 0,
-          internalEdgeCount: 0,
-          findingCount: 0,
-          severityCounts: emptySeverityMix(),
-        })),
+        sources: sources.map((s) => {
+          const counts = live.get(s.id);
+          return {
+            id: s.id,
+            name: s.name,
+            type: s.type,
+            assetCount: counts?.assetCount ?? 0,
+            connectedAssetCount: 0,
+            isolatedAssetCount: counts?.assetCount ?? 0,
+            internalEdgeCount: 0,
+            findingCount: counts?.findingCount ?? 0,
+            severityCounts: counts?.severityCounts ?? emptySeverityMix(),
+          };
+        }),
         links: [],
         boundaryAssets: [],
         bundles: [],
         totals: {
           sources: sources.length,
-          assets: 0,
+          assets: [...live.values()].reduce((n, c) => n + c.assetCount, 0),
           connectedAssets: 0,
-          isolatedAssets: 0,
+          isolatedAssets: [...live.values()].reduce(
+            (n, c) => n + c.assetCount,
+            0,
+          ),
           crossSourceLinks: 0,
         },
         stats: {
@@ -123,9 +145,18 @@ export class ConstellationService {
     const map = await this.sourceGraph.readMap(BUNDLE_THRESHOLD);
     const nodeBySource = new Map(map.nodes.map((n) => [n.sourceId, n]));
 
+    // A source created since the last rebuild has no rollup row at all. Sizing
+    // it from live counts costs one extra grouped read and is the difference
+    // between a new source appearing on the map and appearing as a zero.
+    const missing = sources.filter((s) => !nodeBySource.has(s.id));
+    const live = missing.length
+      ? await this.liveSourceCounts(missing.map((s) => s.id))
+      : new Map<string, LiveSourceCounts>();
+
     const sourceDtos: ConstellationSourceDto[] = sources.map((s) => {
       const node = nodeBySource.get(s.id);
-      const assetCount = node?.assetCount ?? 0;
+      const fallback = live.get(s.id);
+      const assetCount = node?.assetCount ?? fallback?.assetCount ?? 0;
       const connected = node?.connectedAssetCount ?? 0;
       return {
         id: s.id,
@@ -135,8 +166,10 @@ export class ConstellationService {
         connectedAssetCount: connected,
         isolatedAssetCount: Math.max(0, assetCount - connected),
         internalEdgeCount: node?.internalEdgeCount ?? 0,
-        findingCount: node?.findingCount ?? 0,
-        severityCounts: this.toSeverityMix(node?.severityCounts ?? {}),
+        findingCount: node?.findingCount ?? fallback?.findingCount ?? 0,
+        severityCounts: node
+          ? this.toSeverityMix(node.severityCounts ?? {})
+          : (fallback?.severityCounts ?? emptySeverityMix()),
       };
     });
 
@@ -206,6 +239,59 @@ export class ConstellationService {
         source: 'rollup',
       },
     };
+  }
+
+  /**
+   * Asset and open-finding counts straight from the tables, one row per source.
+   *
+   * Deliberately not the whole rollup: this answers only the two questions that
+   * `assets` and `findings` can answer on their own indexes. Anything about how
+   * things are *connected* needs the edge aggregation, which is exactly the
+   * work the rollup exists to keep off the request path.
+   */
+  private async liveSourceCounts(
+    sourceIds?: string[],
+  ): Promise<Map<string, LiveSourceCounts>> {
+    const where = sourceIds ? { sourceId: { in: sourceIds } } : {};
+    const [assets, findings] = await Promise.all([
+      this.prisma.asset.groupBy({
+        by: ['sourceId'],
+        where,
+        _count: { _all: true },
+      }),
+      this.prisma.finding.groupBy({
+        by: ['sourceId', 'severity'],
+        where: { ...where, status: 'OPEN' },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const counts = new Map<string, LiveSourceCounts>();
+    const entry = (sourceId: string): LiveSourceCounts => {
+      let row = counts.get(sourceId);
+      if (!row) {
+        row = {
+          assetCount: 0,
+          findingCount: 0,
+          severityCounts: emptySeverityMix(),
+        };
+        counts.set(sourceId, row);
+      }
+      return row;
+    };
+
+    for (const row of assets) {
+      entry(row.sourceId).assetCount = row._count._all;
+    }
+    for (const row of findings) {
+      const target = entry(row.sourceId);
+      target.findingCount += row._count._all;
+      const key = row.severity.toLowerCase() as keyof ReturnType<
+        typeof emptySeverityMix
+      >;
+      if (key in target.severityCounts) target.severityCounts[key] += row._count._all;
+    }
+    return counts;
   }
 
   /**

@@ -51,7 +51,9 @@ function TooltipContent({
         )}
         {...props}
       >
-        {children}
+        {/* The token remap lives on a `display: contents` wrapper, not on the
+            tooltip itself — see `.tooltip-surface`. */}
+        <span className="tooltip-surface">{children}</span>
         <TooltipPrimitive.Arrow className="bg-foreground fill-foreground z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>

@@ -2,7 +2,14 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, GitBranch, Copy as CopyIcon } from "lucide-react";
+import {
+  ChevronsDownUp,
+  ChevronsUpDown,
+  ExternalLink,
+  GitBranch,
+  ListTree,
+  Copy as CopyIcon,
+} from "lucide-react";
 import type {
   ConstellationResponseDto,
   FindingsDiscoveryTopAssetDto,
@@ -48,6 +55,8 @@ export function ConnectionsRail({
   expandedSources,
   activeClasses,
   onExpandSource,
+  onCollapseAll,
+  isBuilt = true,
 }: {
   map: ConstellationResponseDto | null;
   topAssets?: FindingsDiscoveryTopAssetDto[];
@@ -56,9 +65,20 @@ export function ConnectionsRail({
   expandedSources: Map<string, unknown>;
   activeClasses: Set<ClassName>;
   onExpandSource: (sourceId: string) => void;
+  onCollapseAll: () => void;
+  /**
+   * False while the source-graph rollup has never finished. Every count on this
+   * panel comes from that rollup, so without this the panel confidently reports
+   * zero connected assets, zero internal links and zero findings for a source
+   * that has plenty of all three.
+   */
+  isBuilt?: boolean;
 }) {
   const router = useRouter();
   const { t } = useTranslation();
+
+  /** A count the rollup has not produced yet is unknown, not zero. */
+  const pending = (value: number) => (isBuilt ? value.toLocaleString() : "—");
 
   const source =
     selectedNode && isClusterNode(selectedNode)
@@ -85,41 +105,101 @@ export function ConnectionsRail({
             {source.name}
           </h4>
           <div className="mt-3 space-y-0.5">
+            {/* The total goes first. Without it "Connected 0 / Unconnected 0"
+                is the same panel for a source holding nothing and a source
+                whose rollup row is missing, and "Connected 3" says nothing
+                about whether that is 3 of 4 or 3 of 500. */}
+            <Row
+              label={t("connections.totalAssets")}
+              value={source.assetCount.toLocaleString()}
+            />
             <Row
               label={t("connections.connectedAssets")}
-              value={source.connectedAssetCount.toLocaleString()}
+              value={pending(source.connectedAssetCount)}
             />
             <Row
               label={t("connections.unconnected")}
-              value={source.isolatedAssetCount.toLocaleString()}
+              value={pending(source.isolatedAssetCount)}
             />
             <Row
               label={t("connections.internalEdges")}
-              value={source.internalEdgeCount.toLocaleString()}
+              value={pending(source.internalEdgeCount)}
             />
             <Row
               label={t("discovery.findingsLabel")}
-              value={source.findingCount.toLocaleString()}
+              value={pending(source.findingCount)}
             />
           </div>
+          {!isBuilt && (
+            <p className="mt-2 font-mono text-[10px] leading-relaxed tracking-[0.02em] text-muted-foreground/70">
+              {t("connections.notBuiltYet")}
+            </p>
+          )}
           <div className="mt-3 flex flex-col gap-1.5">
+            {/* Expanding a source draws only what fits on the canvas, and the
+                rail's ranking is the five busiest. Neither answers "what IS in
+                here", so the panel hands that question to the assets table,
+                pre-filtered to this source. */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-[4px] border-2 font-mono text-[10px] uppercase tracking-[0.1em]"
+              onClick={() =>
+                router.push(nsPath(`/assets?source=${source.id}`))
+              }
+            >
+              <ListTree className="mr-1 h-3 w-3" />
+              {t("connections.browseAssets", {
+                count: source.assetCount.toLocaleString(),
+              })}
+            </Button>
+            {/* "Open this source" read as "take me to the source page"; it
+                actually fans the source out into its assets on the canvas.
+                It says what it does now, and the button that really does
+                navigate is separate and marked as leaving the page. */}
             <Button
               size="sm"
               variant="outline"
               className="rounded-[4px] border-2 font-mono text-[10px] uppercase tracking-[0.1em]"
               onClick={() => onExpandSource(source.id)}
             >
-              {expandedSources.has(source.id)
-                ? t("connections.collapse")
-                : t("connections.expand")}
+              {expandedSources.has(source.id) ? (
+                <>
+                  <ChevronsDownUp className="mr-1 h-3 w-3" />
+                  {t("connections.collapse")}
+                </>
+              ) : (
+                <>
+                  <ChevronsUpDown className="mr-1 h-3 w-3" />
+                  {t("connections.expand")}
+                </>
+              )}
             </Button>
+            {expandedSources.size > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="justify-start rounded-[4px] font-mono text-[10px] uppercase tracking-[0.1em]"
+                onClick={onCollapseAll}
+              >
+                <ChevronsDownUp className="mr-1 h-3 w-3" />
+                {t("connections.collapseAll")}
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"
               className="justify-start rounded-[4px] font-mono text-[10px] uppercase tracking-[0.1em]"
-              onClick={() => router.push(nsPath(`/sources/${source.id}`))}
+              onClick={() =>
+                window.open(
+                  nsPath(`/sources/${source.id}`),
+                  "_blank",
+                  "noopener,noreferrer",
+                )
+              }
             >
-              {t("connections.openSource")} <ArrowRight className="ml-1 h-3 w-3" />
+              {t("connections.openSource")}
+              <ExternalLink className="ml-1 h-3 w-3" />
             </Button>
           </div>
         </>
@@ -250,6 +330,16 @@ export function ConnectionsRail({
               <div className="mt-2">
                 <BusiestAssets assets={topAssets} limit={5} emptyAction={false} />
               </div>
+              {/* Five rows is a ranking, not an inventory. */}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="mt-2 w-full justify-start rounded-[4px] font-mono text-[10px] uppercase tracking-[0.1em]"
+                onClick={() => router.push(nsPath("/assets"))}
+              >
+                <ListTree className="mr-1 h-3 w-3" />
+                {t("connections.browseAllAssets")}
+              </Button>
             </div>
           )}
         </>
