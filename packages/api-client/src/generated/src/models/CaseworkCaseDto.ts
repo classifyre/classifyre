@@ -38,7 +38,7 @@ export interface CaseworkCaseDto {
      */
     status: CaseworkCaseDtoStatusEnum;
     /**
-     * How important this case is to the investigation — an importance ranking, not a threat level.
+     * How much this case matters — a priority level, not a threat level. Distinct from a finding's importance score, which is the ranking pass's output.
      * @type {string}
      * @memberof CaseworkCaseDto
      */
