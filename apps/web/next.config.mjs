@@ -53,10 +53,15 @@ const nextConfig = {
         // `docs/.` (a slash followed by at least one character) excludes the
         // bundled static docs site while leaving `/docs/` itself — the web
         // app's own landing page — to be locale-prefixed like any other page.
+        //
+        // The locale alternation MUST stay in its own group: `en|de(?:/|$)`
+        // parses as `en` OR `de(?:/|$)`, so a bare `en` swallows every path
+        // that merely starts with those letters and a workspace named
+        // `england` 404s.
         beforeFiles: [
           { source: "/", destination: `/${DEFAULT_LOCALE}` },
           {
-            source: `/:path((?!${LOCALE_ALTERNATION}(?:/|$)|api/|_next/|sitemap/|sitemap\\.xml|robots\\.txt|manifest\\.json|classifyre-cfg|classifyre-usr/|favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|docs/.).*)`,
+            source: `/:path((?!(?:${LOCALE_ALTERNATION})(?:/|$)|api/|_next/|sitemap/|sitemap\\.xml|robots\\.txt|manifest\\.json|classifyre-cfg|classifyre-usr/|favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|docs/.).*)`,
             destination: `/${DEFAULT_LOCALE}/:path`,
           },
         ],

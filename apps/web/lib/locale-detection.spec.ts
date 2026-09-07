@@ -374,6 +374,68 @@ describe("next.config.mjs locale table", () => {
   it("uses the same default locale", () => {
     expect(config).toContain(`const DEFAULT_LOCALE = "${DEFAULT_LOCALE}";`);
   });
+
+  describe("the beforeFiles locale rewrite", () => {
+    // The rewrite's negative lookahead decides which paths get `/en` glued on
+    // and which are already locale-prefixed or not a page at all. Exercised
+    // here as a plain RegExp against the literal in the config, because
+    // getting the alternation precedence wrong is silent: `en|de(?:/|$)`
+    // parses as `en` OR `de(?:/|$)`, and every workspace whose slug starts
+    // with "en" 404s.
+    const source = /source: `\/:path\((.*?)\)`,/s
+      .exec(config)?.[1]
+      // The config builds the pattern in a template literal, so undo both
+      // levels of escaping the file carries.
+      ?.replace("${LOCALE_ALTERNATION}", LOCALES.join("|"))
+      .replace(/\\\\/g, "\\");
+    const pattern = new RegExp(`^${source}$`);
+
+    it("was found in the config", () => {
+      expect(source).toBeTruthy();
+    });
+
+    it("prefixes ordinary workspace paths", () => {
+      for (const path of [
+        "acme",
+        "acme/findings",
+        "acme/findings/abc-123",
+        "namespaces/x/settings",
+        "docs",
+      ]) {
+        expect(pattern.test(path)).toBe(true);
+      }
+    });
+
+    it("does not swallow a slug that merely starts with a locale", () => {
+      for (const path of ["england", "england/findings", "denmark", "dev"]) {
+        expect(pattern.test(path)).toBe(true);
+      }
+    });
+
+    it("leaves already-prefixed paths alone", () => {
+      for (const path of ["en", "de", "en/acme", "de/acme/findings"]) {
+        expect(pattern.test(path)).toBe(false);
+      }
+    });
+
+    it("leaves route handlers and file metadata alone", () => {
+      for (const path of [
+        "api/health",
+        "_next/static/x.js",
+        "sitemap/acme/pages.xml",
+        "sitemap.xml",
+        "robots.txt",
+        "manifest.json",
+        "classifyre-cfg",
+        "classifyre-usr/e",
+        "favicon.ico",
+        // The bundled docs site, but not its landing page (above).
+        "docs/how-it-works",
+      ]) {
+        expect(pattern.test(path)).toBe(false);
+      }
+    });
+  });
 });
 
 // ─── Language switcher target ───────────────────────────────────────
