@@ -435,6 +435,23 @@ describe("next.config.mjs locale table", () => {
         expect(pattern.test(path)).toBe(false);
       }
     });
+
+    it("leaves every public/ asset alone", () => {
+      // Rewriting a file into the page tree makes it render as a dashboard
+      // for a workspace named after the file: the app logo came back as a
+      // 500 and the sidebar icon was blank. A namespace slug cannot contain
+      // a dot (SLUG_RE), so "has a dot" is a safe test for "is a file".
+      for (const path of [
+        "clasifyre_icon.png",
+        "web-app-manifest-192x192.png",
+        "web-app-manifest-512x512.png",
+        "icon0.svg",
+        "apple-icon.png",
+        "some-future-asset.woff2",
+      ]) {
+        expect(pattern.test(path)).toBe(false);
+      }
+    });
   });
 });
 

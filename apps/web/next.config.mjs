@@ -48,20 +48,28 @@ const nextConfig = {
         // is what lets `/acme/findings` reach the `[locale]` tree at all.
         //
         // The negative lookahead lists everything that is NOT a localized
-        // page: the already-prefixed locales, the route handlers that keep
-        // their exact URLs, Next's own assets, and file-based metadata.
-        // `docs/.` (a slash followed by at least one character) excludes the
-        // bundled static docs site while leaving `/docs/` itself — the web
-        // app's own landing page — to be locale-prefixed like any other page.
+        // page:
         //
-        // The locale alternation MUST stay in its own group: `en|de(?:/|$)`
-        // parses as `en` OR `de(?:/|$)`, so a bare `en` swallows every path
-        // that merely starts with those letters and a workspace named
-        // `england` 404s.
+        //  - an already-prefixed locale. This MUST stay in its own group:
+        //    `en|de(?:/|$)` parses as `en` OR `de(?:/|$)`, so a bare `en`
+        //    swallows every path that merely *starts* with those letters and
+        //    a workspace named `england` 404s.
+        //  - the route handlers, which keep their exact URLs.
+        //  - `[^/]*\.[^/]*` — a first segment containing a dot, i.e. a FILE.
+        //    That is every asset under `public/` (the app logo, the web
+        //    manifest icons), file-based metadata (favicon.ico, icon0.svg,
+        //    apple-icon.png), and the sitemap/robots/manifest routes, all in
+        //    one rule. Enumerating them instead is how the app icon ended up
+        //    rewritten to `/en/clasifyre_icon.png` and rendered as a
+        //    dashboard for a workspace named "clasifyre_icon.png". Namespace
+        //    slugs cannot contain a dot (SLUG_RE), so no real page is caught.
+        //  - `docs/.` (a slash followed by at least one character), the
+        //    bundled static docs site — while leaving `/docs/` itself, the web
+        //    app's own landing page, to be prefixed like any other page.
         beforeFiles: [
           { source: "/", destination: `/${DEFAULT_LOCALE}` },
           {
-            source: `/:path((?!(?:${LOCALE_ALTERNATION})(?:/|$)|api/|_next/|sitemap/|sitemap\\.xml|robots\\.txt|manifest\\.json|classifyre-cfg|classifyre-usr/|favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|docs/.).*)`,
+            source: `/:path((?!(?:${LOCALE_ALTERNATION})(?:/|$)|api/|_next/|sitemap/|classifyre-cfg|classifyre-usr/|[^/]*\\.[^/]*|docs/.).*)`,
             destination: `/${DEFAULT_LOCALE}/:path`,
           },
         ],
