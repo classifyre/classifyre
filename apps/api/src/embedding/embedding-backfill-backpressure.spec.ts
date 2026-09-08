@@ -44,8 +44,42 @@ describe('embedding backfill backpressure', () => {
 
   const rt = { queueName: 'semantic-embeddings-space-1', spaceId: 'space-1' };
 
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  /**
+   * The poll sleep, made steppable without waiting five real seconds.
+   *
+   * Fake timers are not enough here: the loop awaits the queue stats between
+   * sleeps, so a timer advance has to be interleaved with the microtasks those
+   * awaits queue. Capturing the sleeps instead lets a test release exactly one
+   * poll at a time, and a real macrotask in between settles everything the
+   * released poll set in motion.
+   */
+  const sleeps: Array<() => void> = [];
+  const realSetTimeout = globalThis.setTimeout;
+
+  beforeEach(() => {
+    sleeps.length = 0;
+    (globalThis as unknown as { setTimeout: unknown }).setTimeout = ((
+      fn: () => void,
+    ) => {
+      sleeps.push(fn);
+      return 0;
+    }) as unknown as typeof setTimeout;
+  });
+  afterEach(() => {
+    (globalThis as unknown as { setTimeout: unknown }).setTimeout =
+      realSetTimeout;
+  });
+
+  /** Release up to `polls` pending sleeps, settling the loop after each. */
+  async function releasePolls(polls: number): Promise<void> {
+    for (let i = 0; i < polls; i++) {
+      await new Promise((resolve) => realSetTimeout(resolve, 0));
+      const next = sleeps.shift();
+      if (!next) return;
+      next();
+    }
+    await new Promise((resolve) => realSetTimeout(resolve, 0));
+  }
 
   it('enqueues immediately when the queue has room', async () => {
     const h = harness([10]);
@@ -59,7 +93,7 @@ describe('embedding backfill backpressure', () => {
     const h = harness([5000, 4000, 10]); // full, still full, drained
 
     const waiting = h.service.awaitQueueCapacity(rt);
-    await jest.advanceTimersByTimeAsync(15_000);
+    await releasePolls(2);
     await waiting;
 
     expect(h.stats).toHaveBeenCalledTimes(3);
@@ -70,7 +104,7 @@ describe('embedding backfill backpressure', () => {
     const h = harness([5000, 5000, 5000, 1]);
 
     const waiting = h.service.awaitQueueCapacity(rt);
-    await jest.advanceTimersByTimeAsync(20_000);
+    await releasePolls(3);
     await waiting;
 
     expect((h.service as any).logger.log).toHaveBeenCalledTimes(1);
@@ -78,14 +112,16 @@ describe('embedding backfill backpressure', () => {
 
   it('stops waiting when the runtime is disposed', async () => {
     // Shutdown must not be held up by a queue that never drains.
-    const h = harness([5000, 5000]);
+    // A queue that stays full forever: only the dispose flag can end this.
+    const h = harness(Array<number>(50).fill(5000));
     const disposable = { ...rt, disposed: false };
 
     const waiting = h.service.awaitQueueCapacity(disposable);
     disposable.disposed = true;
-    await jest.advanceTimersByTimeAsync(10_000);
+    await releasePolls(3);
 
     await expect(waiting).resolves.toBeUndefined();
+    expect(h.stats).toHaveBeenCalledTimes(1);
   });
 
   it.each([
