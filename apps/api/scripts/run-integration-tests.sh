@@ -53,11 +53,28 @@ cleanup_schema() {
 BASE_DATABASE_URL="${DATABASE_URL}"
 if [[ -n "${INTEGRATION_TEST_SCHEMA_KEY:-}" ]]; then
   echo "Preparing isolated integration schema from key: ${INTEGRATION_TEST_SCHEMA_KEY}"
-  eval "$(
+  # Captured, not `eval "$(...)"` directly: command substitution inside eval
+  # discards the child's exit status (eval succeeds at evaluating an empty
+  # string), so `set -e` does not fire. An unreachable database then surfaced
+  # eleven lines later as `INTEGRATION_TEST_SCHEMA: unbound variable`, which
+  # says nothing about the actual cause.
+  if ! prepare_output="$(
     DATABASE_URL="${BASE_DATABASE_URL}" \
       INTEGRATION_TEST_SCHEMA_KEY="${INTEGRATION_TEST_SCHEMA_KEY}" \
       bun run ./scripts/manage-integration-schema.ts prepare
-  )"
+  )"; then
+    echo "Failed to prepare the integration schema; see the error above." >&2
+    echo "DATABASE_URL host: $(printf '%s' "${BASE_DATABASE_URL}" | sed -E 's#.*@([^/?]+).*#\1#')" >&2
+    exit 1
+  fi
+
+  eval "${prepare_output}"
+
+  if [[ -z "${INTEGRATION_TEST_SCHEMA:-}" ]]; then
+    echo "The prepare step succeeded but printed no INTEGRATION_TEST_SCHEMA." >&2
+    exit 1
+  fi
+
   trap cleanup_schema EXIT
   echo "Using integration schema ${INTEGRATION_TEST_SCHEMA}"
 fi

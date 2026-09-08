@@ -19,13 +19,39 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   DOCKER_PLATFORMS: linux/amd64,linux/arm64
-  INTEGRATION_DATABASE_URL: ${{ secrets.INTEGRATION_DATABASE_URL || vars.INTEGRATION_DATABASE_URL || '' }}
+  # Integration tests run against an ephemeral Postgres service container (see
+  # the `validate` job below), not a shared external database. The previous
+  # setup pointed at a Supabase tenant that no longer resolves, so the job had
+  # been red on every branch; a service container also removes the need to
+  # isolate concurrent branches inside one database, which is what the
+  # INTEGRATION_TEST_SCHEMA_KEY dance exists for.
+  #
+  # Set the `INTEGRATION_DATABASE_URL` *repository variable* to point the
+  # tests at a real database again; leaving it unset uses the container.
+  INTEGRATION_DATABASE_URL: ${{ vars.INTEGRATION_DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/classifyre_it' }}
 
 jobs:
   validate:
     name: Validate
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
+
+    # pgvector, not stock postgres: the semantic-embeddings migration does
+    # `CREATE EXTENSION vector`, so plain postgres:16 fails on migrate deploy.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: classifyre_it
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout
