@@ -9,6 +9,7 @@ import { DemoModeBlockedDialog } from "@/components/demo-mode-blocked-dialog";
 import { InstanceSettingsProvider } from "@/components/instance-settings-provider";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { ActiveNamespacesProvider } from "@/components/active-namespaces-provider";
+import { LocaleRedirect } from "@/components/locale-redirect";
 import type { Locale } from "@/lib/locale-detection";
 
 export function Providers({
@@ -30,6 +31,10 @@ export function Providers({
       >
         <ActiveNamespacesProvider>
           <InstanceSettingsProvider routeLocale={locale}>
+            {/* Inside the provider so it can see the instance's language
+                setting, and above the page so it redirects before any
+                workspace data is fetched in the wrong language. */}
+            <LocaleRedirect />
             <AssistantWorkflowProvider>
               {children}
               <DemoModeBlockedDialog />
