@@ -28,7 +28,7 @@ data:
             "serviceAccountName": "{{ default (include "classifyre.serviceAccountName" .) .Values.api.cliJobs.serviceAccountName }}",
             "automountServiceAccountToken": {{ .Values.api.cliJobs.automountServiceAccountToken }},
             "imagePullSecrets": {{ .Values.imagePullSecrets | toJson }},
-            "priorityClassName": {{ .Values.api.cliJobs.priorityClassName | quote }},
+            "priorityClassName": {{ include "classifyre.priorityClassName" (dict "name" .Values.api.cliJobs.priorityClassName "root" .) | quote }},
             "nodeSelector": {{ .Values.api.cliJobs.nodeSelector | toJson }},
             "tolerations": {{ .Values.api.cliJobs.tolerations | toJson }},
             "affinity": {{ .Values.api.cliJobs.affinity | toJson }},

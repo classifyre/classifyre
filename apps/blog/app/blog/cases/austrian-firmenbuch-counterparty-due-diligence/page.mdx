@@ -1,0 +1,538 @@
+---
+title: Who Am I Actually Dealing With? Austria's Company Register, Made Answerable
+description: Two Austrian companies, both registered in 1992, both "active". One filed 21 sets of accounts, the other has filed none in 34 years. Here is how we built the namespace that tells them apart.
+date: 2026-09-08T00:00:00.000Z
+tags:
+  - investigations
+  - detector-design
+  - public-data
+  - lineage
+categories:
+  - Field Notes
+author: Banandre
+image: /blog/assets/images/austrian-firmenbuch-counterparty-due-diligence.jpg
+keywords:
+  - Firmenbuch
+  - Austrian company register
+  - counterparty due diligence
+  - shell company detection
+  - Jahresabschluss analysis
+  - custom detectors
+  - data lineage
+  - Classifyre
+alternates:
+  canonical: /blog/cases/austrian-firmenbuch-counterparty-due-diligence
+openGraph:
+  type: article
+  title: Who Am I Actually Dealing With? Austria's Company Register, Made Answerable
+  description: Two Austrian companies, both registered in 1992, both "active". One filed 21 sets of accounts, the other has filed none in 34 years. Here is how we built the namespace that tells them apart.
+  url: /blog/cases/austrian-firmenbuch-counterparty-due-diligence
+  siteName: Classifyre
+  publishedTime: 2026-09-08T00:00:00.000Z
+  modifiedTime: 2026-09-08T00:00:00.000Z
+  authors:
+    - Banandre
+  section: Field Notes
+  tags:
+    - counterparty due diligence
+    - company register
+    - custom detectors
+    - data lineage
+  images:
+    - /blog/assets/images/austrian-firmenbuch-counterparty-due-diligence.jpg
+twitter:
+  card: summary
+  title: Who Am I Actually Dealing With? Austria's Company Register, Made Answerable
+  description: Two Austrian companies, both registered in 1992, both "active". One filed 21 sets of accounts, the other has filed none in 34 years.
+  images:
+    - /blog/assets/images/austrian-firmenbuch-counterparty-due-diligence.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/austrian-firmenbuch-counterparty-due-diligence.jpg"
+  eyebrow="Field notes"
+  title="Who Am I Actually Dealing With?"
+  description="Two Austrian companies, both registered in 1992, both listed as active. One filed 21 sets of accounts. The other has filed none in 34 years. Here is how we built the namespace that tells them apart."
+/>
+
+<ArticleJsonLd
+  headline="Who Am I Actually Dealing With? Austria's Company Register, Made Answerable"
+  description="Two Austrian companies, both registered in 1992, both active. One filed 21 sets of accounts, the other none in 34 years. How we built the namespace that tells them apart."
+  path="/blog/cases/austrian-firmenbuch-counterparty-due-diligence"
+  datePublished="2026-09-08T00:00:00.000Z"
+  dateModified="2026-09-08T00:00:00.000Z"
+  authorName="Banandre"
+  articleSection="Field Notes"
+  about={[
+    "Counterparty due diligence",
+    "Austrian company register (Firmenbuch)",
+    "Shell company detection",
+    "Financial statement analysis",
+  ]}
+  mentions={[
+    {
+      "@type": "Dataset",
+      name: "Firmenbuch HVD - FBW-WebServices (justizonline.gv.at)",
+      url: "https://justizonline.gv.at/jop/web/firmenbuchabfrage",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://demo.classifyre.com/firmenbuch-austria",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://demo.classifyre.com/firmenbuch-austria"
+  liveCaseName="Austrian Firmenbuch investigation"
+/>
+
+<LiveCaseLink
+  href="https://demo.classifyre.com/firmenbuch-austria"
+  caseName="Austrian Firmenbuch namespace"
+/>
+
+<ArticleSideRail
+  title="Who Am I Actually Dealing With?"
+  path="/blog/cases/austrian-firmenbuch-counterparty-due-diligence/"
+  tags={["investigations", "detector-design", "public-data", "lineage"]}
+  backHref="/blog/cases"
+  backLabel="All case files"
+/>
+
+Two Austrian companies.
+
+Both are a limited partnership (*Kommanditgesellschaft*). Both were entered in
+the commercial register in 1992. Both are listed today as **active**
+(*aktiv*). If your supplier check asks "does this company exist and is it
+registered?", both come back clean.
+
+One of them has filed 21 sets of annual accounts, the most recent for the year
+ended 31 December 2024, and is financed 96.8% out of its own funds.
+
+The other has filed **nothing, ever**. Its register file has not been touched
+since 1 August 1995. Its registered address is "5020 Salzburg" — a postcode and
+a city, no street. Seven other companies share it.
+
+> **The short answer:** we turned Austria's company register into a namespace
+> that answers "who am I dealing with" — six linked sources, 22 custom
+> detectors, 21,475 companies and 363,252 findings so far. Every conclusion is
+> a register fact or a filed figure. Three things it deliberately cannot tell
+> you are named as loudly as the things it can.
+
+This is the record of how it was built and what it can actually do.
+
+## The question this namespace exists to answer
+
+Most company-data products answer *"does this company exist?"*. That is the
+question the register is designed to answer, and it is nearly useless on its
+own — as the two companies above demonstrate.
+
+The question a business actually has is harder:
+
+- Is this a real operating business, or a registration?
+- Can it pay? Is it getting stronger or weaker?
+- Who controls it, and what else do they control?
+- Has anything changed recently that I should know about?
+- **And what can I not find out?**
+
+That last one turns out to matter as much as the rest.
+
+## Where the data comes from
+
+Everything is public, and all of it is Austrian primary source. No scraped
+aggregators, no resold databases.
+
+| Source | What it is | Access |
+|---|---|---|
+| **Firmenbuch HVD** — [FBW-WebServices](https://justizonline.gv.at/jop/web/firmenbuchabfrage) | The commercial register itself: companies, officers, court filings, the documents they file | SOAP, API key |
+| **OGD FN → ÖNACE extract** — [data.statistik.gv.at](https://data.statistik.gv.at/data/OGDEXT_HVD_FBNR_OENACE_1.csv) | Every Firmenbuch number in Austria with its industry code | Open CSV |
+| **GISA** — [Gewerbeinformationssystem Austria](https://www.gisa.gv.at/) | The trade-licence register | REST, API key |
+| **EVI** — [evi.gv.at](https://www.evi.gv.at/) | The electronic register of publications (*Ediktsdatei*) | Public web |
+| **OeNB** — [Austrian National Bank](https://www.oenb.at/) | Lists of regulated financial institutions with LEI codes | Open data |
+
+The register has **326,871** companies. That OGD extract matters more than it
+looks: the Firmenbuch API has no "list all companies" operation, only
+lookup-by-number and a change feed. Without a published enumeration you can
+only ever see what recently changed — which is a permanent blind spot, because
+a company that has filed nothing since 1992 never appears in a change feed.
+The Salzburg company in this article is exactly that case, and we would never
+have found it without walking the full list.
+
+## Six sources, and why not one
+
+The obvious build is one connector that fetches everything per company. We
+split it into six. Each ingests independently and they link afterwards.
+
+```text
+                    ┌──────────────────────────────────────────────┐
+                    │  SHARED IDENTITY                             │
+                    │  company://at/firmenbuchnummer/<fn>          │
+                    │  document://at/firmenbuch/<key>              │
+                    └──────────────────────────────────────────────┘
+                                       ▲
+        ┌──────────────┬───────────────┼───────────────┬──────────────┐
+        │              │               │               │              │
+   same_as()      same_as()      references()    references()   sets Asset.urn
+        │              │               │               │              │
+ ┌──────┴─────┐ ┌──────┴─────┐ ┌───────┴──────┐ ┌──────┴──────┐ ┌─────┴────────┐
+ │    EVI     │ │   OeNB     │ │    GISA      │ │ Bilanz-     │ │  FIRMENBUCH  │
+ │ publication│ │ regulated  │ │ trade        │ │ analyse     │ │  REGISTER    │
+ │ profiles   │ │ institutes │ │ register     │ │ (per year)  │ │  companies + │
+ └────────────┘ └────────────┘ └──────────────┘ └─────────────┘ │  officers    │
+                                                       ▲         └──────┬───────┘
+                                          flow(TRANSFORM)                │
+                                          + field mappings          contains()
+                                                       │                 │
+                                              ┌────────┴─────────────────▼──────┐
+                                              │  FIRMENBUCH FINANCIALS          │
+                                              │  filed PDF + XML documents      │
+                                              │  sets document://…              │
+                                              └─────────────────────────────────┘
+```
+
+Three reasons the split earns itself:
+
+**They fail independently.** GISA refuses per-company lookups to our API key.
+In a single connector that refusal would have taken the whole scan down with
+it. Split, GISA degrades on its own and the register keeps running.
+
+**They run at different speeds.** The register is fast. The document source
+converts PDFs and is slow. The analysis source calls a model. Splitting lets
+each find its own cadence instead of everything moving at the pace of the
+slowest.
+
+**Order stops mattering.** Because every source addresses companies by the same
+URN, none of them needs another to have run first. A GISA record can point at a
+company the register has not reached yet; the edge is kept as an *external*
+endpoint and stitched the moment that company arrives.
+
+### What each source contributes
+
+- **Firmenbuch Register** — the anchor. Company, legal form, seat, registry
+  court, first registration, business purpose, officers with birthdates and
+  representation powers, and the full court event log (*VOLLZ*). It stamps
+  `Asset.urn`, which is what everything else joins to.
+- **Firmenbuch Financials** — the filed annual accounts as documents. Each
+  filing exists twice, as a PDF and as a tagged XML. We ingest both and read
+  the XML, because the figures are already structured — no OCR.
+- **Bilanzanalyse** — one record per company per financial year: the balance
+  sheet, the ratios, and the statutory crisis tests.
+- **GISA** — trade-licence data where available, and where not, the refusal
+  itself.
+- **EVI** — an independent confirmation of register status. When two sources
+  agree, that is corroboration; when they disagree, that is the interesting case.
+- **OeNB** — which companies are regulated financial institutions, with LEI codes.
+
+## How the sources actually link
+
+Two mechanisms, both boring on purpose.
+
+**Identity is a string both sides can compute.** Every source derives
+`company://at/firmenbuchnummer/<fn>` from the Firmenbuch number it already has.
+The register *stamps* it on its company assets; everyone else *points* at it.
+No shared table, no lookup service, no ordering requirement.
+
+**Facts become findings via TAG detectors.** This is the part worth explaining.
+
+A [TAG detector](https://docs.classifyre.com/detectors/custom-detectors/tag/)
+runs nothing. It is a declaration that a fact exists and what it is called. The
+connector already knows the company's legal form, its registry court, its shell
+score — it read them from the register. Re-deriving those with a classifier
+would be slower and worse.
+
+So the connector asserts them directly:
+
+```python
+Asset(
+    id=f"company-{fn}",
+    urn=company_urn(fn),
+    tags={
+        "fb_status": "aktiv",
+        "fb_legal_form": "Kommanditgesellschaft",
+        "fb_shell_risk": "hoch (6/12): keine Jahresabschlüsse trotz "
+                         "Offenlegungspflicht; ...",
+    },
+)
+```
+
+Each tag becomes a finding with that detector's label and severity. Why bother,
+when the data is already in the asset's metadata? Because a finding is a
+first-class object in Classifyre and metadata is not. A finding can be filtered,
+attached to a case as evidence, matched by a standing question, weighted by the
+correlation engine, and embedded for semantic search. Metadata just sits there.
+
+The choice, concretely: **push a fact to metadata and it is retrievable; make it
+a TAG finding and it is investigable.**
+
+## The detectors, and why these ones
+
+22 custom detectors. Every one exists because a specific question needed it.
+
+**Identity and structure** — `fb_status` (register status), `fb_legal_form`,
+`fb_jurisdiction` (registry court), `fb_company_age`, `fb_onace` (industry),
+`fb_size_class`, `at_company_ids` (a regex over FN / UID / EUID / LEI).
+
+**Substance** — `fb_shell_risk` scores twelve register facts: struck off *ex
+officio*, no accounts despite a filing duty, dissolved within two years of
+formation, address shared with three or more registrations, sole officer with
+sole representation, no line of business, no deliverable address.
+`fb_filing_gap` measures how overdue the accounts are.
+
+**Financial health** — `fb_distress` implements the statutory tests: book
+overindebtedness (*buchmäßige Überschuldung*, negative equity) and the URG
+§§ 22–24 reorganisation test, which needs an equity ratio below 8% **and** a
+notional debt-repayment period above 15 years — both limbs, or neither.
+`fb_capital_thin` catches partly paid-in share capital. `fb_solvency_outlook`
+is the one AI detector, giving a forward-looking read.
+
+**Control** — `fb_officer_role`, `fb_representation`, `fb_mandate_power` (how
+many companies one person runs at once).
+
+**Change** — `fb_register_churn`, counting court entries in the last three
+years. Frequent movement — seat changes, management turnover, a name swapped —
+is a different signal from a lifetime event count, which says nothing: a
+40-year-old company has many events and a clean history.
+
+**And the blind spot** — `fb_trade_access` records GISA's refusal *as a
+finding*. This one deserves a note. It would have been easy to log the failure
+and move on, and every case in the namespace would then have quietly rested on
+an assumption nobody could see. Instead the gap is an object with 4,563
+matches, attached to the cases it constrains, so no analysis can silently
+assume "this company has no trade licence" when the truth is "we were not
+allowed to ask".
+
+## Lineage: how a number keeps its provenance
+
+A figure that cannot be traced back is not evidence. Every derived value here
+carries a typed edge to what it came from.
+
+Take one company's 2024 accounts:
+
+```
+company://at/firmenbuchnummer/008316f          (Firmenbuch Register)
+  │
+  ├── contains() ──▶ document://at/firmenbuch/<key>   Jahresabschluss 2024 (PDF)
+  ├── contains() ──▶ document://at/firmenbuch/<key>   Jahresabschluss 2024 (XML)
+  │                       │
+  │                       └── flow(TRANSFORM) ──▶ Bilanzanalyse record 2024
+  │                              + field mappings: Bilanzsumme, Eigenkapital, …
+  │
+  ├── ◀── same_as() ────── EVI profile
+  ├── ◀── references() ─── GISA lookup (refused)
+  └── ◀── uses() ───────── each officer, one edge per mandate
+```
+
+The `flow(TRANSFORM)` edge carries **field mappings** — which balance-sheet line
+produced which output field. So "equity ratio 96.8%" is not a number in a
+database. It is a number with a path back to the XML element in the filed
+document that produced it, and from there to the company.
+
+Across the namespace, that currently resolves to:
+
+| From | Relation | To | Edges |
+|---|---|---|---|
+| EVI | `same_as` | Register | 17,881 |
+| GISA | `references` | Register | 2,479 |
+| Register | `contains` | Financials | 649 |
+| Financials | `flow(TRANSFORM)` | Bilanzanalyse | 622 |
+| Bilanzanalyse | `references` | Register | 367 |
+| OeNB | `same_as` | Register | 18 |
+
+## The glossary, which did more than expected
+
+Austrian company law has vocabulary that is meaningless to a non-specialist and
+unambiguous to a specialist. The register writes `GES`, `E`, `K`, `W`. A
+document says *Offenlegungspflicht*. The XML says `HGB_224_3_A`.
+
+We loaded 55 terms with their aliases — German, English, and the register's own
+codes:
+
+| Term | Aliases | Why it matters |
+|---|---|---|
+| **Eigenmittelquote** | equity ratio, capital ratio | below 8% is one limb of the URG test |
+| **Buchmäßige Überschuldung** | book overindebtedness, negative equity | a reason to look, never a finding of insolvency on its own |
+| **Einzelvertretung** | E, sole representation | one officer can bind the company alone |
+| **EUID** | European Unique Identifier | how the company appears in the EU register interconnection |
+
+Two things it changed. Search stopped depending on which language the analyst
+thinks in — a query for "equity ratio" reaches records that only ever say
+*Eigenmittelquote*. And single-letter register codes resolve correctly: `E`
+means *Einzelvertretung*, not "the letter E", which matters when a code that
+short would otherwise match half the corpus as a substring.
+
+Notably, we put **no company names** in the glossary. Names are data, not
+terminology, and a glossary that learns entity names starts making the
+correlation engine confident about things it should be questioning.
+
+## The cases
+
+Cases are questions with evidence attached, not conclusions. Each one carries
+its own limits in its description, so nobody can read past them.
+
+### Shell companies without substance (*Scheinfirmen ohne Substanz*)
+
+Which registered companies look like registrations rather than businesses.
+Evidence is register fact, never inference: an *ex officio* deletion is the
+court recording that it found no assets; a nil filing history in a form that
+carries a disclosure duty is a breach of a duty that exists from year one.
+
+One hypothesis in this case is recorded as **REFUTED** — a shared registered
+address is *not* by itself a shell signal, and the case says so with the
+counter-examples that showed it. A business park, a serviced office and a
+formation agent look identical from the register. It is worth one point out of
+twelve and no more.
+
+### Early warning: insolvency and reorganisation (*Frühwarnung*)
+
+Two independent readings of the same filings, deliberately kept apart: the
+arithmetic rule (negative equity; both URG limbs) and the AI detector's
+trajectory read. Agreement is corroboration. Disagreement is the lead worth
+working.
+
+### Influential officeholders (*Einflussreiche Funktionsträger*)
+
+Who controls many companies at once, measured from the register's own records
+rather than press coverage. Each person is a real asset with a stable identity
+(name plus birthdate) and one edge per mandate. The interesting overlap is with
+the shell-company case: a person whose mandates cluster in companies that never
+file is a different story from one whose mandates are in filing, capitalised
+companies.
+
+### Risers (*Aufsteiger*)
+
+The other direction — balance sheet and equity both growing with the equity
+ratio intact. Kept as its own case because the failure mode is different: here
+the risk is mistaking a one-off capital injection for a trend, which is why the
+AI detector must name a counter-argument in every prediction.
+
+### Counterparty check (*Geschäftspartnerprüfung*)
+
+The case the namespace exists for, and the last one we wrote — the earlier four
+are all questions asked *of* the corpus by an analyst. None of them was *"I am
+about to trade with this company."* It covers five dimensions: existence and
+standing, substance, financial health, stability, and who is behind it.
+
+## Two worked examples
+
+Both real, both live in the namespace.
+
+### A. GARANT Austria GmbH & Co KG (FN 008316f) — assessable
+
+Vienna, registered 28 January 1992. Wholesale (*Großhandel*, ÖNACE 46150).
+
+| Financial year | 2022 | 2023 | 2024 |
+|---|---|---|---|
+| Balance-sheet total (*Bilanzsumme*) | 2,291,225 | 2,024,358 | 1,762,556 EUR |
+| Equity ratio (*Eigenmittelquote*) | 95.4% | 95.7% | 96.8% |
+| Liquidity 3rd degree (*Liquidität 3. Grades*) | 17.1× | 19.5× | 24.1× |
+
+The balance sheet is **shrinking** about 11% a year. Read alone that looks like
+decline. Read together with the other two rows it is the opposite: the equity
+ratio rises and liquidity gains 41% over the same period, which is only
+arithmetically possible if liabilities are falling faster than assets. That is
+deleveraging, not deterioration.
+
+The case records it as a hypothesis with a testable predicate — *if this is
+deleveraging, equity ratio and liquidity must move up while the total moves
+down* — and states what would refute it: an equity ratio below 90% in the next
+filing, or liquidity turning down.
+
+Alongside: 21 annual accounts over 32 years, current filing gap, shell score
+2/12, no insolvency event. **Filing discipline is the strongest signal the
+register offers**, because filing costs money and exposes the filer. The
+accountant is named in the document. The prior-year column is checkable against
+the previous filing. A company with nothing behind it does not do this 21 times.
+
+### B. Videozentrale Verwaltungsgesellschaft m.b.H. & Co. KG. (FN 028409d) — not assessable
+
+Salzburg, registered 21 August 1992. Business consultancy (ÖNACE 70100).
+
+| | |
+|---|---|
+| Annual accounts filed | **0**, in 34 years |
+| Last register entry | **1 August 1995** — 31 years ago |
+| Registered seat | "5020 Salzburg" — no street, no number |
+| Address shared with | **7** other registrations |
+| Shell score | **6 of 12** — highest in the corpus |
+| Register status | **aktiv** |
+
+The conclusion is deliberately narrow, and it is not an accusation. Each fact
+has an innocent explanation available — a dormant holding vehicle parked for
+decades is entirely lawful. What the facts establish is something else:
+
+> There is no published basis on which to assess this company at all.
+
+No accounts, so no equity, no liquidity, no trend. No register activity to
+suggest anyone is administering it. No address at which it can be found. For a
+counterparty decision that is a **negative** outcome, not a neutral one.
+
+And note what is *not* claimed: GISA refused the trade-licence lookup, so "this
+company holds no licence" is not available as evidence, and no hypothesis in the
+case is allowed to assume it.
+
+### Why the pair is the point
+
+Same legal form. Same year of registration. Same register status. A check that
+stops at "is it registered?" returns YES for both.
+
+Everything that separates them came from asking better questions of data that
+was public the entire time.
+
+## What it cannot do
+
+Stated as plainly as the rest, because a due-diligence tool that implies more
+than it has is worse than one that admits less.
+
+**No profitability.** The filing we receive is a balance-sheet extract
+(*Auszug aus der Bilanz*). Small companies under § 242 UGB are **not required to
+publish a profit and loss account at all**. For most of the register there is no
+revenue, no profit, no margin — and no model should be used to invent one. Every
+ratio here is a balance-sheet ratio.
+
+**No trade activity.** GISA refuses per-company lookups to this key. It is an
+entitlement question, not an expired credential.
+
+**Employee counts, almost never.** Headcount appears only in a free-text
+annotation in the older filing taxonomy — 5 findings across 645 analysed
+filings. Per-employee ratios are therefore not meaningful here.
+
+**Partial coverage.** The register walk is still running. For any given company
+the honest answer is either the data or *"not scanned yet"* — never *"nothing
+found"*. On a partially-swept register those are very different claims.
+
+## How it was built
+
+Almost entirely through Classifyre's own MCP server. The connectors are Python
+notebooks written and revised through the same tool surface that reads them
+back — create a source, push a cell, run it, read the findings, adjust. The
+cases, inquiries, detectors and glossary in this article were all created the
+same way.
+
+Two things that came out of that:
+
+**The connector should assert what it already knows.** Every fact the register
+hands over — legal form, court, officer roles — becomes a TAG finding rather
+than something a classifier re-derives from prose. It is faster, and it is
+exactly right instead of approximately right.
+
+**A blind spot has to be an object.** The single most useful design decision was
+making GISA's refusal a finding. A gap you can attach to a case constrains the
+analysis. A gap in a log file does not.
+
+## See it yourself
+
+The namespace is live, with every detector, inquiry, case, hypothesis and
+lineage edge described above:
+
+**[demo.classifyre.com/firmenbuch-austria](https://demo.classifyre.com/firmenbuch-austria)**
+
+Start with the two worked cases — *Geschäftspartner-Prüfung A* and *B* — and
+follow the evidence back through the lineage to the filed XML it came from.
+
+A detector match is not proof of wrongdoing, and an open case is a question with
+evidence attached, not a conclusion with a question mark added afterwards.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/blog/cases/austrian-firmenbuch-counterparty-due-diligence"
+/>

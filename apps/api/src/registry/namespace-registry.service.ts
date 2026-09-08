@@ -224,6 +224,45 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  /**
+   * Rows in `status` across every active local tenant, for deployment-wide caps.
+   *
+   * Anything counted through `PrismaService` is answered by a schema-scoped
+   * client, so a "global" limit expressed that way is silently per-namespace and
+   * the real ceiling is the limit times the number of workspaces. That is how
+   * MAX_CONCURRENT_RUNNERS came to allow 8 concurrent scans on a box configured
+   * for 2. Contention is for one machine's cores and memory, so the count has to
+   * span schemas the way the contention does.
+   *
+   * One UNION ALL over a handful of schemas, on the shared public pool. A schema
+   * that is mid-provision or mid-drop contributes nothing rather than failing the
+   * query -- the caller is deciding whether to start more work, and a transient
+   * registry hiccup should not read as "the deployment is idle".
+   */
+  async countRowsAcrossNamespaces(
+    table: 'runners',
+    where: string,
+  ): Promise<number> {
+    const local = (await this.list()).filter((ns) => ns.type === 'local');
+    if (local.length === 0) return 0;
+    const counts = await Promise.all(
+      local.map(async (ns) => {
+        try {
+          const { rows } = await this.pool.query<{ count: number }>(
+            `SELECT count(*)::int AS count FROM "${ns.schemaName}"."${table}" WHERE ${where}`,
+          );
+          return rows[0]?.count ?? 0;
+        } catch (error) {
+          this.logger.warn(
+            `Cross-namespace count on "${ns.schemaName}"."${table}" failed, treating as 0: ${String(error)}`,
+          );
+          return 0;
+        }
+      }),
+    );
+    return counts.reduce((sum, n) => sum + n, 0);
+  }
+
   /** Raw thumbnail bytes for the streaming endpoint, or null when unset. */
   async getThumbnail(
     id: string,
