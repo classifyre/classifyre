@@ -32,7 +32,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      {{- with .Values.frontend.priorityClassName }}
+      {{- with (include "classifyre.priorityClassName" (dict "name" .Values.frontend.priorityClassName "root" .)) }}
       priorityClassName: {{ . | quote }}
       {{- end }}
       {{- if ne .Values.frontend.terminationGracePeriodSeconds nil }}

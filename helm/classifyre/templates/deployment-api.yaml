@@ -40,7 +40,7 @@ spec:
     spec:
       serviceAccountName: {{ include "classifyre.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
-      {{- with .Values.api.priorityClassName }}
+      {{- with (include "classifyre.priorityClassName" (dict "name" .Values.api.priorityClassName "root" .)) }}
       priorityClassName: {{ . | quote }}
       {{- end }}
       {{- if ne .Values.api.terminationGracePeriodSeconds nil }}
