@@ -167,6 +167,14 @@ RUN set -eux; \
 COPY --from=api-image /app /app
 COPY --from=web-image /app /app/web
 COPY --from=cli-image /app/apps/cli /app/apps/cli
+# packages/schemas comes from the *cli* image, overwriting the api image's copy.
+# Both carry the same files, but the CLI's uv.lock pins it as an editable path
+# dependency and records its version, so `uv run --locked` — which is how the
+# API launches every scan — refuses to start if the two disagree. Taking it from
+# the image whose virtualenv references it makes that pair self-consistent by
+# construction, instead of relying on all three images having been built from
+# the same commit.
+COPY --from=cli-image /app/packages/schemas /app/packages/schemas
 
 ENV HOME=/home/classifyre \
     PGDATA=/var/lib/postgresql/data \

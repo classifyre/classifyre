@@ -47,8 +47,15 @@ TMP_DIR="$(mktemp -d)"
 cleanup() {
   local code=$?
   if [ "$code" -ne 0 ]; then
-    printf '\n\033[31m--- container logs ---\033[0m\n' >&2
-    docker logs --tail 200 "${CONTAINER}" >&2 2>&1 || true
+    # The interesting lines are rarely the last ones: a first boot prints every
+    # migration it applies, which buries a scan failure hundreds of lines up.
+    # Pull the errors out first, then the tail for context.
+    printf '\n\033[31m--- errors and scan output ---\033[0m\n' >&2
+    docker logs "${CONTAINER}" 2>&1 \
+      | grep -aiE "\[CLI\]|ERROR|FATAL|Traceback|exited with code|uv sync|Timed out" \
+      | grep -avE "RouterExplorer|Mapped \{" | tail -40 >&2 || true
+    printf '\n\033[31m--- last 60 lines ---\033[0m\n' >&2
+    docker logs --tail 60 "${CONTAINER}" >&2 2>&1 || true
   fi
   if [ "${KEEP:-0}" = "1" ] && [ "$code" -eq 0 ]; then
     printf '\nContainer left running at %s (KEEP=1)\n' "${BASE}"
@@ -188,6 +195,15 @@ ok "workspace schema provisioned (${tables} tables)"
 
 # ── A real scan ───────────────────────────────────────────────────────────────
 step "Scanning the fixture corpus"
+
+# Touch the workspace first, and let it settle. A namespace does its runner
+# reconciliation when it is first resolved, and that sweep marks every
+# PENDING/RUNNING runner it cannot see executing as orphaned — including one
+# created a moment earlier by a client faster than any human. Resolving the
+# namespace here means the sweep has happened before a runner exists to catch.
+api GET "/${NS}/sources" >/dev/null
+sleep 10
+
 source_id="$(api POST "/${NS}/sources" -d '{
   "type": "LOCAL_FOLDER",
   "name": "Smoke fixture",
@@ -216,7 +232,16 @@ done
 [ "${status}" = "COMPLETED" ] || fail "scan ended as '${status}', expected COMPLETED"
 ok "scan completed"
 
-findings="$(api GET "/${NS}/findings/stats?sourceId=${source_id}" | jget total)"
+# /findings/stats answers from a rollup table refreshed on its own schedule, so
+# a correct scan can still report zero for a few seconds after it completes.
+# Poll rather than sampling once — the assertion is "findings arrive", not
+# "findings are already in the rollup the instant the runner goes COMPLETED".
+findings=0
+for _ in $(seq 1 60); do
+  findings="$(api GET "/${NS}/findings/stats?sourceId=${source_id}" | jget total)"
+  [ "${findings:-0}" -ge 1 ] && break
+  sleep 5
+done
 [ "${findings:-0}" -ge 1 ] \
   || fail "the scan produced no findings — extraction, the detector pool, or the REST callback is broken"
 ok "${findings} finding(s) recorded"
