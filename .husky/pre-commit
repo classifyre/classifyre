@@ -21,3 +21,14 @@ echo "Checking generated docs artifacts..."
 cd "$CLASSIFYRE"
 node scripts/extract-helm-values.mjs --check
 echo "Docs generated artifacts OK"
+
+echo "Regenerating CLI notebook runtime packages..."
+cd "$CLASSIFYRE/apps/cli"
+uv run python scripts/generate_runtime_packages.py
+RUNTIME_PACKAGES_FILE="$REPO_ROOT/packages/schemas/src/schemas/notebook_runtime_packages.json"
+if ! git diff --quiet -- "$RUNTIME_PACKAGES_FILE"; then
+  git add "$RUNTIME_PACKAGES_FILE"
+  echo "notebook_runtime_packages.json was stale; regenerated and staged"
+else
+  echo "notebook_runtime_packages.json OK"
+fi
