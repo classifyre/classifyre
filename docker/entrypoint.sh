@@ -232,6 +232,27 @@ if [ -z "${CLASSIFYRE_INTERNAL_KEY:-}" ]; then
   export CLASSIFYRE_INTERNAL_KEY="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
 fi
 
+# ── Runtime directories ───────────────────────────────────────────────────────
+# The Dockerfile creates these, but a mount replaces whatever the image had at
+# that path: a named volume is seeded from the image, a *bind* mount is not — it
+# arrives empty and root-owned. So TEMP_DIR disappears and the API's recipe
+# write fails with ENOENT (a 400 on every scan start), and /cache/uv becomes
+# unwritable so no optional Python group can install.
+#
+# Recreate them here instead, after the mounts are in place and while this is
+# still root. Cheap, idempotent, and it makes bind mounts behave exactly like
+# named volumes.
+for dir in "${TEMP_DIR}" "${RUNNER_LOG_DIR}" "${UV_CACHE_DIR}" \
+           "${PLAYWRIGHT_BROWSERS_PATH}" "${EMBEDDING_CACHE_DIR}"; do
+  [ -n "${dir}" ] || continue
+  mkdir -p "${dir}"
+  # Only fix ownership when it is wrong: a large warm uv cache is not worth
+  # walking on every boot.
+  if [ "$(stat -c '%u' "${dir}")" != "10001" ]; then
+    chown -R 10001:10001 "${dir}"
+  fi
+done
+
 # ── Report ────────────────────────────────────────────────────────────────────
 log "memory=${TOTAL_MB}MB cpus=${CPUS} shm=${SHM_MB}MB"
 log "node heap=${EFFECTIVE_HEAP_MB}MB rss guard=${guard_mb}MB"

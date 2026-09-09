@@ -81,9 +81,29 @@ print(value)
 # Number of elements in a JSON array on stdin.
 jlen() { python3 -c 'import json,sys; print(len(json.load(sys.stdin)))'; }
 
+# Any non-2xx prints the status and the response body before failing. `curl -f`
+# alone just exits 22, which tells you nothing about *why* the API said no.
+#
+# The JSON content-type is added only when there is actually a body: Fastify
+# rejects `Content-Type: application/json` with an empty payload outright
+# ("Body cannot be empty..."), which is what a bodyless POST like /runs is.
 api() {
   local method="$1" path="$2"; shift 2
-  curl -fsS -X "${method}" "${API}${path}" -H 'Content-Type: application/json' "$@"
+  local body status has_body=0 arg
+  for arg in "$@"; do
+    case "${arg}" in -d|--data|--data-*) has_body=1 ;; esac
+  done
+  local -a headers=()
+  [ "${has_body}" = "1" ] && headers=(-H 'Content-Type: application/json')
+
+  body="$(curl -sS -w '\n%{http_code}' -X "${method}" "${API}${path}" \
+    "${headers[@]+"${headers[@]}"}" "$@")"
+  status="${body##*$'\n'}"
+  body="${body%$'\n'*}"
+  case "${status}" in
+    2*) printf '%s' "${body}" ;;
+    *)  fail "${method} ${path} -> HTTP ${status}: ${body}" ;;
+  esac
 }
 
 # ── Boot ──────────────────────────────────────────────────────────────────────
@@ -126,6 +146,23 @@ ok "docs site at /docs/"
 curl -fsS -o /dev/null "${API}/docs" || fail "Swagger did not answer at /api/docs"
 ok "Swagger at /api/docs (no collision with the docs site)"
 
+# ── Bootstrap workspace ───────────────────────────────────────────────────────
+# Must come before the database checks: pgvector and the tenant tables are
+# created by the *tenant* migrations, which only run once a workspace exists.
+# The API answers /ping well before that finishes, so poll rather than assume.
+step "Waiting for the first-run workspace"
+namespaces=""
+for _ in $(seq 1 "${BOOT_WAIT}"); do
+  namespaces="$(api GET /namespaces 2>/dev/null || echo '[]')"
+  [ "$(printf '%s' "${namespaces}" | jlen)" -ge 1 ] && break
+  sleep 2
+done
+count="$(printf '%s' "${namespaces}" | jlen)"
+[ "${count:-0}" -ge 1 ] || fail "no workspace was created on first boot"
+slug="$(printf '%s' "${namespaces}" | jget "0.slug")"
+[ "${slug}" = "${NS}" ] || fail "expected a workspace named '${NS}', found '${slug}'"
+ok "workspace '${slug}' exists"
+
 # ── Database ──────────────────────────────────────────────────────────────────
 step "Checking the database"
 docker exec "${CONTAINER}" psql -U postgres -d classifyre -tAc \
@@ -133,20 +170,21 @@ docker exec "${CONTAINER}" psql -U postgres -d classifyre -tAc \
   || fail "the pgvector extension is not installed — semantic search and duplicate review will not work"
 ok "pgvector installed"
 
-migrations="$(docker exec "${CONTAINER}" psql -U postgres -d classifyre -tAc \
-  "SELECT count(*) FROM information_schema.tables WHERE table_schema LIKE 'ns\_%'" | tr -d '[:space:]')"
-[ "${migrations:-0}" -gt 100 ] \
-  || fail "expected a provisioned workspace schema, found ${migrations} tables"
-ok "workspace schema provisioned (${migrations} tables)"
-
-# ── Bootstrap workspace ───────────────────────────────────────────────────────
-step "Checking the first-run workspace"
-namespaces="$(api GET /namespaces)"
-count="$(printf '%s' "${namespaces}" | jlen)"
-[ "${count:-0}" -ge 1 ] || fail "no workspace was created on first boot"
-slug="$(printf '%s' "${namespaces}" | jget "0.slug")"
-[ "${slug}" = "${NS}" ] || fail "expected a workspace named '${NS}', found '${slug}'"
-ok "workspace '${slug}' exists"
+# The workspace row is inserted before its schema is migrated, so the API can
+# list it while the tenant tables are still being created. Wait for the count to
+# settle rather than sampling once. (One workspace is ~83 tables; the floor is a
+# sanity check, not an exact expectation.)
+tables=0
+for _ in $(seq 1 60); do
+  tables="$(docker exec "${CONTAINER}" psql -U postgres -d classifyre -tAc \
+    "SELECT count(*) FROM information_schema.tables WHERE table_schema LIKE 'ns\_%'" \
+    | tr -d '[:space:]')"
+  [ "${tables:-0}" -ge 50 ] && break
+  sleep 5
+done
+[ "${tables:-0}" -ge 50 ] \
+  || fail "workspace schema never finished provisioning (${tables} tables)"
+ok "workspace schema provisioned (${tables} tables)"
 
 # ── A real scan ───────────────────────────────────────────────────────────────
 step "Scanning the fixture corpus"
