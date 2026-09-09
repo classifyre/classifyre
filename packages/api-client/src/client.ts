@@ -1344,6 +1344,42 @@ function createConfiguration(baseUrl?: string): Configuration {
 
 // Namespace (tenant) registry. Hand-written (not in the OpenAPI spec) and
 // deliberately NOT namespace-prefixed — these run against the `public` registry.
+/** One external link shown on a workspace card. Both fields are mandatory. */
+export interface NamespaceExternalLink {
+  id: string;
+  title: string;
+  url: string;
+}
+
+/** A link as sent to the API; the id is assigned server-side when omitted. */
+export interface NamespaceExternalLinkInput {
+  id?: string;
+  title: string;
+  url: string;
+}
+
+/** A workspace category. Flat, shared across all workspaces. */
+export interface NamespaceCategory {
+  id: string;
+  title: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+  workspaceCount: number;
+  /** The built-in fallback category; it cannot be deleted. */
+  isDefault: boolean;
+}
+
+export interface CreateNamespaceCategoryInput {
+  title: string;
+  description?: string | null;
+}
+
+export interface UpdateNamespaceCategoryInput {
+  title?: string;
+  description?: string | null;
+}
+
 export interface Namespace {
   id: string;
   name: string;
@@ -1354,6 +1390,10 @@ export interface Namespace {
   remoteUrl: string | null;
   thumbnail: string | null;
   settings: Record<string, unknown>;
+  /** Ordered external links shown on the workspace card. */
+  externalLinks: NamespaceExternalLink[];
+  /** Categories this workspace is filed under; never empty. */
+  categoryIds: string[];
   createdAt: string;
   updatedAt: string;
   lastOpenedAt: string | null;
@@ -1367,6 +1407,9 @@ export interface CreateNamespaceInput {
   remoteUrl?: string;
   /** Base64 image data URI (`data:image/...;base64,...`), max 2 MB. */
   thumbnail?: string;
+  externalLinks?: NamespaceExternalLinkInput[];
+  /** Defaults to the built-in default category when omitted or empty. */
+  categoryIds?: string[];
 }
 
 export interface UpdateNamespaceInput {
@@ -1375,6 +1418,10 @@ export interface UpdateNamespaceInput {
   description?: string;
   /** Base64 image data URI to set, or `null` to clear the thumbnail. */
   thumbnail?: string | null;
+  /** Replaces the whole link array. Omit to leave links untouched. */
+  externalLinks?: NamespaceExternalLinkInput[];
+  /** Replaces the category set; empty falls back to the default category. */
+  categoryIds?: string[];
 }
 
 /** Per-namespace source rollups for the workspace directory cards. */
@@ -1472,6 +1519,67 @@ class NamespacesApi {
       throw new Error(`Failed to delete namespace (${res.status})`);
     }
   }
+
+  // Categories live under /namespaces/categories rather than a top-level route:
+  // `namespaces` is already a reserved (non-namespace-prefixed) path segment, so
+  // nesting them keeps the registry's routing exemption intact.
+
+  async listCategories(): Promise<NamespaceCategory[]> {
+    const res = await resilientFetch(this.url("/categories"), {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Failed to load categories (${res.status})`);
+    return (await res.json()) as NamespaceCategory[];
+  }
+
+  async createCategory(
+    input: CreateNamespaceCategoryInput,
+  ): Promise<NamespaceCategory> {
+    const res = await resilientFetch(this.url("/categories"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error(await errorMessage(res, "create category"));
+    return (await res.json()) as NamespaceCategory;
+  }
+
+  async updateCategory(
+    id: string,
+    input: UpdateNamespaceCategoryInput,
+  ): Promise<NamespaceCategory> {
+    const res = await resilientFetch(
+      this.url(`/categories/${encodeURIComponent(id)}`),
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    if (!res.ok) throw new Error(await errorMessage(res, "update category"));
+    return (await res.json()) as NamespaceCategory;
+  }
+
+  async removeCategory(id: string): Promise<void> {
+    const res = await resilientFetch(
+      this.url(`/categories/${encodeURIComponent(id)}`),
+      { method: "DELETE" },
+    );
+    if (!res.ok && res.status !== 204) {
+      throw new Error(await errorMessage(res, "delete category"));
+    }
+  }
+}
+
+/** The API's own error message when it sent one, else a generic fallback. */
+async function errorMessage(res: Response, action: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { message?: string };
+    if (body?.message) return body.message;
+  } catch {
+    // fall through to the status-only message
+  }
+  return `Failed to ${action} (${res.status})`;
 }
 
 // API client singleton
