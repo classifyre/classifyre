@@ -20,6 +20,8 @@ import {
   SidebarSeparator,
 } from "@workspace/ui/components/sidebar";
 import { useTranslation } from "@/hooks/use-translation";
+import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
+import { useLocalePath } from "@/lib/app-path";
 import type { TranslationKey } from "@/i18n";
 import { VersionSidebarNotifier } from "./version-update-notifier";
 import { AiHealthSidebarWarning } from "./ai-health";
@@ -83,7 +85,22 @@ const NAV_GROUPS: NavGroup[] = [
 export function AppSidebar() {
   const pathname = usePathname();
   const { t } = useTranslation();
-  const { nsHref, displayName, slug } = useNamespace();
+  const { nsHref, displayName, namespace, slug } = useNamespace();
+  const localePath = useLocalePath();
+  const { categories } = useNamespaceCategories();
+  // The categories this workspace is filed under, in the registry's own
+  // (alphabetical) order. Empty only while the two requests are in flight —
+  // a workspace always belongs to at least one.
+  const filedUnder = React.useMemo(
+    () =>
+      namespace
+        ? categories.filter((category) =>
+            namespace.categoryIds.includes(category.id),
+          )
+        : [],
+    [categories, namespace],
+  );
+  const primaryCategory = filedUnder[0];
   const isActivePath = (href: string) => {
     const full = nsHref(href);
     return pathname === full || pathname.startsWith(full + "/");
@@ -95,8 +112,15 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href={nsHref("/")}>
-                <div className="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg">
+              {/* A div, not a Link: the caption underneath is itself a link and
+                  an anchor cannot be nested inside another anchor. The header
+                  keeps its own layout and styling either way. */}
+              <div>
+                <Link
+                  href={nsHref("/")}
+                  aria-label={displayName}
+                  className="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg"
+                >
                   <Image
                     src="/clasifyre_icon.png"
                     width={32}
@@ -104,16 +128,48 @@ export function AppSidebar() {
                     alt="Classifyre"
                     className="size-full object-cover"
                   />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-serif font-bold">
+                </Link>
+                <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+                  <Link
+                    href={nsHref("/")}
+                    className="truncate font-serif font-bold"
+                  >
                     {displayName}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    /{slug}
-                  </span>
+                  </Link>
+                  {primaryCategory ? (
+                    // Same caption slot the workspace path used to occupy —
+                    // where the workspace is filed says more than a URL the
+                    // address bar already shows.
+                    <span className="truncate text-xs text-muted-foreground">
+                      <Link
+                        href={localePath(
+                          `/namespaces/categories/${primaryCategory.id}`,
+                        )}
+                        title={t("categories.viewAria", {
+                          title: primaryCategory.title,
+                        })}
+                        className="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                      >
+                        {primaryCategory.title}
+                      </Link>
+                      {filedUnder.length > 1 && (
+                        // Only the first one fits; the rest are one click away
+                        // on the category page itself.
+                        <span title={filedUnder.map((c) => c.title).join(", ")}>
+                          {" "}
+                          +{filedUnder.length - 1}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    // Until the registry answers, the route slug is the only
+                    // thing known about this workspace.
+                    <span className="truncate text-xs text-muted-foreground">
+                      /{slug}
+                    </span>
+                  )}
                 </div>
-              </Link>
+              </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

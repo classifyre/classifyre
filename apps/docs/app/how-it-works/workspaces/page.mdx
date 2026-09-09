@@ -1,6 +1,6 @@
 ---
 title: Workspaces
-description: Isolated workspaces let one Classifyre instance hold many separate investigations — each with its own database schema, evidence, detectors, autopilot memory, and API address, with nothing shared between them.
+description: Isolated workspaces let one Classifyre instance hold many separate investigations — each with its own database schema, evidence, detectors, autopilot memory, and API address, with nothing shared between them. Categories and links keep a large directory navigable.
 ---
 
 import { Callout } from "nextra/components"
@@ -40,8 +40,8 @@ Nothing in this list is shared between workspaces:
 | Notifications | Its own feed and unread state |
 
 Shared across the instance: the workspace registry itself (names, slugs,
-thumbnails), the application version, and the machine or cluster it all runs
-on.
+thumbnails, categories, and links), the application version, and the machine or
+cluster it all runs on.
 
 ---
 
@@ -75,17 +75,18 @@ and cannot be used as slugs.
 ## Working with workspaces
 
 **Choosing one.** Opening Classifyre lands you on the workspace directory: a
-card per workspace with its name, description, and a live count of sources and
-failing sources. Pick one to enter it; use *All workspaces* in the sidebar to
-come back.
+card per workspace with its name, description, links, and a live count of
+sources and failing sources, **grouped by category**. Pick one to enter it; use
+*All workspaces* in the sidebar to come back.
 
-**Creating one.** *New workspace* asks for a name and optional description and
-thumbnail. Classifyre derives a slug, creates the schema, runs migrations into
-it, and starts its workers — usually a few seconds. There is no default
-workspace: a fresh install has none until you create the first.
+**Creating one.** *New workspace* asks for a name, its categories, and an
+optional description and thumbnail. Classifyre derives a slug, creates the
+schema, runs migrations into it, and starts its workers — usually a few
+seconds. There is no default workspace: a fresh install has none until you
+create the first.
 
 **Renaming one.** Workspace settings let you edit the name, description,
-thumbnail, and URL slug at any time.
+thumbnail, categories, links, and URL slug at any time.
 
 **Retiring one.** Deleting a workspace removes it from the directory and stops
 its workers and scheduling, and any request to its URL then 404s. **The data is
@@ -96,6 +97,88 @@ cannot be silently reused by a different investigation.
 lives on another Classifyre instance. It appears in the directory alongside
 local ones and opens that instance in your browser; no data is copied to your
 machine.
+
+---
+
+## Categories
+
+Ten workspaces are a list. Sixty are a filing problem. **Categories** are the
+shelves the workspace directory is arranged on: *Clients*, *Internal*,
+*Regulated*, *2026 matters* — whatever division your work actually has.
+
+A category is deliberately shallow. It has a name and an optional description,
+nothing more: no nesting, no rules, no effect on what a workspace can see or
+do. It exists to make a long directory readable, and that is all it does.
+
+### The rules worth knowing
+
+- **Every workspace is in at least one category.** There is no uncategorised
+  state to leave a workspace stranded in. Save a workspace with no category
+  selected and Classifyre files it under **General**, the built-in default.
+- **A workspace can be in several.** A client matter that is also under
+  regulatory review is filed under both, and appears under both headings in the
+  directory. Categories are labels, not folders — nothing moves.
+- **General cannot be deleted.** It is the fallback every other rule leans on.
+- **Deleting a category never deletes a workspace.** The label is removed; any
+  workspace that is left with no label at all falls back to General.
+- **Renaming one is felt everywhere** — the directory heading, the sidebar, and
+  every card that carried it.
+
+### Where categories show up
+
+**The directory** groups its cards under category headings, in alphabetical
+order, with a count beside each. A workspace filed under two categories appears
+under both. When everything is in a single category the headings are hidden —
+one heading over every card is a line to skip, not a structure.
+
+**The sidebar**, inside a workspace, names the category directly under the
+workspace name. It is a link: click it to see everything filed alongside what
+you are working in. When a workspace sits in several, the first is shown with a
+`+n` for the rest.
+
+**The category page** lists every workspace on that shelf, as the same cards
+the directory uses, and is where you rename or delete that category.
+
+**The category index** (*Categories*, from the directory toolbar) is the map of
+the whole filing system: every category in order, its description, the
+workspaces on it by name, and a way into each one.
+
+### Creating and assigning
+
+Categories are picked from a dropdown when you create a workspace, and from the
+same dropdown in workspace settings afterwards. If the shelf you want does not
+exist yet, *New* creates it right there — without leaving the form — and
+selects it for the workspace you are filling in.
+
+<Callout type="info">
+Upgrading an existing instance does not ask you to re-file anything. The
+upgrade creates **General** and puts every workspace you already have into it,
+so the directory looks exactly as it did before, with grouping ready when you
+want it.
+</Callout>
+
+Categories are instance-wide, like the workspace registry itself: everyone
+looking at the same Classifyre sees the same shelves. They are not an access
+boundary — a category does not hide anything from anyone. Restricting *who may
+open which workspace* is the governance question below.
+
+---
+
+## Links on a workspace card
+
+A workspace usually has a life outside Classifyre: the case tracker, the
+engagement folder, the client's own portal, the ticket that started it. Each
+workspace can carry a list of **external links** — a name and a URL, both
+required — shown on its card in the directory and opened in a new tab.
+
+Add them in workspace settings, in the order you want them read. The name is
+what appears on the card, so name them the way you would say them out loud
+("Case tracker", not "https://tracker.example.com/b/1183"). Links must be
+ordinary `http://` or `https://` addresses; up to twenty per workspace.
+
+They are a signpost, not an integration: Classifyre stores the address and
+nothing else. It does not fetch these pages, scan them, or know whether whoever
+clicks can open them.
 
 ---
 
