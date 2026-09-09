@@ -383,6 +383,40 @@ which each deployment sets on its own after including this block.
   value: "--max-old-space-size={{ $heapMb }}"
 - name: UNDER_PRESSURE_MAX_HEAP_USED_BYTES
   value: {{ div (mul $heapMb 1024 1024 85) 100 | quote }}
+{{- /* under-pressure's OTHER threshold is total process RSS, and its library
+     default is a flat 1 GB that knows nothing about this pod's limit. That
+     default cannot coexist with a heap cap above it: the JS heap alone grows
+     past 1 GB, isUnderPressure() latches true for the life of the process, and
+     CliBackpressureGuard then 503s every CLI ingestion call for ever — scans
+     fail with "Server is under load" on an API that is nowhere near its limit.
+     Measured on a 4Gi API pod: VmRSS 1558 MB against the 1024 MB default.
+     Size it against the memory limit instead, so it fires as the real backstop
+     it is meant to be — just before the cgroup OOM-kills the pod. */}}
+{{- $roleValues := ternary .Values.worker .Values.api (eq $role "worker") }}
+{{- $limitMb := "" }}
+{{- if $roleValues.resources }}{{- if $roleValues.resources.limits }}
+{{- $limitMb = include "classifyre.memQuantityMb" ($roleValues.resources.limits.memory | default "") }}
+{{- end }}{{- end }}
+{{- /* Derived from the memory limit by default so it follows the limit
+     automatically; an explicit maxRssMb still wins. 0.875 leaves the guard
+     firing just under the cgroup ceiling rather than during healthy work. */}}
+{{- $rssMb := 0 }}
+{{- if $roleValues.maxRssMb }}
+{{- $rssMb = int $roleValues.maxRssMb }}
+{{- else if $limitMb }}
+{{- $rssMb = div (mul (int $limitMb) 875) 1000 }}
+{{- else }}
+{{- $rssMb = int .Values.api.maxRssMbFallback }}
+{{- end }}
+{{- /* The bug this whole block exists to prevent: a heap cap at or above the
+     RSS guard means the JS heap alone latches isUnderPressure() true for the
+     life of the process, and every CLI ingestion call 503s for ever. Fail the
+     render rather than ship an instance whose scans cannot succeed. */}}
+{{- if ge $heapMb $rssMb }}
+{{- fail (printf "%s: maxOldSpaceSizeMb (%d MB) must be below the RSS guard (%d MB), or the JS heap alone trips under-pressure and every CLI ingestion endpoint returns 503 permanently. Raise resources.limits.memory, or lower the heap cap." $role $heapMb $rssMb) }}
+{{- end }}
+- name: UNDER_PRESSURE_MAX_RSS_BYTES
+  value: {{ mul $rssMb 1024 1024 | quote }}
 {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
 - name: DATABASE_URL
   valueFrom:
@@ -551,3 +585,61 @@ they only store and hand on the path the user typed.
 {{ merge (dict "name" (printf "local-folder-%s" $folder.name)) (omit $folder "name" "mountPath" "readOnly") | toJson }}
 {{- end }}
 {{- end }}
+
+{{/*
+Convert a Kubernetes memory quantity ("2Gi", "512Mi", "1G") to whole MB.
+
+Exists so the memory-derived env knobs below have ONE source of truth. Before
+this, `resources.limits.memory`, `maxOldSpaceSizeMb` and `maxRssMb` were three
+independent numbers an operator had to keep in agreement by hand, and the
+consequence of forgetting was not a crash but a subtle misbehaviour: an RSS
+guard sized for a smaller pod sheds every CLI ingestion request with 503 while
+the API sits at a third of its limit.
+
+Fractional quantities ("1.5Gi") and unrecognised units return an empty string,
+so callers fall back to their explicit value rather than silently computing a
+wrong one from a truncated integer.
+*/}}
+{{- define "classifyre.memQuantityMb" -}}
+{{- $q := . | toString -}}
+{{- if regexMatch "^[0-9]+Gi$" $q -}}
+{{- mul (trimSuffix "Gi" $q | int) 1024 -}}
+{{- else if regexMatch "^[0-9]+Mi$" $q -}}
+{{- trimSuffix "Mi" $q | int -}}
+{{- else if regexMatch "^[0-9]+G$" $q -}}
+{{- div (mul (trimSuffix "G" $q | int) 1000000000) 1048576 -}}
+{{- else if regexMatch "^[0-9]+M$" $q -}}
+{{- div (mul (trimSuffix "M" $q | int) 1000000) 1048576 -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Resolve a pod's priorityClassName, refusing to name a class this release has
+not created.
+
+Referencing a missing PriorityClass is not a soft failure: the API server
+rejects the pod outright with `no PriorityClass with name ... was found`, the
+ReplicaSet reports FailedCreate, and the Deployment sits at 0 replicas. Applied
+to Postgres that is a database outage produced entirely by a rendering mistake.
+
+It is an easy mistake to make, because the two halves live in different files:
+the class names default to the chart's own in values.yaml, while
+`priorityClasses.create` is commonly flipped off in an environment overlay. A
+values file that turns creation off while leaving the defaults alone renders a
+dangling reference.
+
+So: a chart-owned name is only emitted when the chart is creating the classes.
+Any other name is assumed to be externally managed (a platform-wide class) and
+is passed through untouched.
+
+Usage: {{ include "classifyre.priorityClassName" (dict "name" .Values.api.priorityClassName "root" .) }}
+*/}}
+{{- define "classifyre.priorityClassName" -}}
+{{- $name := .name | default "" -}}
+{{- $pc := .root.Values.priorityClasses -}}
+{{- $chartOwned := list $pc.serviceName $pc.batchName -}}
+{{- if and (has $name $chartOwned) (not $pc.create) -}}
+{{- else -}}
+{{- $name -}}
+{{- end -}}
+{{- end -}}

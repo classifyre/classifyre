@@ -74,7 +74,7 @@ spec:
       {{- end }}
     spec:
       automountServiceAccountToken: false
-      {{- with .Values.postgres.embedded.priorityClassName }}
+      {{- with (include "classifyre.priorityClassName" (dict "name" .Values.postgres.embedded.priorityClassName "root" .)) }}
       priorityClassName: {{ . | quote }}
       {{- end }}
       {{- if ne .Values.postgres.embedded.terminationGracePeriodSeconds nil }}
@@ -109,26 +109,39 @@ spec:
                 secretKeyRef:
                   name: {{ include "classifyre.databaseSecretName" . }}
                   key: {{ include "classifyre.databasePasswordKey" . }}
+          {{- if .Values.postgres.embedded.livenessProbe.enabled }}
+          # Off by default, and think hard before switching it on. This is a
+          # single Postgres with no failover: a liveness probe cannot repair
+          # anything here, it can only convert "slow" into "restarted", and
+          # `pg_isready` measures the node's ability to fork a process as much
+          # as it measures Postgres. Under a saturated node it times out, the
+          # kubelet SIGTERMs the database, every API/worker connection drops
+          # and in-flight runs die -- a load spike laundered into an outage.
+          # Readiness alone already removes a wedged instance from the Service.
           livenessProbe:
             exec:
               command:
                 - sh
                 - -c
                 - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p {{ .Values.postgres.embedded.port }}
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 6
+            initialDelaySeconds: {{ .Values.postgres.embedded.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.postgres.embedded.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.postgres.embedded.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.postgres.embedded.livenessProbe.failureThreshold }}
+          {{- end }}
+          # Readiness is the safe probe: a failure only parks traffic, it never
+          # kills the process. The thresholds are still generous, because a
+          # flapping ready state churns every consumer's connection pool.
           readinessProbe:
             exec:
               command:
                 - sh
                 - -c
                 - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p {{ .Values.postgres.embedded.port }}
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 5
-            failureThreshold: 6
+            initialDelaySeconds: {{ .Values.postgres.embedded.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.postgres.embedded.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.postgres.embedded.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.postgres.embedded.readinessProbe.failureThreshold }}
           resources:
             {{- toYaml .Values.postgres.embedded.resources | nindent 12 }}
           {{- with .Values.postgres.embedded.containerSecurityContext }}

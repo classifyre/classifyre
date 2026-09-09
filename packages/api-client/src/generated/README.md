@@ -260,12 +260,16 @@ All URIs are relative to *http://localhost*
 *InstanceSettingsApi* | [**mcpSettingsControllerListTokens**](docs/InstanceSettingsApi.md#mcpsettingscontrollerlisttokens) | **GET** /instance-settings/mcp/tokens | List MCP access tokens
 *InstanceSettingsApi* | [**mcpSettingsControllerUpdateToken**](docs/InstanceSettingsApi.md#mcpsettingscontrollerupdatetoken) | **PATCH** /instance-settings/mcp/tokens/{id} | Update MCP access token
 *NamespacesApi* | [**namespacesControllerCreate**](docs/NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations)
+*NamespacesApi* | [**namespacesControllerCreateCategory**](docs/NamespacesApi.md#namespacescontrollercreatecategory) | **POST** /namespaces/categories | Create a workspace category
 *NamespacesApi* | [**namespacesControllerGet**](docs/NamespacesApi.md#namespacescontrollerget) | **GET** /namespaces/{id} | Get a namespace by id
 *NamespacesApi* | [**namespacesControllerList**](docs/NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List all namespaces
+*NamespacesApi* | [**namespacesControllerListCategories**](docs/NamespacesApi.md#namespacescontrollerlistcategories) | **GET** /namespaces/categories | List workspace categories with workspace counts
 *NamespacesApi* | [**namespacesControllerRemove**](docs/NamespacesApi.md#namespacescontrollerremove) | **DELETE** /namespaces/{id} | Soft-delete a namespace (hidden from listings; data retained)
+*NamespacesApi* | [**namespacesControllerRemoveCategory**](docs/NamespacesApi.md#namespacescontrollerremovecategory) | **DELETE** /namespaces/categories/{categoryId} | Delete a category (its workspaces fall back to the default category)
 *NamespacesApi* | [**namespacesControllerStats**](docs/NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing)
 *NamespacesApi* | [**namespacesControllerThumbnail**](docs/NamespacesApi.md#namespacescontrollerthumbnail) | **GET** /namespaces/{id}/thumbnail | Stream a namespace\&#39;s thumbnail image
 *NamespacesApi* | [**namespacesControllerUpdate**](docs/NamespacesApi.md#namespacescontrollerupdate) | **PATCH** /namespaces/{id} | Update a namespace
+*NamespacesApi* | [**namespacesControllerUpdateCategory**](docs/NamespacesApi.md#namespacescontrollerupdatecategory) | **PATCH** /namespaces/categories/{categoryId} | Rename or re-describe a workspace category
 *NotebooksApi* | [**notebookControllerCancel**](docs/NotebooksApi.md#notebookcontrollercancel) | **POST** /notebook/executions/{executionId}/cancel | Stop a running execution
 *NotebooksApi* | [**notebookControllerCreateExecution**](docs/NotebooksApi.md#notebookcontrollercreateexecution) | **POST** /sources/{sourceId}/notebook/executions | Start a notebook execution
 *NotebooksApi* | [**notebookControllerExportPython**](docs/NotebooksApi.md#notebookcontrollerexportpython) | **GET** /sources/{sourceId}/notebook/export | The notebook as an ordinary Python module

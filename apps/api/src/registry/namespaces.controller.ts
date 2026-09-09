@@ -14,9 +14,12 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
 import { NamespaceRegistryService } from './namespace-registry.service';
 import type {
+  CreateNamespaceCategoryInput,
   CreateNamespaceInput,
   Namespace,
+  NamespaceCategory,
   NamespaceStats,
+  UpdateNamespaceCategoryInput,
   UpdateNamespaceInput,
 } from './namespace.types';
 
@@ -51,6 +54,41 @@ export class NamespacesController {
   @ApiOperation({ summary: 'Per-namespace source rollups (total + failing)' })
   stats(): Promise<NamespaceStats[]> {
     return this.registry.stats();
+  }
+
+  // Category routes are declared BEFORE `:id` so `/namespaces/categories` is
+  // matched as itself and not as a namespace whose id is "categories".
+  @Get('categories')
+  @ApiOperation({ summary: 'List workspace categories with workspace counts' })
+  listCategories(): Promise<NamespaceCategory[]> {
+    return this.registry.listCategories();
+  }
+
+  @Post('categories')
+  @ApiOperation({ summary: 'Create a workspace category' })
+  createCategory(
+    @Body() body: CreateNamespaceCategoryInput,
+  ): Promise<NamespaceCategory> {
+    return this.registry.createCategory(body);
+  }
+
+  @Patch('categories/:categoryId')
+  @ApiOperation({ summary: 'Rename or re-describe a workspace category' })
+  updateCategory(
+    @Param('categoryId') categoryId: string,
+    @Body() body: UpdateNamespaceCategoryInput,
+  ): Promise<NamespaceCategory> {
+    return this.registry.updateCategory(categoryId, body);
+  }
+
+  @Delete('categories/:categoryId')
+  @HttpCode(204)
+  @ApiOperation({
+    summary:
+      'Delete a category (its workspaces fall back to the default category)',
+  })
+  async removeCategory(@Param('categoryId') categoryId: string): Promise<void> {
+    await this.registry.removeCategory(categoryId);
   }
 
   @Get(':id')

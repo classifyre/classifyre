@@ -71,13 +71,31 @@ api:
     #                                 flight before it declines to start more.
     #                                 Defaults to 2, and nothing sets it.
     # Raising only the first left the scheduler still logging "cap 2" and
-    # holding overdue sources back with slots free.
+    # holding overdue sources back with slots free, so both move together.
     #
-    # Four, not two: the register sweep is bounded by ingest+detection
-    # throughput rather than by any external API, and the k3d node sits around
-    # 23% CPU with two scans in flight.
-    MAX_CONCURRENT_RUNNERS: "4"
-    AUTO_SCHEDULE_MAX_CONCURRENT: "4"
+    # Back to two from four. Four was chosen when the register sweep looked
+    # ingest-bound on an idle node, but this is a single 16Gi k3d node that
+    # also hosts Postgres, the API and the worker — and each extract pod is
+    # allowed 2 CPU and 8Gi. Four concurrent scans plus the worker's embedding
+    # runtimes is what turns node pressure into OOM kills. Two leaves the node
+    # room to absorb a scan that hits a heavy PDF without taking Postgres's
+    # page cache with it.
+    #
+    # Note this cap is enforced per NAMESPACE, not deployment-wide as
+    # CliRunnerService's comment claims: canStartNewRunner() counts through the
+    # namespace-scoped Prisma client, so the real ceiling is this number times
+    # the number of active workspaces. With four namespaces, "2" is up to 8.
+    # One, because the resource budget below only has room for one extract pod
+    # (7Gi requested against ~15.9Gi allocatable, with postgres/api/worker
+    # reserved). Keeping the application cap and the scheduler's arithmetic in
+    # agreement means the second scan waits in the app queue rather than
+    # creating a Job that sits Pending and holds a uv-cache mount.
+    #
+    # The per-namespace caveat below still applies -- with N workspaces this is
+    # still N -- but it no longer decides whether the node survives: the memory
+    # *request* on the CLI Job does, and the scheduler enforces that one.
+    MAX_CONCURRENT_RUNNERS: "1"
+    AUTO_SCHEDULE_MAX_CONCURRENT: "1"
     # Politeness on a shared node, NOT a memory fix. This was halved from 4 as
     # an OOM mitigation on the theory that each namespace forks its own
     # onnxruntime and four of them were stacking up. That theory was wrong on
@@ -239,13 +257,27 @@ api:
         path: /var/lib/classifyre/cache/api/bun
         type: Directory
 
+  # Every limit in this file is sized against ONE 16Gi / 10-CPU k3d node, and
+  # they are meant to be read together. Before this pass the limits summed to
+  # 31.9Gi -- 199% of the node -- because the scheduler only ever looks at
+  # requests, and every pod requested a token 100m/256Mi. So everything fit on
+  # paper and then fought over memory that did not exist. The budget now is:
+  #
+  #   postgres   3Gi  (request == limit, Guaranteed)
+  #   api        2Gi
+  #   worker     3Gi
+  #   extract    7Gi  (request == limit, so exactly one fits)
+  #   ---------------
+  #   total     15Gi  against ~15.9Gi allocatable
+  #
+  # Change one and re-check the sum, or the node goes back to overcommitted.
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 250m
+      memory: 512Mi
     limits:
       cpu: "2"
-      memory: 4Gi
+      memory: 2Gi
 
   affinity: {}
   topologySpreadConstraints: []
@@ -312,19 +344,32 @@ api:
           type: Directory
     resources:
       requests:
-        cpu: 100m
-        # Kept small so several scans still schedule side by side on the single
-        # k3d node -- the limit below is the headroom that matters, not this.
-        memory: 512Mi
+        cpu: 500m
+        # Equal to the limit, which reverses the previous advice here. Keeping
+        # the request small did let several scans schedule side by side -- that
+        # was the bug, not the feature. The node cannot actually honour two 10Gi
+        # jobs, so "they all fit" only meant the collision happened later, in
+        # the kernel, where the victim is chosen by oom_score rather than by
+        # anything that knows Postgres matters more than a PDF.
+        #
+        # Requesting the full 7Gi makes the *scheduler* the enforcement point:
+        # with postgres+api+worker reserved, there is room for exactly one
+        # extract pod, and a second stays Pending until the first finishes.
+        # Slow, which is fine. It also means this holds regardless of
+        # MAX_CONCURRENT_RUNNERS, which is counted per namespace and therefore
+        # multiplies by the number of workspaces.
+        memory: 7Gi
         ephemeral-storage: 1Gi
       limits:
         cpu: "2"
-        # 4Gi was not enough for a real scanned PDF. A filing with no text layer
+        # 4Gi was not enough for a real scanned PDF: a filing with no text layer
         # falls through to docling's StandardPdfPipeline (layout transformer +
-        # TableFormer, on CPU), which OOMKilled the job (exit 137) mid-scan and
-        # lost the whole run. The node has 16Gi and limits may overcommit, so
-        # the ceiling is raised rather than the request.
-        memory: 10Gi
+        # TableFormer, on CPU), which OOMKilled the job (exit 137) mid-scan.
+        # 7Gi rather than the 10Gi that replaced it, because 10Gi was only ever
+        # affordable while the node was overcommitted -- two such jobs claimed
+        # 20Gi of a 16Gi machine. A job that still exceeds 7Gi now dies alone,
+        # which is the intended blast radius: one lost run, not a lost database.
+        memory: 7Gi
         ephemeral-storage: 10Gi
     uvCache:
       enabled: true
@@ -337,8 +382,11 @@ worker:
   replicaCount: 1
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      # A real request, not a token one. 100m gave the worker the same cgroup v2
+      # CPU weight as Postgres and as every extract pod, so "the node is busy"
+      # and "Postgres is starved" were the same event.
+      cpu: 250m
+      memory: 512Mi
     limits:
       cpu: "2"
       # 6Gi, and this is not the lever. The pod was OOMKilled (exit 137) at
@@ -374,7 +422,15 @@ worker:
       # 391 Mi while the pod died. The allocation is native and V8 flags
       # cannot bound it; raising the cap only lets V8 compete for the same
       # budget.
-      memory: 6Gi
+      #
+      # 3Gi now, down from 6Gi, for the reason the last paragraph already gave:
+      # the ceiling never saved the pod, it only decided how much of the node a
+      # runaway took on its way out. With the inference batch bounded the peak
+      # is in the low hundreds of MB, so 3Gi is ~10x real usage and it keeps the
+      # node's total limits under what the node actually has. If the worker
+      # OOMKills at 3Gi, that is a batching regression to go and find -- raising
+      # this number back up would only hide it and re-overcommit the node.
+      memory: 3Gi
 
 frontend:
   # Web is not deployed in-cluster for local dev — run it directly on your
@@ -406,20 +462,32 @@ postgres:
         - ReadWriteOnce
       size: 5Gi
     parameters:
-      shared_buffers: 128MB
-      work_mem: 8MB
+      # Raised with the memory limit below. At 128MB against a 1Gi limit every
+      # query was effectively disk-bound -- cold planning alone was measured in
+      # seconds -- which is also what made pg_isready time out under load and
+      # get the database killed. Cache starvation was a stability problem here,
+      # not just a speed one.
+      shared_buffers: 768MB
+      work_mem: 16MB
     resources:
+      # Request == limit puts Postgres in the Guaranteed QoS class, and that is
+      # the point of this whole block. Requests are what the kernel and kubelet
+      # actually rank by: the CPU request is the cgroup v2 scheduling weight,
+      # and the memory request sets oom_score_adj and the node-pressure eviction
+      # order. At 100m/256Mi Postgres had the same CPU weight as a docling
+      # pipeline and, running 3x over its request, was a leading OOM candidate.
+      # Guaranteed makes it the last thing on the node to be touched.
       requests:
-        cpu: 100m
-        memory: 256Mi
+        cpu: "2"
+        memory: 3Gi
       limits:
-        cpu: "1"
-        memory: 1Gi
+        cpu: "2"
+        memory: 3Gi
 
 networkPolicy:
   enabled: false
 priorityClasses:
-  create: false
+  create: true
 telemetry:
   enabled: false
   instanceId:

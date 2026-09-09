@@ -17,6 +17,14 @@ import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { WorkspaceHeader } from "@/components/namespace/workspace-header";
 import { ThumbnailPicker } from "@/components/namespace/thumbnail-picker";
+import { CategorySelect } from "@/components/namespace/category-select";
+import {
+  ExternalLinksEditor,
+  isCompleteLink,
+  isPartialLink,
+  type EditableLink,
+} from "@/components/namespace/external-links-editor";
+import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
 import { useTranslation } from "@/hooks/use-translation";
 import { useActiveNamespaces } from "@/components/active-namespaces-provider";
 import { useStaticRouteParam } from "@/lib/use-route-id";
@@ -41,12 +49,19 @@ export default function NamespaceSettingsPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const { update: updateActiveNamespace } = useActiveNamespaces();
+  const {
+    categories,
+    loading: categoriesLoading,
+    upsert: upsertCategory,
+  } = useNamespaceCategories();
   const [namespace, setNamespace] = React.useState<Namespace | null>(null);
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [thumbnail, setThumbnail] = React.useState<string | null>(null);
   const [thumbnailChanged, setThumbnailChanged] = React.useState(false);
+  const [links, setLinks] = React.useState<EditableLink[]>([]);
+  const [categoryIds, setCategoryIds] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -67,6 +82,15 @@ export default function NamespaceSettingsPage() {
       setDescription(result.description ?? "");
       setThumbnail(result.thumbnail);
       setThumbnailChanged(false);
+      setLinks(
+        result.externalLinks.map((link) => ({
+          key: link.id,
+          id: link.id,
+          title: link.title,
+          url: link.url,
+        })),
+      );
+      setCategoryIds(result.categoryIds);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -86,6 +110,10 @@ export default function NamespaceSettingsPage() {
     event.preventDefault();
     const normalizedSlug = slug.replace(/-+$/, "");
     if (!namespace || !name.trim() || !normalizedSlug || saving) return;
+    if (links.some(isPartialLink)) {
+      toast.error(t("workspaces.linkIncomplete"));
+      return;
+    }
 
     setSaving(true);
     try {
@@ -96,6 +124,14 @@ export default function NamespaceSettingsPage() {
         // Only send the image when it actually changed; a data URI sets it,
         // `null` clears it, `undefined` leaves it untouched.
         ...(thumbnailChanged ? { thumbnail } : {}),
+        // A row still being typed (one field filled) is blocked by the submit
+        // guard above; a completely empty row is simply dropped.
+        externalLinks: links.filter(isCompleteLink).map((link) => ({
+          id: link.id,
+          title: link.title.trim(),
+          url: link.url.trim(),
+        })),
+        categoryIds,
       });
       updateActiveNamespace(updated, namespace.slug);
       setNamespace(updated);
@@ -104,6 +140,15 @@ export default function NamespaceSettingsPage() {
       setDescription(updated.description ?? "");
       setThumbnail(updated.thumbnail);
       setThumbnailChanged(false);
+      setLinks(
+        updated.externalLinks.map((link) => ({
+          key: link.id,
+          id: link.id,
+          title: link.title,
+          url: link.url,
+        })),
+      );
+      setCategoryIds(updated.categoryIds);
       window.electronAPI?.notifyNamespacesChanged();
       toast.success(t("workspaces.settingsSaved"));
       router.refresh();
@@ -176,9 +221,7 @@ export default function NamespaceSettingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="workspace-slug">
-                {t("workspaces.urlPath")}
-              </Label>
+              <Label htmlFor="workspace-slug">{t("workspaces.urlPath")}</Label>
               <div className="flex items-center">
                 <span className="select-none rounded-l border border-r-0 border-input bg-muted px-2.5 py-2 font-mono text-sm text-muted-foreground">
                   /
@@ -212,6 +255,27 @@ export default function NamespaceSettingsPage() {
                 onChange={(event) => setDescription(event.target.value)}
                 disabled={saving}
                 rows={5}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t("categories.label")}</Label>
+              <CategorySelect
+                categories={categories}
+                value={categoryIds}
+                onChange={setCategoryIds}
+                onCategoryCreated={upsertCategory}
+                loading={categoriesLoading}
+                disabled={saving}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t("workspaces.linksLabel")}</Label>
+              <ExternalLinksEditor
+                links={links}
+                onChange={setLinks}
+                disabled={saving}
               />
             </div>
 

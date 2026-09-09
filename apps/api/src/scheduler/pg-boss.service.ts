@@ -95,8 +95,68 @@ export class PgBossService implements OnApplicationShutdown {
     });
     await boss.start();
     this.bosses.set(schema, boss);
+    await this.releaseAbandonedJobs(boss, schema, namespaceId);
     this.logger.log(`pg-boss started for namespace schema '${schema}'`);
     return boss;
+  }
+
+  /**
+   * Fail jobs left `active` by a process that died holding them.
+   *
+   * A job is claimed by marking it active; releasing it is the worker's
+   * responsibility, so a worker that is OOMKilled mid-job leaves the row
+   * claimed by a process that no longer exists. Each job carries its own
+   * `expire_seconds` and pg-boss is supposed to reap them, but that reaping
+   * runs *inside* the same process — so the failure that creates the mess is
+   * the failure that stops it being cleaned up.
+   *
+   * Observed: one worker OOM left 44 jobs stuck across four namespaces,
+   * including the `auto-schedule.tick` singleton. Nothing ran for seven hours
+   * while every pod reported healthy, because the queue that starts scans was
+   * permanently occupied by a job belonging to a dead process. It needed a
+   * manual UPDATE to recover.
+   *
+   * Startup is the right moment: a process starting up is, by definition, one
+   * that is not holding any of these. Each job's own `expire_seconds` is
+   * honoured rather than a blanket timeout, so a legitimately long job running
+   * in another live replica is not touched.
+   */
+  private async releaseAbandonedJobs(
+    boss: PgBossInstance,
+    schema: string,
+    namespaceId: string,
+  ): Promise<void> {
+    const bossSchema = pgBossSchemaForId(namespaceId);
+    try {
+      const rows = await boss.getDb().executeSql(
+        `UPDATE ${bossSchema}.job
+            SET state = 'failed',
+                completed_on = now(),
+                output = jsonb_build_object(
+                  'message',
+                  'expired: worker terminated while the job was active'
+                )
+          WHERE state = 'active'
+            AND started_on < now() - (coalesce(expire_seconds, 900) * interval '1 second')
+          RETURNING name`,
+        [],
+      );
+      const released = rows?.rows?.length ?? 0;
+      if (released > 0) {
+        const names = [...new Set(rows.rows.map((r: { name: string }) => r.name))];
+        this.logger.warn(
+          `Released ${released} abandoned pg-boss job(s) in '${schema}' left ` +
+            `active by a terminated worker (${names.join(', ')}). Those queues ` +
+            'were blocked until now.',
+        );
+      }
+    } catch (error) {
+      // Never stop a namespace from starting because the cleanup failed.
+      this.logger.error(
+        `Could not release abandoned jobs for '${schema}': ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /** Stop and forget the pg-boss instance for a namespace schema. */
