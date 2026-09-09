@@ -236,7 +236,7 @@ export async function applyAllPendingMigrations(): Promise<void> {
       schema_name: string;
       status: string;
     }>(
-      "SELECT id, schema_name, status FROM namespaces WHERE type = 'local' AND status IN ('active', 'provisioning') ORDER BY created_at ASC",
+      "SELECT id, schema_name, status FROM namespaces WHERE status IN ('active', 'provisioning') ORDER BY created_at ASC",
     );
     schemas = rows.map((r) => ({
       id: r.id,
