@@ -49,7 +49,13 @@ const nextConfig = {
         //
         // The negative lookahead lists everything that is NOT a localized
         // page: the already-prefixed locales, the route handlers that keep
-        // their exact URLs, Next's own assets, and file-based metadata.
+        // their exact URLs, Next's own assets, file-based metadata, and any
+        // top-level static file served straight out of `public/` (matched by
+        // `[^/]+\.[a-zA-Z0-9]+$` — a single path segment ending in a file
+        // extension, e.g. `clasifyre_icon.png`). Without that last branch,
+        // requests for public/ assets that aren't individually enumerated
+        // here get rewritten to `/en/<file>` and 404 (this broke the sidebar
+        // and topbar logo — see git history on this file).
         // `docs/.` (a slash followed by at least one character) excludes the
         // bundled static docs site while leaving `/docs/` itself — the web
         // app's own landing page — to be locale-prefixed like any other page.
@@ -61,7 +67,7 @@ const nextConfig = {
         beforeFiles: [
           { source: "/", destination: `/${DEFAULT_LOCALE}` },
           {
-            source: `/:path((?!(?:${LOCALE_ALTERNATION})(?:/|$)|api/|_next/|sitemap/|sitemap\\.xml|robots\\.txt|manifest\\.json|classifyre-cfg|classifyre-usr/|favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|docs/.).*)`,
+            source: `/:path((?!(?:${LOCALE_ALTERNATION})(?:/|$)|api/|_next/|sitemap/|sitemap\\.xml|robots\\.txt|manifest\\.json|classifyre-cfg|classifyre-usr/|favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|docs/.|[^/]+\\.[a-zA-Z0-9]+$).*)`,
             destination: `/${DEFAULT_LOCALE}/:path`,
           },
         ],

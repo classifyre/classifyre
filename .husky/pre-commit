@@ -32,3 +32,25 @@ if ! git diff --quiet -- "$RUNTIME_PACKAGES_FILE"; then
 else
   echo "notebook_runtime_packages.json OK"
 fi
+
+CODEGEN_PATHS="packages/api-client/src/generated apps/cli/src/models packages/schemas apps/api/openapi.json openapi.json"
+
+echo "Running codegen..."
+cd "$CLASSIFYRE"
+bun run codegen
+if ! git diff --quiet -- $CODEGEN_PATHS; then
+  git add -- $CODEGEN_PATHS
+  echo "codegen output was stale; regenerated and staged"
+else
+  echo "codegen output OK"
+fi
+
+echo "Regenerating docs artifacts..."
+cd "$CLASSIFYRE"
+bun run docs:generate
+if ! git diff --quiet -- apps/docs/src/_generated; then
+  git add -- apps/docs/src/_generated
+  echo "docs artifacts were stale; regenerated and staged"
+else
+  echo "docs artifacts OK"
+fi
