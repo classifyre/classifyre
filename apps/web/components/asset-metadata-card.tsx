@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   Card,
   CardContent,
@@ -7,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
+import { JsonValue } from "@workspace/ui/components/json-value";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
@@ -115,16 +117,18 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(1)} ${units[unit]}`;
 }
 
-function renderValue(key: string, value: unknown): string {
-  if (value === null || value === undefined) return "—";
-  if (Array.isArray(value)) return value.map((v) => String(v)).join(", ");
-  if (typeof value === "number") {
-    if (SIZE_KEYS.has(key)) return formatBytes(value);
-    return value.toLocaleString();
+function renderValue(key: string, value: unknown): ReactNode {
+  if (value === null || value === undefined) {
+    return <span className="text-muted-foreground">—</span>;
   }
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
+  // Bytes are the one key family with a domain-specific format; everything
+  // else — including every array and nested object — goes through the shared
+  // JSON renderer so it stays readable instead of collapsing to
+  // "[object Object]".
+  if (typeof value === "number" && SIZE_KEYS.has(key)) {
+    return <span className="tabular-nums">{formatBytes(value)}</span>;
+  }
+  return <JsonValue value={value} copyable />;
 }
 
 type Props = {

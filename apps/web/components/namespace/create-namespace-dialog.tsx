@@ -18,6 +18,8 @@ import { Label } from "@workspace/ui/components/label";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { ThumbnailPicker } from "@/components/namespace/thumbnail-picker";
 import { NamespaceSeedPicker } from "@/components/namespace/namespace-seed-picker";
+import { CategorySelect } from "@/components/namespace/category-select";
+import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
 import { useTranslation } from "@/hooks/use-translation";
 import { useTransferJob } from "@/hooks/use-transfer-job";
 import {
@@ -48,7 +50,15 @@ export function CreateNamespaceDialog({
   onCreated: (namespace: Namespace) => void;
 }) {
   const { t } = useTranslation();
+  const {
+    categories,
+    loading: categoriesLoading,
+    upsert: upsertCategory,
+  } = useNamespaceCategories();
   const [name, setName] = React.useState("");
+  // Empty is fine: the API files an uncategorised workspace under the default
+  // category rather than rejecting the create.
+  const [categoryIds, setCategoryIds] = React.useState<string[]>([]);
   const [description, setDescription] = React.useState("");
   const [thumbnail, setThumbnail] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
@@ -70,6 +80,7 @@ export function CreateNamespaceDialog({
   const reset = () => {
     setName("");
     setDescription("");
+    setCategoryIds([]);
     setThumbnail(null);
     setSubmitting(false);
     setSeedFile(null);
@@ -126,6 +137,7 @@ export function CreateNamespaceDialog({
         name: name.trim(),
         description: description.trim() || undefined,
         thumbnail: thumbnail ?? undefined,
+        categoryIds,
       });
 
       if (!seedFile) {
@@ -190,7 +202,8 @@ export function CreateNamespaceDialog({
               />
               {slug && (
                 <p className="text-muted-foreground text-xs">
-                  {t("workspaces.url")}: <span className="font-mono">/{slug}</span>
+                  {t("workspaces.url")}:{" "}
+                  <span className="font-mono">/{slug}</span>
                 </p>
               )}
             </div>
@@ -204,6 +217,17 @@ export function CreateNamespaceDialog({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={t("workspaces.descriptionPlaceholder")}
                 rows={2}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>{t("categories.label")}</Label>
+              <CategorySelect
+                categories={categories}
+                value={categoryIds}
+                onChange={setCategoryIds}
+                onCategoryCreated={upsertCategory}
+                loading={categoriesLoading}
+                disabled={submitting || seed !== null}
               />
             </div>
             <div className="grid gap-2">
@@ -232,7 +256,9 @@ export function CreateNamespaceDialog({
               variant="outline"
               // Once the workspace exists, closing is "leave it running", not
               // "cancel" — the caller still has to learn the workspace is there.
-              onClick={() => (seed ? finish(seed.namespace) : onOpenChange(false))}
+              onClick={() =>
+                seed ? finish(seed.namespace) : onOpenChange(false)
+              }
               disabled={submitting}
             >
               {seed
@@ -242,7 +268,11 @@ export function CreateNamespaceDialog({
             <Button
               type="submit"
               variant="default"
-              disabled={(!name.trim() && !seed) || submitting || (seed !== null && !seedDone)}
+              disabled={
+                (!name.trim() && !seed) ||
+                submitting ||
+                (seed !== null && !seedDone)
+              }
             >
               {(submitting || (seed !== null && !seedDone)) && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

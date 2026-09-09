@@ -23,12 +23,20 @@ export interface NamespacesControllerRemoveRequest {
     id: string;
 }
 
+export interface NamespacesControllerRemoveCategoryRequest {
+    categoryId: string;
+}
+
 export interface NamespacesControllerThumbnailRequest {
     id: string;
 }
 
 export interface NamespacesControllerUpdateRequest {
     id: string;
+}
+
+export interface NamespacesControllerUpdateCategoryRequest {
+    categoryId: string;
 }
 
 /**
@@ -62,6 +70,34 @@ export class NamespacesApi extends runtime.BaseAPI {
      */
     async namespacesControllerCreate(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.namespacesControllerCreateRaw(initOverrides);
+    }
+
+    /**
+     * Create a workspace category
+     */
+    async namespacesControllerCreateCategoryRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/namespaces/categories`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Create a workspace category
+     */
+    async namespacesControllerCreateCategory(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.namespacesControllerCreateCategoryRaw(initOverrides);
     }
 
     /**
@@ -129,6 +165,34 @@ export class NamespacesApi extends runtime.BaseAPI {
     }
 
     /**
+     * List workspace categories with workspace counts
+     */
+    async namespacesControllerListCategoriesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/namespaces/categories`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * List workspace categories with workspace counts
+     */
+    async namespacesControllerListCategories(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.namespacesControllerListCategoriesRaw(initOverrides);
+    }
+
+    /**
      * Soft-delete a namespace (hidden from listings; data retained)
      */
     async namespacesControllerRemoveRaw(requestParameters: NamespacesControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -162,6 +226,42 @@ export class NamespacesApi extends runtime.BaseAPI {
      */
     async namespacesControllerRemove(requestParameters: NamespacesControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.namespacesControllerRemoveRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Delete a category (its workspaces fall back to the default category)
+     */
+    async namespacesControllerRemoveCategoryRaw(requestParameters: NamespacesControllerRemoveCategoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['categoryId'] == null) {
+            throw new runtime.RequiredError(
+                'categoryId',
+                'Required parameter "categoryId" was null or undefined when calling namespacesControllerRemoveCategory().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/namespaces/categories/{categoryId}`;
+        urlPath = urlPath.replace(`{${"categoryId"}}`, encodeURIComponent(String(requestParameters['categoryId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Delete a category (its workspaces fall back to the default category)
+     */
+    async namespacesControllerRemoveCategory(requestParameters: NamespacesControllerRemoveCategoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.namespacesControllerRemoveCategoryRaw(requestParameters, initOverrides);
     }
 
     /**
@@ -262,6 +362,42 @@ export class NamespacesApi extends runtime.BaseAPI {
      */
     async namespacesControllerUpdate(requestParameters: NamespacesControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.namespacesControllerUpdateRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Rename or re-describe a workspace category
+     */
+    async namespacesControllerUpdateCategoryRaw(requestParameters: NamespacesControllerUpdateCategoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['categoryId'] == null) {
+            throw new runtime.RequiredError(
+                'categoryId',
+                'Required parameter "categoryId" was null or undefined when calling namespacesControllerUpdateCategory().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/namespaces/categories/{categoryId}`;
+        urlPath = urlPath.replace(`{${"categoryId"}}`, encodeURIComponent(String(requestParameters['categoryId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Rename or re-describe a workspace category
+     */
+    async namespacesControllerUpdateCategory(requestParameters: NamespacesControllerUpdateCategoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.namespacesControllerUpdateCategoryRaw(requestParameters, initOverrides);
     }
 
 }

@@ -102,6 +102,34 @@ api:
   # -- limit. Rule of thumb: heap ≈ 0.75 × the memory limit (in MB).
   maxOldSpaceSizeMb: 1536
 
+  # -- Total process RSS (MB) above which the six CLI ingestion endpoints shed
+  # with 503 and the CLI retries. This is under-pressure's second threshold,
+  # alongside the JS-heap one derived from `maxOldSpaceSizeMb`.
+  #
+  # It MUST be set, and set above the heap cap. under-pressure's own default is
+  # a flat 1 GB that ignores the pod's memory limit, and with a 1536 MB heap
+  # the JS heap alone grows past it — RSS never comes back down, the pressure
+  # flag latches on, and every scan then fails with "Server is under load" on
+  # an API using a third of its limit. That is what a 4Gi API pod measured:
+  # VmRSS 1558 MB against the 1024 MB default.
+  #
+  # LEAVE EMPTY. Empty means "derive it from `resources.limits.memory`" (0.875
+  # x the limit), which is what you want: the guard then follows the limit
+  # automatically instead of being a third number to keep in sync by hand.
+  # Set it only to override that derivation.
+  #
+  # Sizing it near the heap cap instead of near the limit is the failure mode:
+  # RSS is heap PLUS native (Prisma, Buffers, the embedding model), so a guard
+  # close to the heap fires during healthy operation. The chart fails to render
+  # if the heap cap ever lands at or above this value.
+  maxRssMb: ""
+
+  # -- Fallback RSS guard (MB) used only when `maxRssMb` is empty AND the
+  # memory limit is absent or not a whole Gi/Mi quantity (e.g. "1.5Gi").
+  # Never leave this at under-pressure's own 1 GB library default, which
+  # ignores the pod limit entirely.
+  maxRssMbFallback: 1792
+
   # -- Days a deleted workspace stays recoverable before it is dropped for
   # good. Deleting a workspace only marks it and stops serving it; its schema
   # and all its data survive until this many days later, when a background
@@ -179,10 +207,24 @@ api:
     # -- deleted (including their logs) when a new run is triggered and the count
     # -- exceeds this value. Set to "0" to disable cleanup.
     MAX_RUNNERS_PER_SOURCE: "5"
-    # -- Maximum number of runners that can execute concurrently across all sources.
-    # -- New runs are queued in PENDING state when this limit is reached.
-    # -- Set to "0" to disable the limit (unlimited concurrency).
+    # -- Maximum number of runners that can execute concurrently. New runs are
+    # -- queued in PENDING state when this limit is reached. Set "0" for no limit.
+    # --
+    # -- Enforced PER NAMESPACE, not per deployment: CliRunnerService counts
+    # -- runner rows through the namespace-scoped Prisma client, so the real
+    # -- ceiling is this number times the number of workspaces running scans.
     MAX_CONCURRENT_RUNNERS: "3"
+    # -- Days of scan history kept. The nightly cleanup deletes runs older than
+    # -- this along with their logs. Code default when unset: 14.
+    RUNNER_RETENTION_DAYS: "14"
+    # -- Cron (UTC) for that nightly cleanup. Code default when unset: "0 3 * * *".
+    RUNNER_CLEANUP_CRON: "0 3 * * *"
+    # -- Cron (UTC) for the orphaned CLI Job reaper, which deletes Kubernetes
+    # -- Jobs whose runner already reached a terminal state. Far more frequent
+    # -- than the nightly cleanup on purpose: an orphan is not stale history, it
+    # -- is a pod holding CPU and memory right now, and one that is invisible to
+    # -- MAX_CONCURRENT_RUNNERS because that cap counts runner rows, not pods.
+    CLI_JOB_REAP_CRON: "*/5 * * * *"
     # -- Enable read-only demo mode. When "true" all mutating API operations return 403.
     DEMO_MODE: "false"
 
@@ -318,8 +360,9 @@ api:
   affinity: {}
   # -- API topology spread constraints. When empty, a default hostname spread is applied.
   topologySpreadConstraints: []
-  # -- API pod priority class.
-  priorityClassName: ""
+  # -- API pod priority class. Defaults to the chart's service class so API and
+  # -- worker outrank batch CLI Jobs under node pressure (see priorityClasses).
+  priorityClassName: "service-standard"
   # -- API pod termination grace period (seconds). Set to null to use Kubernetes default.
   terminationGracePeriodSeconds: null
   # -- API deployment strategy override.
@@ -488,13 +531,21 @@ api:
         # to the limit. A 1Gi request against a 4Gi limit made these pods prime
         # node-pressure eviction targets mid-scan; requesting near the limit keeps
         # the scheduler honest and lets long scans finish.
-        memory: 3Gi
+        # Equal to the limit below, on purpose. The memory request is the only
+        # thing the *scheduler* looks at, so it is the one cap that holds no
+        # matter how many runners the application layer thinks it may start:
+        # a node with no room left simply cannot accept another Job, and the
+        # extra one stays Pending instead of overcommitting the node into an
+        # OOM. Application-level caps (MAX_CONCURRENT_RUNNERS) are advisory by
+        # comparison -- they are counted per namespace, so N workspaces
+        # multiply them. Keep request == limit when tuning.
+        memory: 4Gi
         # CLI containers routinely use 5-6 Gi (uv package downloads, pip wheels,
         # extracted asset temp files). Requesting 6 Gi matches real usage so the
         # scheduler only places jobs on nodes with enough disk and kubelet does not
         # rank them as high-priority eviction candidates under node disk pressure.
         ephemeral-storage: 6Gi
-      # -- CLI job resource limits.
+      # -- CLI job resource limits. Memory must equal the request above.
       limits:
         cpu: "2"
         memory: 4Gi
@@ -506,8 +557,11 @@ api:
     tolerations: []
     # -- CLI job scheduling: affinity rules.
     affinity: {}
-    # -- CLI job priority class.
-    priorityClassName: ""
+    # -- CLI job priority class. Batch by default: CLI Jobs are the workload
+    # -- that spikes, and this is what tells the kubelet to evict a scan rather
+    # -- than Postgres when the node runs short. Its preemptionPolicy is Never,
+    # -- so a pending Job waits for room instead of displacing a service pod.
+    priorityClassName: "batch-low-priority"
     # -- Mount service account token into CLI job pods.
     automountServiceAccountToken: false
     # -- Pod security context for CLI job pods.
@@ -623,6 +677,12 @@ worker:
   # binding constraint, the heap cap was, and 1.5 GB of the pod's 3 GB simply
   # went unused. Same 0.75x rule of thumb as the API: 2304 ≈ 0.75 × 3072.
   maxOldSpaceSizeMb: 2304
+
+  # -- Total process RSS (MB) for the WORKER pods. Leave empty to derive it
+  # from the worker's OWN `resources.limits.memory` (0.875 x), which is almost
+  # always what you want — the worker holds the forked onnxruntime child on top
+  # of everything the API holds, and its limit differs from the API's.
+  maxRssMb: ""
 
   # -- Seconds a job batch may wait for a concurrency slot before it gives up.
   # An unbounded wait is indistinguishable from a hang: the handler never runs,
@@ -817,7 +877,7 @@ frontend:
   # -- Web topology spread constraints. When empty, a default hostname spread is applied.
   topologySpreadConstraints: []
   # -- Web pod priority class.
-  priorityClassName: ""
+  priorityClassName: "service-standard"
   # -- Web pod termination grace period (seconds). Set to null to use Kubernetes default.
   terminationGracePeriodSeconds: null
   # -- Web deployment strategy override.
@@ -964,7 +1024,7 @@ postgres:
     # -- Embedded Postgres scheduling: affinity rules.
     affinity: {}
     # -- Embedded Postgres pod priority class.
-    priorityClassName: ""
+    priorityClassName: "service-standard"
     # -- Embedded Postgres pod termination grace period (seconds). Set to null to use Kubernetes default.
     terminationGracePeriodSeconds: null
     # -- Embedded Postgres pod security context.
@@ -1014,12 +1074,42 @@ postgres:
     parameters:
       shared_buffers: 512MB
       work_mem: 16MB
+    # -- Liveness probe for embedded Postgres. Disabled by default: this is a
+    # -- single instance with no failover, so a restart can only lose in-flight
+    # -- work, never repair anything. `pg_isready` also measures the node's
+    # -- ability to fork under load, so a busy node (a heavy scan, an embedding
+    # -- batch) reads as a dead database and the kubelet kills it. Readiness
+    # -- already parks traffic on a wedged instance without that risk.
+    livenessProbe:
+      enabled: false
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 15
+      failureThreshold: 10
+    # -- Readiness probe for embedded Postgres. Failing readiness only removes
+    # -- the pod from the Service, so the thresholds can be generous: a probe
+    # -- that flaps under load churns every consumer's connection pool.
+    readinessProbe:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 10
+      failureThreshold: 6
     resources:
-      # -- Embedded Postgres resource requests.
+      # -- Embedded Postgres resources. Requests deliberately equal limits, which
+      # -- puts the pod in the Guaranteed QoS class. This is the whole point: in
+      # -- cgroup v2 the CPU *request* is the scheduling weight, and the memory
+      # -- request drives both `oom_score_adj` and kubelet's node-pressure
+      # -- eviction order. With the old 100m/256Mi request Postgres carried the
+      # -- same CPU weight as a docling PDF pipeline and, sitting far above its
+      # -- request, ranked as a prime kill candidate -- the one process in the
+      # -- cluster that must not be lost had the weakest guarantee in the chart.
+      # -- Guaranteed makes it the last thing the kernel and the kubelet touch.
+      # -- Keep these two blocks identical when tuning; splitting them silently
+      # -- demotes the pod to Burstable.
       requests:
-        cpu: 100m
-        memory: 256Mi
-      # -- Embedded Postgres resource limits.
+        cpu: "2"
+        memory: 4Gi
+      # -- Embedded Postgres resource limits. Must equal requests (see above).
       limits:
         cpu: "2"
         memory: 4Gi
@@ -1116,8 +1206,12 @@ networkPolicy:
   ingressNamespaceSelector: {}
 
 priorityClasses:
-  # -- Create service and batch priority classes.
-  create: false
+  # -- Create service and batch priority classes. On by default: without them
+  # -- every pod sits at priority 0, so under node pressure the kubelet has no
+  # -- way to prefer Postgres over a batch scan. `batch-low-priority` also sets
+  # -- preemptionPolicy: Never, so a queued CLI Job can never displace a running
+  # -- service pod -- it waits for room instead.
+  create: true
   # -- Priority class name for service workloads.
   serviceName: service-standard
   # -- Numeric priority value for service workloads.

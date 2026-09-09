@@ -4,6 +4,7 @@ import { RunnerStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from './pg-boss.service';
 import { RunnerLogStorageService } from '../cli-runner/runner-log-storage.service';
+import { KubernetesCliJobService } from '../cli-runner/kubernetes-cli-job.service';
 
 /** pg-boss queue + schedule name for the nightly cleanup job. */
 const CLEANUP_QUEUE = 'cleanup-old-runners';
@@ -13,6 +14,30 @@ const DEFAULT_RETENTION_DAYS = 14;
 
 /** Default cron: 03:00 every day (UTC), off-peak. */
 const DEFAULT_CRON = '0 3 * * *';
+
+/** pg-boss queue + schedule name for the orphaned-Job reaper. */
+const REAP_QUEUE = 'reap-orphaned-cli-jobs';
+
+/**
+ * Default reaper cron: every five minutes.
+ *
+ * Deliberately far more frequent than the nightly cleanup above, because an
+ * orphan is not stale history taking up disk — it is a pod holding CPU and
+ * memory on the node right now.
+ */
+const DEFAULT_REAP_CRON = '*/5 * * * *';
+
+/**
+ * How long a runner must have been terminal before its Job is reaped.
+ *
+ * A pod that finished normally is torn down by its own exit a moment after the
+ * API records the outcome, so anything younger than this is very likely just
+ * mid-teardown and reaping it would race a clean exit for no benefit.
+ */
+const REAP_GRACE_MS = 2 * 60 * 1000;
+
+/** Most orphans to reap in one pass, so a backlog cannot monopolise the tick. */
+const REAP_BATCH_SIZE = 50;
 
 /** How many expired runners to delete per DB round-trip. */
 const DELETE_BATCH_SIZE = 500;
@@ -44,6 +69,7 @@ export class RunnerCleanupService {
     private readonly prisma: PrismaService,
     private readonly pgBoss: PgBossService,
     private readonly runnerLogStorage: RunnerLogStorageService,
+    private readonly k8sJobs: KubernetesCliJobService,
   ) {}
 
   /**
@@ -63,8 +89,16 @@ export class RunnerCleanupService {
     // schedule() is an upsert keyed by name, so this is idempotent across boots.
     await boss.schedule(CLEANUP_QUEUE, cron, {}, { tz: 'UTC' });
 
+    await boss.createQueue(REAP_QUEUE);
+    await this.pgBoss.work(REAP_QUEUE, { localConcurrency: 1 }, (jobs) =>
+      this.handleReapJob(jobs as Job[]),
+    );
+    const reapCron = process.env.CLI_JOB_REAP_CRON || DEFAULT_REAP_CRON;
+    await boss.schedule(REAP_QUEUE, reapCron, {}, { tz: 'UTC' });
+
     this.logger.log(
-      `Registered nightly runner cleanup: "${cron}" (UTC), retention ${this.resolveRetentionDays()}d`,
+      `Registered nightly runner cleanup: "${cron}" (UTC), retention ${this.resolveRetentionDays()}d; ` +
+        `orphaned CLI Job reaper: "${reapCron}" (UTC)`,
     );
   }
 
@@ -80,6 +114,86 @@ export class RunnerCleanupService {
   /** pg-boss delivers the scheduled job (possibly batched); one pass suffices. */
   private async handleCleanupJob(_jobs: Job[]): Promise<void> {
     await this.runCleanup();
+  }
+
+  /** pg-boss delivers the scheduled job (possibly batched); one pass suffices. */
+  private async handleReapJob(_jobs: Job[]): Promise<void> {
+    await this.reapOrphanedJobs();
+  }
+
+  /**
+   * Delete Kubernetes Jobs whose runner already reached a terminal state.
+   *
+   * The two can drift apart: the API marks a runner ERROR the moment a CLI
+   * call fails, but nothing makes the pod exit, and
+   * `K8S_CLI_JOB_CLEANUP_POLICY=failed` only reaps a Job after the POD fails —
+   * which never happens if the process keeps running. Observed on a dev
+   * cluster: three runners marked ERROR within one second of starting, their
+   * extract pods still running forty minutes later, one of them holding
+   * 1.9 CPU and 2.3 GB.
+   *
+   * These orphans are worse than wasted capacity, because they are invisible
+   * to the concurrency cap: `canStartNewRunner` counts runner ROWS in RUNNING,
+   * so a pod whose row says ERROR consumes the node without occupying a slot.
+   * MAX_CONCURRENT_RUNNERS is only a real limit if this drift is corrected.
+   */
+  async reapOrphanedJobs(): Promise<{ reaped: number }> {
+    const cutoff = new Date(Date.now() - REAP_GRACE_MS);
+
+    const candidates = await this.prisma.runner.findMany({
+      where: {
+        status: { in: TERMINAL_STATUSES },
+        jobName: { not: null },
+        completedAt: { not: null, lt: cutoff },
+      },
+      orderBy: { completedAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        jobName: true,
+        jobNamespace: true,
+        completedAt: true,
+      },
+      take: REAP_BATCH_SIZE,
+    });
+    if (candidates.length === 0) return { reaped: 0 };
+
+    let reaped = 0;
+    for (const runner of candidates) {
+      const jobName = runner.jobName;
+      if (!jobName) continue;
+      try {
+        // Ask Kubernetes before deleting: the overwhelming majority of these
+        // rows are ordinary finished runs whose Job is long gone, and this
+        // sweep runs every few minutes.
+        const active = await this.k8sJobs.isJobActive(
+          jobName,
+          runner.jobNamespace ?? undefined,
+        );
+        if (!active) continue;
+
+        await this.k8sJobs.stopRunnerJob(runner.id, {
+          jobName,
+          ...(runner.jobNamespace ? { namespace: runner.jobNamespace } : {}),
+        });
+        reaped++;
+        this.logger.warn(
+          `Reaped orphaned CLI Job ${jobName} for runner ${runner.id}: the run ` +
+            `has been ${runner.status} since ${runner.completedAt?.toISOString()} ` +
+            `but its pod was still active.`,
+        );
+      } catch (err) {
+        // Never let one unreachable Job stop the sweep — the next tick retries.
+        this.logger.warn(
+          `Failed to reap CLI Job ${jobName} for runner ${runner.id}: ${String(err)}`,
+        );
+      }
+    }
+
+    if (reaped > 0) {
+      this.logger.log(`Orphaned CLI Job reaper: deleted ${reaped} Job(s).`);
+    }
+    return { reaped };
   }
 
   /** Public entrypoint so the cleanup can also be triggered/tested directly. */

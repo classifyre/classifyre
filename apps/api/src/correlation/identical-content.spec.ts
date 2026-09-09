@@ -55,11 +55,28 @@ describe('exact duplicate linking from the content hash', () => {
     prisma.asset.findMany.mockResolvedValueOnce(ids.map((id) => ({ id })));
   };
 
+  /**
+   * Drain every mock, one-shot queues included.
+   *
+   * `jest.resetAllMocks()` is not enough under bun's runner: it clears calls
+   * and implementations but leaves the `mockResolvedValueOnce` queue intact.
+   * These tests queue results per case, and not every queued result is
+   * consumed — an oversized group is skipped before its members are read — so
+   * a leftover answered the *next* test's query and the group under test came
+   * back a member short. `mockReset()` on each mock does drain the queue.
+   */
+  const resetPrismaMocks = () => {
+    for (const value of Object.values(prisma)) {
+      if (typeof value === 'function') {
+        (value as jest.Mock).mockReset();
+        continue;
+      }
+      for (const fn of Object.values(value)) (fn as jest.Mock).mockReset();
+    }
+  };
+
   beforeEach(() => {
-    // resetAllMocks, not clearAllMocks: these tests queue results with
-    // mockResolvedValueOnce, and clearAllMocks leaves an unconsumed queue in
-    // place for the next test to pick up.
-    jest.resetAllMocks();
+    resetPrismaMocks();
     prisma.edge.createMany.mockResolvedValue({ count: 0 });
     prisma.edge.deleteMany.mockResolvedValue({ count: 0 });
     prisma.asset.groupBy.mockResolvedValue([]);
