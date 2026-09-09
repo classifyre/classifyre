@@ -435,6 +435,18 @@ describe("next.config.mjs locale table", () => {
         expect(pattern.test(path)).toBe(false);
       }
     });
+
+    it("leaves top-level public/ assets alone", () => {
+      // Regression: these weren't individually enumerated, so they were
+      // rewritten to /en/<file> and 404'd -- including the sidebar/topbar logo.
+      for (const path of [
+        "clasifyre_icon.png",
+        "web-app-manifest-192x192.png",
+        "web-app-manifest-512x512.png",
+      ]) {
+        expect(pattern.test(path)).toBe(false);
+      }
+    });
   });
 });
 

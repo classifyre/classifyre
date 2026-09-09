@@ -7203,6 +7203,80 @@
         ]
       }
     },
+    "/namespaces/categories": {
+      "get": {
+        "operationId": "NamespacesController_listCategories",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List workspace categories with workspace counts",
+        "tags": [
+          "Namespaces"
+        ]
+      },
+      "post": {
+        "operationId": "NamespacesController_createCategory",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a workspace category",
+        "tags": [
+          "Namespaces"
+        ]
+      }
+    },
+    "/namespaces/categories/{categoryId}": {
+      "patch": {
+        "operationId": "NamespacesController_updateCategory",
+        "parameters": [
+          {
+            "name": "categoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Rename or re-describe a workspace category",
+        "tags": [
+          "Namespaces"
+        ]
+      },
+      "delete": {
+        "operationId": "NamespacesController_removeCategory",
+        "parameters": [
+          {
+            "name": "categoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a category (its workspaces fall back to the default category)",
+        "tags": [
+          "Namespaces"
+        ]
+      }
+    },
     "/namespaces/{id}": {
       "get": {
         "operationId": "NamespacesController_get",

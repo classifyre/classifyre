@@ -58,7 +58,69 @@ UPDATE public.namespaces
   WHERE status = 'deleted' AND deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS namespaces_status_deleted_at_idx
   ON public.namespaces (status, deleted_at);
+-- Editable external links shown on the workspace card, as an ORDERED array of
+-- {id, title, url}. A jsonb column rather than a side table because the array is
+-- always read, written and reordered as a whole, and never joined against.
+ALTER TABLE public.namespaces
+  ADD COLUMN IF NOT EXISTS external_links jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+-- Workspace categories. Flat (no nesting), shared across all workspaces, and
+-- therefore in the public schema next to the registry itself -- a per-tenant
+-- schema could not hold a grouping that spans tenants.
+CREATE TABLE IF NOT EXISTS public.namespace_categories (
+  id          uuid PRIMARY KEY,
+  title       text NOT NULL,
+  description text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+-- Case-insensitive uniqueness: the create-category dialog offers a free-text
+-- title, and "Clients"/"clients" as two rows would just be a broken grouping.
+CREATE UNIQUE INDEX IF NOT EXISTS namespace_categories_title_key
+  ON public.namespace_categories (lower(title));
+
+-- Many-to-many: one workspace can be filed under several categories.
+CREATE TABLE IF NOT EXISTS public.namespace_category_members (
+  namespace_id uuid NOT NULL
+    REFERENCES public.namespaces (id) ON DELETE CASCADE,
+  category_id  uuid NOT NULL
+    REFERENCES public.namespace_categories (id) ON DELETE CASCADE,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (namespace_id, category_id)
+);
+CREATE INDEX IF NOT EXISTS namespace_category_members_category_idx
+  ON public.namespace_category_members (category_id);
+
+-- The default category, with a fixed id so every deployment agrees on which one
+-- it is. It exists before any backfill so the invariant below ("a workspace is
+-- always in at least one category") always has somewhere to put a stray row.
+INSERT INTO public.namespace_categories (id, title, description)
+VALUES (
+  '00000000-0000-4000-8000-000000000001',
+  'General',
+  'Workspaces that have not been filed under a category yet.'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Backfill: every workspace that predates categories -- and any row that has
+-- somehow ended up with none -- lands in the default category. Idempotent, so it
+-- doubles as a self-heal on every boot.
+INSERT INTO public.namespace_category_members (namespace_id, category_id)
+SELECT n.id, '00000000-0000-4000-8000-000000000001'
+  FROM public.namespaces n
+ WHERE NOT EXISTS (
+   SELECT 1 FROM public.namespace_category_members m WHERE m.namespace_id = n.id
+ )
+ON CONFLICT DO NOTHING;
 `;
+
+/**
+ * Id of the built-in default category. Fixed (not random) so the backfill in
+ * {@link REGISTRY_TABLE_DDL}, the service invariant and any operator query all
+ * name the same row. It cannot be deleted; workspaces left without a category
+ * fall back to it.
+ */
+export const DEFAULT_CATEGORY_ID = '00000000-0000-4000-8000-000000000001';
 
 /** libpq `options` value that pins a connection's search_path to `public`. */
 export const PUBLIC_SEARCH_PATH_OPTION = '-c search_path=public';

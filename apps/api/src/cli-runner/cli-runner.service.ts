@@ -21,6 +21,7 @@ import {
 } from '../correlation/correlation.constants';
 import { AUTO_SCHEDULE_QUEUE } from '../scheduler/auto-schedule.constants';
 import { ClsService } from 'nestjs-cls';
+import { NamespaceRegistryService } from '../registry/namespace-registry.service';
 import { CLS_SCHEMA, CLS_NAMESPACE_ID } from '../namespace/namespace.constants';
 import {
   buildNamespaceApiBaseUrl,
@@ -125,6 +126,15 @@ const TERMINAL_RUNNER_STATUSES = new Set<RunnerStatus>([
  */
 const DEFAULT_MAX_CONCURRENT_RUNNERS = 2;
 
+/**
+ * How long a RUNNING runner may have no execution before it counts as orphaned.
+ *
+ * Covers the gap between claiming a runner and its Kubernetes Job existing:
+ * a Job create plus the write-back of its name, which an image pull or a busy
+ * API server can stretch well past a second.
+ */
+const RUNNER_LAUNCH_GRACE_MS = 2 * 60 * 1000;
+
 @Injectable()
 export class CliRunnerService {
   private readonly logger = new Logger(CliRunnerService.name);
@@ -150,6 +160,11 @@ export class CliRunnerService {
     private pgBossService?: PgBossService,
     @Optional()
     private cls?: ClsService,
+    // Must stay a value import (see the import above): a `import type` here
+    // makes Nest inject undefined and the concurrency cap quietly reverts to
+    // per-namespace, which is the bug this dependency exists to fix.
+    @Optional()
+    private namespaceRegistry?: NamespaceRegistryService,
   ) {}
 
   /** Current namespace UUID from CLS, if running within a namespace context. */
@@ -365,7 +380,19 @@ export class CliRunnerService {
    */
   async reconcileStaleInFlight(): Promise<number> {
     const inFlight = await this.prisma.runner.findMany({
-      where: { status: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] } },
+      // RUNNING only. PENDING is excluded on purpose: a queued runner has no
+      // execution *by design* -- that is what PENDING means -- so "is its
+      // execution still there?" is not a question that applies to it.
+      //
+      // Including it made the queue unusable. Both callers reconcile at
+      // precisely the moment runners are queued (auto-schedule only when
+      // `budget <= 0`, and startRun before admitting another), every PENDING
+      // row has a null jobName, and isRunnerExecutionActive() reads a null
+      // jobName as "gone" -- so a runner that had correctly waited its turn was
+      // failed within a minute with "its execution no longer exists". Observed
+      // in classifyre-dev: five runs killed 30-95s after trigger, all with a
+      // null job_name and a null started_at, i.e. none of them had ever run.
+      where: { status: RunnerStatus.RUNNING },
       select: {
         id: true,
         sourceId: true,
@@ -373,17 +400,25 @@ export class CliRunnerService {
         executionMode: true,
         jobName: true,
         jobNamespace: true,
+        triggeredAt: true,
+        startedAt: true,
       },
     });
 
     let retired = 0;
     for (const runner of inFlight) {
       if (await this.isRunnerExecutionActive(runner)) continue;
+      // A managed runner is flipped to RUNNING before its Job exists, so there
+      // is a window where "no jobName" means "still launching" rather than
+      // "vanished". Retiring it there would be the same bug one status along.
+      if (!runner.jobName && this.isWithinLaunchGrace(runner)) continue;
       retired += 1;
       await this.markRunnerAsOrphaned(
         runner.id,
         runner.sourceId,
-        'Runner was orphaned (its execution no longer exists)',
+        runner.jobName
+          ? 'Runner was orphaned (its execution no longer exists)'
+          : 'Runner was orphaned (it never started an execution)',
       );
     }
     if (retired > 0) {
@@ -608,6 +643,26 @@ export class CliRunnerService {
     return state;
   }
 
+  /**
+   * Is this runner still inside the window where having no execution is normal?
+   *
+   * `dequeueNextPendingRunner` marks a runner RUNNING and only then creates the
+   * Job and writes `jobName` back, so between those two points a perfectly
+   * healthy run looks exactly like a vanished one. The gap is normally
+   * milliseconds, but a slow API server or a contended node stretches it, and
+   * the reconcile tick is not synchronised with it. Genuine launch failures
+   * take the normal error path with a real message, so this only delays
+   * retiring a runner whose process died mid-launch -- until the next tick.
+   */
+  private isWithinLaunchGrace(runner: {
+    triggeredAt?: Date | null;
+    startedAt?: Date | null;
+  }): boolean {
+    const launchedAt = runner.startedAt ?? runner.triggeredAt;
+    if (!launchedAt) return true;
+    return Date.now() - launchedAt.getTime() < RUNNER_LAUNCH_GRACE_MS;
+  }
+
   private async isRunnerExecutionActive(
     runner: ActiveExecutionRecord,
   ): Promise<boolean> {
@@ -627,10 +682,17 @@ export class CliRunnerService {
             runner.jobNamespace || undefined,
           );
         } catch (error) {
+          // Assume alive. `isJobActive` already answers "not found" as a clean
+          // false, so reaching here means the *question* failed, not that the
+          // Job is gone -- an API server timeout, a throttle, a dropped
+          // connection. Answering false there turns a blip in the control plane
+          // into a failed scan, and the caller acts on it destructively. The
+          // next tick asks again; a genuinely dead Job is retired then.
           this.logger.warn(
-            `Failed to reconcile Kubernetes runner ${runner.id}: ${String(error)}`,
+            `Failed to reconcile Kubernetes runner ${runner.id}, assuming it is ` +
+              `still active until the next check: ${String(error)}`,
           );
-          return false;
+          return true;
         }
       }
       case RunnerExecutionMode.EXTERNAL:
@@ -709,6 +771,8 @@ export class CliRunnerService {
           executionMode: true,
           jobName: true,
           jobNamespace: true,
+          triggeredAt: true,
+          startedAt: true,
         },
       });
 
@@ -745,6 +809,13 @@ export class CliRunnerService {
       if (await this.isRunnerExecutionActive(runner)) {
         continue;
       }
+      // Same launch window as reconcileStaleInFlight: RUNNING is set before the
+      // Job exists, so a run that is merely still starting must not be read as
+      // one that has died. At startup a genuinely stranded runner is older than
+      // the grace period anyway, and anything newer is retired on the next pass.
+      if (!runner.jobName && this.isWithinLaunchGrace(runner)) {
+        continue;
+      }
 
       repairedSources += 1;
       await this.markRunnerAsOrphaned(
@@ -765,6 +836,21 @@ export class CliRunnerService {
     triggeredBy?: string,
     forceFullRescan = false,
   ) {
+    // Before refusing with "already has a running scan", make sure the scan it
+    // is talking about still exists. A runner whose Job has vanished keeps the
+    // source pinned to RUNNING for good, and the operator sees a conflict on a
+    // source that is provably idle — which is indistinguishable from the source
+    // genuinely being busy. `reconcileStaleInFlight` verifies rather than
+    // trusts, and no-ops when everything really is running, so this costs one
+    // lookup on the path where a human is already waiting.
+    await this.reconcileStaleInFlight().catch((error: unknown) => {
+      // Never block a legitimate start because the check itself failed.
+      this.logger.warn(
+        `Pre-start reconciliation failed for source ${sourceId}: ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+
     const executionMode = this.resolveManagedExecutionMode();
     const { source, runner, hasSuccessfulRuns, previousSourceState } =
       await this.prisma.$transaction(async (tx) => {
@@ -4186,10 +4272,41 @@ export class CliRunnerService {
   private async canStartNewRunner(): Promise<boolean> {
     const limit = this.resolveMaxConcurrentRunners();
     if (limit === 0) return true;
-    const running = await this.prisma.runner.count({
+    return (await this.countRunningRunners()) < limit;
+  }
+
+  /**
+   * Running scans across the whole deployment, not just the calling namespace.
+   *
+   * `this.prisma` is a CLS-resolving proxy onto the current tenant's schema, so
+   * counting through it answered "runners running in THIS workspace" while the
+   * limit it was compared against was documented as instance-wide. Four
+   * workspaces turned MAX_CONCURRENT_RUNNERS=2 into eight concurrent scans on
+   * one node -- the cap read as enforced right up until the node died.
+   *
+   * Falls back to the scoped count when the registry is absent (desktop, unit
+   * tests), where there is exactly one schema and the two agree by construction.
+   */
+  private async countRunningRunners(): Promise<number> {
+    if (this.namespaceRegistry) {
+      try {
+        return await this.namespaceRegistry.countRowsAcrossNamespaces(
+          'runners',
+          `status = '${RunnerStatus.RUNNING}'`,
+        );
+      } catch (error) {
+        // Deliberately not falling through to the scoped count: that would
+        // under-report and let the cap be exceeded exactly when the database is
+        // already struggling. Refusing to start more work is the safe answer.
+        this.logger.warn(
+          `Cross-namespace runner count failed, holding new runners: ${String(error)}`,
+        );
+        return Number.MAX_SAFE_INTEGER;
+      }
+    }
+    return this.prisma.runner.count({
       where: { status: RunnerStatus.RUNNING },
     });
-    return running < limit;
   }
 
   private async dequeueNextPendingRunner(): Promise<void> {

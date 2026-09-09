@@ -5,12 +5,16 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**namespacesControllerCreate**](NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations) |
+| [**namespacesControllerCreateCategory**](NamespacesApi.md#namespacescontrollercreatecategory) | **POST** /namespaces/categories | Create a workspace category |
 | [**namespacesControllerGet**](NamespacesApi.md#namespacescontrollerget) | **GET** /namespaces/{id} | Get a namespace by id |
 | [**namespacesControllerList**](NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List all namespaces |
+| [**namespacesControllerListCategories**](NamespacesApi.md#namespacescontrollerlistcategories) | **GET** /namespaces/categories | List workspace categories with workspace counts |
 | [**namespacesControllerRemove**](NamespacesApi.md#namespacescontrollerremove) | **DELETE** /namespaces/{id} | Soft-delete a namespace (hidden from listings; data retained) |
+| [**namespacesControllerRemoveCategory**](NamespacesApi.md#namespacescontrollerremovecategory) | **DELETE** /namespaces/categories/{categoryId} | Delete a category (its workspaces fall back to the default category) |
 | [**namespacesControllerStats**](NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing) |
 | [**namespacesControllerThumbnail**](NamespacesApi.md#namespacescontrollerthumbnail) | **GET** /namespaces/{id}/thumbnail | Stream a namespace\&#39;s thumbnail image |
 | [**namespacesControllerUpdate**](NamespacesApi.md#namespacescontrollerupdate) | **PATCH** /namespaces/{id} | Update a namespace |
+| [**namespacesControllerUpdateCategory**](NamespacesApi.md#namespacescontrollerupdatecategory) | **PATCH** /namespaces/categories/{categoryId} | Rename or re-describe a workspace category |
 
 
 
@@ -35,6 +39,63 @@ async function example() {
 
   try {
     const data = await api.namespacesControllerCreate();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## namespacesControllerCreateCategory
+
+> namespacesControllerCreateCategory()
+
+Create a workspace category
+
+### Example
+
+```ts
+import {
+  Configuration,
+  NamespacesApi,
+} from '@workspace/api-client';
+import type { NamespacesControllerCreateCategoryRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new NamespacesApi();
+
+  try {
+    const data = await api.namespacesControllerCreateCategory();
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -193,6 +254,63 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## namespacesControllerListCategories
+
+> namespacesControllerListCategories()
+
+List workspace categories with workspace counts
+
+### Example
+
+```ts
+import {
+  Configuration,
+  NamespacesApi,
+} from '@workspace/api-client';
+import type { NamespacesControllerListCategoriesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new NamespacesApi();
+
+  try {
+    const data = await api.namespacesControllerListCategories();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## namespacesControllerRemove
 
 > namespacesControllerRemove(id)
@@ -235,6 +353,71 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## namespacesControllerRemoveCategory
+
+> namespacesControllerRemoveCategory(categoryId)
+
+Delete a category (its workspaces fall back to the default category)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  NamespacesApi,
+} from '@workspace/api-client';
+import type { NamespacesControllerRemoveCategoryRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new NamespacesApi();
+
+  const body = {
+    // string
+    categoryId: categoryId_example,
+  } satisfies NamespacesControllerRemoveCategoryRequest;
+
+  try {
+    const data = await api.namespacesControllerRemoveCategory(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **categoryId** | `string` |  | [Defaults to `undefined`] |
 
 ### Return type
 
@@ -422,6 +605,71 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## namespacesControllerUpdateCategory
+
+> namespacesControllerUpdateCategory(categoryId)
+
+Rename or re-describe a workspace category
+
+### Example
+
+```ts
+import {
+  Configuration,
+  NamespacesApi,
+} from '@workspace/api-client';
+import type { NamespacesControllerUpdateCategoryRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new NamespacesApi();
+
+  const body = {
+    // string
+    categoryId: categoryId_example,
+  } satisfies NamespacesControllerUpdateCategoryRequest;
+
+  try {
+    const data = await api.namespacesControllerUpdateCategory(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **categoryId** | `string` |  | [Defaults to `undefined`] |
 
 ### Return type
 
