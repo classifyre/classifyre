@@ -37,7 +37,13 @@ default() {
 : "${PORT_HTTP:=3000}"
 : "${API_PORT:=8000}"
 : "${WEB_PORT:=3100}"
+: "${TEMP_DIR:=/var/lib/classifyre/tmp}"
+: "${RUNNER_LOG_DIR:=/var/lib/classifyre/runner-logs}"
+: "${UV_CACHE_DIR:=/cache/uv}"
+: "${EMBEDDING_CACHE_DIR:=/opt/classifyre/models}"
+: "${PLAYWRIGHT_BROWSERS_PATH:=/var/lib/classifyre/playwright}"
 export PG_MAJOR PGDATA PGPORT POSTGRES_USER POSTGRES_DB PORT_HTTP API_PORT WEB_PORT
+export TEMP_DIR RUNNER_LOG_DIR UV_CACHE_DIR EMBEDDING_CACHE_DIR PLAYWRIGHT_BROWSERS_PATH
 
 # ── Detect the memory limit ───────────────────────────────────────────────────
 # cgroup v2 first, then v1, then the host. A cgroup file can hold "max", and an
@@ -124,7 +130,15 @@ POOL_WORKERS=$(( CPUS > 4 ? 4 : (CPUS < 1 ? 1 : CPUS) ))
 if [ -z "${NODE_OPTIONS:-}" ]; then
   export NODE_OPTIONS="--max-old-space-size=${CLASSIFYRE_NODE_HEAP_MB:-${HEAP_MB}}"
 fi
-EFFECTIVE_HEAP_MB="${CLASSIFYRE_NODE_HEAP_MB:-${HEAP_MB}}"
+
+# Read the ceiling back out of NODE_OPTIONS rather than assuming what we would
+# have chosen. An operator who sets NODE_OPTIONS directly — the documented way
+# to pass any V8 flag — otherwise gets a backpressure guard sized for a heap
+# that is not the one V8 will enforce, which is precisely the mismatch the
+# check below exists to catch.
+EFFECTIVE_HEAP_MB="$(printf '%s' "${NODE_OPTIONS}" \
+  | sed -n 's/.*--max-old-space-size[= ]\([0-9][0-9]*\).*/\1/p')"
+: "${EFFECTIVE_HEAP_MB:=${CLASSIFYRE_NODE_HEAP_MB:-${HEAP_MB}}}"
 
 # @fastify/under-pressure sheds ingestion when RSS crosses this. Its own default
 # is 1 GB, which is below our heap ceiling and would latch the API into
@@ -133,8 +147,20 @@ EFFECTIVE_HEAP_MB="${CLASSIFYRE_NODE_HEAP_MB:-${HEAP_MB}}"
 if [ -z "${UNDER_PRESSURE_MAX_RSS_BYTES:-}" ]; then
   api_share_mb=$(( TOTAL_MB - PG_SHARED_MB - 256 - 1536 - 256 ))
   rss_mb=$(( api_share_mb * 875 / 1000 ))
+
+  # Lift it clear of the heap ceiling, or the JS heap alone would trip the
+  # guard and shed every request.
   floor_mb=$(( EFFECTIVE_HEAP_MB * 5 / 4 ))
   [ "$rss_mb" -lt "$floor_mb" ] && rss_mb="$floor_mb"
+
+  # …but never above the container's own limit. A guard the process cannot
+  # reach is not a guard: it would be OOM-killed by the cgroup long before
+  # under-pressure said anything. Capping here is what lets the invariant
+  # below actually fail on a heap too large for the container, instead of the
+  # floor quietly raising the bar to meet it.
+  ceiling_mb=$(( TOTAL_MB * 9 / 10 ))
+  [ "$rss_mb" -gt "$ceiling_mb" ] && rss_mb="$ceiling_mb"
+
   export UNDER_PRESSURE_MAX_RSS_BYTES=$(( rss_mb * 1024 * 1024 ))
 fi
 
@@ -143,7 +169,7 @@ fi
 # ingestion endpoint 503s forever. Fail loudly instead of booting into that.
 guard_mb=$(( UNDER_PRESSURE_MAX_RSS_BYTES / 1024 / 1024 ))
 if [ "$EFFECTIVE_HEAP_MB" -ge "$guard_mb" ]; then
-  die "Node heap ceiling (${EFFECTIVE_HEAP_MB} MB) must be below UNDER_PRESSURE_MAX_RSS_BYTES (${guard_mb} MB), or the API will reject every scan callback. Lower CLASSIFYRE_NODE_HEAP_MB or raise UNDER_PRESSURE_MAX_RSS_BYTES."
+  die "Node heap ceiling (${EFFECTIVE_HEAP_MB} MB) must be below the RSS backpressure guard (${guard_mb} MB), or the API sheds every scan callback the moment the heap fills. This container has ${TOTAL_MB} MB: either lower the heap (CLASSIFYRE_NODE_HEAP_MB, or --max-old-space-size in NODE_OPTIONS) or give the container more memory."
 fi
 
 # UNDER_PRESSURE_MAX_HEAP_USED_BYTES is deliberately left unset: heap-guard.ts
