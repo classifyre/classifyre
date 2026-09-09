@@ -143,7 +143,9 @@ export class PgBossService implements OnApplicationShutdown {
       );
       const released = rows?.rows?.length ?? 0;
       if (released > 0) {
-        const names = [...new Set(rows.rows.map((r: { name: string }) => r.name))];
+        const names = [
+          ...new Set(rows.rows.map((r: { name: string }) => r.name)),
+        ];
         this.logger.warn(
           `Released ${released} abandoned pg-boss job(s) in '${schema}' left ` +
             `active by a terminated worker (${names.join(', ')}). Those queues ` +

@@ -354,17 +354,17 @@ test("an absolute folder path is accepted", async ({ mount }) => {
   );
 });
 
-test("the browse button is hidden outside the desktop app", async ({
-  mount,
-}) => {
-  // window.electronAPI is exposed only by the desktop preload script, so in a
-  // browser the field degrades to plain text rather than offering a control
-  // that cannot work.
+test("a folder path is a plain text field", async ({ mount }) => {
+  // The path is resolved where the scan runs — inside the container, or in a
+  // CLI job pod — so there is nothing on this machine for a picker to browse.
   const component = await mount(
     <LocalFolders
       folders={[{ name: "dumps", path: "/data/dumps" }]}
       onChange={() => undefined}
     />,
+  );
+  await expect(component.getByTestId("input-folder-path-0")).toHaveValue(
+    "/data/dumps",
   );
   await expect(component.getByTestId("browse-folder-path-0")).toHaveCount(0);
 });

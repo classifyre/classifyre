@@ -201,8 +201,13 @@ api:
     ENVIRONMENT: kubernetes
     # -- Temporary directory used by API.
     TEMP_DIR: /tmp
-    # -- Filesystem directory for runner execution logs (filesystem backend only; unused when S3 is configured).
-    RUNNER_LOGS_DIR: /var/lib/classifyre/runner-logs
+    # RUNNER_LOG_DIR is deliberately NOT set here. The filesystem log backend
+    # writes to a directory local to one pod, and nothing in this chart mounts a
+    # shared volume for it — so on Kubernetes the logs would die with the pod and
+    # be invisible to the other API replica, while the UI reported them as
+    # persisted. Set objectStorage.enabled to keep scan logs after a run. (This
+    # value used to be spelled RUNNER_LOGS_DIR, which the API never read, so it
+    # had silently done nothing at all.)
     # -- Maximum number of completed/failed runs to keep per source. Older runs are
     # -- deleted (including their logs) when a new run is triggered and the count
     # -- exceeds this value. Set to "0" to disable cleanup.
@@ -272,8 +277,8 @@ api:
   # Data on disk that folder-backed sources read: the "Mounted Folder" source
   # type, and a CUSTOM notebook's `ctx.folder("name")`.
   #
-  # On desktop the folder is a path on the user's own machine and they pick it
-  # with a file dialog. In Kubernetes the machine that runs a scan is an
+  # With the all-in-one Docker image the folder is simply bind-mounted into the
+  # container. In Kubernetes the machine that runs a scan is an
   # ephemeral CLI job pod, so the data has to be mounted into that pod — and
   # this is where you say so. Each entry becomes one volume plus one volumeMount
   # on every CLI job pod, which covers scans, notebook runs and connection
@@ -282,7 +287,7 @@ api:
   #
   # After mounting, create the source in the UI and type the `mountPath` as its
   # folder path (e.g. `/mnt/corpora/invoices`). Nothing else is needed — the
-  # same config works on desktop and in the cluster.
+  # same config works in the container and in the cluster.
   #
   # Each entry is `{name, mountPath, readOnly?}` plus EXACTLY ONE Kubernetes
   # volume source (`persistentVolumeClaim`, `configMap`, `secret`, `hostPath`,
@@ -820,8 +825,8 @@ frontend:
     # Off by default: a Classifyre instance is normally private and reached
     # only by people who already have a contract with its operator, where a
     # public-website consent bar is noise. Turn it on for deliberately public
-    # deployments — the demo instance does (see values-vps.yaml). The desktop
-    # app never shows it: that build ships no analytics at all.
+    # deployments — the demo instance does (see values-vps.yaml). The
+    # all-in-one image never shows it: it ships no analytics at all.
     #
     # Turning it on does not, by itself, make a deployment compliant: the
     # operator of the instance is the data controller and is responsible for

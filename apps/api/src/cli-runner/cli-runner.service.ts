@@ -174,7 +174,7 @@ export class CliRunnerService {
 
   /**
    * `DATABASE_URL` scoped to the current namespace schema, for the spawned CLI
-   * (local/desktop) so any direct DB access it does lands in the tenant schema.
+   * (local subprocess) so any direct DB access it does lands in the tenant schema.
    */
   private namespacedDatabaseUrl(): string | undefined {
     const schema = this.cls?.get<string>(CLS_SCHEMA);
@@ -1629,7 +1629,7 @@ export class CliRunnerService {
 
     switch (environment) {
       case 'development':
-      case 'desktop':
+      case 'docker':
         return resolveCliPath(configuredPath || defaultDevelopmentCliPath);
       case 'kubernetes':
         throw new Error('Kubernetes CLI execution must use a Kubernetes Job');
@@ -1639,9 +1639,8 @@ export class CliRunnerService {
   }
 
   private getVenvPath(environment: string): string {
-    // Desktop (and any custom deployment) passes the venv location explicitly —
-    // there the venv does NOT live at <cli>/.venv (it's relocated to a
-    // writable per-user dir at first launch).
+    // A deployment may keep the virtualenv somewhere other than <cli>/.venv and
+    // says so with VENV_PATH.
     if (process.env.VENV_PATH) {
       return path.normalize(process.env.VENV_PATH);
     }
@@ -4255,8 +4254,8 @@ export class CliRunnerService {
    * Deployment-wide rather than per-workspace: two scans contend for the same
    * cores whichever workspace started them, so the budget belongs to whoever
    * owns the machine. `MAX_CONCURRENT_RUNNERS` is set by the Helm chart on
-   * Kubernetes and by the desktop app's settings window
-   * (apps/desktop/src/main/process-manager.ts) — it used to also be a
+   * Kubernetes, and derived from the container's CPU and memory limits by the
+   * all-in-one image (docker/entrypoint.sh) — it used to also be a
    * per-workspace row in instance_settings, but that control was inert on
    * every real deployment because the environment variable always won.
    */
@@ -4284,7 +4283,7 @@ export class CliRunnerService {
    * workspaces turned MAX_CONCURRENT_RUNNERS=2 into eight concurrent scans on
    * one node -- the cap read as enforced right up until the node died.
    *
-   * Falls back to the scoped count when the registry is absent (desktop, unit
+   * Falls back to the scoped count when the registry is absent (single-host, unit
    * tests), where there is exactly one schema and the two agree by construction.
    */
   private async countRunningRunners(): Promise<number> {

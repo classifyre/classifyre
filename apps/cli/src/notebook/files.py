@@ -59,7 +59,7 @@ class ParsedContent:
 
 
 def local_folders(recipe: dict[str, Any]) -> dict[str, str]:
-    """The desktop-only folders a source declared, as ``{name: path}``.
+    """The folders a source declared, as ``{name: path}``.
 
     Read straight from the recipe rather than handed over separately: unlike an
     uploaded file there is nothing to fetch, only a path the notebook may open.

@@ -223,7 +223,7 @@ class AugmentationSession:
             if not path.is_dir():
                 raise ChildProcessError(
                     f"Local folder {entry.get('name')!r} points at {path}, which is not "
-                    "a directory. Local folders are only available in the desktop application."
+                    "a directory. The folder must be mounted where the scan runs."
                 )
 
     async def _slot(self, index: int) -> _ChildSlot:

@@ -79,7 +79,7 @@ slower, and `multilingual-e5-small` is the one to pick for a corpus that is not
 mostly English.
 
 <Callout type="info">
-  The packaged desktop app ships one pinned model and runs offline. It cannot
+  The all-in-one Docker image ships one pinned model and runs offline. It cannot
   download a different local model — the settings page says so when that
   applies. Use a remote provider there, or run a deployment that permits model
   downloads.
@@ -240,7 +240,7 @@ rarely a reason to change them without a measured problem.
 Every setting on this page has a **deployment default** underneath it:
 
 - On **Kubernetes**, from the Helm chart's `api.embedding` values.
-- In the **desktop app**, from the bundled defaults sized to the machine.
+- In the **all-in-one Docker image**, from the baked-in defaults sized to the container.
 
 The page shows that default under any setting you have overridden, along with
 **Use default** to return to it. An override applies to **one workspace** —

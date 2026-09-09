@@ -100,8 +100,18 @@ updates:
         update-types: [minor, patch]
 
   # ── Docker ──────────────────────────────────────────────────────────────────
+  # Both Dockerfiles in one update config, so their base-image bumps arrive as a
+  # single PR rather than two that have to be reviewed against each other:
+  #   /         the three service images (api, web, cli) built for Kubernetes
+  #   /docker   the all-in-one image, which is composed from those three
+  # The all-in-one pins Node, Caddy, uv and Python as literal `FROM` tags for
+  # exactly this reason. Its s6-overlay and PostgreSQL versions are ARGs
+  # Dependabot cannot reach (a release tarball and an apt repository) — those
+  # are tracked by hand, and called out in docker/Dockerfile.
   - package-ecosystem: docker
-    directory: /
+    directories:
+      - /
+      - /docker
     target-branch: develop
     schedule:
       interval: weekly
@@ -113,6 +123,16 @@ updates:
     groups:
       docker-non-major:
         update-types: [minor, patch]
+    ignore:
+      # The Python and Node majors are load-bearing, not preferences: the CLI's
+      # virtualenv is built against Python 3.12, and the API's native addons
+      # (Prisma's query engine, onnxruntime) are compiled for Node 24's ABI.
+      # Patch and minor bumps are wanted; a major has to change the service
+      # images first, deliberately.
+      - dependency-name: python
+        update-types: ["version-update:semver-major"]
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
 
   # ── Helm: classifyre ────────────────────────────────────────────────────────
   - package-ecosystem: helm

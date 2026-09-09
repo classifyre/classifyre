@@ -5,7 +5,7 @@
  *   pollers are not started (jobs can still be enqueued).
  * - `worker`: runs the background workers (the HTTP server still starts, so
  *   /ping probes work).
- * - `all` (default): both — used by desktop and local dev, where a single
+ * - `all` (default): both — used by the all-in-one image and local dev, where a single
  *   process is the whole deployment.
  */
 export type ServiceRole = 'api' | 'worker' | 'all';

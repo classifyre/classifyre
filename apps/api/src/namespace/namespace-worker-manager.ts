@@ -99,7 +99,6 @@ export class NamespaceWorkerManager
     }
 
     for (const ns of await this.registry.list()) {
-      if (ns.type !== 'local') continue;
       await this.start({
         namespaceId: ns.id,
         slug: ns.slug,
@@ -336,16 +335,14 @@ export class NamespaceWorkerManager
       return;
     }
     const local = new Map<string, NamespaceContext>(
-      namespaces
-        .filter((ns) => ns.type === 'local')
-        .map((ns) => [
-          ns.schemaName,
-          this.store({
-            namespaceId: ns.id,
-            slug: ns.slug,
-            schemaName: ns.schemaName,
-          }),
-        ]),
+      namespaces.map((ns) => [
+        ns.schemaName,
+        this.store({
+          namespaceId: ns.id,
+          slug: ns.slug,
+          schemaName: ns.schemaName,
+        }),
+      ]),
     );
 
     try {

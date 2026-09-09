@@ -11,18 +11,20 @@ import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote }
 <SourceFacts type="LOCAL_FOLDER" />
 
 The simplest source there is: point Classifyre at a **folder** and it scans what
-is in it. On the desktop application that's a folder on your own machine; in
-Kubernetes it's a volume mounted into the cluster — a file share, a NAS export,
-a migrated archive.
+is in it. With the [all-in-one Docker image](/deployment/docker/) that's a
+directory you bind-mount from your own machine; in Kubernetes it's a volume
+mounted into the cluster — a file share, a NAS export, a migrated archive.
 
 ## What you need to connect
 
-A **path**, as seen by the machine running the scan. There are no credentials:
-the scan reads the filesystem with the permissions of the process doing the
-scanning — the desktop app's, or the scan job's in the cluster. That's the whole
-security model, and it's worth being deliberate about which folders you expose.
+A **path, as the scan sees it** — not as your file browser sees it. With Docker
+that is the container-side path of a bind mount (`-v ~/case-files:/data/case-files:ro`
+means you enter `/data/case-files`); in Kubernetes it is the `mountPath` the
+chart's `api.localFolders` gave it.
 
-In the desktop application you pick the folder with a normal file browser.
+There are no credentials: the scan reads the filesystem with the permissions of
+the process doing the scanning. That's the whole security model, so be
+deliberate about which folders you expose — and mount them read-only.
 
 ## What Classifyre reads
 

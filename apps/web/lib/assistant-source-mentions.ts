@@ -29,7 +29,7 @@ export interface SourceMentionInput {
   cells: NotebookCell[] | null;
   /** Files attached to the source, uploaded or still pending. */
   files: Array<{ name: string; detail?: string }>;
-  /** Folders on the machine running the app (desktop only). */
+  /** Folders mounted into the machine that runs the scan. */
   localFolders: NotebookLocalFolder[];
   /** The detector selection currently on the form. */
   detectors: DetectorConfigInput[];
@@ -93,7 +93,7 @@ export function buildSourceMentions(
       body: [
         `Local folder "${folder.name}" is configured on this source at ${folder.path}.`,
         'Read it in the notebook with ctx.folder("' + folder.name + '").',
-        "Desktop only: a Kubernetes deployment has no such machine.",
+        "The path is resolved where the scan runs, so it must be mounted there.",
       ].join("\n"),
     });
   }

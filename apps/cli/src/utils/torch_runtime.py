@@ -5,9 +5,9 @@ generates C++ and shells out to a compiler *at scan time*. That is a poor fit
 for how this CLI is deployed, in two independent ways:
 
 1. It needs a working C++ toolchain on the machine running the scan. Neither
-   the desktop bundle nor a slim container image promises one.
+   a packaged bundle nor a slim container image promises one.
 2. Inductor builds the compiler command line without quoting its paths, so any
-   path containing a space breaks it. The desktop venv lives under
+   path containing a space breaks it. A venv living under
    ``~/Library/Application Support/…``, which produces exactly that:
 
        clang++: error: no such file or directory:

@@ -28,7 +28,7 @@ export class CaseworkCaseDto {
   @ApiProperty({
     enum: Severity,
     description:
-      'How much this case matters — a priority level, not a threat level. Distinct from a finding\'s importance score, which is the ranking pass\'s output.',
+      "How much this case matters — a priority level, not a threat level. Distinct from a finding's importance score, which is the ranking pass's output.",
   })
   severity: Severity;
 
@@ -69,7 +69,9 @@ export class CaseworkInquiryDto {
   @ApiProperty()
   matchCount: number;
 
-  @ApiProperty({ description: 'Matches that appeared since the inquiry was last viewed.' })
+  @ApiProperty({
+    description: 'Matches that appeared since the inquiry was last viewed.',
+  })
   newMatchCount: number;
 
   @ApiProperty()
@@ -102,7 +104,9 @@ export class CaseworkInquiriesDto {
 }
 
 export class CaseworkLeadsDto {
-  @ApiProperty({ description: 'Leads proposed and not yet accepted or dismissed.' })
+  @ApiProperty({
+    description: 'Leads proposed and not yet accepted or dismissed.',
+  })
   proposed: number;
 }
 

@@ -114,7 +114,6 @@ export function CreateNamespaceDialog({
   };
 
   const finish = (namespace: Namespace) => {
-    window.electronAPI?.notifyNamespacesChanged();
     toast.success(t("workspaces.createSuccess", { name: namespace.name }));
     onCreated(namespace);
     onOpenChange(false);
@@ -157,7 +156,6 @@ export function CreateNamespaceDialog({
         return;
       }
 
-      window.electronAPI?.notifyNamespacesChanged();
       setSubmitting(false);
     } catch (error) {
       toast.error(

@@ -192,7 +192,7 @@ recorded collation version no longer matches the OS library.
 
 **This is not fixed by a Prisma migration.** Migrations run automatically on API
 startup (`CLASSIFYRE_AUTO_MIGRATE`) inside a transaction and on every
-deployment including fresh desktop databases — `REINDEX DATABASE` is far too
+deployment including fresh single-container databases — `REINDEX DATABASE` is far too
 heavy and takes locks that must not run at boot, and `REFRESH COLLATION
 VERSION` alone only silences the warning without repairing any index whose sort
 order actually shifted. Run it as a deliberate one-off operation instead:

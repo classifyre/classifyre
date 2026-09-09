@@ -2,7 +2,7 @@
  * Retry policy shared by the generated client and the hand-written fetches.
  *
  * The API answers a momentarily unavailable database with `503` +
- * `Retry-After` (see `PrismaExceptionFilter`), and the desktop app's local API
+ * `Retry-After` (see `PrismaExceptionFilter`), and a single-host API
  * can refuse connections outright for a second or two while it boots. Both used
  * to reach the UI as a hard "Failed to load …" on the overview pages, which
  * a single retry a few hundred milliseconds later would have avoided.

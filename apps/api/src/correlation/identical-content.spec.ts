@@ -68,10 +68,10 @@ describe('exact duplicate linking from the content hash', () => {
   const resetPrismaMocks = () => {
     for (const value of Object.values(prisma)) {
       if (typeof value === 'function') {
-        (value as jest.Mock).mockReset();
+        value.mockReset();
         continue;
       }
-      for (const fn of Object.values(value)) (fn as jest.Mock).mockReset();
+      for (const fn of Object.values(value)) fn.mockReset();
     }
   };
 

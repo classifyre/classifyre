@@ -8,7 +8,6 @@
 import type { Metadata } from "next";
 
 import { entityMetadata, sectionMetadata, siteMetadata } from "./seo-metadata";
-import { DYNAMIC_ID_SENTINEL } from "./dynamic-route";
 
 // Deliberately not a *.classifyre.com host: the defect being pinned was a
 // self-hosted instance declaring the marketing domain as its own canonical.
@@ -125,7 +124,7 @@ describe("seo metadata", () => {
       });
 
       expect(unresolved.title).toBe(generic.title);
-      expect(unresolved.title).not.toContain(DYNAMIC_ID_SENTINEL);
+      expect(unresolved.title).not.toContain("abc");
     });
 
     it("translates the entity template", async () => {

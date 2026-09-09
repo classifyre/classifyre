@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 const DESTINATIONS: Array<{ name: string; blurb: string; href: string }> = [
   {
     name: "Install Classifyre",
-    blurb: "The desktop app, or the Helm chart on Kubernetes.",
+    blurb: "The all-in-one Docker image, or the Helm chart on Kubernetes.",
     href: "/deployment/",
   },
   {

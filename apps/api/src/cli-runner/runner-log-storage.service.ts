@@ -38,7 +38,8 @@ interface StoredLogObject {
 /**
  * Persistence backend for per-run NDJSON log objects.
  * Two implementations: S3-compatible object storage and the local filesystem
- * (used by the desktop app, where no object storage exists).
+ * (the default for the all-in-one Docker image, and for any deployment that
+ * has not configured S3_BUCKET).
  */
 interface LogObjectStore {
   /** Overwrite the whole object for a run with the given NDJSON content. */
@@ -173,7 +174,7 @@ class S3LogObjectStore implements LogObjectStore {
   }
 }
 
-// ── Local filesystem store (desktop) ───────────────────────────────────────
+// ── Local filesystem store (RUNNER_LOG_DIR) ────────────────────────────────
 
 class LocalFileLogObjectStore implements LogObjectStore {
   constructor(private readonly rootDir: string) {}

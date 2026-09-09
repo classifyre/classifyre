@@ -102,7 +102,7 @@ export function SiteFooter({
      actions that live as buttons up there (Demo, GitHub). */
   const navigation: readonly FooterLink[] = [
     { label: "Home", href: marketing(marketingPaths.home) },
-    { label: "Download & install", href: marketing(marketingPaths.download) },
+    { label: "Get Classifyre", href: marketing(marketingPaths.get) },
     { label: "Sources", href: marketing(marketingPaths.sources) },
     {
       label: "Open source vs Enterprise",
@@ -156,7 +156,7 @@ export function SiteFooter({
           </p>
 
           <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
-            Desktop app · Kubernetes · Apache-2.0
+            Docker · Kubernetes · Apache-2.0
           </p>
         </div>
 

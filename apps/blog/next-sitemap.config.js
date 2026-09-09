@@ -54,9 +54,16 @@ const config = {
   changefreq: "weekly",
   priority: 0.7,
   sitemapSize: 5000,
-  exclude: ["/api/*", "/_next/*", "/404", "/500"],
+  exclude: ["/api/*", "/_next/*", "/404", "/500", "/download"],
   transform: async (config, route) => {
     if (route.includes("/_next/") || route.includes("/api/")) {
+      return null;
+    }
+
+    // /download is a noindex stub that only redirects to /get, kept for links
+    // that shipped before the rename. Advertising it would point crawlers at a
+    // page whose whole job is to send them somewhere else.
+    if (normalizeRoute(route) === "/download") {
       return null;
     }
 

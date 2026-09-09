@@ -59,8 +59,24 @@ Run the production Helm chart locally on k3d with Skaffold:
 ./scripts/dev/start.sh
 ```
 
-Open [http://localhost:3000](http://localhost:3000), or install the desktop app
-from the [latest release](https://github.com/classifyre/classifyre/releases/latest).
+Open [http://localhost:3000](http://localhost:3000).
+
+### Or just run the image
+
+To try Classifyre without a cluster, the all-in-one image carries the whole
+stack — API, web UI, scan workers and PostgreSQL — in one container:
+
+```bash
+docker run -d --name classifyre \
+  -p 3000:3000 --shm-size=1g \
+  -v classifyre-pgdata:/var/lib/postgresql/data \
+  -v classifyre-data:/var/lib/classifyre \
+  -v classifyre-uv-cache:/cache/uv \
+  classifyre/all-in-one:latest
+```
+
+See [`docker/README.md`](docker/README.md) for configuration, external
+databases, object storage and resource tuning.
 
 ## Production deployment
 
