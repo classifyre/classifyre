@@ -7,13 +7,6 @@ import { parseRunnerSocketPayload } from "@/lib/runner-ws-merge";
 import { useNamespace } from "@/components/namespace-provider";
 
 const getWebSocketUrl = () => {
-  if (
-    typeof window !== "undefined" &&
-    window.__CLASSIFYRE_DESKTOP__?.apiBaseUrl
-  ) {
-    return window.__CLASSIFYRE_DESKTOP__.apiBaseUrl;
-  }
-
   if (process.env.NEXT_PUBLIC_WS_URL) {
     return process.env.NEXT_PUBLIC_WS_URL;
   }

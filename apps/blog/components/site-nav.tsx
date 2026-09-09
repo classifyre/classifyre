@@ -21,7 +21,7 @@ export function SiteNav() {
         size="sm"
         className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
       >
-        <a href={routes.download}>Download</a>
+        <a href={routes.get}>Get Classifyre</a>
       </Button>
 
       <Button

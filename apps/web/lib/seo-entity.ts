@@ -11,16 +11,12 @@
  */
 
 import { apiBaseUrls } from "./api-upstream";
-import { DYNAMIC_ID_SENTINEL } from "./dynamic-route";
 
 /** Metadata must never be the slow part of a render. */
 const REQUEST_TIMEOUT_MS = 1_500;
 
 /** How long a resolved name is reused across requests (seconds). */
 const REVALIDATE_SECONDS = 60;
-
-/** The static export has no API to reach at build time. */
-const isDesktopBuild = process.env.DESKTOP_BUILD === "true";
 
 export type SeoEntityKind =
   | "source"
@@ -103,9 +99,7 @@ export async function seoEntityName(
   namespaceSlug: string | undefined,
   id: string | undefined,
 ): Promise<string | null> {
-  if (isDesktopBuild) return null;
-  if (!namespaceSlug || !id || id === DYNAMIC_ID_SENTINEL) return null;
-  if (namespaceSlug === DYNAMIC_ID_SENTINEL) return null;
+  if (!namespaceSlug || !id) return null;
 
   const encodedId = encodeURIComponent(id);
 

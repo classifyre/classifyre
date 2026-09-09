@@ -17,7 +17,6 @@ import {
   BreadcrumbSeparator,
 } from "@workspace/ui/components/breadcrumb";
 import { NotificationCenter } from "./notification-center";
-import { DesktopNotificationsBridge } from "./desktop-notifications-bridge";
 import { Button } from "@workspace/ui/components/button";
 import { BookOpen, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -390,16 +389,11 @@ export function DashboardLayout({
                   <LanguageSwitcher />
                   <ThemeToggle />
                   <NotificationCenter />
-                  <DesktopNotificationsBridge />
                   {/*
                   A plain <a>, not next/link: the documentation is a separate
                   Next app (apps/docs) exported into apps/web/public/docs, so
                   /docs is static files rather than a route in this router — a
-                  client-side navigation there would not resolve. Opens in a new
-                  tab in the browser; in the desktop app the URL becomes
-                  app://classifyre/docs/ and the main process opens it in its
-                  own window (see setWindowOpenHandler in
-                  apps/desktop/src/main/index.ts).
+                  client-side navigation there would not resolve.
                 */}
                   <Button
                     variant="ghost"

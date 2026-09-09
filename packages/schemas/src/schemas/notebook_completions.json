@@ -130,7 +130,7 @@
           "label": "folders",
           "kind": "property",
           "detail": "dict[str, Path]",
-          "documentation": "Folders this source was configured with, by name.\n\nThe paths are resolved on whatever machine runs the scan: this computer\non desktop, an ephemeral CLI job pod in Kubernetes. In a cluster the\nfolder has to be mounted into those pods first (the chart's\n``api.localFolders``); an unmounted path simply will not exist.",
+          "documentation": "Folders this source was configured with, by name.\n\nThe paths are resolved on whatever machine runs the scan: inside the\nall-in-one container, or an ephemeral CLI job pod in Kubernetes. Either\nway the folder has to be mounted there first (a bind mount, or the\nchart's ``api.localFolders``); an unmounted path simply will not exist.",
           "insertText": "folders"
         },
         {

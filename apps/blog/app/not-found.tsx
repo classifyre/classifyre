@@ -25,9 +25,9 @@ const DESTINATIONS: Array<{
   external?: boolean;
 }> = [
   {
-    title: "Download & install",
-    body: "The desktop app for macOS, Windows, and Linux, or the Helm chart for Kubernetes.",
-    href: routes.download,
+    title: "Get Classifyre",
+    body: "One Docker image on macOS, Windows, or Linux, or the Helm chart for Kubernetes.",
+    href: routes.get,
   },
   {
     title: "Documentation",

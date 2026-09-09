@@ -16,8 +16,8 @@ the only place the distinction can come from.
 .eml or a Parquet file is not connector logic, every other source in the system
 already delegates it to the same parser, and a notebook that had to reimplement
 it would get it wrong. It arrives with the files it operates on: ``ctx.files``
-for what was uploaded to the source, ``ctx.folder(...)`` for a folder on a
-desktop machine.
+for what was uploaded to the source, ``ctx.folder(...)`` for a folder mounted
+into the machine that runs the scan.
 """
 
 from __future__ import annotations
@@ -332,7 +332,7 @@ class Context:
         """Folders this source was configured with, by name.
 
         The paths are resolved on whatever machine runs the scan: this computer
-        on desktop, an ephemeral CLI job pod in Kubernetes. In a cluster the
+        inside the container, an ephemeral CLI job pod in Kubernetes. In a cluster the
         folder has to be mounted into those pods first (the chart's
         ``api.localFolders``); an unmounted path simply will not exist.
         """

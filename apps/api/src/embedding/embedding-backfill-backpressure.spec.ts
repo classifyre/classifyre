@@ -58,12 +58,12 @@ describe('embedding backfill backpressure', () => {
 
   beforeEach(() => {
     sleeps.length = 0;
-    (globalThis as unknown as { setTimeout: unknown }).setTimeout = ((
+    (globalThis as unknown as { setTimeout: unknown }).setTimeout = (
       fn: () => void,
     ) => {
       sleeps.push(fn);
       return 0;
-    }) as unknown as typeof setTimeout;
+    };
   });
   afterEach(() => {
     (globalThis as unknown as { setTimeout: unknown }).setTimeout =

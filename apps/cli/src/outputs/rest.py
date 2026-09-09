@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # The API has no user authentication, so the ingest endpoints are restricted to
 # callers holding this shared secret; the API injects it into every CLI job's
 # environment (Kubernetes job env, or inherited from the parent process on
-# desktop). Absent locally, where the API leaves the restriction disabled.
+# all-in-one image). Absent locally, where the API leaves the restriction disabled.
 INTERNAL_KEY_HEADER = "X-Classifyre-Internal-Key"
 
 

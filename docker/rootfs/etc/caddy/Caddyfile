@@ -1,0 +1,46 @@
+# One port in, two upstreams out.
+#
+# The route table mirrors the four ingresses the Helm chart creates
+# (helm/classifyre/templates/ingress-{api,web,mcp,socket}.yaml) so that a URL
+# means the same thing here as it does on a cluster. Keep them in step.
+
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+:{$PORT_HTTP:3000} {
+	encode zstd gzip
+
+	# Socket.IO: the /runners and /notifications gateways share the API's port.
+	# Must be matched before the /api rule — the browser connects to
+	# /socket.io/… at the site root, with no /api prefix.
+	@socketio path /socket.io /socket.io/*
+	handle @socketio {
+		reverse_proxy 127.0.0.1:{$API_PORT:8000}
+	}
+
+	# MCP is namespaced: POST /<workspace>/mcp, never a bare /mcp
+	# (apps/api/src/main.ts, and the namespace URL contract). A regexp rather
+	# than a path glob so it cannot swallow a deeper path that merely contains
+	# the segment.
+	@mcp path_regexp mcp ^/[^/]+/mcp(/.*)?$
+	handle @mcp {
+		reverse_proxy 127.0.0.1:{$API_PORT:8000}
+	}
+
+	# The REST API. Stripping /api leaves /<workspace>/<endpoint>, which is
+	# exactly what the API's namespace rewrite expects, and /api/ping reaches
+	# the health endpoint the container's HEALTHCHECK polls.
+	@api path /api /api/*
+	handle @api {
+		uri strip_prefix /api
+		reverse_proxy 127.0.0.1:{$API_PORT:8000}
+	}
+
+	# Everything else is the UI, which also serves the bundled docs at /docs.
+	handle {
+		reverse_proxy 127.0.0.1:{$WEB_PORT:3100}
+	}
+}

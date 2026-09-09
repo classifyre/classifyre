@@ -47,8 +47,6 @@ interface NamespaceRow {
   slug: string;
   schema_name: string;
   description: string | null;
-  type: string;
-  remote_url: string | null;
   has_thumbnail: boolean;
   settings: Record<string, unknown>;
   external_links: NamespaceExternalLink[] | null;
@@ -63,7 +61,7 @@ interface NamespaceRow {
  * boolean and the bytes are streamed separately by the thumbnail endpoint.
  */
 const NAMESPACE_COLUMNS = `
-  id, name, slug, schema_name, description, type, remote_url,
+  id, name, slug, schema_name, description,
   (thumbnail_blob IS NOT NULL) AS has_thumbnail,
   settings, external_links, created_at, updated_at, last_opened_at
 `;
@@ -149,7 +147,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
           this.pool.query<NamespaceRow>(
             `SELECT id, slug, schema_name FROM namespaces
                WHERE ${byId ? 'id = $1' : 'slug = $1'}
-                 AND type = 'local' AND status = 'active'`,
+                 AND status = 'active'`,
             [segment],
           ),
         { label: `namespace resolve '${segment}'` },
@@ -289,9 +287,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
    */
   async stats(): Promise<NamespaceStats[]> {
     const namespaces = await this.list();
-    const local = namespaces.filter((ns) => ns.type === 'local');
     return Promise.all(
-      local.map(async (ns) => {
+      namespaces.map(async (ns) => {
         try {
           const { rows } = await this.pool.query<{
             total: number;
@@ -333,10 +330,10 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     table: 'runners',
     where: string,
   ): Promise<number> {
-    const local = (await this.list()).filter((ns) => ns.type === 'local');
-    if (local.length === 0) return 0;
+    const namespaces = await this.list();
+    if (namespaces.length === 0) return 0;
     const counts = await Promise.all(
-      local.map(async (ns) => {
+      namespaces.map(async (ns) => {
         try {
           const { rows } = await this.pool.query<{ count: number }>(
             `SELECT count(*)::int AS count FROM "${ns.schemaName}"."${table}" WHERE ${where}`,
@@ -388,17 +385,6 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    const type = input.type ?? 'local';
-    if (type !== 'local' && type !== 'remote') {
-      throw new BadRequestException(
-        "Namespace type must be either 'local' or 'remote'",
-      );
-    }
-    if (type === 'remote' && !input.remoteUrl) {
-      throw new BadRequestException('Remote namespaces require a remoteUrl');
-    }
-    if (type === 'remote') validateRemoteUrl(input.remoteUrl as string);
-
     const id = randomUUID();
     // Schema names derive from the immutable UUID, never the slug, so a slug can
     // be edited later without renaming (or breaking access to) any schema.
@@ -409,8 +395,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     try {
       const { rows } = await this.pool.query<NamespaceRow>(
         `INSERT INTO namespaces
-           (id, name, slug, schema_name, description, type, remote_url, status, thumbnail_blob, thumbnail_mime, external_links)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           (id, name, slug, schema_name, description, status, thumbnail_blob, thumbnail_mime, external_links)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING ${NAMESPACE_COLUMNS}`,
         [
           id,
@@ -418,9 +404,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
           slug,
           schemaName,
           input.description ?? null,
-          type,
-          input.remoteUrl ?? null,
-          type === 'local' ? 'provisioning' : 'active',
+          'provisioning',
           thumbnail?.blob ?? null,
           thumbnail?.mime ?? null,
           JSON.stringify(externalLinks),
@@ -432,38 +416,32 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       const categoryIds = await this.categoryIdsFor(id);
       let namespace = this.toNamespace(rows[0], categoryIds);
 
-      // Remote namespaces have no local schema/data — they point at another
-      // Classifyre instance — so skip provisioning entirely.
-      if (type === 'local') {
-        try {
-          await withDatabaseMigrationLock(async () => {
-            await this.pool.query(
-              `CREATE SCHEMA IF NOT EXISTS "${schemaName}"`,
-            );
-            await deployForSchema(schemaName);
-            const activated = await this.pool.query<NamespaceRow>(
-              `UPDATE namespaces SET status = 'active', updated_at = now()
-                 WHERE id = $1 RETURNING ${NAMESPACE_COLUMNS}`,
-              [id],
-            );
-            namespace = this.toNamespace(activated.rows[0], categoryIds);
-          });
-        } catch (provisionError) {
-          // Roll back a half-provisioned namespace so it never appears in the
-          // list or gets workers started for an incomplete schema.
-          this.logger.error(
-            `Provisioning namespace '${slug}' failed; rolling back: ${String(
-              provisionError,
-            )}`,
+      try {
+        await withDatabaseMigrationLock(async () => {
+          await this.pool.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
+          await deployForSchema(schemaName);
+          const activated = await this.pool.query<NamespaceRow>(
+            `UPDATE namespaces SET status = 'active', updated_at = now()
+               WHERE id = $1 RETURNING ${NAMESPACE_COLUMNS}`,
+            [id],
           );
-          await this.pool
-            .query(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`)
-            .catch(() => undefined);
-          await this.pool
-            .query('DELETE FROM namespaces WHERE id = $1', [id])
-            .catch(() => undefined);
-          throw provisionError;
-        }
+          namespace = this.toNamespace(activated.rows[0], categoryIds);
+        });
+      } catch (provisionError) {
+        // Roll back a half-provisioned namespace so it never appears in the
+        // list or gets workers started for an incomplete schema.
+        this.logger.error(
+          `Provisioning namespace '${slug}' failed; rolling back: ${String(
+            provisionError,
+          )}`,
+        );
+        await this.pool
+          .query(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`)
+          .catch(() => undefined);
+        await this.pool
+          .query('DELETE FROM namespaces WHERE id = $1', [id])
+          .catch(() => undefined);
+        throw provisionError;
       }
 
       const ctx: NamespaceLifecycleEvent = {
@@ -471,13 +449,11 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
         slug,
         schemaName,
       };
-      if (type === 'local') {
-        this.resolveCache.set(slug, {
-          context: ctx,
-          expiresAt: Date.now() + RESOLVE_CACHE_TTL_MS,
-        });
-        await this.notify(this.createdListeners, ctx, 'create');
-      }
+      this.resolveCache.set(slug, {
+        context: ctx,
+        expiresAt: Date.now() + RESOLVE_CACHE_TTL_MS,
+      });
+      await this.notify(this.createdListeners, ctx, 'create');
       this.logger.log(`Created namespace '${slug}' (schema ${schemaName})`);
       return namespace;
     } catch (error) {
@@ -517,10 +493,6 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       push('slug', slug);
     }
     if (patch.description !== undefined) push('description', patch.description);
-    if (patch.remoteUrl !== undefined) {
-      validateRemoteUrl(patch.remoteUrl);
-      push('remote_url', patch.remoteUrl);
-    }
     if (patch.thumbnail !== undefined) {
       // `null`/empty clears the image; a data URI replaces it.
       const thumbnail = parseThumbnailDataUri(patch.thumbnail);
@@ -617,7 +589,6 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       id: string;
       slug: string;
       schemaName: string;
-      type: string;
       deletedAt: Date;
     }>
   > {
@@ -626,10 +597,9 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       id: string;
       slug: string;
       schema_name: string;
-      type: string;
       deleted_at: Date;
     }>(
-      `SELECT id, slug, schema_name, type, deleted_at
+      `SELECT id, slug, schema_name, deleted_at
          FROM namespaces
         WHERE status = 'deleted'
           AND deleted_at IS NOT NULL
@@ -641,7 +611,6 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       id: row.id,
       slug: row.slug,
       schemaName: row.schema_name,
-      type: row.type,
       deletedAt: row.deleted_at,
     }));
   }
@@ -659,26 +628,21 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     const { rows } = await this.pool.query<{
       slug: string;
       schema_name: string;
-      type: string;
     }>(
-      `SELECT slug, schema_name, type FROM namespaces
+      `SELECT slug, schema_name FROM namespaces
         WHERE id = $1 AND status = 'deleted'`,
       [id],
     );
     const row = rows[0];
     if (!row) return false;
 
-    if (row.type === 'local') {
-      // CASCADE because the schema owns its own tables and nothing outside it
-      // references them; the registry row is the only external pointer and it
-      // goes below.
-      await this.pool.query(
-        `DROP SCHEMA IF EXISTS "${row.schema_name}" CASCADE`,
-      );
-      await this.pool.query(
-        `DROP SCHEMA IF EXISTS "${pgBossSchemaForId(id)}" CASCADE`,
-      );
-    }
+    // CASCADE because the schema owns its own tables and nothing outside it
+    // references them; the registry row is the only external pointer and it
+    // goes below.
+    await this.pool.query(`DROP SCHEMA IF EXISTS "${row.schema_name}" CASCADE`);
+    await this.pool.query(
+      `DROP SCHEMA IF EXISTS "${pgBossSchemaForId(id)}" CASCADE`,
+    );
 
     const deleted = await this.pool.query(
       "DELETE FROM namespaces WHERE id = $1 AND status = 'deleted'",
@@ -843,8 +807,6 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       slug: row.slug,
       schemaName: row.schema_name,
       description: row.description,
-      type: row.type === 'remote' ? 'remote' : 'local',
-      remoteUrl: row.remote_url,
       // A relative path to the streaming endpoint (cache-busted by updated_at);
       // the web api-client resolves it to an absolute URL. Null when unset.
       thumbnail: row.has_thumbnail
@@ -975,16 +937,6 @@ function normalizeExternalLinks(
       url: url.toString(),
     };
   });
-}
-
-function validateRemoteUrl(value: string): void {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:')
-      throw new Error();
-  } catch {
-    throw new BadRequestException('remoteUrl must be an absolute HTTP(S) URL');
-  }
 }
 
 function isUniqueViolation(error: unknown): boolean {

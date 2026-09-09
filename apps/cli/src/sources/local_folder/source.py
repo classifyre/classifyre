@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class LocalFolderSource(ObjectStorageSourceBase):
-    """Scans a folder on the local filesystem (desktop application deployments).
+    """Scans a folder on the filesystem the scan process runs on.
 
     Reuses the object-storage pipeline: each file becomes an ObjectRef whose key
     is the path relative to the scanned root, so sampling, MIME resolution, text

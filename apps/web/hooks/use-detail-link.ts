@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { isDesktopShell } from "@/lib/desktop";
 import { useNsPath } from "@/lib/ns-path";
 
 /** Anchor props for a namespace-scoped detail link. */
@@ -13,28 +12,21 @@ export interface DetailLinkProps {
 
 /**
  * Build anchor props for drilling into a detail page (source, document,
- * finding) from an exploratory view like the fingerprints graph.
+ * finding) from an exploratory view like the duplicates graph.
  *
- * On the web the operator keeps their place in the graph and the detail opens
- * in a new tab. Inside the desktop shell there are no browser tabs, so the
- * same click navigates in place.
- *
- * `isDesktopShell()` reads a `window` global, which is unavailable while the
- * page is statically rendered. The runtime is therefore resolved after mount:
- * the first paint matches the server output (new tab) and the desktop shell
- * corrects it on hydration, so React never sees an attribute mismatch.
+ * The detail opens in a new tab so the operator keeps their place in the graph:
+ * these views are expensive to rebuild, and losing the layout to a back button
+ * is what makes an exploratory pass feel like work.
  */
 export function useDetailLink(): (path: string) => DetailLinkProps {
   const nsPath = useNsPath();
-  const [inDesktopShell, setInDesktopShell] = React.useState(false);
-
-  React.useEffect(() => setInDesktopShell(isDesktopShell()), []);
 
   return React.useCallback(
-    (path: string): DetailLinkProps =>
-      inDesktopShell
-        ? { href: nsPath(path) }
-        : { href: nsPath(path), target: "_blank", rel: "noreferrer" },
-    [nsPath, inDesktopShell],
+    (path: string): DetailLinkProps => ({
+      href: nsPath(path),
+      target: "_blank",
+      rel: "noreferrer",
+    }),
+    [nsPath],
   );
 }

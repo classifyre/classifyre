@@ -1,0 +1,55 @@
+#!/command/with-contenv bash
+# The bundled PostgreSQL server.
+#
+# PGDATA is a volume, so the cluster is initialised on first boot rather than at
+# image build time (the postgresql package's own createcluster is disabled in
+# the Dockerfile). Everything else here is tuning that entrypoint.sh derived
+# from the container's memory limit.
+set -euo pipefail
+
+# An external DATABASE_URL means there is nothing for this service to run. s6
+# still wants the process to exist so the dependency graph stays intact and
+# `api` starts in the right order, so idle instead of exiting — a longrun that
+# exits is a longrun s6 restarts, forever.
+if [ "${CLASSIFYRE_BUNDLED_POSTGRES:-1}" != "1" ]; then
+  echo "postgres: external DATABASE_URL configured, bundled server not started"
+  exec sleep infinity
+fi
+
+PGDATA="${PGDATA:-/var/lib/postgresql/data}"
+PGPORT="${PGPORT:-5432}"
+PGBIN="/usr/lib/postgresql/${PG_MAJOR}/bin"
+
+mkdir -p "${PGDATA}" /var/run/postgresql
+chown -R postgres:postgres "${PGDATA}" /var/run/postgresql
+chmod 700 "${PGDATA}"
+
+if [ ! -s "${PGDATA}/PG_VERSION" ]; then
+  echo "postgres: initialising a new cluster in ${PGDATA}"
+  # --auth=trust is safe here and only here: the server binds to 127.0.0.1
+  # inside this container's own network namespace, so the only clients that can
+  # reach it are the API and CLI processes running beside it. Point
+  # DATABASE_URL at an external server for anything exposed to a network.
+  s6-setuidgid postgres "${PGBIN}/initdb" \
+    -D "${PGDATA}" \
+    --username="${POSTGRES_USER:-postgres}" \
+    --auth=trust \
+    --encoding=UTF8 \
+    --locale=C.UTF-8
+fi
+
+# Only ever loopback. The database is an implementation detail of this
+# container, not a service it offers.
+exec s6-setuidgid postgres "${PGBIN}/postgres" \
+  -D "${PGDATA}" \
+  -c "listen_addresses=127.0.0.1" \
+  -c "port=${PGPORT}" \
+  -c "unix_socket_directories=/var/run/postgresql" \
+  -c "max_connections=${PG_MAX_CONNECTIONS:-100}" \
+  -c "shared_buffers=${PG_SHARED_BUFFERS:-256MB}" \
+  -c "work_mem=${PG_WORK_MEM:-16MB}" \
+  -c "maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-128MB}" \
+  -c "effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-1GB}" \
+  -c "random_page_cost=${PG_RANDOM_PAGE_COST:-1.1}" \
+  -c "max_parallel_workers_per_gather=${PG_MAX_PARALLEL_WORKERS_PER_GATHER:-2}" \
+  ${PG_EXTRA_ARGS:-}

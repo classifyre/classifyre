@@ -1,0 +1,17 @@
+#!/command/with-contenv bash
+# The Next.js UI, as a standalone server.
+#
+# It also serves the documentation site: `bun run docs:bundle` copies the static
+# docs export into apps/web/public/docs at build time, and a rewrite in
+# next.config.mjs resolves the directory URLs to their index.html.
+#
+# Binds to loopback only — Caddy is the one process that listens publicly.
+set -euo pipefail
+
+exec s6-setuidgid classifyre \
+  env NODE_ENV=production \
+      HOSTNAME=127.0.0.1 \
+      PORT="${WEB_PORT:-3100}" \
+      API_URL="${API_URL:-http://127.0.0.1:8000}" \
+      NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-/api}" \
+  node /app/web/apps/web/server.js

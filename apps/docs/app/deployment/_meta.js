@@ -1,6 +1,6 @@
 export default {
   index: "Overview",
-  desktop: "Desktop App",
+  docker: "Docker (all-in-one)",
   kubernetes: "Kubernetes",
   database: "PostgreSQL Database",
   storage: "S3 Object Storage",

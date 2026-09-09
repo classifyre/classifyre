@@ -3,8 +3,6 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const isDesktopBuild = process.env.DESKTOP_BUILD === "true";
-
 // Mirrors `LOCALES` / `DEFAULT_LOCALE` in `apps/web/lib/locale-detection.ts`.
 // Duplicated because next.config.mjs is loaded by the Next CLI before any
 // TypeScript path aliases exist; `lib/locale-detection.spec.ts` pins the two
@@ -15,25 +13,20 @@ const LOCALE_ALTERNATION = LOCALES.join("|");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: isDesktopBuild ? "export" : "standalone",
+  output: "standalone",
   trailingSlash: true,
-  ...(!isDesktopBuild && {
-    outputFileTracingRoot: path.join(__dirname, "../../"),
-  }),
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   transpilePackages: ["@workspace/ui"],
   typescript: {
     ignoreBuildErrors: process.env.NEXT_IGNORE_BUILD_ERRORS === "1",
   },
-  ...(!isDesktopBuild && {
-    allowedDevOrigins: ["127.0.0.1", "localhost", "classifyre.localhost"],
+  allowedDevOrigins: ["127.0.0.1", "localhost", "classifyre.localhost"],
     // The documentation site (apps/docs) is a static export copied into
     // `public/docs` by `bun run docs:bundle`, so every page of it is a
     // directory holding an `index.html`. Next's public-file handler only serves
     // *exact* paths — `/docs/how-it-works/index.html` resolves, `/docs/how-it-works/`
     // does not — so on the server deployments (Kubernetes, `next start`) the
-    // whole bundled site 404s. The desktop build does not need this: its
-    // `app://` protocol handler already resolves a directory to its index.html,
-    // and `output: "export"` rejects rewrites outright.
+    // whole bundled site 404s.
     //
     // `afterFiles` (not `beforeFiles`) is what makes this safe: it runs only
     // once the filesystem has failed to match, so real files — the docs site's
@@ -97,11 +90,7 @@ const nextConfig = {
           permanent: true,
         },
       ];
-    },
-  }),
-  ...(isDesktopBuild && {
-    images: { unoptimized: true },
-  }),
+  },
 };
 
 export default nextConfig;

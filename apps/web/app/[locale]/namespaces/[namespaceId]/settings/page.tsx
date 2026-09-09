@@ -149,7 +149,6 @@ export default function NamespaceSettingsPage() {
         })),
       );
       setCategoryIds(updated.categoryIds);
-      window.electronAPI?.notifyNamespacesChanged();
       toast.success(t("workspaces.settingsSaved"));
       router.refresh();
     } catch (saveError) {

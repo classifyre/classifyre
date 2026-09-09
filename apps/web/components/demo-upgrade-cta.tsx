@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUpRight, Boxes, Laptop } from "lucide-react";
+import { ArrowUpRight, Boxes, Container } from "lucide-react";
 import {
-  desktopDownloadUrl,
+  getStartedUrl,
   helmDeploymentUrl,
 } from "@workspace/ui/lib/site-links";
 import { cn } from "@workspace/ui/lib/utils";
@@ -27,11 +27,11 @@ type Option = {
 
 const OPTIONS: Option[] = [
   {
-    href: desktopDownloadUrl,
-    icon: Laptop,
-    titleKey: "demo.desktopTitle",
-    descriptionKey: "demo.desktopDescription",
-    ctaKey: "demo.desktopCta",
+    href: getStartedUrl,
+    icon: Container,
+    titleKey: "demo.dockerTitle",
+    descriptionKey: "demo.dockerDescription",
+    ctaKey: "demo.dockerCta",
   },
   {
     href: helmDeploymentUrl,

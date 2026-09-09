@@ -8,7 +8,7 @@ is fed back through the existing docx/xlsx/pptx extraction paths:
 
 The CLI container image ships LibreOffice (the ``libreoffice-*-nogui`` Debian
 packages, which install ``/usr/bin/soffice``), so conversion works out of the box
-under Kubernetes. The desktop app deliberately does NOT bundle it — ~550 MB even
+under Kubernetes, and in the all-in-one Docker image. A packaged distribution may deliberately NOT bundle it — ~550 MB even
 stripped, and slimming the upstream bundle breaks its code signature — so there
 it is a system dependency the user installs.
 
@@ -55,7 +55,7 @@ LEGACY_OFFICE_MIME_TYPES = frozenset(_CONVERSION_TARGETS)
 
 _SOFFICE_TIMEOUT_SECONDS = 120
 
-# How to actually get LibreOffice, per platform. The desktop app does not bundle
+# How to actually get LibreOffice, per platform. A distribution that does not bundle
 # it, so this message is the entire remediation path a user gets — a generic
 # "install LibreOffice" would leave them guessing which package to install.
 _INSTALL_HINTS: dict[str, str] = {
@@ -85,14 +85,14 @@ def soffice_missing_error() -> str:
     )
 
 
-# Explicit override, checked before anything else. The desktop app rebuilds a
+# Explicit override, checked before anything else. A packaged distribution rebuilds a
 # minimal PATH for the processes it spawns, so an installation it discovered
 # itself is handed down through this variable rather than through PATH.
 SOFFICE_PATH_ENV = "CLASSIFYRE_SOFFICE_PATH"
 
 # Install locations to check when PATH comes up empty, keyed by sys.platform.
 # macOS and Windows always need these: their installers drop the binary inside an
-# app bundle / Program Files without touching PATH, and the packaged desktop app
+# app bundle / Program Files without touching PATH, and a packaged distribution
 # rebuilds a minimal PATH that cannot see either. Linux only needs them for an
 # upstream tarball install — the distro packages (including the
 # libreoffice-*-nogui ones in the CLI image) all land on /usr/bin/soffice.
@@ -119,7 +119,7 @@ def find_soffice() -> str | None:
 
     Resolution order, most explicit first:
 
-    1. ``CLASSIFYRE_SOFFICE_PATH`` — an operator/desktop-supplied absolute path.
+    1. ``CLASSIFYRE_SOFFICE_PATH`` — an operator-supplied absolute path.
     2. ``PATH`` — the CLI container, Linux hosts, and dev shells.
     3. Platform install locations — macOS/Windows only (see the table above).
 

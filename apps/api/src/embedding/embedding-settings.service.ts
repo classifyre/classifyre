@@ -116,7 +116,7 @@ export function resolvedFromEnv(
  *
  * Layering, lowest priority first:
  *
- *  1. **Deployment defaults** — Helm values on Kubernetes, the bundled desktop
+ *  1. **Deployment defaults** — Helm values on Kubernetes, the baked-in image
  *     defaults, both arriving as environment variables and read through
  *     {@link EmbeddingConfigService}. This is what an operator gets without
  *     touching anything, and what the settings page shows as "default".

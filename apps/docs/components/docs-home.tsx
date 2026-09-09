@@ -67,7 +67,7 @@ const START_HERE: Array<{
     blurb:
       "Stand the platform up, connect your first system, and watch the first scan land — on a laptop or in production.",
     links: [
-      { text: "Install the desktop app", href: "/deployment/desktop/" },
+      { text: "Run it with Docker", href: "/deployment/docker/" },
       { text: "Deploy with Kubernetes", href: "/deployment/kubernetes/" },
       { text: "Connect a source", href: "/sources/" },
       { text: "Your first scan", href: "/flow/" },
@@ -97,7 +97,7 @@ const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
   {
     name: "Install & Deploy",
     blurb:
-      "The two distributions: the desktop app, and the Helm chart for local and production clusters.",
+      "The two distributions: the all-in-one Docker image, and the Helm chart for local and production clusters.",
     href: "/deployment/",
   },
   {
