@@ -137,6 +137,98 @@ The question a business actually has is harder:
 
 That last one turns out to matter as much as the rest.
 
+## How the namespace works
+
+A **namespace** (*Namensraum*) in Classifyre is one self-contained workspace: its
+own data, its own detectors, its own investigations. This one is Austria's
+company register. Nothing here is bespoke to Firmenbuch — it is the standard
+machinery pointed at a public register.
+
+The shape of it, end to end:
+
+| Layer | What it is here |
+|---|---|
+| **Source** (*Datenquelle*) | Six connectors, each pulling one register on its own schedule |
+| **Asset** (*Datenobjekt*) | One per company, per person, per filed document, per financial year |
+| **Finding** (*Befund*) | A single fact worth investigating, typed and ranked |
+| **Edge** (*Kante*) | A typed link — who owns what, which number came from which filing |
+| **Inquiry** (*stehende Frage*) | A saved question that keeps matching new data as it arrives |
+| **Case** (*Fall*) | The investigation itself: threads, hypotheses, attached evidence |
+| **Glossary** (*Glossar*) | The register's own vocabulary, so terms mean one thing |
+
+Read top to bottom that is the whole product: **something is fetched, it becomes
+an object, facts about it become findings, findings answer standing questions,
+and questions that turn out to matter become cases.**
+
+{/* SCREENSHOT: the namespace overview — source list with last-run status,
+    asset counts and the findings-by-severity breakdown. This is the single
+    best "what am I looking at" image for the whole article. */}
+
+### The loop that keeps it current
+
+The register does not sit still. Measured on the change feed, a single week
+carries between roughly 3,300 and 6,000 entries — new registrations
+(*Neueintragungen*), deletions (*Löschungen*), changed addresses, changed
+management, freshly filed accounts.
+
+So each source runs continuously and asks for two things at once:
+
+- **the change feed** (*Veränderungsfeed*) — what actually moved recently, which
+  is what keeps a counterparty check current;
+- **the full sweep** (*Volldurchlauf*) — a resumable walk through all 326,871
+  Firmenbuch numbers, which is the only way to reach a company that has not
+  filed anything since 1992 and therefore never appears in a feed.
+
+Neither alone is sufficient, which is worth being blunt about: a feed-only
+namespace is permanently blind to dormant companies, and a sweep-only namespace
+knows nothing about the company someone registered last week — usually the one
+with the thinnest history and the most reason to be checked.
+
+One subtlety that matters more than it sounds: because any single run covers
+only a slice of the register, each run **declares that it saw only part of the
+universe**. A company that was not in this run's slice is not treated as
+deleted. Without that declaration, a partial scan quietly retires everything it
+did not happen to visit.
+
+### What you would otherwise have to build
+
+The register is public. Anyone can call the same APIs. The work that is not
+obvious until you try it:
+
+**Identity that survives out-of-order arrival.** Six sources run at six
+different speeds. GISA may describe a company the register connector has not
+reached yet. Every source computes the same string —
+`company://at/firmenbuchnummer/<fn>` — and an edge pointing at a company that
+does not exist yet is *kept* and joined the moment it does. No shared table, no
+ordering requirement, no lost link.
+
+**Facts as objects rather than columns.** The legal form, the shell score, the
+distress verdict are not fields in a row — they are findings. That is the
+difference between data you can retrieve and data you can *investigate*: a
+finding can be filtered, attached to a case as evidence, matched by a standing
+question, and searched semantically. A column cannot.
+
+**Provenance that holds.** Every derived figure carries a typed edge back to the
+filed document it was read out of, so "why do you say equity is negative?" is a
+click, not an argument.
+
+**Questions that keep answering themselves.** An inquiry written once keeps
+matching companies ingested months later. The investigation does not go stale
+the day the scan finishes.
+
+**Gaps that are visible.** Where a source refuses to answer, the refusal is
+recorded as a finding rather than a log line — so no conclusion can silently
+rest on an assumption nobody can see. This turned out to be the most valuable
+design decision in the whole namespace, and it is covered in full below.
+
+{/* SCREENSHOT: one company asset page — tags/findings down one side, the
+    lineage graph showing Jahresabschluss → Bilanzanalyse on the other. Shows
+    "fact becomes finding" and "number keeps its provenance" in one frame. */}
+
+The rest of this article is the specifics: where the data comes from, why it is
+six sources instead of one, what the detectors do, and two real companies run
+through the whole thing.
+
 ## Where the data comes from
 
 Everything is public, and all of it is Austrian primary source. No scraped

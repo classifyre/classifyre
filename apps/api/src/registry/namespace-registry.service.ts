@@ -22,16 +22,22 @@ import {
   slugifyName,
 } from '../namespace/namespace.constants';
 import {
+  DEFAULT_CATEGORY_ID,
   publicConnectionString,
   PUBLIC_SEARCH_PATH_OPTION,
 } from './namespace-registry.sql';
 import { withDbRetry } from '../db/db-retry';
 import { isTransientDbError } from '../db/transient-db-error';
 import type {
+  CreateNamespaceCategoryInput,
   CreateNamespaceInput,
   Namespace,
+  NamespaceCategory,
+  NamespaceExternalLink,
+  NamespaceExternalLinkInput,
   NamespaceLifecycleEvent,
   NamespaceStats,
+  UpdateNamespaceCategoryInput,
   UpdateNamespaceInput,
 } from './namespace.types';
 
@@ -45,6 +51,7 @@ interface NamespaceRow {
   remote_url: string | null;
   has_thumbnail: boolean;
   settings: Record<string, unknown>;
+  external_links: NamespaceExternalLink[] | null;
   created_at: Date;
   updated_at: Date;
   last_opened_at: Date | null;
@@ -58,11 +65,17 @@ interface NamespaceRow {
 const NAMESPACE_COLUMNS = `
   id, name, slug, schema_name, description, type, remote_url,
   (thumbnail_blob IS NOT NULL) AS has_thumbnail,
-  settings, created_at, updated_at, last_opened_at
+  settings, external_links, created_at, updated_at, last_opened_at
 `;
 
 /** Max accepted decoded thumbnail size (2 MB). */
 const MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024;
+
+/** Caps on the per-workspace link list, so a card stays a card. */
+const MAX_EXTERNAL_LINKS = 20;
+const MAX_LINK_TITLE_LENGTH = 80;
+const MAX_LINK_URL_LENGTH = 2048;
+const MAX_CATEGORY_TITLE_LENGTH = 60;
 
 interface ResolveCacheEntry {
   context: NamespaceLifecycleEvent;
@@ -179,7 +192,11 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       `SELECT ${NAMESPACE_COLUMNS} FROM namespaces
          WHERE status = 'active' ORDER BY created_at ASC`,
     );
-    return rows.map((r) => this.toNamespace(r));
+    // One extra round trip for every workspace's categories rather than N, and
+    // no join — the projection above is already wide and a join would multiply
+    // the (thumbnail-free but still chunky) namespace rows per category.
+    const categories = await this.categoriesByNamespace(rows.map((r) => r.id));
+    return rows.map((r) => this.toNamespace(r, categories.get(r.id) ?? []));
   }
 
   async get(id: string): Promise<Namespace> {
@@ -189,7 +206,80 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       [id],
     );
     if (!rows[0]) throw new NotFoundException(`Unknown namespace '${id}'`);
-    return this.toNamespace(rows[0]);
+    return this.toNamespace(rows[0], await this.categoryIdsFor(id));
+  }
+
+  /** Category ids per namespace id, in stable (title) order. */
+  private async categoriesByNamespace(
+    ids: string[],
+  ): Promise<Map<string, string[]>> {
+    const byNamespace = new Map<string, string[]>();
+    if (ids.length === 0) return byNamespace;
+    const { rows } = await this.pool.query<{
+      namespace_id: string;
+      category_id: string;
+    }>(
+      `SELECT m.namespace_id, m.category_id
+         FROM namespace_category_members m
+         JOIN namespace_categories c ON c.id = m.category_id
+        WHERE m.namespace_id = ANY($1::uuid[])
+        ORDER BY lower(c.title) ASC`,
+      [ids],
+    );
+    for (const row of rows) {
+      const current = byNamespace.get(row.namespace_id);
+      if (current) current.push(row.category_id);
+      else byNamespace.set(row.namespace_id, [row.category_id]);
+    }
+    return byNamespace;
+  }
+
+  private async categoryIdsFor(id: string): Promise<string[]> {
+    return (await this.categoriesByNamespace([id])).get(id) ?? [];
+  }
+
+  /**
+   * Replace a workspace's categories.
+   *
+   * An empty (or unknown-only) set is not rejected: it resolves to the default
+   * category, because "a workspace is always in a category" is the invariant the
+   * grouped directory relies on — a workspace with none would simply vanish
+   * from the listing.
+   */
+  private async setCategories(
+    namespaceId: string,
+    requested: string[],
+  ): Promise<void> {
+    const unique = [
+      ...new Set(requested.map((id) => id.trim()).filter(Boolean)),
+    ];
+    let valid: string[] = [];
+    if (unique.length > 0) {
+      const { rows } = await this.pool.query<{ id: string }>(
+        'SELECT id FROM namespace_categories WHERE id = ANY($1::uuid[])',
+        [unique],
+      );
+      valid = rows.map((row) => row.id);
+      const unknown = unique.filter((id) => !valid.includes(id));
+      if (unknown.length > 0) {
+        throw new BadRequestException(
+          `Unknown workspace ${unknown.length === 1 ? 'category' : 'categories'}: ${unknown.join(', ')}`,
+        );
+      }
+    }
+    if (valid.length === 0) valid = [DEFAULT_CATEGORY_ID];
+
+    await this.pool.query(
+      `DELETE FROM namespace_category_members
+        WHERE namespace_id = $1 AND category_id <> ALL($2::uuid[])`,
+      [namespaceId, valid],
+    );
+    await this.pool.query(
+      `INSERT INTO namespace_category_members (namespace_id, category_id)
+       SELECT $1, unnest($2::uuid[])
+       ON CONFLICT DO NOTHING`,
+      [namespaceId, valid],
+    );
   }
 
   /**
@@ -314,12 +404,13 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     // be edited later without renaming (or breaking access to) any schema.
     const schemaName = schemaForId(id);
     const thumbnail = parseThumbnailDataUri(input.thumbnail);
+    const externalLinks = normalizeExternalLinks(input.externalLinks);
 
     try {
       const { rows } = await this.pool.query<NamespaceRow>(
         `INSERT INTO namespaces
-           (id, name, slug, schema_name, description, type, remote_url, status, thumbnail_blob, thumbnail_mime)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           (id, name, slug, schema_name, description, type, remote_url, status, thumbnail_blob, thumbnail_mime, external_links)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING ${NAMESPACE_COLUMNS}`,
         [
           id,
@@ -332,9 +423,14 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
           type === 'local' ? 'provisioning' : 'active',
           thumbnail?.blob ?? null,
           thumbnail?.mime ?? null,
+          JSON.stringify(externalLinks),
         ],
       );
-      let namespace = this.toNamespace(rows[0]);
+      // Filed before anything else can fail: a workspace row that exists but is
+      // in no category would be invisible in the grouped directory.
+      await this.setCategories(id, input.categoryIds ?? []);
+      const categoryIds = await this.categoryIdsFor(id);
+      let namespace = this.toNamespace(rows[0], categoryIds);
 
       // Remote namespaces have no local schema/data — they point at another
       // Classifyre instance — so skip provisioning entirely.
@@ -350,7 +446,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
                  WHERE id = $1 RETURNING ${NAMESPACE_COLUMNS}`,
               [id],
             );
-            namespace = this.toNamespace(activated.rows[0]);
+            namespace = this.toNamespace(activated.rows[0], categoryIds);
           });
         } catch (provisionError) {
           // Roll back a half-provisioned namespace so it never appears in the
@@ -431,11 +527,23 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       push('thumbnail_blob', thumbnail?.blob ?? null);
       push('thumbnail_mime', thumbnail?.mime ?? null);
     }
+    if (patch.externalLinks !== undefined) {
+      push(
+        'external_links',
+        JSON.stringify(normalizeExternalLinks(patch.externalLinks)),
+      );
+    }
     if (patch.settings !== undefined)
       push('settings', JSON.stringify(patch.settings));
     if (patch.lastOpenedAt !== undefined)
       push('last_opened_at', patch.lastOpenedAt);
 
+    if (patch.categoryIds !== undefined) {
+      // Validated against the registry (404s on an unknown id) before the row
+      // update, so a bad category never half-applies a rename.
+      await this.get(id);
+      await this.setCategories(id, patch.categoryIds);
+    }
     if (sets.length === 0) return this.get(id);
     // Capture the current slug so its (now stale) resolve-cache entry is dropped
     // even when the slug itself is being changed.
@@ -459,7 +567,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
     if (!rows[0]) throw new NotFoundException(`Unknown namespace '${id}'`);
-    const namespace = this.toNamespace(rows[0]);
+    const namespace = this.toNamespace(rows[0], await this.categoryIdsFor(id));
     this.resolveCache.delete(previousSlug);
     this.resolveCache.delete(namespace.slug);
     this.resolveCache.delete(namespace.id);
@@ -586,6 +694,129 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     return true;
   }
 
+  // ---------------------------------------------------------------------
+  // Categories
+  // ---------------------------------------------------------------------
+
+  /**
+   * Every category, alphabetically, with the number of ACTIVE workspaces filed
+   * under it (soft-deleted workspaces keep their memberships but must not be
+   * counted — the directory does not show them either).
+   */
+  async listCategories(): Promise<NamespaceCategory[]> {
+    const { rows } = await this.pool.query<{
+      id: string;
+      title: string;
+      description: string | null;
+      created_at: Date;
+      updated_at: Date;
+      workspace_count: number;
+    }>(
+      `SELECT c.id, c.title, c.description, c.created_at, c.updated_at,
+              count(n.id)::int AS workspace_count
+         FROM namespace_categories c
+         LEFT JOIN namespace_category_members m ON m.category_id = c.id
+         LEFT JOIN namespaces n
+                ON n.id = m.namespace_id AND n.status = 'active'
+        GROUP BY c.id
+        ORDER BY lower(c.title) ASC`,
+    );
+    return rows.map((row) => toCategory(row));
+  }
+
+  async getCategory(id: string): Promise<NamespaceCategory> {
+    const category = (await this.listCategories()).find((c) => c.id === id);
+    if (!category) throw new NotFoundException(`Unknown category '${id}'`);
+    return category;
+  }
+
+  async createCategory(
+    input: CreateNamespaceCategoryInput,
+  ): Promise<NamespaceCategory> {
+    const title = normalizeCategoryTitle(input.title);
+    try {
+      const { rows } = await this.pool.query<{ id: string }>(
+        `INSERT INTO namespace_categories (id, title, description)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [randomUUID(), title, input.description?.trim() || null],
+      );
+      return this.getCategory(rows[0].id);
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(
+          `A category named '${title}' already exists`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  async updateCategory(
+    id: string,
+    patch: UpdateNamespaceCategoryInput,
+  ): Promise<NamespaceCategory> {
+    const sets: string[] = [];
+    const values: unknown[] = [];
+    if (patch.title !== undefined) {
+      values.push(normalizeCategoryTitle(patch.title));
+      sets.push(`title = $${values.length}`);
+    }
+    if (patch.description !== undefined) {
+      values.push(patch.description?.trim() || null);
+      sets.push(`description = $${values.length}`);
+    }
+    if (sets.length === 0) return this.getCategory(id);
+    sets.push('updated_at = now()');
+    values.push(id);
+
+    let rowCount: number | null;
+    try {
+      ({ rowCount } = await this.pool.query(
+        `UPDATE namespace_categories SET ${sets.join(', ')}
+          WHERE id = $${values.length}`,
+        values,
+      ));
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(
+          `A category named '${patch.title}' already exists`,
+        );
+      }
+      throw error;
+    }
+    if (!rowCount) throw new NotFoundException(`Unknown category '${id}'`);
+    return this.getCategory(id);
+  }
+
+  /**
+   * Delete a category. Workspaces are never deleted with it: any workspace left
+   * with no category afterwards is re-filed under the default one, which is why
+   * the default category itself cannot be deleted (it is the fallback).
+   */
+  async removeCategory(id: string): Promise<void> {
+    if (id === DEFAULT_CATEGORY_ID) {
+      throw new BadRequestException(
+        'The default category cannot be deleted; workspaces without a category fall back to it.',
+      );
+    }
+    const { rowCount } = await this.pool.query(
+      'DELETE FROM namespace_categories WHERE id = $1',
+      [id],
+    );
+    if (!rowCount) throw new NotFoundException(`Unknown category '${id}'`);
+    // The membership rows went with it (ON DELETE CASCADE); re-home whatever
+    // that emptied out.
+    await this.pool.query(
+      `INSERT INTO namespace_category_members (namespace_id, category_id)
+       SELECT n.id, $1 FROM namespaces n
+        WHERE NOT EXISTS (
+          SELECT 1 FROM namespace_category_members m WHERE m.namespace_id = n.id
+        )
+       ON CONFLICT DO NOTHING`,
+      [DEFAULT_CATEGORY_ID],
+    );
+  }
+
   private async notify(
     listeners: Set<(e: NamespaceLifecycleEvent) => void | Promise<void>>,
     ctx: NamespaceLifecycleEvent,
@@ -605,7 +836,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private toNamespace(row: NamespaceRow): Namespace {
+  private toNamespace(row: NamespaceRow, categoryIds: string[]): Namespace {
     return {
       id: row.id,
       name: row.name,
@@ -620,6 +851,10 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
         ? `/namespaces/${row.id}/thumbnail?v=${row.updated_at.getTime()}`
         : null,
       settings: row.settings ?? {},
+      externalLinks: Array.isArray(row.external_links)
+        ? row.external_links
+        : [],
+      categoryIds,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
       lastOpenedAt: row.last_opened_at
@@ -653,6 +888,93 @@ function parseThumbnailDataUri(
     throw new BadRequestException('Thumbnail image must be 2 MB or smaller');
   }
   return { blob, mime: mime.toLowerCase() };
+}
+
+function toCategory(row: {
+  id: string;
+  title: string;
+  description: string | null;
+  created_at: Date;
+  updated_at: Date;
+  workspace_count: number;
+}): NamespaceCategory {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+    workspaceCount: row.workspace_count ?? 0,
+    isDefault: row.id === DEFAULT_CATEGORY_ID,
+  };
+}
+
+function normalizeCategoryTitle(value: string): string {
+  const title = (value ?? '').trim();
+  if (!title) throw new BadRequestException('Category title is required');
+  if (title.length > MAX_CATEGORY_TITLE_LENGTH) {
+    throw new BadRequestException(
+      `Category title must be ${MAX_CATEGORY_TITLE_LENGTH} characters or fewer`,
+    );
+  }
+  return title;
+}
+
+/**
+ * Validate and normalise the external-link array stored on a workspace.
+ *
+ * Both fields are mandatory and the URL must be absolute HTTP(S): these links
+ * are rendered as `target="_blank"` anchors on the workspace card, so a
+ * `javascript:` or relative value would be a hole, not a convenience.
+ */
+function normalizeExternalLinks(
+  links: NamespaceExternalLinkInput[] | undefined,
+): NamespaceExternalLink[] {
+  if (!links) return [];
+  if (!Array.isArray(links)) {
+    throw new BadRequestException('externalLinks must be an array');
+  }
+  if (links.length > MAX_EXTERNAL_LINKS) {
+    throw new BadRequestException(
+      `A workspace can have at most ${MAX_EXTERNAL_LINKS} links`,
+    );
+  }
+  return links.map((link, index) => {
+    const title = (link?.title ?? '').trim();
+    const rawUrl = (link?.url ?? '').trim();
+    if (!title) {
+      throw new BadRequestException(`Link ${index + 1} is missing a name`);
+    }
+    if (title.length > MAX_LINK_TITLE_LENGTH) {
+      throw new BadRequestException(
+        `Link name must be ${MAX_LINK_TITLE_LENGTH} characters or fewer`,
+      );
+    }
+    if (!rawUrl) {
+      throw new BadRequestException(`Link '${title}' is missing a URL`);
+    }
+    if (rawUrl.length > MAX_LINK_URL_LENGTH) {
+      throw new BadRequestException(`Link '${title}' has an over-long URL`);
+    }
+    let url: URL;
+    try {
+      url = new URL(rawUrl);
+    } catch {
+      throw new BadRequestException(
+        `Link '${title}' must be an absolute URL (https://...)`,
+      );
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new BadRequestException(
+        `Link '${title}' must use http:// or https://`,
+      );
+    }
+    return {
+      id: UUID_RE.test(link.id ?? '') ? (link.id as string) : randomUUID(),
+      title,
+      url: url.toString(),
+    };
+  });
 }
 
 function validateRemoteUrl(value: string): void {

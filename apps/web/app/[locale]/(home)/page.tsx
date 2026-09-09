@@ -1,31 +1,19 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  ArrowRight,
-  FolderOpen,
-  Globe2,
-  Layers,
-  Plus,
-  RefreshCw,
-  Settings,
-  TriangleAlert,
-  Trash2,
-} from "lucide-react";
+import { FolderOpen, Globe2, Plus, RefreshCw, Tags } from "lucide-react";
 import {
   api,
   setActiveNamespaceSlug,
   type Namespace,
+  type NamespaceCategory,
   type NamespaceStats,
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { EmptyState } from "@workspace/ui/components/empty-state";
-import { Skeleton } from "@workspace/ui/components/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,37 +29,78 @@ import { useTranslation } from "@/hooks/use-translation";
 import { WorkspaceHeader } from "@/components/namespace/workspace-header";
 import { AddRemoteWorkspaceDialog } from "@/components/namespace/add-remote-workspace-dialog";
 import { useActiveNamespaces } from "@/components/active-namespaces-provider";
+import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
+import { useOpenWorkspace } from "@/hooks/use-open-workspace";
+import {
+  WorkspaceCard,
+  WorkspaceCardSkeleton,
+} from "@/components/namespace/workspace-card";
 
-function WorkspaceSkeleton() {
-  return (
-    <Card
-      aria-hidden="true"
-      className="gap-0 overflow-hidden py-0 shadow-none"
-    >
-      <Skeleton className="aspect-[16/8.5] w-full rounded-none bg-muted" />
-      <CardContent className="space-y-4 p-5">
-        <Skeleton className="h-5 w-2/3 bg-muted" />
-        <Skeleton className="h-3 w-1/2 bg-muted" />
-        <Skeleton className="h-10 w-full bg-muted" />
-        <Skeleton className="ml-auto h-4 w-16 bg-muted" />
-      </CardContent>
-    </Card>
-  );
+/** A category heading plus the workspaces filed under it. */
+interface WorkspaceGroup {
+  id: string;
+  title: string;
+  description: string | null;
+  workspaces: Namespace[];
 }
 
-/** Host of a stored remote URL; the raw value if it somehow isn't a URL. */
-function remoteHost(remoteUrl: string): string {
-  try {
-    return new URL(remoteUrl).host;
-  } catch {
-    return remoteUrl;
+/**
+ * Group workspaces by category, alphabetically, dropping empty categories.
+ *
+ * A workspace in several categories appears under each of them — that is the
+ * point of allowing several. A workspace whose categories are all unknown to
+ * this listing (a category deleted in another tab, say) still has to appear
+ * somewhere, so it falls into a synthetic group pinned to the end rather than
+ * silently vanishing from the directory.
+ */
+function groupByCategory(
+  namespaces: Namespace[],
+  categories: NamespaceCategory[],
+  uncategorizedTitle: string,
+): WorkspaceGroup[] {
+  const groups = new Map<string, WorkspaceGroup>();
+  for (const category of categories) {
+    groups.set(category.id, {
+      id: category.id,
+      title: category.title,
+      description: category.description,
+      workspaces: [],
+    });
   }
+
+  const orphans: Namespace[] = [];
+  for (const ns of namespaces) {
+    const targets = ns.categoryIds.filter((id) => groups.has(id));
+    if (targets.length === 0) {
+      orphans.push(ns);
+      continue;
+    }
+    for (const id of targets) groups.get(id)!.workspaces.push(ns);
+  }
+
+  const ordered = [...groups.values()]
+    .filter((group) => group.workspaces.length > 0)
+    .sort((a, b) =>
+      a.title.localeCompare(b.title, undefined, { sensitivity: "base" }),
+    );
+  if (orphans.length > 0) {
+    ordered.push({
+      id: "__uncategorized__",
+      title: uncategorizedTitle,
+      description: null,
+      workspaces: orphans,
+    });
+  }
+  return ordered;
 }
 
 export default function LandingPage() {
-  const router = useRouter();
   const { t } = useTranslation();
-  const { activate, removeBySlug } = useActiveNamespaces();
+  const { removeBySlug } = useActiveNamespaces();
+  const open = useOpenWorkspace();
+  // Categories drive the grouping below; a failure to load them degrades to a
+  // single ungrouped list rather than an error page.
+  const { categories, reload: reloadCategories } = useNamespaceCategories();
   const [namespaces, setNamespaces] = React.useState<Namespace[] | null>(null);
   const [stats, setStats] = React.useState<Record<string, NamespaceStats>>({});
   // Remote workspace id → its own namespace count (null once unreachable).
@@ -149,22 +178,6 @@ export default function LandingPage() {
     };
   }, [namespaces]);
 
-  const open = (ns: Namespace) => {
-    if (ns.type === "remote" && ns.remoteUrl) {
-      // In the desktop shell the remote's own UI is browsed in-app (its
-      // workspace directory, then its namespaces) with a way back to here.
-      // A plain browser has no embedded view, so it just follows the link.
-      if (window.__CLASSIFYRE_DESKTOP__) {
-        router.push(`/remote/${ns.id}`);
-        return;
-      }
-      window.location.href = ns.remoteUrl;
-      return;
-    }
-    activate({ id: ns.id, slug: ns.slug, name: ns.name, href: `/${ns.slug}` });
-    router.push(`/${ns.slug}`);
-  };
-
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     setDeleting(true);
@@ -172,10 +185,13 @@ export default function LandingPage() {
       await api.namespaces.remove(pendingDelete.id);
       removeBySlug(pendingDelete.slug);
       window.electronAPI?.notifyNamespacesChanged();
-      toast.success(t("workspaces.deleteSuccess", { name: pendingDelete.name }));
+      toast.success(
+        t("workspaces.deleteSuccess", { name: pendingDelete.name }),
+      );
       setPendingDelete(null);
       await load();
       void loadStats();
+      void reloadCategories();
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : t("workspaces.deleteFailed"),
@@ -186,6 +202,19 @@ export default function LandingPage() {
   };
 
   const hasWorkspaces = (namespaces?.length ?? 0) > 0;
+
+  const groups = React.useMemo(
+    () =>
+      groupByCategory(
+        namespaces ?? [],
+        categories,
+        t("categories.uncategorized"),
+      ),
+    [namespaces, categories, t],
+  );
+  // A single group is not a grouping — showing one heading over every card just
+  // adds a line the reader has to skip.
+  const showGroupHeadings = groups.length > 1;
 
   return (
     <div className="min-h-svh bg-background">
@@ -218,6 +247,12 @@ export default function LandingPage() {
                   {t("workspaces.addRemote")}
                 </Button>
               )}
+              <Button variant="outline" asChild>
+                <Link href="/namespaces/categories">
+                  <Tags className="mr-2 h-4 w-4" />
+                  {t("categories.manage")}
+                </Link>
+              </Button>
               <Button variant="default" onClick={() => setCreateOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 {t("workspaces.new")}
@@ -244,7 +279,7 @@ export default function LandingPage() {
             aria-label={t("workspaces.loading")}
           >
             {Array.from({ length: 6 }, (_, index) => (
-              <WorkspaceSkeleton key={index} />
+              <WorkspaceCardSkeleton key={index} />
             ))}
           </div>
         ) : !hasWorkspaces ? (
@@ -271,171 +306,63 @@ export default function LandingPage() {
             />
           </Card>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {namespaces.map((ns) => {
-              const initial = ns.name.trim().charAt(0).toUpperCase() || "?";
-              const s = stats[ns.id];
-              const isRemote = ns.type === "remote" && !!ns.remoteUrl;
-              // undefined while in flight, null once the remote didn't answer.
-              const remoteCount = remoteCounts[ns.id];
-              return (
-                <Card
-                  key={ns.id}
-                  clickable
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => open(ns)}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) return;
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      open(ns);
-                    }
-                  }}
-                  aria-label={t("workspaces.openAria", { name: ns.name })}
-                  className="group gap-0 overflow-hidden bg-card/95 py-0 shadow-none hover:translate-x-0 hover:translate-y-0 hover:shadow-none"
-                >
-                  <div className="relative aspect-[16/8.5] overflow-hidden border-b bg-muted">
-                    {ns.thumbnail ? (
-                      <Image
-                        src={ns.thumbnail}
-                        alt=""
-                        fill
-                        unoptimized
-                        sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                        className="object-cover object-top transition duration-200 group-hover:scale-[1.01]"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center bg-secondary">
-                        <span className="font-serif text-6xl text-muted-foreground/25">
-                          {initial}
-                        </span>
-                      </div>
+          <div className="space-y-10">
+            {groups.map((group) => (
+              <section
+                key={group.id}
+                // Only label the section when the heading is actually rendered;
+                // a dangling aria-labelledby is worse than none.
+                aria-labelledby={
+                  showGroupHeadings ? `group-${group.id}` : undefined
+                }
+              >
+                {showGroupHeadings && (
+                  <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b pb-2">
+                    <h2
+                      id={`group-${group.id}`}
+                      className="font-serif text-lg uppercase tracking-[0.06em]"
+                    >
+                      {group.title}
+                    </h2>
+                    <span className="text-xs text-muted-foreground">
+                      {group.workspaces.length === 1
+                        ? t("workspaces.groupCountOne")
+                        : t("workspaces.groupCount", {
+                            count: group.workspaces.length,
+                          })}
+                    </span>
+                    {group.description && (
+                      <p className="w-full text-sm text-muted-foreground sm:w-auto sm:flex-1 sm:text-right">
+                        {group.description}
+                      </p>
                     )}
                   </div>
-
-                  <CardContent className="flex min-h-40 flex-1 flex-col p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h2 className="truncate font-semibold uppercase tracking-[0.06em]">
-                          {ns.name}
-                        </h2>
-                        {ns.type === "remote" && ns.remoteUrl ? (
-                          // A remote card opens that server's own directory,
-                          // not a workspace — say so before the click.
-                          <p className="mt-1 flex items-center gap-1.5 truncate font-mono text-xs text-muted-foreground">
-                            <Globe2 className="size-3 shrink-0" />
-                            {remoteHost(ns.remoteUrl)}
-                          </p>
-                        ) : (
-                          <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                            /{ns.slug}
-                          </p>
-                        )}
-                      </div>
-                      <div className="-mr-2 -mt-2 flex shrink-0 items-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          asChild
-                          className="text-muted-foreground"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <Link
-                            href={`/namespaces/${ns.id}/settings`}
-                            aria-label={t("workspaces.settingsAria", {
-                              name: ns.name,
-                            })}
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setPendingDelete(ns);
-                          }}
-                          aria-label={t("workspaces.deleteAria", {
-                            name: ns.name,
-                          })}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <p className="mt-4 line-clamp-2 min-h-10 text-sm leading-relaxed text-muted-foreground">
-                      {ns.description || t("workspaces.noDescription")}
-                    </p>
-                    <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4">
-                      {/* Only the desktop shell can read another origin's
-                          registry; a browser leaves the row empty rather than
-                          waiting on a count that will never arrive. */}
-                      {isRemote && isDesktop ? (
-                        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                          {remoteCount === undefined ? (
-                            <Skeleton className="h-4 w-24 bg-muted" />
-                          ) : remoteCount === null ? (
-                            <>
-                              <TriangleAlert className="size-3.5 shrink-0" />
-                              {t("workspaces.remoteUnavailable")}
-                            </>
-                          ) : (
-                            <>
-                              <Layers className="size-3.5 shrink-0" />
-                              <span>
-                                <span className="font-semibold text-foreground">
-                                  {remoteCount}
-                                </span>{" "}
-                                {t("workspaces.remoteWorkspacesCount", {
-                                  count: remoteCount,
-                                })}
-                              </span>
-                            </>
-                          )}
-                        </span>
-                      ) : s ? (
-                        <div className="flex min-w-0 items-center gap-2.5">
-                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Layers className="size-3.5 shrink-0" />
-                            <span>
-                              <span className="font-semibold text-foreground">
-                                {s.totalSources}
-                              </span>{" "}
-                              {t("workspaces.sourcesCount", {
-                                count: s.totalSources,
-                              })}
-                            </span>
-                          </span>
-                          {s.failingSources > 0 && (
-                            <span className="flex items-center gap-1 rounded-sm border border-destructive/40 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-destructive">
-                              <TriangleAlert className="size-3 shrink-0" />
-                              {t("workspaces.failingCount", {
-                                count: s.failingSources,
-                              })}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span aria-hidden="true" />
-                      )}
-                      <span className="flex shrink-0 items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors group-hover:text-foreground">
-                        {t("common.open")} <ArrowRight className="size-3.5" />
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                )}
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.workspaces.map((ns) => (
+                    <WorkspaceCard
+                      key={ns.id}
+                      namespace={ns}
+                      stats={stats[ns.id]}
+                      remoteCount={remoteCounts[ns.id]}
+                      isDesktop={isDesktop}
+                      onOpen={open}
+                      onDelete={setPendingDelete}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         )}
 
         <CreateNamespaceDialog
           open={createOpen}
           onOpenChange={setCreateOpen}
-          onCreated={(ns) => open(ns)}
+          onCreated={(ns) => {
+            void reloadCategories();
+            open(ns);
+          }}
         />
         <AddRemoteWorkspaceDialog
           open={remoteCreateOpen}
