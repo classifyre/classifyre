@@ -62,7 +62,16 @@ cleanup() {
   else
     docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true
   fi
-  rm -rf "${TMP_DIR}"
+  # Everything under the mounts was written by uids *inside* the container —
+  # postgres for the cluster, 10001 for the app — which on Linux the host user
+  # cannot delete. (On macOS, Docker Desktop maps ownership and plain rm works,
+  # which is how this hid.) Empty it from inside a container that can, then take
+  # the directory itself. Never fatal: the test's verdict is already decided by
+  # this point, and a teardown that cannot tidy up must not turn a pass into a
+  # failure.
+  docker run --rm --entrypoint sh -v "${TMP_DIR}:/cleanup" "${IMAGE}" \
+    -c 'rm -rf /cleanup/* /cleanup/.[!.]*' >/dev/null 2>&1 || true
+  rm -rf "${TMP_DIR}" 2>/dev/null || true
   exit "$code"
 }
 trap cleanup EXIT
