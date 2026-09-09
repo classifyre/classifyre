@@ -331,10 +331,10 @@ class Context:
     def folders(self) -> dict[str, Path]:
         """Folders this source was configured with, by name.
 
-        The paths are resolved on whatever machine runs the scan: this computer
-        inside the container, an ephemeral CLI job pod in Kubernetes. In a cluster the
-        folder has to be mounted into those pods first (the chart's
-        ``api.localFolders``); an unmounted path simply will not exist.
+        The paths are resolved on whatever machine runs the scan: inside the
+        all-in-one container, or an ephemeral CLI job pod in Kubernetes. Either
+        way the folder has to be mounted there first (a bind mount, or the
+        chart's ``api.localFolders``); an unmounted path simply will not exist.
         """
         return dict(self._folders)
 
