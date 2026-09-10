@@ -1676,6 +1676,9 @@ model CorrelationPairSignature {
   computedAt      DateTime                   @map("computed_at")
 
   @@id([aId, bId])
+  // Incremental refreshes delete by touched asset on either side
+  // (`a_id = ANY OR b_id = ANY`); the PK only serves the a_id side.
+  @@index([bId])
   // "the next N undecided pairs in this pattern" as a range seek.
   @@index([patternKey, weighted(sort: Desc)])
   @@index([clusterId])
