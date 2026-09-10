@@ -20,11 +20,13 @@ describe('orphan reconciliation', () => {
   let findMany: jest.Mock;
   let isJobActive: jest.Mock;
   let markOrphaned: jest.Mock;
+  let activeExecutions: Map<string, unknown>;
 
   const build = () => {
     findMany = jest.fn().mockResolvedValue([]);
     isJobActive = jest.fn().mockResolvedValue(true);
     markOrphaned = jest.fn().mockResolvedValue(undefined);
+    activeExecutions = new Map();
     service = Object.create(CliRunnerService.prototype) as CliRunnerService;
     Object.assign(service, {
       prisma: {
@@ -37,6 +39,7 @@ describe('orphan reconciliation', () => {
       },
       logger: { warn: jest.fn(), log: jest.fn(), error: jest.fn() },
       markRunnerAsOrphaned: markOrphaned,
+      activeExecutions,
       reconcileRunningSources: jest.fn().mockResolvedValue(0),
     });
   };
@@ -124,5 +127,57 @@ describe('orphan reconciliation', () => {
 
     await expect(reconcile()).resolves.toBe(0);
     expect(markOrphaned).not.toHaveBeenCalled();
+  });
+
+  describe('LOCAL runners', () => {
+    // A local scan has no Job to ask about: the process that launched it is the
+    // only thing that can vouch for it. Answering "gone" unconditionally read
+    // every healthy local scan as dead once it outlived the launch grace, and
+    // startRun reconciles first -- so in the all-in-one image and the desktop
+    // app, the next scan anyone started failed the one already running.
+    const local = (over: Record<string, unknown> = {}) =>
+      runner({
+        executionMode: RunnerExecutionMode.LOCAL,
+        jobName: null,
+        jobNamespace: null,
+        ...over,
+      });
+
+    it('leaves a long-running local scan alone while this process runs it', async () => {
+      findMany.mockResolvedValue([local()]);
+      activeExecutions.set('r1', {});
+
+      await expect(reconcile()).resolves.toBe(0);
+      expect(markOrphaned).not.toHaveBeenCalled();
+    });
+
+    it('retires a local runner no process is executing', async () => {
+      findMany.mockResolvedValue([local()]);
+
+      await expect(reconcile()).resolves.toBe(1);
+      expect(markOrphaned).toHaveBeenCalledWith(
+        'r1',
+        's1',
+        'Runner was orphaned (its execution no longer exists)',
+      );
+    });
+
+    it('says a local runner never started only when it never did', async () => {
+      // A local run never carries a Job name, so keying this on jobName called
+      // every lost local scan "never started", however long it had run.
+      findMany.mockResolvedValue([
+        local({
+          startedAt: null,
+          triggeredAt: new Date(Date.now() - 10 * 60 * 1000),
+        }),
+      ]);
+
+      await expect(reconcile()).resolves.toBe(1);
+      expect(markOrphaned).toHaveBeenCalledWith(
+        'r1',
+        's1',
+        'Runner was orphaned (it never started an execution)',
+      );
+    });
   });
 });

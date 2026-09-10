@@ -3,12 +3,12 @@
 import * as React from "react";
 
 /**
- * Animated case graph for case #42 — the same investigation the scroll
- * narrative and the Harness recorder walk through. When the figure enters
- * the viewport, the graph assembles itself in evidence order: case, then
- * hypotheses, then edges, then findings, then the analyst and fingerprint
- * links, and finally the autopilot stamp. Animations live in landing.css
- * (`.cl-cg`); strokes use currentColor so the graph adapts to both themes.
+ * Animated case graph for case #42 — a classified file emailed to an
+ * external address. When the figure enters the viewport, the graph assembles
+ * itself in evidence order: case, then hypotheses, then edges, then
+ * findings, then the analyst and duplicate links, and finally the autopilot
+ * stamp. Animations live in landing.css (`.cl-cg`); strokes use currentColor
+ * so the graph adapts to both themes.
  */
 
 const SEVERITY = {
@@ -28,12 +28,17 @@ type FindingNode = {
   pulse?: boolean;
 };
 
+/**
+ * The evidence behind the story: the external email itself, the sender's
+ * identity, the classification marking on the attachment, and the internal
+ * original the duplicate edge ties back to.
+ */
 const FINDINGS: readonly FindingNode[] = [
   {
     cx: 110,
     cy: 340,
     fill: SEVERITY.critical,
-    label: "SEC",
+    label: "EML",
     labelFill: "#ffffff",
     delay: 1500,
     pulse: true,
@@ -42,7 +47,7 @@ const FINDINGS: readonly FindingNode[] = [
     cx: 210,
     cy: 350,
     fill: SEVERITY.high,
-    label: "PII",
+    label: "ID",
     labelFill: "#0a0a0a",
     delay: 1620,
   },
@@ -50,7 +55,7 @@ const FINDINGS: readonly FindingNode[] = [
     cx: 470,
     cy: 350,
     fill: SEVERITY.medium,
-    label: "IBN",
+    label: "TAG",
     labelFill: "#0a0a0a",
     delay: 1740,
   },
@@ -58,7 +63,7 @@ const FINDINGS: readonly FindingNode[] = [
     cx: 590,
     cy: 340,
     fill: SEVERITY.low,
-    label: "SEC",
+    label: "DUP",
     labelFill: "#0a0a0a",
     delay: 1860,
   },
@@ -100,7 +105,7 @@ export function CaseGraph() {
       ref={ref}
       viewBox="0 0 720 460"
       role="img"
-      aria-label="Case graph showing case 42 linked to two hypotheses with severity-colored findings, an analyst link, and a fingerprint match drawn by the autopilot"
+      aria-label="Case graph for case 42, a classified leak via email: sender-traced and impact hypotheses pinned to email, identity, classification-tag, and duplicate findings, with an analyst link and autopilot attribution"
       className="cl-cg h-auto w-full"
       data-inview={inView ? "true" : "false"}
     >
@@ -218,7 +223,7 @@ export function CaseGraph() {
         ANALYST LINK
       </text>
 
-      {/* fingerprint match: the same key seen in two systems */}
+      {/* duplicate match: the same thing seen in two systems */}
       <path
         data-anim="draw"
         style={delayStyle(2700, 560)}
@@ -239,7 +244,7 @@ export function CaseGraph() {
         fill="#a855f7"
         letterSpacing="0.12em"
       >
-        FINGERPRINT MATCH · SAME KEY, TWO SYSTEMS
+        DUPLICATE MATCH · SENT FILE = INTERNAL FILE
       </text>
 
       {/* case node */}
@@ -284,7 +289,7 @@ export function CaseGraph() {
           fill="#0a0a0a"
           fontWeight="700"
         >
-          Credential exposure
+          Classified leak via email
         </text>
       </g>
 
@@ -321,7 +326,7 @@ export function CaseGraph() {
           fill="currentColor"
           fontWeight="700"
         >
-          Leak via CI logs
+          Sender traced: A. Novak
         </text>
       </g>
 
@@ -358,7 +363,7 @@ export function CaseGraph() {
           fill="currentColor"
           fontWeight="700"
         >
-          Stale S3 export
+          214 records exposed
         </text>
       </g>
 
