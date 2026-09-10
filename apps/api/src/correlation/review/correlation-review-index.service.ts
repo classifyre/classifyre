@@ -8,6 +8,8 @@ import {
 import { UnionFind } from '../../utils/union-find';
 import {
   BOILERPLATE_PAIR_CAP,
+  BOILERPLATE_RANK_CAP,
+  BOILERPLATE_STATEMENT_TIMEOUT_MS,
   FANOUT_CAP,
   LINEAGE_HAIRBALL_MIN_ASSETS,
   LINEAGE_HAIRBALL_SHARE,
@@ -74,22 +76,40 @@ export class CorrelationReviewIndexService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Rebuild the whole review index.
+   * Rebuild the review index.
    *
    * Must run AFTER cluster maintenance: cluster ids are an input, and a pair
    * rolled up against a stale cluster would put the reviewer in front of a
    * group that no longer exists.
+   *
+   * Pass `touchedAssetIds` for an incremental run: the pair phases then only
+   * rewrite pairs involving those assets instead of re-deriving the whole
+   * corpus. Omit it (or pass an empty array) for a full rebuild — required
+   * after tuning/config changes, which alter what every pair means, and as a
+   * periodic healer for rows orphaned by asset deletions. The label, lineage
+   * and rollup phases always run whole-corpus: they are linear scans that were
+   * never the scaling problem.
    */
   async refresh(opts: {
     labelWeights: Record<string, number>;
     defaultWeight: number;
+    touchedAssetIds?: string[];
   }): Promise<ReviewIndexStats> {
     const started = Date.now();
     const computedAt = new Date();
+    const touched =
+      opts.touchedAssetIds && opts.touchedAssetIds.length > 0
+        ? [...new Set(opts.touchedAssetIds)]
+        : undefined;
+    this.logger.log(
+      touched
+        ? `Review index incremental refresh for ${touched.length} touched asset(s).`
+        : 'Review index full rebuild.',
+    );
 
     await this.refreshLabelProfiles(opts);
     const lineage = await this.refreshLineageProfiles();
-    const pairs = await this.refreshPairSignatures(computedAt);
+    const pairs = await this.refreshPairSignatures(computedAt, touched);
     await this.applyPatternKeyBucketing();
     const patterns = await this.refreshRollups(computedAt);
     await this.refreshSourcePairs();
@@ -352,7 +372,10 @@ export class CorrelationReviewIndexService {
    *   unknown             → we have no lineage for one of these assets. Not
    *                         evidence of anything, and never presented as such.
    */
-  private async refreshPairSignatures(computedAt: Date): Promise<number> {
+  private async refreshPairSignatures(
+    computedAt: Date,
+    touchedAssetIds?: string[],
+  ): Promise<number> {
     // Membership in a component that was demoted (component_id nulled) is not
     // evidence — see refreshLineageProfiles.
     const hairballGuard = Prisma.sql`
@@ -367,11 +390,22 @@ export class CorrelationReviewIndexService {
       OR la.upstream_roots && lb.upstream_roots
     )`;
 
+    // Incremental runs rewrite only pairs involving touched assets; the rest
+    // of the table is still current because nothing about those assets or
+    // their edges changed. A full rebuild truncates, as before.
+    const clearPairs = touchedAssetIds
+      ? Prisma.sql`DELETE FROM correlation_pair_signatures
+                   WHERE a_id = ANY(${touchedAssetIds})
+                      OR b_id = ANY(${touchedAssetIds})`
+      : Prisma.sql`TRUNCATE TABLE correlation_pair_signatures`;
+    const edgeScope = touchedAssetIds
+      ? Prisma.sql`AND (e.from_id = ANY(${touchedAssetIds})
+                        OR e.to_id = ANY(${touchedAssetIds}))`
+      : Prisma.empty;
+
     await this.prisma.$transaction(
       [
-        this.prisma.$executeRaw(
-          Prisma.sql`TRUNCATE TABLE correlation_pair_signatures`,
-        ),
+        this.prisma.$executeRaw(clearPairs),
         this.prisma.$executeRaw(Prisma.sql`
       -- Normalised so a_id < b_id ALWAYS.
       --
@@ -393,6 +427,7 @@ export class CorrelationReviewIndexService {
         WHERE e.from_type = ${ASSET_REL}
           AND e.to_type = ${ASSET_REL}
           AND e.relation_type IN (${Prisma.join(REVIEWABLE_RELATION_TYPES)})
+          ${edgeScope}
       )
       INSERT INTO correlation_pair_signatures (
         a_id, b_id, pattern_key, family, weighted, shared_count, labels,
@@ -468,7 +503,7 @@ export class CorrelationReviewIndexService {
       { timeout: REBUILD_TX_TIMEOUT_MS },
     );
 
-    await this.foldInBoilerplate(computedAt);
+    await this.foldInBoilerplate(computedAt, touchedAssetIds);
 
     const [{ count }] = await this.prisma.$queryRaw<Array<{ count: bigint }>>(
       Prisma.sql`SELECT COUNT(*)::bigint AS count FROM correlation_pair_signatures`,
@@ -488,7 +523,10 @@ export class CorrelationReviewIndexService {
    * pattern header keeps the uncapped size; a row that says "N pairs" where N
    * was silently truncated is worse than no row.
    */
-  private async foldInBoilerplate(computedAt: Date): Promise<void> {
+  private async foldInBoilerplate(
+    computedAt: Date,
+    touchedAssetIds?: string[],
+  ): Promise<void> {
     const hasEmbeddings = await this.prisma.$queryRaw<Array<{ ok: boolean }>>(
       Prisma.sql`
         SELECT EXISTS (
@@ -499,7 +537,79 @@ export class CorrelationReviewIndexService {
     );
     if (!hasEmbeddings[0]?.ok) return;
 
-    await this.prisma.$executeRaw(Prisma.sql`
+    // Groups are the unit of work: a touched asset re-projects its whole
+    // group (membership and ranking can shift around it), untouched groups
+    // are already current and are left alone.
+    const touchedGroups =
+      touchedAssetIds && touchedAssetIds.length > 0
+        ? Prisma.sql`(SELECT DISTINCT a.duplicate_group_hash
+                      FROM finding_evidence_analyses a
+                      JOIN findings f ON f.id = a.finding_id
+                      WHERE a.duplicate_group_hash IS NOT NULL
+                        AND f.asset_id = ANY(${touchedAssetIds}))`
+        : null;
+    const groupScope = touchedGroups
+      ? Prisma.sql`AND a.duplicate_group_hash IN ${touchedGroups}`
+      : Prisma.empty;
+
+    const [stats] = await this.prisma.$queryRaw<
+      Array<{ groups: bigint; biggest: bigint }>
+    >(Prisma.sql`
+      SELECT COUNT(*)::bigint AS groups,
+             COALESCE(MAX(c), 0)::bigint AS biggest
+      FROM (SELECT COUNT(DISTINCT f.asset_id) AS c
+            FROM finding_evidence_analyses a
+            JOIN findings f ON f.id = a.finding_id
+            WHERE a.duplicate_group_hash IS NOT NULL
+            ${touchedAssetIds ? Prisma.sql`AND a.duplicate_group_hash IN ${touchedGroups!}` : Prisma.empty}
+            GROUP BY a.duplicate_group_hash) g
+    `);
+    const groups = Number(stats.groups);
+    const biggest = Number(stats.biggest);
+    this.logger.log(
+      `Boilerplate projection: ${groups} group(s), biggest ${biggest} member(s), ` +
+        `scope=${touchedAssetIds ? `incremental (${touchedAssetIds.length} touched asset(s))` : 'full corpus'}.`,
+    );
+    if (biggest > BOILERPLATE_RANK_CAP) {
+      this.logger.warn(
+        `Boilerplate group of ${biggest} members exceeds the rank pre-cap ` +
+          `(${BOILERPLATE_RANK_CAP}): only the top-ranked assets enter the ` +
+          `self-join, so this group contributes at most ${BOILERPLATE_PAIR_CAP} ` +
+          `pairs. Output is unchanged by the pre-cap; the alternative was a ` +
+          `${biggest}x${biggest} sort spill.`,
+      );
+    }
+
+    const phaseStarted = Date.now();
+    // Transactional so the statement timeout below is session-scoped to this
+    // phase (SET LOCAL) and the whole projection stays atomic like before.
+    // Incremental runs first clear the boilerplate rows of touched groups by
+    // member asset (never by pattern-key prefix: two groups can share one),
+    // then re-project those groups wholesale, so a touched group always ends
+    // up exactly as a full rebuild would leave it.
+    const statements = [
+      // Server-side backstop: without it this statement runs until it
+      // finishes or the disk does. temp_file_limit is the infrastructure
+      // twin of this guard; this one travels with the query.
+      this.prisma.$executeRaw(
+        Prisma.sql`SELECT set_config('statement_timeout', ${String(BOILERPLATE_STATEMENT_TIMEOUT_MS)}, true)`,
+      ),
+      ...(touchedGroups
+        ? [
+            this.prisma.$executeRaw(Prisma.sql`
+              WITH doomed_members AS (
+                SELECT DISTINCT f.asset_id
+                FROM finding_evidence_analyses a
+                JOIN findings f ON f.id = a.finding_id
+                WHERE a.duplicate_group_hash IN ${touchedGroups}
+              )
+              DELETE FROM correlation_pair_signatures s
+              USING doomed_members m
+              WHERE s.family = 'NEAR_DUPLICATE_TEXT'
+                AND (s.a_id = m.asset_id OR s.b_id = m.asset_id)`),
+          ]
+        : []),
+      this.prisma.$executeRaw(Prisma.sql`
       WITH members AS (
         SELECT a.duplicate_group_hash AS gh,
                f.asset_id,
@@ -508,6 +618,7 @@ export class CorrelationReviewIndexService {
         FROM finding_evidence_analyses a
         JOIN findings f ON f.id = a.finding_id
         WHERE a.duplicate_group_hash IS NOT NULL
+        ${groupScope}
         GROUP BY a.duplicate_group_hash, f.asset_id
       ),
       ranked AS (
@@ -515,14 +626,24 @@ export class CorrelationReviewIndexService {
                ROW_NUMBER() OVER (PARTITION BY gh ORDER BY importance DESC) AS rn
         FROM members
       ),
+      -- Bound the quadratic self-join BEFORE it runs: only the top-ranked
+      -- assets per group enter the projection. The output cap keeps 200 pairs
+      -- ordered by (x.rn, y.rn), so no kept pair can involve an asset ranked
+      -- past 201 — pre-capping at BOILERPLATE_RANK_CAP changes no output row
+      -- while capping pairs per group at 1000^2/2 whatever the group size.
+      ranked_capped AS (
+        SELECT gh, asset_id, sim, rn
+        FROM ranked
+        WHERE rn <= ${BOILERPLATE_RANK_CAP}
+      ),
       pairs AS (
         SELECT x.gh,
                LEAST(x.asset_id, y.asset_id) AS a_id,
                GREATEST(x.asset_id, y.asset_id) AS b_id,
                LEAST(x.sim, y.sim) AS sim,
                ROW_NUMBER() OVER (PARTITION BY x.gh ORDER BY x.rn, y.rn) AS pair_rn
-        FROM ranked x
-        JOIN ranked y ON y.gh = x.gh AND y.asset_id > x.asset_id
+        FROM ranked_capped x
+        JOIN ranked_capped y ON y.gh = x.gh AND y.asset_id > x.asset_id
       )
       INSERT INTO correlation_pair_signatures (
         a_id, b_id, pattern_key, family, weighted, shared_count, labels,
@@ -557,7 +678,17 @@ export class CorrelationReviewIndexService {
       -- A pair already explained by shared values keeps that explanation; the
       -- value overlap is the more actionable of the two.
       ON CONFLICT (a_id, b_id) DO NOTHING
-    `);
+      `),
+    ];
+    const results = await this.prisma.$transaction(statements, {
+      // Same phase ceiling as refreshPairSignatures: a phase that overruns
+      // rolls the whole projection back to the previous index.
+      timeout: REBUILD_TX_TIMEOUT_MS,
+    });
+    const inserted = Number(results[results.length - 1] ?? 0);
+    this.logger.log(
+      `Boilerplate projection wrote ${inserted} pair(s) in ${Date.now() - phaseStarted}ms.`,
+    );
   }
 
   // ── 4. Pattern key bucketing ──────────────────────────────────────────────
@@ -641,6 +772,18 @@ export class CorrelationReviewIndexService {
           Prisma.sql`TRUNCATE TABLE correlation_cluster_patterns`,
         ),
         this.prisma.$executeRaw(Prisma.sql`
+      -- Cluster labels are aggregated once up front, not once per group. The
+      -- previous shape was a correlated ARRAY subquery re-scanning the pair
+      -- table for every (cluster, pattern) group — 25+ minutes on a 3.1M-row
+      -- table (2026-09-10). One grouped pass is the same distinct sorted set.
+      WITH cluster_labels AS (
+        SELECT s2.cluster_id AS cluster_id,
+               ARRAY_AGG(DISTINCT l ORDER BY l) AS labels
+        FROM correlation_pair_signatures s2,
+             LATERAL unnest(s2.labels) AS l
+        WHERE s2.cluster_id IS NOT NULL
+        GROUP BY s2.cluster_id
+      )
       INSERT INTO correlation_cluster_patterns (
         cluster_id, pattern_key, pair_count, undecided_pairs, member_count,
         source_count, max_weighted, avg_weighted, shape, lineage_state, labels
@@ -676,13 +819,11 @@ export class CorrelationReviewIndexService {
           WHEN bool_or(s.lineage_state = 'PATH') THEN 'PATH'
           ELSE 'UNKNOWN'
         END::"CorrelationLineageState",
-        COALESCE(ARRAY(
-          SELECT DISTINCT unnest(s2.labels)
-          FROM correlation_pair_signatures s2
-          WHERE s2.cluster_id = s.cluster_id
-          ORDER BY 1
-        ), ARRAY[]::text[])
+        -- MAX over identical values: labels depend only on the cluster, and
+        -- the joined column must sit inside an aggregate to satisfy GROUP BY.
+        COALESCE(MAX(cl.labels), ARRAY[]::text[])
       FROM correlation_pair_signatures s
+      LEFT JOIN cluster_labels cl ON cl.cluster_id = s.cluster_id
       LEFT JOIN asset_clusters c ON c.id = s.cluster_id
       LEFT JOIN correlation_pair_verdicts v ON v.a_id = s.a_id AND v.b_id = s.b_id
       WHERE s.cluster_id IS NOT NULL
