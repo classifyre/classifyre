@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.91",
+      "version": "1.43.92",
       "modules": [
         "boto3"
       ],
@@ -48,7 +48,7 @@
     },
     {
       "name": "confluent-kafka",
-      "version": "2.15.0",
+      "version": "2.15.1",
       "modules": [
         "confluent_kafka"
       ],
@@ -332,7 +332,7 @@
     },
     {
       "name": "pymongo",
-      "version": "4.18.0",
+      "version": "4.18.1",
       "modules": [
         "pymongo"
       ],
