@@ -135,6 +135,17 @@ const DEFAULT_MAX_CONCURRENT_RUNNERS = 2;
  */
 const RUNNER_LAUNCH_GRACE_MS = 2 * 60 * 1000;
 
+/**
+ * When this process started, used as the upper bound of the startup sweep.
+ *
+ * Derived from `process.uptime()` rather than from module-load time on purpose:
+ * `reconcileOnStartup` runs when a namespace is first *resolved*, which can be
+ * minutes or hours after boot, and the question it asks is "did this row
+ * survive a restart of this process?" That is answered against the process, not
+ * against whenever this file happened to be imported.
+ */
+const PROCESS_STARTED_AT = new Date(Date.now() - process.uptime() * 1000);
+
 @Injectable()
 export class CliRunnerService {
   private readonly logger = new Logger(CliRunnerService.name);
@@ -413,10 +424,18 @@ export class CliRunnerService {
       // "vanished". Retiring it there would be the same bug one status along.
       if (!runner.jobName && this.isWithinLaunchGrace(runner)) continue;
       retired += 1;
+      // Whether an execution ever existed is recorded differently per mode: a
+      // Kubernetes run by its Job name, a local run only by startedAt, since it
+      // never has a Job name at all. Keyed on jobName alone, every lost local
+      // scan was reported as never having started, however long it had run.
+      const launched =
+        runner.executionMode === RunnerExecutionMode.KUBERNETES
+          ? !!runner.jobName
+          : !!runner.startedAt;
       await this.markRunnerAsOrphaned(
         runner.id,
         runner.sourceId,
-        runner.jobName
+        launched
           ? 'Runner was orphaned (its execution no longer exists)'
           : 'Runner was orphaned (it never started an execution)',
       );
@@ -437,6 +456,24 @@ export class CliRunnerService {
         status: {
           in: [RunnerStatus.PENDING, RunnerStatus.RUNNING],
         },
+        // Only rows that predate this process.
+        //
+        // This pass recovers work stranded by a RESTART, but it does not run at
+        // boot -- it runs when a namespace is first resolved, which is the same
+        // request that a client's very first scan arrives on. Unbounded, it
+        // therefore selected the runner that had just been created a few
+        // milliseconds earlier, found no execution for it yet, and failed it
+        // with "application restarted while running". A runner this process
+        // created cannot have been orphaned by a restart of this process, so
+        // the sweep has no business looking at it: seen against the all-in-one
+        // image as `Starting manual run <id>` and `Recovered 1 orphaned
+        // runner(s)` logged in the same second, the scan ending in ERROR with
+        // an empty log. Not reachable by hand -- only a client that creates a
+        // source and starts a run back-to-back is fast enough.
+        //
+        // Anything newer belongs to `reconcileStaleInFlight`, which verifies
+        // rather than assumes and runs on every startRun.
+        triggeredAt: { lt: PROCESS_STARTED_AT },
       },
       select: {
         id: true,
@@ -445,6 +482,8 @@ export class CliRunnerService {
         executionMode: true,
         jobName: true,
         jobNamespace: true,
+        triggeredAt: true,
+        startedAt: true,
       },
     });
 
@@ -453,6 +492,20 @@ export class CliRunnerService {
 
     for (const runner of inFlightRunners) {
       if (await this.isRunnerExecutionActive(runner)) {
+        preservedActiveRunners += 1;
+        continue;
+      }
+
+      // Second guard, for the same race under a skewed clock. `triggered_at` is
+      // filled by the DATABASE (`DEFAULT CURRENT_TIMESTAMP`), so on Kubernetes
+      // it comes from a different machine than `PROCESS_STARTED_AT` above; a
+      // Postgres clock a second behind the API pod's would put a brand-new
+      // runner back inside the window. Same rule as reconcileStaleInFlight: a
+      // runner is flipped in-flight before its execution exists, so "no
+      // jobName" this soon means "still launching", not "vanished". LOCAL
+      // runners never carry a jobName, which is exactly the mode the all-in-one
+      // image runs in.
+      if (!runner.jobName && this.isWithinLaunchGrace(runner)) {
         preservedActiveRunners += 1;
         continue;
       }
@@ -653,6 +706,12 @@ export class CliRunnerService {
    * the reconcile tick is not synchronised with it. Genuine launch failures
    * take the normal error path with a real message, so this only delays
    * retiring a runner whose process died mid-launch -- until the next tick.
+   *
+   * It measures from startedAt, which is why the dequeue claim stamps it: left
+   * null, the fallback is triggeredAt, and a run that had queued for longer
+   * than the grace was outside the window before its launch had begun. For a
+   * local run the window only matters until startTrackedExecution registers
+   * it; from then on `activeExecutions` answers directly.
    */
   private isWithinLaunchGrace(runner: {
     triggeredAt?: Date | null;
@@ -702,7 +761,24 @@ export class CliRunnerService {
         return true;
       case RunnerExecutionMode.LOCAL:
       default:
-        return false;
+        // A local scan is a child of the API process that launched it, so that
+        // process's own registry is the whole answer -- there is no Job to ask.
+        //
+        // This was an unconditional `false`, which was right for the only
+        // caller it had when written: at boot a brand-new process owns nothing,
+        // so every LOCAL row is by definition a restart's leftover.
+        // reconcileStaleInFlight then reused the check on a LIVE process, where
+        // it read every healthy local scan as dead the moment it outlived the
+        // launch grace. startRun reconciles before admitting a new scan, so the
+        // next scan anyone started failed the one already running -- whose child
+        // process carried on, no longer counted against MAX_CONCURRENT_RUNNERS.
+        // The all-in-one image and the desktop app run nothing but LOCAL.
+        //
+        // Sound only because a local scan always runs in the one process that
+        // can see it: the split api/worker pods ship no Python CLI, so they run
+        // every scan as a Kubernetes Job. Give them one and this needs an owner
+        // recorded on the runner row.
+        return this.activeExecutions.has(runner.id);
     }
   }
 
@@ -4322,7 +4398,14 @@ export class CliRunnerService {
 
     const claimed = await this.prisma.runner.updateMany({
       where: { id: pending.id, status: RunnerStatus.PENDING },
-      data: { status: RunnerStatus.RUNNING },
+      // startedAt is stamped by the claim rather than left to executeCliAsync,
+      // which rewrites it once the execution really begins. The claim makes the
+      // row RUNNING several awaits before any execution exists to vouch for it,
+      // and the launch grace that covers that gap measures from startedAt --
+      // falling back to triggeredAt, which for a queued run is however long it
+      // sat in the queue. A reconcile landing mid-launch therefore failed any
+      // run that had waited more than two minutes, before it ever started.
+      data: { status: RunnerStatus.RUNNING, startedAt: new Date() },
     });
     if (claimed.count !== 1) return;
 

@@ -44,8 +44,8 @@ const NODES: readonly BoardNode[] = [
   },
   { label: "INQUIRIES", sub: "standing questions", x: 14, y: 380, width: 156 },
   {
-    label: "FINGERPRINTS",
-    sub: "one value, many systems",
+    label: "DUPLICATES",
+    sub: "review queue, pair by pair",
     x: 190,
     y: 380,
     width: 156,
@@ -76,7 +76,7 @@ export function EvidenceBoard() {
     <svg
       viewBox="0 0 360 566"
       role="img"
-      aria-label="The Classifyre pipeline: sources become assets, detectors raise findings, findings feed inquiries and fingerprints, and both converge into cases — with the autopilot working the investigation half"
+      aria-label="The Classifyre pipeline: sources become assets, detectors raise findings, findings feed inquiries and duplicates, and both converge into cases — with the autopilot working the investigation half"
       className="cl-board h-auto w-full text-foreground"
     >
       {EDGES.map((edge, index) => (

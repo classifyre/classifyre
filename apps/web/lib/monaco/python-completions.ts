@@ -216,6 +216,21 @@ function monacoKind(monaco: Monaco, kind: string) {
   }
 }
 
+/**
+ * Every list this provider returns is a function of the whole line prefix, not
+ * of the word under the cursor: `re` is a module on an import line and the
+ * `return` keyword anywhere else, and `secret` exists only after `ctx.`.
+ *
+ * Monaco only re-asks a provider whose list says it is incomplete. A complete
+ * list is fetched once and then filtered client-side as you keep typing -- and
+ * on a new word it is *reused* wholesale -- so the widget goes on offering the
+ * answer to a question the caret has already moved past. Typing `import re`
+ * would offer the SDK's `references` because the list was built at `i`.
+ *
+ * The cost of re-asking is a few array maps over an in-memory manifest.
+ */
+const RE_ASK_EVERY_KEYSTROKE = true;
+
 let registered = false;
 
 export function registerPythonCompletions(monaco: Monaco): void {
@@ -252,6 +267,7 @@ export function registerPythonCompletions(monaco: Monaco): void {
       // can go, and the version is the thing an author cannot otherwise find.
       if (IMPORT_LINE.test(linePrefix)) {
         return {
+          incomplete: RE_ASK_EVERY_KEYSTROKE,
           suggestions: [
             {
               label: manifest.module,
@@ -286,8 +302,10 @@ export function registerPythonCompletions(monaco: Monaco): void {
       );
       if (member) {
         const target = manifest.objects[member[1]!];
-        if (!target) return { suggestions: [] };
+        if (!target)
+          return { incomplete: RE_ASK_EVERY_KEYSTROKE, suggestions: [] };
         return {
+          incomplete: RE_ASK_EVERY_KEYSTROKE,
           suggestions: target.members.map((entry) => ({
             label: entry.label,
             kind: monacoKind(monaco, entry.kind),
@@ -304,6 +322,7 @@ export function registerPythonCompletions(monaco: Monaco): void {
       if (/\bAsset\s*\([^)]*$/.test(linePrefix)) {
         const fields = manifest.classes.Asset?.fields ?? [];
         return {
+          incomplete: RE_ASK_EVERY_KEYSTROKE,
           suggestions: fields.map((field) => ({
             label: field.label,
             kind: monaco.languages.CompletionItemKind.Field,
@@ -319,6 +338,7 @@ export function registerPythonCompletions(monaco: Monaco): void {
       }
 
       return {
+        incomplete: RE_ASK_EVERY_KEYSTROKE,
         suggestions: [
           ...manifest.globals.map((entry) => ({
             label: entry.label,
