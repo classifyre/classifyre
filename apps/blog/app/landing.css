@@ -259,12 +259,110 @@ body {
   animation-delay: var(--cl-delay, 0s);
 }
 
-/* ── Paw prints ─────────────────────────────────────────────────── */
+/* ── Closing board (string-board backdrop) ────────────────────── */
 
-.cl-paw {
-  opacity: 0;
-  animation: cl-fade 0.4s ease forwards;
+.cl-net {
+  color: rgb(255 255 255 / 0.16);
+}
+
+.cl-thread {
+  stroke-dasharray: 6 7;
+  animation: cl-thread-drift 10s linear infinite;
+}
+
+@keyframes cl-thread-drift {
+  to {
+    stroke-dashoffset: -130;
+  }
+}
+
+.cl-pin-pulse {
+  animation: cl-pin-glow 4.5s ease-in-out infinite;
   animation-delay: var(--cl-delay, 0ms);
+}
+
+@keyframes cl-pin-glow {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.cl-exhibit {
+  position: absolute;
+  border: 2px solid rgb(255 255 255 / 0.22);
+  padding: 0.3rem 0.7rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: rgb(255 255 255 / 0.35);
+}
+
+/* Slow whole-board drift: the network breathes without breaking geometry. */
+.cl-net-svg {
+  animation: cl-net-drift 26s ease-in-out infinite alternate;
+}
+
+@keyframes cl-net-drift {
+  from {
+    transform: scale(1.05) translate(0, 0);
+  }
+  to {
+    transform: scale(1.05) translate(-1.5%, 1%);
+  }
+}
+
+/* Rotating classification labels swap with a short rise-in. */
+.cl-tag-swap {
+  animation: cl-tag-in 0.6s ease;
+  transform-box: fill-box;
+}
+
+@keyframes cl-tag-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 0.5;
+    transform: none;
+  }
+}
+
+/* Lime spotlight tracking --mx/--my; hidden until the first pointer move
+   so touch readers just get the calm board. */
+.cl-net-spot {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  background: radial-gradient(
+    340px circle at var(--mx, 50%) var(--my, 40%),
+    color-mix(in srgb, var(--color-accent) 16%, transparent),
+    transparent 70%
+  );
+}
+
+.cl-net[data-lit="true"] .cl-net-spot {
+  opacity: 1;
+}
+
+/* The investigator's case file rides a slow hover. */
+.cl-float {
+  animation: cl-float 7s ease-in-out infinite;
+}
+
+@keyframes cl-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 /* ── Workspace cabinet (isolated workspaces) ────────────────────── */
@@ -309,6 +407,11 @@ body {
 
   .cl-rotate-slow,
   .cl-rotate-slower,
+  .cl-float,
+  .cl-net-svg,
+  .cl-tag-swap,
+  .cl-thread,
+  .cl-pin-pulse,
   .cl-stamp,
   .cl-mission,
   .cl-mission .cl-mission-dot,

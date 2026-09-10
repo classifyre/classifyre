@@ -16,7 +16,9 @@ import { getAllDetectorDocs } from "@workspace/schemas/detector-docs";
 
 import { normalizeSiteUrl, safeJsonLdStringify } from "@/lib/seo";
 import { CaseGraph } from "@/components/case-graph";
+import { ClosingBoard } from "@/components/closing-board";
 import { EvidenceBoard } from "@/components/evidence-board";
+import { HeroBoard } from "@/components/hero-board";
 import { Illustration, type IllustrationName } from "@/components/illustration";
 import { MissionRing } from "@/components/mission-ring";
 import {
@@ -75,12 +77,16 @@ const investigationPillars: readonly {
     title: "Inquiries",
     description:
       "Standing questions that keep matching new evidence, scan after scan.",
+    href: docs.inquiry,
+    hrefLabel: "How inquiries work",
   },
   {
-    illustration: "finger-print",
-    title: "Fingerprints",
+    illustration: "docs",
+    title: "Duplicates",
     description:
-      "The same value surfacing in two systems, connected by identity.",
+      "A finishable review queue for near-duplicates — grouped by cause, judged pair by pair.",
+    href: docs.duplicates,
+    hrefLabel: "How duplicate review works",
   },
   {
     illustration: "dna",
@@ -95,6 +101,8 @@ const investigationPillars: readonly {
     title: "Cases",
     description:
       "Evidence, competing hypotheses, an owner, and a full audit trail.",
+    href: docs.cases,
+    hrefLabel: "How cases work",
   },
 ];
 
@@ -241,30 +249,6 @@ function PowerMeter({ level }: { level: number }) {
   );
 }
 
-function PawPrint({
-  className,
-  style,
-}: {
-  className?: string;
-  style?: CSSProperties;
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className={cn("h-5 w-5", className)}
-      style={style}
-      fill="currentColor"
-    >
-      <ellipse cx="12" cy="15.5" rx="5" ry="4.5" />
-      <ellipse cx="5" cy="9.5" rx="2.2" ry="2.8" />
-      <ellipse cx="10" cy="6.5" rx="2.2" ry="2.9" />
-      <ellipse cx="14.5" cy="6.8" rx="2.1" ry="2.8" />
-      <ellipse cx="19" cy="10" rx="2.1" ry="2.7" />
-    </svg>
-  );
-}
-
 /* ── Page ──────────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
@@ -334,7 +318,8 @@ export default function HomePage() {
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section aria-labelledby="hero-title">
         <LandingSectionShell tone="signal" fullWidth className="bg-black">
-          <div className="flex flex-col gap-10 text-white lg:flex-row lg:items-center lg:gap-14">
+          <HeroBoard />
+          <div className="relative flex flex-col gap-10 text-white lg:flex-row lg:items-center lg:gap-14">
             <div className="space-y-7 lg:flex-[1.35]">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center border-2 border-accent bg-accent px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-black">
@@ -387,54 +372,53 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* The investigator */}
+            {/* The investigator's case file: the logo pinned as exhibit A,
+                where the convergence threads land. */}
             <div className="lg:flex-1">
-              <div className="relative mx-auto w-52 sm:w-60 lg:w-72">
-                <svg
-                  viewBox="0 0 300 300"
-                  aria-hidden="true"
-                  className="absolute -inset-6 h-auto w-[calc(100%+3rem)] text-white/40"
-                >
-                  <g
-                    className="cl-rotate-slow"
-                    style={{ transformOrigin: "150px 150px" }}
-                  >
-                    <circle
-                      cx="150"
-                      cy="150"
-                      r="144"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeDasharray="16 11"
-                    />
-                  </g>
-                  <g
-                    className="cl-rotate-slower"
-                    style={{ transformOrigin: "150px 150px" }}
-                  >
-                    <circle
-                      cx="150"
-                      cy="150"
-                      r="128"
-                      fill="none"
-                      stroke="var(--accent)"
-                      strokeWidth="1.5"
-                      strokeDasharray="3 14"
-                      opacity="0.8"
-                    />
-                  </g>
-                </svg>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/clasifyre_icon.png"
-                  alt="The Classifyre investigator — a detective cat on a green badge"
-                  width={288}
-                  height={288}
-                  className="relative w-full drop-shadow-[0_0_70px_rgba(183,255,0,0.3)]"
-                />
+              <div className="cl-float relative mx-auto w-60 sm:w-72 lg:w-80">
+                <div className="flex">
+                  <span className="border-2 border-b-0 border-white/25 bg-white/5 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/70">
+                    Case file · 042
+                  </span>
+                </div>
+                <div className="relative border-2 border-white/25 bg-white/[0.04] p-5 sm:p-6">
+                  <span
+                    aria-hidden="true"
+                    className="absolute -left-1 -top-1 size-2 bg-accent"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="absolute -right-1 -top-1 size-2 bg-accent"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="absolute -bottom-1 -left-1 size-2 bg-accent"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="absolute -bottom-1 -right-1 size-2 bg-accent"
+                  />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/clasifyre_icon.png"
+                    alt="The Classifyre investigator — a detective cat on a green badge"
+                    width={288}
+                    height={288}
+                    className="w-full drop-shadow-[0_0_70px_rgba(183,255,0,0.3)]"
+                  />
+                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/15 pt-3 font-mono text-[10px] font-bold uppercase tracking-[0.18em]">
+                    <span className="text-white/60">The investigator</span>
+                    <span className="inline-flex items-center gap-1.5 text-accent">
+                      <span
+                        aria-hidden="true"
+                        className="inline-block size-1.5 rounded-full bg-accent"
+                      />
+                      On duty
+                    </span>
+                  </div>
+                </div>
                 <div
-                  className="cl-stamp absolute -right-8 top-0 border-[3px] border-accent px-2.5 py-1 font-mono text-[11px] font-black uppercase tracking-[0.2em] text-accent"
+                  className="cl-stamp absolute -right-4 -top-3 border-[3px] border-accent px-2.5 py-1 font-mono text-[11px] font-black uppercase tracking-[0.2em] text-accent"
                   style={{ "--cl-delay": "700ms" } as CSSProperties}
                 >
                   Case open
@@ -566,8 +550,8 @@ export default function HomePage() {
                   </div>
                 </div>
                 <figcaption className="border-t-2 border-border pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-                  Hypotheses pinned to severity-rated evidence, a fingerprint
-                  match, and autopilot contributions — all attributed.
+                  A classified file emailed out: sender traced, impact
+                  scoped, duplicate confirmed — all attributed.
                 </figcaption>
               </figure>
             </div>
@@ -924,24 +908,8 @@ export default function HomePage() {
       {/* ── Closing CTA ──────────────────────────────────────────────────── */}
       <section aria-labelledby="closing-title">
         <LandingSectionShell tone="signal" fullWidth className="bg-black">
+          <ClosingBoard />
           <div className="relative text-white">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-1/2 hidden -translate-y-1/2 justify-between px-8 text-white/15 lg:flex"
-            >
-              {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
-                <PawPrint
-                  key={index}
-                  className="cl-paw h-7 w-7"
-                  style={
-                    {
-                      transform: `rotate(${index % 2 === 0 ? 18 : -12}deg) translateY(${index % 2 === 0 ? -14 : 14}px)`,
-                      "--cl-delay": `${index * 120}ms`,
-                    } as CSSProperties
-                  }
-                />
-              ))}
-            </div>
             <div className="relative mx-auto flex max-w-3xl flex-col items-center gap-6 py-6 text-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -965,20 +933,29 @@ export default function HomePage() {
                 the investigator finds. Everything you build carries over when
                 you go remote with Helm.
               </p>
-              <div className="flex w-full flex-wrap items-start justify-center gap-3">
+              <div className="flex w-full flex-col items-center gap-4">
                 <div className="w-full max-w-2xl">
                   <DockerRunBlock tone="dark" />
                 </div>
-                <Button
-                  asChild
-                  size="lg"
-                  variant="secondary"
-                  className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
-                >
-                  <a href={demoUrl} target="_blank" rel="noreferrer">
-                    Try the live demo
-                  </a>
-                </Button>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
+                  >
+                    <a href={routes.get}>Get your own Classifyre</a>
+                  </Button>
+                  <Button
+                    asChild
+                    size="lg"
+                    variant="secondary"
+                    className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
+                  >
+                    <a href={demoUrl} target="_blank" rel="noreferrer">
+                      Try the live demo
+                    </a>
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
