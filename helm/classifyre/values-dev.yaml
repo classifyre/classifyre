@@ -465,6 +465,13 @@ postgres:
       # not just a speed one.
       shared_buffers: 768MB
       work_mem: 16MB
+      # 2026-09-10: a single runaway sort spilled 142GB of pgsql_tmp files,
+      # filled the Docker Desktop VM disk, and took the whole k3d node down
+      # (DiskPressure -> evicted ingress controller -> helm upgrade failed).
+      # This caps per-session temp spill: the rogue query now errors with
+      # "temporary file size exceeds temp_file_limit" instead of sinking the
+      # node. 10GB is ~625x work_mem -- generous for legit sorts on this box.
+      temp_file_limit: 10GB
     resources:
       # Request == limit puts Postgres in the Guaranteed QoS class, and that is
       # the point of this whole block. Requests are what the kernel and kubelet

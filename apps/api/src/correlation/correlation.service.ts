@@ -441,6 +441,31 @@ export class CorrelationService {
     };
   }
 
+  /**
+   * Whether the review index needs a full rebuild rather than an incremental
+   * one. Compares the tuning row's age against the newest index row: anything
+   * built before the current tuning is stale corpus-wide, not just for the
+   * assets the next cycle touches. True when there is nothing to be
+   * incremental against (empty or not-yet-migrated index table).
+   */
+  private async indexNeedsFullRefresh(): Promise<boolean> {
+    const [cfg, newest] = await Promise.all([
+      this.prisma.correlationConfig.findUnique({
+        where: { id: 1 },
+        select: { updatedAt: true },
+      }),
+      this.prisma
+        .$queryRaw<
+          Array<{ max: Date | null }>
+        >(Prisma.sql`SELECT MAX(computed_at) AS max FROM correlation_pair_signatures`)
+        .catch(() => [{ max: null }]),
+    ]);
+    const max = newest[0]?.max ?? null;
+    if (max === null) return true;
+    if (!cfg) return false;
+    return cfg.updatedAt > max;
+  }
+
   /** Current config plus every in-use label with its effective weight. */
   async getConfig(
     recompute?: CorrelationConfigDto['recompute'],
@@ -763,9 +788,17 @@ export class CorrelationService {
     //    rather than empty. An empty queue reads as "nothing left to review",
     //    which is the one wrong answer this feature must never give.
     try {
+      // Incremental scope is only valid when the index was built under the
+      // same tuning: a config change alters what every pair means, so a
+      // config newer than the newest index row forces a full rebuild even for
+      // an incremental recompute. Without this, new weights would only ever
+      // reach the next cycle's touched assets and the rest of the queue would
+      // silently keep the old ones.
+      const fullRefresh = full || (await this.indexNeedsFullRefresh());
       await this.reviewIndex.refresh({
         labelWeights: cfg.rawWeights,
         defaultWeight: cfg.defaultWeight,
+        touchedAssetIds: fullRefresh ? undefined : touchedIds,
       });
     } catch (e) {
       this.logger.error(

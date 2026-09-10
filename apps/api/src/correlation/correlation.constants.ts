@@ -175,6 +175,33 @@ export const MIN_PATTERN_PAIRS = 5;
 export const BOILERPLATE_PAIR_CAP = 200;
 
 /**
+ * How many top-ranked assets per near-duplicate text group may enter the
+ * pair projection. The projection joins the group against itself, so it is
+ * quadratic in group size — and the output cap above keeps 200 pairs ordered
+ * by (x.rn, y.rn), which means no kept pair can involve an asset ranked past
+ * 201. Pre-capping the ranked input at 1,000 therefore cannot change a single
+ * output row, while it bounds the self-join to 1000^2/2 = 500k pairs per
+ * group no matter how large the group grows.
+ *
+ * Without this, one 43k-member boilerplate group projected 920M pairs, the
+ * window sort spilled 142GB of pgsql_tmp, and the whole node went down with
+ * DiskPressure (2026-09-10). The output cap alone cannot prevent that: it
+ * trims rows only after the sort has materialised them all.
+ */
+export const BOILERPLATE_RANK_CAP = 1000;
+
+/**
+ * Server-side ceiling for the boilerplate pair projection, in milliseconds.
+ * Backstop so a future data-skew surprise fails this phase instead of filling
+ * the disk: temp_file_limit is the infrastructure twin of this guard, this one
+ * travels with the query. Sized with margin over the slowest healthy full
+ * rebuild measured on a real corpus (262s on 21k groups / 478k hashed rows,
+ * September 2026) while staying under the 10-minute phase ceiling — and an
+ * incremental run, the normal case from here on, finishes in seconds.
+ */
+export const BOILERPLATE_STATEMENT_TIMEOUT_MS = 8 * 60 * 1000;
+
+/**
  * How far upstream to walk when recording an asset's FLOW roots, and how many
  * to keep. Three hops is the same ceiling the lineage view uses; eight roots is
  * enough to test "do these two share an ancestor" without storing a subgraph.
