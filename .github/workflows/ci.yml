@@ -115,6 +115,27 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      # The all-in-one image ships this model so a first scan embeds offline
+      # instead of blocking on a Hugging Face download. Fetched here, where the
+      # dependencies already exist, and injected into that build as a context —
+      # docker/Dockerfile deliberately builds nothing itself.
+      - name: Cache the embedding model
+        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
+        working-directory: apps/api
+        env:
+          EMBEDDING_CACHE_DIR: /tmp/classifyre-ci-artifacts/models
+        run: bun run embedding:cache
+
+      - name: Upload embedding model
+        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
+        uses: actions/upload-artifact@v7
+        with:
+          name: embedding-model
+          path: /tmp/classifyre-ci-artifacts/models
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Verify generated files are committed
         if: success() || failure()
         run: |
@@ -147,38 +168,6 @@ jobs:
       - name: Install Playwright browsers
         if: success() || failure()
         run: cd apps/web && bunx playwright install --with-deps chromium
-
-      - name: Install PostgreSQL 18 development files
-        # The desktop test (classifyre-desktop#test) builds pgvector against the
-        # embedded PostgreSQL 18 native runtime via stage-pgvector.sh, which needs
-        # a matching pg_config. ubuntu-latest ships PostgreSQL 16, so install the
-        # v18 server dev headers from the PGDG apt repo and point PG_CONFIG at them.
-        if: success() || failure()
-        shell: bash
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl ca-certificates gnupg
-          sudo install -d /usr/share/postgresql-common/pgdg
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/postgresql.asc"
-          sudo gpg --batch --yes --dearmor \
-            --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg \
-            "$RUNNER_TEMP/postgresql.asc"
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update
-          sudo apt-get install -y postgresql-server-dev-18
-          echo "PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config" >> "$GITHUB_ENV"
-
-      - name: Install libicu60 (embedded-postgres runtime dependency)
-        # @embedded-postgres/linux-x64's initdb binary is linked against ICU 60.
-        # ubuntu-24.04 runners no longer ship libicu60 in any apt repo, so pull
-        # the package directly from the Ubuntu archive (last published for bionic).
-        if: success() || failure()
-        shell: bash
-        run: |
-          curl -fsSL http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu60_60.2-3ubuntu3.2_amd64.deb -o "$RUNNER_TEMP/libicu60.deb"
-          sudo dpkg -i "$RUNNER_TEMP/libicu60.deb"
 
       - name: Unit tests
         if: success() || failure()
@@ -298,6 +287,98 @@ jobs:
             web-dist=${{ github.workspace }}/web-dist
           cache-from: type=registry,ref=${{ format('{0}/{1}:build-cache', secrets.DOCKER_USERNAME, matrix.repository) }}
           cache-to: type=registry,ref=${{ format('{0}/{1}:build-cache', secrets.DOCKER_USERNAME, matrix.repository) }},mode=max,image-manifest=true
+
+  # ── All-in-one image ────────────────────────────────────────────────────────
+  # Composed from the three images the matrix above just pushed, so it can only
+  # run after them. It builds nothing: the application is already inside those
+  # images, and the embedding model arrives as a build context.
+  all-in-one:
+    name: Build all-in-one (linux/amd64,linux/arm64)
+    needs: [docker]
+    if: always() && !cancelled() && needs.docker.result == 'success' && github.event_name != 'workflow_call' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    outputs:
+      tag: ${{ steps.tag.outputs.value }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download embedding model
+        uses: actions/download-artifact@v4
+        with:
+          name: embedding-model
+          path: models
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android
+          docker system prune -af || true
+          df -h
+
+      - name: Set up QEMU
+        if: ${{ !env.ACT }}
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64,amd64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Compute image tag
+        id: tag
+        run: echo "value=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: docker
+          file: docker/Dockerfile
+          platforms: ${{ env.DOCKER_PLATFORMS }}
+          push: true
+          tags: ${{ format('{0}/all-in-one:{1}', secrets.DOCKER_USERNAME, steps.tag.outputs.value) }}
+          build-args: |
+            BASE_TAG=${{ steps.tag.outputs.value }}
+            IMAGE_NS=${{ secrets.DOCKER_USERNAME }}
+          build-contexts: |
+            models=${{ github.workspace }}/models
+          cache-from: type=registry,ref=${{ format('{0}/all-in-one:build-cache', secrets.DOCKER_USERNAME) }}
+          cache-to: type=registry,ref=${{ format('{0}/all-in-one:build-cache', secrets.DOCKER_USERNAME) }},mode=max,image-manifest=true
+
+  # ── Smoke test ──────────────────────────────────────────────────────────────
+  # Boots the image and scans a fixture corpus end to end. A health check only
+  # proves the API answers; this proves the part that actually breaks — the
+  # Python subprocess, the detector pool, and the REST callback that writes
+  # findings back — plus that the data survives a restart.
+  smoke:
+    name: Smoke test the all-in-one image
+    needs: [all-in-one]
+    if: always() && !cancelled() && needs['all-in-one'].result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Run the smoke test
+        env:
+          IMAGE: ${{ format('{0}/all-in-one:{1}', secrets.DOCKER_USERNAME, needs['all-in-one'].outputs.tag) }}
+        run: bash docker/scripts/smoke.sh
 
   deploy-develop:
     name: Deploy → classifyre-develop

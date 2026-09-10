@@ -193,8 +193,14 @@ When implementing database features:
 ### Deployment Context
 
 The supported deployment modes are Kubernetes through the production Helm chart
-and the packaged desktop application. Local Kubernetes development uses k3d,
-Skaffold, and the same Helm chart.
+and the all-in-one Docker image in `docker/`. Local Kubernetes development uses
+k3d, Skaffold, and the same Helm chart.
+
+The all-in-one image builds nothing itself: it composes the three service images
+(`api`, `web`, `cli`) produced by the root `Dockerfile`, plus a pre-fetched
+embedding model injected as a build context. `ENVIRONMENT=docker` is what puts
+the API in single-host mode, where scans run as local subprocesses rather than
+Kubernetes Jobs.
 
 ## Code Style and Patterns
 

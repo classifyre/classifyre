@@ -129,8 +129,8 @@ const COMPARISON: readonly RowGroup[] = [
     summary: "Identical. No runtime is held back.",
     rows: [
       {
-        capability: "Desktop app",
-        detail: "macOS, Windows, Linux — PostgreSQL embedded",
+        capability: "All-in-one Docker image",
+        detail: "macOS, Windows, Linux — PostgreSQL inside",
         oss: true,
         ent: true,
       },
@@ -344,7 +344,7 @@ export default function EditionsPage() {
                 points={[
                   "Every connector, detector pack, and custom detector tier",
                   "Inquiries, fingerprints, cases, and the Harness AI autopilot",
-                  "Desktop app and the Helm chart, both fully featured",
+                  "The Docker image and the Helm chart, both fully featured",
                   "Workspace isolation is in the core and always on",
                 ]}
                 action={
@@ -353,7 +353,7 @@ export default function EditionsPage() {
                       asChild
                       className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
                     >
-                      <a href={routes.download}>Download</a>
+                      <a href={routes.get}>Get it</a>
                     </Button>
                     <Button
                       asChild
@@ -558,8 +558,8 @@ export default function EditionsPage() {
                 size="lg"
                 className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
               >
-                <a href={"/download"} target="_blank" rel="noreferrer">
-                  Download the free core
+                <a href={routes.get}>
+                  Get the free core
                 </a>
               </Button>
               <Button

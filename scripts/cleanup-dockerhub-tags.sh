@@ -10,7 +10,11 @@ fi
 DRY_RUN="${DRY_RUN:-0}"
 PAGE_SIZE="${PAGE_SIZE:-100}"
 KEEP_PATTERN='^(main|latest|develop|build-cache(|-.+)|[0-9]+\.[0-9]+\.[0-9]+)$'
-REPOSITORIES=(web api cli)
+# Every repository the release and CI pipelines push to. all-in-one is one of
+# them: ci.yml tags it per branch exactly like the three service images, so
+# without it here those tags accumulate forever — and at ~4 GB each that is the
+# most expensive repository to leave untended.
+REPOSITORIES=(web api cli all-in-one)
 
 dockerhub_api() {
   local method="$1"

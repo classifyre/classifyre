@@ -13,10 +13,6 @@ import { ANALYTICS_CONFIG_PATH } from "@/lib/analytics-config";
 import { isLocale, LOCALES, localeHtmlLang } from "@/lib/locale-detection";
 import { siteMetadata } from "@/lib/seo-metadata";
 
-// Desktop is a static export with no server to serve the runtime config, and
-// ships without analytics anyway.
-const isDesktopBuild = process.env.DESKTOP_BUILD === "true";
-
 const fontSerif = Archivo_Black({
   subsets: ["latin"],
   weight: ["400"],
@@ -42,9 +38,8 @@ const fontHero = League_Gothic({
 });
 
 /**
- * Emit one tree per locale. The server build needs this so the `beforeFiles`
- * rewrite has something to hit; the desktop static export needs it so both
- * language shells ship.
+ * Emit one tree per locale, so the `beforeFiles` rewrite in next.config.mjs
+ * has something to hit.
  */
 export function generateStaticParams() {
   return LOCALES.map((locale) => ({ locale }));
@@ -86,7 +81,7 @@ export default async function RootLayout({
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- deliberate:
             a small same-origin script that must run before hydration so the
             PostHog provider sees its config on first effect. */}
-        {!isDesktopBuild && <script src={ANALYTICS_CONFIG_PATH} />}
+        <script src={ANALYTICS_CONFIG_PATH} />
         <Providers locale={locale}>{children}</Providers>
       </body>
     </html>

@@ -10,7 +10,7 @@ Two properties drive the design:
 directory with its own ``HOME`` and its own git configuration, and deletes all of
 it when the run ends — normally, on abort, and on failure. There is no clone
 cache and no credential cache, so one job can never see another job's objects or
-another job's secrets. In Kubernetes the pod dies anyway; on the desktop, where
+another job's secrets. In Kubernetes the pod dies anyway; in a long-lived container, where
 the process is long-lived and scans many sources, that guarantee has to be made
 by this module.
 
@@ -573,7 +573,7 @@ class GitSource(ObjectStorageSourceBase):
     def _git_binary() -> str:
         """The git executable to use.
 
-        ``CLASSIFYRE_GIT_BINARY`` lets a packaged desktop build point at the git
+        ``CLASSIFYRE_GIT_BINARY`` lets a packaged build point at the git
         it ships rather than whatever the user happens to have installed — an
         operational concern, so it is an environment variable rather than a
         field on the source.

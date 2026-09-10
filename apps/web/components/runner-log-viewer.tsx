@@ -65,7 +65,7 @@ export interface LogFetchParams {
 export interface RunnerLogViewerProps {
   runnerId: string;
   isRunning: boolean;
-  s3Configured?: boolean;
+  logsPersisted?: boolean;
   /** Pass the WebSocket connection state so the viewer can skip polling when live. */
   isWsConnected?: boolean;
   /**
@@ -152,7 +152,7 @@ function CopyButton({ text }: { text: string }) {
 export function RunnerLogViewer({
   runnerId,
   isRunning,
-  s3Configured = true,
+  logsPersisted = true,
   isWsConnected,
   fetchFn,
   wsEntries,
@@ -438,7 +438,7 @@ export function RunnerLogViewer({
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {!s3Configured && (
+        {!logsPersisted && (
           <Alert className="border-amber-500/40 bg-amber-50/50 dark:bg-amber-950/20">
             <TriangleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             <AlertTitle className="text-amber-800 dark:text-amber-300">

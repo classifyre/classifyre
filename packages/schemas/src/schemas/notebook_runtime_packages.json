@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.89",
+      "version": "1.43.90",
       "modules": [
         "boto3"
       ],
@@ -137,7 +137,7 @@
     },
     {
       "name": "google-cloud-storage",
-      "version": "3.13.1",
+      "version": "3.14.1",
       "modules": [
         "google.cloud.storage"
       ],
@@ -341,7 +341,7 @@
     },
     {
       "name": "pymssql",
-      "version": "2.4.0",
+      "version": "2.4.1",
       "modules": [
         "pymssql"
       ],

@@ -133,8 +133,10 @@ describe('SourceGraphService readMap', () => {
       $queryRaw: jest.fn((strings: TemplateStringsArray) => {
         const text = Array.from(strings).join(' ? ');
         queries.push(text);
-        if (text.includes('FROM source_graph_nodes')) return Promise.resolve(nodeRows);
-        if (text.includes('FROM source_graph_links')) return Promise.resolve(linkRows);
+        if (text.includes('FROM source_graph_nodes'))
+          return Promise.resolve(nodeRows);
+        if (text.includes('FROM source_graph_links'))
+          return Promise.resolve(linkRows);
         if (text.includes('COUNT(DISTINCT asset_id)'))
           return Promise.resolve(pairSummary);
         return Promise.resolve([]);
@@ -150,7 +152,12 @@ describe('SourceGraphService readMap', () => {
 
   it('bundles a pairing rather than fetching its assets, above the threshold', async () => {
     const { service, queries } = build([
-      { source_id: 'a', peer_source_id: 'b', asset_count: BigInt(44452), edge_count: BigInt(90000) },
+      {
+        source_id: 'a',
+        peer_source_id: 'b',
+        asset_count: BigInt(44452),
+        edge_count: BigInt(90000),
+      },
     ]);
 
     const map = await service.readMap(12);
@@ -161,20 +168,29 @@ describe('SourceGraphService readMap', () => {
     expect(map.boundary).toEqual([]);
     // The whole point: no statement went looking for those 44,452 rows.
     expect(
-      queries.some((q) => q.includes('SELECT asset_id, source_id, peer_source_id')),
+      queries.some((q) =>
+        q.includes('SELECT asset_id, source_id, peer_source_id'),
+      ),
     ).toBe(false);
   });
 
   it('fetches the assets of a pairing small enough to draw', async () => {
     const { service, queries } = build([
-      { source_id: 'a', peer_source_id: 'b', asset_count: BigInt(3), edge_count: BigInt(5) },
+      {
+        source_id: 'a',
+        peer_source_id: 'b',
+        asset_count: BigInt(3),
+        edge_count: BigInt(5),
+      },
     ]);
 
     const map = await service.readMap(12);
 
     expect(map.bundles).toEqual([]);
     expect(
-      queries.some((q) => q.includes('SELECT asset_id, source_id, peer_source_id')),
+      queries.some((q) =>
+        q.includes('SELECT asset_id, source_id, peer_source_id'),
+      ),
     ).toBe(true);
   });
 });

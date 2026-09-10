@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { FolderOpen, Globe2, Plus, RefreshCw, Tags } from "lucide-react";
+import { FolderOpen, Plus, RefreshCw, Tags } from "lucide-react";
 import {
   api,
   setActiveNamespaceSlug,
@@ -27,7 +27,6 @@ import {
 import { CreateNamespaceDialog } from "@/components/namespace/create-namespace-dialog";
 import { useTranslation } from "@/hooks/use-translation";
 import { WorkspaceHeader } from "@/components/namespace/workspace-header";
-import { AddRemoteWorkspaceDialog } from "@/components/namespace/add-remote-workspace-dialog";
 import { useActiveNamespaces } from "@/components/active-namespaces-provider";
 import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
 import { useOpenWorkspace } from "@/hooks/use-open-workspace";
@@ -103,14 +102,8 @@ export default function LandingPage() {
   const { categories, reload: reloadCategories } = useNamespaceCategories();
   const [namespaces, setNamespaces] = React.useState<Namespace[] | null>(null);
   const [stats, setStats] = React.useState<Record<string, NamespaceStats>>({});
-  // Remote workspace id → its own namespace count (null once unreachable).
-  const [remoteCounts, setRemoteCounts] = React.useState<
-    Record<string, number | null>
-  >({});
   const [error, setError] = React.useState<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [remoteCreateOpen, setRemoteCreateOpen] = React.useState(false);
-  const [isDesktop, setIsDesktop] = React.useState(false);
   const [pendingDelete, setPendingDelete] = React.useState<Namespace | null>(
     null,
   );
@@ -120,10 +113,6 @@ export default function LandingPage() {
   // registry calls below are not namespace-prefixed.
   React.useEffect(() => {
     setActiveNamespaceSlug(undefined);
-  }, []);
-
-  React.useEffect(() => {
-    setIsDesktop(!!window.__CLASSIFYRE_DESKTOP__);
   }, []);
 
   const load = React.useCallback(async () => {
@@ -151,40 +140,12 @@ export default function LandingPage() {
     void loadStats();
   }, [load, loadStats]);
 
-  // A remote's own workspace count, read live through the desktop bridge (the
-  // renderer cannot reach another origin's API). Each remote resolves on its
-  // own, so one unreachable server never delays the others' cards; a failure
-  // leaves the count absent rather than showing a wrong number.
-  React.useEffect(() => {
-    const bridge = window.electronAPI?.remoteNamespaceCount;
-    if (!bridge || !namespaces) return;
-    let cancelled = false;
-    for (const ns of namespaces) {
-      if (ns.type !== "remote" || !ns.remoteUrl) continue;
-      void bridge(ns.remoteUrl)
-        .then((count) => {
-          if (!cancelled) {
-            setRemoteCounts((current) => ({ ...current, [ns.id]: count }));
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setRemoteCounts((current) => ({ ...current, [ns.id]: null }));
-          }
-        });
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [namespaces]);
-
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     setDeleting(true);
     try {
       await api.namespaces.remove(pendingDelete.id);
       removeBySlug(pendingDelete.slug);
-      window.electronAPI?.notifyNamespacesChanged();
       toast.success(
         t("workspaces.deleteSuccess", { name: pendingDelete.name }),
       );
@@ -238,15 +199,6 @@ export default function LandingPage() {
           </div>
           {namespaces && hasWorkspaces && (
             <div className="flex flex-wrap gap-2">
-              {isDesktop && (
-                <Button
-                  variant="outline"
-                  onClick={() => setRemoteCreateOpen(true)}
-                >
-                  <Globe2 className="mr-2 h-4 w-4" />
-                  {t("workspaces.addRemote")}
-                </Button>
-              )}
               <Button variant="outline" asChild>
                 <Link href="/namespaces/categories">
                   <Tags className="mr-2 h-4 w-4" />
@@ -295,14 +247,6 @@ export default function LandingPage() {
                 label: t("workspaces.createAction"),
                 onClick: () => setCreateOpen(true),
               }}
-              secondaryAction={
-                isDesktop
-                  ? {
-                      label: t("workspaces.addRemote"),
-                      onClick: () => setRemoteCreateOpen(true),
-                    }
-                  : undefined
-              }
             />
           </Card>
         ) : (
@@ -344,8 +288,6 @@ export default function LandingPage() {
                       key={ns.id}
                       namespace={ns}
                       stats={stats[ns.id]}
-                      remoteCount={remoteCounts[ns.id]}
-                      isDesktop={isDesktop}
                       onOpen={open}
                       onDelete={setPendingDelete}
                     />
@@ -364,15 +306,6 @@ export default function LandingPage() {
             open(ns);
           }}
         />
-        <AddRemoteWorkspaceDialog
-          open={remoteCreateOpen}
-          onOpenChange={setRemoteCreateOpen}
-          onCreated={(workspace) =>
-            setNamespaces((current) =>
-              current ? [...current, workspace] : [workspace],
-            )
-          }
-        />
 
         <AlertDialog
           open={pendingDelete !== null}
@@ -386,9 +319,7 @@ export default function LandingPage() {
                 })}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                {pendingDelete?.type === "remote"
-                  ? t("workspaces.remoteDeleteDescription")
-                  : t("workspaces.deleteDescription")}
+                {t("workspaces.deleteDescription")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

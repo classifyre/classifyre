@@ -62,7 +62,7 @@ api:
     HOME: /tmp
     BUN_INSTALL_CACHE_DIR: /var/cache/classifyre/bun/install
     TEMP_DIR: /tmp
-    RUNNER_LOGS_DIR: /tmp/classifyre/runner-logs
+    RUNNER_LOG_DIR: /tmp/classifyre/runner-logs
     MAX_RUNNERS_PER_SOURCE: "5"
     # Two different caps, and only the second one gates adaptive scheduling:
     #   MAX_CONCURRENT_RUNNERS      - hard instance-wide cap in CliRunnerService;
@@ -138,10 +138,6 @@ api:
     - name: development-source
       mountPath: /workspace/apps/cli/package.json
       subPath: apps/cli/package.json
-      readOnly: true
-    - name: development-source
-      mountPath: /workspace/apps/desktop/package.json
-      subPath: apps/desktop/package.json
       readOnly: true
     - name: development-source
       mountPath: /workspace/apps/docs/package.json

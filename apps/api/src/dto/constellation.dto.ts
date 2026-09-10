@@ -29,7 +29,9 @@ export class ConstellationClassCountsDto {
   @ApiProperty({ description: 'Lineage. The class that says data moved.' })
   flow: number;
 
-  @ApiProperty({ description: 'Structural containment — archive members, attachments.' })
+  @ApiProperty({
+    description: 'Structural containment — archive members, attachments.',
+  })
   containment: number;
 
   @ApiProperty({ description: 'The same thing seen twice.' })
@@ -90,7 +92,9 @@ export class ConstellationLinkDto {
   @ApiProperty({ type: ConstellationClassCountsDto })
   byClass: ConstellationClassCountsDto;
 
-  @ApiProperty({ description: 'Distinct assets participating, on either side.' })
+  @ApiProperty({
+    description: 'Distinct assets participating, on either side.',
+  })
   assetCount: number;
 
   @ApiProperty({
@@ -104,7 +108,8 @@ export class ConstellationBoundaryEdgeDto {
   @ApiProperty({
     required: false,
     nullable: true,
-    description: 'The source on the far side, or null when the far end is external.',
+    description:
+      'The source on the far side, or null when the far end is external.',
   })
   peerSourceId?: string | null;
 

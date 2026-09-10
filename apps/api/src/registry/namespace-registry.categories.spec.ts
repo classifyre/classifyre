@@ -41,8 +41,6 @@ function buildService(options: { knownCategoryIds?: string[] } = {}) {
             slug: 'acme',
             schema_name: 'ns_1',
             description: null,
-            type: 'local',
-            remote_url: null,
             has_thumbnail: false,
             settings: {},
             external_links: [],
@@ -63,8 +61,6 @@ function buildService(options: { knownCategoryIds?: string[] } = {}) {
             slug: 'acme',
             schema_name: 'ns_1',
             description: null,
-            type: 'local',
-            remote_url: null,
             has_thumbnail: false,
             settings: {},
             external_links: JSON.parse(

@@ -14,7 +14,7 @@ export const INTERNAL_API_KEY_HEADER = 'x-classifyre-internal-key';
  * the web proxy.
  *
  * The key is supplied via `CLASSIFYRE_INTERNAL_KEY`: Helm generates and
- * persists one per release, the desktop app generates one per install, and the
+ * persists one per release, the all-in-one image generates one per boot, and the
  * API forwards it into every CLI job's environment.
  *
  * When the variable is unset the guard fails OPEN and logs a warning once.

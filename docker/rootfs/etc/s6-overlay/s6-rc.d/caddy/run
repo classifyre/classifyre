@@ -1,0 +1,15 @@
+#!/command/with-contenv bash
+# The single public port. Everything else in this container listens on
+# loopback; Caddy is what fans one port out to the API and the web UI.
+set -euo pipefail
+
+# Caddy insists on a writable data/config directory even with no TLS to manage.
+# Point it inside the runtime user's home rather than letting it try /root.
+export XDG_DATA_HOME="${HOME:-/home/classifyre}/.local/share"
+export XDG_CONFIG_HOME="${HOME:-/home/classifyre}/.config"
+mkdir -p "${XDG_DATA_HOME}" "${XDG_CONFIG_HOME}"
+chown -R 10001:10001 "${XDG_DATA_HOME}" "${XDG_CONFIG_HOME}"
+
+exec s6-setuidgid classifyre \
+  env XDG_DATA_HOME="${XDG_DATA_HOME}" XDG_CONFIG_HOME="${XDG_CONFIG_HOME}" \
+  caddy run --config /etc/caddy/Caddyfile --adapter caddyfile

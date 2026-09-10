@@ -107,7 +107,8 @@ export class CaseworkSummaryService {
     for (const group of inquiryStatusGroups) {
       const count = group._count._all;
       inquiryTotal += count;
-      if (group.status === InquiryStatus.ACTIVE) byInquiryStatus.active += count;
+      if (group.status === InquiryStatus.ACTIVE)
+        byInquiryStatus.active += count;
       else byInquiryStatus.archived += count;
     }
 

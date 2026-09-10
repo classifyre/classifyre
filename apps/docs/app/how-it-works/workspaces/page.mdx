@@ -93,11 +93,6 @@ its workers and scheduling, and any request to its URL then 404s. **The data is
 retained** — the schema is never dropped — and the slug stays reserved so it
 cannot be silently reused by a different investigation.
 
-**Remote workspaces (desktop).** The desktop app can also list a workspace that
-lives on another Classifyre instance. It appears in the directory alongside
-local ones and opens that instance in your browser; no data is copied to your
-machine.
-
 ---
 
 ## Categories
@@ -237,8 +232,8 @@ What it deliberately does not ship is **authorization**: it has no built-in
 concept of users, roles, or who may open which workspace. Anyone who can reach
 the instance can switch between the workspaces on it.
 
-That is fine for a single investigator on the desktop app, or for a deployment
-that is already behind your own access layer. If you need governed workspaces —
+That is fine for a single investigator running the Docker image, or for a
+deployment that is already behind your own access layer. If you need governed workspaces —
 SSO, roles, and per-workspace authorization so an auditor sees only the audit
 workspace and a regional team only its region — that is part of the enterprise
 offering. See [Deployment](/deployment/) or get in touch at

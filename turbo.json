@@ -15,8 +15,6 @@
     "SITEMAP_BASE_URL",
     "SITEMAP_CHUNK_SIZE",
     "PUBLIC_BASE_URL",
-    "DESKTOP_BUILD",
-    "NEXT_PUBLIC_DESKTOP_BUILD",
     "NODE_ENV",
     "GITHUB_TOKEN",
     "GH_TOKEN"
@@ -79,15 +77,6 @@
     "test:e2e": {
       "cache": false,
       "dependsOn": ["build"]
-    },
-    "desktop#dev": {
-      "dependsOn": ["prisma:generate"],
-      "cache": false,
-      "persistent": true
-    },
-    "desktop#make": {
-      "dependsOn": ["^build"],
-      "cache": false
     },
     "docker:build": {
       "cache": false

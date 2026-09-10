@@ -562,8 +562,9 @@ Mounted folders (`api.localFolders`), rendered as JSON fragments for the CLI
 job template.
 
 A folder-backed source — the "Mounted Folder" type, or a CUSTOM notebook's
-`ctx.folder(...)` — reads a path on the machine that runs the scan. On desktop
-that machine is the user's laptop. In Kubernetes it is the CLI job pod, so the
+`ctx.folder(...)` — reads a path on the machine that runs the scan. In the
+all-in-one image that is the container, and a bind mount is enough. In
+Kubernetes it is the CLI job pod, so the
 data has to be mounted into that pod, and these two helpers are what put it
 there. Each entry becomes one volume plus one volumeMount, so an operator
 declares the corpus once and every scan, notebook run and connection test sees

@@ -31,7 +31,6 @@ import { RunnerAssetsTable } from "@/components/runner-assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { RunnerLogViewer } from "@/components/runner-log-viewer";
 import { useServerConfig } from "@/components/dashboard-layout";
-import { isDesktopShell } from "@/lib/desktop";
 import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { RunnerStatusBadge } from "@/components/runner-status-badge";
 import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
@@ -79,7 +78,7 @@ const EMPTY_FINDINGS_CHARTS: SearchFindingsChartsResponseDto = {
 export default function RunnerDetailPage() {
   const { t } = useTranslation();
   const formatDuration = useFormatDuration();
-  const { s3Configured } = useServerConfig();
+  const { logsPersisted } = useServerConfig();
   const router = useRouter();
   const runnerId = useRouteId();
 
@@ -942,7 +941,7 @@ export default function RunnerDetailPage() {
           <RunnerLogViewer
             runnerId={runnerId}
             isRunning={hasActiveRun}
-            s3Configured={s3Configured || isDesktopShell()}
+            logsPersisted={logsPersisted}
             isWsConnected={isConnected}
             fetchFn={fetchLogsFn}
             wsEntries={wsLogEntries}
