@@ -63,7 +63,7 @@ def get_effective_memory_mb() -> int:
         pass
 
     # macOS (and other POSIX without /proc): total physical memory via sysconf.
-    # Without this the desktop app fell through to the 4096 MB guess, which
+    # Without this a single-host install fell through to the 4096 MB guess, which
     # oversized the pool on small laptops and undersized it on big ones.
     try:
         pages = os.sysconf("SC_PHYS_PAGES")

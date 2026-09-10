@@ -28,7 +28,7 @@ import {
  * The **Python** half is keywords and common builtins. Real type inference --
  * knowing that `df` is a DataFrame -- needs a language server, and a language
  * server needs a persistent process this architecture deliberately does not
- * have: notebook execution is a short-lived job, the desktop build is a static
+ * have: notebook execution is a short-lived job, an offline install is a static
  * export with no server, and monaco-languageclient would require standing one
  * up and holding a socket open per editor. What that would buy is inference
  * over third-party libraries; what it would cost is the property that makes

@@ -37,7 +37,7 @@ export function validateLocalFolder(
 
   const path = entry.path.trim();
   if (!path) return "pathRequired";
-  // Both shapes, because the desktop app runs on Windows too and a relative
+  // Both shapes, because a Windows host can supply one too and a relative
   // path would resolve against the runner's working directory rather than
   // against anything the author meant.
   if (!(path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path)))

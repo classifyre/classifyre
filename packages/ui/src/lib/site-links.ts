@@ -18,18 +18,20 @@ export const privacyPolicyUrl = `${marketingSiteUrl}/privacy/`;
  * deployment turns every blocked action into a pointer at these) as well as
  * from the marketing site, so they belong here rather than in either app.
  */
-export const desktopDownloadUrl = `${marketingSiteUrl}/download/`;
+export const getStartedUrl = `${marketingSiteUrl}/get/`;
 export const helmDeploymentUrl = `${docsSiteUrl}/deployment/kubernetes/`;
 
 export const repositoryUrl = "https://github.com/classifyre/classifyre";
 export const contactEmail = "contact@classifyre.com";
 
-/**
- * The GitHub release the desktop builds are published to. Used as the last
- * fallback by the download UI (see `components/download-links`) when a release
- * can't be resolved, so a download link is never a dead end.
- */
+/** The latest GitHub release, for release notes and source tarballs. */
 export const releasesLatestUrl = `${repositoryUrl}/releases/latest`;
+
+/**
+ * The all-in-one image, quoted verbatim in `docker run` lines. One image with
+ * the whole product inside it — see docker/README.md.
+ */
+export const dockerImageRef = "classifyre/all-in-one";
 
 /** The OCI reference of the Helm chart, quoted verbatim in install commands. */
 export const helmChartRef =
@@ -45,7 +47,7 @@ export const helmChartRef =
  */
 export const marketingPaths = {
   home: "/",
-  download: "/download/",
+  get: "/get/",
   sources: "/sources/",
   editions: "/open-source-vs-enterprise/",
   madeInEurope: "/made-in-europe/",

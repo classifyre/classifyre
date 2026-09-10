@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { dynamicIdParams } from "@/lib/dynamic-route";
 import { isLocale } from "@/lib/locale-detection";
 import { entityMetadata } from "@/lib/seo-metadata";
 import { seoEntityName } from "@/lib/seo-entity";
@@ -17,10 +16,6 @@ export async function generateMetadata({
     namespaceSlug,
     path: `/investigations/inquiries/${id}`,
   });
-}
-
-export function generateStaticParams() {
-  return dynamicIdParams();
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {

@@ -1531,7 +1531,7 @@ export class McpServerFactoryService {
       {
         title: 'Set Notebook Local Folders',
         description:
-          'Replace the local folders a notebook reads with ctx.folder("name"). Desktop only — not available in Kubernetes deployments, where files are uploaded to the source instead (upload_notebook_file).',
+          'Replace the local folders a notebook reads with ctx.folder("name"). Needs a deployment that exposes host folders to scans: the all-in-one Docker image (bind-mount them) or a Kubernetes chart with api.localFolders configured. Otherwise upload files to the source instead (upload_notebook_file).',
         inputSchema: {
           sourceId: z.string().uuid(),
           scope: scopeSchema,

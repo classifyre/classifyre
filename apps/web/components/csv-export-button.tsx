@@ -18,7 +18,7 @@ import { getNamespacedApiBaseUrl } from "@workspace/api-client";
 
 // These export URLs are opened directly by the browser rather than fetched
 // through the generated client, so they need the same `<base>/<slug>` prefix
-// (including the desktop's injected API origin) resolved here.
+// resolved here.
 function getApiBaseUrl(): string {
   return getNamespacedApiBaseUrl();
 }

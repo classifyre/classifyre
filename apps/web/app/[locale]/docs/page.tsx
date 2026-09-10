@@ -143,7 +143,7 @@ const docSections = [
     title: "Setup & Administration",
     badge: "ADMIN",
     description:
-      "Instance settings, AI provider credentials, and the MCP server — plus running Classifyre on desktop or Kubernetes.",
+      "Instance settings, AI provider credentials, and the MCP server — plus running Classifyre with Docker or Kubernetes.",
     href: "/docs/settings/",
     items: [
       { label: "Settings & AI providers", href: "/docs/settings/" },

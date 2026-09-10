@@ -45,7 +45,7 @@ export const RESERVED_PREFIXES = new Set<string>([
   // Web app top-level routes (apps/web/app/*). `docs` is shared: the web serves
   // the bundled documentation site there, the API serves Swagger UI.
   'docs',
-  'remote', // desktop's embedded remote-workspace browser
+  'remote', // reserved: was the embedded remote-workspace browser's route
   'classifyre-usr', // analytics proxy route
   '_next', // Next.js build assets
 ]);
@@ -81,8 +81,8 @@ export function isReservedSlug(slug: string): boolean {
 
 /**
  * A valid slug: lowercase alphanumerics and single dashes, 1–50 chars, no
- * leading/trailing dash. Mirrors the desktop slugify rules so the same names
- * work in both deployments.
+ * leading/trailing dash. Mirrors the web app's own slugify rules so a name
+ * chosen in the UI is the one that ends up in the URL.
  */
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/;
 

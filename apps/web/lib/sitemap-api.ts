@@ -21,7 +21,6 @@ const INDEX_REVALIDATE_SECONDS = 300;
 export interface SitemapNamespace {
   id: string;
   slug: string;
-  type: "local" | "remote";
   updatedAt: string | null;
 }
 
@@ -90,7 +89,7 @@ export async function fetchSitemapNamespaces(): Promise<SitemapNamespace[]> {
   const namespaces = await getJson<SitemapNamespace[]>("/namespaces", {
     revalidateSeconds: INDEX_REVALIDATE_SECONDS,
   });
-  return namespaces.filter((ns) => ns.type !== "remote" && Boolean(ns.slug));
+  return namespaces.filter((ns) => Boolean(ns.slug));
 }
 
 export async function fetchSitemapIndex(

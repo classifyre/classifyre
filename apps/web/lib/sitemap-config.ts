@@ -3,7 +3,7 @@
  * is a route handler.
  *
  * The sitemap is **off by default**: a Classifyre instance is usually private
- * (and the desktop app has no server at all), so it is opt-in per deployment
+ * (and most are private), so it is opt-in per deployment
  * via `SITEMAP_ENABLED` (Helm: `frontend.sitemap.enabled`). When it is off the
  * sitemap routes 404 and robots.txt disallows everything.
  *

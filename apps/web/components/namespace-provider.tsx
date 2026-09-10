@@ -1,14 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { usePathname } from "next/navigation";
 import {
   api,
   setActiveNamespaceSlug,
   type Namespace,
 } from "@workspace/api-client";
-import { DYNAMIC_ID_SENTINEL } from "@/lib/dynamic-route";
-import { stripLocalePrefix } from "@/lib/locale-detection";
 import { withLocaleAndSlug } from "@/lib/ns-path";
 import { useLocale } from "@/lib/app-path";
 
@@ -41,27 +38,7 @@ export function NamespaceProvider({
   slug: string;
   children: React.ReactNode;
 }) {
-  const isStaticShell = slug === DYNAMIC_ID_SENTINEL;
-  const [effectiveSlug, setEffectiveSlug] = React.useState(
-    isStaticShell ? "" : slug,
-  );
-  // The static export serves every namespace from the same placeholder shell,
-  // so `slug` stays "__id__" across a client navigation from one workspace to
-  // another and cannot signal the switch. The pathname is the only thing that
-  // changes, so it must drive the re-read of the real slug.
-  const pathname = usePathname();
-
-  React.useEffect(() => {
-    if (!isStaticShell) {
-      setEffectiveSlug(slug);
-      return;
-    }
-    // The locale segment, when present, sits ahead of the slug.
-    const { rest } = stripLocalePrefix(window.location.pathname);
-    const first = rest.split("/").filter(Boolean)[0] ?? "";
-    const recovered = decodeURIComponent(first);
-    setEffectiveSlug(recovered === DYNAMIC_ID_SENTINEL ? "" : recovered);
-  }, [isStaticShell, pathname, slug]);
+  const effectiveSlug = slug;
 
   // Register immediately (module-level, idempotent) so SSR/first render is
   // scoped correctly, then keep it in sync on client navigations.
@@ -112,16 +89,15 @@ export function NamespaceProvider({
     [effectiveSlug, namespace, locale],
   );
 
-  // Match the prerendered desktop placeholder shell during hydration, then
-  // mount dashboard children once the real slug has been recovered from URL.
+  // A namespace route always carries a slug; the guard is here so a malformed
+  // one renders nothing rather than scoping every API call to an empty tenant.
   if (!effectiveSlug) return null;
 
   return (
     <NamespaceContext.Provider value={value}>
-      {/* Switching workspaces reuses this layout instance (the same route
-          segment, and on desktop the same placeholder shell), so key the
-          subtree to drop state and in-flight data belonging to the old
-          tenant. */}
+      {/* Switching workspaces reuses this layout instance — it is the same
+          route segment — so key the subtree to drop state and in-flight data
+          belonging to the old tenant. */}
       <React.Fragment key={effectiveSlug}>{children}</React.Fragment>
     </NamespaceContext.Provider>
   );

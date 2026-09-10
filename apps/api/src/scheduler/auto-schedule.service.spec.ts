@@ -547,8 +547,8 @@ describe('AutoScheduleService', () => {
     // every slot held, nothing able to start and no error anywhere.
     it('reconciles stale in-flight runners before yielding, then re-checks', async () => {
       prisma.source.count
-        .mockResolvedValueOnce(2)   // at the cap
-        .mockResolvedValueOnce(0);  // after the orphans are retired
+        .mockResolvedValueOnce(2) // at the cap
+        .mockResolvedValueOnce(0); // after the orphans are retired
       cliRunner.reconcileStaleInFlight.mockResolvedValue(2);
       prisma.source.findMany.mockResolvedValue([]);
 

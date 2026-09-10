@@ -139,16 +139,14 @@ function formatPlaceholder(
 }
 
 /**
- * Identifies the LOCAL_FOLDER source's `required.path` field, which is the
- * only field across all source schemas shaped as `required.path` (an
- * absolute local filesystem path). When running inside the desktop app this
- * field gets a native "Browse..." folder picker button (see the Electron
- * `dialog:select-folder` IPC channel wired up in
- * apps/desktop/src/main/ipc-handlers.ts). This targeted check avoids
- * threading a source-type prop through every layer of the generic
- * schema-driven form renderer.
+ * Identifies the LOCAL_FOLDER source's `required.path` field, which is the only
+ * field across all source schemas shaped as `required.path` (an absolute
+ * filesystem path, resolved where the scan runs rather than in the browser).
+ * It renders through FolderPathInput so the placeholder and help text can say
+ * so. This targeted check avoids threading a source-type prop through every
+ * layer of the generic schema-driven form renderer.
  */
-function isDesktopFolderPathField(
+function isFolderPathFieldSchema(
   fieldPath: string,
   schema: JSONSchema7,
 ): boolean {
@@ -2096,7 +2094,7 @@ function SchemaField({
   const isUrl =
     normalizedSchema.format === "uri" || name.toLowerCase().includes("url");
   const isLongField = isBlobField || isLongText(normalizedSchema);
-  const isFolderPathField = isDesktopFolderPathField(
+  const isFolderPathField = isFolderPathFieldSchema(
     fieldPath,
     normalizedSchema,
   );
@@ -2168,9 +2166,9 @@ function SchemaField({
 /**
  * Text input for the LOCAL_FOLDER source's `required.path` field.
  *
- * Thin wrapper over the shared FolderPathInput, which owns the desktop
- * "Browse..." affordance -- react-hook-form's field object is the only thing
- * this adds.
+ * Thin wrapper over the shared FolderPathInput, which owns the copy explaining
+ * that the path is resolved where the scan runs -- react-hook-form's field
+ * object is the only thing this adds.
  */
 function FolderPathField({
   field,

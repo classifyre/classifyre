@@ -132,7 +132,7 @@ function Stat({
  * A labelled control that also says what the deployment configured.
  *
  * The default matters here in a way it does not elsewhere in settings: these
- * values arrive from Helm values or the desktop bundle, an operator cannot see
+ * values arrive from Helm values or the image's own defaults, an operator cannot see
  * them from the browser otherwise, and "reset" is meaningless without knowing
  * where it lands.
  */

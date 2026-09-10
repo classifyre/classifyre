@@ -45,8 +45,6 @@ export interface Namespace {
   slug: string;
   schemaName: string;
   description: string | null;
-  type: 'local' | 'remote';
-  remoteUrl: string | null;
   thumbnail: string | null;
   settings: Record<string, unknown>;
   /** Ordered external links shown on the workspace card. */
@@ -63,8 +61,6 @@ export interface CreateNamespaceInput {
   name: string;
   slug?: string;
   description?: string;
-  type?: 'local' | 'remote';
-  remoteUrl?: string;
   /** Optional base64 image data URI (`data:image/...;base64,...`), max 2 MB. */
   thumbnail?: string;
   externalLinks?: NamespaceExternalLinkInput[];
@@ -78,7 +74,6 @@ export interface UpdateNamespaceInput {
   /** URL routing alias; editable and validated against SLUG_RE. */
   slug?: string;
   description?: string;
-  remoteUrl?: string;
   /**
    * Base64 image data URI to set as the thumbnail (max 2 MB), or `null`/empty
    * to clear it. Omit to leave the existing thumbnail unchanged.

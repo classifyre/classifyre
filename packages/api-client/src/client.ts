@@ -1209,8 +1209,6 @@ function getServerApiBaseUrl(): string {
 
 function getBaseUrl(): string {
   if (typeof window !== "undefined") {
-    const desktop = (window as any).__CLASSIFYRE_DESKTOP__;
-    if (desktop?.apiBaseUrl) return desktop.apiBaseUrl as string;
     return process.env.NEXT_PUBLIC_API_URL || "/api";
   }
 
@@ -1225,7 +1223,7 @@ function getBaseUrl(): string {
 const RESERVED_ROUTE_PREFIXES = new Set([
   "api",
   "namespaces",
-  "remote", // embedded remote-workspace browser (desktop)
+  "remote", // reserved: previously the embedded remote-workspace browser
   "docs",
   "health",
   "ping",
@@ -1244,8 +1242,8 @@ const LOCALE_PREFIXES = new Set(["en", "de"]);
 
 /**
  * The namespace slug encoded in an app pathname, or undefined when the path is
- * outside any namespace (landing page, `/namespaces/<id>/settings`, a file such
- * as the desktop shell's `/index.html`).
+ * outside any namespace (landing page, `/namespaces/<id>/settings`, or a static
+ * file).
  */
 export function namespaceSlugFromPath(
   pathname: string | null | undefined,
@@ -1292,7 +1290,7 @@ export function getActiveNamespaceSlug(): string | undefined {
 
 /**
  * API base for hand-written `fetch` calls that bypass the generated client:
- * the desktop's injected API origin, the configured URL, or the `/api` proxy.
+ * the configured URL, or the `/api` proxy.
  */
 export function getApiBaseUrl(): string {
   return getBaseUrl().replace(/\/+$/, "");
@@ -1386,8 +1384,6 @@ export interface Namespace {
   slug: string;
   schemaName: string;
   description: string | null;
-  type: "local" | "remote";
-  remoteUrl: string | null;
   thumbnail: string | null;
   settings: Record<string, unknown>;
   /** Ordered external links shown on the workspace card. */
@@ -1403,8 +1399,6 @@ export interface CreateNamespaceInput {
   name: string;
   slug?: string;
   description?: string;
-  type?: "local" | "remote";
-  remoteUrl?: string;
   /** Base64 image data URI (`data:image/...;base64,...`), max 2 MB. */
   thumbnail?: string;
   externalLinks?: NamespaceExternalLinkInput[];

@@ -244,14 +244,10 @@ export function McpSettingsCard() {
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
-      // In the desktop app the page origin is the app:// bundle, not the API —
-      // the MCP endpoint clients must call is the per-workspace API server.
-      const desktop = (
-        window as unknown as {
-          __CLASSIFYRE_DESKTOP__?: { apiBaseUrl?: string };
-        }
-      ).__CLASSIFYRE_DESKTOP__;
-      setOrigin(desktop?.apiBaseUrl ?? window.location.origin);
+      // The MCP endpoint is served from the same origin as this page — the Helm
+      // chart routes it through its own ingress, and the all-in-one image
+      // through the same reverse proxy as everything else.
+      setOrigin(window.location.origin);
     }
   }, []);
 

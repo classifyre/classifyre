@@ -8,7 +8,7 @@ import {
  * Prisma error codes that mean "nothing was committed, try again".
  *
  * P1001 — can't reach the database server (network blip, checkpoint I/O stall,
- *         a Postgres pod restart, or the desktop Postgres still booting).
+ *         a Postgres pod restart, or the bundled Postgres still booting).
  * P1002 — server reached but the connection timed out.
  * P1008 — operation timed out.
  * P1017 — server closed the connection (idle reaper, failover, restart).

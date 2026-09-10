@@ -1,8 +1,9 @@
 /**
  * Server-side runtime configuration.
  *
- * All values here are injected by Helm at deployment time as environment
- * variables. They MUST only be read from server components or server actions —
+ * All values here come from environment variables set by the deployment (the
+ * Helm chart, or the all-in-one image's entrypoint). They MUST only be read
+ * from server components or server actions —
  * they are never available in the client bundle.
  *
  * Prefer `getServerConfig()` over reading individual env vars directly so
@@ -11,13 +12,17 @@
 
 export interface ServerConfig {
   /**
-   * True when S3-compatible object storage is configured.
-   * Set by Helm from objectStorage.enabled (S3_CONFIGURED env var), or
-   * inferred from the presence of S3_BUCKET when S3_CONFIGURED is not
-   * explicitly set (non-Helm deployments).
-   * When false, runner logs are streamed live but not persisted after the run.
+   * True when scan logs survive the run.
+   *
+   * Mirrors the backend's own fallback order in
+   * apps/api/src/cli-runner/runner-log-storage.service.ts: a local directory
+   * when RUNNER_LOG_DIR is set (the all-in-one Docker image), otherwise
+   * S3-compatible object storage when S3_BUCKET is (the Helm chart, from
+   * objectStorage.enabled via S3_CONFIGURED). When neither is configured, logs
+   * stream live and are gone once the run ends — which is what the log viewer
+   * warns about.
    */
-  s3Configured: boolean;
+  logsPersisted: boolean;
 
   /**
    * True when the instance runs in read-only demo mode.
@@ -33,7 +38,8 @@ export interface ServerConfig {
  */
 export function getServerConfig(): ServerConfig {
   return {
-    s3Configured:
+    logsPersisted:
+      !!process.env.RUNNER_LOG_DIR ||
       process.env.S3_CONFIGURED === "true" ||
       (process.env.S3_CONFIGURED !== "false" && !!process.env.S3_BUCKET),
     demoMode: process.env.DEMO_MODE === "true",
