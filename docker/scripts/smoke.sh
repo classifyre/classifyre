@@ -205,13 +205,16 @@ ok "workspace schema provisioned (${tables} tables)"
 # ── A real scan ───────────────────────────────────────────────────────────────
 step "Scanning the fixture corpus"
 
-# Touch the workspace first, and let it settle. A namespace does its runner
-# reconciliation when it is first resolved, and that sweep marks every
-# PENDING/RUNNING runner it cannot see executing as orphaned — including one
-# created a moment earlier by a client faster than any human. Resolving the
-# namespace here means the sweep has happened before a runner exists to catch.
-api GET "/${NS}/sources" >/dev/null
-sleep 10
+# Deliberately back-to-back: create the source and start the run with nothing
+# in between, and on a namespace this request is the first to resolve.
+#
+# That is the shape that used to fail. A namespace runs its runner
+# reconciliation when it is first resolved rather than at boot, and that sweep
+# marked every PENDING/RUNNING runner it could not see executing as orphaned —
+# including the one created milliseconds earlier, which ended the scan as ERROR
+# with an empty log. This used to need a warm-up GET and a 10s settle to pass;
+# the sweep is now bounded to runners that predate the process, so the race is
+# the point. Do not add a sleep here — it would only hide the regression.
 
 source_id="$(api POST "/${NS}/sources" -d '{
   "type": "LOCAL_FOLDER",

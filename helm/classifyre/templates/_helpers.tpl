@@ -615,6 +615,25 @@ wrong one from a truncated integer.
 {{- end -}}
 
 {{/*
+PriorityClass is cluster-scoped, so a fixed name collides across releases
+sharing the cluster (e.g. `classifyre` prod and `classifyre-develop`): whichever
+release deploys second gets rejected with an ownership-metadata error because
+Helm won't adopt an object annotated for another release. Prefixing with
+.Release.Name gives each release its own object while the numeric `value`
+(the thing that actually governs preemption) stays whatever values.yaml says,
+so relative priority across releases on the same node is unchanged.
+
+Usage: {{ include "classifyre.priorityClassServiceName" . }}
+*/}}
+{{- define "classifyre.priorityClassServiceName" -}}
+{{- printf "%s-%s" .Release.Name .Values.priorityClasses.serviceName -}}
+{{- end -}}
+
+{{- define "classifyre.priorityClassBatchName" -}}
+{{- printf "%s-%s" .Release.Name .Values.priorityClasses.batchName -}}
+{{- end -}}
+
+{{/*
 Resolve a pod's priorityClassName, refusing to name a class this release has
 not created.
 
@@ -629,17 +648,21 @@ the class names default to the chart's own in values.yaml, while
 values file that turns creation off while leaving the defaults alone renders a
 dangling reference.
 
-So: a chart-owned name is only emitted when the chart is creating the classes.
-Any other name is assumed to be externally managed (a platform-wide class) and
-is passed through untouched.
+So: a name matching the chart's own default (`priorityClasses.serviceName` /
+`.batchName`) is resolved to the actual release-scoped object name only when
+this release is creating the classes; otherwise it renders as nothing (no
+priorityClassName on the pod). Any other name is assumed to be externally
+managed (a platform-wide class) and is passed through untouched.
 
 Usage: {{ include "classifyre.priorityClassName" (dict "name" .Values.api.priorityClassName "root" .) }}
 */}}
 {{- define "classifyre.priorityClassName" -}}
 {{- $name := .name | default "" -}}
 {{- $pc := .root.Values.priorityClasses -}}
-{{- $chartOwned := list $pc.serviceName $pc.batchName -}}
-{{- if and (has $name $chartOwned) (not $pc.create) -}}
+{{- if eq $name $pc.serviceName -}}
+{{- if $pc.create -}}{{- include "classifyre.priorityClassServiceName" .root -}}{{- end -}}
+{{- else if eq $name $pc.batchName -}}
+{{- if $pc.create -}}{{- include "classifyre.priorityClassBatchName" .root -}}{{- end -}}
 {{- else -}}
 {{- $name -}}
 {{- end -}}
