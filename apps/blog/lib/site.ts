@@ -36,6 +36,7 @@ export const docs = {
   duplicates: "https://docs.classifyre.com/duplicates/",
   duplicatesGlossary: "https://docs.classifyre.com/duplicates/glossary/",
   cases: "https://docs.classifyre.com/investigations/cases/",
+  inquiry: "https://docs.classifyre.com/investigations/inquiry/",
   detectors: "https://docs.classifyre.com/detectors/",
   customDetectors: "https://docs.classifyre.com/detectors/custom-detectors/",
   preBuiltDetectors: "https://docs.classifyre.com/detectors/pre-built/",

@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.90",
+      "version": "1.43.91",
       "modules": [
         "boto3"
       ],
@@ -128,7 +128,7 @@
     },
     {
       "name": "google-auth",
-      "version": "2.57.1",
+      "version": "2.58.0",
       "modules": [
         "google.auth"
       ],
@@ -181,7 +181,7 @@
     },
     {
       "name": "litellm",
-      "version": "1.100.0",
+      "version": "1.100.1",
       "modules": [
         "litellm"
       ],
@@ -270,7 +270,7 @@
     },
     {
       "name": "psycopg2-binary",
-      "version": "2.9.12",
+      "version": "2.9.13",
       "modules": [
         "psycopg2"
       ],
