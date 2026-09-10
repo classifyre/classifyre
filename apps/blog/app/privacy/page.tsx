@@ -481,7 +481,7 @@ export default function PrivacyPage() {
           >
             <p>
               <strong className="text-foreground">Your own installation.</strong>{" "}
-              A Classifyre instance you run — desktop app, Kubernetes, or
+              A Classifyre instance you run — Docker, Kubernetes, or
               otherwise — does not phone home. There is no licence check, no
               usage beacon, and no crash reporting to us. Whatever it scans stays
               in your database, and you are the controller for it. The software

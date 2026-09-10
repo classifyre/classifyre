@@ -1474,39 +1474,39 @@ export class FindingsService {
       recentRunsRaw,
       freshness,
     ] = await Promise.all([
-        this.stats.severityStatusTotals(input.windowStart, filters),
-        // Same rollup read, no status filter — this is the only way to get a
-        // truthful review-state mix while `totals` stays open-only.
-        this.stats.severityStatusTotals(input.windowStart, {}),
-        this.stats.activity(
-          input.todayStart,
-          input.weekStart,
-          input.monthStart,
-          filters,
-        ),
-        this.stats.topAssets(input.windowStart, 50),
-        this.prisma.runner.findMany({
-          orderBy: { triggeredAt: 'desc' },
-          take: 10,
-          select: {
-            id: true,
-            status: true,
-            triggerType: true,
-            triggeredAt: true,
-            startedAt: true,
-            completedAt: true,
-            durationMs: true,
-            totalFindings: true,
-            findingsCreated: true,
-            findingsResolved: true,
-            assetsCreated: true,
-            assetsUpdated: true,
-            errorMessage: true,
-            source: { select: { id: true, name: true, type: true } },
-          },
-        }),
-        this.stats.getFreshness(),
-      ]);
+      this.stats.severityStatusTotals(input.windowStart, filters),
+      // Same rollup read, no status filter — this is the only way to get a
+      // truthful review-state mix while `totals` stays open-only.
+      this.stats.severityStatusTotals(input.windowStart, {}),
+      this.stats.activity(
+        input.todayStart,
+        input.weekStart,
+        input.monthStart,
+        filters,
+      ),
+      this.stats.topAssets(input.windowStart, 50),
+      this.prisma.runner.findMany({
+        orderBy: { triggeredAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          status: true,
+          triggerType: true,
+          triggeredAt: true,
+          startedAt: true,
+          completedAt: true,
+          durationMs: true,
+          totalFindings: true,
+          findingsCreated: true,
+          findingsResolved: true,
+          assetsCreated: true,
+          assetsUpdated: true,
+          errorMessage: true,
+          source: { select: { id: true, name: true, type: true } },
+        },
+      }),
+      this.stats.getFreshness(),
+    ]);
 
     for (const row of severityTotals) {
       this.applyOverviewBucket(

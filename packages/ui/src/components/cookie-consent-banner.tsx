@@ -36,7 +36,7 @@ export interface CookieConsentBannerProps {
   policyHref: string;
   /**
    * Set false to compile the banner out entirely — used by the web app, where
-   * the chart decides per-deployment and the desktop build never shows it.
+   * the chart decides per-deployment and the all-in-one image never shows it.
    */
   enabled?: boolean;
   /** Copy overrides, so the web app can pass translated strings. */

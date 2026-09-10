@@ -34,7 +34,7 @@ test("demo mode issues no provider probe and renders no fix banner", async ({
 
   const component = await mount(
     <ServerConfigContext.Provider
-      value={{ s3Configured: false, demoMode: true }}
+      value={{ logsPersisted: false, demoMode: true }}
     >
       <AiHealthProvider>
         <AiHealthFixButton />
@@ -57,7 +57,7 @@ test("outside demo mode missing role assignments link to Harness configuration",
 
   await mount(
     <ServerConfigContext.Provider
-      value={{ s3Configured: false, demoMode: false }}
+      value={{ logsPersisted: false, demoMode: false }}
     >
       <AiHealthProvider>
         <AiHealthFixButton />

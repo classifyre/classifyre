@@ -33,7 +33,10 @@ const emptyClassCounts = () => ({
 });
 
 /** Stored enum → the DTO field carrying its count. */
-const CLASS_FIELD: Record<EdgeClass, keyof ReturnType<typeof emptyClassCounts>> = {
+const CLASS_FIELD: Record<
+  EdgeClass,
+  keyof ReturnType<typeof emptyClassCounts>
+> = {
   [EdgeClass.FLOW]: 'flow',
   [EdgeClass.CONTAINMENT]: 'containment',
   [EdgeClass.IDENTITY]: 'identity',
@@ -87,9 +90,14 @@ export class ConstellationService {
       }),
       // Populated only after a duplicate-review index rebuild. Missing means
       // "not measured", which is why its absence is a zero and not an error.
-      this.prisma.correlationSourcePair
-        .findMany()
-        .catch(() => [] as Array<{ sourceAId: string; sourceBId: string; pairCount: number }>),
+      this.prisma.correlationSourcePair.findMany().catch(
+        () =>
+          [] as Array<{
+            sourceAId: string;
+            sourceBId: string;
+            pairCount: number;
+          }>,
+      ),
     ]);
 
     if (!freshness.isBuilt) {
@@ -104,7 +112,9 @@ export class ConstellationService {
       // answer live. Everything that genuinely needs the edge rollup
       // (connected, internal, the links themselves) stays zero, and `isBuilt`
       // tells the client to render those as unknown rather than as none.
-      await this.scheduler.scheduleRebuild('constellation requested before first build');
+      await this.scheduler.scheduleRebuild(
+        'constellation requested before first build',
+      );
       const live = await this.liveSourceCounts();
       return {
         sources: sources.map((s) => {
@@ -289,7 +299,8 @@ export class ConstellationService {
       const key = row.severity.toLowerCase() as keyof ReturnType<
         typeof emptySeverityMix
       >;
-      if (key in target.severityCounts) target.severityCounts[key] += row._count._all;
+      if (key in target.severityCounts)
+        target.severityCounts[key] += row._count._all;
     }
     return counts;
   }

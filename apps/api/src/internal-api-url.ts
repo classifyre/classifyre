@@ -18,7 +18,9 @@ export function resolveInternalApiBaseUrl(
     return normalizeAbsoluteBaseUrl(configured);
   }
 
-  if (environment === 'desktop') {
+  // The all-in-one Docker image: the API, the web UI and every scan process
+  // share one network namespace, so a callback is always loopback.
+  if (environment === 'docker') {
     return `http://127.0.0.1:${env.PORT || '8000'}`;
   }
   if (environment === 'development' || environment === 'test') {

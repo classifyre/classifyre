@@ -30,9 +30,6 @@ import {
 } from "@/lib/locale-detection";
 import { isSitemapEnabled, resolveBaseUrl } from "@/lib/sitemap-config";
 
-/** The static export has no server, no request headers and no crawler. */
-const isDesktopBuild = process.env.DESKTOP_BUILD === "true";
-
 /** Where a page sits, in locale-independent terms. */
 export interface PageLocation {
   /** Workspace slug, when the page lives inside one. */
@@ -59,8 +56,6 @@ function readEnv(name: string): string | undefined {
  * trade only when nothing else can supply the origin.
  */
 async function resolveConfiguredBaseUrl(): Promise<string | null> {
-  if (isDesktopBuild) return null;
-
   const override = readEnv("SITEMAP_BASE_URL") ?? readEnv("PUBLIC_BASE_URL");
   if (override) return override.trim().replace(/\/+$/, "");
 

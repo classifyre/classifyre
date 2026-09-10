@@ -15,7 +15,7 @@ import {
 /**
  * Folders the notebook may read, as `ctx.folder("name")`.
  *
- * The path is resolved wherever the scan runs: this computer on desktop, a CLI
+ * The path is resolved wherever the scan runs: inside the container, a CLI
  * job pod in Kubernetes. In a cluster the folder is mounted into those pods by
  * the chart (`api.localFolders`) and the user enters the mountPath here, so the
  * form is the same in both deployments and only the path differs.

@@ -251,7 +251,7 @@
   "LOCAL_FOLDER": [
     {
       "name": "Documents folder scan",
-      "description": "Scan a local folder on this computer for documents, spreadsheets, and images (desktop app only)",
+      "description": "Scan a mounted folder for documents, spreadsheets, and images",
       "config": {
         "type": "LOCAL_FOLDER",
         "required": {
@@ -3778,7 +3778,7 @@
       },
       {
         "name": "Read a mounted folder",
-        "description": "Walks a folder configured on the source and turns each file into an asset. Works in both deployments: a path on this computer on desktop, or a volume mounted into scan pods by the chart in Kubernetes.",
+        "description": "Walks a folder configured on the source and turns each file into an asset. Works in both deployments: a directory bind-mounted into the all-in-one container, or a volume mounted into scan pods by the chart in Kubernetes.",
         "config": {
           "type": "CUSTOM",
           "required": {
@@ -3788,7 +3788,7 @@
                 {
                   "id": "intro",
                   "type": "markdown",
-                  "source": "# A folder the scan can read\n\nAdd a folder in **Files & folders** above and reach it with `ctx.folder(\"name\")`,\nwhich hands back a `pathlib.Path`. Nothing is copied: the notebook opens the\nfiles where they are, which is what makes this workable for a dump too large to\nupload.\n\nThe path is resolved on the machine that runs the scan. On desktop that is this\ncomputer, so any path you can open works. In Kubernetes it is an ephemeral scan\npod, so the folder has to be mounted into CLI jobs first -- set\n`api.localFolders` in the chart, then enter the `mountPath` you gave it (for\nexample `/mnt/corpora/dumps`).\n\nIf you would rather not mount anything, upload the files to the source and read\nthem with `ctx.files` instead.\n"
+                  "source": "# A folder the scan can read\n\nAdd a folder in **Files & folders** above and reach it with `ctx.folder(\"name\")`,\nwhich hands back a `pathlib.Path`. Nothing is copied: the notebook opens the\nfiles where they are, which is what makes this workable for a dump too large to\nupload.\n\nThe path is resolved on the machine that runs the scan. With the all-in-one\nDocker image, bind-mount the directory and use its container-side path. In\nKubernetes it is an ephemeral scan pod, so the folder has to be mounted into CLI\njobs first -- set `api.localFolders` in the chart, then enter the `mountPath` you\ngave it (for example `/mnt/corpora/dumps`).\n\nIf you would rather not mount anything, upload the files to the source and read\nthem with `ctx.files` instead.\n"
                 },
                 {
                   "id": "imports",

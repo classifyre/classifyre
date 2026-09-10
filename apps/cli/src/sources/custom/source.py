@@ -233,7 +233,7 @@ class CustomSource(BaseSource):
             if not path.is_dir():
                 raise CustomSourceError(
                     f"Local folder {folder.name!r} points at {path}, which is not a directory. "
-                    "Local folders are only available in the desktop application."
+                    "The folder must be mounted where the scan runs."
                 )
 
     def _materialize_uploaded_files(self) -> Path | None:

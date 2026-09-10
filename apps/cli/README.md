@@ -26,14 +26,11 @@ docx|xlsx|pptx` and feeds the result through the normal OOXML extractors. Withou
 it those files scan as *"no content available"* — a silent coverage gap, not an
 error.
 
-- **Kubernetes**: installed in the CLI image (`libreoffice-*-nogui`), so this
-  works out of the box.
-- **Desktop and local dev**: install it yourself — `brew install --cask libreoffice`
+- **Kubernetes and the all-in-one Docker image**: installed in the image
+  (`libreoffice-*-nogui`), so this works out of the box.
+- **Local dev**: install it yourself — `brew install --cask libreoffice`
   (macOS), `apt install libreoffice-writer libreoffice-calc libreoffice-impress`
-  (Debian/Ubuntu), or libreoffice.org on Windows. The desktop app deliberately
-  does not bundle LibreOffice: it is ~550 MB even stripped, and slimming the
-  upstream bundle breaks its code signature, which Apple Silicon punishes by
-  killing the process on launch.
+  (Debian/Ubuntu), or libreoffice.org on Windows.
 - **Non-standard install**: set `CLASSIFYRE_SOFFICE_PATH` to the binary. The CLI
   checks that first, then `PATH`, then the standard macOS, Windows, and
   Linux-tarball install locations.

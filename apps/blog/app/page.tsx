@@ -2,18 +2,16 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 
 import {
-  AllReleasesLink,
   Button,
   DetectorCatalog,
   detectorCatalogGroups,
-  DownloadPlatformGrid,
-  DownloadPrimaryButton,
+  DockerLogo,
+  DockerRunBlock,
   HelmLogo,
   KubernetesLogo,
   resolveDetectorGroupId,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
-import { fetchLatestRelease } from "@workspace/ui/lib/releases";
 import { getAllDetectorDocs } from "@workspace/schemas/detector-docs";
 
 import { normalizeSiteUrl, safeJsonLdStringify } from "@/lib/seo";
@@ -45,21 +43,21 @@ import "./landing.css";
 export const metadata: Metadata = {
   title: "The Open-Source Investigation Platform for Your Data",
   description:
-    "Classifyre reads the systems you already run, finds the signals you define — a company heading for insolvency, a shipment to the wrong address, a leaked credential — and follows them: lineage across sources, standing inquiries, ranked evidence, cases, and an AI autopilot. Free desktop app for macOS, Windows, and Linux, or a Helm chart on Kubernetes.",
+    "Classifyre reads the systems you already run, finds the signals you define — a company heading for insolvency, a shipment to the wrong address, a leaked credential — and follows them: lineage across sources, standing inquiries, ranked evidence, cases, and an AI autopilot. One Docker image on macOS, Windows or Linux, or a Helm chart on Kubernetes.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Classifyre | Every trail leads somewhere",
+    title: "Classifyre | Scattered data in, closed cases out",
     description:
       "An open-source investigation platform. Detectors and tags surface evidence, lineage connects it across sources, cases turn it into an investigation, and an AI autopilot works between scans. Runs on your laptop or your Kubernetes cluster.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Classifyre | Every trail leads somewhere",
+    title: "Classifyre | Scattered data in, closed cases out",
     description:
-      "Open-source data investigation: detectors, lineage, ranked evidence, cases, and an AI autopilot. Desktop app or Helm chart.",
+      "Open-source data investigation: detectors, lineage, ranked evidence, cases, and an AI autopilot. One Docker image, or a Helm chart.",
   },
 };
 
@@ -269,10 +267,7 @@ function PawPrint({
 
 /* ── Page ──────────────────────────────────────────────────────────────── */
 
-export default async function HomePage() {
-  // Resolved once at build time so the exported HTML already carries direct
-  // asset links; the download components refresh it in the browser.
-  const latestRelease = await fetchLatestRelease();
+export default function HomePage() {
   const detectorDocs = getAllDetectorDocs();
   const siteUrl = normalizeSiteUrl(
     process.env.NEXT_PUBLIC_BLOG_SITE_URL ?? "https://blog.classifyre.local",
@@ -299,14 +294,14 @@ export default async function HomePage() {
     "@type": "SoftwareApplication",
     name: "Classifyre",
     applicationCategory: "BusinessApplication",
-    operatingSystem: "macOS, Windows, Linux, Kubernetes",
+    operatingSystem: "Docker, Linux, macOS, Windows, Kubernetes",
     url: siteUrl,
     description:
-      "Classifyre is an open-source investigation platform: detectors and tags surface evidence across modern source systems, lineage connects it across them, findings become inquiries, duplicates, and cases, and Harness AI works the investigation between scans. Available as a free desktop app for macOS, Windows, and Linux, and as a Helm chart for Kubernetes.",
+      "Classifyre is an open-source investigation platform: detectors and tags surface evidence across modern source systems, lineage connects it across them, findings become inquiries, duplicates, and cases, and Harness AI works the investigation between scans. Available as a free all-in-one Docker image that runs on macOS, Windows, and Linux, and as a Helm chart for Kubernetes.",
     offers: [
       {
         "@type": "Offer",
-        name: "Classifyre Desktop (macOS, Windows, Linux)",
+        name: "Classifyre All-in-One (Docker)",
         price: "0",
         priceCurrency: "USD",
       },
@@ -348,7 +343,7 @@ export default async function HomePage() {
                 <span className="inline-flex items-center border-2 border-white/25 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">
                   {/* The published release when it could be resolved — the
                       workspace version can be a -SNAPSHOT ahead of it. */}
-                  v{latestRelease?.version ?? softwareVersion}
+                  v{softwareVersion}
                 </span>
               </div>
 
@@ -356,11 +351,11 @@ export default async function HomePage() {
                 id="hero-title"
                 className="font-hero text-[clamp(4.2rem,11vw,9rem)] font-normal uppercase leading-[0.86] tracking-[0.01em] text-white"
               >
-                <span className="block">Every trail</span>
+                <span className="block">Scattered data in.</span>
                 <span className="block">
-                  leads{" "}
+                  Closed cases {" "}
                   <span className="inline-block bg-accent px-[0.12em] text-black">
-                    somewhere.
+                    out.
                   </span>
                 </span>
               </h1>
@@ -377,7 +372,7 @@ export default async function HomePage() {
                   size="lg"
                   className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
                 >
-                  <a href="#run-it">Download the app</a>
+                  <a href="#run-it">Run it locally</a>
                 </Button>
                 <Button
                   asChild
@@ -456,30 +451,29 @@ export default async function HomePage() {
           <div className="space-y-8">
 
             <div className="grid gap-4 lg:grid-cols-2">
-              {/* Desktop — the primary path */}
+              {/* Docker — the primary path */}
               <div className="flex h-full min-w-0 flex-col gap-6 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)] sm:p-8">
                 <div className="space-y-2">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                    Download · free · no signup
+                  <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    <DockerLogo className="size-3.5" />
+                    One command · free · no signup
                   </span>
                   <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em] sm:text-3xl">
-                    Install it on your machine
+                    Run it on your machine
                   </h3>
                   <p className="text-sm leading-6 text-muted-foreground">
-                    Everything — sources, findings, cases — stays on
+                    The database, the UI and the scan workers are all in the
+                    image. Everything — sources, findings, cases — stays on
                     your machine.
                   </p>
                 </div>
 
-                {/* The three platforms, large and unmissable — each tile is
-                    the real installer for that OS, not a link to GitHub. */}
-                <DownloadPlatformGrid release={latestRelease} />
+                <DockerRunBlock />
 
                 <div className="mt-auto space-y-3">
-                  <DownloadPrimaryButton release={latestRelease} />
-                  <div className="text-center">
-                    <AllReleasesLink release={latestRelease} />
-                  </div>
+                  <Button asChild size="lg" className="w-full">
+                    <a href={routes.get}>Setup &amp; configuration</a>
+                  </Button>
                 </div>
               </div>
 
@@ -967,17 +961,13 @@ export default async function HomePage() {
                 </span>
               </h2>
               <p className="max-w-xl text-base leading-7 text-white/70">
-                Download it, point it at a system you already run, and see what
+                Run it, point it at a system you already run, and see what
                 the investigator finds. Everything you build carries over when
                 you go remote with Helm.
               </p>
               <div className="flex w-full flex-wrap items-start justify-center gap-3">
-                <div className="w-full max-w-xs">
-                  {/* Dark section: the caption under the button inherits
-                      muted-foreground, which reads on white — force it light. */}
-                  <div className="[&_p]:text-white/55">
-                    <DownloadPrimaryButton release={latestRelease} />
-                  </div>
+                <div className="w-full max-w-2xl">
+                  <DockerRunBlock tone="dark" />
                 </div>
                 <Button
                   asChild

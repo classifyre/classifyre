@@ -25,8 +25,6 @@ CREATE TABLE IF NOT EXISTS public.namespaces (
   slug           text NOT NULL UNIQUE,
   schema_name    text NOT NULL,
   description    text,
-  type           text NOT NULL DEFAULT 'local',
-  remote_url     text,
   thumbnail_blob bytea,
   thumbnail_mime text,
   settings       jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -44,6 +42,15 @@ ALTER TABLE public.namespaces
 -- Legacy text thumbnail column (pre-blob); dropped so the model stays clean.
 ALTER TABLE public.namespaces
   DROP COLUMN IF EXISTS thumbnail;
+-- Remote workspaces: a row that pointed at *another* Classifyre server rather
+-- than a schema on this one. It was only ever usable inside the desktop shell's
+-- embedded browser, which no longer exists, so the columns are dropped with it.
+-- Any such row keeps its name and slug and simply becomes an ordinary (empty)
+-- workspace; nothing was ever stored in this database for it anyway.
+ALTER TABLE public.namespaces
+  DROP COLUMN IF EXISTS type;
+ALTER TABLE public.namespaces
+  DROP COLUMN IF EXISTS remote_url;
 -- When the workspace was soft-deleted, which starts the retention clock before
 -- its schema is dropped for good. Separate from updated_at because that moves
 -- for any edit; this must only ever mean "deleted at".

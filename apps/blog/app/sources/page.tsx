@@ -134,7 +134,7 @@ export default function SourcesPage() {
               variant="secondary"
               className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
             >
-              <a href={routes.download}>Download & connect one</a>
+              <a href={routes.get}>Run it and connect one</a>
             </Button>
           </>
         }

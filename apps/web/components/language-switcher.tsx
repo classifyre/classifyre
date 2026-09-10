@@ -33,7 +33,7 @@ export function LanguageSwitcher() {
   /**
    * Language is addressable, so switching it is a navigation, not just a
    * preference: the URL prefix decides `<html lang>` and every server-rendered
-   * title. The cookie is still written — it is what the desktop build (which
+   * title. The cookie is still written — it is what a build (which
    * has no rewrites) and any unprefixed entry URL read.
    */
   const switchLanguage = (language: ResolvedLanguage) => {

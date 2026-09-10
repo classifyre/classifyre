@@ -7,7 +7,6 @@ import {
   ArrowRight,
   ArrowUpRight,
   ExternalLink,
-  Globe2,
   Layers,
   Settings,
   TriangleAlert,
@@ -18,15 +17,6 @@ import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
-
-/** Host of a stored remote URL; the raw value if it somehow isn't a URL. */
-export function remoteHost(remoteUrl: string): string {
-  try {
-    return new URL(remoteUrl).host;
-  } catch {
-    return remoteUrl;
-  }
-}
 
 /** The card's loading twin, so a grid of them keeps its rhythm while data lands. */
 export function WorkspaceCardSkeleton() {
@@ -54,23 +44,17 @@ export function WorkspaceCardSkeleton() {
 export function WorkspaceCard({
   namespace: ns,
   stats,
-  remoteCount,
-  isDesktop = false,
   onOpen,
   onDelete,
 }: {
   namespace: Namespace;
   stats?: NamespaceStats;
-  /** Remote's own workspace count: undefined while in flight, null if unreachable. */
-  remoteCount?: number | null;
-  isDesktop?: boolean;
   onOpen: (namespace: Namespace) => void;
   /** Omit to render a card with no delete affordance. */
   onDelete?: (namespace: Namespace) => void;
 }) {
   const { t } = useTranslation();
   const initial = ns.name.trim().charAt(0).toUpperCase() || "?";
-  const isRemote = ns.type === "remote" && !!ns.remoteUrl;
 
   return (
     <Card
@@ -113,18 +97,9 @@ export function WorkspaceCard({
             <h3 className="truncate font-semibold uppercase tracking-[0.06em]">
               {ns.name}
             </h3>
-            {isRemote ? (
-              // A remote card opens that server's own directory, not a
-              // workspace — say so before the click.
-              <p className="mt-1 flex items-center gap-1.5 truncate font-mono text-xs text-muted-foreground">
-                <Globe2 className="size-3 shrink-0" />
-                {remoteHost(ns.remoteUrl as string)}
-              </p>
-            ) : (
-              <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                /{ns.slug}
-              </p>
-            )}
+            <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+              /{ns.slug}
+            </p>
           </div>
           <div className="-mr-2 -mt-2 flex shrink-0 items-center">
             <Button
@@ -196,33 +171,7 @@ export function WorkspaceCard({
         )}
 
         <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4">
-          {/* Only the desktop shell can read another origin's registry; a
-              browser leaves the row empty rather than waiting on a count that
-              will never arrive. */}
-          {isRemote && isDesktop ? (
-            <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-              {remoteCount === undefined ? (
-                <Skeleton className="h-4 w-24 bg-muted" />
-              ) : remoteCount === null ? (
-                <>
-                  <TriangleAlert className="size-3.5 shrink-0" />
-                  {t("workspaces.remoteUnavailable")}
-                </>
-              ) : (
-                <>
-                  <Layers className="size-3.5 shrink-0" />
-                  <span>
-                    <span className="font-semibold text-foreground">
-                      {remoteCount}
-                    </span>{" "}
-                    {t("workspaces.remoteWorkspacesCount", {
-                      count: remoteCount,
-                    })}
-                  </span>
-                </>
-              )}
-            </span>
-          ) : stats ? (
+          {stats ? (
             <div className="flex min-w-0 items-center gap-2.5">
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Layers className="size-3.5 shrink-0" />

@@ -10,7 +10,7 @@ import type { ServerConfig } from "@/lib/server-config";
 // Lives in its own module rather than in dashboard-layout so components the
 // layout renders (ai-health, …) can read it without an import cycle.
 export const DEFAULT_SERVER_CONFIG: ServerConfig = {
-  s3Configured: true,
+  logsPersisted: true,
   demoMode: false,
 };
 

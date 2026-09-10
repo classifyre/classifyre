@@ -9,7 +9,7 @@ import {
  * One configuration knob, as the settings page needs to render it.
  *
  * The pair matters: an operator changing a model has to see what the
- * deployment asked for (Helm values, or the desktop bundle's defaults) next to
+ * deployment asked for (Helm values, or the image's own defaults) next to
  * what this workspace chose, or "reset to default" is a button with an unknown
  * destination.
  */
@@ -20,7 +20,7 @@ export class EmbeddingSettingValueDto {
 
   @ApiProperty({
     description:
-      'What the deployment configured (Helm values, or the desktop defaults)',
+      'What the deployment configured (Helm values, or the image defaults)',
   })
   deploymentDefault!: string | number | boolean | null;
 
@@ -130,7 +130,7 @@ export class EmbeddingSettingsResponseDto {
 
   @ApiProperty({
     description:
-      'Whether this deployment may download models from Hugging Face. False in the packaged desktop app, which ships one pinned model and runs offline — so a different local model cannot be fetched there.',
+      'Whether this deployment may download models from Hugging Face. False by default in the all-in-one Docker image, which bakes in one pinned model so it works offline — a different local model cannot be fetched there unless EMBEDDING_ALLOW_REMOTE_MODELS is turned on.',
   })
   allowRemoteModels!: boolean;
 

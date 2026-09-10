@@ -44,7 +44,6 @@ export default function CategoryDetailPage() {
   );
   const [namespaces, setNamespaces] = React.useState<Namespace[] | null>(null);
   const [stats, setStats] = React.useState<Record<string, NamespaceStats>>({});
-  const [isDesktop, setIsDesktop] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [editing, setEditing] = React.useState(false);
@@ -55,9 +54,6 @@ export default function CategoryDetailPage() {
     setActiveNamespaceSlug(undefined);
   }, []);
 
-  React.useEffect(() => {
-    setIsDesktop(!!window.__CLASSIFYRE_DESKTOP__);
-  }, []);
 
   const load = React.useCallback(async () => {
     if (!categoryId) return;
@@ -219,7 +215,6 @@ export default function CategoryDetailPage() {
                     key={ns.id}
                     namespace={ns}
                     stats={stats[ns.id]}
-                    isDesktop={isDesktop}
                     onOpen={openWorkspace}
                   />
                 ))}

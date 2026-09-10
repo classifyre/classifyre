@@ -19,9 +19,9 @@ export default {
     type: "menu",
     title: "Product",
     items: {
-      download: {
-        title: "Download & install",
-        href: "/download",
+      get: {
+        title: "Get Classifyre",
+        href: "/get",
       },
       sources: {
         title: "Sources",
@@ -61,9 +61,14 @@ export default {
     title: "Documentation",
     href: "https://docs.classifyre.com/",
   },
+  get: {
+    type: "page",
+    title: "Get Classifyre",
+    display: "hidden",
+  },
   download: {
     type: "page",
-    title: "Download & install",
+    title: "Download (moved)",
     display: "hidden",
   },
   sources: {

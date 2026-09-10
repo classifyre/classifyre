@@ -33,7 +33,7 @@ export function resolveModelSource(config: WorkerRequest['config']): {
 
   // EMBEDDING_LOCAL_MODEL_PATH is a Transformers.js model root, so models are
   // mounted at <root>/<model>/... without the FileCache revision directory.
-  // The desktop preload uses cacheDir instead, whose pinned files live at
+  // The image's baked-in model uses cacheDir instead, whose pinned files live at
   // <cache>/<model>/<revision>/... and must be addressed directly to avoid the
   // Transformers.js 4.2 tokenizer discovery bug.
   const modelSource = config.localModelPath
@@ -78,7 +78,7 @@ async function extractorFor(config: WorkerRequest['config']) {
     if (config.localModelPath) env.localModelPath = config.localModelPath;
 
     // Transformers.js 4.2 discovers pipeline components without forwarding
-    // the requested revision. In an offline desktop build that makes it look
+    // the requested revision. In an offline build that makes it look
     // for tokenizer metadata at <cache>/<model>/ instead of the pinned
     // <cache>/<model>/<revision>/ directory, so it constructs a pipeline with
     // tokenizer=null even though the tokenizer files are present. Point the

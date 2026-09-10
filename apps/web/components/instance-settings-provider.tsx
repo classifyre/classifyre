@@ -98,13 +98,6 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
 const InstanceSettingsContext =
   React.createContext<InstanceSettingsContextValue | null>(null);
 
-/**
- * The static export ships one tree per locale but has no rewrites to route
- * between them, so on desktop the URL is always the default locale's and the
- * cookie stays the only way to pick a language.
- */
-const isDesktopBuild = process.env.NEXT_PUBLIC_DESKTOP_BUILD === "true";
-
 export function InstanceSettingsProvider({
   children,
   routeLocale,
@@ -188,7 +181,7 @@ export function InstanceSettingsProvider({
 
   const resolvedLanguage = React.useMemo<ResolvedLanguage>(
     () =>
-      routeLocale && !isDesktopBuild
+      routeLocale
         ? localeToLanguage(routeLocale)
         : resolveLanguage(effectiveLanguageSetting),
     [routeLocale, effectiveLanguageSetting],

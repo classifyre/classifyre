@@ -5130,7 +5130,7 @@
       "properties": {
         "path": {
           "type": "string",
-          "description": "Absolute path of the folder to scan, as seen by the machine that runs the scan. On desktop that is this computer (for example /Users/jane/Documents). In Kubernetes it is the scan pod, so the folder must be mounted into CLI jobs first via the chart's `api.localFolders` \u2014 then use the `mountPath` you gave it there (for example /mnt/corpora/invoices)."
+          "description": "Absolute path of the folder to scan, as seen by the machine that runs the scan \u2014 not as your browser sees it. With the all-in-one Docker image, bind-mount the directory and use the container-side path (`-v ~/invoices:/data/invoices:ro` \u2192 /data/invoices). In Kubernetes the scan runs in a pod, so the folder must be mounted into CLI jobs first via the chart's `api.localFolders` \u2014 then use the `mountPath` you gave it there (for example /mnt/corpora/invoices)."
         }
       },
       "required": [
@@ -5165,7 +5165,7 @@
       "title": "LocalFolderMasked",
       "label": "Mounted Folder Credentials",
       "type": "object",
-      "description": "A folder scan reads the filesystem it runs on with that process's own permissions \u2014 the desktop app's, or the CLI job pod's. No credentials are required.",
+      "description": "A folder scan reads the filesystem it runs on with that process's own permissions \u2014 the container's, or the CLI job pod's. No credentials are required.",
       "properties": {},
       "additionalProperties": false
     },
@@ -12669,7 +12669,7 @@
           "items": {
             "$ref": "#/definitions/NotebookLocalFolder"
           },
-          "description": "Desktop only. Folders on this machine the notebook reads with ctx.folder(\"name\"). Not available in Kubernetes deployments, where files are uploaded to the source instead. This is a convenience, not a sandbox: the notebook process runs as you and can open any path you can."
+          "description": "Folders the notebook reads with ctx.folder(\"name\"). Not available in Kubernetes deployments, where files are uploaded to the source instead. This is a convenience, not a sandbox: the notebook process runs as you and can open any path you can."
         }
       },
       "additionalProperties": false
@@ -12755,7 +12755,7 @@
       "title": "NotebookLocalFolder",
       "label": "Mounted Folder",
       "type": "object",
-      "description": "A folder the notebook can read on the machine that runs the scan: this computer on desktop, or a path mounted into CLI jobs by the chart's `api.localFolders` in Kubernetes.",
+      "description": "A folder the notebook can read on the machine that runs the scan: a bind-mounted path in the all-in-one Docker image, or one mounted into CLI jobs by the chart's `api.localFolders` in Kubernetes.",
       "properties": {
         "name": {
           "type": "string",
@@ -12766,7 +12766,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 4096,
-          "description": "Absolute path to the folder, as seen by the machine that runs the scan \u2014 for example /Users/me/dumps on desktop, or /mnt/corpora/dumps for a folder mounted by the chart."
+          "description": "Absolute path to the folder, as seen by the machine that runs the scan \u2014 for example /data/dumps for a directory bind-mounted into the container, or /mnt/corpora/dumps for a folder mounted by the chart."
         }
       },
       "required": [
@@ -12909,7 +12909,7 @@
           "items": {
             "$ref": "#/definitions/NotebookLocalFolder"
           },
-          "description": "Desktop only. Folders on this machine the notebook reads with ctx.folder(\"name\"). Not available in Kubernetes deployments, where files are uploaded to the source instead."
+          "description": "Folders the notebook reads with ctx.folder(\"name\"). Not available in Kubernetes deployments, where files are uploaded to the source instead."
         },
         "limits": {
           "$ref": "#/definitions/AugmentationLimits"

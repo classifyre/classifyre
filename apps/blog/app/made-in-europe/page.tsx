@@ -15,7 +15,6 @@ import {
 import { Reveal } from "@/components/reveal";
 import {
   demoUrl,
-  releasesLatestUrl,
   docs,
   enterpriseContactEmail,
   repoUrl,
@@ -114,7 +113,7 @@ const consequences: readonly {
   {
     marker: "Residency",
     title: "Your data never has to leave the building",
-    body: "Classifyre is software you install, not a service you upload to. The desktop build keeps everything on one machine; the Helm chart keeps everything inside your cluster. There is no vendor tenancy to pick a region for, because there is no vendor tenancy.",
+    body: "Classifyre is software you run, not a service you upload to. The Docker image keeps everything on one machine; the Helm chart keeps everything inside your cluster. There is no vendor tenancy to pick a region for, because there is no vendor tenancy.",
     href: docs.deployment,
     hrefLabel: "Deployment options",
   },
@@ -157,7 +156,7 @@ const openSourceFacts: readonly {
     label: "Scope",
     value: "The whole engine",
     detail:
-      "Connectors, detectors, investigations, autopilot, desktop app, and Helm chart — not a stripped demo.",
+      "Connectors, detectors, investigations, autopilot, Docker image, and Helm chart — not a stripped demo.",
   },
   {
     label: "Development",
@@ -289,7 +288,7 @@ export default function MadeInEuropePage() {
               variant="secondary"
               className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
             >
-              <a href={routes.download}>Download</a>
+              <a href={routes.get}>Get Classifyre</a>
             </Button>
           </>
         }
@@ -447,7 +446,7 @@ export default function MadeInEuropePage() {
               </span>
             </h2>
             <p className="max-w-xl text-base leading-7 text-white/70">
-              Download the desktop app and point it at something real. Nothing
+              Run it and point it at something real. Nothing
               is uploaded, nothing phones a foreign cloud, and everything you
               build carries over when you move to Kubernetes.
             </p>
@@ -457,8 +456,8 @@ export default function MadeInEuropePage() {
                 size="lg"
                 className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
               >
-                <a href={releasesLatestUrl} target="_blank" rel="noreferrer">
-                  Download Classifyre
+                <a href={routes.get}>
+                  Get Classifyre
                 </a>
               </Button>
               <Button

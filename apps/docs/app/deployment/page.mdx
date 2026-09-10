@@ -1,7 +1,7 @@
 ---
 title: Deployment
 sidebarTitle: Overview
-description: The two Classifyre distributions — the desktop app and the Helm chart — and how to choose between them.
+description: The two Classifyre distributions — the all-in-one Docker image and the Helm chart — and how to choose between them.
 ---
 
 import { InstallOptions } from "../../components/install-options";
@@ -10,8 +10,8 @@ import { InstallOptions } from "../../components/install-options";
 
 Classifyre ships in two distributions, with the same features in both:
 
-- **Desktop** — one installer for macOS, Windows, or Linux, with the database
-  and scan workers inside the package.
+- **Docker** — one image that runs on macOS, Windows, or Linux, with the
+  database and scan workers inside it.
 - **Kubernetes with Helm** — for shared instances, production, high
   availability, and horizontal scaling.
 
@@ -20,13 +20,13 @@ is not a decision you are locked into.
 
 <InstallOptions />
 
-## Desktop
+## Docker
 
-The desktop package carries the API, the web UI, the Python scan workers, and
-an embedded PostgreSQL, so nothing else has to be installed. It is also the
-only build that can scan a local folder.
+The all-in-one image carries the API, the web UI, the Python scan workers, and
+PostgreSQL, so nothing else has to be provisioned. Bind-mount a directory and it
+becomes a source like any other.
 
-[Read the desktop install guide](/deployment/desktop/).
+[Read the Docker install guide](/deployment/docker/).
 
 ## Kubernetes
 

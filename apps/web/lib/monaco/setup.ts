@@ -5,7 +5,7 @@
  *
  * By default `@monaco-editor/react` loads the editor from cdn.jsdelivr.net at
  * runtime. That quietly fails in the two places this product actually runs:
- * the desktop app, which serves a static export over `app://` with no internet
+ * an offline deployment, which has no internet
  * assumption, and air-gapped clusters. The failure mode is not an error but a
  * silent downgrade to the plain-textarea loading state -- survivable for a JSON
  * field, not survivable for a notebook.
