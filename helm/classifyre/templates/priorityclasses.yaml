@@ -2,7 +2,7 @@
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
-  name: {{ .Values.priorityClasses.serviceName }}
+  name: {{ include "classifyre.priorityClassServiceName" . }}
   labels:
     {{- include "classifyre.commonLabels" . | nindent 4 }}
 value: {{ .Values.priorityClasses.serviceValue }}
@@ -13,7 +13,7 @@ description: "Service workloads priority class"
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
-  name: {{ .Values.priorityClasses.batchName }}
+  name: {{ include "classifyre.priorityClassBatchName" . }}
   labels:
     {{- include "classifyre.commonLabels" . | nindent 4 }}
 value: {{ .Values.priorityClasses.batchValue }}

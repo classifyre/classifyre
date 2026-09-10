@@ -534,6 +534,9 @@ describe('CliRunnerService', () => {
 
   it('marks orphaned running runners as error on bootstrap', async () => {
     const { service, prisma } = createService();
+    // Stranded by a previous incarnation: triggered well before this process,
+    // and long past the launch window.
+    const strandedAt = new Date(Date.now() - 60 * 60 * 1000);
     prisma.runner.findMany.mockResolvedValue([
       {
         id: 'runner-1',
@@ -542,6 +545,8 @@ describe('CliRunnerService', () => {
         executionMode: RunnerExecutionMode.LOCAL,
         jobName: null,
         jobNamespace: null,
+        triggeredAt: strandedAt,
+        startedAt: strandedAt,
       },
       {
         id: 'runner-2',
@@ -550,6 +555,8 @@ describe('CliRunnerService', () => {
         executionMode: RunnerExecutionMode.LOCAL,
         jobName: null,
         jobNamespace: null,
+        triggeredAt: strandedAt,
+        startedAt: strandedAt,
       },
     ]);
     prisma.source.findMany.mockResolvedValue([]);
@@ -559,7 +566,10 @@ describe('CliRunnerService', () => {
     await service.reconcileOnStartup();
 
     expect(prisma.runner.findMany).toHaveBeenCalledWith({
-      where: { status: { in: ['PENDING', 'RUNNING'] } },
+      where: {
+        status: { in: ['PENDING', 'RUNNING'] },
+        triggeredAt: { lt: expect.any(Date) },
+      },
       select: {
         id: true,
         sourceId: true,
@@ -567,6 +577,8 @@ describe('CliRunnerService', () => {
         executionMode: true,
         jobName: true,
         jobNamespace: true,
+        triggeredAt: true,
+        startedAt: true,
       },
     });
     expect(prisma.runner.update).toHaveBeenNthCalledWith(1, {
@@ -595,6 +607,173 @@ describe('CliRunnerService', () => {
       where: { id: 'source-2', currentRunnerId: 'runner-2' },
       data: { runnerStatus: 'ERROR', currentRunnerId: null },
     });
+  });
+
+  it('bounds the startup sweep at process start, not at "now"', async () => {
+    // This pass runs when a namespace is first RESOLVED, not at boot -- which
+    // is the same request a client's very first scan arrives on. Unbounded, it
+    // selected the runner created milliseconds earlier and failed it with
+    // "application restarted while running". The bound has to be process start
+    // specifically: the pass can fire hours into an uptime, and everything
+    // created since is this process's own live work, not a restart's leftovers.
+    const { service, prisma } = createService();
+    prisma.runner.findMany.mockResolvedValue([]);
+    prisma.source.findMany.mockResolvedValue([]);
+
+    await service.reconcileOnStartup();
+
+    const bound = prisma.runner.findMany.mock.calls[0][0].where.triggeredAt
+      .lt as Date;
+    const processStartedAt = Date.now() - process.uptime() * 1000;
+    expect(bound.getTime()).toBeGreaterThan(processStartedAt - 5_000);
+    expect(bound.getTime()).toBeLessThanOrEqual(processStartedAt + 5_000);
+  });
+
+  it('spares a just-created runner that slipped past the query bound', async () => {
+    // Second guard, for the same race under a skewed clock. `triggered_at` is
+    // written by the database (`DEFAULT CURRENT_TIMESTAMP`) while the bound
+    // above is read from this process; on Kubernetes those are two machines,
+    // and a Postgres clock running a second behind puts a brand-new runner back
+    // inside the window. LOCAL runners never carry a jobName, so the launch
+    // grace is the only thing standing between them and a bogus ERROR.
+    const { service, prisma } = createService();
+    prisma.runner.findMany.mockResolvedValue([
+      {
+        id: 'runner-just-started',
+        sourceId: 'source-1',
+        status: RunnerStatus.RUNNING,
+        executionMode: RunnerExecutionMode.LOCAL,
+        jobName: null,
+        jobNamespace: null,
+        triggeredAt: new Date(),
+        startedAt: null,
+      },
+    ]);
+    prisma.source.findMany.mockResolvedValue([]);
+
+    await service.reconcileOnStartup();
+
+    expect(prisma.runner.update).not.toHaveBeenCalled();
+    expect(prisma.source.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('keeps a local scan it launched through reconciliation, for as long as it runs', async () => {
+    // The registry is what vouches for a local scan, so what matters is that
+    // the real launch path fills it and the real settle clears it -- not that a
+    // hand-seeded map gets read. Long past the launch grace, a scan still
+    // running must survive the reconcile startRun does before admitting the
+    // next one; once it settles, a row still marked RUNNING is genuinely
+    // stranded and has to be reapable.
+    const { service, prisma } = createService();
+    let finishScan!: () => void;
+    jest.spyOn(service as any, 'executeCliAsync').mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishScan = resolve;
+      }),
+    );
+    const runningSince = new Date(Date.now() - 30 * 60 * 1000);
+    prisma.runner.findMany.mockResolvedValue([
+      {
+        id: 'runner-1',
+        sourceId: 'source-1',
+        status: RunnerStatus.RUNNING,
+        executionMode: RunnerExecutionMode.LOCAL,
+        jobName: null,
+        jobNamespace: null,
+        triggeredAt: runningSince,
+        startedAt: runningSince,
+      },
+    ]);
+    prisma.runner.update.mockResolvedValue({});
+
+    (service as any).startTrackedExecution(
+      'runner-1',
+      { id: 'source-1' },
+      false,
+    );
+
+    await expect(service.reconcileStaleInFlight()).resolves.toBe(0);
+    expect(prisma.runner.update).not.toHaveBeenCalled();
+
+    finishScan();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    await expect(service.reconcileStaleInFlight()).resolves.toBe(1);
+    expect(prisma.runner.update).toHaveBeenCalledWith({
+      where: { id: 'runner-1' },
+      data: expect.objectContaining({
+        status: 'ERROR',
+        errorMessage: 'Runner was orphaned (its execution no longer exists)',
+      }),
+    });
+  });
+
+  it('does not fail a queued runner in the gap between claiming and launching it', async () => {
+    // dequeueNextPendingRunner flips the row to RUNNING several awaits before
+    // the execution that vouches for it exists. The launch grace covers that
+    // gap only if it measures from the claim: measured from triggeredAt, a run
+    // that had queued for ten minutes was already outside it, so a reconcile
+    // landing mid-launch failed it before it had started.
+    //
+    // The row the mid-launch reconcile sees is built from what the claim
+    // actually wrote, so this fails if the claim stops recording its moment.
+    const { service, prisma, maskedConfigCryptoService } = createService();
+    const queuedAt = new Date(Date.now() - 10 * 60 * 1000);
+    const source = {
+      id: 'source-1',
+      config: maskedConfigCryptoService.encryptMaskedConfig({
+        type: 'POSTGRESQL',
+        required: { host: 'db.local', port: 5432 },
+      }),
+    };
+    prisma.runner.findFirst
+      .mockResolvedValueOnce({
+        id: 'runner-queued',
+        sourceId: 'source-1',
+        status: RunnerStatus.PENDING,
+        triggeredAt: queuedAt,
+        startedAt: null,
+        source,
+      })
+      // hasSuccessfulRuns
+      .mockResolvedValueOnce(null);
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    (prisma.runner as any).updateMany = updateMany;
+    const executeCliAsync = jest
+      .spyOn(service as any, 'executeCliAsync')
+      .mockResolvedValue(undefined);
+
+    let reconciledMidLaunch: number | undefined;
+    jest
+      .spyOn(service as any, 'hydrateCustomDetectorsForRun')
+      .mockImplementation(async (_sourceId: unknown, config: unknown) => {
+        const claim = updateMany.mock.calls[0][0].data;
+        prisma.runner.findMany.mockResolvedValueOnce([
+          {
+            id: 'runner-queued',
+            sourceId: 'source-1',
+            status: claim.status,
+            executionMode: RunnerExecutionMode.LOCAL,
+            jobName: null,
+            jobNamespace: null,
+            triggeredAt: queuedAt,
+            startedAt: claim.startedAt ?? null,
+          },
+        ]);
+        reconciledMidLaunch = await service.reconcileStaleInFlight();
+        return config;
+      });
+
+    await (service as any).dequeueNextPendingRunner();
+
+    expect(reconciledMidLaunch).toBe(0);
+    expect(prisma.runner.update).not.toHaveBeenCalled();
+    expect(executeCliAsync).toHaveBeenCalledWith(
+      'runner-queued',
+      expect.objectContaining({ id: 'source-1' }),
+      false,
+      'namespace-id',
+    );
   });
 
   it('repairs sources stuck in RUNNING when the current runner record is missing', async () => {
