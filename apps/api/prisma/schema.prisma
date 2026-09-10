@@ -382,8 +382,8 @@ model Finding {
 /// Workspace-level overrides for the embedding subsystem.
 ///
 /// Every column is nullable and every null means "inherit the deployment
-/// default" — the Helm values on Kubernetes, the bundled defaults in the
-/// desktop app, read through EmbeddingConfigService. That is the whole point
+/// default" — the Helm values on Kubernetes, the baked-in defaults in the
+/// all-in-one image, read through EmbeddingConfigService. That is the whole point
 /// of the table: an operator can retune one workspace from the settings page
 /// without redeploying, and the UI can still show what the deployment asked
 /// for next to what this workspace chose. A row of all-nulls is therefore

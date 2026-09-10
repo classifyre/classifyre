@@ -663,7 +663,7 @@ export class KubernetesCliJobService {
     // Proves to the API that the callbacks this job makes (asset ingest,
     // runner status, graph edges) come from a job the API itself launched.
     // Injected here rather than in the Helm job template so every launch path
-    // — chart, desktop, local dev — carries the same key the API validates.
+    // — chart, all-in-one image, local dev — carries the same key the API validates.
     const internalKey = this.internalApiKey.value;
     if (internalKey && !isNotebook) {
       this.setEnvValue(envMap, 'CLASSIFYRE_INTERNAL_KEY', internalKey);

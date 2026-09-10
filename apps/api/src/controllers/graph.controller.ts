@@ -44,7 +44,7 @@ export class GraphController {
   @ReadOnlyEndpoint()
   @Get('constellation')
   @ApiOperation({
-    summary: 'How this workspace\'s sources connect',
+    summary: "How this workspace's sources connect",
     description:
       'One bubble per source, one line per source pairing split by edge class, ' +
       'and the assets whose edges actually leave their own source. ' +

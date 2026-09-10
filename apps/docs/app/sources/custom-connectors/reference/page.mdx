@@ -492,7 +492,7 @@ def extract():
         yield Asset(id=file.name, name=file.name, content=parsed.text, kind="file")
 ```
 
-### `ctx.folders` — local folders _(desktop only)_
+### `ctx.folders` — local folders
 
 Folders configured on the source, as `pathlib.Path`. Nothing is copied — the
 notebook opens files where they are.

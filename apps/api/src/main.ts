@@ -72,7 +72,7 @@ async function bootstrap() {
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     // @fastify/cors (used by the Fastify adapter) defaults Access-Control-Allow-
     // Methods to only 'GET,HEAD,POST' — unlike the Express cors package. The
-    // desktop web talks to the API cross-origin (app://classifyre → 127.0.0.1),
+    // a UI served from another origin talks to the API cross-origin,
     // so without listing PUT/PATCH/DELETE every mutating request fails preflight.
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
@@ -132,7 +132,7 @@ async function bootstrap() {
   const heapGuard = resolveHeapGuard();
   const asMb = (bytes: number) => Math.round(bytes / 1024 / 1024);
   // Logged at every boot: the requested-versus-enforced heap gap is invisible
-  // otherwise, and it is what let the desktop app run for months with a guard
+  // otherwise, and it is what let a real install run for months with a guard
   // that could not fire.
   logger.log(
     `Heap guard: shedding CLI ingestion above ${asMb(
@@ -190,7 +190,7 @@ async function bootstrap() {
     // relative server URL is resolved against whatever origin is serving this
     // page:
     //
-    //  * Behind the ingress / the desktop shell the API only exists under
+    //  * Behind an ingress or the all-in-one image's proxy the API only exists under
     //    `/api` (nginx routes `/api/(.*)` to the API service and strips the
     //    prefix; the web app proxies the same path). This page itself is
     //    served as `<host>/api/docs`, so `/api/{namespace}` is the default.
@@ -202,7 +202,7 @@ async function bootstrap() {
     // 404s with `Unknown namespace '<first path segment>'`.
     .addServer(
       '/api/{namespace}',
-      'Through the web gateway (ingress/desktop)',
+      'Through the web gateway (ingress or the all-in-one proxy)',
       {
         namespace: {
           default: 'your-workspace-slug',
@@ -239,7 +239,7 @@ async function bootstrap() {
   // proxy does the same), so anything served at `/api` on the API process is
   // unreachable from a browser — the request arrives here as `/`. `/docs`
   // survives that strip, which makes the one URL `<host>/api/docs` work through
-  // the ingress, through the desktop/dev proxy, and `<api>/docs` work when
+  // the ingress, through the all-in-one/dev proxy, and `<api>/docs` work when
   // talking to the process directly.
   //
   // `docs`, `docs-json` and `docs-yaml` are all in RESERVED_PREFIXES so

@@ -26,7 +26,7 @@ export interface EmbeddingSettingValueDto {
      */
     value: object;
     /**
-     * What the deployment configured (Helm values, or the desktop defaults)
+     * What the deployment configured (Helm values, or the image defaults)
      * @type {object}
      * @memberof EmbeddingSettingValueDto
      */

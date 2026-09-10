@@ -268,11 +268,13 @@ def extract():
 This is the mechanism that works in a Kubernetes deployment, where the runner is
 an ephemeral pod with no filesystem of yours to reach.
 
-### Local folders — desktop only
+### Local folders
 
-In the desktop app you can also point the source at a folder on your machine and
-read it in place — the right choice for a dump too large to upload. Add it under
-**Local folders**, then:
+You can also point the source at a folder the scan can already see and read it
+in place — the right choice for a dump too large to upload. That means a
+bind-mounted directory with the [all-in-one Docker
+image](/deployment/docker/), or one the chart mounts into CLI jobs via
+`api.localFolders` on Kubernetes. Add it under **Local folders**, then:
 
 ```python
 def extract():

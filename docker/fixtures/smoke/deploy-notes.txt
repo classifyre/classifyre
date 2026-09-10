@@ -1,0 +1,16 @@
+Deployment notes — staging rebuild
+==================================
+
+Fake credentials for the all-in-one smoke test. Nothing here is real.
+
+Reminder from the migration call: the staging bucket still uses the old
+static key pair instead of the instance role. Ticket OPS-4417 tracks it.
+
+    AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+    AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+
+The reporting job also reads the analytics database directly:
+
+    DATABASE_URL=postgresql://reporting:hunter2placeholder@db.staging.invalid:5432/analytics
+
+Rotate both before the next release.

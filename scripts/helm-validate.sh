@@ -107,7 +107,7 @@ run_checks() {
     "${rendered}"
 
   # The key must never be baked into the job template on disk; the API injects
-  # it per job so desktop and non-Helm launches carry the same value.
+  # it per job so local and non-Helm launches carry the same value.
   assert_not_contains \
     "CLI Job template does not hardcode the internal API key" \
     '"name": "CLASSIFYRE_INTERNAL_KEY"' \

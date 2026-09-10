@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useNamespace } from "@/components/namespace-provider";
 
 /**
- * Route a namespace root to its discovery page after the runtime namespace
- * slug has been recovered. A server redirect would bake the static-export
- * sentinel (`__id__`) into the desktop build and lose the real tenant slug.
+ * Route a namespace root to its discovery page. Done on the client rather than
+ * with a server redirect so the destination is built from the same namespace
+ * context every other link in the subtree uses.
  */
 export default function HomePage() {
   const router = useRouter();

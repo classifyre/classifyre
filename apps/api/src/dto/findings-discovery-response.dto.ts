@@ -82,7 +82,7 @@ export class FindingsDiscoveryTopAssetDto {
   @ApiProperty({
     type: FindingsDiscoverySeverityBreakdownDto,
     description:
-      'Priority mix of this asset\'s findings. Already computed to rank the list, so it costs nothing to return and lets the caller draw a per-asset bar.',
+      "Priority mix of this asset's findings. Already computed to rank the list, so it costs nothing to return and lets the caller draw a per-asset bar.",
   })
   severityCounts: FindingsDiscoverySeverityBreakdownDto;
 
@@ -129,10 +129,14 @@ export class DiscoveryRecentRunDto {
   })
   totalFindings: number;
 
-  @ApiProperty({ description: 'Findings this run raised that did not exist before.' })
+  @ApiProperty({
+    description: 'Findings this run raised that did not exist before.',
+  })
   findingsCreated: number;
 
-  @ApiProperty({ description: 'Findings this run resolved because they were gone.' })
+  @ApiProperty({
+    description: 'Findings this run resolved because they were gone.',
+  })
   findingsResolved: number;
 
   @ApiProperty()
@@ -195,7 +199,10 @@ export class FindingsDiscoveryRefreshResponseDto {
  * keeps its "still open" meaning while the review-state strip tells the truth.
  */
 export class FindingsDiscoveryStatusMixDto extends FindingsDiscoveryStatusBreakdownDto {
-  @ApiProperty({ description: 'Sum of the four buckets — findings of any status in the window.' })
+  @ApiProperty({
+    description:
+      'Sum of the four buckets — findings of any status in the window.',
+  })
   total: number;
 }
 

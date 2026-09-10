@@ -226,7 +226,6 @@ jobs:
             package.json \
             apps/api/package.json \
             apps/blog/package.json \
-            apps/desktop/package.json \
             apps/docs/package.json \
             apps/web/package.json \
             apps/cli/package.json \
@@ -289,6 +288,15 @@ jobs:
           bun run docs:bundle
           bash ./scripts/stage-docker-artifacts.sh "${RUNNER_TEMP}/release-artifacts"
 
+      # Baked into the all-in-one image so a first scan embeds offline rather
+      # than blocking on a Hugging Face download. Fetched here, where the
+      # dependencies exist; docker/Dockerfile deliberately builds nothing.
+      - name: Cache the embedding model
+        working-directory: apps/api
+        env:
+          EMBEDDING_CACHE_DIR: ${{ runner.temp }}/release-artifacts/models
+        run: bun run embedding:cache
+
       - name: Free disk space for release image builds
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -338,6 +346,27 @@ jobs:
           build_and_push "web" "web-final"
           build_and_push "api" "api-final"
           build_and_push "cli" "cli-final"
+
+      # The all-in-one image, composed from the three just pushed. Separate step
+      # because it has a different Dockerfile, context and build arguments — and
+      # because it can only start once those three exist in the registry.
+      - name: Build and push the all-in-one image
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          docker buildx build docker \
+            --file docker/Dockerfile \
+            --platform "${DOCKER_PLATFORMS}" \
+            --push \
+            --tag "${DOCKER_NAMESPACE}/all-in-one:${VERSION}" \
+            --tag "${DOCKER_NAMESPACE}/all-in-one:latest" \
+            --build-arg "BASE_TAG=${VERSION}" \
+            --build-arg "IMAGE_NS=${DOCKER_NAMESPACE}" \
+            --build-context "models=${RUNNER_TEMP}/release-artifacts/models" \
+            --cache-from "type=registry,ref=${DOCKER_NAMESPACE}/all-in-one:build-cache" \
+            --cache-to "type=registry,ref=${DOCKER_NAMESPACE}/all-in-one:build-cache,mode=max,image-manifest=true"
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
@@ -407,7 +436,6 @@ jobs:
             package.json \
             apps/api/package.json \
             apps/blog/package.json \
-            apps/desktop/package.json \
             apps/docs/package.json \
             apps/web/package.json \
             apps/cli/package.json \
@@ -491,12 +519,3 @@ jobs:
 
     outputs:
       tag: ${{ steps.versions.outputs.tag }}
-
-  # ── 10. Desktop builds (runs in parallel on macOS/Windows/Linux) ─────
-  desktop:
-    name: Desktop Builds
-    needs: release
-    uses: ./.github/workflows/release-desktop.yml
-    with:
-      tag: ${{ needs.release.outputs.tag }}
-    secrets: inherit

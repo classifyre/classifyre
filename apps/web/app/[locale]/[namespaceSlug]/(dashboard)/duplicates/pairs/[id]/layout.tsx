@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { dynamicIdParams } from "@/lib/dynamic-route";
 import { isLocale } from "@/lib/locale-detection";
 import { sectionMetadata } from "@/lib/seo-metadata";
 
@@ -17,10 +16,6 @@ export async function generateMetadata({
       path: `/duplicates/pairs/${id}`,
     })),
   };
-}
-
-export function generateStaticParams() {
-  return dynamicIdParams();
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {

@@ -150,7 +150,7 @@ export interface EmbeddingSettingsResponseDto {
      */
     aiProviderConfigId?: string | null;
     /**
-     * Whether this deployment may download models from Hugging Face. False in the packaged desktop app, which ships one pinned model and runs offline — so a different local model cannot be fetched there.
+     * Whether this deployment may download models from Hugging Face. False by default in the all-in-one Docker image, which bakes in one pinned model so it works offline — a different local model cannot be fetched there unless EMBEDDING_ALLOW_REMOTE_MODELS is turned on.
      * @type {boolean}
      * @memberof EmbeddingSettingsResponseDto
      */

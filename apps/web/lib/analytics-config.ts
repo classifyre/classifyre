@@ -8,8 +8,8 @@
  * (see `app/classifyre-cfg/route.ts`), which assigns it to
  * {@link ANALYTICS_CONFIG_GLOBAL} before React hydrates.
  *
- * Desktop builds are a static export with no server, so they fall back to the
- * build-time `NEXT_PUBLIC_*` values, which do work in that mode.
+ * A build with no server to answer that route falls back to the build-time
+ * `NEXT_PUBLIC_*` values.
  */
 
 import { privacyPolicyUrl } from "@workspace/ui/lib/site-links";
@@ -69,7 +69,7 @@ declare global {
 
 /**
  * Reads the PostHog config injected by the server, falling back to build-time
- * env vars for desktop/static builds and local development.
+ * env vars for static builds and local development.
  */
 export function readPostHogRuntimeConfig(): PostHogRuntimeConfig | null {
   if (typeof window !== "undefined") {
@@ -103,9 +103,8 @@ export function readGoogleAnalyticsRuntimeConfig(): GoogleAnalyticsRuntimeConfig
  * Cookie-banner settings for this deployment.
  *
  * Disabled whenever the server did not say otherwise — which covers the
- * desktop build (a static export with no config script, and no analytics to
- * consent to) and any chart install that left `frontend.cookieConsent.enabled`
- * at its default.
+ * all-in-one image (no analytics to consent to) and any chart install that
+ * left `frontend.cookieConsent.enabled` at its default.
  */
 export function readCookieConsentRuntimeConfig(): CookieConsentRuntimeConfig {
   if (typeof window === "undefined") {

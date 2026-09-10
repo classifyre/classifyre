@@ -44,6 +44,7 @@ export const docs = {
   sourceTesting: "https://docs.classifyre.com/sources/testing/",
   sampling: "https://docs.classifyre.com/sources/sampling/",
   deployment: "https://docs.classifyre.com/deployment/",
+  docker: "https://docs.classifyre.com/deployment/docker/",
   kubernetes: "https://docs.classifyre.com/deployment/kubernetes/",
   database: "https://docs.classifyre.com/deployment/database/",
   storage: "https://docs.classifyre.com/deployment/storage/",
@@ -57,7 +58,7 @@ export const docs = {
 /** Marketing routes that live on this site rather than the docs site. */
 export const routes = {
   home: "/",
-  download: "/download",
+  get: "/get",
   sources: "/sources",
   editions: "/open-source-vs-enterprise",
   madeInEurope: "/made-in-europe",

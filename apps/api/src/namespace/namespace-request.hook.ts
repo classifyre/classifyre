@@ -165,8 +165,8 @@ export function registerNamespaceHook(
  * background workload. Public/browser requests never carry that key and stay
  * on the interactive pool reserved for UI latency.
  *
- * When no key is configured (`bun dev`, tests — never the desktop app or the
- * Helm chart, both of which always generate one) internal traffic is
+ * When no key is configured (`bun dev`, tests — never the all-in-one image or
+ * the Helm chart, both of which always generate one) internal traffic is
  * indistinguishable from browser traffic and lands on the interactive lane.
  * In-process workers still set their lane directly, so the protection that
  * matters under load survives; only HTTP CLI callbacks lose it.

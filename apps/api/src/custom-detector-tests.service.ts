@@ -375,7 +375,7 @@ export class CustomDetectorTestsService {
           JSON.stringify([detectorEntry], null, 2),
         );
         const cliPath = this.getCliPath();
-        // Desktop relocates the venv out of the bundle; VENV_PATH points at it.
+        // A deployment may keep the venv elsewhere; VENV_PATH points at it.
         const venvPath = process.env.VENV_PATH
           ? path.normalize(process.env.VENV_PATH)
           : path.join(cliPath, '.venv');
@@ -689,11 +689,11 @@ export class CustomDetectorTestsService {
       return path.resolve(apiRoot, raw);
     }
     const env = process.env.ENVIRONMENT || 'development';
-    if (env === 'development' || env === 'desktop') {
+    if (env === 'development' || env === 'docker') {
       return path.join(__dirname, '../../../cli');
     }
     throw new Error(
-      'Local detector execution is only available in development or desktop mode',
+      'Local detector execution is only available in development or docker mode',
     );
   }
 
