@@ -283,9 +283,16 @@ export default function GetPage() {
               title="Or scale it on your cluster"
               lede="The same open-source core as a Helm chart — web, API, worker, and ephemeral scan Jobs that fan out under load and scale to zero between runs."
               action={
-                <DocsLink href={docs.kubernetes}>
-                  Full deployment guide
-                </DocsLink>
+                <div className="flex flex-wrap gap-2">
+                  <DocsLink href={docs.kubernetes}>
+                    Full deployment guide
+                  </DocsLink>
+                  <DocsLink
+                    href={`${repoUrl}/blob/main/helm/classifyre/README.md`}
+                  >
+                    Chart README on GitHub
+                  </DocsLink>
+                </div>
               }
             />
 

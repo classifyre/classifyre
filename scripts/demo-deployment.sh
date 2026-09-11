@@ -2,7 +2,7 @@
 # Deploy or update the demo Helm release in the classifyre namespace.
 #
 # This script is purpose-built for the demo instance (classifyre namespace).
-# It uses values-vps.yaml (NodePort 30100) so it never collides with the
+# It uses helm/develop/values-vps.yaml (NodePort 30100) so it never collides with the
 # develop instance on NodePort 30101.
 #
 # Usage:
@@ -73,7 +73,7 @@ cd "${REPO_ROOT}"
 IMAGE_TAG="main"
 HELM_NAMESPACE="classifyre"
 HELM_RELEASE_NAME="classifyre"
-BASE_VALUES_FILE="./helm/classifyre/values-vps.yaml"
+BASE_VALUES_FILE="./helm/develop/values-vps.yaml"
 DEMO_MODE="true"
 DEPLOY_TIMEOUT="15m"
 DOCKER_NAMESPACE="${DOCKER_NAMESPACE:-classifyre}"

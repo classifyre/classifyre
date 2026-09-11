@@ -27,7 +27,7 @@ Options:
   -n, --namespace NAME      Kubernetes namespace. Default: classifyre-develop
   -r, --release NAME        Helm release name. Default: same as namespace
   -f, --values FILE         Extra Helm values file. Can be passed multiple times.
-      --base-values FILE    Base values file. Default: ./helm/classifyre/values-vps-develop.yaml
+      --base-values FILE    Base values file. Default: ./helm/develop/values-vps-develop.yaml
       --demo-mode BOOL      Set api.env.DEMO_MODE to true or false. Default: true
       --timeout DURATION    Helm and rollout timeout. Default: 15m
   -h, --help                Show this help
@@ -69,7 +69,7 @@ cd "${REPO_ROOT}"
 IMAGE_TAG="develop"
 HELM_NAMESPACE="classifyre-develop"
 HELM_RELEASE_NAME=""
-BASE_VALUES_FILE="./helm/classifyre/values-vps-develop.yaml"
+BASE_VALUES_FILE="./helm/develop/values-vps-develop.yaml"
 DEMO_MODE="true"
 DEPLOY_TIMEOUT="15m"
 DOCKER_NAMESPACE="${DOCKER_NAMESPACE:-classifyre}"

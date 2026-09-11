@@ -172,7 +172,7 @@ uv. Instead:
   --values /tmp/override.yaml                       # override namespace and merge extra values
 ```
 
-The script always runs Helm with `helm/classifyre/values-vps-develop.yaml`, layers any
+The script always runs Helm with `helm/develop/values-vps-develop.yaml`, layers any
 extra `--values` files on top, then forces a rollout restart for every deployment in the
 release so mutable tags like `:develop` are re-pulled.
 
