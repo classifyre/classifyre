@@ -17,9 +17,15 @@ api:
     # writable cluster against this same database:
     #   ./scripts/dev/start-vps-db.sh
     DEMO_MODE: "true"
-    # Single-node VPS: node has ~11.4Gi allocatable memory. 3 concurrent CLI
-    # extract jobs at 3Gi request/4Gi limit each (9Gi) left no headroom for
-    # API/postgres/worker, causing OOMKilled restarts and Pending jobs.
+    # Single-node VPS: node has ~11.4Gi allocatable memory. The chart now
+    # sizes CLI jobs at 4Gi request == limit and embedded Postgres at 4Gi
+    # request == limit (Guaranteed), so the steady-state budget is:
+    #   postgres 4Gi + api 768Mi + worker 512Mi + web 2x384Mi (~6.1Gi)
+    #   + one extract job 4Gi = ~10.1Gi, leaving ~1Gi headroom.
+    # The develop release shares this same node and is therefore kept on a
+    # diet (see values-vps-develop.yaml) — two full-footprint stacks (two
+    # 4Gi Postgres reservations) leave no room for any job and every scan
+    # sits Pending. That is what happened on 2026-09-10.
     MAX_CONCURRENT_RUNNERS: "1"
     # Backpressure strategy (see chart values `api.maxOldSpaceSizeMb`):
     #   * Heap guard: left at the chart default (85% of the JS heap cap). Now
@@ -37,9 +43,16 @@ api:
   # Single-node VPS: cap replicas so CLI jobs don't trigger runaway HPA scale-out.
   # 10 API pods on one node causes memory pressure → liveness probe failures →
   # RemoteDisconnected errors mid-request → asset failures.
+  #
+  # maxReplicas is 1, not 2: a second API pod (+768Mi request) on its own
+  # consumes the whole extract-job headroom below, and the HPA latches onto
+  # it — 2 pods idling at ~40% each never average below the 75% memory
+  # target, so it never scales back and every new scan sits Pending
+  # (observed 2026-09-11). One API pod idles at ~300Mi and handled prod
+  # alone for months; the CLI write-backs retry across the rolling restart.
   autoscaling:
     minReplicas: 1
-    maxReplicas: 2
+    maxReplicas: 1
 
   cliJobs:
     image:

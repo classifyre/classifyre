@@ -161,6 +161,12 @@ That profile keeps:
 - API internal as `ClusterIP`
 - browser traffic entering through Web, then proxying `/api`
 - `ReadWriteOnce` PVC access modes for local-path storage
+- coexistence with the `classifyre-develop` release on the same node: the
+  develop values file (`helm/classifyre/values-vps-develop.yaml`) keeps the
+  idle develop stack on reduced requests (api/web parked at 0 replicas, small
+  Postgres/worker requests) so prod always has room to schedule a scan. The
+  node budget is documented in `values-vps.yaml`. Two full-footprint stacks
+  do not fit on one ~12Gi node — every scan sits Pending.
 
 Use it with:
 
