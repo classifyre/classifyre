@@ -36,6 +36,7 @@ import {
   docs,
   enterpriseContactEmail,
   helmInstallCommand,
+  repoUrl,
   routes,
   softwareVersion,
 } from "@/lib/site";
@@ -492,9 +493,15 @@ export default function HomePage() {
                   <code>{helmInstallCommand.join("\n")}</code>
                 </pre>
 
-                <div className="mt-auto">
+                <div className="mt-auto flex flex-wrap gap-2">
                   <DocsLink href={docs.kubernetes} tone="signal">
                     Helm chart docs
+                  </DocsLink>
+                  <DocsLink
+                    href={`${repoUrl}/blob/main/helm/classifyre/README.md`}
+                    tone="signal"
+                  >
+                    Chart README on GitHub
                   </DocsLink>
                 </div>
               </div>

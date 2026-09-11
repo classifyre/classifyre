@@ -77,10 +77,10 @@ jobs:
           ns="${{ env.HELM_NAMESPACE }}"
           if [[ "${ns}" == "classifyre" ]]; then
             echo "release_name=classifyre"           >> "$GITHUB_OUTPUT"
-            echo "values_file=./helm/classifyre/values-vps.yaml" >> "$GITHUB_OUTPUT"
+            echo "values_file=./helm/develop/values-vps.yaml" >> "$GITHUB_OUTPUT"
           else
             echo "release_name=classifyre-develop"   >> "$GITHUB_OUTPUT"
-            echo "values_file=./helm/classifyre/values-vps-develop.yaml" >> "$GITHUB_OUTPUT"
+            echo "values_file=./helm/develop/values-vps-develop.yaml" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout

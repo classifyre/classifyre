@@ -32,9 +32,9 @@
 | api.cliJobs.outputRestTimeoutSec | int | `120` | HTTP read timeout (seconds) for CLI→API REST calls (bulk ingest, finalize, status updates). The API processes each batch in a Postgres transaction that can take 30-60 s under load; this must be set higher than the API's transaction timeout to avoid spurious read-timeout failures. |
 | api.cliJobs.podSecurityContext | object | `{"fsGroup":10001,"runAsGroup":10001,"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod security context for CLI job pods. |
 | api.cliJobs.pollIntervalMs | int | `2000` | Poll interval while waiting for job completion (milliseconds). |
-| api.cliJobs.priorityClassName | string | `""` | CLI job priority class. |
-| api.cliJobs.resources.limits | object | `{"cpu":"2","ephemeral-storage":"20Gi","memory":"4Gi"}` | CLI job resource limits. |
-| api.cliJobs.resources.requests | object | `{"cpu":"500m","ephemeral-storage":"6Gi","memory":"3Gi"}` | CLI job resource requests. |
+| api.cliJobs.priorityClassName | string | `"batch-low-priority"` | so a pending Job waits for room instead of displacing a service pod. |
+| api.cliJobs.resources.limits | object | `{"cpu":"2","ephemeral-storage":"20Gi","memory":"4Gi"}` | CLI job resource limits. Memory must equal the request above. |
+| api.cliJobs.resources.requests | object | `{"cpu":"500m","ephemeral-storage":"6Gi","memory":"4Gi"}` | CLI job resource requests. |
 | api.cliJobs.serviceAccountName | string | `""` | Service account for CLI jobs. Empty uses API service account. |
 | api.cliJobs.tolerations | list | `[]` | CLI job scheduling: tolerations. |
 | api.cliJobs.ttlSecondsAfterFinished | int | `1800` | TTL for completed CLI jobs (seconds). Ignored when cleanup policy deletes jobs immediately. |
@@ -87,13 +87,17 @@
 | api.embedding.retrySeconds | int | `30` |  |
 | api.embedding.revision | string | `"751bff37182d3f1213fa05d7196b954e230abad9"` | Immutable model revision. Change it to create a new embedding space. |
 | api.embedding.workerConcurrency | int | `1` | Maximum embedding batches processed concurrently across all API replicas. |
+| api.env.CLI_JOB_REAP_CRON | string | `"*/5 * * * *"` | MAX_CONCURRENT_RUNNERS because that cap counts runner rows, not pods. |
 | api.env.DEMO_MODE | string | `"false"` | Enable read-only demo mode. When "true" all mutating API operations return 403. |
 | api.env.ENVIRONMENT | string | `"kubernetes"` | Execution mode used by API. |
-| api.env.MAX_CONCURRENT_RUNNERS | string | `"3"` | Set to "0" to disable the limit (unlimited concurrency). |
+| api.env.MAX_CONCURRENT_RUNNERS | string | `"3"` | ceiling is this number times the number of workspaces running scans. |
 | api.env.MAX_RUNNERS_PER_SOURCE | string | `"5"` | exceeds this value. Set to "0" to disable cleanup. |
+| api.env.NAMESPACE_IDLE_AFTER_DAYS | string | `"7"` | for testing. Set to "0" to disable cold mode. |
+| api.env.NAMESPACE_IDLE_CHECK_MS | string | `"60000"` | and wake sleeping namespaces. Code default when unset: 60000. |
 | api.env.NODE_ENV | string | `"production"` | Runtime environment passed to API container. |
 | api.env.PORT | string | `"8000"` | API listen port. |
-| api.env.RUNNER_LOGS_DIR | string | `"/var/lib/classifyre/runner-logs"` | Filesystem directory for runner execution logs (filesystem backend only; unused when S3 is configured). |
+| api.env.RUNNER_CLEANUP_CRON | string | `"0 3 * * *"` | Cron (UTC) for that nightly cleanup. Code default when unset: "0 3 * * *". |
+| api.env.RUNNER_RETENTION_DAYS | string | `"14"` | this along with their logs. Code default when unset: 14. |
 | api.env.TEMP_DIR | string | `"/tmp"` | Temporary directory used by API. |
 | api.extraEnv | list | `[]` | Extra environment variables for API container. |
 | api.extraEnvFrom | list | `[]` | Extra envFrom sources for API container. |
@@ -122,6 +126,8 @@
 | api.maskedConfigEncryption.secretName | string | `""` | Secret name created by this chart when existingSecret is empty. |
 | api.maskedConfigEncryption.value | string | `""` | Must be exactly 32 chars when using raw string format. |
 | api.maxOldSpaceSizeMb | int | `1536` | limit. Rule of thumb: heap ≈ 0.75 × the memory limit (in MB). |
+| api.maxRssMb | string | `""` | Total process RSS (MB) above which the six CLI ingestion endpoints shed with 503 and the CLI retries. This is under-pressure's second threshold, alongside the JS-heap one derived from `maxOldSpaceSizeMb`.  It MUST be set, and set above the heap cap. under-pressure's own default is a flat 1 GB that ignores the pod's memory limit, and with a 1536 MB heap the JS heap alone grows past it — RSS never comes back down, the pressure flag latches on, and every scan then fails with "Server is under load" on an API using a third of its limit. That is what a 4Gi API pod measured: VmRSS 1558 MB against the 1024 MB default.  LEAVE EMPTY. Empty means "derive it from `resources.limits.memory`" (0.875 x the limit), which is what you want: the guard then follows the limit automatically instead of being a third number to keep in sync by hand. Set it only to override that derivation.  Sizing it near the heap cap instead of near the limit is the failure mode: RSS is heap PLUS native (Prisma, Buffers, the embedding model), so a guard close to the heap fires during healthy operation. The chart fails to render if the heap cap ever lands at or above this value. |
+| api.maxRssMbFallback | int | `1792` | Fallback RSS guard (MB) used only when `maxRssMb` is empty AND the memory limit is absent or not a whole Gi/Mi quantity (e.g. "1.5Gi"). Never leave this at under-pressure's own 1 GB library default, which ignores the pod limit entirely. |
 | api.migration.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}` | Override with runAsUser/runAsNonRoot: false if the migration toolchain requires root (e.g. Prisma on Bun). |
 | api.migration.enabled | bool | `true` | API applies pending migrations itself before NestJS startup. |
 | api.migration.script | string | `"node -e \"require('./dist/src/database-migrations.js').applyAllPendingMigrations().catch((error) => { console.error(error); process.exit(1); })\""` | Migration command/script. |
@@ -136,7 +142,7 @@
 | api.podSecurityContext.runAsNonRoot | bool | `true` | Require API container to run as non-root. |
 | api.podSecurityContext.runAsUser | int | `10001` | API pod user ID. |
 | api.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` | API pod seccomp profile type. |
-| api.priorityClassName | string | `""` | API pod priority class. |
+| api.priorityClassName | string | `"service-standard"` | worker outrank batch CLI Jobs under node pressure (see priorityClasses). |
 | api.readinessProbe.enabled | bool | `true` | Enable API readiness probe. |
 | api.readinessProbe.failureThreshold | int | `6` | API readiness failure threshold. |
 | api.readinessProbe.initialDelaySeconds | int | `10` | Delay before starting API readiness checks. |
@@ -214,7 +220,7 @@
 | frontend.posthog.ingestHost | string | `"https://us.i.posthog.com"` | Use https://eu.i.posthog.com for EU Cloud, or your managed proxy CNAME. |
 | frontend.posthog.token | string | `""` | PostHog project token (phc_...). Required when enabled=true. |
 | frontend.posthog.uiHost | string | `"https://us.posthog.com"` | Use https://eu.posthog.com for EU Cloud. |
-| frontend.priorityClassName | string | `""` | Web pod priority class. |
+| frontend.priorityClassName | string | `"service-standard"` | Web pod priority class. |
 | frontend.readinessProbe.enabled | bool | `true` | Enable web readiness probe. |
 | frontend.readinessProbe.failureThreshold | int | `6` | Web readiness failure threshold. |
 | frontend.readinessProbe.initialDelaySeconds | int | `10` | Delay before starting web readiness checks. |
@@ -283,6 +289,7 @@
 | postgres.embedded.image.pullPolicy | string | `"IfNotPresent"` | Embedded Postgres image pull policy. |
 | postgres.embedded.image.repository | string | `"pgvector/pgvector"` | Embedded Postgres image repository. |
 | postgres.embedded.image.tag | string | `"0.8.5-pg18-bookworm"` | Embedded Postgres image tag. |
+| postgres.embedded.livenessProbe | object | `{"enabled":false,"failureThreshold":10,"initialDelaySeconds":10,"periodSeconds":30,"timeoutSeconds":15}` | already parks traffic on a wedged instance without that risk. |
 | postgres.embedded.nodeSelector | object | `{}` | Embedded Postgres scheduling: node selector. |
 | postgres.embedded.parameters | object | `{"shared_buffers":"512MB","work_mem":"16MB"}` | how Postgres itself uses the memory already granted to it. |
 | postgres.embedded.password | string | `""` | Embedded Postgres password (required when existingSecret is empty). |
@@ -296,9 +303,10 @@
 | postgres.embedded.podLabels | object | `{}` | Additional labels for embedded Postgres pod. |
 | postgres.embedded.podSecurityContext | object | `{"fsGroup":999,"runAsGroup":999,"runAsUser":999,"seccompProfile":{"type":"RuntimeDefault"}}` | Embedded Postgres pod security context. |
 | postgres.embedded.port | int | `5432` | Embedded Postgres service and container port. |
-| postgres.embedded.priorityClassName | string | `""` | Embedded Postgres pod priority class. |
-| postgres.embedded.resources.limits | object | `{"cpu":"2","memory":"4Gi"}` | Embedded Postgres resource limits. |
-| postgres.embedded.resources.requests | object | `{"cpu":"100m","memory":"256Mi"}` | Embedded Postgres resource requests. |
+| postgres.embedded.priorityClassName | string | `"service-standard"` | Embedded Postgres pod priority class. |
+| postgres.embedded.readinessProbe | object | `{"failureThreshold":6,"initialDelaySeconds":5,"periodSeconds":10,"timeoutSeconds":10}` | that flaps under load churns every consumer's connection pool. |
+| postgres.embedded.resources.limits | object | `{"cpu":"2","memory":"4Gi"}` | Embedded Postgres resource limits. Must equal requests (see above). |
+| postgres.embedded.resources.requests | object | `{"cpu":"2","memory":"4Gi"}` | demotes the pod to Burstable. |
 | postgres.embedded.service.annotations | object | `{}` | Additional annotations for embedded Postgres service. |
 | postgres.embedded.shmSize | string | `"1Gi"` | to fall back to the runtime default. |
 | postgres.embedded.terminationGracePeriodSeconds | string | `nil` | Embedded Postgres pod termination grace period (seconds). Set to null to use Kubernetes default. |
@@ -316,7 +324,7 @@
 | postgres.mode | string | `"embedded"` | PostgreSQL mode: external, cnpg, or embedded. |
 | priorityClasses.batchName | string | `"batch-low-priority"` | Priority class name for batch workloads. |
 | priorityClasses.batchValue | int | `1000` | Numeric priority value for batch workloads. |
-| priorityClasses.create | bool | `false` | Create service and batch priority classes. |
+| priorityClasses.create | bool | `true` |  |
 | priorityClasses.serviceName | string | `"service-standard"` | Priority class name for service workloads. |
 | priorityClasses.serviceValue | int | `10000` | Numeric priority value for service workloads. |
 | rbac.create | bool | `true` | Create Role/RoleBinding for API CLI job orchestration. |
@@ -339,6 +347,7 @@
 | worker.autoscaling.targetCPUUtilizationPercentage | int | `75` | Target average CPU utilization. CPU only, on purpose: worker memory tracks resident namespaces rather than queue depth, so scaling on memory adds replicas that raise total memory instead of relieving it. |
 | worker.maxConcurrentNamespaceJobs | int | `4` | Maximum namespace-scoped background job batches executing concurrently across all worker replicas. All tenant queues remain registered; excess jobs wait on a PostgreSQL advisory-lock slot. Set 0 for unlimited.  This is a GLOBAL semaphore spanning every namespace AND every queue, so at 1 a single slow handler stalls the whole instance — scheduler ticks, scan hand-offs and autopilot runs all queue behind it. 4 keeps the rationing that makes the limit worth having while leaving room for control-plane work to get through alongside one long job. |
 | worker.maxOldSpaceSizeMb | int | `2304` | V8 old-space (JS heap) cap in MB for the WORKER pods, overriding `api.maxOldSpaceSizeMb`. Leave empty to inherit the API's value.  The worker needs its own number because it has its own memory limit. With the shared 1536 MB cap inside a 3Gi worker the container stopped being OOMKilled and started dying of `FATAL ERROR: Reached heap limit` (SIGSEGV, exit 139) roughly 40s after boot instead — the cgroup was no longer the binding constraint, the heap cap was, and 1.5 GB of the pod's 3 GB simply went unused. Same 0.75x rule of thumb as the API: 2304 ≈ 0.75 × 3072. |
+| worker.maxRssMb | string | `""` | Total process RSS (MB) for the WORKER pods. Leave empty to derive it from the worker's OWN `resources.limits.memory` (0.875 x), which is almost always what you want — the worker holds the forked onnxruntime child on top of everything the API holds, and its limit differs from the API's. |
 | worker.namespaceJobSlotTimeoutSeconds | int | `900` | Seconds a job batch may wait for a concurrency slot before it gives up. An unbounded wait is indistinguishable from a hang: the handler never runs, never fails and never reports. On timeout the batch throws, pg-boss retries it later, and the stall becomes visible in the worker queue view instead of silent. Set 0 to wait forever (the previous behaviour). |
 | worker.replicaCount | int | `1` | background work no longer competes with api pods for their memory limit. |
 | worker.resources.limits | object | `{"cpu":"1","memory":"3Gi"}` | felt pressure. 3Gi leaves ~1.5 GB for native allocations. |

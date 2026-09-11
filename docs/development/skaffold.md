@@ -32,7 +32,7 @@ These are the local ports Skaffold forwards, which differ from the in-cluster
 ports the services listen on (8000, 5432). `portForward` in `skaffold.yaml` is
 the source of truth.
 
-Web (`frontend.enabled: false` in `values-dev.yaml`) is not deployed to this
+Web (`frontend.enabled: false` in `helm/develop/values-dev.yaml`) is not deployed to this
 cluster at all — run it locally with `bun run dev` in `apps/web`, pointed at
 the API port-forward above. See
 [`scripts/dev/README.md`](../../scripts/dev/README.md) for the exact command.
@@ -44,7 +44,7 @@ ordinary local process removes that cache entirely.
 
 ## How development runs
 
-Skaffold installs `helm/classifyre` using `values-dev.yaml`, monitors chart
+Skaffold installs `helm/classifyre` using `helm/develop/values-dev.yaml`, monitors chart
 changes, streams deployment status, and owns the port-forwards. Its local
 profile intentionally has no build artifacts or file-sync rules.
 
@@ -74,7 +74,7 @@ and worker installations are serialized through a shared lock directory.
 | `bun.lock` or relevant `package.json` | Restart API/worker; dependencies reinstall into k3d-owned caches            |
 | Prisma schema                         | Restart API/worker; Prisma client regenerates and startup applies migrations |
 | Python dependency files               | Build and publish the normal production CLI image through CI                 |
-| Helm templates or `values-dev.yaml`   | Skaffold upgrades the Helm release                                           |
+| Helm templates or `helm/develop/values-dev.yaml`   | Skaffold upgrades the Helm release                                           |
 | Root `Dockerfile`                     | Affects only explicit production workload-image builds                       |
 
 Source changes never trigger image builds. Skaffold sync is not used because
@@ -128,7 +128,7 @@ GitHub Actions builds and publishes them for both supported architectures.
 ## Troubleshooting
 
 - Run `skaffold diagnose -p dev --yaml-only` to inspect the effective pipeline.
-- Run `helm lint helm/classifyre -f helm/classifyre/values-dev.yaml` to validate
+- Run `helm lint helm/classifyre -f helm/develop/values-dev.yaml` to validate
   the local overrides.
 - If a source watcher misses an event, confirm the checkout mount exists with
   `docker exec k3d-classifyre-server-0 ls /var/lib/classifyre/source`.
