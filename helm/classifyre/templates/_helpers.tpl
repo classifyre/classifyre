@@ -373,16 +373,22 @@ which each deployment sets on its own after including this block.
      limit, so the process OOM-crashes far below its granted memory. Raise the
      cap and set the Fastify under-pressure heap guard just below it (85%), so
      the CLI ingestion endpoints shed with 503 (CLI retries → no lost batches)
-     before V8 hard-crashes. Both are overridable via `.Values.api.env`, which
-     is spread after this block. */}}
+     before V8 hard-crashes. Each entry below is skipped when the same name is
+     set via `.Values.api.env` (spread after this block): appending a second
+     same-named entry does NOT override — the API server rejects the resulting
+     strategic-merge patch ("doesn't match $setElementOrder"). */}}
 {{- $heapMb := int .Values.api.maxOldSpaceSizeMb }}
 {{- if and (eq $role "worker") .Values.worker.maxOldSpaceSizeMb }}
 {{- $heapMb = int .Values.worker.maxOldSpaceSizeMb }}
 {{- end }}
+{{- if not (hasKey .Values.api.env "NODE_OPTIONS") }}
 - name: NODE_OPTIONS
   value: "--max-old-space-size={{ $heapMb }}"
+{{- end }}
+{{- if not (hasKey .Values.api.env "UNDER_PRESSURE_MAX_HEAP_USED_BYTES") }}
 - name: UNDER_PRESSURE_MAX_HEAP_USED_BYTES
   value: {{ div (mul $heapMb 1024 1024 85) 100 | quote }}
+{{- end }}
 {{- /* under-pressure's OTHER threshold is total process RSS, and its library
      default is a flat 1 GB that knows nothing about this pod's limit. That
      default cannot coexist with a heap cap above it: the JS heap alone grows
@@ -415,8 +421,10 @@ which each deployment sets on its own after including this block.
 {{- if ge $heapMb $rssMb }}
 {{- fail (printf "%s: maxOldSpaceSizeMb (%d MB) must be below the RSS guard (%d MB), or the JS heap alone trips under-pressure and every CLI ingestion endpoint returns 503 permanently. Raise resources.limits.memory, or lower the heap cap." $role $heapMb $rssMb) }}
 {{- end }}
+{{- if not (hasKey .Values.api.env "UNDER_PRESSURE_MAX_RSS_BYTES") }}
 - name: UNDER_PRESSURE_MAX_RSS_BYTES
   value: {{ mul $rssMb 1024 1024 | quote }}
+{{- end }}
 {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
 - name: DATABASE_URL
   valueFrom:

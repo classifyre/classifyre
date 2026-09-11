@@ -1173,7 +1173,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: postgres
-          image: pgvector/pgvector:0.8.5-pg18-bookworm
+          image: pgvector/pgvector:0.8.6-pg18-bookworm
           imagePullPolicy: IfNotPresent
           args:
             - -c
