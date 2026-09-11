@@ -30,12 +30,23 @@ import { SourceGraphWorker } from '../stats/source-graph.worker';
 import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { NotificationEventsGateway } from '../websocket/notification-events.gateway';
 import {
+  AutoSchedulePhase,
+  RunnerStatus,
+  SourceScheduleMode,
+} from '@prisma/client';
+import { PrismaService } from '../prisma.service';
+import {
   CLS_DATABASE_LANE,
   CLS_NAMESPACE_ID,
   CLS_SCHEMA,
   CLS_SLUG,
   type NamespaceContext,
 } from './namespace.constants';
+import {
+  coldModeConfigFromEnv,
+  decideNamespaceIdle,
+  type NamespaceActivitySnapshot,
+} from './namespace-idle-policy';
 import type { NamespaceLifecycleEvent } from '../registry/namespace.types';
 
 /**
@@ -52,9 +63,21 @@ export class NamespaceWorkerManager
 {
   private readonly logger = new Logger(NamespaceWorkerManager.name);
   private readonly active = new Map<string, NamespaceContext>();
+  /**
+   * Namespaces whose workers were put to sleep by cold mode, keyed by schema.
+   * Sleeping namespaces keep their data and pg-boss schedules; only the
+   * polling workers and pools are gone. They are excluded from the reconcile
+   * auto-start and re-evaluated for activity on the idle timer.
+   */
+  private readonly sleeping = new Map<
+    string,
+    { ctx: NamespaceContext; since: Date }
+  >();
   private configWatchTimer?: NodeJS.Timeout;
   private reconcileTimer?: NodeJS.Timeout;
+  private idleTimer?: NodeJS.Timeout;
   private reconciling = false;
+  private evaluatingIdle = false;
 
   constructor(
     private readonly registry: NamespaceRegistryService,
@@ -81,6 +104,7 @@ export class NamespaceWorkerManager
     private readonly runnerEvents: RunnerEventsGateway,
     private readonly notificationEvents: NotificationEventsGateway,
     private readonly leadership: WorkerLeadershipService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -127,6 +151,14 @@ export class NamespaceWorkerManager
       void this.watchConfigs();
     }, ChatGatewayService.CONFIG_WATCH_INTERVAL_MS);
     this.configWatchTimer.unref();
+
+    // Cold mode: put scan-idle namespaces to sleep and wake them when scans
+    // (or schedules) reappear. Runs only here, on worker pods.
+    const coldMode = coldModeConfigFromEnv();
+    this.idleTimer = setInterval(() => {
+      void this.evaluateIdle();
+    }, coldMode.checkMs);
+    this.idleTimer.unref();
   }
 
   /**
@@ -152,6 +184,7 @@ export class NamespaceWorkerManager
   async onApplicationShutdown(): Promise<void> {
     if (this.configWatchTimer) clearInterval(this.configWatchTimer);
     if (this.reconcileTimer) clearInterval(this.reconcileTimer);
+    if (this.idleTimer) clearInterval(this.idleTimer);
     for (const ctx of [...this.active.values()]) {
       await this.stop(ctx).catch(() => undefined);
     }
@@ -251,6 +284,8 @@ export class NamespaceWorkerManager
    */
   private async stop(e: NamespaceLifecycleEvent): Promise<void> {
     const wasActive = this.active.delete(e.schemaName);
+    // A deleted namespace must never be woken back up by the idle evaluator.
+    this.sleeping.delete(e.schemaName);
     const settle = async (label: string, fn: () => unknown): Promise<void> => {
       try {
         await fn();
@@ -319,6 +354,181 @@ export class NamespaceWorkerManager
   }
 
   /**
+   * One cold-mode pass: sleep scan-idle namespaces, wake sleeping ones whose
+   * activity reappeared.
+   *
+   * Fail-closed by construction: a namespace whose activity cannot be read
+   * (transient database error, mid-migration schema) is left exactly as it is.
+   * Sleeping requires a positive idle verdict from a fresh snapshot; waking
+   * requires a positive activity verdict. An error is neither.
+   */
+  private async evaluateIdle(): Promise<void> {
+    if (this.evaluatingIdle) return;
+    const config = coldModeConfigFromEnv();
+    if (!config.enabled) return;
+    this.evaluatingIdle = true;
+    try {
+      const now = new Date();
+      for (const ctx of [...this.active.values()]) {
+        let snapshot: NamespaceActivitySnapshot;
+        try {
+          snapshot = await this.runInNamespace(ctx, () =>
+            this.gatherActivitySnapshot(),
+          );
+        } catch (error) {
+          this.logger.warn(
+            `Cold-mode check skipped for namespace '${ctx.slug}': ${error instanceof Error ? error.message : String(error)}`,
+          );
+          continue;
+        }
+        const decision = decideNamespaceIdle(
+          snapshot,
+          now,
+          config.idleAfterDays,
+        );
+        if (decision.idle) {
+          await this.sleepNamespace(ctx, decision.reason).catch((error) =>
+            this.logger.warn(
+              `Cold-mode sleep failed for namespace '${ctx.slug}': ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          );
+        }
+      }
+
+      if (this.sleeping.size === 0) return;
+      const namespaces = await this.registry.list().catch(() => []);
+      const known = new Map(
+        namespaces.map((ns) => [ns.schemaName, ns] as [string, typeof ns]),
+      );
+      for (const [schema, entry] of [...this.sleeping]) {
+        const live = known.get(schema);
+        if (!live) continue; // Deleted: reconcile owns the teardown.
+        const ctx: NamespaceContext = {
+          namespaceId: live.id,
+          slug: live.slug,
+          schemaName: live.schemaName,
+        };
+        let snapshot: NamespaceActivitySnapshot;
+        try {
+          snapshot = await this.runInNamespace(ctx, () =>
+            this.gatherActivitySnapshot(),
+          );
+        } catch {
+          continue;
+        }
+        const decision = decideNamespaceIdle(
+          snapshot,
+          now,
+          config.idleAfterDays,
+        );
+        if (decision.idle) continue;
+        this.sleeping.delete(schema);
+        this.logger.log(
+          `Waking workers for namespace '${ctx.slug}' after ${this.describeSleep(entry.since, now)} asleep — ${decision.reason}.`,
+        );
+        await this.start({
+          namespaceId: ctx.namespaceId,
+          slug: ctx.slug,
+          schemaName: ctx.schemaName,
+        }).catch((error) =>
+          this.logger.error(
+            `Failed to wake workers for namespace '${ctx.slug}': ${String(error)}`,
+          ),
+        );
+      }
+    } finally {
+      this.evaluatingIdle = false;
+    }
+  }
+
+  /**
+   * What "activity" means for cold mode: scans, and only scans, plus the
+   * things that lead to one. Findings, cases and inquiries deliberately do not
+   * count — on a quiet namespace they are all downstream of a scan, so counting
+   * them would only keep workers warm with no work to do.
+   */
+  private async gatherActivitySnapshot(): Promise<NamespaceActivitySnapshot> {
+    const [
+      inFlightRunners,
+      inFlightSources,
+      dirtySources,
+      plannedSources,
+      latestRunner,
+    ] = await Promise.all([
+      this.prisma.runner.count({
+        where: { status: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] } },
+      }),
+      this.prisma.source.count({
+        where: {
+          runnerStatus: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
+        },
+      }),
+      this.prisma.source.count({
+        where: { autopilotDirtyAt: { not: null } },
+      }),
+      // A namespace with future work of its own must never sleep: the sleep
+      // would silently cancel the daily STEADY re-checks and cron schedules.
+      this.prisma.source.count({
+        where: {
+          OR: [
+            { scheduleEnabled: true },
+            {
+              scheduleMode: SourceScheduleMode.AUTO,
+              autoPhase: { not: AutoSchedulePhase.PAUSED },
+            },
+          ],
+        },
+      }),
+      this.prisma.runner.findFirst({
+        orderBy: { triggeredAt: 'desc' },
+        select: { triggeredAt: true },
+      }),
+    ]);
+    return {
+      inFlightRunners,
+      inFlightSources,
+      dirtySources,
+      plannedSources,
+      latestRunnerAt: latestRunner?.triggeredAt ?? null,
+    };
+  }
+
+  /**
+   * Release a namespace's workers and pools without touching its data.
+   * `stop()` only releases process-local resources (boss, pools, pollers,
+   * registry entries) — the namespace row, its schema tables and its pg-boss
+   * schedules all survive, so `start()` later resumes exactly where it left
+   * off. pg-boss cron jobs due while asleep simply fire on wake; every one of
+   * those handlers is an idempotent reconciliation.
+   */
+  private async sleepNamespace(
+    ctx: NamespaceContext,
+    reason: string,
+  ): Promise<void> {
+    await this.stop({
+      namespaceId: ctx.namespaceId,
+      slug: ctx.slug,
+      schemaName: ctx.schemaName,
+    });
+    this.sleeping.set(ctx.schemaName, { ctx, since: new Date() });
+    this.logger.log(
+      `Namespace '${ctx.slug}' idle (${reason}) — background workers asleep; ` +
+        `they wake automatically on the next scan or schedule change.`,
+    );
+  }
+
+  private describeSleep(since: Date, now: Date): string {
+    const minutes = Math.max(
+      0,
+      Math.round((now.getTime() - since.getTime()) / 60_000),
+    );
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 48) return `${hours}h`;
+    return `${Math.floor(hours / 24)}d`;
+  }
+
+  /**
    * Reconcile process-local state with the shared registry. Lifecycle callbacks
    * only reach the API process that handled a CRUD request; production worker
    * pods and sibling API replicas discover those changes through this poll.
@@ -348,7 +558,12 @@ export class NamespaceWorkerManager
     try {
       if (runsBackgroundWorkers()) {
         for (const ctx of local.values()) {
-          if (!this.active.has(ctx.schemaName)) {
+          // Sleeping namespaces wake only through the idle evaluator, which
+          // has seen their activity snapshot — not through the blind reconcile.
+          if (
+            !this.active.has(ctx.schemaName) &&
+            !this.sleeping.has(ctx.schemaName)
+          ) {
             await this.start(ctx).catch((error) =>
               this.logger.error(
                 `Failed to start workers for namespace '${ctx.slug}': ${String(error)}`,
@@ -360,6 +575,7 @@ export class NamespaceWorkerManager
 
       const knownSchemas = new Set([
         ...this.active.keys(),
+        ...this.sleeping.keys(),
         ...this.prismaManager.residentSchemas(),
       ]);
       for (const schema of knownSchemas) {

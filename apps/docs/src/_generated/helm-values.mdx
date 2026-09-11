@@ -92,6 +92,8 @@
 | api.env.ENVIRONMENT | string | `"kubernetes"` | Execution mode used by API. |
 | api.env.MAX_CONCURRENT_RUNNERS | string | `"3"` | ceiling is this number times the number of workspaces running scans. |
 | api.env.MAX_RUNNERS_PER_SOURCE | string | `"5"` | exceeds this value. Set to "0" to disable cleanup. |
+| api.env.NAMESPACE_IDLE_AFTER_DAYS | string | `"7"` | for testing. Set to "0" to disable cold mode. |
+| api.env.NAMESPACE_IDLE_CHECK_MS | string | `"60000"` | and wake sleeping namespaces. Code default when unset: 60000. |
 | api.env.NODE_ENV | string | `"production"` | Runtime environment passed to API container. |
 | api.env.PORT | string | `"8000"` | API listen port. |
 | api.env.RUNNER_CLEANUP_CRON | string | `"0 3 * * *"` | Cron (UTC) for that nightly cleanup. Code default when unset: "0 3 * * *". |
