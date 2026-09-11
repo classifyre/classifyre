@@ -11,10 +11,24 @@ This chart deploys Classifyre API and Web services with Kubernetes-native CLI jo
 **Prerequisites:** Kubernetes 1.28+, Helm 3.12+, and a Postgres 15+ database
 (external, CloudNativePG, or the built-in embedded instance for trials).
 
+**Getting the chart.** Every release is published as an OCI artifact — Helm
+3.8+ speaks OCI natively, so there is no `helm repo add` step:
+
+```text
+oci://registry-1.docker.io/classifyre/classifyre-core
+```
+
+Pin `--version` to the release you want (`helm show chart` lists them).
+Working from a source checkout instead? The chart source is
+[`helm/classifyre`](https://github.com/classifyre/classifyre/tree/main/helm/classifyre)
+— replace the OCI reference below with `./helm/classifyre`.
+
 **Trial (embedded Postgres, single namespace):**
 
 ```bash
-helm upgrade --install classifyre ./helm/classifyre \
+helm upgrade --install classifyre \
+  oci://registry-1.docker.io/classifyre/classifyre-core \
+  --version '<version>' \
   -n classifyre \
   --create-namespace
 ```
@@ -24,13 +38,19 @@ helm upgrade --install classifyre ./helm/classifyre \
 ```bash
 kubectl create namespace classifyre
 
-helm upgrade --install classifyre ./helm/classifyre \
+helm upgrade --install classifyre \
+  oci://registry-1.docker.io/classifyre/classifyre-core \
+  --version '<version>' \
   -n classifyre \
-  -f ./helm/classifyre/values-production.example.yaml \
+  -f your-values.yaml \
   --set api.image.tag='<version>' \
   --set api.cliJobs.image.tag='<version>' \
   --set frontend.image.tag='<version>'
 ```
+
+Start `your-values.yaml` from
+[`values-production.example.yaml`](https://github.com/classifyre/classifyre/blob/main/helm/classifyre/values-production.example.yaml)
+— a commented starting point, not a drop-in file.
 
 See [Quick Start (External Postgres)](#quick-start-external-postgres) and
 [Quick Start (CloudNativePG)](#quick-start-cloudnativepg) below for the
@@ -241,6 +261,8 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.env.ENVIRONMENT | string | `"kubernetes"` | Execution mode used by API. |
 | api.env.MAX_CONCURRENT_RUNNERS | string | `"3"` | ceiling is this number times the number of workspaces running scans. |
 | api.env.MAX_RUNNERS_PER_SOURCE | string | `"5"` | exceeds this value. Set to "0" to disable cleanup. |
+| api.env.NAMESPACE_IDLE_AFTER_DAYS | string | `"7"` | for testing. Set to "0" to disable cold mode. |
+| api.env.NAMESPACE_IDLE_CHECK_MS | string | `"60000"` | and wake sleeping namespaces. Code default when unset: 60000. |
 | api.env.NODE_ENV | string | `"production"` | Runtime environment passed to API container. |
 | api.env.PORT | string | `"8000"` | API listen port. |
 | api.env.RUNNER_CLEANUP_CRON | string | `"0 3 * * *"` | Cron (UTC) for that nightly cleanup. Code default when unset: "0 3 * * *". |

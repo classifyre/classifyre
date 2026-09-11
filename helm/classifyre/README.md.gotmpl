@@ -11,10 +11,24 @@ This chart deploys Classifyre API and Web services with Kubernetes-native CLI jo
 **Prerequisites:** Kubernetes 1.28+, Helm 3.12+, and a Postgres 15+ database
 (external, CloudNativePG, or the built-in embedded instance for trials).
 
+**Getting the chart.** Every release is published as an OCI artifact — Helm
+3.8+ speaks OCI natively, so there is no `helm repo add` step:
+
+```text
+oci://registry-1.docker.io/classifyre/classifyre-core
+```
+
+Pin `--version` to the release you want (`helm show chart` lists them).
+Working from a source checkout instead? The chart source is
+[`helm/classifyre`](https://github.com/classifyre/classifyre/tree/main/helm/classifyre)
+— replace the OCI reference below with `./helm/classifyre`.
+
 **Trial (embedded Postgres, single namespace):**
 
 ```bash
-helm upgrade --install classifyre ./helm/classifyre \
+helm upgrade --install classifyre \
+  oci://registry-1.docker.io/classifyre/classifyre-core \
+  --version '<version>' \
   -n classifyre \
   --create-namespace
 ```
@@ -24,13 +38,19 @@ helm upgrade --install classifyre ./helm/classifyre \
 ```bash
 kubectl create namespace classifyre
 
-helm upgrade --install classifyre ./helm/classifyre \
+helm upgrade --install classifyre \
+  oci://registry-1.docker.io/classifyre/classifyre-core \
+  --version '<version>' \
   -n classifyre \
-  -f ./helm/classifyre/values-production.example.yaml \
+  -f your-values.yaml \
   --set api.image.tag='<version>' \
   --set api.cliJobs.image.tag='<version>' \
   --set frontend.image.tag='<version>'
 ```
+
+Start `your-values.yaml` from
+[`values-production.example.yaml`](https://github.com/classifyre/classifyre/blob/main/helm/classifyre/values-production.example.yaml)
+— a commented starting point, not a drop-in file.
 
 See [Quick Start (External Postgres)](#quick-start-external-postgres) and
 [Quick Start (CloudNativePG)](#quick-start-cloudnativepg) below for the
