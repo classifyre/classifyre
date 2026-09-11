@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/docs",
-  "version": "0.5.2-SNAPSHOT",
+  "version": "0.5.2",
   "type": "module",
   "private": true,
   "scripts": {
