@@ -6,6 +6,45 @@
 
 This chart deploys Classifyre API and Web services with Kubernetes-native CLI job execution.
 
+## Installation
+
+**Prerequisites:** Kubernetes 1.28+, Helm 3.12+, and a Postgres 15+ database
+(external, CloudNativePG, or the built-in embedded instance for trials).
+
+**Trial (embedded Postgres, single namespace):**
+
+```bash
+helm upgrade --install classifyre ./helm/classifyre \
+  -n classifyre \
+  --create-namespace
+```
+
+**Production (external Postgres, pinned images):**
+
+```bash
+kubectl create namespace classifyre
+
+helm upgrade --install classifyre ./helm/classifyre \
+  -n classifyre \
+  -f ./helm/classifyre/values-production.example.yaml \
+  --set api.image.tag='<version>' \
+  --set api.cliJobs.image.tag='<version>' \
+  --set frontend.image.tag='<version>'
+```
+
+See [Quick Start (External Postgres)](#quick-start-external-postgres) and
+[Quick Start (CloudNativePG)](#quick-start-cloudnativepg) below for the
+database setup, and [Production Guidance](#production-guidance) for the
+checklist to review before going live.
+
+## Environment Profiles
+
+The chart ships only `values.yaml` (sane defaults) plus
+`values-production.example.yaml` (a commented starting point — copy it, don't
+use it verbatim). The maintainers' own environment overlays (local k3d,
+single-node VPS) live in [`helm/develop/`](../develop/README.md) and are not
+part of the published chart.
+
 ## Production Guidance
 
 1. Use dedicated images for API, Web, and CLI jobs.

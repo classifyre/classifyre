@@ -20,7 +20,7 @@ profiles:
             namespace: classifyre-dev
             createNamespace: true
             valuesFiles:
-              - helm/classifyre/values-dev.yaml
+              - helm/develop/values-dev.yaml
             skipBuildDependencies: true
             wait: false
 
@@ -52,8 +52,8 @@ profiles:
             namespace: classifyre-vps-db
             createNamespace: true
             valuesFiles:
-              - helm/classifyre/values-dev.yaml
-              - helm/classifyre/values-dev-vps-db.yaml
+              - helm/develop/values-dev.yaml
+              - helm/develop/values-dev-vps-db.yaml
             setValueTemplates:
               postgres.external.host: "{{.CLASSIFYRE_VPS_DB_HOST}}"
               postgres.external.password: "{{.CLASSIFYRE_VPS_DB_PASSWORD}}"

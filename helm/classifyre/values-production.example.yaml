@@ -1,6 +1,6 @@
 # Production example values
 # Use this as the baseline for real Kubernetes deployments.
-# Demo/test profiles such as values-vps.yaml intentionally keep different tradeoffs.
+# Demo/test profiles such as helm/develop/values-vps.yaml intentionally keep different tradeoffs.
 #
 # Quick start:
 #   1. Copy this file, fill in all <REQUIRED> placeholders.

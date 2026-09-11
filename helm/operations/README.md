@@ -12,7 +12,7 @@ This document captures the practical configuration choices and operational consi
 ## Values File Strategy
 
 - Keep one shared production baseline values file and environment-specific overlays beside it.
-- Keep single-node k3s overrides in a dedicated file such as [`helm/classifyre/values-vps.yaml`](/unstructured/helm/classifyre/values-vps.yaml).
+- Keep single-node k3s overrides in a dedicated file such as [`helm/develop/values-vps.yaml`](/unstructured/helm/develop/values-vps.yaml).
 - Keep local k3d values separate from production values so storage classes, service exposure, and replica counts do not leak across environments.
 
 ## Secrets And Encryption

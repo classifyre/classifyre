@@ -185,7 +185,7 @@ else
   helm upgrade --install classifyre ./helm/classifyre \
     --namespace classifyre \
     --create-namespace \
-    -f ./helm/classifyre/values-vps.yaml \
+    -f ./helm/develop/values-vps.yaml \
     --set api.image.tag="${VERSION}" \
     --set api.cliJobs.image.tag="${VERSION}" \
     --set frontend.image.tag="${VERSION}" \

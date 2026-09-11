@@ -5,7 +5,7 @@ triggering the full GitHub Actions deploy workflow.
 
 > **Warning:** The next GitHub Actions deploy will overwrite any manual `kubectl set` / `kubectl edit`
 > changes. If you want something permanent (e.g. a new env var), add it to
-> `helm/classifyre/values-vps-develop.yaml` and commit instead.
+> `helm/develop/values-vps-develop.yaml` and commit instead.
 
 ---
 
