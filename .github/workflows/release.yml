@@ -34,7 +34,7 @@ jobs:
       DOCKER_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
       HELM_RELEASE_NAME: classifyre
       HELM_NAMESPACE: classifyre
-      HELM_VALUES_FILE: ./helm/classifyre/values-vps.yaml
+      HELM_VALUES_FILE: ./helm/develop/values-vps.yaml
       PYPI_TOKEN: ${{ secrets.PYPI_TOKEN || '' }}
       REPO: ${{ github.repository }}
 

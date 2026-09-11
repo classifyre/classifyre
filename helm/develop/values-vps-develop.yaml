@@ -2,6 +2,13 @@
 # Same single-node K3s setup as values-vps.yaml, but deployed to the
 # classifyre-develop namespace on NodePort 30101 with :develop image tags.
 # Access: https://staging.classifyre.com/
+#
+# Develop shares the node with prod (see the budget in values-vps.yaml) and
+# is parked between test runs: api/web are scaled to 0 with their HPAs
+# removed (scale-down step in .github/workflows/develop.yml). Postgres and
+# worker stay up but on reduced requests below, so the prod namespace always
+# has room to schedule a scan. Develop postgres idles at ~50Mi, worker at
+# ~180Mi — neither needs the full-footprint defaults.
 
 api:
   image:
@@ -59,6 +66,22 @@ postgres:
     persistence:
       accessModes:
         - ReadWriteOnce
+    # Shared-node diet: the chart default reserves 4Gi (request == limit for
+    # Guaranteed QoS), which the idle develop DB never uses. Requests only —
+    # limits stay at the chart default so test-time spikes still have
+    # headroom. This changes scheduler placement, not runtime caps.
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+worker:
+  # Same shared-node diet as postgres above. Requests only; limits stay at
+  # the chart default.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
 
 telemetry:
   enabled: true

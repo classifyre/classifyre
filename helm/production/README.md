@@ -151,7 +151,7 @@ ingress:
 
 ## k3s NodePort Profile
 
-For single-node k3s without ingress, use the repo values file [`helm/classifyre/values-vps.yaml`](/unstructured/helm/classifyre/values-vps.yaml).
+For single-node k3s without ingress, use the repo values file [`helm/develop/values-vps.yaml`](/unstructured/helm/develop/values-vps.yaml).
 
 That profile keeps:
 
@@ -161,6 +161,12 @@ That profile keeps:
 - API internal as `ClusterIP`
 - browser traffic entering through Web, then proxying `/api`
 - `ReadWriteOnce` PVC access modes for local-path storage
+- coexistence with the `classifyre-develop` release on the same node: the
+  develop values file (`helm/develop/values-vps-develop.yaml`) keeps the
+  idle develop stack on reduced requests (api/web parked at 0 replicas, small
+  Postgres/worker requests) so prod always has room to schedule a scan. The
+  node budget is documented in `helm/develop/values-vps.yaml`. Two full-footprint stacks
+  do not fit on one ~12Gi node — every scan sits Pending.
 
 Use it with:
 
@@ -172,7 +178,7 @@ cd /unstructured
 helm upgrade --install classifyre ./helm/classifyre \
   -n classifyre \
   --create-namespace \
-  -f ./helm/classifyre/values-vps.yaml
+  -f ./helm/develop/values-vps.yaml
 ```
 
 The public entrypoint for that profile is `http://<node-ip>:30100`.

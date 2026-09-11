@@ -33,7 +33,7 @@ export interface GoogleAnalyticsRuntimeConfig {
  *
  * Off by default: a Classifyre instance is normally a private, internal tool
  * behind SSO where a public-website consent bar is noise. It is turned on for
- * deliberately public deployments (the demo instance — see values-vps.yaml),
+ * deliberately public deployments (the demo instance — see helm/develop/values-vps.yaml),
  * which are the ones an EU visitor can reach without a contract.
  */
 export interface CookieConsentRuntimeConfig {
