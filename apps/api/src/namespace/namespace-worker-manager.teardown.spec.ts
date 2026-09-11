@@ -62,6 +62,7 @@ describe('NamespaceWorkerManager teardown isolation', () => {
     sourceGraph: { registerForNamespace: asyncNoop },
     runnerEvents: { stopForSchema: noop },
     notificationEvents: { stopForSchema: noop },
+    prisma: {},
     // Never the leader in these tests, so start() takes the branch that skips
     // chat connectors — the teardown paths under test are unaffected either
     // way, and a double that claimed leadership would start pollers here.
@@ -96,6 +97,7 @@ describe('NamespaceWorkerManager teardown isolation', () => {
       d.runnerEvents as never,
       d.notificationEvents as never,
       d.leadership as never,
+      d.prisma as never,
     );
     return { manager, deps: d };
   };

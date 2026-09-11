@@ -2,13 +2,13 @@
 
 These scripts run the **production Helm chart** on a local k3d cluster. There
 are no separate development manifests — the same `helm/classifyre` chart that
-ships to the VPS is installed with a `values-dev.yaml` overlay.
+ships to the VPS is installed with a `helm/develop/values-dev.yaml` overlay.
 
 The API and worker run from official Bun containers with your working copy
 bind-mounted read-only, so TypeScript source edits restart the pod in place.
 
 **Web is not deployed in-cluster** (`frontend.enabled: false` in
-`values-dev.yaml`). Run it directly on your machine instead:
+`helm/develop/values-dev.yaml`). Run it directly on your machine instead:
 
 ```bash
 cd apps/web
@@ -32,7 +32,7 @@ Two modes:
 
 | Mode            | Database                        | Demo mode             | Use it to                                           |
 | --------------- | ------------------------------- | --------------------- | --------------------------------------------------- |
-| `dev` (default) | embedded Postgres in-cluster    | per `values-dev.yaml` | Normal feature work on throwaway local data         |
+| `dev` (default) | embedded Postgres in-cluster    | per `helm/develop/values-dev.yaml` | Normal feature work on throwaway local data         |
 | `dev-vps-db`    | the **VPS instance's** Postgres | forced off            | Administer the public demo while it stays read-only |
 
 ## Prerequisites
@@ -107,7 +107,7 @@ reachable by the cluster, and by nothing else. The chart gets that container's
 IP as `postgres.external.host`.
 
 **Two writers on one database need guardrails.** The overlay
-(`helm/classifyre/values-dev-vps-db.yaml`) applies three:
+(`helm/develop/values-dev-vps-db.yaml`) applies three:
 
 - `worker.replicaCount: 0` — two independent pg-boss consumers on one database
   means scheduled scans and autopilot cycles can be claimed twice, and the local
@@ -139,7 +139,7 @@ the environment, so it is never written to a file in the repo.
 
 ```
 skaffold.yaml            profiles: dev, dev-vps-db
-  └─ helm/classifyre     the production chart
+  └─ helm/classifyre     the production chart, with overlays from helm/develop/
        ├─ values-dev.yaml            source mounts, Bun containers, embedded PG
        └─ values-dev-vps-db.yaml     + external PG, DEMO_MODE=false, worker=0
 ```

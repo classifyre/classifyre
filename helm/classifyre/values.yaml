@@ -230,6 +230,17 @@ api:
     # -- is a pod holding CPU and memory right now, and one that is invisible to
     # -- MAX_CONCURRENT_RUNNERS because that cap counts runner rows, not pods.
     CLI_JOB_REAP_CRON: "*/5 * * * *"
+    # -- Days without any scan before a namespace's background workers are put
+    # -- to sleep (cold mode): its pg-boss instance stops polling, its cron
+    # -- ticks stop contending for global worker slots, and its DB pools are
+    # -- released. Scans define activity — workers wake automatically on the
+    # -- next scan or schedule change. Namespaces with CRON/AUTO schedules of
+    # -- their own never sleep. Code default when unset: 7. Accepts fractions
+    # -- for testing. Set to "0" to disable cold mode.
+    NAMESPACE_IDLE_AFTER_DAYS: "7"
+    # -- How often (milliseconds) worker pods re-evaluate namespace idleness
+    # -- and wake sleeping namespaces. Code default when unset: 60000.
+    NAMESPACE_IDLE_CHECK_MS: "60000"
     # -- Enable read-only demo mode. When "true" all mutating API operations return 403.
     DEMO_MODE: "false"
 
@@ -825,7 +836,7 @@ frontend:
     # Off by default: a Classifyre instance is normally private and reached
     # only by people who already have a contract with its operator, where a
     # public-website consent bar is noise. Turn it on for deliberately public
-    # deployments — the demo instance does (see values-vps.yaml). The
+    # deployments — the demo instance does (see helm/develop/values-vps.yaml). The
     # all-in-one image never shows it: it ships no analytics at all.
     #
     # Turning it on does not, by itself, make a deployment compliant: the
@@ -846,7 +857,7 @@ frontend:
     #
     # Off by default: most Classifyre instances are private, and a sitemap
     # would enumerate every asset and finding in the workspace. Turn it on only
-    # for deliberately public instances (see values-vps.yaml).
+    # for deliberately public instances (see helm/develop/values-vps.yaml).
     # -- Publish sitemap.xml and allow crawling (SITEMAP_ENABLED).
     enabled: false
     # -- Canonical origin for the URLs in the sitemap (SITEMAP_BASE_URL), e.g. `https://demo.example.com`. Leave empty to derive it from each request's Host/X-Forwarded-* headers.
