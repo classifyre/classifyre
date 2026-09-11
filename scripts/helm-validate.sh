@@ -160,7 +160,62 @@ run_checks() {
     "${rendered}"
 }
 
+assert_count_exact() {
+  local description="$1"
+  local pattern="$2"
+  local expected="$3"
+  local rendered="$4"
+  local count
+  count="$(grep -cF -- "${pattern}" <<<"${rendered}" || true)"
+  if [[ "${count}" -eq "${expected}" ]]; then
+    echo "  ✓ ${description}"
+    PASS=$((PASS + 1))
+  else
+    echo "  ✗ ${description} — expected exactly ${expected}, found ${count}: ${pattern}"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+run_env_uniqueness_checks() {
+  local label="$1"
+  local values_file="$2"
+  local rendered
+  rendered="$(helm template classifyre "${CHART_DIR}" -f "${values_file}" "${HELM_COMMON_ARGS[@]}" \
+    --set postgres.mode=embedded --set postgres.embedded.password=validate-password)"
+
+  echo ""
+  echo "── ${label} ──"
+
+  # api.env is spread after the chart-computed env block. A computed entry
+  # that is ALSO set via api.env used to render twice (UNDER_PRESSURE_MAX_RSS_BYTES
+  # as both the derived guard and the VPS "0" override), and the API server
+  # rejects that strategic-merge patch ("doesn't match $setElementOrder"),
+  # failing the whole release upgrade. Each name must appear exactly once per
+  # workload container: api + worker = 2 per render.
+  assert_count_exact \
+    "UNDER_PRESSURE_MAX_RSS_BYTES appears once per workload" \
+    "- name: UNDER_PRESSURE_MAX_RSS_BYTES" \
+    2 \
+    "${rendered}"
+
+  assert_count_exact \
+    "UNDER_PRESSURE_MAX_HEAP_USED_BYTES appears once per workload" \
+    "- name: UNDER_PRESSURE_MAX_HEAP_USED_BYTES" \
+    2 \
+    "${rendered}"
+
+  assert_count_exact \
+    "NODE_OPTIONS appears once per workload" \
+    "- name: NODE_OPTIONS" \
+    2 \
+    "${rendered}"
+}
+
 run_checks "default values" "${CHART_DIR}/values.yaml"
+run_env_uniqueness_checks "default values" "${CHART_DIR}/values.yaml"
+# The VPS profile overrides UNDER_PRESSURE_MAX_RSS_BYTES to "0" via api.env —
+# the exact combination that duplicated the entry and broke release upgrades.
+run_env_uniqueness_checks "VPS profile (api.env overrides)" "${REPO_ROOT}/helm/develop/values-vps.yaml"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

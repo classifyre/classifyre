@@ -457,7 +457,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.embedded.existingSecretPasswordKey | string | `"password"` | Secret key name for embedded Postgres password. |
 | postgres.embedded.image.pullPolicy | string | `"IfNotPresent"` | Embedded Postgres image pull policy. |
 | postgres.embedded.image.repository | string | `"pgvector/pgvector"` | Embedded Postgres image repository. |
-| postgres.embedded.image.tag | string | `"0.8.5-pg18-bookworm"` | Embedded Postgres image tag. |
+| postgres.embedded.image.tag | string | `"0.8.6-pg18-bookworm"` | Embedded Postgres image tag. |
 | postgres.embedded.livenessProbe | object | `{"enabled":false,"failureThreshold":10,"initialDelaySeconds":10,"periodSeconds":30,"timeoutSeconds":15}` | already parks traffic on a wedged instance without that risk. |
 | postgres.embedded.nodeSelector | object | `{}` | Embedded Postgres scheduling: node selector. |
 | postgres.embedded.parameters | object | `{"shared_buffers":"512MB","work_mem":"16MB"}` | how Postgres itself uses the memory already granted to it. |

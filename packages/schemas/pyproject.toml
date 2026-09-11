@@ -1,10 +1,10 @@
 [project]
 name = "classifyre-schemas"
-version = "0.5.1"
+version = "0.5.2"
 description = "Shared JSON schemas for Classifyre monorepo"
 requires-python = ">=3.12"
 dependencies = [
-    "fastjsonschema==2.21.2",
+    "fastjsonschema==2.22.2",
 ]
 
 [tool.uv]
