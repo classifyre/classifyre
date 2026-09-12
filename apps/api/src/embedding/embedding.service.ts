@@ -608,6 +608,18 @@ export class EmbeddingService {
    *
    * `maxBatches` bounds the phase so a pass always terminates — an unbounded
    * refresh over a corpus that grows every two minutes never returns.
+   *
+   * The bound is on rows ANALYZED, not on batches of seed findings, because
+   * those are not the same number and were not close. A batch is 500 findings,
+   * but `analyzeHashes` expands each to every finding sharing its content hash,
+   * and on the Firmenbuch corpus one `tag:Legal form` hash is 56,405 of them.
+   * So `20 x 500 = 10,000` described no limit: a single refresh pass rewrote all
+   * 603,633 analyses, and the lifetime counters read 7,372,783 updates against
+   * 604,235 rows — twelve rewrites apiece, and about 480 MB of the table's
+   * 1024 MB was the free space they left behind.
+   *
+   * A phase that stops short is safe by construction: the refresh orders by
+   * `analyzedAt`, so whatever it did not reach is what the next pass starts on.
    */
   private async analyzeBatches(
     space: { id: string; dim: number },
@@ -618,7 +630,16 @@ export class EmbeddingService {
     orderBy: Prisma.FindingOrderByWithRelationInput,
     maxBatches: number,
   ): Promise<number> {
+    // Phase 1 passes Infinity and means it: scoring the never-scored is the
+    // work that makes the ranking usable, and its cohort expansion is not
+    // waste — adding one finding to a cohort genuinely changes `similarCount`
+    // for every existing member, so they all have to be rewritten.
+    const maxRows =
+      maxBatches === Number.POSITIVE_INFINITY
+        ? Number.POSITIVE_INFINITY
+        : maxBatches * RECALIBRATE_BATCH_SIZE;
     let analyzed = 0;
+    let spent = 0;
     for (let batch = 0; batch < maxBatches; batch++) {
       const findings = await this.prisma.finding.findMany({
         where,
@@ -635,10 +656,31 @@ export class EmbeddingService {
         ),
       ];
       if (hashes.length > 0) {
-        await this.analysis.analyzeHashes(space.id, hashes, recurrence);
-        await this.calibrateNeighborhood(space, hashes);
+        // Both walks spend the budget, and both walk the same cohorts. Counting
+        // only the analysis side let a bounded pass do up to twice the rows it
+        // reported — still terminating, but a looser bound than the number
+        // says. `spent` is what the budget is measured against; `analyzed` is
+        // what the pass reports, and stays the count of findings analysed so
+        // the log line keeps meaning one thing.
+        const budget = maxRows - spent;
+        const visited = await this.analysis.analyzeHashes(
+          space.id,
+          hashes,
+          recurrence,
+          budget,
+        );
+        analyzed += visited;
+        spent += visited;
+        spent += await this.calibrateNeighborhood(
+          space,
+          hashes,
+          maxRows - spent,
+        );
+      } else {
+        analyzed += findings.length;
+        spent += findings.length;
       }
-      analyzed += findings.length;
+      if (spent >= maxRows) break;
       if (findings.length < RECALIBRATE_BATCH_SIZE) break;
       await new Promise((resolve) => setImmediate(resolve));
     }
@@ -673,8 +715,12 @@ export class EmbeddingService {
   private async calibrateNeighborhood(
     space: { id: string; dim: number },
     contentHashes: string[],
-  ) {
-    if (!contentHashes.length) return;
+    // Same budget as `analyzeHashes`, for the same reason: this walks the
+    // cohorts too, so a caller that bounded the analysis and not this one has
+    // bounded nothing.
+    maxRows = Number.POSITIVE_INFINITY,
+  ): Promise<number> {
+    if (!contentHashes.length || maxRows <= 0) return 0;
     const spaceId = this.spaceIdLiteral(space.id);
     const dim = Prisma.raw(String(space.dim));
     // Must match the expression ensureHnswIndex built, or the planner ignores
@@ -765,7 +811,10 @@ export class EmbeddingService {
     // fatal moment showed 7.8 million UUID strings live, all of them elements
     // of driver result arrays. The bound has to cover what is retained, not
     // just what is fetched.
-    for await (const page of this.findingPagesForHashes(contentHashes)) {
+    let calibrated = 0;
+    for await (const fullPage of this.findingPagesForHashes(contentHashes)) {
+      const page = fullPage.slice(0, maxRows - calibrated);
+      calibrated += page.length;
       const grouped = new Map<string, NeighborhoodRow[]>();
       for (const target of page) {
         const seedsForTarget = seedsByKey.get(
@@ -893,12 +942,32 @@ export class EmbeddingService {
             .filter(([, value]) => value === groupHash)
             .map(([hash]) => hash);
           return this.prisma.findingEvidenceAnalysis.updateMany({
-            where: { finding: { embedContentHash: { in: hashes } } },
+            where: {
+              finding: { embedContentHash: { in: hashes } },
+              // Already correct on most rows after the first pass; without this
+              // the statement rewrites the whole component every time.
+              //
+              // The null arm is not redundant. Prisma compiles `not` to SQL
+              // inequality, which is three-valued: a NULL group is neither
+              // equal nor unequal, so a bare `{ not: groupHash }` silently
+              // skips every row that has no group yet — exactly the findings
+              // whose content hash is unique but which still belong to a
+              // near-duplicate component. They would never be assigned one,
+              // keeping `noveltyScore` pinned at 1.0 and their importance
+              // inflated, permanently. Measured on one namespace: `not`
+              // matched 593,085 of 605,220 rows, missing all 12,135 nulls.
+              OR: [
+                { duplicateGroupHash: null },
+                { duplicateGroupHash: { not: groupHash } },
+              ],
+            },
             data: { duplicateGroupHash: groupHash },
           });
         },
       );
+      if (calibrated >= maxRows) break;
     }
+    return calibrated;
   }
 
   async putChunks(sourceId: string, dto: PutAssetChunksDto) {

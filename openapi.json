@@ -15989,7 +15989,7 @@
           "harnessExpressImportance": {
             "type": "number",
             "description": "Importance at or above which a single new finding earns an immediate cycle instead of waiting for the batch.",
-            "example": 0.75
+            "example": 0.85
           },
           "harnessObservationChars": {
             "type": "number",
@@ -16253,7 +16253,7 @@
           "harnessExpressImportance": {
             "type": "number",
             "description": "Importance at or above which a single new finding earns an immediate cycle instead of waiting for the batch.",
-            "example": 0.75,
+            "example": 0.85,
             "minimum": 0,
             "maximum": 1
           }

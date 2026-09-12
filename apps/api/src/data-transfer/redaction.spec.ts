@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { MASKED_CONFIG_ENCRYPTED_PREFIX } from '../utils/masked-config.utils';
 import { assertNoSecrets, redactRow } from './redaction';
 import { knownModelNames, scalarFields } from './prisma-delegate';
@@ -19,6 +21,30 @@ const spec = (over: Partial<TransferTableSpec> = {}): TransferTableSpec => ({
 
 const encrypted = (value: string) =>
   `${MASKED_CONFIG_ENCRYPTED_PREFIX}${Buffer.from(value).toString('base64url')}`;
+
+const SCHEMA = readFileSync(
+  join(__dirname, '..', '..', 'prisma', 'schema.prisma'),
+  'utf8',
+);
+
+/** The scalar columns backing a model's `@relation(fields: [...])` clauses. */
+function relationColumns(modelName: string): string[] {
+  const block = new RegExp(
+    `^model ${modelName} \\{$([\\s\\S]*?)^\\}$`,
+    'm',
+  ).exec(SCHEMA);
+  if (!block) throw new Error(`model ${modelName} not found in schema.prisma`);
+  const columns = new Set<string>();
+  for (const [, fields] of block[1].matchAll(
+    /@relation\([^)]*?fields:\s*\[([^\]]*)\]/g,
+  )) {
+    for (const column of fields.split(',')) {
+      const trimmed = column.trim();
+      if (trimmed) columns.add(trimmed);
+    }
+  }
+  return [...columns];
+}
 
 describe('redactRow', () => {
   it('removes declared credential columns and reports them', () => {
@@ -233,6 +259,39 @@ describe('transfer scope registry', () => {
       for (const key of uuidKeys) {
         if (key.endsWith('Hash')) continue;
         expect(table.idRefs ?? []).toContain(key);
+      }
+    }
+  });
+
+  it('declares every foreign key among the remappable id columns', () => {
+    // The test above checks a table's own primary key. Nothing checked its
+    // FOREIGN keys, and `assetCorrelationValue.findingId` sat unlisted from the
+    // migration that added it: on import the finding was remapped and this
+    // column was not, so the row either failed its constraint and was silently
+    // skipped, or — re-importing into the same namespace — landed pointing at
+    // some other asset's finding. One omission, in a file whose own doc comment
+    // says the list "is exhaustive by necessity".
+    //
+    // Read from schema.prisma rather than `Prisma.dmmf`: the client's runtime
+    // dmmf carries the relation FIELDS but leaves `relationFromFields`
+    // undefined, so asking it which columns back a relation quietly returns
+    // nothing and the assertion passes on every model. Verified by reverting
+    // the fix above and watching this test stay green.
+    const naturalKeys = new Set([
+      // A content hash, not an id: the remapper passes non-UUIDs through
+      // untouched anyway, and remapping it would break the join it exists for.
+      'customDetectorExtraction.payloadHash',
+    ]);
+    for (const table of TRANSFER_TABLES) {
+      const foreignKeys = relationColumns(
+        table.model.charAt(0).toUpperCase() + table.model.slice(1),
+      ).filter((column) => !naturalKeys.has(`${table.model}.${column}`));
+      for (const column of foreignKeys) {
+        expect({
+          model: table.model,
+          column,
+          remapped: (table.idRefs ?? []).includes(column),
+        }).toEqual({ model: table.model, column, remapped: true });
       }
     }
   });

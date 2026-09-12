@@ -65,6 +65,104 @@ function isKnownTestValue(value: string): boolean {
   return digits.length >= 12 && KNOWN_TEST_NUMBERS.has(digits);
 }
 
+/**
+ * Three decimals, matching the precision `importanceScore` is stored at.
+ *
+ * Applied to the derived signals so the payload is stable against changes too
+ * small to mean anything: `noveltyScore` is `1/sqrt(similarCount + 1)`, so on a
+ * 56,000-member cohort one more member moves it by ~1e-8. At full float
+ * precision that is a different value every scan, and every one of them was a
+ * row rewrite.
+ */
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
+/**
+ * JSON with keys in a fixed order, for comparing a computed object against one
+ * read back from JSONB.
+ *
+ * Postgres normalises JSONB key order (shortest first, then bytewise), so a
+ * plain `JSON.stringify` of the two disagrees on ordering alone and every row
+ * reads as changed.
+ */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+/**
+ * The group hash to write, given what is already stored.
+ *
+ * Two phases write this column and they mean different things by it. Analysis
+ * knows about EXACT duplicates and writes the finding's own content hash;
+ * `calibrateNeighborhood` knows about near-duplicate components and writes the
+ * component's root hash, which is a wider and different value.
+ *
+ * Both used to write unconditionally, so for every finding in a multi-hash
+ * component the two took turns: analysis wrote the own hash, `analysisChanged`
+ * saw the mismatch on the next pass and did a full rewrite — upsert, trigger,
+ * cascading `findings` UPDATE — calibration flipped it back, forever. 130,489
+ * analyses on one namespace, 21.6% of the table, stood diverged, so the no-op
+ * optimisation could not converge for any of them and the value a client read
+ * depended on which phase happened to run last.
+ *
+ * Analysis therefore seeds the group and may clear a value it owns, but never
+ * overwrites a component root it has no way of computing. That converges: once
+ * calibration has claimed a row, analysis reproduces what is stored and the
+ * comparison reads equal.
+ */
+function groupHashFor(
+  storedGroupHash: string | null | undefined,
+  ownHash: string,
+  similarCount: number,
+): string | null {
+  // A stored value that is neither absent nor this finding's own hash can only
+  // have come from calibration.
+  if (storedGroupHash != null && storedGroupHash !== ownHash) {
+    return storedGroupHash;
+  }
+  return similarCount ? ownHash : null;
+}
+
+/** The stored columns an analysis write would touch, for the no-op check. */
+type ComparableAnalysis = {
+  spaceId: string;
+  importanceScore: number;
+  qualityScore: number;
+  similarCount: number;
+  duplicateGroupHash: string | null;
+  reasons: unknown;
+  signals: unknown;
+};
+
+/**
+ * Whether re-analysing this finding actually produced anything new.
+ *
+ * A legacy row always reads as changed, because its reasons carry the finished
+ * sentences rather than codes — which is wanted: the rewrite compacts it.
+ */
+function analysisChanged(
+  stored: ComparableAnalysis,
+  computed: ComparableAnalysis,
+): boolean {
+  return (
+    stored.spaceId !== computed.spaceId ||
+    stored.importanceScore !== computed.importanceScore ||
+    stored.qualityScore !== computed.qualityScore ||
+    stored.similarCount !== computed.similarCount ||
+    stored.duplicateGroupHash !== computed.duplicateGroupHash ||
+    canonical(stored.reasons) !== canonical(computed.reasons) ||
+    canonical(stored.signals) !== canonical(computed.signals)
+  );
+}
+
 @Injectable()
 export class EmbeddingAnalysisService {
   constructor(private readonly prisma: PrismaService) {}
@@ -148,12 +246,26 @@ export class EmbeddingAnalysisService {
     ];
   }
 
+  /**
+   * Score every finding sharing one of these content hashes.
+   *
+   * Returns how many findings were visited, and stops early once `maxRows` is
+   * reached. The count is what the caller budgets on: a hash list derived from
+   * 500 findings expands to every member of their cohorts, and one register-wide
+   * tag hash is 56,405 findings — so "500 findings" is not a bound on anything.
+   *
+   * Stopping mid-cohort leaves the remainder with a stale `analyzedAt`, which
+   * is exactly what the refresh phase orders by, so the next pass picks them up
+   * first. It does re-walk the part already done, but those rows now compare
+   * equal and cost one HOT update each.
+   */
   async analyzeHashes(
     spaceId: string,
     contentHashes: string[],
     recurrenceSnapshot?: ValueRecurrence,
-  ): Promise<void> {
-    if (!contentHashes.length) return;
+    maxRows = Number.POSITIVE_INFINITY,
+  ): Promise<number> {
+    if (!contentHashes.length || maxRows <= 0) return 0;
 
     // Occurrence counts come from a GROUP BY, not from counting rows here.
     //
@@ -185,7 +297,10 @@ export class EmbeddingAnalysisService {
       recurrenceSnapshot ??
       (await this.valueRecurrenceForHashes(contentHashes));
 
-    for await (const findings of this.findingPages(contentHashes)) {
+    let visited = 0;
+    for await (const page of this.findingPages(contentHashes)) {
+      const findings = page.slice(0, maxRows - visited);
+      visited += findings.length;
       await Promise.all(
         findings.map(async (finding) => {
           const hash = finding.embedContentHash as string;
@@ -207,15 +322,38 @@ export class EmbeddingAnalysisService {
           const testValue = isKnownTestValue(finding.matchedContent);
           const repeatedDigits =
             !testValue && isRepeatedDigitPattern(finding.matchedContent);
-          // Recurrence is a lead only when the value reappears in DIFFERENT
-          // contexts: the same value inside identical context windows is a
-          // copied template/fixture, already handled as a duplicate group.
-          const crossDocumentLead =
+          // A value carried by a handful of assets is the strongest evidential
+          // signal here — the same company number across several filings is
+          // exactly what an investigator is looking for.
+          //
+          // This used to require `similarCount === 0`. That was deliberate, not
+          // an oversight: docs/first-use/ranking-calibration-2026-07-16.md added
+          // this bonus precisely because recurrence went unrewarded, and scoped
+          // it to values appearing "in different contexts" — "same-context
+          // repeats are template copies and stay penalized" — implemented as
+          // that test. It holds for prose and fails for structured extraction,
+          // where a shared field has identical context BY CONSTRUCTION: every
+          // asset's company-number field looks the same because the context
+          // window IS the field. So the fix for "recurrence unrewarded"
+          // reintroduced it for exactly the corpus shape it matters most in. The
+          // effect on the Firmenbuch corpus was that 147,823 analyses were
+          // denied the reason, 90,570 of them `regex:AT_FIRMENBUCHNUMMER`
+          // averaging 4.8 assets — so 6.0% of narrow-group findings cleared the
+          // 0.75 express/unmonitored threshold against 99.2% of ungrouped ones,
+          // and autopilot could not see the cross-reference at all.
+          const crossDocumentRecurrence =
             !testValue &&
             !repeatedDigits &&
-            similarCount === 0 &&
             crossAssetCount >= 2 &&
             crossAssetCount <= RECURRENCE_HUB_CAP;
+          // The bonus follows the reason. It used to keep the old
+          // `similarCount === 0` gate while the reason went wider, because
+          // awarding it moves ~68k findings over the importance bar (nearly
+          // all company numbers) and the express/unmonitored thresholds had
+          // to be re-tuned in the same change. That re-tune has now happened
+          // (both bars 0.75 -> 0.85, see the calibration doc); there is no
+          // longer a separate lead condition.
+          const crossDocumentLead = crossDocumentRecurrence;
           const commonValue = crossAssetCount > RECURRENCE_HUB_CAP;
           let base =
             qualityScore * 0.3 +
@@ -251,7 +389,7 @@ export class EmbeddingAnalysisService {
           if (contextScore >= 0.5) {
             reasons.push({ c: 'context' });
           }
-          if (crossDocumentLead) {
+          if (crossDocumentRecurrence) {
             reasons.push({
               c: 'cross_document_recurrence',
               n: crossAssetCount,
@@ -272,48 +410,75 @@ export class EmbeddingAnalysisService {
             s: finding.severity.toLowerCase(),
           });
 
+          // One payload, used for the write AND for the comparison below, so
+          // the two cannot drift. It used to be spelled out twice.
+          const stored = finding.evidenceAnalysis;
+          const computed = {
+            spaceId,
+            importanceScore,
+            qualityScore,
+            similarCount,
+            duplicateGroupHash: groupHashFor(
+              stored?.duplicateGroupHash,
+              hash,
+              similarCount,
+            ),
+            reasons,
+            signals: {
+              contextScore: round3(contextScore),
+              noveltyScore: round3(noveltyScore),
+              detectorConfidence: Number(finding.confidence),
+              crossAssetCount,
+              crossSourceCount,
+              valueLength: normalizedValue.length,
+              ...(similarCount > 0 ? { duplicateSimilarity: 1 } : {}),
+            },
+          };
+
+          if (stored && !analysisChanged(stored, computed)) {
+            // Nothing moved, so do not rewrite the row. This is most of the
+            // work on a mature corpus: a cohort member whose `similarCount`
+            // goes 56,404 -> 56,405 has an `importanceScore` identical to three
+            // decimals, and used to take a full row rewrite plus a
+            // `trg_sync_finding_importance_score` firing plus the cascading
+            // single-row UPDATE on `findings` that the trigger performs. The
+            // lifetime counters on one namespace read 7,372,783 updates against
+            // 604,235 rows.
+            //
+            // `analyzedAt` still has to move. Recalibration's refresh phase
+            // orders by it and relies on a processed row leaving the set its
+            // query selects from; skipping the write entirely would pin the
+            // pass to the same prefix forever. Setting it alone is cheap in the
+            // way the full rewrite is not — it touches neither index, so the
+            // update stays HOT-eligible, and because the trigger is declared
+            // `UPDATE OF importance_score`, leaving that column out of the SET
+            // list means it does not fire.
+            await this.prisma.findingEvidenceAnalysis.update({
+              where: { findingId: finding.id },
+              data: { analyzedAt: new Date() },
+              select: { findingId: true },
+            });
+            return;
+          }
+
           await this.prisma.findingEvidenceAnalysis.upsert({
             where: { findingId: finding.id },
             create: {
               findingId: finding.id,
-              spaceId,
-              importanceScore,
-              qualityScore,
-              similarCount,
-              duplicateGroupHash: similarCount ? hash : null,
+              ...computed,
               reasons: reasonsForStorage(reasons),
-              signals: {
-                contextScore,
-                noveltyScore,
-                detectorConfidence: Number(finding.confidence),
-                crossAssetCount,
-                crossSourceCount,
-                valueLength: normalizedValue.length,
-                ...(similarCount > 0 ? { duplicateSimilarity: 1 } : {}),
-              },
             },
             update: {
-              spaceId,
-              importanceScore,
-              qualityScore,
-              similarCount,
-              duplicateGroupHash: similarCount ? hash : null,
+              ...computed,
               reasons: reasonsForStorage(reasons),
-              signals: {
-                contextScore,
-                noveltyScore,
-                detectorConfidence: Number(finding.confidence),
-                crossAssetCount,
-                crossSourceCount,
-                valueLength: normalizedValue.length,
-                ...(similarCount > 0 ? { duplicateSimilarity: 1 } : {}),
-              },
               analyzedAt: new Date(),
             },
           });
         }),
       );
+      if (visited >= maxRows) break;
     }
+    return visited;
   }
 
   /**
@@ -366,6 +531,19 @@ export class EmbeddingAnalysisService {
           matchedContent: true,
           contextBefore: true,
           contextAfter: true,
+          // Read back so an unchanged analysis can be recognised and left
+          // alone — see the write in `analyzeHashes`.
+          evidenceAnalysis: {
+            select: {
+              spaceId: true,
+              importanceScore: true,
+              qualityScore: true,
+              similarCount: true,
+              duplicateGroupHash: true,
+              reasons: true,
+              signals: true,
+            },
+          },
         },
         orderBy: { id: 'asc' },
         take: ANALYZE_PAGE_SIZE,

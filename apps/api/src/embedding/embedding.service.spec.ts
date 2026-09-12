@@ -47,7 +47,12 @@ describe('EmbeddingService', () => {
     version: jest.fn(),
   };
   const analysis = {
-    analyzeHashes: jest.fn(),
+    // Resolves the rows-analyzed count the refresh phase budgets on.
+    analyzeHashes: jest
+      .fn()
+      .mockImplementation((_space: string, hashes: string[]) =>
+        Promise.resolve(hashes.length),
+      ),
     valueRecurrenceSnapshot: jest.fn(),
   };
   let service: EmbeddingService;
@@ -182,17 +187,21 @@ describe('EmbeddingService', () => {
 
     expect(analysis.valueRecurrenceSnapshot).toHaveBeenCalledTimes(1);
     expect(analysis.analyzeHashes).toHaveBeenCalledTimes(2);
+    // The fourth argument is the rows-analyzed budget. Phase 1 is deliberately
+    // unbounded; the refresh phase passes what is left of its allowance.
     expect(analysis.analyzeHashes).toHaveBeenNthCalledWith(
       1,
       activeSpace.id,
       expect.any(Array),
       snapshot,
+      Number.POSITIVE_INFINITY,
     );
     expect(analysis.analyzeHashes).toHaveBeenNthCalledWith(
       2,
       activeSpace.id,
       ['hash-500'],
       snapshot,
+      Number.POSITIVE_INFINITY,
     );
   });
 });

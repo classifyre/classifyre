@@ -2845,10 +2845,12 @@ describe('AssetService', () => {
             expect.objectContaining({
               where: { id: 'finding-llm' },
               data: {
+                // Stored compact: `s` is the status, `x` the reason CODE.
+                // The sentence comes back through renderHistory on read.
                 history: [
                   expect.objectContaining({
-                    status: FindingStatus.OPEN,
-                    changeReason: expect.stringMatching(/is kept because/),
+                    s: FindingStatus.OPEN,
+                    x: '#retained',
                   }),
                 ],
               },
