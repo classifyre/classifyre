@@ -471,16 +471,21 @@ model EmbeddingSpace {
   @@map("embedding_spaces")
 }
 
+/// A vector is identified by the space it lives in and the content it was
+/// taken over — there is no second thing a row could be. The surrogate `id`
+/// this used to carry was generated on every insert, read by nothing, and cost
+/// a 64 MB b-tree plus 37 bytes a row on top of the unique index that was
+/// already enforcing the real key.
 model ContentEmbedding {
-  id          String                @id @default(uuid())
-  spaceId     String                @map("space_id")
-  contentHash String                @map("content_hash") @db.VarChar(64)
-  vec         Unsupported("vector")
-  createdAt   DateTime              @default(now()) @map("created_at")
+  spaceId     String                 @map("space_id")
+  contentHash String                 @map("content_hash") @db.VarChar(64)
+  /// Half precision: two bytes a dimension rather than four. See vectorCast.
+  vec         Unsupported("halfvec")
+  createdAt   DateTime               @default(now()) @map("created_at")
 
   space EmbeddingSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
-  @@unique([spaceId, contentHash])
+  @@id([spaceId, contentHash])
   @@index([contentHash])
   @@map("content_embeddings")
 }
@@ -524,8 +529,10 @@ model FindingEvidenceAnalysis {
   finding Finding        @relation(fields: [findingId], references: [id], onDelete: Cascade)
   space   EmbeddingSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
-  @@index([importanceScore(sort: Desc)])
-  @@index([qualityScore(sort: Desc)])
+  // No index on importanceScore/qualityScore. Ranked reads go through the
+  // denormalised `Finding.importanceScore` and its own index; the two indexes
+  // that used to sit here were 90 MB with zero scans across the lifetime of a
+  // 577k-analysis workspace.
   @@index([duplicateGroupHash])
   @@map("finding_evidence_analyses")
 }
@@ -1361,7 +1368,15 @@ model Edge {
   @@unique([fromType, fromId, toType, toId, relationType])
   @@index([fromType, fromId])
   @@index([toType, toId])
-  @@index([relationType])
+  // No index on relationType alone. It holds seven values across millions of
+  // rows, and every query that filters on it also pins an endpoint — so the
+  // planner reaches for [fromType, fromId] or [toType, toId] instead. Measured
+  // at 36 scans against 131,075 and 132,875 for those two, for 53 MB.
+  //
+  // The `id` column stays, unlike the equivalent surrogate on
+  // content_embeddings: PATCH and DELETE /graph/edges/{id} address a manual
+  // edge by it, so it is a public contract and not dead weight.
+  //
   // The lineage traversal's access pattern: always class-first, then endpoint.
   @@index([relationClass, fromType, fromId])
   @@index([relationClass, toType, toId])
@@ -1379,8 +1394,12 @@ model Edge {
 // reverse index: querying by `valueHash` yields every asset sharing a value.
 // `label` is the finding's free-form type (email, phone, custom labels, …) so
 // correlation stays label-agnostic.
+/// Identified by the asset and the value, which is what a correlation row *is*.
+/// The surrogate `id` this used to carry was generated on every insert, read by
+/// nothing, referenced by no foreign key, and cost a 48 MB b-tree plus 37 bytes
+/// a row on top of the unique index already enforcing the real key — which the
+/// migration promotes in place rather than rebuilding.
 model AssetCorrelationValue {
-  id                String       @id @default(uuid())
   assetId           String       @map("asset_id")
   sourceId          String       @map("source_id")
   // Representative OPEN finding that produced this asset/value occurrence.
@@ -1403,8 +1422,11 @@ model AssetCorrelationValue {
   asset   Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
   finding Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
 
-  @@unique([assetId, valueHash])
+  @@id([assetId, valueHash])
   @@index([valueHash])
+  // Kept despite the PK leading on assetId: this narrow index answers
+  // asset-only lookups in 23 MB against the PK's 144 MB, and it takes 495,198
+  // scans to the PK's prefix use.
   @@index([assetId])
   @@index([findingId])
   @@index([sourceId])
@@ -1682,8 +1704,10 @@ model CorrelationPairSignature {
   // "the next N undecided pairs in this pattern" as a range seek.
   @@index([patternKey, weighted(sort: Desc)])
   @@index([clusterId])
-  // "412 disconnected similarity pairs" — a work queue someone picks up.
-  @@index([lineageState, weighted(sort: Desc)])
+  // No index on lineageState. It has three values across millions of rows, and
+  // every query that filters on it does so as an extra AND beside a selective
+  // predicate (patternKey, clusterId) that the planner uses instead — measured
+  // at zero scans and 161 MB.
   @@map("correlation_pair_signatures")
 }
 

@@ -1,12 +1,23 @@
 /**
- * How a space's vectors are cast for indexing and for distance queries.
+ * How a space's vectors are stored, indexed, and compared.
  *
- * pgvector stores up to 16,000 dimensions in a `vector`, but its HNSW index
- * covers only the first 2,000 — and `halfvec` (half precision, added in
- * pgvector 0.7) raises that index ceiling to 4,000. The product previously
- * refused anything above 2,000 outright, which rejected perfectly ordinary
- * modern models: nemotron-3-embed-1b is 2,048, text-embedding-3-large is
- * 3,072. Those are storable and searchable; they just need the halfvec index.
+ * Everything is `halfvec` — half precision, two bytes a dimension instead of
+ * four. pgvector stores up to 16,000 dimensions either way; what differs is
+ * size. Measured on a 879,135-row space at 384 dimensions:
+ * `pg_column_size(vec)` was 1,544 bytes against 776 for the same vector as
+ * `halfvec`, and the table and its HNSW index together were 3,757 MB.
+ *
+ * This is the one deliberately lossy trade in the storage work, so it is worth
+ * being precise about the cost. float16 carries about three decimal digits.
+ * Embedding components live in [-1, 1] and the metric is cosine, so the
+ * ordering of neighbours is effectively unchanged — but it *is* an
+ * approximation, not a free win, and a space that needs exact float32
+ * reconstruction is not served by this.
+ *
+ * Half precision was already the path for 2,001–4,000 dimensions, because
+ * that is the only way pgvector can index them at all (the `vector` HNSW
+ * ceiling is 2,000; halfvec raises it to 4,000). Using one representation
+ * everywhere removes the branch rather than adding one.
  *
  * Above 4,000 nothing can be indexed. Vectors are still stored and still
  * searched correctly, but by sequential scan — so the space reports itself as
@@ -20,13 +31,11 @@ export function vectorCast(dim: number): {
   ops: string;
   indexed: boolean;
 } {
-  if (dim <= 2000) {
-    return { type: 'vector', ops: 'public.vector_cosine_ops', indexed: true };
-  }
-  if (dim <= 4000) {
-    return { type: 'halfvec', ops: 'public.halfvec_cosine_ops', indexed: true };
-  }
-  return { type: 'vector', ops: 'public.vector_cosine_ops', indexed: false };
+  return {
+    type: 'halfvec',
+    ops: 'public.halfvec_cosine_ops',
+    indexed: dim <= MAX_INDEXED_DIMENSIONS,
+  };
 }
 
 /** pgvector's hard storage ceiling for a single vector. */

@@ -8,6 +8,7 @@ import {
 import { UnionFind } from '../../utils/union-find';
 import {
   BOILERPLATE_PAIR_CAP,
+  BOILERPLATE_GROUP_BREADTH_CAP,
   BOILERPLATE_RANK_CAP,
   BOILERPLATE_STATEMENT_TIMEOUT_MS,
   FANOUT_CAP,
@@ -19,6 +20,37 @@ import {
   PATTERN_LABEL_CAP,
   SCORE_BUCKET_COUNT,
 } from '../correlation.constants';
+
+/**
+ * Near-duplicate text groups too broad to be evidence, decided over the WHOLE
+ * corpus.
+ *
+ * Unscoped by construction, and extracted precisely so it stays that way. It
+ * sits two lines above a `members` CTE that IS scoped on an incremental run,
+ * and adding the same scope here would be the natural-looking edit — it is also
+ * exactly the bug that was just fixed one level down in the scoring fan-out,
+ * where an incremental scan judged a register-wide value by the handful of
+ * assets it had touched.
+ *
+ * A group spanning the register is a template sentence, not a lead. The label
+ * half of this queue already refuses hub values on the same reasoning; this is
+ * the missing half, and both now use the same threshold.
+ *
+ * Measured on firmenbuch-test-2: 24 groups spanned 2,000+ assets and carried
+ * 341,057 of 591,106 group memberships — 57.7% of all membership from 0.1% of
+ * groups. The groups worth a reviewer's time are the 13,182 with two to five
+ * members.
+ */
+export function broadGroupsCte(): Prisma.Sql {
+  return Prisma.sql`
+    SELECT a.duplicate_group_hash AS gh
+    FROM finding_evidence_analyses a
+    JOIN findings f ON f.id = a.finding_id
+    WHERE a.duplicate_group_hash IS NOT NULL
+    GROUP BY a.duplicate_group_hash
+    HAVING COUNT(DISTINCT f.asset_id) > ${BOILERPLATE_GROUP_BREADTH_CAP}
+  `;
+}
 
 const ASSET_REL = 'asset';
 const STREAM_PAGE = 5000;
@@ -459,6 +491,10 @@ export class CorrelationReviewIndexService {
         --
         -- Clamped to [0,1], not 0.999: numeric(4,3) holds up to 9.999, and
         -- shaving a perfect match would reintroduce the same mismatch.
+        --
+        -- The "weighted" key is no longer written: confidence already holds
+        -- the same 2dp value in a typed column, so it serves as the fallback
+        -- for an edge with no usable denominator.
         LEAST(1, GREATEST(0, COALESCE(
           CASE
             WHEN COALESCE((n.metadata ->> 'denom')::numeric, 0) > 0
@@ -467,7 +503,15 @@ export class CorrelationReviewIndexService {
           END,
           (n.metadata ->> 'weighted')::numeric,
           n.confidence))),
-        COALESCE((n.metadata ->> 'sharedCount')::int, 0),
+        -- Summed from sharedByLabel rather than read from a "sharedCount" key
+        -- that repeated the same number on four million rows. Both passes
+        -- build sharedByLabel as the per-label breakdown of exactly this
+        -- count; checked against 200,000 live edges, the two agreed on every
+        -- row before the key was dropped.
+        COALESCE((
+          SELECT SUM(v::int)::int
+          FROM jsonb_each_text(n.metadata -> 'sharedByLabel') AS e(k, v)
+        ), 0),
         COALESCE(ARRAY(
           SELECT k FROM jsonb_object_keys(n.metadata -> 'sharedByLabel') k ORDER BY k
         ), ARRAY[]::text[]),
@@ -621,10 +665,12 @@ export class CorrelationReviewIndexService {
         ${groupScope}
         GROUP BY a.duplicate_group_hash, f.asset_id
       ),
+      broad_groups AS (${broadGroupsCte()}),
       ranked AS (
         SELECT gh, asset_id, sim,
                ROW_NUMBER() OVER (PARTITION BY gh ORDER BY importance DESC) AS rn
         FROM members
+        WHERE NOT EXISTS (SELECT 1 FROM broad_groups b WHERE b.gh = members.gh)
       ),
       -- Bound the quadratic self-join BEFORE it runs: only the top-ranked
       -- assets per group enter the projection. The output cap keeps 200 pairs

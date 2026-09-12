@@ -82,10 +82,15 @@ export class FindingStatsService {
   async rebuildAll(): Promise<number> {
     const started = Date.now();
 
-    await this.prisma.$executeRaw`DELETE FROM finding_stats_daily`;
-    await this.prisma.$executeRaw`DELETE FROM finding_stats_asset_daily`;
-    await this.prisma.$executeRaw`DELETE FROM finding_stats_first_daily`;
-    await this.prisma.$executeRaw`DELETE FROM finding_stats_first_asset_daily`;
+    // TRUNCATE, not DELETE. A full rebuild replaces every row, and DELETE
+    // leaves all of them behind as dead tuples plus dead index entries for
+    // autovacuum to reclaim into free space it can never hand back — which is
+    // how a 48 MB rollup came to carry 420 MB of indexes. TRUNCATE returns the
+    // files to zero. The visibility window is the same as DELETE's (neither is
+    // wrapped in a transaction with the inserts that follow), and the
+    // ACCESS EXCLUSIVE lock is held only for the statement itself.
+    await this.prisma
+      .$executeRaw`TRUNCATE TABLE finding_stats_daily, finding_stats_asset_daily, finding_stats_first_daily, finding_stats_first_asset_daily`;
     await this.prisma.$executeRaw`
       INSERT INTO finding_stats_daily (day, severity, status, detector_type, source_id, count)
       SELECT detected_at::date, severity, status, detector_type, source_id, COUNT(*)::int
@@ -141,15 +146,20 @@ export class FindingStatsService {
     }
 
     const days = claimed.map((row) => row.day);
-    await this.prisma.$executeRaw`
-      DELETE FROM finding_stats_daily WHERE day = ANY(${days}::date[])`;
-    await this.prisma.$executeRaw`
-      DELETE FROM finding_stats_asset_daily WHERE day = ANY(${days}::date[])`;
-    await this.prisma.$executeRaw`
-      DELETE FROM finding_stats_first_daily WHERE day = ANY(${days}::date[])`;
-    await this.prisma.$executeRaw`
-      DELETE FROM finding_stats_first_asset_daily WHERE day = ANY(${days}::date[])`;
 
+    // Upserted, not deleted-and-reinserted.
+    //
+    // The old shape rewrote every row of a dirty day on every pass, and this
+    // job runs on every ingest: measured at 7,609 runs against a rollup of
+    // 417,897 rows, whose primary key had grown to 263 MB holding 25,710
+    // deleted pages around 7,911 live ones — 28 MB of actual keys.
+    //
+    // Two things make the new shape cheap. The `WHERE` on `DO UPDATE` skips
+    // the write entirely for a row whose counts did not move, which on a
+    // re-scan is nearly all of them. And `count`/`last_detected_at` are not
+    // indexed, so the updates that do happen can be HOT and touch no index at
+    // all. What is left is the genuinely new rows.
+    //
     // One half-open range per day, never an expression over the column.
     //
     // `WHERE detected_at::date = ANY(...)` reads naturally and is a trap: any
@@ -165,30 +175,110 @@ export class FindingStatsService {
       const end = new Date(start);
       end.setUTCDate(end.getUTCDate() + 1);
 
+      // Bounds and prune key are passed as naive literals, never as Date
+      // objects, so nothing in these statements depends on the session's
+      // TimeZone.
+      //
+      // `detected_at` is `timestamp WITHOUT time zone` and `day` is a `date`.
+      // A JS Date bound reaches Postgres as a timestamptz, and comparing that
+      // to a naive column converts it through the session TimeZone — so on a
+      // server not running in UTC the range would select a shifted window
+      // while `detected_at::date` (naive, no conversion) kept grouping on the
+      // real day. The two halves of the same statement would disagree about
+      // which day they were rebuilding.
+      //
+      // 'YYYY-MM-DD'::date and 'YYYY-MM-DD 00:00:00'::timestamp are both
+      // unambiguous: naive in, naive out, matching the column domain exactly.
+      const dayKey = start.toISOString().slice(0, 10);
+      const nextDayKey = end.toISOString().slice(0, 10);
+      const from = Prisma.sql`${`${dayKey} 00:00:00`}::timestamp`;
+      const until = Prisma.sql`${`${nextDayKey} 00:00:00`}::timestamp`;
+
       await this.prisma.$executeRaw`
-        INSERT INTO finding_stats_daily (day, severity, status, detector_type, source_id, count)
-        SELECT detected_at::date, severity, status, detector_type, source_id, COUNT(*)::int
-        FROM findings
-        WHERE detected_at >= ${start} AND detected_at < ${end}
-        GROUP BY 1, 2, 3, 4, 5`;
+        WITH fresh AS (
+          SELECT detected_at::date AS day, severity, status, detector_type, source_id,
+                 COUNT(*)::int AS count
+          FROM findings
+          WHERE detected_at >= ${from} AND detected_at < ${until}
+          GROUP BY 1, 2, 3, 4, 5
+        ), upserted AS (
+          INSERT INTO finding_stats_daily (day, severity, status, detector_type, source_id, count)
+          SELECT day, severity, status, detector_type, source_id, count FROM fresh
+          ON CONFLICT (day, severity, status, detector_type, source_id) DO UPDATE
+            SET count = EXCLUDED.count
+            WHERE finding_stats_daily.count IS DISTINCT FROM EXCLUDED.count
+        )
+        DELETE FROM finding_stats_daily s
+         WHERE s.day = ${dayKey}::date
+           AND NOT EXISTS (
+             SELECT 1 FROM fresh f
+              WHERE f.severity = s.severity AND f.status = s.status
+                AND f.detector_type = s.detector_type AND f.source_id = s.source_id
+           )`;
       await this.prisma.$executeRaw`
-        INSERT INTO finding_stats_asset_daily (day, asset_id, severity, status, count, last_detected_at)
-        SELECT detected_at::date, asset_id, severity, status, COUNT(*)::int, MAX(detected_at)
-        FROM findings
-        WHERE detected_at >= ${start} AND detected_at < ${end}
-        GROUP BY 1, 2, 3, 4`;
+        WITH fresh AS (
+          SELECT detected_at::date AS day, asset_id, severity, status,
+                 COUNT(*)::int AS count, MAX(detected_at) AS last_detected_at
+          FROM findings
+          WHERE detected_at >= ${from} AND detected_at < ${until}
+          GROUP BY 1, 2, 3, 4
+        ), upserted AS (
+          INSERT INTO finding_stats_asset_daily (day, asset_id, severity, status, count, last_detected_at)
+          SELECT day, asset_id, severity, status, count, last_detected_at FROM fresh
+          ON CONFLICT (day, asset_id, severity, status) DO UPDATE
+            SET count = EXCLUDED.count, last_detected_at = EXCLUDED.last_detected_at
+            WHERE finding_stats_asset_daily.count IS DISTINCT FROM EXCLUDED.count
+               OR finding_stats_asset_daily.last_detected_at IS DISTINCT FROM EXCLUDED.last_detected_at
+        )
+        DELETE FROM finding_stats_asset_daily s
+         WHERE s.day = ${dayKey}::date
+           AND NOT EXISTS (
+             SELECT 1 FROM fresh f
+              WHERE f.asset_id = s.asset_id AND f.severity = s.severity
+                AND f.status = s.status
+           )`;
       await this.prisma.$executeRaw`
-        INSERT INTO finding_stats_first_daily (day, severity, status, detector_type, source_id, count)
-        SELECT first_detected_at::date, severity, status, detector_type, source_id, COUNT(*)::int
-        FROM findings
-        WHERE first_detected_at >= ${start} AND first_detected_at < ${end}
-        GROUP BY 1, 2, 3, 4, 5`;
+        WITH fresh AS (
+          SELECT first_detected_at::date AS day, severity, status, detector_type, source_id,
+                 COUNT(*)::int AS count
+          FROM findings
+          WHERE first_detected_at >= ${from} AND first_detected_at < ${until}
+          GROUP BY 1, 2, 3, 4, 5
+        ), upserted AS (
+          INSERT INTO finding_stats_first_daily (day, severity, status, detector_type, source_id, count)
+          SELECT day, severity, status, detector_type, source_id, count FROM fresh
+          ON CONFLICT (day, severity, status, detector_type, source_id) DO UPDATE
+            SET count = EXCLUDED.count
+            WHERE finding_stats_first_daily.count IS DISTINCT FROM EXCLUDED.count
+        )
+        DELETE FROM finding_stats_first_daily s
+         WHERE s.day = ${dayKey}::date
+           AND NOT EXISTS (
+             SELECT 1 FROM fresh f
+              WHERE f.severity = s.severity AND f.status = s.status
+                AND f.detector_type = s.detector_type AND f.source_id = s.source_id
+           )`;
       await this.prisma.$executeRaw`
-        INSERT INTO finding_stats_first_asset_daily (day, asset_id, severity, status, count)
-        SELECT first_detected_at::date, asset_id, severity, status, COUNT(*)::int
-        FROM findings
-        WHERE first_detected_at >= ${start} AND first_detected_at < ${end}
-        GROUP BY 1, 2, 3, 4`;
+        WITH fresh AS (
+          SELECT first_detected_at::date AS day, asset_id, severity, status,
+                 COUNT(*)::int AS count
+          FROM findings
+          WHERE first_detected_at >= ${from} AND first_detected_at < ${until}
+          GROUP BY 1, 2, 3, 4
+        ), upserted AS (
+          INSERT INTO finding_stats_first_asset_daily (day, asset_id, severity, status, count)
+          SELECT day, asset_id, severity, status, count FROM fresh
+          ON CONFLICT (day, asset_id, severity, status) DO UPDATE
+            SET count = EXCLUDED.count
+            WHERE finding_stats_first_asset_daily.count IS DISTINCT FROM EXCLUDED.count
+        )
+        DELETE FROM finding_stats_first_asset_daily s
+         WHERE s.day = ${dayKey}::date
+           AND NOT EXISTS (
+             SELECT 1 FROM fresh f
+              WHERE f.asset_id = s.asset_id AND f.severity = s.severity
+                AND f.status = s.status
+           )`;
     }
 
     const total = await this.markBuilt(started);
