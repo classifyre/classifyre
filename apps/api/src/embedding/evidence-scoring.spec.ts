@@ -12,10 +12,12 @@ import type { PrismaService } from '../prisma.service';
  *    context by construction. On the Firmenbuch corpus that denied the reason to
  *    147,823 analyses, 90,570 of them company numbers averaging 4.8 assets.
  *
- * 2. Widening the *reason* must not move the *score*. Awarding the +0.12 bonus
- *    to that wider set puts 67,621 findings over the 0.75 the express lane and
- *    the unmonitored-evidence signal fire on, which is a separate decision. The
- *    scores below are pinned to the numbers the old formula produced.
+ * 2. The *bonus* follows the *reason*. Awarding the +0.12 to the wider set
+ *    puts ~68k findings over the old 0.75 bar (nearly all company numbers),
+ *    so the express lane and the unmonitored-evidence signal were re-tuned to
+ *    0.85 in the same change — see the calibration doc. The scores below are
+ *    pinned to the numbers the bonus-inclusive formula produces: touching the
+ *    bonus without updating them fails here first.
  */
 describe('evidence scoring', () => {
   const SPACE = 'space-1';
@@ -87,15 +89,15 @@ describe('evidence scoring', () => {
       });
     });
 
-    it('does not pay the bonus for it — the score is what it always was', async () => {
+    it('pays the bonus for it — the reason and the score move together', async () => {
       givenCohort(4);
 
       await service.analyzeHashes(SPACE, [HASH], recurrence);
 
       // quality 1 * 0.3 + confidence 1 * 0.2 + novelty (1/sqrt 4) 0.5 * 0.25
       //   + context (10/320) 0.03125 * 0.15 + severity INFO 0.15 * 0.1
-      // = 0.6446875, and emphatically NOT that plus RECURRENCE_BONUS (0.765).
-      expect(written().create.importanceScore).toBe(0.645);
+      // = 0.6446875, plus RECURRENCE_BONUS 0.12 = 0.7646875.
+      expect(written().create.importanceScore).toBe(0.765);
     });
 
     it('still pays the bonus when the finding is the only one of its kind', async () => {
@@ -130,7 +132,7 @@ describe('evidence scoring', () => {
     /** Exactly what the first pass writes for `givenCohort(4)`. */
     const settled = {
       spaceId: SPACE,
-      importanceScore: 0.645,
+      importanceScore: 0.765,
       qualityScore: 1,
       similarCount: 3,
       duplicateGroupHash: HASH,

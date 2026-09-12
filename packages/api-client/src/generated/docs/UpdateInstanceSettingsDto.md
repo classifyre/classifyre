@@ -67,7 +67,7 @@ const example = {
   "harnessDreamIntervalDays": 2,
   "harnessEvidenceUsableCoverage": 0.25,
   "harnessEvidenceWarnCoverage": 0.8,
-  "harnessExpressImportance": 0.75,
+  "harnessExpressImportance": 0.85,
 } satisfies UpdateInstanceSettingsDto
 
 console.log(example)

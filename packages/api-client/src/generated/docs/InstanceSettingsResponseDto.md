@@ -65,7 +65,7 @@ const example = {
   "harnessEvidenceUsableFindings": 2000,
   "harnessEvidenceUsableCoverage": 0.25,
   "harnessEvidenceWarnCoverage": 0.8,
-  "harnessExpressImportance": 0.75,
+  "harnessExpressImportance": 0.85,
   "harnessObservationChars": 8000,
   "harnessTurnObservationChars": 24000,
   "harnessMaxRankedFindings": 25,

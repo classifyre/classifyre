@@ -960,7 +960,7 @@ model InstanceSettings {
   // partial. Distinct from the gate above: this shapes the prompt, not the run.
   harnessEvidenceWarnCoverage   Float @default(0.8) @map("harness_evidence_warn_coverage")
   // Importance at or above which a single finding earns an express cycle.
-  harnessExpressImportance      Float @default(0.75) @map("harness_express_importance")
+  harnessExpressImportance      Float @default(0.85) @map("harness_express_importance")
   // Transcript guards. The ReAct transcript is quadratic by construction —
   // every iteration appends its tool results and resends the whole thing — so
   // these bound one observation and one turn's worth of them. Characters, not
