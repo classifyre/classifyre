@@ -12,7 +12,15 @@ import {
   AssetFindingsSort,
 } from './dto/query-findings-assets.dto';
 import { DetectorType, FindingStatus, Prisma, Severity } from '@prisma/client';
-import { HistoryEventType } from './types/finding-history.types';
+import {
+  HistoryEventType,
+  type FindingHistoryEntry,
+} from './types/finding-history.types';
+import {
+  historyEntryForStorage,
+  historyForStorage,
+  renderHistory,
+} from './types/finding-history';
 import { generateDetectionIdentity } from './utils/detection-identity';
 import { QueryFindingsDiscoveryDto } from './dto/query-findings-discovery.dto';
 import {
@@ -36,6 +44,16 @@ import {
 } from './stats/finding-stats.service';
 import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
 import { FINDING_TOTAL_CAP } from './stats/finding-stats.constants';
+
+/**
+ * Findings a filter-mode bulk update processes per page.
+ *
+ * This bounds what is held: the history append happens in SQL from a list of
+ * ids, but the custom-detector feedback on the same walk needs `matchedContent`
+ * for each row, and reading that unbounded over a select-all is the shape
+ * behind two previous heap OOMs here.
+ */
+const BULK_STATUS_PAGE_SIZE = 5000;
 
 @Injectable()
 export class FindingsService {
@@ -445,7 +463,7 @@ export class FindingsService {
         metadata: metadata ? (metadata as any) : undefined,
         firstDetectedAt: now,
         lastDetectedAt: now,
-        history: [
+        history: historyForStorage([
           {
             timestamp: now,
             runnerId: createDto.runnerId || 'manual',
@@ -453,9 +471,8 @@ export class FindingsService {
             status: FindingStatus.OPEN,
             severity: createDto.severity,
             confidence: createDto.confidence,
-            location: location ? (location as any) : undefined,
           },
-        ] as any,
+        ]) as any,
       },
     });
     this.embeddingQueue?.enqueue([{ hash: contentHash, text }]);
@@ -763,7 +780,19 @@ export class FindingsService {
 
     const findings = await this.prisma.finding.findMany({
       where,
-      include: {
+      // Named columns rather than `include`, which takes every scalar. This
+      // aggregates severity, status and detector counts per asset and reads
+      // nothing else — but it was pulling `history` (368 bytes a row, uncapped),
+      // `matchedContent` and both context windows for every finding on the
+      // page, none of which it looks at.
+      select: {
+        assetId: true,
+        detectedAt: true,
+        lastDetectedAt: true,
+        severity: true,
+        status: true,
+        detectorType: true,
+        findingType: true,
         asset: {
           select: {
             id: true,
@@ -976,14 +1005,21 @@ export class FindingsService {
         evidenceAnalysis: true,
       },
     });
-    if (!finding?.evidenceAnalysis) return finding;
-    // Reasons are stored as codes; the sentence is built on read.
+    if (!finding) return finding;
+    // History and reasons are both stored compact; the shape a client reads is
+    // built here. Two stored shapes coexist and both render — see
+    // types/finding-history.ts and embedding/reason-labels.ts.
     return {
       ...finding,
-      evidenceAnalysis: {
-        ...finding.evidenceAnalysis,
-        reasons: renderReasons(finding.evidenceAnalysis.reasons),
-      },
+      history: renderHistory(finding.history),
+      ...(finding.evidenceAnalysis
+        ? {
+            evidenceAnalysis: {
+              ...finding.evidenceAnalysis,
+              reasons: renderReasons(finding.evidenceAnalysis.reasons),
+            },
+          }
+        : {}),
     };
   }
 
@@ -1053,7 +1089,9 @@ export class FindingsService {
     }
 
     if (historyEntries.length > 0) {
-      data.history = [...currentHistory, ...historyEntries];
+      // Existing entries pass through in whatever shape they were written in;
+      // only the new ones are compacted. See types/finding-history.ts.
+      data.history = [...currentHistory, ...historyForStorage(historyEntries)];
     }
 
     const updatedFinding = await this.prisma.finding.update({
@@ -1116,24 +1154,6 @@ export class FindingsService {
       if (status) data.status = status;
       if (severity) data.severity = severity;
       if (comment !== undefined) data.comment = comment;
-      const feedbackCandidates =
-        status && this.shouldRecordFeedbackStatus(status)
-          ? await this.prisma.finding.findMany({
-              where: {
-                AND: [where, { status: { not: status } }],
-              },
-              select: {
-                id: true,
-                sourceId: true,
-                detectorType: true,
-                customDetectorId: true,
-                customDetectorKey: true,
-                customDetectorName: true,
-                findingType: true,
-                matchedContent: true,
-              },
-            })
-          : [];
       const now = new Date();
       if (
         status === FindingStatus.RESOLVED ||
@@ -1144,10 +1164,22 @@ export class FindingsService {
       } else if (status === FindingStatus.OPEN) {
         data.resolvedAt = null;
       }
-      const result = await this.prisma.finding.updateMany({ where, data });
-      if (status && feedbackCandidates.length > 0) {
-        await this.recordCustomDetectorFeedback(feedbackCandidates, status);
+      // Before the update, because it selects the rows that are ABOUT to
+      // change and the update is what stops them matching.
+      //
+      // `updateMany` cannot append to a JSONB array, so the select-all path
+      // used to write no history at all — and history is where a manual status
+      // decision is recorded. `findingHasManualStatusOverride` looks for the
+      // last STATUS_CHANGED entry; finding none it reports no override, and
+      // ingest computes `shouldReopen = wasResolved && !statusOverride`. So the
+      // next scan that re-detected these findings silently re-opened every one
+      // of them, discarding the operator's judgement without saying so. It is
+      // reachable from the findings table's select-all and from the
+      // `bulk_update_findings` MCP tool, which takes the same `filters`.
+      if (status) {
+        await this.recordBulkStatusChange(where, status, severity, comment);
       }
+      const result = await this.prisma.finding.updateMany({ where, data });
       if (status && result.count > 0) {
         await this.correlationJobs?.scheduleFull('bulk finding status changed');
         // Filter-based bulk update: the matched findings can span any detection
@@ -1160,7 +1192,105 @@ export class FindingsService {
 
     // ── ID-based mode: update with per-finding history tracking ───────────────
     if (!ids?.length) return { updatedCount: 0, ids: [] };
+    return this.bulkUpdateByIds(ids, status, severity, comment, userId);
+  }
 
+  /**
+   * Walk the findings a filter-mode bulk update is about to change, a page at a
+   * time, recording the status change on each.
+   *
+   * Two things happen per page — the history entry, and the custom-detector
+   * feedback row — because both used to walk this same set and neither was
+   * bounded. The feedback read in particular selected every matching finding
+   * including its `matchedContent` in one array; on a select-all over a corpus
+   * the size of firmenbuch-test-2 (~607,000 findings) that is the exact
+   * unbounded-`findMany` shape behind two previous heap OOMs here. The history
+   * side never read the rows at all: `history` averages 368 bytes with no cap,
+   * so it is appended in SQL and only ids are held.
+   *
+   * One walk rather than two, since the cursor and the predicate are identical
+   * and the second pass was pure duplication — 122 pages instead of 244 on that
+   * corpus. The wide projection is taken only when feedback is actually wanted.
+   *
+   * Ordering: this must run BEFORE the `updateMany`, because the update is what
+   * stops these rows matching `{ status: { not: status } }`. That also means
+   * both writes land before it, so a failure mid-walk leaves some findings
+   * carrying a history entry and feedback rows for a status change that did not
+   * complete. That window is not new — none of these statements shared a
+   * transaction before either — and wrapping a 607k-row walk in one would hold
+   * a transaction open long enough to block vacuum, which is worse.
+   *
+   * The walk is stable: neither write touches `status`, so a page that has been
+   * processed still satisfies the predicate and the keyset cursor does not slip.
+   */
+  private async recordBulkStatusChange(
+    where: Prisma.FindingWhereInput,
+    status: FindingStatus,
+    severity: Severity | undefined,
+    comment: string | undefined,
+  ): Promise<void> {
+    const entry = historyEntryForStorage({
+      timestamp: new Date(),
+      // Not attributable to a scan, and deliberately not to a runner either —
+      // the single-finding path borrows the finding's `runnerId`, which says
+      // something untrue about who made the decision.
+      runnerId: 'manual',
+      eventType: HistoryEventType.STATUS_CHANGED,
+      status,
+      ...(severity ? { severity } : {}),
+      changeReason: comment || 'Bulk status change',
+    });
+    // One fixed projection, including the feedback columns even for the two
+    // statuses that do not record feedback. Making it conditional would leave
+    // the page's type a union that no longer matches
+    // `recordCustomDetectorFeedback`, and the cast that papers over that is the
+    // kind that hides a dropped column: the recorder's filter would quietly
+    // exclude every row instead of failing. Bounded is what mattered here —
+    // `matchedContent` for 5,000 rows is nothing; it was 607,000 at once that
+    // was the problem.
+    const wantsFeedback = this.shouldRecordFeedbackStatus(status);
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await this.prisma.finding.findMany({
+        where: { AND: [where, { status: { not: status } }] },
+        select: {
+          id: true,
+          sourceId: true,
+          detectorType: true,
+          customDetectorId: true,
+          customDetectorKey: true,
+          customDetectorName: true,
+          findingType: true,
+          matchedContent: true,
+        },
+        orderBy: { id: 'asc' },
+        take: BULK_STATUS_PAGE_SIZE,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      });
+      if (!page.length) return;
+      await this.prisma.$executeRaw`
+        UPDATE findings
+        SET history = history || ${JSON.stringify([entry])}::jsonb
+        WHERE id = ANY(${page.map((row) => row.id)}::text[])
+      `;
+      if (wantsFeedback) {
+        // Safe per page: this filters rows and inserts them, holding no state
+        // across calls, so N pages produce exactly the rows one call with the
+        // concatenation would have.
+        await this.recordCustomDetectorFeedback(page, status);
+      }
+      if (page.length < BULK_STATUS_PAGE_SIZE) return;
+      cursor = page.at(-1)?.id;
+    }
+  }
+
+  private async bulkUpdateByIds(
+    ids: string[],
+    status: FindingStatus | undefined,
+    severity: Severity | undefined,
+    comment: string | undefined,
+    userId: string | undefined,
+  ): Promise<{ updatedCount: number; ids: string[] }> {
     const findings = await this.prisma.finding.findMany({
       where: { id: { in: ids } },
       select: {
@@ -1186,7 +1316,7 @@ export class FindingsService {
       const currentHistory = Array.isArray(finding.history)
         ? (finding.history as object[])
         : [];
-      const historyEntries: object[] = [];
+      const historyEntries: FindingHistoryEntry[] = [];
       const nextStatus = status ?? finding.status;
       const nextSeverity = severity ?? finding.severity;
 
@@ -1228,7 +1358,10 @@ export class FindingsService {
       }
 
       if (historyEntries.length > 0)
-        data.history = [...currentHistory, ...historyEntries];
+        data.history = [
+          ...currentHistory,
+          ...historyForStorage(historyEntries),
+        ];
       return this.prisma.finding.update({ where: { id: finding.id }, data });
     });
 
