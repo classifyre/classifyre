@@ -1394,8 +1394,12 @@ model Edge {
 // reverse index: querying by `valueHash` yields every asset sharing a value.
 // `label` is the finding's free-form type (email, phone, custom labels, …) so
 // correlation stays label-agnostic.
+/// Identified by the asset and the value, which is what a correlation row *is*.
+/// The surrogate `id` this used to carry was generated on every insert, read by
+/// nothing, referenced by no foreign key, and cost a 48 MB b-tree plus 37 bytes
+/// a row on top of the unique index already enforcing the real key — which the
+/// migration promotes in place rather than rebuilding.
 model AssetCorrelationValue {
-  id                String       @id @default(uuid())
   assetId           String       @map("asset_id")
   sourceId          String       @map("source_id")
   // Representative OPEN finding that produced this asset/value occurrence.
@@ -1418,8 +1422,11 @@ model AssetCorrelationValue {
   asset   Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
   finding Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
 
-  @@unique([assetId, valueHash])
+  @@id([assetId, valueHash])
   @@index([valueHash])
+  // Kept despite the PK leading on assetId: this narrow index answers
+  // asset-only lookups in 23 MB against the PK's 144 MB, and it takes 495,198
+  // scans to the PK's prefix use.
   @@index([assetId])
   @@index([findingId])
   @@index([sourceId])
