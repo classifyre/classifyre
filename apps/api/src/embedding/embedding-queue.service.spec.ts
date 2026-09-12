@@ -1,4 +1,5 @@
 import { EmbeddingQueueService } from './embedding-queue.service';
+import { embeddingContentHash } from './embedding-text';
 
 describe('EmbeddingQueueService', () => {
   const boss = {
@@ -158,14 +159,16 @@ describe('EmbeddingQueueService', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     // Chunks travel grouped: one queue row carries many hashes, so the
-    // backlog stays small enough for pg-boss to fetch cheaply.
+    // backlog stays small enough for pg-boss to fetch cheaply. The text is
+    // deliberately absent — the handler reads it back from the row the hash
+    // was taken over.
     expect(boss.insert).toHaveBeenCalledWith(
       'semantic-embeddings-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
       [
         expect.objectContaining({
           data: {
             spaceId: '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
-            items: [{ hash: 'a'.repeat(64), text: 'repeated text' }],
+            hashes: ['a'.repeat(64)],
           },
           singletonKey: expect.any(String),
         }),
@@ -407,15 +410,16 @@ describe('EmbeddingQueueService', () => {
         data: { embedContentHash: expect.any(String) },
       }),
     );
+    // The payload carries the hash, so what is asserted is that the term,
+    // its aliases and its notes were joined and normalized into exactly the
+    // text the handler will reconstruct when it reads the row back.
     expect(boss.insert).toHaveBeenCalledWith(
       'semantic-embeddings-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
       expect.arrayContaining([
         expect.objectContaining({
           data: expect.objectContaining({
-            items: expect.arrayContaining([
-              expect.objectContaining({
-                text: 'Jane Doe J. Doe Person of interest',
-              }),
+            hashes: expect.arrayContaining([
+              embeddingContentHash('Jane Doe J. Doe Person of interest'),
             ]),
           }),
         }),
