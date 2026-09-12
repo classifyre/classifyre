@@ -41,6 +41,26 @@ describe('embedding queue batching', () => {
         Promise.resolve(texts.map(() => [0.1, 0.2])),
       ),
     };
+    // Jobs carry hashes only, so the handler reads the text back out of the
+    // rows it was derived from. `hash-N` stands for an asset chunk whose text
+    // is `chunk text N`, which is what `chunks()` below would have inlined.
+    const prisma = {
+      assetChunk: {
+        findMany: jest.fn(
+          ({ where }: { where: { contentHash: { in: string[] } } }) =>
+            Promise.resolve(
+              where.contentHash.in
+                .filter((hash) => /^hash-\d+$/.test(hash))
+                .map((hash) => ({
+                  contentHash: hash,
+                  text: `chunk text ${hash.slice('hash-'.length)}`,
+                })),
+            ),
+        ),
+      },
+      finding: { findMany: jest.fn().mockResolvedValue([]) },
+      glossaryTerm: { findMany: jest.fn().mockResolvedValue([]) },
+    };
 
     // `persist` and `handle` are private; reach them through a structural
     // type rather than widening the class's API for a test.
@@ -53,11 +73,12 @@ describe('embedding queue batching', () => {
       pgBoss: { getBossAsync: () => Promise.resolve(boss) },
       embeddings,
       provider,
+      prisma,
       ensureRuntime: () => Promise.resolve(runtime),
       runtime: () => runtime,
       scheduleRecalibration: () => undefined,
     });
-    return { service, boss, inserted, embeddings, provider };
+    return { service, boss, inserted, embeddings, provider, prisma };
   }
 
   const chunks = (n: number) =>
@@ -66,6 +87,10 @@ describe('embedding queue batching', () => {
       text: `chunk text ${i}`,
     }));
 
+  /** What a job enqueued by the current version carries. */
+  const hashes = (n: number) =>
+    Array.from({ length: n }, (_, i) => `hash-${i}`);
+
   it('packs many chunks into one job instead of one job each', async () => {
     const h = harness(4);
 
@@ -73,13 +98,39 @@ describe('embedding queue batching', () => {
 
     const jobs = h.inserted.flatMap((i) => i.jobs);
     expect(jobs).toHaveLength(3); // 4 + 4 + 2, not 10
-    expect(jobs[0].data.items).toHaveLength(4);
-    expect(jobs[2].data.items).toHaveLength(2);
+    expect(jobs[0].data.hashes).toHaveLength(4);
+    expect(jobs[2].data.hashes).toHaveLength(2);
     // Every chunk still queued exactly once.
-    const queued = jobs.flatMap((j: any) =>
-      j.data.items.map((i: any) => i.hash),
-    );
+    const queued = jobs.flatMap((j: any) => j.data.hashes);
     expect(new Set(queued).size).toBe(10);
+  });
+
+  it('never puts the corpus text in the job payload', async () => {
+    // The text is already in asset_chunks/findings/glossary_terms, and a copy
+    // of it here is what made job_common the largest table in the database:
+    // 31 KB per job across 124,336 jobs on one namespace.
+    const h = harness(4);
+
+    await h.service.persist(chunks(10));
+
+    const jobs = h.inserted.flatMap((i) => i.jobs);
+    for (const job of jobs) {
+      expect(JSON.stringify(job.data)).not.toContain('chunk text');
+      expect(job.data).not.toHaveProperty('items');
+    }
+  });
+
+  it('caps how long a finished job is kept', async () => {
+    // retentionSeconds only expires work never picked up; deleteAfterSeconds
+    // is what removes a job once it has completed. Without it pg-boss keeps
+    // finished jobs for seven days.
+    const h = harness(4);
+
+    await h.service.persist(chunks(2));
+
+    const [job] = h.inserted.flatMap((i) => i.jobs);
+    expect(job.deleteAfterSeconds).toBeGreaterThan(0);
+    expect(job.deleteAfterSeconds).toBeLessThanOrEqual(3600);
   });
 
   it('gives each group a stable, content-derived singleton key', async () => {
@@ -100,11 +151,11 @@ describe('embedding queue batching', () => {
     expect(keysA).toEqual(keysB); // and stable across runs
   });
 
-  it('embeds a batched job end to end', async () => {
+  it('embeds a batched job end to end, reading text back by hash', async () => {
     const h = harness(4);
 
     await h.service.handle([
-      { data: { spaceId: 'space-1', items: chunks(3) } },
+      { data: { spaceId: 'space-1', hashes: hashes(3) } },
     ]);
 
     expect(h.provider.embedMany).toHaveBeenCalledWith(
@@ -114,9 +165,57 @@ describe('embedding queue batching', () => {
     expect(h.embeddings.putVectors).toHaveBeenCalledTimes(1);
   });
 
-  it('still drains single-chunk jobs left in the queue by older versions', async () => {
+  it('skips a hash whose row was deleted between enqueue and dequeue', async () => {
+    // Normal during a rescan. There is nothing left to embed, so the batch
+    // must proceed without it rather than fail and retry forever.
+    const h = harness(4);
+
+    await h.service.handle([
+      { data: { spaceId: 'space-1', hashes: [...hashes(2), 'hash-gone'] } },
+    ]);
+
+    expect(h.provider.embedMany).toHaveBeenCalledWith(
+      ['chunk text 0', 'chunk text 1'],
+      expect.anything(),
+    );
+  });
+
+  it('falls back to findings and glossary terms for a hash', async () => {
+    // The three producers in backfillStoredContent, in the order the resolver
+    // tries them. A finding's text is its context window joined and squeezed,
+    // which is what its hash was taken over.
+    const h = harness(4);
+    h.prisma.finding.findMany.mockResolvedValueOnce([
+      {
+        embedContentHash: 'finding-1',
+        contextBefore: 'before  ',
+        matchedContent: 'MATCH',
+        contextAfter: ' after',
+      },
+    ]);
+    h.prisma.glossaryTerm.findMany.mockResolvedValueOnce([
+      {
+        embedContentHash: 'term-1',
+        term: 'Firmenbuch',
+        aliases: ['FN'],
+        notes: null,
+      },
+    ]);
+
+    await h.service.handle([
+      { data: { spaceId: 'space-1', hashes: ['finding-1', 'term-1'] } },
+    ]);
+
+    expect(h.provider.embedMany).toHaveBeenCalledWith(
+      ['before MATCH after', 'Firmenbuch FN'],
+      expect.anything(),
+    );
+  });
+
+  it('still drains jobs left in the queue by older versions', async () => {
     // Millions of these are queued on live installs; discarding them would
-    // silently leave those chunks unembedded.
+    // silently leave those chunks unembedded. Their inline text is used as-is
+    // rather than read back, so draining costs no extra queries.
     const h = harness(4);
 
     await h.service.handle([
@@ -128,14 +227,15 @@ describe('embedding queue batching', () => {
       ['old shape', 'chunk text 0', 'chunk text 1'],
       expect.anything(),
     );
+    expect(h.prisma.assetChunk.findMany).not.toHaveBeenCalled();
   });
 
   it('does not embed the same chunk twice within one fetch', async () => {
     const h = harness(4);
 
     await h.service.handle([
-      { data: { spaceId: 'space-1', items: chunks(2) } },
-      { data: { spaceId: 'space-1', items: chunks(2) } },
+      { data: { spaceId: 'space-1', hashes: hashes(2) } },
+      { data: { spaceId: 'space-1', hashes: hashes(2) } },
     ]);
 
     expect(h.provider.embedMany).toHaveBeenCalledWith(
@@ -144,17 +244,24 @@ describe('embedding queue batching', () => {
     );
   });
 
-  it('skips chunks that already have vectors', async () => {
+  it('skips chunks that already have vectors without reading their text', async () => {
     const h = harness(4);
     h.embeddings.missingHashes.mockResolvedValueOnce(['hash-1']);
 
     await h.service.handle([
-      { data: { spaceId: 'space-1', items: chunks(3) } },
+      { data: { spaceId: 'space-1', hashes: hashes(3) } },
     ]);
 
     expect(h.provider.embedMany).toHaveBeenCalledWith(
       ['chunk text 1'],
       expect.anything(),
+    );
+    // Only the outstanding hash is looked up: on a re-queued batch most rows
+    // already have a vector and reading them back would waste the change.
+    expect(h.prisma.assetChunk.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { contentHash: { in: ['hash-1'] } },
+      }),
     );
   });
 
@@ -227,7 +334,7 @@ describe('embedding queue batching', () => {
     const h = harness(4);
 
     await h.service.handle([
-      { data: { spaceId: 'someone-else', items: chunks(3) } },
+      { data: { spaceId: 'someone-else', hashes: hashes(3) } },
     ]);
 
     expect(h.provider.embedMany).not.toHaveBeenCalled();

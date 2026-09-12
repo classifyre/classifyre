@@ -11,6 +11,7 @@ import { EmbeddingQueueService } from '../embedding/embedding-queue.service';
 import { EmbeddingService } from '../embedding/embedding.service';
 import { QueryEmbeddingService } from '../embedding/query-embedding.service';
 import { embeddingContentHash } from '../embedding/embedding-text';
+import { vectorCast } from '../embedding/embedding-vector';
 
 export type GlossaryUpsertInput = {
   id?: string;
@@ -538,19 +539,25 @@ export class GlossaryService {
     try {
       const space = await this.embeddings.configuredSpace();
       const dim = Prisma.raw(String(space.dim));
+      // Must match the expression ensureHnswIndex built, or the planner
+      // silently ignores the index and falls back to a sequential scan. This
+      // query named `vector` outright while the index has been built through
+      // `vectorCast` since half precision was introduced — so on any space
+      // above 2,000 dimensions it has never been able to use it.
+      const vecType = Prisma.raw(vectorCast(space.dim).type);
       const rows = await this.prisma.$queryRaw<
         Array<{ id: string; score: number }>
       >(Prisma.sql`
         SELECT gt.id, 1 - (
-          ce.vec::public.vector(${dim}) <=>
-          ${JSON.stringify(vector)}::public.vector(${dim})
+          ce.vec::public.${vecType}(${dim}) <=>
+          ${JSON.stringify(vector)}::public.${vecType}(${dim})
         ) AS score
         FROM glossary_terms gt
         JOIN content_embeddings ce
           ON ce.content_hash = gt.embed_content_hash
          AND ce.space_id = ${space.id}
-        ORDER BY ce.vec::public.vector(${dim}) <=>
-          ${JSON.stringify(vector)}::public.vector(${dim})
+        ORDER BY ce.vec::public.${vecType}(${dim}) <=>
+          ${JSON.stringify(vector)}::public.${vecType}(${dim})
         LIMIT ${limit + excludeIds.size}
       `);
       const candidates = rows.filter((row) => !excludeIds.has(row.id));

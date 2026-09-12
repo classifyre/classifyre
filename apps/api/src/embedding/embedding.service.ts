@@ -28,6 +28,7 @@ import {
   type ResolvedEmbeddingConfig,
 } from './embedding-settings.service';
 import { embeddingContentHash } from './embedding-text';
+import { reasonsForStorage, type StoredReason } from './reason-labels';
 import { MAX_INDEXED_DIMENSIONS, vectorCast } from './embedding-vector';
 
 type SimilarityRow = { id: string; score: number };
@@ -115,6 +116,8 @@ export class EmbeddingService {
     ReturnType<EmbeddingService['ensureSpace']>
   >();
   private readonly configuredSpaceIds = new Map<string, string>();
+  /** Detached HNSW builds in flight, keyed schema.index, so two callers do not both start one. */
+  private readonly hnswBuilds = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -240,7 +243,7 @@ export class EmbeddingService {
         data: { ...input, provider, isActive: true },
       });
     });
-    await this.ensureHnswIndex(space.id, space.dim);
+    this.ensureHnswIndex(space.id, space.dim);
     return space;
   }
 
@@ -264,7 +267,30 @@ export class EmbeddingService {
     return Prisma.raw(`'${spaceId}'`);
   }
 
-  private async ensureHnswIndex(spaceId: string, dim: number): Promise<void> {
+  /**
+   * Bring the space's partial HNSW index into existence, without making
+   * anything wait for it.
+   *
+   * Building this index is not a quick DDL. Measured on a 879,135-vector space
+   * at 384 dimensions: roughly twenty minutes. It used to be awaited inside
+   * `ensureSpace`, which is awaited by `registerForNamespace`, which the
+   * namespace worker manager awaits in sequence — so one space needing its
+   * index built stalled that namespace's startup for twenty minutes and every
+   * namespace queued behind it with it. On a deployment whose readiness probe
+   * has previously turned a slow start into an outage, that is not a cost to
+   * pay on the boot path.
+   *
+   * So the build is detached and runs CONCURRENTLY. Until it finishes,
+   * similarity queries fall back to a sequential scan: slower, never wrong.
+   *
+   * `CONCURRENTLY` cannot run inside a transaction and can leave an invalid
+   * index behind if it fails, so a previous failure is detected and dropped
+   * before retrying. The schema is captured synchronously and written into the
+   * statement, because the detached build outlives the CLS context that would
+   * otherwise resolve it — and resolving it late would target whichever
+   * namespace happened to be current.
+   */
+  private ensureHnswIndex(spaceId: string, dim: number): void {
     if (!/^[0-9a-f-]{36}$/i.test(spaceId)) {
       throw new Error(`Invalid embedding space id ${spaceId}`);
     }
@@ -278,17 +304,93 @@ export class EmbeddingService {
       );
       return;
     }
-    await this.prisma.$executeRaw(
-      Prisma.raw(
-        `CREATE INDEX IF NOT EXISTS "${indexName}"
-         ON "content_embeddings"
+
+    const schema = this.cls?.get<string>(CLS_SCHEMA);
+    if (!schema || !/^[A-Za-z0-9_]+$/.test(schema)) {
+      this.logger.warn(
+        `Cannot build ${indexName}: no usable namespace schema in context.`,
+      );
+      return;
+    }
+    const key = `${schema}.${indexName}`;
+    if (this.hnswBuilds.has(key)) return;
+    this.hnswBuilds.add(key);
+
+    void this.buildHnswIndex(schema, indexName, spaceId, dim, cast)
+      .catch((error) => {
+        this.logger.error(
+          `Background build of ${indexName} failed: ${
+            error instanceof Error ? error.message : String(error)
+          }. Similarity queries fall back to a sequential scan until it succeeds.`,
+        );
+      })
+      .finally(() => this.hnswBuilds.delete(key));
+  }
+
+  private async buildHnswIndex(
+    schema: string,
+    indexName: string,
+    spaceId: string,
+    dim: number,
+    cast: ReturnType<typeof vectorCast>,
+  ): Promise<void> {
+    // Is anyone already building it? The in-process guard is not enough: the
+    // API and the worker are separate processes that both resolve the space,
+    // and a restart brings up a third while the previous build is still
+    // running. Postgres itself is the only place that knows.
+    //
+    // Getting this wrong is not benign. An in-flight CREATE INDEX
+    // CONCURRENTLY leaves an *invalid* index row for its whole run, so a
+    // second process that reads "invalid" and decides to clean up issues a
+    // DROP INDEX CONCURRENTLY against an index that is still being built —
+    // and the two wait on each other indefinitely. Observed live: eight such
+    // statements stacked up across restarts, none of them progressing, and
+    // they blocked the pg-boss maintenance sweep with them.
+    const building = await this.prisma.$queryRaw<Array<{ pid: number }>>`
+      SELECT pid FROM pg_stat_activity
+      WHERE state = 'active'
+        AND query ILIKE ${'%INDEX%' + indexName + '%'}
+        AND pid <> pg_backend_pid()
+      LIMIT 1
+    `;
+    if (building.length > 0) return;
+
+    const existing = await this.prisma.$queryRaw<Array<{ valid: boolean }>>`
+      SELECT i.indisvalid AS valid
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_index i ON i.indexrelid = c.oid
+      WHERE n.nspname = ${schema} AND c.relname = ${indexName}
+    `;
+    if (existing[0]?.valid) return;
+    if (existing.length > 0) {
+      // Left invalid by a build that died, and — per the check above — nobody
+      // is building it now. A plain DROP, not CONCURRENTLY: an invalid index
+      // is not used by any query, so there is no reader to be gentle with,
+      // and the concurrent form is exactly what deadlocked against the build.
+      this.logger.warn(
+        `Dropping invalid ${indexName} left by an interrupted build.`,
+      );
+      await this.prisma.$executeRawUnsafe(
+        `DROP INDEX IF EXISTS "${schema}"."${indexName}"`,
+      );
+    }
+
+    const started = Date.now();
+    this.logger.log(
+      `Building ${indexName} in the background (${dim} dimensions, ${cast.type}); ` +
+        'similarity queries use a sequential scan until it completes.',
+    );
+    await this.prisma.$executeRawUnsafe(
+      `CREATE INDEX CONCURRENTLY IF NOT EXISTS "${indexName}"
+         ON "${schema}"."content_embeddings"
          USING hnsw (("vec"::public.${cast.type}(${dim})) ${cast.ops})
          WITH (m = ${this.cfg.hnswM}, ef_construction = ${this.cfg.hnswEfConstruction})
          WHERE "space_id" = '${spaceId}'`,
-      ),
     );
     this.logger.log(
-      `Embedding space ${spaceId} ready (${this.cfg.provider}:${this.cfg.model}, ${dim} dimensions, ${cast.type} index)`,
+      `Embedding space ${spaceId} indexed (${this.cfg.provider}:${this.cfg.model}, ` +
+        `${dim} dimensions, ${cast.type}) in ${Math.round((Date.now() - started) / 1000)}s`,
     );
   }
 
@@ -388,14 +490,18 @@ export class EmbeddingService {
 
     let created = 0;
     if (items.length) {
-      const ids = items.map(() => randomUUID());
       const hashes = items.map((item) => item.contentHash);
       const vectors = items.map((item) => JSON.stringify(item.vector));
+      // Cast to the column's own representation rather than naming `vector`
+      // outright. Postgres would coerce it either way (vector -> halfvec is an
+      // implicit cast), but going through the same resolver the index and every
+      // ORDER BY use keeps one definition of what a stored vector is.
+      const storedType = Prisma.raw(vectorCast(space.dim).type);
       created = await this.prisma.$executeRaw`
-        INSERT INTO content_embeddings (id, space_id, content_hash, vec)
-        SELECT t.id, ${space.id}, t.content_hash, t.vec::public.vector
-        FROM unnest(${ids}::text[], ${hashes}::text[], ${vectors}::text[])
-          AS t(id, content_hash, vec)
+        INSERT INTO content_embeddings (space_id, content_hash, vec)
+        SELECT ${space.id}, t.content_hash, t.vec::public.${storedType}
+        FROM unnest(${hashes}::text[], ${vectors}::text[])
+          AS t(content_hash, vec)
         ON CONFLICT (space_id, content_hash) DO NOTHING
       `;
     }
@@ -733,40 +839,22 @@ export class EmbeddingService {
               analysis.importanceScore + outlierAdjustment - duplicatePenalty,
             ),
           );
-          const reasons = Array.isArray(analysis.reasons)
-            ? [...analysis.reasons]
+          // Appends to whatever the lexical pass stored, in the same shape:
+          // codes and parameters, rendered into sentences on read.
+          const reasons: StoredReason[] = Array.isArray(analysis.reasons)
+            ? (analysis.reasons as unknown as StoredReason[]).slice()
             : [];
           if (nearDuplicates.length) {
-            reasons.push({
-              code: 'near_duplicate',
-              label: `${nearDuplicates.length} near-duplicate findings grouped semantically`,
-              impact: 'down',
-            });
+            reasons.push({ c: 'near_duplicate', n: nearDuplicates.length });
           }
           reasons.push(
             !neighborhoodReliable
-              ? {
-                  code: 'insufficient_neighborhood',
-                  label: 'Too few comparable findings for semantic analysis',
-                  impact: 'neutral',
-                }
+              ? { c: 'insufficient_neighborhood' }
               : textQuality < 0.55 && semanticOutlier > 0.45
-                ? {
-                    code: 'isolated_ocr',
-                    label: 'Isolated low-quality text; possible OCR noise',
-                    impact: 'down',
-                  }
+                ? { c: 'isolated_ocr' }
                 : semanticOutlier >= OUTLIER_BONUS_THRESHOLD
-                  ? {
-                      code: 'semantic_outlier',
-                      label: 'Semantically unusual for its neighbours',
-                      impact: 'up',
-                    }
-                  : {
-                      code: 'semantic_support',
-                      label: 'Consistent with its semantic neighbours',
-                      impact: 'neutral',
-                    },
+                  ? { c: 'semantic_outlier' }
+                  : { c: 'semantic_support' },
           );
           await this.prisma.findingEvidenceAnalysis.update({
             where: { findingId },
@@ -778,7 +866,7 @@ export class EmbeddingService {
               duplicateGroupHash:
                 duplicateGroupByHash.get(neighbors[0].targetHash) ??
                 analysis.duplicateGroupHash,
-              reasons,
+              reasons: reasonsForStorage(reasons),
               signals: {
                 ...(analysis.signals && typeof analysis.signals === 'object'
                   ? (analysis.signals as Record<string, unknown>)

@@ -41,6 +41,31 @@ type PgBossInstance = InstanceType<PgBossModule['PgBoss']>;
 export { pgBossSchemaForId };
 
 /**
+ * How long a finished job's row (and its payload) is kept.
+ *
+ * pg-boss has two independent retention knobs and they are easy to confuse:
+ * `retentionSeconds` writes `keep_until`, which is only consulted for jobs in a
+ * state *below* active — it expires work that was never picked up. Finished
+ * jobs are deleted on `deletion_seconds`, which defaults to seven days and
+ * which nothing here was setting.
+ *
+ * The gap is not academic. On one namespace 103,904 completed
+ * `semantic-embeddings` jobs were holding 4,040 MB of TOASTed payload — a fifth
+ * of the entire database — while the code that enqueued them believed it had
+ * asked for a one-day retention. The same table had to be pruned by hand on the
+ * VPS once already.
+ *
+ * An hour is long enough to inspect a failure that just happened and short
+ * enough that the queue never becomes storage. Nothing reads completed jobs:
+ * run history lives in `runners`, and the only pg-boss reads here are
+ * `getQueueStats`/`getQueues`, which count queued, active and deferred.
+ */
+const COMPLETED_JOB_RETENTION_SECONDS = 3600;
+
+/** How often pg-boss sweeps jobs whose retention has expired. */
+const MAINTENANCE_INTERVAL_SECONDS = 600;
+
+/**
  * Multi-tenant pg-boss: one {@link PgBossInstance} per namespace, each in its
  * own `pgboss_<uuid>` Postgres schema (derived from the immutable namespace
  * UUID, so a slug edit never orphans a job schema) so a namespace's worker can
@@ -89,6 +114,17 @@ export class PgBossService implements OnApplicationShutdown {
       connectionString: process.env.DATABASE_URL,
       max: 5,
       schema: pgBossSchemaForId(namespaceId),
+      // How often finished jobs are actually collected.
+      //
+      // pg-boss defaults this to MAX_EXPIRATION_HOURS — 24 hours — so a queue
+      // sweeps its expired rows once a day. Capping retention is only half the
+      // fix without this: with the default, a namespace that had just had its
+      // retention lowered from seven days to one hour still sat on 121,710
+      // completed jobs and 4.5 GB, because the next sweep was a day away.
+      //
+      // Ten minutes keeps the table small, and the sweep is cheap precisely
+      // because it is frequent — there is never much to delete.
+      maintenanceIntervalSeconds: MAINTENANCE_INTERVAL_SECONDS,
     });
     boss.on('error', (error) => {
       this.logger.error(`pg-boss error [${schema}]:`, error);
@@ -96,8 +132,68 @@ export class PgBossService implements OnApplicationShutdown {
     await boss.start();
     this.bosses.set(schema, boss);
     await this.releaseAbandonedJobs(boss, schema, namespaceId);
+    await this.normalizeJobRetention(boss, schema, namespaceId);
     this.logger.log(`pg-boss started for namespace schema '${schema}'`);
     return boss;
+  }
+
+  /**
+   * Cap how long finished jobs are kept, for every queue in this namespace.
+   *
+   * Done here rather than at each `createQueue` call site for two reasons.
+   * `createQueue` is `ON CONFLICT DO NOTHING`, so options passed to it are
+   * ignored for every queue that already exists — which is all of them on an
+   * upgrade. And `deletion_seconds` is copied onto each job row at insert time,
+   * so fixing the queue default alone would leave the existing backlog to sit
+   * out its original seven days.
+   *
+   * Both are therefore updated: the queue, so new jobs inherit the cap, and the
+   * rows already written, so pg-boss's own maintenance pass collects the
+   * backlog on its next run instead of needing a manual DELETE.
+   *
+   * Only ever lowers a value. A queue that deliberately asks to keep its jobs
+   * for less than this keeps its own setting.
+   */
+  private async normalizeJobRetention(
+    boss: PgBossInstance,
+    schema: string,
+    namespaceId: string,
+  ): Promise<void> {
+    const bossSchema = pgBossSchemaForId(namespaceId);
+    try {
+      await boss.getDb().executeSql(
+        `UPDATE ${bossSchema}.queue
+              SET deletion_seconds = $1
+            WHERE deletion_seconds > $1`,
+        [COMPLETED_JOB_RETENTION_SECONDS],
+      );
+      // Every state, not only the finished ones. `deletion_seconds` is read
+      // once a job completes, so restricting this to `state >= 'completed'`
+      // bought nothing and left every job that was queued or in flight at
+      // upgrade time carrying the old seven-day value — which it would then
+      // honour *after* completing, up to a week later.
+      const rows = await boss.getDb().executeSql(
+        `UPDATE ${bossSchema}.job
+              SET deletion_seconds = $1
+            WHERE deletion_seconds > $1
+          RETURNING id`,
+        [COMPLETED_JOB_RETENTION_SECONDS],
+      );
+      const retired = rows?.rows?.length ?? 0;
+      if (retired > 0) {
+        this.logger.log(
+          `Capped retention on ${retired} pg-boss job(s) in '${schema}' ` +
+            `to ${COMPLETED_JOB_RETENTION_SECONDS}s; maintenance will collect ` +
+            'them once they finish.',
+        );
+      }
+    } catch (error) {
+      // Retention is housekeeping. A namespace must still start without it.
+      this.logger.error(
+        `Could not normalize job retention for '${schema}': ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**
@@ -156,6 +252,35 @@ export class PgBossService implements OnApplicationShutdown {
       // Never stop a namespace from starting because the cleanup failed.
       this.logger.error(
         `Could not release abandoned jobs for '${schema}': ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Cap one queue's retention, lowering it only.
+   *
+   * A queue that deliberately asks to keep its finished jobs for less than this
+   * keeps its own setting.
+   */
+  private async capQueueRetention(
+    boss: PgBossInstance,
+    queue: string,
+    schema: string,
+    namespaceId: string,
+  ): Promise<void> {
+    const bossSchema = pgBossSchemaForId(namespaceId);
+    try {
+      await boss.getDb().executeSql(
+        `UPDATE ${bossSchema}.queue
+              SET deletion_seconds = $1
+            WHERE name = $2 AND deletion_seconds > $1`,
+        [COMPLETED_JOB_RETENTION_SECONDS, queue],
+      );
+    } catch (error) {
+      // Housekeeping: a queue must still register without it.
+      this.logger.warn(
+        `Could not cap retention for queue '${queue}' in '${schema}': ` +
           `${error instanceof Error ? error.message : String(error)}`,
       );
     }
@@ -220,6 +345,16 @@ export class PgBossService implements OnApplicationShutdown {
     // so instrumenting here covers all of them - and every queue added later.
     const observed = namespaceId ? { namespaceId, queue } : undefined;
     if (observed) this.queueRegistry.register(observed);
+
+    // Cap this queue's retention here as well as at startup, because most
+    // queues do not exist yet at startup: `startForNamespace` runs before the
+    // workers register, and `createQueue` is ON CONFLICT DO NOTHING, so options
+    // passed to it are ignored for a queue that already exists. On a freshly
+    // created namespace that left ten of eleven queues on pg-boss's seven-day
+    // default until the next process restart.
+    if (namespaceId) {
+      await this.capQueueRetention(boss, queue, schema, namespaceId);
+    }
 
     const wrapped = async (jobs: Job<T>[]): Promise<unknown> => {
       // Refuse before taking a slot: a paused queue must not occupy one of the

@@ -24,10 +24,13 @@ import type {
  * an equal negative penalty — that is the evidence against, and it sits
  * inside the sum rather than hidden in a blend.
  *
- * `contribByLabel` is read rather than recomputed from `sharedByLabel`
- * because the phonetic pass stores a fuzzy-match COUNT there while scoring
- * with a sum of jaro-winkler similarities; multiplying that count by the
- * label weight overstates the pair by up to 25%.
+ * `contribByLabel` is stored only where it cannot be recomputed. The phonetic
+ * pass keeps it because it holds a fuzzy-match COUNT there while scoring with
+ * a sum of jaro-winkler similarities, so multiplying that count by the label
+ * weight overstates the pair by up to 25%. The exact pass does not: there the
+ * contribution is `w_L * sharedByLabel[L]` by construction, and deriving it
+ * here costs nothing while writing it out cost 193 MB across four million
+ * edges.
  */
 export function buildWaterfall(input: {
   metadata: Record<string, unknown>;
@@ -38,10 +41,23 @@ export function buildWaterfall(input: {
   weightOf: (label: string) => number;
 }): ReviewWaterfallDto {
   const { metadata, storedScore, profiles, aId, bId, weightOf } = input;
-  const contrib = (metadata.contribByLabel ?? {}) as Record<string, number>;
   const shared = (metadata.sharedByLabel ?? {}) as Record<string, number>;
   const denomRaw = Number(metadata.denom);
   const phonetic = metadata.phoneticOnly === true;
+  // Present on phonetic edges, and on every edge written before the exact
+  // pass stopped storing what it could derive. Absent means "derive it".
+  const storedContrib = metadata.contribByLabel as
+    | Record<string, number>
+    | undefined;
+  const contrib: Record<string, number> =
+    storedContrib && typeof storedContrib === 'object'
+      ? storedContrib
+      : Object.fromEntries(
+          Object.entries(shared).map(([label, count]) => [
+            label,
+            weightOf(label) * (Number(count) || 0),
+          ]),
+        );
 
   const countFor = (assetId: string, label: string): number =>
     profiles.find((p) => p.assetId === assetId && p.label === label)?.nfCount ??
