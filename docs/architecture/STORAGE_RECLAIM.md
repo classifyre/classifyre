@@ -174,6 +174,47 @@ before/after diff of `asset_cluster_members` on a corpus of this size.
 
 ---
 
+## The bug behind the numbers
+
+The 4.05M → 574,419 pair collapse was not the corpus growing. It was a defect,
+fixed in this branch.
+
+`stagePairAggregates` counted value owners inside `raw`, which is scoped to the
+working set, and `loadAssetTotals` scoped its `hash_counts` CTE the same way. On
+a full recompute that scope is the corpus, so the cap worked. On an incremental
+scan it is a handful of touched assets — so a value held by 84,034 assets
+corpus-wide showed fifty owners, sailed under the 2000 cap, and produced pairs
+joined on "is an active company". 22 hub values spanning 333,622 rows were
+admissible incrementally and excluded by a full recompute.
+
+One bug, three symptoms: a review queue that was 86% non-evidence, ~6 GB across
+`edges` and `correlation_pair_signatures`, and a portfolio endpoint at 122s
+instead of 3.8s. Both sites now share `hubValuesCte()`, unscoped by
+construction.
+
+**The lesson generalises**: any "is this too common to be evidence" test must be
+asked of the corpus, never of the scan window. The same mistake was present in
+the boilerplate projection, which capped pairs per group but never asked whether
+a group was too broad — 24 groups spanned 2,000+ assets and carried 55% of all
+membership. Now capped by `BOILERPLATE_GROUP_BREADTH_CAP`.
+
+### Still open: boilerplate suppresses importance on 55% of the corpus
+
+The breadth cap is scoped to the pair projection, so its effect on queue volume
+is small — those groups were already bounded to 200 pairs each, so excluding 24
+of them removed ~4,800 pairs, not 341,057.
+
+The larger harm is untouched. 591,304 of 602,938 analyses (98%) sit in some
+duplicate group, and the `duplicate_group` reason carries `impact: 'down'` — so
+membership in a register-wide template pushes `importanceScore` down across most
+of the corpus, making "has near-duplicates" nearly uninformative. Applying the
+same breadth exclusion inside `EmbeddingAnalysisService` would fix it, but it
+re-scores most of the corpus and changes what investigators and autopilot agents
+see. That is a product decision, not a storage fix, and it needs a before/after
+ranking comparison on a real corpus before anyone ships it.
+
+---
+
 ## Operational notes
 
 Two things are worth knowing before measuring this again.
