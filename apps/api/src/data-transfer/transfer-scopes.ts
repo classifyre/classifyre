@@ -407,10 +407,13 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
   },
   {
     model: 'assetCorrelationValue',
-    idRefs: ['id', 'assetId', 'sourceId'],
+    idRefs: ['assetId', 'sourceId'],
     scope: 'fingerprints',
     order: 420,
-    keys: ['id'],
+    // (assetId, valueHash) is the table's identity; the surrogate `id` it used
+    // to carry was read by nothing and cost a 48 MB index plus 37 bytes a row.
+    keys: ['assetId', 'valueHash'],
+    compoundKey: 'assetId_valueHash',
   },
   {
     model: 'assetCluster',
