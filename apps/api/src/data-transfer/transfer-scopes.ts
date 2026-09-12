@@ -407,7 +407,25 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
   },
   {
     model: 'assetCorrelationValue',
-    idRefs: ['assetId', 'sourceId'],
+    // `findingId` was missing here, and it is the one column on this table with
+    // a real FK behind it — the listed `sourceId` has none. Two ways that went
+    // wrong, depending on where the archive landed. Into a fresh namespace, the
+    // finding had been remapped and this row still pointed at the original id,
+    // so the constraint rejected it, `insertBisecting` halved down to single
+    // rows, and most of the scope was skipped behind the generic "already exist
+    // here, or reference data in a scope that was not included" warning. Back
+    // into the same namespace, `assetId` remapped and the insert SUCCEEDED
+    // carrying a stale `findingId` — so Fingerprints deep-linked an imported
+    // asset's value to a different asset's finding, and the self-heal in
+    // `getValueOccurrences` never corrects it because it only repairs nulls.
+    idRefs: ['assetId', 'sourceId', 'findingId'],
+    // Both halves are needed. `fingerprints` declares `dependsOn: ['assets']`
+    // and not `findings`, so importing it without them is supported — and with
+    // `findingId` newly remapped, every non-null one would then point at a
+    // finding that is not there. Nulling it lets the row land, and the
+    // self-heal repairs the reference on first read, which is what it already
+    // does for legacy rows.
+    optionalRefs: { findingId: 'findings' },
     scope: 'fingerprints',
     order: 420,
     // (assetId, valueHash) is the table's identity; the surrogate `id` it used
