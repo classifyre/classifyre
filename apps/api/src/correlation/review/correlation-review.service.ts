@@ -1580,7 +1580,26 @@ export class CorrelationReviewService {
     ]);
 
     const meta = (edge?.metadata ?? {}) as Record<string, unknown>;
-    const contrib = (meta.contribByLabel ?? {}) as Record<string, number>;
+    // Keyed off sharedByLabel, which both passes always write and which has
+    // the same label set contribByLabel did. The exact pass no longer stores
+    // contribByLabel at all, so reading the label list from it would have
+    // silently emptied this panel on every newly scored pair.
+    const shared = (meta.sharedByLabel ?? {}) as Record<string, number>;
+    const storedContrib = meta.contribByLabel as
+      | Record<string, number>
+      | undefined;
+    const weightOf = (label: string): number =>
+      config.labels.find((l) => l.label === label)?.weight ??
+      config.defaultWeight;
+    const contrib: Record<string, number> =
+      storedContrib && typeof storedContrib === 'object'
+        ? storedContrib
+        : Object.fromEntries(
+            Object.entries(shared).map(([label, count]) => [
+              label,
+              weightOf(label) * (Number(count) || 0),
+            ]),
+          );
     const totalContrib =
       Object.values(contrib).reduce((a, b) => a + (Number(b) || 0), 0) || 1;
 
