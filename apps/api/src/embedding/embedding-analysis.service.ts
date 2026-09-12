@@ -1,12 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Severity } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
-
-type Reason = {
-  code: string;
-  label: string;
-  impact: 'up' | 'down' | 'neutral';
-};
+import { reasonsForStorage, type StoredReason } from './reason-labels';
 
 type ValueRecurrenceRow = {
   normalizedValue: string;
@@ -240,77 +235,41 @@ export class EmbeddingAnalysisService {
           if (repeatedDigits) base -= REPEATED_DIGIT_PENALTY;
           const importanceScore =
             Math.round(Math.max(0, Math.min(1, base)) * 1000) / 1000;
-          const reasons: Reason[] = [];
+          // Codes and their parameters only; the sentence and the impact are
+          // rendered on read. See reason-labels.ts.
+          const reasons: StoredReason[] = [];
           reasons.push(
             qualityScore < 0.45
-              ? {
-                  code: 'ocr_fragment',
-                  label: 'Possible OCR fragment',
-                  impact: 'down',
-                }
-              : {
-                  code: 'readable_context',
-                  label: 'Readable supporting context',
-                  impact: 'up',
-                },
+              ? { c: 'ocr_fragment' }
+              : { c: 'readable_context' },
           );
           reasons.push(
             similarCount > 0
-              ? {
-                  code: 'duplicate_group',
-                  label: `${similarCount} identical findings grouped`,
-                  impact: 'down',
-                }
-              : {
-                  code: 'unique_evidence',
-                  label: 'Unique evidence in this corpus',
-                  impact: 'up',
-                },
+              ? { c: 'duplicate_group', n: similarCount }
+              : { c: 'unique_evidence' },
           );
           if (contextScore >= 0.5) {
-            reasons.push({
-              code: 'context',
-              label: 'Substantial surrounding context',
-              impact: 'up',
-            });
+            reasons.push({ c: 'context' });
           }
           if (crossDocumentLead) {
             reasons.push({
-              code: 'cross_document_recurrence',
-              label: `Same value found in ${crossAssetCount} assets${
-                crossSourceCount > 1
-                  ? ` across ${crossSourceCount} sources`
-                  : ''
-              }`,
-              impact: 'up',
+              c: 'cross_document_recurrence',
+              n: crossAssetCount,
+              n2: crossSourceCount,
             });
           }
           if (commonValue) {
-            reasons.push({
-              code: 'common_value',
-              label: `Common value shared by ${crossAssetCount} assets; not discriminating`,
-              impact: 'down',
-            });
+            reasons.push({ c: 'common_value', n: crossAssetCount });
           }
           if (testValue) {
-            reasons.push({
-              code: 'known_test_value',
-              label: 'Matches a documented payment-network test number',
-              impact: 'down',
-            });
+            reasons.push({ c: 'known_test_value' });
           }
           if (repeatedDigits) {
-            reasons.push({
-              code: 'repeated_digit_pattern',
-              label:
-                'Digit string dominated by repeated digits; likely artifact',
-              impact: 'down',
-            });
+            reasons.push({ c: 'repeated_digit_pattern' });
           }
           reasons.push({
-            code: 'severity_separate',
-            label: `${finding.severity.toLowerCase()} detector severity (not importance)`,
-            impact: 'neutral',
+            c: 'severity_separate',
+            s: finding.severity.toLowerCase(),
           });
 
           await this.prisma.findingEvidenceAnalysis.upsert({
@@ -322,7 +281,7 @@ export class EmbeddingAnalysisService {
               qualityScore,
               similarCount,
               duplicateGroupHash: similarCount ? hash : null,
-              reasons,
+              reasons: reasonsForStorage(reasons),
               signals: {
                 contextScore,
                 noveltyScore,
@@ -339,7 +298,7 @@ export class EmbeddingAnalysisService {
               qualityScore,
               similarCount,
               duplicateGroupHash: similarCount ? hash : null,
-              reasons,
+              reasons: reasonsForStorage(reasons),
               signals: {
                 contextScore,
                 noveltyScore,
