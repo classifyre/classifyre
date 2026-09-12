@@ -39,6 +39,38 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Fail early, and say something useful, if any vector cannot survive the cast.
+--
+-- The cast rejects a component whose magnitude exceeds the float16 range
+-- (~65504) with `"70000" is out of range for type halfvec` -- no table, no
+-- row, no count, thrown from inside an ALTER that the boot-time migrator will
+-- then retry on every restart. This turns that into one actionable line.
+--
+-- Not a NaN check: pgvector refuses NaN and infinity at the `vector` type
+-- itself ("NaN not allowed in vector"), so a non-finite component cannot be
+-- stored in this column at all. Overflow is the only reachable failure, and
+-- only for a space configured without normalization -- a normalized embedding
+-- has components in [-1, 1]. Measured on a 879,135-row space, the largest
+-- absolute component was 0.166.
+DO $$
+DECLARE
+  bad bigint;
+BEGIN
+  SELECT count(*) INTO bad
+  FROM (
+    SELECT max(abs(component)) AS peak
+    FROM content_embeddings,
+         LATERAL unnest(vec::real[]) AS component
+    GROUP BY ctid
+  ) magnitudes
+  WHERE peak > 65504;
+
+  IF bad > 0 THEN
+    RAISE EXCEPTION
+      'Cannot store embeddings at half precision: % row(s) in content_embeddings have a component above the float16 range (65504). That space is not normalized. Re-embed it with normalization enabled, or delete those rows (reconciliation re-creates them), then re-run this migration.', bad;
+  END IF;
+END $$;
+
 -- Schema-qualified. Migrations run with search_path set to the tenant schema
 -- (ns_<uuid>), and pgvector's types live in public, so a bare `halfvec` here
 -- fails with "type halfvec does not exist" on every namespace -- while passing

@@ -175,18 +175,31 @@ export class FindingStatsService {
       const end = new Date(start);
       end.setUTCDate(end.getUTCDate() + 1);
 
-      // A literal 'YYYY-MM-DD', not the Date object. The rollup key is a
-      // `date`, and casting a timestamptz to date resolves through the
-      // session's TimeZone — so a server not running in UTC would prune the
-      // neighbouring day's rows.
+      // Bounds and prune key are passed as naive literals, never as Date
+      // objects, so nothing in these statements depends on the session's
+      // TimeZone.
+      //
+      // `detected_at` is `timestamp WITHOUT time zone` and `day` is a `date`.
+      // A JS Date bound reaches Postgres as a timestamptz, and comparing that
+      // to a naive column converts it through the session TimeZone — so on a
+      // server not running in UTC the range would select a shifted window
+      // while `detected_at::date` (naive, no conversion) kept grouping on the
+      // real day. The two halves of the same statement would disagree about
+      // which day they were rebuilding.
+      //
+      // 'YYYY-MM-DD'::date and 'YYYY-MM-DD 00:00:00'::timestamp are both
+      // unambiguous: naive in, naive out, matching the column domain exactly.
       const dayKey = start.toISOString().slice(0, 10);
+      const nextDayKey = end.toISOString().slice(0, 10);
+      const from = Prisma.sql`${`${dayKey} 00:00:00`}::timestamp`;
+      const until = Prisma.sql`${`${nextDayKey} 00:00:00`}::timestamp`;
 
       await this.prisma.$executeRaw`
         WITH fresh AS (
           SELECT detected_at::date AS day, severity, status, detector_type, source_id,
                  COUNT(*)::int AS count
           FROM findings
-          WHERE detected_at >= ${start} AND detected_at < ${end}
+          WHERE detected_at >= ${from} AND detected_at < ${until}
           GROUP BY 1, 2, 3, 4, 5
         ), upserted AS (
           INSERT INTO finding_stats_daily (day, severity, status, detector_type, source_id, count)
@@ -194,7 +207,6 @@ export class FindingStatsService {
           ON CONFLICT (day, severity, status, detector_type, source_id) DO UPDATE
             SET count = EXCLUDED.count
             WHERE finding_stats_daily.count IS DISTINCT FROM EXCLUDED.count
-          RETURNING 1
         )
         DELETE FROM finding_stats_daily s
          WHERE s.day = ${dayKey}::date
@@ -208,7 +220,7 @@ export class FindingStatsService {
           SELECT detected_at::date AS day, asset_id, severity, status,
                  COUNT(*)::int AS count, MAX(detected_at) AS last_detected_at
           FROM findings
-          WHERE detected_at >= ${start} AND detected_at < ${end}
+          WHERE detected_at >= ${from} AND detected_at < ${until}
           GROUP BY 1, 2, 3, 4
         ), upserted AS (
           INSERT INTO finding_stats_asset_daily (day, asset_id, severity, status, count, last_detected_at)
@@ -217,7 +229,6 @@ export class FindingStatsService {
             SET count = EXCLUDED.count, last_detected_at = EXCLUDED.last_detected_at
             WHERE finding_stats_asset_daily.count IS DISTINCT FROM EXCLUDED.count
                OR finding_stats_asset_daily.last_detected_at IS DISTINCT FROM EXCLUDED.last_detected_at
-          RETURNING 1
         )
         DELETE FROM finding_stats_asset_daily s
          WHERE s.day = ${dayKey}::date
@@ -231,7 +242,7 @@ export class FindingStatsService {
           SELECT first_detected_at::date AS day, severity, status, detector_type, source_id,
                  COUNT(*)::int AS count
           FROM findings
-          WHERE first_detected_at >= ${start} AND first_detected_at < ${end}
+          WHERE first_detected_at >= ${from} AND first_detected_at < ${until}
           GROUP BY 1, 2, 3, 4, 5
         ), upserted AS (
           INSERT INTO finding_stats_first_daily (day, severity, status, detector_type, source_id, count)
@@ -239,7 +250,6 @@ export class FindingStatsService {
           ON CONFLICT (day, severity, status, detector_type, source_id) DO UPDATE
             SET count = EXCLUDED.count
             WHERE finding_stats_first_daily.count IS DISTINCT FROM EXCLUDED.count
-          RETURNING 1
         )
         DELETE FROM finding_stats_first_daily s
          WHERE s.day = ${dayKey}::date
@@ -253,7 +263,7 @@ export class FindingStatsService {
           SELECT first_detected_at::date AS day, asset_id, severity, status,
                  COUNT(*)::int AS count
           FROM findings
-          WHERE first_detected_at >= ${start} AND first_detected_at < ${end}
+          WHERE first_detected_at >= ${from} AND first_detected_at < ${until}
           GROUP BY 1, 2, 3, 4
         ), upserted AS (
           INSERT INTO finding_stats_first_asset_daily (day, asset_id, severity, status, count)
@@ -261,7 +271,6 @@ export class FindingStatsService {
           ON CONFLICT (day, asset_id, severity, status) DO UPDATE
             SET count = EXCLUDED.count
             WHERE finding_stats_first_asset_daily.count IS DISTINCT FROM EXCLUDED.count
-          RETURNING 1
         )
         DELETE FROM finding_stats_first_asset_daily s
          WHERE s.day = ${dayKey}::date

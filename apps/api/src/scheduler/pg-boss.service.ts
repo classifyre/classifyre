@@ -167,19 +167,24 @@ export class PgBossService implements OnApplicationShutdown {
             WHERE deletion_seconds > $1`,
         [COMPLETED_JOB_RETENTION_SECONDS],
       );
+      // Every state, not only the finished ones. `deletion_seconds` is read
+      // once a job completes, so restricting this to `state >= 'completed'`
+      // bought nothing and left every job that was queued or in flight at
+      // upgrade time carrying the old seven-day value — which it would then
+      // honour *after* completing, up to a week later.
       const rows = await boss.getDb().executeSql(
         `UPDATE ${bossSchema}.job
               SET deletion_seconds = $1
             WHERE deletion_seconds > $1
-              AND state >= 'completed'
           RETURNING id`,
         [COMPLETED_JOB_RETENTION_SECONDS],
       );
       const retired = rows?.rows?.length ?? 0;
       if (retired > 0) {
         this.logger.log(
-          `Capped retention on ${retired} finished pg-boss job(s) in '${schema}' ` +
-            `to ${COMPLETED_JOB_RETENTION_SECONDS}s; maintenance will collect them.`,
+          `Capped retention on ${retired} pg-boss job(s) in '${schema}' ` +
+            `to ${COMPLETED_JOB_RETENTION_SECONDS}s; maintenance will collect ` +
+            'them once they finish.',
         );
       }
     } catch (error) {
@@ -259,20 +264,19 @@ export class PgBossService implements OnApplicationShutdown {
    * keeps its own setting.
    */
   private async capQueueRetention(
+    boss: PgBossInstance,
     queue: string,
     schema: string,
     namespaceId: string,
   ): Promise<void> {
     const bossSchema = pgBossSchemaForId(namespaceId);
     try {
-      await this.currentBoss()
-        .getDb()
-        .executeSql(
-          `UPDATE ${bossSchema}.queue
+      await boss.getDb().executeSql(
+        `UPDATE ${bossSchema}.queue
               SET deletion_seconds = $1
             WHERE name = $2 AND deletion_seconds > $1`,
-          [COMPLETED_JOB_RETENTION_SECONDS, queue],
-        );
+        [COMPLETED_JOB_RETENTION_SECONDS, queue],
+      );
     } catch (error) {
       // Housekeeping: a queue must still register without it.
       this.logger.warn(
@@ -348,7 +352,9 @@ export class PgBossService implements OnApplicationShutdown {
     // passed to it are ignored for a queue that already exists. On a freshly
     // created namespace that left ten of eleven queues on pg-boss's seven-day
     // default until the next process restart.
-    if (namespaceId) await this.capQueueRetention(queue, schema, namespaceId);
+    if (namespaceId) {
+      await this.capQueueRetention(boss, queue, schema, namespaceId);
+    }
 
     const wrapped = async (jobs: Job<T>[]): Promise<unknown> => {
       // Refuse before taking a slot: a paused queue must not occupy one of the
