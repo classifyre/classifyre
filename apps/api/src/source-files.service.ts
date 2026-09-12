@@ -16,6 +16,7 @@ import { createHash } from 'crypto';
 import * as path from 'path';
 import { PrismaService } from './prisma.service';
 import { HistoryEventType } from './types/finding-history.types';
+import { historyColumn, historyEntryForStorage } from './types/finding-history';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
 
 // Uploads are not size-capped by the API; the transport (Fastify bodyLimit /
@@ -199,16 +200,16 @@ export class SourceFilesService {
               status: FindingStatus.RESOLVED,
               resolvedAt: now,
               resolutionReason: 'Uploaded source file deleted',
-              history: [
+              history: historyColumn([
                 ...history,
-                {
+                historyEntryForStorage({
                   timestamp: now,
                   runnerId: 'source-file-delete',
                   eventType: HistoryEventType.STATUS_CHANGED,
                   status: FindingStatus.RESOLVED,
                   changeReason: 'Uploaded source file deleted',
-                },
-              ],
+                }),
+              ]),
             },
           });
         }
