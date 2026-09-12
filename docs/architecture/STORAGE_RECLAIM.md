@@ -1,7 +1,9 @@
 # Namespace storage — what was reclaimed, and what is left
 
 > Status: tiers 1 and 2 shipped in [PR #277](https://github.com/classifyre/classifyre/pull/277).
-> Measured on `firmenbuch-test-2` (159,394 assets, 590,387 findings): **21 GB → 15 GB**.
+> Measured on `firmenbuch-test-2`: **21 GB → 15 GB** from these changes alone, and
+> **9944 MB** once a full correlation recompute had also re-evaluated the pair set.
+> Only ~7.4 GB of that is this work — see the attribution note below.
 > This document records what was *not* done, why, and what it would take — so the
 > next person does not re-derive the same dead ends.
 
@@ -20,7 +22,30 @@ more than once.
 | `finding_stats_asset_daily` | 458 MB | 75 MB | Upsert instead of delete+insert |
 | `finding_stats_first_asset_daily` | 428 MB | 71 MB | Same |
 | Never-scanned indexes | 304 MB | 0 | Four dropped |
-| `edges` metadata | 342 B/row | 123 B/row | Six of nine JSONB keys derived |
+| `edges` metadata | 342 B/row | 128 B/row | Six of nine JSONB keys derived |
+
+### Attribution: what a recompute does that this work did not
+
+A full correlation recompute run afterwards took `edges` to 418 MB and
+`correlation_pair_signatures` to 525 MB, but most of that is **not** the metadata
+slimming. Scored pairs fell from ~4.05M to 574,419 because the fan-out filter
+re-evaluated the corpus as it grew (159,394 → 166,863 assets, 277,390 → 606,798
+correlation values):
+
+| Tag | Distinct values | Assets | Assets per value |
+|---|---:|---:|---:|
+| `tag_register_status` | 10 | 84,034 | 8,403 |
+| `tag_legal_form` | 38 | 82,713 | 2,177 |
+| `tag_balance_sheet_size_class` | 4 | 5,188 | 1,297 |
+
+A value shared by 8,403 companies is not evidence. The old 4.05M had accumulated
+across incremental scans that never re-evaluated those tags globally; the top of
+the queue is now `regex_at_firmenbuchnummer` (383,826 pairs), the real company
+number. **A better queue, not merely a smaller one** — and a reminder that pair
+counts are not a storage metric.
+
+Side effect worth knowing: `GET /correlation/review/portfolio` went from 122 s to
+3.8 s, because it aggregates that table.
 
 Two of those shrink **as data is rewritten**, not retroactively: existing edges
 keep their nine-key metadata until the next correlation recompute, and existing
@@ -158,6 +183,11 @@ was 263 MB holding 25,710 deleted pages around 7,911 live ones — about 28 MB o
 actual keys. `pgstatindex` shows this; `pg_relation_size` does not. After the
 upsert fix and a `REINDEX`, the two rollups' indexes went 420 → 36 MB and
 394 → 35 MB.
+
+**Reclaiming after a recompute needs a `VACUUM`.** Deleting 4.05M edges left the
+heap at 2504 MB holding 574k live rows; `VACUUM (FULL, ANALYZE)` took it to
+226 MB. Autovacuum recycles that space for reuse but never hands it back to the
+filesystem, so schedule it rather than assume it.
 
 **`ALTER TYPE` rewrites the table under `ACCESS EXCLUSIVE` during boot.** The
 HNSW *index* build was moved off the boot path; the halfvec column rewrite was
