@@ -54,13 +54,21 @@ const MAX_RECALIBRATION_DEFERRALS = 5;
 type QueuedContent = { hash: string; text: string };
 
 /**
- * A queue job carries a *group* of chunks.
+ * A queue job carries a *group* of chunks, by hash.
  *
- * The single-chunk shape is still accepted because jobs enqueued by earlier
- * versions are sitting in the queue right now; they drain through the same
- * handler rather than being discarded.
+ * It deliberately does not carry the text. Every hash here was computed from a
+ * row that is already in this database — an asset chunk, a finding's context
+ * window, or a glossary term — so putting the text in the payload stored a
+ * second copy of the corpus inside the job queue and then threw it away after
+ * one inference call. Measured on one namespace: 31 KB per job across 124,336
+ * jobs, 3.85 GB, against a corpus whose own chunk table is 1.5 GB.
+ *
+ * The two older shapes are still accepted. Jobs enqueued before this change are
+ * sitting in the queue right now and drain through the same handler; their
+ * inline text is used as-is rather than re-read.
  */
 type EmbeddingJob = { spaceId: string } & (
+  | { hashes: string[] }
   | QueuedContent
   | { items: QueuedContent[] }
 );
@@ -72,28 +80,48 @@ type EmbeddingJob = { spaceId: string } & (
  * they were grouped, and hashed rather than concatenated because singleton_key
  * is a single indexed column, not a place for 64 content hashes.
  */
-function batchKey(items: QueuedContent[]): string {
+function batchKey(hashes: string[]): string {
   const digest = createHash('sha256');
-  for (const hash of items.map((item) => item.hash).sort()) {
+  for (const hash of [...hashes].sort()) {
     digest.update(hash);
   }
   return digest.digest('hex');
 }
 
-/** Chunks carried by a job, whichever shape it was enqueued in. */
-function jobItems(data: EmbeddingJob | undefined): QueuedContent[] {
-  if (!data) return [];
-  const batch = (data as { items?: unknown }).items;
-  if (Array.isArray(batch)) {
-    return batch.filter(
-      (item): item is QueuedContent =>
-        typeof item?.hash === 'string' && typeof item?.text === 'string',
-    );
+/**
+ * What a job asks to be embedded, whichever shape it was enqueued in.
+ *
+ * Legacy jobs carry their text inline; current ones carry only hashes and the
+ * text is read back from the rows it was derived from. Returning both lets the
+ * handler treat the two identically without re-reading what it already has.
+ */
+function jobWork(data: EmbeddingJob | undefined): {
+  hashes: string[];
+  inline: Map<string, string>;
+} {
+  const inline = new Map<string, string>();
+  const hashes: string[] = [];
+  if (!data) return { hashes, inline };
+
+  const bare = (data as { hashes?: unknown }).hashes;
+  if (Array.isArray(bare)) {
+    for (const hash of bare) {
+      if (typeof hash === 'string') hashes.push(hash);
+    }
+    return { hashes, inline };
   }
-  const single = data as Partial<QueuedContent>;
-  return typeof single.hash === 'string' && typeof single.text === 'string'
-    ? [{ hash: single.hash, text: single.text }]
-    : [];
+
+  const batch = (data as { items?: unknown }).items;
+  const items: unknown[] = Array.isArray(batch) ? batch : [data];
+  for (const item of items) {
+    const entry = item as Partial<QueuedContent> | undefined;
+    if (typeof entry?.hash !== 'string' || typeof entry.text !== 'string') {
+      continue;
+    }
+    hashes.push(entry.hash);
+    inline.set(entry.hash, entry.text);
+  }
+  return { hashes, inline };
 }
 
 /** Captured namespace context so timers/setImmediate can re-enter CLS. */
@@ -414,6 +442,7 @@ export class EmbeddingQueueService {
         retryDelay: this.cfg.retrySeconds,
         expireInSeconds: 3600,
         retentionSeconds: 86400,
+        deleteAfterSeconds: 600,
       },
     );
     return jobId !== null;
@@ -565,23 +594,28 @@ export class EmbeddingQueueService {
         DEFAULT_QUEUE_BATCH_SIZE;
       const jobs: JobInsert<EmbeddingJob>[] = [];
       for (let offset = 0; offset < entries.length; offset += size) {
-        const items = entries
+        const hashes = entries
           .slice(offset, offset + size)
-          .map(([hash, text]) => ({ hash, text }));
+          .map(([hash]) => hash);
         jobs.push({
-          data: { spaceId: rt.spaceId, items },
+          data: { spaceId: rt.spaceId, hashes },
           // The queue policy is `exclusive`, so singleton_key is what keeps a
           // job unique; a null key would let only one job exist at a time.
           // Deriving it from the group's contents keeps the old idempotency:
           // re-enqueueing the same chunks collapses instead of duplicating.
-          singletonKey: batchKey(items),
+          singletonKey: batchKey(hashes),
           group: { id: EMBEDDING_GROUP },
           retryLimit: 5,
           retryDelay: this.cfg.retrySeconds,
           retryBackoff: true,
           retryDelayMax: 3600,
           expireInSeconds: 3600,
+          // Two different knobs: `retentionSeconds` expires work that was never
+          // picked up, `deleteAfterSeconds` removes it once it has finished.
+          // Only the first was set here, so completed jobs sat for pg-boss's
+          // seven-day default. See COMPLETED_JOB_RETENTION_SECONDS.
           retentionSeconds: 86400,
+          deleteAfterSeconds: 600,
         });
       }
       for (let offset = 0; offset < jobs.length; offset += INSERT_BATCH_SIZE) {
@@ -595,29 +629,117 @@ export class EmbeddingQueueService {
     }
   }
 
+  /**
+   * Read back the text each hash was derived from.
+   *
+   * Mirrors the three producers in `backfillStoredContent` exactly, including
+   * their use of `normalizeEmbeddingText` — the hash is of the normalized
+   * string, so rebuilding it any other way would produce text that no longer
+   * matches its own hash. Sources are tried in descending order of volume and
+   * each one only looks up what the previous ones did not resolve.
+   *
+   * A hash with no surviving row simply does not come back. That is a chunk or
+   * finding deleted between enqueue and dequeue, which is normal during a
+   * rescan, and skipping it is correct: there is nothing left to embed.
+   */
+  private async resolveTexts(hashes: string[]): Promise<Map<string, string>> {
+    const resolved = new Map<string, string>();
+    if (!hashes.length) return resolved;
+
+    const outstanding = () => hashes.filter((hash) => !resolved.has(hash));
+
+    const chunks = await this.prisma.assetChunk.findMany({
+      where: { contentHash: { in: outstanding() } },
+      select: { contentHash: true, text: true },
+      distinct: ['contentHash'],
+    });
+    for (const chunk of chunks) {
+      resolved.set(chunk.contentHash, chunk.text);
+    }
+
+    const pendingFindings = outstanding();
+    if (pendingFindings.length) {
+      const findings = await this.prisma.finding.findMany({
+        where: { embedContentHash: { in: pendingFindings } },
+        select: {
+          embedContentHash: true,
+          contextBefore: true,
+          matchedContent: true,
+          contextAfter: true,
+        },
+        distinct: ['embedContentHash'],
+      });
+      for (const finding of findings) {
+        if (!finding.embedContentHash) continue;
+        resolved.set(
+          finding.embedContentHash,
+          normalizeEmbeddingText(
+            finding.contextBefore,
+            finding.matchedContent,
+            finding.contextAfter,
+          ),
+        );
+      }
+    }
+
+    const pendingTerms = outstanding();
+    if (pendingTerms.length) {
+      const terms = await this.prisma.glossaryTerm.findMany({
+        where: { embedContentHash: { in: pendingTerms } },
+        select: {
+          embedContentHash: true,
+          term: true,
+          aliases: true,
+          notes: true,
+        },
+      });
+      for (const term of terms) {
+        if (!term.embedContentHash) continue;
+        resolved.set(
+          term.embedContentHash,
+          normalizeEmbeddingText(term.term, ...term.aliases, term.notes),
+        );
+      }
+    }
+
+    return resolved;
+  }
+
   private async handle(jobs: Job<EmbeddingJob>[]): Promise<void> {
     const rt = this.runtime();
     const seen = new Set<string>();
-    const contents: QueuedContent[] = [];
+    const requested: string[] = [];
+    const inline = new Map<string, string>();
     for (const job of jobs) {
       if (job.data?.spaceId !== rt.spaceId) continue;
-      for (const item of jobItems(job.data)) {
+      const work = jobWork(job.data);
+      for (const [hash, text] of work.inline) inline.set(hash, text);
+      for (const hash of work.hashes) {
         // A chunk can appear in more than one group when reconciliation
         // regroups it; embedding it twice in one pass would be waste.
-        if (seen.has(item.hash)) continue;
-        seen.add(item.hash);
-        contents.push(item);
+        if (seen.has(hash)) continue;
+        seen.add(hash);
+        requested.push(hash);
       }
     }
-    if (!contents.length) return;
+    if (!requested.length) return;
 
+    // Filter before reading text, not after: on a re-queued batch most hashes
+    // already have a vector, and reading their text back would be the whole
+    // point of this change wasted on rows nothing is going to embed.
     const missing = new Set(
-      await this.embeddings.missingHashes(
-        contents.map((content) => content.hash),
-        rt.spaceId,
-      ),
+      await this.embeddings.missingHashes(requested, rt.spaceId),
     );
-    const work = contents.filter((content) => missing.has(content.hash));
+    const outstanding = requested.filter((hash) => missing.has(hash));
+    if (!outstanding.length) return;
+
+    const lookups = outstanding.filter((hash) => !inline.has(hash));
+    const fetched = await this.resolveTexts(lookups);
+    const work: QueuedContent[] = [];
+    for (const hash of outstanding) {
+      const text = inline.get(hash) ?? fetched.get(hash);
+      if (text) work.push({ hash, text });
+    }
     if (!work.length) return;
 
     try {
