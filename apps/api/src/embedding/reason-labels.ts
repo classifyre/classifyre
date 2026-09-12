@@ -54,10 +54,19 @@ export interface StoredReason {
  *
  * Deliberately a local constant and not `BOILERPLATE_GROUP_BREADTH_CAP`, which
  * this mirrors: that cap counts DISTINCT ASSETS per group, while `n` here is
- * `similarCount` — findings sharing the content hash. On the corpus this was
- * measured against the two coincide (every one of the 24 register-wide groups
- * had exactly one finding per asset), but they are not the same unit and a
- * shared constant would imply they are. Rendering only; nothing scores on it.
+ * `similarCount` — findings sharing the content hash, which is the cohort size
+ * MINUS ONE. On the corpus this was measured against the two coincide (every
+ * one of the 24 register-wide groups had exactly one finding per asset), but
+ * they are not the same unit and a shared constant would imply they are.
+ *
+ * The comparisons look inconsistent and are not. `n >= 2000` here and
+ * `COUNT(DISTINCT asset_id) > 2000` there pick out the same groups precisely
+ * because `n` is off by one: a cohort of 2,001 has `n = 2000` and 2,001 assets,
+ * so both fire; a cohort of 2,000 has `n = 1999` and 2,000 assets, so neither
+ * does. Changing this to `>` to match the other would introduce the skew it
+ * looks like it is removing.
+ *
+ * Rendering only; nothing scores on it.
  */
 const BREADTH_LABEL_THRESHOLD = 2000;
 

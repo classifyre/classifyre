@@ -157,9 +157,14 @@ function renderOne(entry: unknown): FindingHistoryEntry | null {
   }
 
   if (typeof row.t !== 'string' || typeof row.e !== 'string') return null;
+  // A `t` that does not parse would otherwise survive as an Invalid Date and
+  // reach the client, which is the opposite of what this function promises:
+  // a malformed entry costs that entry, never the response.
+  const timestamp = new Date(row.t);
+  if (Number.isNaN(timestamp.getTime())) return null;
   const reason = row.x;
   return {
-    timestamp: new Date(row.t),
+    timestamp,
     runnerId: row.r ?? '',
     eventType: EVENT_BY_CODE.get(row.e) ?? (row.e as HistoryEventType),
     status: row.s as FindingStatus,

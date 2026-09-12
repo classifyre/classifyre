@@ -134,6 +134,15 @@ describe('finding history', () => {
     expect(renderHistory([null, 42, {}, { t: 'x' }])).toEqual([]);
   });
 
+  it('drops an entry whose timestamp does not parse', () => {
+    // Rather than letting it through as an Invalid Date, which serialises to
+    // null and reaches the client — the opposite of costing that entry only.
+    expect(renderHistory([{ t: 'not-a-date', e: 'D', s: 'OPEN' }])).toEqual([]);
+    // And the malformed one costs nothing but itself.
+    const good = historyEntryForStorage(detected);
+    expect(renderHistory([{ t: 'not-a-date', e: 'D' }, good])).toHaveLength(1);
+  });
+
   describe('lastEntryOfType', () => {
     const manualResolve = historyEntryForStorage({
       ...detected,
