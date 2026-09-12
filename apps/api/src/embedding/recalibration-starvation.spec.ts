@@ -28,7 +28,15 @@ describe('evidence recalibration prioritises unscored findings', () => {
 
   beforeEach(() => {
     findMany = jest.fn().mockResolvedValue([]);
-    analyzeHashes = jest.fn().mockResolvedValue(undefined);
+    // Returns rows analyzed, which is what the phase budgets on. Every finding
+    // here has its own hash, so the cohort of a hash is one finding and the
+    // count matches the seed batch — the real thing expands far past it, which
+    // is the whole point of the budget (see `analyzeBatches`).
+    analyzeHashes = jest
+      .fn()
+      .mockImplementation((_space: string, hashes: string[]) =>
+        Promise.resolve(hashes.length),
+      );
     service = new EmbeddingService(
       {
         embeddingSpace: {
