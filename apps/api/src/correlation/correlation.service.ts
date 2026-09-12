@@ -73,6 +73,34 @@ export const CORRELATION_RELATION_TYPES = [
   REL_IDENTICAL,
 ];
 
+/**
+ * The values that are too common to be evidence, decided over the WHOLE table.
+ *
+ * This is deliberately unscoped, and that is the entire point. Both callers
+ * used to count owners inside their own working set, which made the cap mean
+ * something different on an incremental scan than on a full recompute: a value
+ * held by 84,034 assets corpus-wide looks like it has fifty owners inside a
+ * five-thousand-asset batch, sails under the cap, and produces pairs joined on
+ * "is an active company".
+ *
+ * Measured on firmenbuch-test-2 before the fix: 22 hub values spanning 333,622
+ * rows were admissible incrementally and excluded by a full recompute. The
+ * accumulated difference was 4.05M scored pairs against the 574,419 a full
+ * recompute produced — a review queue that was 86% non-evidence, ~6 GB of
+ * storage, and a portfolio endpoint that took 122s instead of 3.8s.
+ *
+ * Cost is one aggregate over `asset_correlation_values` per scan: 1.25s for
+ * 607k rows, against a self-join that dominates the run either way.
+ */
+export function hubValuesCte(): Prisma.Sql {
+  return Prisma.sql`
+    SELECT value_hash
+    FROM asset_correlation_values
+    GROUP BY value_hash
+    HAVING COUNT(*) > ${FANOUT_CAP}
+  `;
+}
+
 /** One normalized, correlatable token belonging to an asset. */
 interface ValueRow {
   valueHash: string;
@@ -1298,11 +1326,13 @@ export class CorrelationService {
    * all-values totals AND fanout-filtered totals so the scoring step can use
    * consistent populations for numerator and denominator.
    *
-   * The fanout filter mirrors the one in stagePairAggregates: values shared by
-   * more than FANOUT_CAP assets within the same scope are excluded from
-   * sharedCount/weightedShared in the staging table, so they must also be
-   * excluded from the denominator (and the `exact` check) to avoid inflating
-   * the denominator and deflating similarity scores.
+   * The fanout filter mirrors the one in stagePairAggregates: hub values are
+   * excluded from sharedCount/weightedShared in the staging table, so they must
+   * also be excluded from the denominator (and the `exact` check) to avoid
+   * inflating the denominator and deflating similarity scores.
+   *
+   * "Hub" is decided over the WHOLE table, never over `assetIds` — see
+   * {@link hubValuesCte}.
    */
   private async loadAssetTotals(
     assetIds: string[] | null,
@@ -1314,11 +1344,6 @@ export class CorrelationService {
     >
   > {
     const weightsJson = JSON.stringify(cfg.rawWeights);
-    // Two separate scope fragments are needed — one for the CTE, one for the
-    // outer join — because Prisma parameterises each ${assetIds} independently.
-    const scopeCte = assetIds
-      ? Prisma.sql`WHERE asset_id = ANY(${assetIds})`
-      : Prisma.empty;
     const scopeMain = assetIds
       ? Prisma.sql`WHERE v.asset_id = ANY(${assetIds})`
       : Prisma.empty;
@@ -1332,20 +1357,15 @@ export class CorrelationService {
         nf_count: bigint;
       }>
     >(Prisma.sql`
-      WITH hash_counts AS (
-        SELECT value_hash, COUNT(*) AS owners
-        FROM asset_correlation_values
-        ${scopeCte}
-        GROUP BY value_hash
-      )
+      WITH hub_values AS (${hubValuesCte()})
       SELECT v.asset_id,
              SUM(COALESCE((${weightsJson}::jsonb ->> v.label)::numeric, ${cfg.defaultWeight})) AS total_weight,
              COUNT(*) AS value_count,
              SUM(COALESCE((${weightsJson}::jsonb ->> v.label)::numeric, ${cfg.defaultWeight}))
-               FILTER (WHERE hc.owners <= ${FANOUT_CAP}) AS nf_weight,
-             COUNT(*) FILTER (WHERE hc.owners <= ${FANOUT_CAP}) AS nf_count
+               FILTER (WHERE hub.value_hash IS NULL) AS nf_weight,
+             COUNT(*) FILTER (WHERE hub.value_hash IS NULL) AS nf_count
       FROM asset_correlation_values v
-      JOIN hash_counts hc ON hc.value_hash = v.value_hash
+      LEFT JOIN hub_values hub ON hub.value_hash = v.value_hash
       ${scopeMain}
       GROUP BY v.asset_id
     `);
@@ -1438,17 +1458,15 @@ export class CorrelationService {
         FROM asset_correlation_values v
         ${scope}
       ),
-      -- Hub values (shared by > FANOUT_CAP assets) are excluded: they are
-      -- non-discriminating and would produce spurious duplicate edges.
-      -- loadAssetTotals uses the same filter so numerator and denominator
-      -- stay consistent.
-      hash_counts AS (
-        SELECT value_hash, COUNT(*) AS owners FROM raw GROUP BY value_hash
-      ),
+      -- Hub values are excluded: they are non-discriminating and would produce
+      -- spurious duplicate edges. loadAssetTotals applies the same exclusion so
+      -- numerator and denominator stay consistent.
+      hub_values AS (${hubValuesCte()}),
       av AS (
         SELECT raw.* FROM raw
-        JOIN hash_counts hc ON hc.value_hash = raw.value_hash
-        WHERE hc.owners <= ${FANOUT_CAP}
+        WHERE NOT EXISTS (
+          SELECT 1 FROM hub_values h WHERE h.value_hash = raw.value_hash
+        )
       ),
       pair_label AS (
         SELECT
