@@ -1368,7 +1368,15 @@ model Edge {
   @@unique([fromType, fromId, toType, toId, relationType])
   @@index([fromType, fromId])
   @@index([toType, toId])
-  @@index([relationType])
+  // No index on relationType alone. It holds seven values across millions of
+  // rows, and every query that filters on it also pins an endpoint — so the
+  // planner reaches for [fromType, fromId] or [toType, toId] instead. Measured
+  // at 36 scans against 131,075 and 132,875 for those two, for 53 MB.
+  //
+  // The `id` column stays, unlike the equivalent surrogate on
+  // content_embeddings: PATCH and DELETE /graph/edges/{id} address a manual
+  // edge by it, so it is a public contract and not dead weight.
+  //
   // The lineage traversal's access pattern: always class-first, then endpoint.
   @@index([relationClass, fromType, fromId])
   @@index([relationClass, toType, toId])
