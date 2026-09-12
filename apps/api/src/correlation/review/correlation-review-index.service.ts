@@ -21,6 +21,37 @@ import {
   SCORE_BUCKET_COUNT,
 } from '../correlation.constants';
 
+/**
+ * Near-duplicate text groups too broad to be evidence, decided over the WHOLE
+ * corpus.
+ *
+ * Unscoped by construction, and extracted precisely so it stays that way. It
+ * sits two lines above a `members` CTE that IS scoped on an incremental run,
+ * and adding the same scope here would be the natural-looking edit — it is also
+ * exactly the bug that was just fixed one level down in the scoring fan-out,
+ * where an incremental scan judged a register-wide value by the handful of
+ * assets it had touched.
+ *
+ * A group spanning the register is a template sentence, not a lead. The label
+ * half of this queue already refuses hub values on the same reasoning; this is
+ * the missing half, and both now use the same threshold.
+ *
+ * Measured on firmenbuch-test-2: 24 groups spanned 2,000+ assets and carried
+ * 341,057 of 591,106 group memberships — 57.7% of all membership from 0.1% of
+ * groups. The groups worth a reviewer's time are the 13,182 with two to five
+ * members.
+ */
+export function broadGroupsCte(): Prisma.Sql {
+  return Prisma.sql`
+    SELECT a.duplicate_group_hash AS gh
+    FROM finding_evidence_analyses a
+    JOIN findings f ON f.id = a.finding_id
+    WHERE a.duplicate_group_hash IS NOT NULL
+    GROUP BY a.duplicate_group_hash
+    HAVING COUNT(DISTINCT f.asset_id) > ${BOILERPLATE_GROUP_BREADTH_CAP}
+  `;
+}
+
 const ASSET_REL = 'asset';
 const STREAM_PAGE = 5000;
 
@@ -634,20 +665,7 @@ export class CorrelationReviewIndexService {
         ${groupScope}
         GROUP BY a.duplicate_group_hash, f.asset_id
       ),
-      -- A text group spanning the whole register is a template, not a lead.
-      -- The label side of this queue already refuses hub values on the same
-      -- reasoning; this is the missing half. Breadth is counted over the WHOLE
-      -- corpus, never over the incremental group scope, for exactly the reason
-      -- the scoring fan-out is unscoped: otherwise an incremental run would
-      -- judge a register-wide template by the few assets it just touched.
-      broad_groups AS (
-        SELECT a.duplicate_group_hash AS gh
-        FROM finding_evidence_analyses a
-        JOIN findings f ON f.id = a.finding_id
-        WHERE a.duplicate_group_hash IS NOT NULL
-        GROUP BY a.duplicate_group_hash
-        HAVING COUNT(DISTINCT f.asset_id) > ${BOILERPLATE_GROUP_BREADTH_CAP}
-      ),
+      broad_groups AS (${broadGroupsCte()}),
       ranked AS (
         SELECT gh, asset_id, sim,
                ROW_NUMBER() OVER (PARTITION BY gh ORDER BY importance DESC) AS rn
