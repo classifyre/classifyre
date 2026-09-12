@@ -188,6 +188,29 @@ export const BOILERPLATE_PAIR_CAP = 200;
  * DiskPressure (2026-09-10). The output cap alone cannot prevent that: it
  * trims rows only after the sort has materialised them all.
  */
+/**
+ * Asset breadth past which a near-duplicate text group stops being evidence.
+ *
+ * The label side of the review queue already refuses hub values: a value held
+ * by more than FANOUT_CAP assets is a category, not an identifier. The text
+ * side had no equivalent — it capped pairs *per group* and ranked entrants, but
+ * never asked whether a group was too broad to mean anything. The two halves of
+ * one queue therefore applied different standards for "too common".
+ *
+ * Measured on firmenbuch-test-2: 24 groups spanned 2,000+ assets each and
+ * carried 341,057 of 623,106 memberships — 55% of all membership from 0.1% of
+ * groups. Those are template sentences that appear in every filing in the
+ * register. The interesting groups are the 13,182 with two to five members.
+ *
+ * Deliberately applied to the pair PROJECTION only, not to evidence ranking.
+ * The same groups also push `importanceScore` down through the
+ * `duplicate_group` reason on 55% of the corpus, which is arguably the larger
+ * harm — but re-scoring is a product decision with a much wider blast radius,
+ * so it is recorded in docs/architecture/STORAGE_RECLAIM.md rather than
+ * changed here.
+ */
+export const BOILERPLATE_GROUP_BREADTH_CAP = 2000;
+
 export const BOILERPLATE_RANK_CAP = 1000;
 
 /**
