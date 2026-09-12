@@ -408,6 +408,16 @@ findings, and one `tag:Legal form` hash is 56,405 findings. One pass rewrote all
 
 Two fixes, both in the embedding module:
 
+- **`duplicateGroupHash` has one owner.** Analysis means "my own content hash,
+  if I have exact duplicates" by that column; `calibrateNeighborhood` means "the
+  root of my near-duplicate component", which is a wider and different value.
+  Both wrote it unconditionally, so the two took turns — analysis wrote the own
+  hash, the comparison below saw a mismatch on the next pass and rewrote the
+  row, calibration flipped it back, forever. **130,489 analyses (21.6 %) stood
+  diverged**, so the optimisation below could not converge for any of them, and
+  the value a client read depended on which phase ran last. Analysis now seeds
+  the group and may clear a value it owns, but never overwrites a component root
+  it has no way of computing.
 - **No-op writes are skipped.** The computed payload is compared against the
   stored row and, when nothing moved, only `analyzedAt` is stamped. That still
   rotates the refresh cursor, but touches neither index and does not fire
@@ -421,10 +431,21 @@ Two fixes, both in the embedding module:
   it. The derived signals are rounded to the three decimals `importanceScore`
   already uses, so a cohort member going 56,404 → 56,405 no longer reads as
   changed.
-- **The budget counts rows analyzed.** `analyzeHashes` returns its visited count
-  and honours a cap; `analyzeBatches` budgets on that. Phase 1 stays unbounded
-  deliberately — its cohort expansion is semantically required, since adding one
-  finding to a cohort really does change `similarCount` for every member.
+- **The budget counts rows walked, by both phases.** `analyzeHashes` and
+  `calibrateNeighborhood` each return a visited count and honour a cap;
+  `analyzeBatches` spends one budget across the two. Counting only the analysis
+  side let a bounded pass do up to twice the rows it reported, since calibration
+  walks the same cohorts. Phase 1 stays unbounded deliberately — its cohort
+  expansion is semantically required, since adding one finding to a cohort
+  really does change `similarCount` for every member.
+
+  One SQL note, because it is easy to reintroduce: the guard that stops
+  calibration rewriting a whole component every pass needs an explicit null arm.
+  Prisma compiles `not` to inequality, which is three-valued, so a bare
+  `{ not: root }` skips every row that has no group yet — the findings whose
+  content hash is unique but which still belong to a component, whose
+  `noveltyScore` would then stay pinned at 1.0 for good. Measured: the bare form
+  matched 593,085 of 605,220 rows, missing all 12,135 nulls.
 
 The free space is reusable but not returned: this table needs a one-off
 `VACUUM (FULL, ANALYZE)` like the post-recompute `edges` below.
@@ -476,6 +497,37 @@ imported asset's value to a different asset's finding. The self-heal in
 Both `idRefs` and `optionalRefs` were needed: `fingerprints` declares
 `dependsOn: ['assets']` and not `findings`, so importing it without them is
 supported, and a newly-remapped `findingId` would then point at nothing.
+
+**Two things an operator has to do, because neither fix reaches backwards.**
+
+*Stale links from imports taken before the fix have no repair path.* The
+self-heal in `getValueOccurrences` only fills nulls — a row carrying a
+wrong-but-valid `findingId` is trusted outright, which is what made the
+same-namespace direction the nastier one. They are precisely detectable,
+because a correlation value and the finding it cites always belong to the same
+asset (606,798 of 606,798 on a never-imported namespace, zero exceptions):
+
+```sql
+-- Findings cited by a correlation value on a DIFFERENT asset: imported rows
+-- whose reference was never remapped. Nulling them hands the row back to the
+-- self-heal, which re-derives the link on the next read.
+UPDATE asset_correlation_values v
+SET finding_id = NULL
+FROM findings f
+WHERE f.id = v.finding_id AND f.asset_id <> v.asset_id;
+```
+
+Run it per tenant schema on any install that imported `fingerprints` before this
+change. It is deliberately not a boot migration: it is a data repair that only
+affects installs that imported, and the boot path is already the wrong place for
+per-tenant table scans.
+
+*Manual bulk-resolves taken before the fix will re-open once.* Rows resolved
+through filter-mode carry no `STATUS_CHANGED` entry, so ingest cannot tell them
+from auto-resolved ones and `shouldReopen` fires on the next detection. Nothing
+to repair — the judgement was never recorded — but an install that has used
+select-all should expect one re-open wave and redo those resolutions, which will
+then stick.
 
 The regression guard is a test that asks **schema.prisma** which columns back
 each model's relations and asserts every one is in `idRefs`. Note for whoever
