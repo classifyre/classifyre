@@ -27,10 +27,14 @@ import {
   configuredDetectorKeysFromConfig,
   findingDetectorConfigKey,
 } from './utils/detector-config-keys';
+import { HistoryEventType } from './types/finding-history.types';
 import {
-  HistoryEventType,
-  type FindingHistoryEntry,
-} from './types/finding-history.types';
+  historyColumn,
+  historyEntryForStorage,
+  historyForStorage,
+  lastEntry,
+  lastEntryOfType,
+} from './types/finding-history';
 import {
   SearchAssetsRequestDto,
   SearchAssetsSortBy,
@@ -2222,16 +2226,16 @@ export class AssetService {
               runnerId,
               resolvedAt: now,
               resolutionReason: 'Asset deleted from source (full scan)',
-              history: [
+              history: historyColumn([
                 ...currentHistory,
-                {
+                historyEntryForStorage({
                   timestamp: now,
                   runnerId,
                   eventType: HistoryEventType.STATUS_CHANGED,
                   status: FindingStatus.RESOLVED,
                   changeReason: 'Asset deleted from source (full scan)',
-                },
-              ],
+                }),
+              ]),
             },
           });
         }
@@ -2290,16 +2294,16 @@ export class AssetService {
               runnerId,
               resolvedAt: now,
               resolutionReason: 'Detection no longer present in scan',
-              history: [
+              history: historyColumn([
                 ...currentHistory,
-                {
+                historyEntryForStorage({
                   timestamp: now,
                   runnerId,
                   eventType: HistoryEventType.RESOLVED,
                   status: FindingStatus.RESOLVED,
                   changeReason: 'Detection no longer present in scan',
-                },
-              ],
+                }),
+              ]),
             },
           });
         }
@@ -2351,8 +2355,21 @@ export class AssetService {
     const configured = await this.configuredDetectorKeys(source.config);
     if (configured === null) return none;
 
+    // Named columns: this reads every OPEN finding on the source, and taking
+    // every scalar meant both context windows, `redactedContent`, `metadata`
+    // and `location` rode along unread. `matchedContent` is genuinely needed —
+    // the detector-feedback record quotes it.
     const openFindings = await this.prisma.finding.findMany({
       where: { sourceId: source.id, status: FindingStatus.OPEN },
+      select: {
+        id: true,
+        history: true,
+        sourceId: true,
+        detectorType: true,
+        findingType: true,
+        customDetectorKey: true,
+        matchedContent: true,
+      },
     });
 
     const orphaned = openFindings.filter((finding) => {
@@ -2385,16 +2402,16 @@ export class AssetService {
                 runnerId,
                 resolvedAt: now,
                 resolutionReason: reason,
-                history: [
+                history: historyColumn([
                   ...currentHistory,
-                  {
+                  historyEntryForStorage({
                     timestamp: now,
                     runnerId,
                     eventType: HistoryEventType.RESOLVED,
                     status: FindingStatus.RESOLVED,
                     changeReason: reason,
-                  },
-                ],
+                  }),
+                ]),
               },
             });
           }
@@ -2490,9 +2507,9 @@ export class AssetService {
       'Detector removed from source configuration, but this finding is kept ' +
       'because a case cites it or an active inquiry watches it';
     const needsNote = retained.filter((finding) => {
-      const history = Array.isArray(finding.history) ? finding.history : [];
-      const last = history.at(-1) as { changeReason?: string } | undefined;
-      return last?.changeReason !== note;
+      // Rendered, so the comparison is against the sentence in both stored
+      // shapes — the compact one holds a reason CODE, not this text.
+      return lastEntry(finding.history)?.changeReason !== note;
     });
     if (needsNote.length === 0) return;
 
@@ -2505,16 +2522,16 @@ export class AssetService {
           await tx.finding.update({
             where: { id: finding.id },
             data: {
-              history: [
+              history: historyColumn([
                 ...currentHistory,
-                {
+                historyEntryForStorage({
                   timestamp: now,
                   runnerId,
                   eventType: HistoryEventType.RE_DETECTED,
                   status: FindingStatus.OPEN,
                   changeReason: note,
-                },
-              ],
+                }),
+              ]),
             },
           });
         }
@@ -2593,12 +2610,14 @@ export class AssetService {
   private findingHasManualStatusOverride(finding: {
     history: unknown;
   }): boolean {
-    const history = Array.isArray(finding.history) ? finding.history : [];
-    const lastStatusChange = [...history]
-      .reverse()
-      .find(
-        (entry: any) => entry?.eventType === HistoryEventType.STATUS_CHANGED,
-      ) as { status?: string } | undefined;
+    // Through `lastEntryOfType` rather than matching on `eventType` directly:
+    // history is stored compact now and only the legacy shape has that key, so
+    // a raw scan would quietly stop recognising overrides on new rows — and an
+    // unrecognised override is a finding re-opened against the operator.
+    const lastStatusChange = lastEntryOfType(
+      finding.history,
+      HistoryEventType.STATUS_CHANGED,
+    );
     return lastStatusChange
       ? lastStatusChange.status !== FindingStatus.OPEN
       : false;
@@ -3138,38 +3157,33 @@ export class AssetService {
               status: FindingStatus.OPEN,
               firstDetectedAt: detection.detectedAt,
               lastDetectedAt: detection.detectedAt,
-              history: [
-                {
-                  timestamp: detection.detectedAt,
-                  runnerId,
-                  eventType: HistoryEventType.DETECTED,
-                  status: FindingStatus.OPEN,
-                  severity: detection.severity,
-                  confidence: detection.confidence,
-                  location: detection.location,
-                },
-              ],
+              history: historyColumn(
+                historyForStorage([
+                  {
+                    timestamp: detection.detectedAt,
+                    runnerId,
+                    eventType: HistoryEventType.DETECTED,
+                    status: FindingStatus.OPEN,
+                    severity: detection.severity,
+                    confidence: detection.confidence,
+                  },
+                ]),
+              ),
             });
             newFindings++;
           } else {
             // EXISTING DETECTION
-            const currentHistory: FindingHistoryEntry[] = Array.isArray(
-              existing.history,
-            )
-              ? (existing.history as unknown as FindingHistoryEntry[])
+            const currentHistory: unknown[] = Array.isArray(existing.history)
+              ? existing.history
               : [];
-            const lastStatusChange = [...currentHistory]
-              .reverse()
-              .find(
-                (entry: any) =>
-                  entry.eventType === HistoryEventType.STATUS_CHANGED,
-              );
-            const lastSeverityChange = [...currentHistory]
-              .reverse()
-              .find(
-                (entry: any) =>
-                  entry.eventType === HistoryEventType.SEVERITY_CHANGED,
-              );
+            const lastStatusChange = lastEntryOfType(
+              currentHistory,
+              HistoryEventType.STATUS_CHANGED,
+            );
+            const lastSeverityChange = lastEntryOfType(
+              currentHistory,
+              HistoryEventType.SEVERITY_CHANGED,
+            );
             const statusOverride = lastStatusChange
               ? lastStatusChange.status !== FindingStatus.OPEN
               : false;
@@ -3200,8 +3214,8 @@ export class AssetService {
               // hasManualStatusOverride correctly reflects the current state.
               // Without this, a previous STATUS_CHANGED(RESOLVED) in history
               // would prevent future auto-resolution when the finding disappears.
-              const extraHistoryEntries: object[] = shouldReopen
-                ? [
+              const extraHistoryEntries = shouldReopen
+                ? historyForStorage([
                     {
                       timestamp: detection.detectedAt,
                       runnerId,
@@ -3211,7 +3225,7 @@ export class AssetService {
                       changeReason:
                         'Re-opened: detection found again after resolution',
                     },
-                  ]
+                  ])
                 : [];
 
               if (existing.detectedAt) staleStatsDays.push(existing.detectedAt);
@@ -3241,19 +3255,18 @@ export class AssetService {
                   resolutionReason: shouldReopen
                     ? null
                     : existing.resolutionReason,
-                  history: [
+                  history: historyColumn([
                     ...currentHistory,
-                    {
+                    historyEntryForStorage({
                       timestamp: detection.detectedAt,
                       runnerId,
                       eventType,
                       status: statusToApply,
                       severity: severityToApply,
                       confidence: detection.confidence,
-                      location: detection.location,
-                    },
+                    }),
                     ...extraHistoryEntries,
-                  ],
+                  ]),
                 },
               });
             } else {
