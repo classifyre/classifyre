@@ -198,13 +198,13 @@ export const BOILERPLATE_PAIR_CAP = 200;
  * one queue therefore applied different standards for "too common".
  *
  * Measured on firmenbuch-test-2: 24 groups spanned 2,000+ assets each and
- * carried 341,057 of 623,106 memberships — 55% of all membership from 0.1% of
+ * carried 341,057 of 591,106 group memberships — 57.7% of all membership from 0.1% of
  * groups. Those are template sentences that appear in every filing in the
  * register. The interesting groups are the 13,182 with two to five members.
  *
  * Deliberately applied to the pair PROJECTION only, not to evidence ranking.
  * The same groups also push `importanceScore` down through the
- * `duplicate_group` reason on 55% of the corpus, which is arguably the larger
+ * `duplicate_group` reason on 98% of analyses, which is arguably the larger
  * harm — but re-scoring is a product decision with a much wider blast radius,
  * so it is recorded in docs/architecture/STORAGE_RECLAIM.md rather than
  * changed here.

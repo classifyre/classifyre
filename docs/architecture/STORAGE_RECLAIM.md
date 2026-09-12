@@ -45,7 +45,7 @@ number. **A better queue, not merely a smaller one** — and a reminder that pai
 counts are not a storage metric.
 
 Side effect worth knowing: `GET /correlation/review/portfolio` went from 122 s to
-3.8 s, because it aggregates that table.
+3.9-7.7 s warm (about 22 s cold), because it aggregates that table.
 
 Two of those shrink **as data is rewritten**, not retroactively: existing edges
 keep their nine-key metadata until the next correlation recompute, and existing
@@ -189,16 +189,30 @@ admissible incrementally and excluded by a full recompute.
 
 One bug, three symptoms: a review queue that was 86% non-evidence, ~6 GB across
 `edges` and `correlation_pair_signatures`, and a portfolio endpoint at 122s
-instead of 3.8s. Both sites now share `hubValuesCte()`, unscoped by
+instead of 3.9-7.7s warm. Both sites now share `hubValuesCte()`, unscoped by
 construction.
 
 **The lesson generalises**: any "is this too common to be evidence" test must be
 asked of the corpus, never of the scan window. The same mistake was present in
 the boilerplate projection, which capped pairs per group but never asked whether
-a group was too broad — 24 groups spanned 2,000+ assets and carried 55% of all
+a group was too broad — 24 groups spanned 2,000+ assets and carried 57.7% of all
 membership. Now capped by `BOILERPLATE_GROUP_BREADTH_CAP`.
 
-### Still open: boilerplate suppresses importance on 55% of the corpus
+### Which denominator is which
+
+Three different units are easy to confuse, so once, explicitly:
+
+| Unit | Value | What it counts |
+|---|---:|---|
+| Group memberships | 591,106 | distinct `(duplicate_group_hash, asset_id)` pairs — the unit the breadth analysis uses |
+| Analyses in a group | 591,304 | rows of `finding_evidence_analyses` with a non-null group hash |
+| Analyses total | 602,938 | all rows of `finding_evidence_analyses` |
+
+The breadth exclusion removes 341,057 of the 591,106 memberships (57.7%),
+leaving 250,049. The ranking harm is measured against analyses: 591,304 of
+602,938, which is 98%.
+
+### Still open: boilerplate suppresses importance on 98% of analyses
 
 The breadth cap is scoped to the pair projection, so its effect on queue volume
 is small — those groups were already bounded to 200 pairs each, so excluding 24

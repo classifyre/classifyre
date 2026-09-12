@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { hubValuesCte } from './correlation.service';
+import { broadGroupsCte } from './review/correlation-review-index.service';
 import {
   BOILERPLATE_GROUP_BREADTH_CAP,
   BOILERPLATE_PAIR_CAP,
@@ -22,7 +23,7 @@ import {
  * rows were admissible incrementally and excluded by a full recompute. The
  * accumulated difference was 4.05M scored pairs against 574,419 — a review
  * queue that was 86% non-evidence, roughly 6 GB of storage, and a portfolio
- * endpoint at 122s instead of 3.8s.
+ * endpoint at 122s instead of 3.9-7.7s warm.
  *
  * These tests pin the property that prevents that: the hub decision is taken
  * over the whole table, never over a scope.
@@ -70,12 +71,27 @@ describe('scoring fan-out scope', () => {
    * of two to five assets that are actually worth looking at.
    */
   describe('boilerplate breadth', () => {
-    it('refuses a text group that spans the corpus', () => {
-      // Both halves of the queue now have a "too common" rule, which is the
-      // point. The exact numbers may diverge — the mechanisms differ — but a
-      // breadth cap has to exist at all.
-      expect(BOILERPLATE_GROUP_BREADTH_CAP).toBeGreaterThan(0);
-      expect(Number.isFinite(BOILERPLATE_GROUP_BREADTH_CAP)).toBe(true);
+    it('decides breadth over the whole corpus, with no group scope', () => {
+      // The regression that matters. `broad_groups` sits two lines above a
+      // `members` CTE that IS scoped on an incremental run, so adding the same
+      // scope here is the natural-looking edit — and it is exactly the bug
+      // fixed one level down in the scoring fan-out.
+      const sql = sqlOf(broadGroupsCte());
+
+      expect(sql).toContain('FROM finding_evidence_analyses');
+      expect(sql).toContain('GROUP BY a.duplicate_group_hash');
+      expect(sql).toMatch(/HAVING\s+COUNT\(DISTINCT f\.asset_id\)\s*>/i);
+      // No scope of any kind: no group filter, no touched-asset list.
+      expect(sql).not.toMatch(/groupScope/i);
+      expect(sql).not.toMatch(/= ANY/i);
+      expect(sql).not.toMatch(/\bIN\s*\(/i);
+      // The only WHERE is the NOT NULL guard, never a narrowing one.
+      expect(sql.match(/\bWHERE\b/gi) ?? []).toHaveLength(1);
+      expect(sql).toContain('duplicate_group_hash IS NOT NULL');
+    });
+
+    it('compares breadth against the breadth cap, parameterised', () => {
+      expect(broadGroupsCte().values).toContain(BOILERPLATE_GROUP_BREADTH_CAP);
     });
 
     it('stays above the per-group caps it sits behind', () => {
