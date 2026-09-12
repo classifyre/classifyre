@@ -49,6 +49,19 @@ export interface StoredReason {
 }
 
 /**
+ * Above this many co-members, `duplicate_group` reads as a register-wide value
+ * rather than a duplicate.
+ *
+ * Deliberately a local constant and not `BOILERPLATE_GROUP_BREADTH_CAP`, which
+ * this mirrors: that cap counts DISTINCT ASSETS per group, while `n` here is
+ * `similarCount` — findings sharing the content hash. On the corpus this was
+ * measured against the two coincide (every one of the 24 register-wide groups
+ * had exactly one finding per asset), but they are not the same unit and a
+ * shared constant would imply they are. Rendering only; nothing scores on it.
+ */
+const BREADTH_LABEL_THRESHOLD = 2000;
+
+/**
  * The boundary cast for writing reasons to a JSONB column.
  *
  * Prisma's `InputJsonValue` only accepts objects carrying an index signature,
@@ -67,21 +80,51 @@ type Template = {
   label: (r: StoredReason) => string;
 };
 
+/**
+ * `impact` is evidential strength, not text hygiene.
+ *
+ * `readable_context` and `context` used to be `up`, and that killed the
+ * autopilot evidence floor. `readable_context` fires whenever `qualityScore`
+ * clears `QUALITY_GATE` (0.45), and the *minimum* quality on the Firmenbuch
+ * corpus is 0.690 — so it fired on 603,633 of 603,633 analyses.
+ * `hasPositiveImpact` was therefore always true, `strong === analyzed` always
+ * held, and `provablyWeak` was unreachable: both refusals it gates
+ * (`inquiries.create` over a boilerplate cluster, `cases.create` over noise)
+ * could never fire. Its unit test passed only because the `weak()` fixture
+ * omitted the one reason the analyzer always writes.
+ *
+ * "The text is readable" says nothing about whether a finding is evidence. The
+ * `up` set is now the three codes that make an evidential claim:
+ * `unique_evidence`, `cross_document_recurrence`, `semantic_outlier`.
+ *
+ * The general rule, which is the one to check when adding a code: a signal that
+ * fires on ~100% of the corpus carries no information, and if it carries a
+ * direction it breaks whatever reads that direction.
+ */
 const TEMPLATES: Record<string, Template> = {
   ocr_fragment: { impact: 'down', label: () => 'Possible OCR fragment' },
   readable_context: {
-    impact: 'up',
+    impact: 'neutral',
     label: () => 'Readable supporting context',
   },
   duplicate_group: {
     impact: 'down',
-    label: (r) => `${r.n ?? 0} identical findings grouped`,
+    // Breadth changes what this means. A four-member group is a duplicate; a
+    // group spanning most of the register is a taxonomy value, and saying
+    // "56,404 identical findings grouped" about it is accurate and useless.
+    label: (r) =>
+      (r.n ?? 0) >= BREADTH_LABEL_THRESHOLD
+        ? `Register-wide value: ${(r.n ?? 0) + 1} findings carry it`
+        : `${r.n ?? 0} identical findings grouped`,
   },
   unique_evidence: {
     impact: 'up',
     label: () => 'Unique evidence in this corpus',
   },
-  context: { impact: 'up', label: () => 'Substantial surrounding context' },
+  context: {
+    impact: 'neutral',
+    label: () => 'Substantial surrounding context',
+  },
   cross_document_recurrence: {
     impact: 'up',
     label: (r) =>
@@ -139,12 +182,16 @@ function renderOne(entry: unknown): RenderedReason | null {
 
   // Written before this change: already a finished sentence, kept as-is so an
   // existing corpus reads identically without a backfill.
+  //
+  // The stored `impact` is deliberately IGNORED. It is a property of the code,
+  // as the header says, so the table is the only place it should come from —
+  // and honouring the row instead meant a reclassification took effect only on
+  // rows recalibration had already rewritten. 206,700 legacy rows still carried
+  // `readable_context: 'up'` when that impact was the reason the evidence floor
+  // could not fire, so a third of the corpus would have stayed broken for as
+  // long as it took the refresh to rotate through.
   if (typeof row.label === 'string' && typeof row.code === 'string') {
-    return {
-      code: row.code,
-      label: row.label,
-      impact: (row.impact as ReasonImpact) ?? impactOf(row.code),
-    };
+    return { code: row.code, label: row.label, impact: impactOf(row.code) };
   }
 
   const code = typeof row.c === 'string' ? row.c : row.code;
