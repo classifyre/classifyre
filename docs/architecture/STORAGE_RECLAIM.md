@@ -159,6 +159,22 @@ actual keys. `pgstatindex` shows this; `pg_relation_size` does not. After the
 upsert fix and a `REINDEX`, the two rollups' indexes went 420 → 36 MB and
 394 → 35 MB.
 
+**`ALTER TYPE` rewrites the table under `ACCESS EXCLUSIVE` during boot.** The
+HNSW *index* build was moved off the boot path; the halfvec column rewrite was
+not. On the deploy that carries that migration, expect embedding reads and
+writes to stall for minutes and readiness probes to flap. The "15-second boot"
+figure describes every boot *after* it, not that one.
+
+**HNSW parameter changes never rebuild an existing index.** `buildHnswIndex`
+returns early on a valid index, so editing `hnswM` or `ef_construction` in
+settings has no effect on spaces that already have one. This is pre-existing
+(the old `CREATE INDEX IF NOT EXISTS` behaved identically), and it is left
+deliberately: now that the build is backgrounded, rebuilding on a param change
+would mean a settings tweak silently starts a 20–70 minute index build. That is
+plausibly right, but it is a product decision rather than a storage fix.
+`buildHnswIndex` is where the stored-parameter comparison belongs if someone
+wants it.
+
 **`REINDEX … CONCURRENTLY` queues behind `CREATE INDEX CONCURRENTLY`** on the
 same table, waiting on `virtualxid`. If a per-space HNSW build is running
 (20–70 minutes on ~880k vectors), every concurrent reindex waits for it.
