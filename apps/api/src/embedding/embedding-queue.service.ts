@@ -654,7 +654,18 @@ export class EmbeddingQueueService {
       distinct: ['contentHash'],
     });
     for (const chunk of chunks) {
-      resolved.set(chunk.contentHash, chunk.text);
+      // Normalized, because `asset_chunks.text` is stored raw while its
+      // `content_hash` is `embeddingContentHash(text)` — which hashes the
+      // NORMALIZED form. Embedding the raw text would put a vector under a
+      // hash that does not describe it, and would drift from every chunk
+      // embedded before this queue stopped carrying text (the old `persist`
+      // squeezed whitespace on everything it enqueued).
+      //
+      // It also restores the old skip: a whitespace-only chunk normalizes to
+      // '' and is dropped by the caller instead of burning an inference slot.
+      // The other two producers already hash and resolve through the same
+      // function, so this is the only asymmetric path.
+      resolved.set(chunk.contentHash, normalizeEmbeddingText(chunk.text));
     }
 
     const pendingFindings = outstanding();
