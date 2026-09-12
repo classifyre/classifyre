@@ -97,6 +97,40 @@ function canonical(value: unknown): string {
   return JSON.stringify(value) ?? 'null';
 }
 
+/**
+ * The group hash to write, given what is already stored.
+ *
+ * Two phases write this column and they mean different things by it. Analysis
+ * knows about EXACT duplicates and writes the finding's own content hash;
+ * `calibrateNeighborhood` knows about near-duplicate components and writes the
+ * component's root hash, which is a wider and different value.
+ *
+ * Both used to write unconditionally, so for every finding in a multi-hash
+ * component the two took turns: analysis wrote the own hash, `analysisChanged`
+ * saw the mismatch on the next pass and did a full rewrite — upsert, trigger,
+ * cascading `findings` UPDATE — calibration flipped it back, forever. 130,489
+ * analyses on one namespace, 21.6% of the table, stood diverged, so the no-op
+ * optimisation could not converge for any of them and the value a client read
+ * depended on which phase happened to run last.
+ *
+ * Analysis therefore seeds the group and may clear a value it owns, but never
+ * overwrites a component root it has no way of computing. That converges: once
+ * calibration has claimed a row, analysis reproduces what is stored and the
+ * comparison reads equal.
+ */
+function groupHashFor(
+  storedGroupHash: string | null | undefined,
+  ownHash: string,
+  similarCount: number,
+): string | null {
+  // A stored value that is neither absent nor this finding's own hash can only
+  // have come from calibration.
+  if (storedGroupHash != null && storedGroupHash !== ownHash) {
+    return storedGroupHash;
+  }
+  return similarCount ? ownHash : null;
+}
+
 /** The stored columns an analysis write would touch, for the no-op check. */
 type ComparableAnalysis = {
   spaceId: string;
@@ -377,12 +411,17 @@ export class EmbeddingAnalysisService {
 
           // One payload, used for the write AND for the comparison below, so
           // the two cannot drift. It used to be spelled out twice.
+          const stored = finding.evidenceAnalysis;
           const computed = {
             spaceId,
             importanceScore,
             qualityScore,
             similarCount,
-            duplicateGroupHash: similarCount ? hash : null,
+            duplicateGroupHash: groupHashFor(
+              stored?.duplicateGroupHash,
+              hash,
+              similarCount,
+            ),
             reasons,
             signals: {
               contextScore: round3(contextScore),
@@ -395,7 +434,6 @@ export class EmbeddingAnalysisService {
             },
           };
 
-          const stored = finding.evidenceAnalysis;
           if (stored && !analysisChanged(stored, computed)) {
             // Nothing moved, so do not rewrite the row. This is most of the
             // work on a mature corpus: a cohort member whose `similarCount`
