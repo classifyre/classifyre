@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'pg-boss';
 import { DetectorType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
+import { renderReasons } from '../embedding/reason-labels';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import {
   candidateWhere,
@@ -446,9 +447,7 @@ export class InquiryMatchingService {
             quality: f.evidenceAnalysis.qualityScore,
             similarCount: f.evidenceAnalysis.similarCount,
             duplicateGroupHash: f.evidenceAnalysis.duplicateGroupHash,
-            reasons: Array.isArray(f.evidenceAnalysis.reasons)
-              ? (f.evidenceAnalysis.reasons as never[])
-              : [],
+            reasons: renderReasons(f.evidenceAnalysis.reasons),
             coverage: 'analyzed' as const,
           }
         : {

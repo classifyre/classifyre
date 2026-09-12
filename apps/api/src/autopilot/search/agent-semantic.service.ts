@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import { renderReasons } from '../../embedding/reason-labels';
 import { EmbeddingService } from '../../embedding/embedding.service';
 import { QueryEmbeddingService } from '../../embedding/query-embedding.service';
 import { MAX_SAMPLE_VALUE_LENGTH } from '../autopilot.constants';
@@ -9,8 +10,6 @@ const MAX_RANKED_FINDINGS = 25;
 const MAX_SEMANTIC_RESULTS = 15;
 const MAX_SIMILAR_RESULTS = 10;
 const MAX_BOILERPLATE_CLUSTERS = 10;
-
-type Reason = { code: string; label: string; impact: string };
 
 type CompactRankedFinding = {
   findingId: string;
@@ -40,8 +39,11 @@ export class AgentSemanticService {
   ) {}
 
   private reasonCodes(reasons: unknown): string[] {
-    if (!Array.isArray(reasons)) return [];
-    return (reasons as Reason[])
+    // Rendered first: reasons are stored as codes, so reading `.code` and
+    // `.impact` off the raw row would see undefined on every analysis written
+    // after that change and filter the whole list away — leaving the agents
+    // with no evidence signals at all.
+    return renderReasons(reasons)
       .filter((reason) => reason && typeof reason.code === 'string')
       .map((reason) =>
         reason.impact === 'down'
@@ -284,7 +286,7 @@ export class AgentSemanticService {
             semanticOutlier: this.round(analysis.semanticOutlier),
             similarCount: analysis.similarCount,
             duplicateGroupSize: duplicates,
-            reasons: Array.isArray(analysis.reasons) ? analysis.reasons : [],
+            reasons: renderReasons(analysis.reasons),
             signals:
               analysis.signals && typeof analysis.signals === 'object'
                 ? analysis.signals

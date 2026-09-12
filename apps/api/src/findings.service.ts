@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { renderReasons } from './embedding/reason-labels';
 import { CreateFindingDto } from './dto/create-finding.dto';
 import { UpdateFindingDto } from './dto/update-finding.dto';
 import {
@@ -678,13 +679,23 @@ export class FindingsService {
       asset: finding.asset
         ? { ...finding.asset, type: finding.asset.assetType }
         : finding.asset,
+      // Rendered here too, not only under `ranking`. The spread above carries
+      // the analysis row through verbatim, and reasons are stored as codes —
+      // so without this a client reading `evidenceAnalysis.reasons` would get
+      // `[{ c: 'unique_evidence' }]` instead of a sentence.
+      evidenceAnalysis: finding.evidenceAnalysis
+        ? {
+            ...finding.evidenceAnalysis,
+            reasons: renderReasons(finding.evidenceAnalysis.reasons),
+          }
+        : finding.evidenceAnalysis,
       ranking: {
         importance: finding.evidenceAnalysis?.importanceScore ?? null,
         quality: finding.evidenceAnalysis?.qualityScore ?? null,
         similarCount: finding.evidenceAnalysis?.similarCount ?? 0,
         duplicateGroupHash:
           finding.evidenceAnalysis?.duplicateGroupHash ?? null,
-        reasons: finding.evidenceAnalysis?.reasons ?? [],
+        reasons: renderReasons(finding.evidenceAnalysis?.reasons),
         coverage: finding.evidenceAnalysis ? 'analyzed' : 'pending',
         ...queryRanking,
       },
@@ -940,8 +951,8 @@ export class FindingsService {
     };
   }
 
-  findOne(id: string) {
-    return this.prisma.finding.findUnique({
+  async findOne(id: string) {
+    const finding = await this.prisma.finding.findUnique({
       where: { id },
       include: {
         source: {
@@ -965,6 +976,15 @@ export class FindingsService {
         evidenceAnalysis: true,
       },
     });
+    if (!finding?.evidenceAnalysis) return finding;
+    // Reasons are stored as codes; the sentence is built on read.
+    return {
+      ...finding,
+      evidenceAnalysis: {
+        ...finding.evidenceAnalysis,
+        reasons: renderReasons(finding.evidenceAnalysis.reasons),
+      },
+    };
   }
 
   countDuplicateGroup(duplicateGroupHash: string) {

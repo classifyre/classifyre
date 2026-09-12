@@ -11,6 +11,7 @@ import * as fs from 'fs';
 
 import * as z from 'zod';
 import { AssetService } from './asset.service';
+import { renderReasons } from './embedding/reason-labels';
 import { CliRunnerService } from './cli-runner/cli-runner.service';
 import { CustomDetectorsService } from './custom-detectors.service';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
@@ -2596,7 +2597,7 @@ export class McpServerFactoryService {
                 semanticOutlier: analysis.semanticOutlier,
                 similarCount: analysis.similarCount,
                 duplicateGroupSize,
-                reasons: analysis.reasons,
+                reasons: renderReasons(analysis.reasons),
                 signals: analysis.signals,
                 coverage: 'analyzed',
               }

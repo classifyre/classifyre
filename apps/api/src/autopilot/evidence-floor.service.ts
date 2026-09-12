@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { renderReasons } from '../embedding/reason-labels';
 import { InquiryMatchingService } from '../matching/inquiry-matching.service';
 import type { InquiryMatchers } from '../matching/inquiry-matcher';
 import {
@@ -389,8 +390,16 @@ interface ReasonRow {
   impact?: unknown;
 }
 
+/**
+ * Reasons are stored as codes and rendered on read, so both the code and the
+ * impact come from `renderReasons` rather than off the raw row. Reading
+ * `r.impact` directly would have quietly seen `undefined` on every analysis
+ * written after that change — and since a missing positive impact is what
+ * marks evidence "provably weak", the floor would have started standing agents
+ * down on perfectly good findings.
+ */
 function asReasonRows(reasons: unknown): ReasonRow[] {
-  return Array.isArray(reasons) ? (reasons as ReasonRow[]) : [];
+  return renderReasons(reasons);
 }
 
 function reasonCodes(reasons: unknown): string[] {
