@@ -21,7 +21,11 @@ const MAX_SEED_FINDINGS = 10;
 const NEIGHBORS_PER_SEED = 5;
 const MAX_PROPOSALS_PER_RUN = 20;
 const MIN_NEIGHBOR_SIMILARITY = 0.7;
-const MIN_INQUIRY_IMPORTANCE = 0.75;
+// Same "high importance" standard as the express lane and the unmonitored
+// signal (both 0.85 since the recurrence-bonus re-tune): the bonus lifts ~68k
+// narrow-group findings over the old 0.75 bar, and leaving this one behind
+// would recreate the same meaning-drift inside lead proposals.
+const MIN_INQUIRY_IMPORTANCE = 0.85;
 
 /**
  * Lead triage for cases: ranked candidates (semantic neighbours of accepted

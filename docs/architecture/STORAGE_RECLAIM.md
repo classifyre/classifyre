@@ -339,19 +339,50 @@ was blind to the register's central cross-reference.
 **Shipped: the reason only.** `crossDocumentRecurrence` now governs the reason
 and `crossDocumentLead` still governs the bonus, so no score moved.
 
-**Not shipped: the bonus.** Awarding it to the wider set moves **67,621**
-findings over 0.75, 66,647 of them company numbers — which re-tunes what the
-express lane and the unmonitored-evidence signal fire on. Both thresholds were
-calibrated against a distribution where 99.2 % of ungrouped findings sat above
-them; they would have to be re-set in the same change, against a before/after
-ranking comparison on a real corpus. The methodology is in
-`docs/first-use/ranking-calibration-2026-07-16.md`; budget for it accordingly,
-since recalibration ran at ~35–45 min per 33.5k findings there and this corpus
-is 18× that.
+**Shipped 2026-09-12: the bonus, with the re-tune.** `crossDocumentLead` is
+now `crossDocumentRecurrence`, so the +0.12 follows the wider set, and
+`EXPRESS_IMPORTANCE_SCORE`, `UNMONITORED_MIN_IMPORTANCE` (plus the third 0.75
+on the same standard, case-leads `MIN_INQUIRY_IMPORTANCE`) moved 0.75 → 0.85
+in the same change. Re-measured at ship time on 605,935 analyses: 148,231
+eligible (was 147,823), 67,968 newly over the old 0.75, 66,961 of them company
+numbers. The 0.85 rests on the express bypass rate (137 of 272 scans today;
+251 at 0.75 post-bonus, 146 at 0.85) — count-matching is impossible because
+structured contexts quantize scores into lumps. Full before/after,
+methodology, and the 10.5–13.5 h rollout budget are in
+`docs/first-use/ranking-calibration-2026-07-16.md`. Scores land only as
+recalibration rewrites rows; run the `VACUUM (FULL, ANALYZE)` below after it.
 
-Note also that `RECURRENCE_HUB_CAP = 25` and `BOILERPLATE_GROUP_BREADTH_CAP =
-2000` are two "too common to be evidence" caps in one pipeline, set two orders
-of magnitude apart, and the calibration doc concedes both remain hypotheses.
+### Reconciled, still hypotheses: the two "too common" caps
+
+`RECURRENCE_HUB_CAP = 25` and `BOILERPLATE_GROUP_BREADTH_CAP = 2000` look like
+the same judgement written twice, two orders of magnitude apart. They are not
+the same judgement — they measure different units on different signals, with
+different costs of being wrong:
+
+- The **25** counts *distinct assets sharing one normalized value* and feeds
+  *scoring*: 2–25 earns the recurrence bonus, above it earns the common-value
+  penalty. Its unit is the identifier — a company number recurring across a
+  handful of filings is the register's central cross-reference, while one on
+  8,403 filings is a category. Being wrong here mis-scores individual
+  findings, so the cap sits close to the "handful" end.
+- The **2000** counts *distinct assets in one near-duplicate text cohort* and
+  feeds the *pair projection only*: above it, a text group contributes no
+  asset pairs to Duplicate Review. Its unit is the template sentence —
+  register boilerplate repeats verbatim in tens of thousands of filings, and
+  the measured break (24 groups over 2,000 assets carrying 57.7% of
+  membership) is where projection pairs stop being candidate duplicates and
+  start being co-occurrence noise. Being wrong here floods or starves a review
+  queue, so the cap sits where the queue was measured to drown.
+
+A shared constant would imply the units are interchangeable; they are not
+(the label-side breadth note in `reason-labels.ts` makes the same point about
+`similarCount` vs asset counts). What would settle each: for the 25, an
+analyst review of findings just under and over it on a corpus where recurrence
+is common (this one) — do 20-asset values read as leads and 30-asset values
+as noise? For the 2000, a before/after of the Duplicate Review queue at a
+lower candidate (e.g. 500): does anything evidential disappear, or only
+template pairs? Until someone runs those, both remain hypotheses — but they
+are two hypotheses, not one contradiction.
 
 ### Closed: the autopilot evidence floor was dead
 
@@ -447,8 +478,11 @@ Two fixes, both in the embedding module:
   `noveltyScore` would then stay pinned at 1.0 for good. Measured: the bare form
   matched 593,085 of 605,220 rows, missing all 12,135 nulls.
 
-The free space is reusable but not returned: this table needs a one-off
-`VACUUM (FULL, ANALYZE)` like the post-recompute `edges` below.
+The free space was reusable but not returned. Done 2026-09-12, after the
+no-op-write fix had stopped the bleeding: `VACUUM (FULL, ANALYZE)` took the
+table **1024 MB → 514 MB** (heap 474 MB), so ~510 MB handed back — the ~480 MB
+estimate plus a little drift. Run it again after the bonus-award rewrite pass,
+which rewrites the same ~600k rows once more.
 
 ---
 

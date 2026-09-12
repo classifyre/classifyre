@@ -346,13 +346,14 @@ export class EmbeddingAnalysisService {
             !repeatedDigits &&
             crossAssetCount >= 2 &&
             crossAssetCount <= RECURRENCE_HUB_CAP;
-          // The BONUS keeps the old gate, deliberately. Awarding it to the
-          // wider set moves 67,621 findings over 0.75 (66,647 of them company
-          // numbers), which re-tunes what the express lane and the
-          // unmonitored-evidence signal fire on. That is a separate, measured
-          // decision; this change moves no score. See STORAGE_RECLAIM.md.
-          const crossDocumentLead =
-            crossDocumentRecurrence && similarCount === 0;
+          // The bonus follows the reason. It used to keep the old
+          // `similarCount === 0` gate while the reason went wider, because
+          // awarding it moves ~68k findings over the importance bar (nearly
+          // all company numbers) and the express/unmonitored thresholds had
+          // to be re-tuned in the same change. That re-tune has now happened
+          // (both bars 0.75 -> 0.85, see the calibration doc); there is no
+          // longer a separate lead condition.
+          const crossDocumentLead = crossDocumentRecurrence;
           const commonValue = crossAssetCount > RECURRENCE_HUB_CAP;
           let base =
             qualityScore * 0.3 +
