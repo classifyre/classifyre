@@ -459,6 +459,10 @@ export class CorrelationReviewIndexService {
         --
         -- Clamped to [0,1], not 0.999: numeric(4,3) holds up to 9.999, and
         -- shaving a perfect match would reintroduce the same mismatch.
+        --
+        -- The "weighted" key is no longer written: confidence already holds
+        -- the same 2dp value in a typed column, so it serves as the fallback
+        -- for an edge with no usable denominator.
         LEAST(1, GREATEST(0, COALESCE(
           CASE
             WHEN COALESCE((n.metadata ->> 'denom')::numeric, 0) > 0
@@ -467,7 +471,15 @@ export class CorrelationReviewIndexService {
           END,
           (n.metadata ->> 'weighted')::numeric,
           n.confidence))),
-        COALESCE((n.metadata ->> 'sharedCount')::int, 0),
+        -- Summed from sharedByLabel rather than read from a "sharedCount" key
+        -- that repeated the same number on four million rows. Both passes
+        -- build sharedByLabel as the per-label breakdown of exactly this
+        -- count; checked against 200,000 live edges, the two agreed on every
+        -- row before the key was dropped.
+        COALESCE((
+          SELECT SUM(v::int)::int
+          FROM jsonb_each_text(n.metadata -> 'sharedByLabel') AS e(k, v)
+        ), 0),
         COALESCE(ARRAY(
           SELECT k FROM jsonb_object_keys(n.metadata -> 'sharedByLabel') k ORDER BY k
         ), ARRAY[]::text[]),

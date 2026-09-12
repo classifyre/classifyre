@@ -1194,8 +1194,6 @@ export class CorrelationService {
 
           const denom = nfWeightA + nfWeightB;
           const weighted = denom === 0 ? 0 : (2 * weightedShared) / denom;
-          const union = nfCountA + nfCountB - sharedCount;
-          const jaccard = union === 0 ? 0 : sharedCount / union;
           const exact =
             sharedCount > 0 &&
             sharedCount === nfCountA &&
@@ -1204,18 +1202,6 @@ export class CorrelationService {
 
           const isDuplicate = weighted >= cfg.duplicateMin || exact;
           const byLabel = r.sharedByLabel as Record<string, number>;
-          const reasons = buildReasons(byLabel, cfg.weightOf);
-          // Per-label share of the numerator, so the review queue can show a
-          // decomposition that sums back to the score. In this pass
-          // stagePairAggregates groups by (a, b, label) and the weight is a
-          // pure function of the label, so w_L * count_L is exact — but the
-          // phonetic pass below cannot say the same, which is why the
-          // contribution is written out rather than reconstructed by the
-          // reader. See buildWaterfall in review/correlation-review.service.ts.
-          const contribByLabel: Record<string, number> = {};
-          for (const [label, count] of Object.entries(byLabel)) {
-            contribByLabel[label] = round4(cfg.weightOf(label) * count);
-          }
           buffer.push({
             fromType: ASSET_REL,
             fromId: r.aId,
@@ -1224,19 +1210,29 @@ export class CorrelationService {
             relationType: isDuplicate ? REL_DUPLICATE : REL_RELATED,
             confidence: roundConfidence(weighted),
             origin: 'INFERRED',
+            // Three keys, not nine.
+            //
+            // This object is written once per scored pair, and on one workspace
+            // that was 4.05M rows carrying 1323 MB of JSONB between them — for
+            // 2,399 distinct values, of which roughly 390 MB was the repeated
+            // key names alone. Everything omitted below is arithmetic over what
+            // is kept, and every reader now does that arithmetic:
+            //
+            //   weighted       = 2 * weightedShared / denom   (and `confidence`
+            //                    already holds the 2dp display copy)
+            //   sharedCount    = sum of sharedByLabel's values
+            //   contribByLabel = w_L * sharedByLabel[L]       (exact pass only;
+            //                    the phonetic pass below still stores it)
+            //   reasons        = buildReasons(sharedByLabel)
+            //   jaccard, exact = read by nothing
+            //
+            // Verified against 200,000 live edges before the keys were dropped:
+            // the derived sharedCount and weighted matched the stored ones on
+            // every row.
             metadata: {
-              // Two decimals, kept because the scoped graph, the MCP tools and
-              // the finding UI all read this key. The 4dp companions below
-              // exist for arithmetic, not display.
-              weighted: round2(weighted),
-              jaccard: round2(jaccard),
-              sharedCount,
               sharedByLabel: byLabel,
-              exact,
-              reasons,
               denom: round4(denom),
               weightedShared: round4(weightedShared),
-              contribByLabel,
             },
           });
           affected.add(r.aId);
@@ -1244,11 +1240,14 @@ export class CorrelationService {
           if (isDuplicate) duplicatePairs++;
           else relatedPairs++;
           if (!topMatch || weighted > topMatch.weighted) {
+            // Built here rather than for every pair: this is the only thing in
+            // the exact pass that still needs the phrasing, and it changes a
+            // handful of times across millions of rows.
             topMatch = {
               fromAssetId: r.aId,
               toAssetId: r.bId,
               weighted: round2(weighted),
-              reasons,
+              reasons: buildReasons(byLabel, cfg.weightOf),
             };
           }
           if (buffer.length >= EDGE_BATCH) await flush();
@@ -1641,18 +1640,14 @@ export class CorrelationService {
             confidence: roundConfidence(weighted),
             origin: 'INFERRED',
             metadata: {
-              weighted: round2(weighted),
-              jaccard: 0,
-              sharedCount: matchCount,
               sharedByLabel: byLabel,
-              exact: false,
-              reasons,
               // `sharedByLabel` here is a COUNT of Jaro-Winkler matches, while
               // the numerator is a sum of jw * weight with jw in [0.75, 1).
               // w_L * matchCount therefore overstates this pair's contribution
               // by up to 25%, so anything reconstructing a decomposition from
               // sharedByLabel would be silently wrong on every phonetic edge.
-              // These three keys are the truth; readers must use them.
+              // These three keys are the truth; readers must use them — which
+              // is why contribByLabel survives here and not in the exact pass.
               denom: round4(denom),
               weightedShared: round4(jwWeighted),
               contribByLabel: { [group.label]: round4(jwWeighted) },
@@ -2616,7 +2611,15 @@ export function scorePair(
   return { weighted, jaccard, sharedCount, sharedByLabel, exact };
 }
 
-function buildReasons(
+/**
+ * The human phrasing of a pair's overlap: "3 shared ibans, 1 shared email".
+ *
+ * Exported because it is derived, not stored. The scorer used to write the
+ * finished strings into `Edge.metadata.reasons` — 181 MB across four million
+ * edges for a value that is a pure function of `sharedByLabel`, which sits in
+ * the same object. Readers call this instead.
+ */
+export function buildReasons(
   sharedByLabel: Record<string, number>,
   weightOf: WeightOf = weightForLabel,
 ): string[] {

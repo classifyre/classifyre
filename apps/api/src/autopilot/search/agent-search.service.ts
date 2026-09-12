@@ -7,7 +7,10 @@ import {
   SourceScheduleMode,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { CORRELATION_RELATION_TYPES } from '../../correlation/correlation.service';
+import {
+  CORRELATION_RELATION_TYPES,
+  buildReasons,
+} from '../../correlation/correlation.service';
 import { InquiryMatchingService } from '../../matching/inquiry-matching.service';
 import {
   CUSTOM_KEY_PREFIX,
@@ -1359,6 +1362,7 @@ export class AgentSearchService {
         const meta = (e.metadata ?? {}) as {
           weighted?: number;
           reasons?: string[];
+          sharedByLabel?: Record<string, number>;
         };
         return {
           fromAssetId: e.fromId,
@@ -1367,7 +1371,9 @@ export class AgentSearchService {
           matchPercent: Math.round(
             (meta.weighted ?? Number(e.confidence)) * 100,
           ),
-          reasons: meta.reasons ?? [],
+          // Derived from sharedByLabel; `reasons` is only present on edges
+          // written before the scorer stopped storing it.
+          reasons: meta.reasons ?? buildReasons(meta.sharedByLabel ?? {}),
         };
       }),
     };
