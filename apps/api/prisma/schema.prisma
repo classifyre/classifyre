@@ -471,16 +471,21 @@ model EmbeddingSpace {
   @@map("embedding_spaces")
 }
 
+/// A vector is identified by the space it lives in and the content it was
+/// taken over — there is no second thing a row could be. The surrogate `id`
+/// this used to carry was generated on every insert, read by nothing, and cost
+/// a 64 MB b-tree plus 37 bytes a row on top of the unique index that was
+/// already enforcing the real key.
 model ContentEmbedding {
-  id          String                @id @default(uuid())
-  spaceId     String                @map("space_id")
-  contentHash String                @map("content_hash") @db.VarChar(64)
-  vec         Unsupported("vector")
-  createdAt   DateTime              @default(now()) @map("created_at")
+  spaceId     String                 @map("space_id")
+  contentHash String                 @map("content_hash") @db.VarChar(64)
+  /// Half precision: two bytes a dimension rather than four. See vectorCast.
+  vec         Unsupported("halfvec")
+  createdAt   DateTime               @default(now()) @map("created_at")
 
   space EmbeddingSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
-  @@unique([spaceId, contentHash])
+  @@id([spaceId, contentHash])
   @@index([contentHash])
   @@map("content_embeddings")
 }
@@ -524,8 +529,10 @@ model FindingEvidenceAnalysis {
   finding Finding        @relation(fields: [findingId], references: [id], onDelete: Cascade)
   space   EmbeddingSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
-  @@index([importanceScore(sort: Desc)])
-  @@index([qualityScore(sort: Desc)])
+  // No index on importanceScore/qualityScore. Ranked reads go through the
+  // denormalised `Finding.importanceScore` and its own index; the two indexes
+  // that used to sit here were 90 MB with zero scans across the lifetime of a
+  // 577k-analysis workspace.
   @@index([duplicateGroupHash])
   @@map("finding_evidence_analyses")
 }
@@ -1682,8 +1689,10 @@ model CorrelationPairSignature {
   // "the next N undecided pairs in this pattern" as a range seek.
   @@index([patternKey, weighted(sort: Desc)])
   @@index([clusterId])
-  // "412 disconnected similarity pairs" — a work queue someone picks up.
-  @@index([lineageState, weighted(sort: Desc)])
+  // No index on lineageState. It has three values across millions of rows, and
+  // every query that filters on it does so as an extra AND beside a selective
+  // predicate (patternKey, clusterId) that the planner uses instead — measured
+  // at zero scans and 161 MB.
   @@map("correlation_pair_signatures")
 }
 
