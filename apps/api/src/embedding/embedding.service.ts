@@ -639,6 +639,7 @@ export class EmbeddingService {
         ? Number.POSITIVE_INFINITY
         : maxBatches * RECALIBRATE_BATCH_SIZE;
     let analyzed = 0;
+    let spent = 0;
     for (let batch = 0; batch < maxBatches; batch++) {
       const findings = await this.prisma.finding.findMany({
         where,
@@ -655,18 +656,31 @@ export class EmbeddingService {
         ),
       ];
       if (hashes.length > 0) {
-        const budget = maxRows - analyzed;
-        analyzed += await this.analysis.analyzeHashes(
+        // Both walks spend the budget, and both walk the same cohorts. Counting
+        // only the analysis side let a bounded pass do up to twice the rows it
+        // reported — still terminating, but a looser bound than the number
+        // says. `spent` is what the budget is measured against; `analyzed` is
+        // what the pass reports, and stays the count of findings analysed so
+        // the log line keeps meaning one thing.
+        const budget = maxRows - spent;
+        const visited = await this.analysis.analyzeHashes(
           space.id,
           hashes,
           recurrence,
           budget,
         );
-        await this.calibrateNeighborhood(space, hashes, budget);
+        analyzed += visited;
+        spent += visited;
+        spent += await this.calibrateNeighborhood(
+          space,
+          hashes,
+          maxRows - spent,
+        );
       } else {
         analyzed += findings.length;
+        spent += findings.length;
       }
-      if (analyzed >= maxRows) break;
+      if (spent >= maxRows) break;
       if (findings.length < RECALIBRATE_BATCH_SIZE) break;
       await new Promise((resolve) => setImmediate(resolve));
     }
@@ -705,8 +719,8 @@ export class EmbeddingService {
     // cohorts too, so a caller that bounded the analysis and not this one has
     // bounded nothing.
     maxRows = Number.POSITIVE_INFINITY,
-  ) {
-    if (!contentHashes.length || maxRows <= 0) return;
+  ): Promise<number> {
+    if (!contentHashes.length || maxRows <= 0) return 0;
     const spaceId = this.spaceIdLiteral(space.id);
     const dim = Prisma.raw(String(space.dim));
     // Must match the expression ensureHnswIndex built, or the planner ignores
@@ -932,7 +946,20 @@ export class EmbeddingService {
               finding: { embedContentHash: { in: hashes } },
               // Already correct on most rows after the first pass; without this
               // the statement rewrites the whole component every time.
-              duplicateGroupHash: { not: groupHash },
+              //
+              // The null arm is not redundant. Prisma compiles `not` to SQL
+              // inequality, which is three-valued: a NULL group is neither
+              // equal nor unequal, so a bare `{ not: groupHash }` silently
+              // skips every row that has no group yet — exactly the findings
+              // whose content hash is unique but which still belong to a
+              // near-duplicate component. They would never be assigned one,
+              // keeping `noveltyScore` pinned at 1.0 and their importance
+              // inflated, permanently. Measured on one namespace: `not`
+              // matched 593,085 of 605,220 rows, missing all 12,135 nulls.
+              OR: [
+                { duplicateGroupHash: null },
+                { duplicateGroupHash: { not: groupHash } },
+              ],
             },
             data: { duplicateGroupHash: groupHash },
           });
@@ -940,6 +967,7 @@ export class EmbeddingService {
       );
       if (calibrated >= maxRows) break;
     }
+    return calibrated;
   }
 
   async putChunks(sourceId: string, dto: PutAssetChunksDto) {

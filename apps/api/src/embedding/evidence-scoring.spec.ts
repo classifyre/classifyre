@@ -190,6 +190,52 @@ describe('evidence scoring', () => {
       expect(prisma.findingEvidenceAnalysis.upsert).toHaveBeenCalledTimes(1);
     });
 
+    /**
+     * Analysis and calibration mean different things by `duplicateGroupHash`:
+     * analysis writes the finding's own content hash, calibration writes the
+     * near-duplicate component's root. Both used to write unconditionally, so
+     * each pass saw the other's value as a change and rewrote the row — 130,489
+     * analyses on one namespace, 21.6% of the table, never converged.
+     */
+    it('leaves a calibration component root alone instead of fighting it', async () => {
+      const componentRoot = 'component-root-hash';
+      givenCohort(4, { ...settled, duplicateGroupHash: componentRoot });
+
+      await service.analyzeHashes(SPACE, [HASH], recurrence);
+
+      // Reproduces what is stored, so the comparison reads equal and the row
+      // is not rewritten. Without this the two phases take turns forever.
+      expect(prisma.findingEvidenceAnalysis.upsert).not.toHaveBeenCalled();
+    });
+
+    it('still seeds the group when nothing has claimed the row', async () => {
+      givenCohort(4, { ...settled, duplicateGroupHash: null });
+
+      await service.analyzeHashes(SPACE, [HASH], recurrence);
+
+      expect(written().update.duplicateGroupHash).toBe(HASH);
+    });
+
+    it('clears a group it owns once the duplicates are gone', async () => {
+      // Its own hash, so analysis owns it — and there is nothing left to group.
+      givenCohort(1, { ...settled, duplicateGroupHash: HASH });
+
+      await service.analyzeHashes(SPACE, [HASH], recurrence);
+
+      expect(written().update.duplicateGroupHash).toBeNull();
+    });
+
+    it('does not clear a component root it never owned', async () => {
+      // Same "no exact duplicates" case, but the group came from calibration:
+      // the finding can be alone on its content hash and still belong to a
+      // near-duplicate component.
+      givenCohort(1, { ...settled, duplicateGroupHash: 'component-root-hash' });
+
+      await service.analyzeHashes(SPACE, [HASH], recurrence);
+
+      expect(written().update.duplicateGroupHash).toBe('component-root-hash');
+    });
+
     it('rewrites a legacy row, which is how its reasons get compacted', async () => {
       givenCohort(4, {
         ...settled,
