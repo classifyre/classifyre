@@ -8,6 +8,7 @@ import {
 import { UnionFind } from '../../utils/union-find';
 import {
   BOILERPLATE_PAIR_CAP,
+  BOILERPLATE_GROUP_BREADTH_CAP,
   BOILERPLATE_RANK_CAP,
   BOILERPLATE_STATEMENT_TIMEOUT_MS,
   FANOUT_CAP,
@@ -633,10 +634,25 @@ export class CorrelationReviewIndexService {
         ${groupScope}
         GROUP BY a.duplicate_group_hash, f.asset_id
       ),
+      -- A text group spanning the whole register is a template, not a lead.
+      -- The label side of this queue already refuses hub values on the same
+      -- reasoning; this is the missing half. Breadth is counted over the WHOLE
+      -- corpus, never over the incremental group scope, for exactly the reason
+      -- the scoring fan-out is unscoped: otherwise an incremental run would
+      -- judge a register-wide template by the few assets it just touched.
+      broad_groups AS (
+        SELECT a.duplicate_group_hash AS gh
+        FROM finding_evidence_analyses a
+        JOIN findings f ON f.id = a.finding_id
+        WHERE a.duplicate_group_hash IS NOT NULL
+        GROUP BY a.duplicate_group_hash
+        HAVING COUNT(DISTINCT f.asset_id) > ${BOILERPLATE_GROUP_BREADTH_CAP}
+      ),
       ranked AS (
         SELECT gh, asset_id, sim,
                ROW_NUMBER() OVER (PARTITION BY gh ORDER BY importance DESC) AS rn
         FROM members
+        WHERE NOT EXISTS (SELECT 1 FROM broad_groups b WHERE b.gh = members.gh)
       ),
       -- Bound the quadratic self-join BEFORE it runs: only the top-ranked
       -- assets per group enter the projection. The output cap keeps 200 pairs
