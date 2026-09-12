@@ -301,7 +301,7 @@ export class UpdateInstanceSettingsDto {
   @ApiPropertyOptional({
     description:
       'Importance at or above which a single new finding earns an immediate cycle instead of waiting for the batch.',
-    example: 0.75,
+    example: 0.85,
     minimum: 0,
     maximum: 1,
   })

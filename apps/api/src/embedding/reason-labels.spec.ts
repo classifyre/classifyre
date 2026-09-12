@@ -39,9 +39,22 @@ describe('renderReasons', () => {
     ).toBe('Same value found in 4 assets across 2 sources');
   });
 
-  it('passes through rows written before the change, untouched', () => {
+  it('names a register-wide group for what it is', () => {
+    // Breadth changes the meaning. Below the threshold it is a duplicate;
+    // above it, it is a taxonomy value and "56,404 identical findings grouped"
+    // is accurate and useless.
+    expect(renderReasons([{ c: 'duplicate_group', n: 1999 }])[0].label).toBe(
+      '1999 identical findings grouped',
+    );
+    expect(renderReasons([{ c: 'duplicate_group', n: 56404 }])[0].label).toBe(
+      'Register-wide value: 56405 findings carry it',
+    );
+  });
+
+  it('passes through the sentence of rows written before the change', () => {
     // There is no backfill, so a corpus scored by an older version has to keep
-    // reading exactly as it did.
+    // reading as it did — but see the next test for the one part that does not
+    // pass through.
     const legacy = {
       code: 'semantic_support',
       label: 'Consistent with its semantic neighbours',
@@ -50,16 +63,40 @@ describe('renderReasons', () => {
     expect(renderReasons([legacy])).toEqual([legacy]);
   });
 
-  it('keeps the impact the evidence floor reads', () => {
-    // The floor calls a finding "provably weak" when nothing has impact 'up'.
-    // If impact stopped resolving, it would stand agents down on good evidence.
-    const rendered = renderReasons([
-      { c: 'readable_context' },
-      { c: 'ocr_fragment' },
-      { c: 'severity_separate', s: 'info' },
+  it('takes impact from the table even when the row carries its own', () => {
+    // Impact is a property of the code, so the table is the only place it may
+    // come from. Honouring the stored value meant a reclassification reached
+    // only the rows recalibration had already rewritten — 206,700 legacy rows
+    // still carried `readable_context: 'up'` while that was exactly the impact
+    // that had disabled the evidence floor.
+    expect(
+      renderReasons([
+        {
+          code: 'readable_context',
+          label: 'Readable supporting context',
+          impact: 'up',
+        },
+      ]),
+    ).toEqual([
+      {
+        code: 'readable_context',
+        label: 'Readable supporting context',
+        impact: 'neutral',
+      },
     ]);
-    expect(rendered.map((r) => r.impact)).toEqual(['up', 'down', 'neutral']);
+  });
+
+  it('reserves impact "up" for codes that make an evidential claim', () => {
+    // The guard that would have caught the dead evidence floor. `hasPositiveImpact`
+    // treats any 'up' as strength, so a hygiene signal — "the text is readable",
+    // "there is surrounding context" — must never carry one: those fire on
+    // essentially every finding, and a gate keyed on them can never close.
     expect(impactOf('unique_evidence')).toBe('up');
+    expect(impactOf('cross_document_recurrence')).toBe('up');
+    expect(impactOf('semantic_outlier')).toBe('up');
+    for (const hygiene of ['readable_context', 'context']) {
+      expect(impactOf(hygiene)).not.toBe('up');
+    }
   });
 
   it('survives anything that is not a reason', () => {
@@ -69,7 +106,7 @@ describe('renderReasons', () => {
       {
         code: 'context',
         label: 'Substantial surrounding context',
-        impact: 'up',
+        impact: 'neutral',
       },
     ]);
   });

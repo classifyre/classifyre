@@ -22,25 +22,42 @@ describe('EvidenceFloorService', () => {
   };
   const mockMatching = { probeMatches: jest.fn() };
 
-  /** A finding row whose analysis says it is genuine evidence. */
+  /**
+   * A finding row whose analysis says it is genuine evidence.
+   *
+   * The strength is `cross_document_recurrence` alone — `readable_context` is
+   * present because the analyzer always writes it, not because it contributes.
+   */
   const strong = (id: string) => ({
     id,
     evidenceAnalysis: {
       reasons: [
-        { code: 'readable_context', impact: 'up' },
-        { code: 'cross_document_recurrence', impact: 'up' },
+        { c: 'readable_context' },
+        { c: 'cross_document_recurrence', n: 4, n2: 2 },
+        { c: 'severity_separate', s: 'high' },
       ],
     },
   });
 
-  /** A finding row whose analysis says it is noise. */
+  /**
+   * A finding row whose analysis says it is noise.
+   *
+   * `readable_context` is here on purpose. The analyzer emits it on every
+   * finding that clears the quality gate, which on a real corpus is all of
+   * them — and while it carried `impact: 'up'`, `hasPositiveImpact` was
+   * therefore always true and `provablyWeak` could never fire. This fixture
+   * used to omit it, so the floor's tests passed against a reason set the
+   * analyzer never writes and the gate was dead in production for the whole
+   * time they were green. Keep it: it is what makes these tests mean anything.
+   */
   const weak = (id: string) => ({
     id,
     evidenceAnalysis: {
       reasons: [
-        { code: 'ocr_fragment', impact: 'down' },
-        { code: 'duplicate_group', impact: 'down' },
-        { code: 'severity_separate', impact: 'neutral' },
+        { c: 'readable_context' },
+        { c: 'ocr_fragment' },
+        { c: 'duplicate_group', n: 1523 },
+        { c: 'severity_separate', s: 'info' },
       ],
     },
   });

@@ -101,7 +101,17 @@ export const AUTOPILOT_CORPUS_SINGLETON_KEY = 'autopilot:corpus';
  * the config agent rather than the investigation agents — 60 of the first run's
  * 82 scans errored, and nothing in the system said so.
  */
-export const EXPRESS_IMPORTANCE_SCORE = 0.75;
+/**
+ * Re-tuned 0.75 -> 0.85 alongside the recurrence-bonus award (see the
+ * ranking-calibration doc). The bonus lifts ~68k narrow-group findings over
+ * the old bar — at 0.75, 251 of 272 recent scans carried an express-grade
+ * finding and batching was defeated (baseline: 137). At 0.85 the bypass rate
+ * is 146 scans, restoring the calibrated behaviour. An install whose
+ * `harnessExpressImportance` row already stores 0.75 keeps it: that dial is
+ * operator intent, so existing rows are not migrated — move it by hand if the
+ * default was never deliberately chosen.
+ */
+export const EXPRESS_IMPORTANCE_SCORE = 0.85;
 /** Consecutive failed scans before a source is escalated as an operator problem. */
 export const EXPRESS_CONSECUTIVE_FAILURES = 3;
 
@@ -198,7 +208,17 @@ export const EVIDENCE_ANALYSIS_USABLE_FINDINGS = 2000;
  * nothing pushed the other way, so maintenance was the rational move. This is
  * the missing counterweight: evidence nobody is watching.
  */
-export const UNMONITORED_MIN_IMPORTANCE = 0.75;
+/**
+ * Re-tuned 0.75 -> 0.85 alongside the recurrence-bonus award (see the
+ * ranking-calibration doc). Post-bonus, 88,924 findings clear the old bar
+ * against 20,956 before — the "ought to be watched" pool quadruples and the
+ * unmonitored count saturates instead of signalling a gap. At 0.85 the pool
+ * is 3,862 and the top-300 ranking is untouched (cutoff 0.907; 61 new rows
+ * above it). Residual: ~3.1k higher-context company numbers still clear the
+ * bar, as ~14.8k unique ones already did — the bar rations attention, it does
+ * not exclude identifiers.
+ */
+export const UNMONITORED_MIN_IMPORTANCE = 0.85;
 
 /**
  * Completed scans examined when asking "is this source still detecting
