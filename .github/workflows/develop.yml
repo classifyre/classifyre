@@ -24,9 +24,9 @@ on:
           - "true"
           - "false"
       scale_down:
-        description: "Scale the app to zero after verifying it is alive (parks the release between runs)"
+        description: "Park the release at zero replicas after verifying it is alive (worker and Postgres included). Pass false to keep it up for testing. Never park the classifyre (prod) namespace."
         required: false
-        default: "false"
+        default: "true"
         type: choice
         options:
           - "true"
@@ -44,7 +44,7 @@ on:
         default: "true"
       scale_down:
         type: string
-        default: "false"
+        default: "true"
     secrets:
       DOCKER_USERNAME:
         required: true
@@ -67,7 +67,7 @@ jobs:
       HELM_NAMESPACE: ${{ inputs.environment || 'classifyre-develop' }}
       IMAGE_TAG: ${{ inputs.image_tag || 'develop' }}
       DEMO_MODE: ${{ inputs.demo_mode || 'true' }}
-      SCALE_DOWN: ${{ inputs.scale_down || 'false' }}
+      SCALE_DOWN: ${{ inputs.scale_down || 'true' }}
 
     steps:
       - name: Derive environment settings
@@ -188,14 +188,25 @@ jobs:
 
           echo "SCALE_DOWN=true → parking ${HELM_RELEASE_NAME} at zero replicas."
 
+          # Never run this against the prod (classifyre) namespace — it takes
+          # the demo offline. The step is opt-out via scale_down=false.
+          if [[ "${HELM_NAMESPACE}" == "classifyre" ]]; then
+            echo "Refusing to park the prod namespace. Pass scale_down=false to deploy it running." >&2
+            exit 1
+          fi
+
           # Remove HPAs first so they don't immediately scale the deployments
           # back up (minReplicas). The next helm upgrade recreates them.
-          for name in api web; do
+          for name in api web worker; do
             kubectl -n "${HELM_NAMESPACE}" delete hpa "${HELM_RELEASE_NAME}-${name}" \
               --ignore-not-found=true
           done
 
-          for name in api web; do
+          # Park everything, worker and Postgres included: on the shared
+          # single-node VPS an idle develop stack must reserve nothing, so
+          # prod always has room to schedule a scan. Data survives in the
+          # PVCs; the next deploy's helm upgrade restores replicas.
+          for name in api web worker postgres; do
             echo "Scaling deployment/${HELM_RELEASE_NAME}-${name} to 0"
             kubectl -n "${HELM_NAMESPACE}" scale deployment/"${HELM_RELEASE_NAME}-${name}" \
               --replicas=0
@@ -203,7 +214,7 @@ jobs:
 
           # Wait until the app pods are actually gone so the run reflects the
           # parked state. The next deploy's helm upgrade restores replicas.
-          for name in api web; do
+          for name in api web worker postgres; do
             kubectl -n "${HELM_NAMESPACE}" rollout status \
               deployment/"${HELM_RELEASE_NAME}-${name}" --timeout=5m || true
           done
