@@ -278,8 +278,10 @@ export class CorrelationWorker {
     runnerId: string,
   ): Promise<{ reason: string; agentKinds?: AgentKind[] } | null> {
     // The bar for "important enough to bypass the batch" is an operator dial:
-    // what counts as urgent depends on the corpus, and a fixed 0.75 was either
+    // what counts as urgent depends on the corpus, and a fixed number was either
     // deafening or silent depending on how the analyzer scored that workspace.
+    // (The shipped default is EXPRESS_IMPORTANCE_SCORE, re-tuned to 0.85 with
+    // the recurrence-bonus award; a stored row keeps whatever it holds.)
     // Advisory: a fresh workspace has no settings row yet, and failing the
     // whole hand-off because a threshold could not be read would lose the
     // cycle entirely over a number that has a perfectly good default.
