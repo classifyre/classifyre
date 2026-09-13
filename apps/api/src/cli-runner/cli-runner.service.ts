@@ -3657,6 +3657,24 @@ export class CliRunnerService {
       this.runnerEventsGateway.emitRunnerUpdate(runnerDto as any);
     }
 
+    // Stopping a run frees its concurrency slot, so the queue has to be
+    // drained here exactly as `completeRunner` and `failRunner` do it.
+    //
+    // Without this the instance deadlocks, and silently. `startRun` queues a
+    // runner as PENDING when the cap is reached, and the only things that ever
+    // promote a PENDING runner are these three call sites plus boot. But the
+    // budget in AutoScheduleService counts PENDING *and* RUNNING — so a queued
+    // runner that nothing will start still consumes the slot it is waiting
+    // for, against itself, forever.
+    //
+    // Observed: one stopped scan left a PENDING runner idle for 25+ minutes on
+    // a completely empty cluster, with `Auto-schedule yielding: 1 scan(s)
+    // already in flight (cap 1)` on repeat — the one scan in flight being the
+    // queued runner itself. It clears only on restart, which is what
+    // "Runner was left pending during application restart" in the run history
+    // actually is.
+    void this.dequeueNextPendingRunner();
+
     return { message: 'Runner stopped' };
   }
 
