@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/blog",
-  "version": "0.5.4-SNAPSHOT",
+  "version": "0.5.4",
   "type": "module",
   "private": true,
   "scripts": {
