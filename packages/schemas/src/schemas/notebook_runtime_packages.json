@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.92",
+      "version": "1.43.93",
       "modules": [
         "boto3"
       ],
