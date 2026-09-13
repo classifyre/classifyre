@@ -1416,6 +1416,44 @@ describe('CliRunnerService', () => {
     });
   });
 
+  it('drains the queue after a stop, so a PENDING runner cannot block on itself', async () => {
+    // Regression: stopRunner freed the slot but never promoted the next queued
+    // runner, and AutoScheduleService counts PENDING as in-flight — so the
+    // queued runner held the only slot against itself until the next restart.
+    const { service, prisma } = createService();
+    const dequeue = jest
+      .spyOn(service as any, 'dequeueNextPendingRunner')
+      .mockResolvedValue(undefined);
+
+    // PENDING on purpose: the queued runner is the one that deadlocks.
+    prisma.runner.findUnique
+      .mockResolvedValueOnce({
+        id: 'runner-1',
+        sourceId: 'source-1',
+        status: 'PENDING',
+        executionMode: RunnerExecutionMode.LOCAL,
+        jobName: null,
+        jobNamespace: null,
+      })
+      .mockResolvedValueOnce({
+        id: 'runner-1',
+        sourceId: 'source-1',
+        status: 'ERROR',
+      });
+
+    const tx = {
+      runner: { update: jest.fn().mockResolvedValue({}) },
+      source: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      runnerAsset: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    };
+    prisma.$transaction.mockImplementation((callback: any) => callback(tx));
+
+    await service.stopRunner('runner-1');
+
+    expect(dequeue).toHaveBeenCalled();
+    dequeue.mockRestore();
+  });
+
   it('does not overwrite a terminal runner state after kubernetes job exit', async () => {
     const kubernetesCliJobService = {
       isEnabled: jest.fn().mockReturnValue(true),
