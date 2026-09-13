@@ -1,0 +1,12 @@
+-- Express-lane default follows the recurrence-bonus re-tune (0.75 -> 0.85).
+--
+-- Awarding the +0.12 cross-document bonus to narrow duplicate groups lifts
+-- ~68k findings over the old bar on the Firmenbuch corpus, nearly all company
+-- numbers; at 0.75, 251 of 272 recent scans carried an express-grade finding
+-- and the coalescing window was defeated (baseline: 137 scans). At 0.85 the
+-- bypass rate is 146 scans. See docs/first-use/ranking-calibration-2026-07-16.md.
+--
+-- New rows only, deliberately: a stored 0.75 may be an operator's explicit
+-- choice, and a migration cannot tell that from an untouched default. An
+-- install that never set the dial should move it to 0.85 by hand.
+ALTER TABLE "instance_settings" ALTER COLUMN "harness_express_importance" SET DEFAULT 0.85;

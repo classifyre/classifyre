@@ -26,10 +26,12 @@ describe('neighbourhood fan-out', () => {
       calibrateNeighborhood: (
         space: { id: string; dim: number },
         hashes: string[],
-      ) => Promise<void>;
+        maxRows?: number,
+      ) => Promise<number>;
       findingPagesForHashes: (hashes: string[]) => AsyncGenerator<unknown[]>;
     };
     const calibrated: string[][] = [];
+    const grouped: any[] = [];
     Object.assign(service, {
       config: { hnswEfSearch: 40 },
       logger: { log: jest.fn(), warn: jest.fn(), error: jest.fn() },
@@ -44,6 +46,10 @@ describe('neighbourhood fan-out', () => {
             return Promise.resolve([]);
           }),
           upsert: jest.fn(() => Promise.resolve({})),
+          updateMany: jest.fn((args: any) => {
+            grouped.push(args);
+            return Promise.resolve({ count: 0 });
+          }),
         },
         $transaction: jest.fn((fn: (tx: unknown) => unknown) =>
           fn({ $executeRaw: jest.fn(), $queryRaw: queryRaw }),
@@ -51,7 +57,7 @@ describe('neighbourhood fan-out', () => {
       },
       spaceIdLiteral: (id: string) => id,
     });
-    return { service, queryRaw, findMany, calibrated };
+    return { service, queryRaw, findMany, calibrated, grouped };
   }
 
   it('asks the database for distinct hash/type pairs, not per finding', async () => {
@@ -186,5 +192,97 @@ describe('neighbourhood fan-out', () => {
     await h.service.calibrateNeighborhood({ id: 'space-1', dim: 384 }, []);
 
     expect(h.queryRaw).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Assigning the component's group hash, and paying for the walk.
+   *
+   * Both of these were introduced by the guard that stopped this statement
+   * rewriting a whole component on every pass — the guard was right, its SQL
+   * semantics were not.
+   */
+  describe('near-duplicate group assignment', () => {
+    const seed = (targetHash: string, neighborHash: string, score: number) => ({
+      targetHash,
+      findingType: 'regex:AT_FIRMENBUCHNUMMER',
+      neighborHash,
+      score,
+    });
+
+    const page = (findingId: string, hash: string) => ({
+      id: findingId,
+      embedContentHash: hash,
+      findingType: 'regex:AT_FIRMENBUCHNUMMER',
+    });
+
+    it('assigns the component root to rows that have no group yet', async () => {
+      // `{ not: root }` alone is SQL three-valued logic: a NULL group is neither
+      // equal nor unequal, so every row without a group is silently skipped —
+      // and those are exactly the findings whose content hash is unique but which
+      // belong to a near-duplicate component. They would keep noveltyScore at 1.0
+      // and an inflated importance, permanently. Measured on one namespace: the
+      // bare form matched 593,085 of 605,220 rows, missing all 12,135 nulls.
+      const h = harness(
+        [seed('h1', 'h2', 0.97)],
+        [[page('f1', 'h1'), page('f2', 'h2')], []],
+      );
+
+      await h.service.calibrateNeighborhood({ id: 'space-1', dim: 384 }, [
+        'h1',
+        'h2',
+      ]);
+
+      expect(h.grouped).toHaveLength(1);
+      expect(h.grouped[0].where.OR).toEqual([
+        { duplicateGroupHash: null },
+        { duplicateGroupHash: { not: 'h1' } },
+      ]);
+      expect(h.grouped[0].data).toEqual({ duplicateGroupHash: 'h1' });
+    });
+
+    it('reports what it walked, so the pass budget can count it', async () => {
+      // The refresh budget used to accumulate only the analysis walk while this
+      // one ran on the same cohorts for free, so a bounded pass did up to twice
+      // the rows it reported.
+      const h = harness(
+        [seed('h1', 'h2', 0.97)],
+        [[page('f1', 'h1'), page('f2', 'h2')], []],
+      );
+
+      const walked = await h.service.calibrateNeighborhood(
+        { id: 'space-1', dim: 384 },
+        ['h1', 'h2'],
+      );
+
+      expect(walked).toBe(2);
+    });
+
+    it('stops at the budget it was given', async () => {
+      const h = harness(
+        [seed('h1', 'h2', 0.97)],
+        [[page('f1', 'h1'), page('f2', 'h2')], []],
+      );
+
+      const walked = await h.service.calibrateNeighborhood(
+        { id: 'space-1', dim: 384 },
+        ['h1', 'h2'],
+        1,
+      );
+
+      expect(walked).toBe(1);
+    });
+
+    it('does no work at all on an exhausted budget', async () => {
+      const h = harness([seed('h1', 'h2', 0.97)], [[page('f1', 'h1')], []]);
+
+      expect(
+        await h.service.calibrateNeighborhood(
+          { id: 'space-1', dim: 384 },
+          ['h1'],
+          0,
+        ),
+      ).toBe(0);
+      expect(h.queryRaw).not.toHaveBeenCalled();
+    });
   });
 });

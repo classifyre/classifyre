@@ -10,6 +10,7 @@ import { CorrelationReviewService } from '../../../correlation/review/correlatio
 import {
   CORRELATION_RELATION_TYPES,
   CorrelationService,
+  buildReasons,
 } from '../../../correlation/correlation.service';
 import { DuplicatesFinderAgentService } from '../../../correlation/duplicates-finder-agent.service';
 import { DecisionApplierService } from '../../decision-applier.service';
@@ -121,6 +122,7 @@ export class FingerprintsToolset {
               const meta = (e.metadata ?? {}) as {
                 weighted?: number;
                 reasons?: string[];
+                sharedByLabel?: Record<string, number>;
               };
               const k = key(e.fromId, e.toId);
               const signature = signatureBy.get(k);
@@ -130,7 +132,9 @@ export class FingerprintsToolset {
                 matchPercent: Math.round(
                   (meta.weighted ?? Number(e.confidence)) * 100,
                 ),
-                reasons: meta.reasons ?? [],
+                // Derived from sharedByLabel; `reasons` is only present on
+                // edges written before the scorer stopped storing it.
+                reasons: meta.reasons ?? buildReasons(meta.sharedByLabel ?? {}),
                 patternKey: signature?.patternKey ?? null,
                 // PATH means lineage explains the resemblance (a derived copy).
                 // NO_PATH means both sides have lineage and nothing connects

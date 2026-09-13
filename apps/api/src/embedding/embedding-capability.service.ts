@@ -58,17 +58,22 @@ export class EmbeddingCapabilityService {
             AND attribute.attname = 'vec'
             AND NOT attribute.attisdropped
         ) AS "columnType",
+        -- Either representation is valid. halfvec is what the column is
+        -- migrated to (half the bytes a dimension, and the only type pgvector
+        -- can HNSW-index above 2,000 dimensions); vector is what it was
+        -- before that migration, and an install part-way through an upgrade
+        -- must still boot rather than refusing with a type error.
         (
-          SELECT attribute.atttypid = vector_type.oid
+          SELECT attribute.atttypid = ANY(vector_types.oids)
           FROM pg_attribute attribute
           CROSS JOIN LATERAL (
-            SELECT type.oid
+            SELECT array_agg(type.oid) AS oids
             FROM pg_type type
             JOIN pg_extension extension
               ON extension.extname = 'vector'
              AND extension.extnamespace = type.typnamespace
-            WHERE type.typname = 'vector'
-          ) vector_type
+            WHERE type.typname IN ('vector', 'halfvec')
+          ) vector_types
           WHERE attribute.attrelid = to_regclass('content_embeddings')
             AND attribute.attname = 'vec'
             AND NOT attribute.attisdropped
@@ -82,7 +87,7 @@ export class EmbeddingCapabilityService {
     }
     if (!result.columnIsVector) {
       throw new Error(
-        `Classifyre detected pgvector ${result.version}, but content_embeddings.vec is missing or has the wrong type (${result.columnType ?? 'missing'}). The API normally applies pending migrations before this check; verify that DATABASE_URL points to the intended database and that the Prisma migration history is consistent with its schema.`,
+        `Classifyre detected pgvector ${result.version}, but content_embeddings.vec is missing or has the wrong type (${result.columnType ?? 'missing'}; expected halfvec or vector). The API normally applies pending migrations before this check; verify that DATABASE_URL points to the intended database and that the Prisma migration history is consistent with its schema.`,
       );
     }
     this.vectorVersions.set(key, result.version);

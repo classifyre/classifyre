@@ -5,6 +5,7 @@ import { ArchiveReader } from './archive';
 import { ArchiveStoreService } from './archive-store.service';
 import { NamespaceExportService } from './namespace-export.service';
 import { NamespaceImportService } from './namespace-import.service';
+import { tablesForScopes } from './transfer-scopes';
 import { MASKED_CONFIG_ENCRYPTED_PREFIX } from '../utils/masked-config.utils';
 import type { PrismaService } from '../prisma.service';
 
@@ -245,6 +246,7 @@ const encrypted = `${MASKED_CONFIG_ENCRYPTED_PREFIX}abc.def.ghi`;
 // tests would silently exercise the pass-through path instead of the remap.
 const SOURCE_ID = '11111111-1111-4111-8111-000000000001';
 const RUNNER_ID = '22222222-2222-4222-8222-000000000002';
+const FINDING_ID = '33333333-3333-4333-8333-000000000003';
 const assetId = (i: number) =>
   `33333333-3333-4333-8333-${String(i).padStart(12, '0')}`;
 
@@ -682,6 +684,97 @@ describe('export → import round trip', () => {
     expect(
       warnings.filter((warning) => /scan history/i.test(warning)),
     ).toHaveLength(1);
+  });
+
+  /**
+   * `fingerprints` is the scope this was missing entirely, and the column it
+   * was missing is the one that silently mis-links evidence.
+   *
+   * `assetCorrelationValue.findingId` was absent from `idRefs`, so it kept the
+   * exporting namespace's id while `assetId` was remapped. Importing somewhere
+   * new, the foreign key rejected the row and it was dropped; importing back
+   * into the same namespace the row survived pointing at a DIFFERENT asset's
+   * finding, which is what the Fingerprints screen deep-links to.
+   */
+  const FINGERPRINT_SCOPES = ['sources', 'assets', 'findings', 'fingerprints'];
+
+  /**
+   * Every table these scopes touch, empty unless named — the export asks for a
+   * delegate per declared model, so a partial fixture fails on the first table
+   * nobody thought about rather than on anything this test is asserting.
+   */
+  const tablesFor = (
+    scopes: string[],
+    rows: Record<string, Record<string, unknown>[]> = {},
+  ) =>
+    Object.fromEntries(
+      tablesForScopes(scopes as never).map((table) => [
+        table.model,
+        { keys: [...table.keys], rows: rows[table.model] ?? [] },
+      ]),
+    ) as unknown as Record<string, FakeTable>;
+
+  const fingerprintRows = () => ({
+    source: [{ id: SOURCE_ID, name: 'Wiki' }],
+    asset: manyAssets(2),
+    finding: [{ id: FINDING_ID, sourceId: SOURCE_ID, assetId: assetId(0) }],
+    assetCorrelationValue: [
+      {
+        assetId: assetId(0),
+        valueHash: 'v-hash-1',
+        sourceId: SOURCE_ID,
+        findingId: FINDING_ID,
+        label: 'company number',
+        normalizedValue: 'fn 123456a',
+      },
+    ],
+  });
+
+  it('remaps a correlation value onto the imported finding, not the old one', async () => {
+    const { archiveId } = await runExport(
+      FINGERPRINT_SCOPES,
+      tablesFor(FINGERPRINT_SCOPES, fingerprintRows()),
+    );
+
+    const target = tablesFor(FINGERPRINT_SCOPES);
+    const job = {
+      ...baseJob,
+      kind: 'IMPORT' as const,
+      archived: true,
+      scopes: FINGERPRINT_SCOPES,
+    };
+    const state = makePrisma(target, job, chunkStore);
+    await importer(state.prisma).run(stageImport(archiveId, job));
+
+    expect(target['assetCorrelationValue'].rows).toHaveLength(1);
+    const value = target['assetCorrelationValue'].rows[0];
+    const finding = target['finding'].rows[0];
+    // The point of the test: it followed the finding through the remap rather
+    // than keeping the id it arrived with.
+    expect(value['findingId']).not.toBe(FINDING_ID);
+    expect(value['findingId']).toBe(finding['id']);
+  });
+
+  it('nulls the finding reference when findings were left out', async () => {
+    const { archiveId } = await runExport(
+      FINGERPRINT_SCOPES,
+      tablesFor(FINGERPRINT_SCOPES, fingerprintRows()),
+    );
+
+    // `fingerprints` depends on `assets` and not on `findings`, so this is a
+    // supported import — and the reason `findingId` needs `optionalRefs` as
+    // well as `idRefs`. Without it the row would be rejected by the foreign key
+    // rather than landing with a null the self-heal can repair on first read.
+    const scopes = ['assets', 'fingerprints'];
+    const target = tablesFor(scopes);
+    target['assetCorrelationValue'].fkCheck = (row) =>
+      row['findingId'] === null;
+    const job = { ...baseJob, kind: 'IMPORT' as const, archived: true, scopes };
+    const state = makePrisma(target, job, chunkStore);
+    await importer(state.prisma).run(stageImport(archiveId, job));
+
+    expect(target['assetCorrelationValue'].rows).toHaveLength(1);
+    expect(target['assetCorrelationValue'].rows[0]['findingId']).toBeNull();
   });
 
   it('imports what it can from a truncated archive and says so', async () => {

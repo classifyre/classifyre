@@ -142,7 +142,7 @@ export class InstanceSettingsResponseDto {
   @ApiProperty({
     description:
       'Importance at or above which a single new finding earns an immediate cycle instead of waiting for the batch.',
-    example: 0.75,
+    example: 0.85,
   })
   harnessExpressImportance: number;
 

@@ -5,37 +5,40 @@ import {
 } from './embedding-vector';
 
 /**
- * The dimension cap was pgvector's *index* limit used as a validation rule, so
- * the product rejected models it could serve perfectly well. Reported from a
- * live instance: `PUT /embeddings/settings` with nemotron-3-embed-1b (2,048)
- * answered "dimensions must be between 1 and 2000" — a 400 on a configuration
- * that pgvector stores and searches without complaint.
+ * Two rules have to hold here.
  *
- * The rule that has to hold: the index expression and the query expression
- * agree for every dimension count, because a silent disagreement means the
- * planner ignores the index and similarity search degrades to a sequential
- * scan that nobody is told about.
+ * The index expression and the query expression must agree for every dimension
+ * count, because a silent disagreement means the planner ignores the index and
+ * similarity search degrades to a sequential scan that nobody is told about.
+ *
+ * And the dimension cap must stay a statement about *indexing*, not about what
+ * the product will accept. It was once used as a validation rule, so a live
+ * instance answered `PUT /embeddings/settings` with nemotron-3-embed-1b (2,048)
+ * as "dimensions must be between 1 and 2000" -- a 400 on a configuration
+ * pgvector stores and searches without complaint.
  */
 describe('vectorCast', () => {
-  it('indexes ordinary models as vector', () => {
-    expect(vectorCast(384)).toEqual({
-      type: 'vector',
-      ops: 'public.vector_cosine_ops',
-      indexed: true,
-    });
-    expect(vectorCast(2000).type).toBe('vector');
-    expect(vectorCast(2000).indexed).toBe(true);
+  it('stores every space at half precision', () => {
+    // Two bytes a dimension instead of four, across the whole range. Measured
+    // at 384 dimensions: 776 bytes a row against 1,544.
+    for (const dim of [1, 384, 1536, 2000, 2048, 3072, 4000]) {
+      expect(vectorCast(dim).type).toBe('halfvec');
+    }
   });
 
-  it('indexes the models the old cap rejected, via halfvec', () => {
-    // The exact case from the bug report.
-    expect(vectorCast(2048)).toEqual({
+  it('indexes ordinary models', () => {
+    expect(vectorCast(384)).toEqual({
       type: 'halfvec',
       ops: 'public.halfvec_cosine_ops',
       indexed: true,
     });
-    // text-embedding-3-large.
-    expect(vectorCast(3072).type).toBe('halfvec');
+    expect(vectorCast(2000).indexed).toBe(true);
+  });
+
+  it('indexes the models the old cap rejected', () => {
+    // The exact case from the bug report, and text-embedding-3-large.
+    expect(vectorCast(2048).indexed).toBe(true);
+    expect(vectorCast(3072).indexed).toBe(true);
     expect(vectorCast(MAX_INDEXED_DIMENSIONS).indexed).toBe(true);
   });
 
@@ -43,7 +46,7 @@ describe('vectorCast', () => {
     const cast = vectorCast(MAX_INDEXED_DIMENSIONS + 1);
     expect(cast.indexed).toBe(false);
     // Still a usable cast: the query has to run, just without an index.
-    expect(cast.type).toBe('vector');
+    expect(cast.type).toBe('halfvec');
   });
 
   it('pairs every type with its own operator class', () => {

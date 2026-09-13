@@ -75,8 +75,12 @@ describe('FindingStatsService', () => {
       await service.rebuildAll();
 
       const sql = sqlOf(executeRaw.mock.calls);
+      // TRUNCATE, not DELETE: a full rebuild replaces every row, and the
+      // DELETE left them all behind as dead tuples plus dead index entries
+      // that autovacuum can only recycle, never hand back.
+      expect(sql).toContain('TRUNCATE TABLE');
       for (const table of TABLES) {
-        expect(sql).toContain(`DELETE FROM ${table}`);
+        expect(sql).toContain(table);
         expect(sql).toContain(`INSERT INTO ${table}`);
       }
     });
@@ -96,8 +100,35 @@ describe('FindingStatsService', () => {
 
       const sql = sqlOf(executeRaw.mock.calls);
       for (const table of TABLES) {
-        expect(sql).toContain(`DELETE FROM ${table} WHERE day`);
+        // Upsert, then prune only the keys the fresh aggregate stopped
+        // producing. The old shape deleted the whole day and reinserted it on
+        // every pass, which is what grew one rollup's 28 MB of keys into a
+        // 263 MB index across 7,609 runs.
         expect(sql).toContain(`INSERT INTO ${table}`);
+        expect(sql).toContain(`ON CONFLICT`);
+        expect(sql).toContain(`DELETE FROM ${table} s`);
+        expect(sql).toContain(`NOT EXISTS`);
+      }
+    });
+
+    it('does not rewrite a rollup row whose counts did not move', async () => {
+      // Nearly every row of a dirty day is unchanged on a rescan. Without the
+      // guard on DO UPDATE, each of those still writes a new tuple.
+      const executeRaw = jest.fn().mockResolvedValue(0);
+      const queryRaw = jest
+        .fn()
+        .mockResolvedValueOnce([{ day: new Date('2026-08-13T00:00:00Z') }])
+        .mockResolvedValue([{ total: 1n }]);
+      const service = new FindingStatsService({
+        $executeRaw: executeRaw,
+        $queryRaw: queryRaw,
+      } as never);
+
+      await service.refreshDirtyDays();
+
+      const sql = sqlOf(executeRaw.mock.calls);
+      for (const table of TABLES) {
+        expect(sql).toContain(`WHERE ${table}.count IS DISTINCT FROM`);
       }
     });
 
