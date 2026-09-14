@@ -62,7 +62,7 @@ FROM models AS models-source
 # ── runtime ───────────────────────────────────────────────────────────────────
 # Based on the same image the CLI is, so the virtualenv's interpreter, its
 # symlinks and every native wheel it carries are the ones they were built for.
-FROM python:3.12.14-slim-bookworm AS runtime
+FROM python:3.14.7-slim-bookworm AS runtime
 
 ARG TARGETARCH
 ARG PG_MAJOR
