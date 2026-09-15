@@ -11,8 +11,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.detectors.custom.runners._llm import LLMCompletionError, LLMRunner
+from src.detectors.custom.runners._llm import (
+    LLMCompletionError,
+    LLMProviderRefusedError,
+    LLMRunner,
+    _quota_markers,
+)
+from src.detectors.errors import ProviderRefusedError
 from src.models.generated_detectors import (
+    DetectorBudget,
     LLMLabelDefinition,
     LLMOutputField,
     LLMPipelineSchema,
@@ -216,6 +223,108 @@ def test_completion_error_is_picklable() -> None:
     restored = pickle.loads(pickle.dumps(err))
     assert isinstance(restored, LLMCompletionError)
     assert "429" in str(restored)
+
+
+# ── Non-retryable refusals and the per-detector budget ────────────────────────
+
+# The body OpenRouter's free tier returns once its daily allowance is gone. Four
+# attempts with backoff turned this into ~15-40 s per asset and a 150-minute run
+# that failed on every asset — the refusal was already the final answer.
+OPENROUTER_DAILY_QUOTA = (
+    'OpenrouterException - {"error":{"message":"Rate limit exceeded: '
+    "free-models-per-day. Add 10 credits to unlock 1000 free model requests per "
+    'day","code":429,"metadata":{"headers":{"X-RateLimit-Limit":"50",'
+    '"X-RateLimit-Remaining":"0"}}}}'
+)
+
+
+def test_shared_marker_list_is_the_one_in_use() -> None:
+    # The CLI and the API must agree on what "retrying cannot help" means, so
+    # both read packages/schemas; the fallback is for a broken package only.
+    assert "credits to unlock" in _quota_markers()
+
+
+def test_daily_quota_refusal_is_not_retried(monkeypatch) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", sleeps.append)
+    completion = MagicMock(side_effect=_RateLimitError(OPENROUTER_DAILY_QUOTA))
+    runner = _runner(_schema(), completion)
+
+    with pytest.raises(LLMProviderRefusedError, match="quota exhausted"):
+        runner.detect(TEXT, "text/plain")
+
+    assert completion.call_count == 1
+    assert sleeps == []
+
+
+def test_auth_refusal_is_a_provider_refusal(monkeypatch) -> None:
+    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    completion = MagicMock(side_effect=_AuthError("invalid api key"))
+    runner = _runner(_schema(), completion)
+
+    with pytest.raises(ProviderRefusedError) as raised:
+        runner.detect(TEXT, "text/plain")
+
+    # Still an LLMCompletionError, so every existing caller keeps working.
+    assert isinstance(raised.value, LLMCompletionError)
+    assert completion.call_count == 1
+
+
+def test_plain_rate_limit_without_quota_wording_is_still_retried(monkeypatch) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", sleeps.append)
+    good = _mock_completion({"labels": [{"name": "bad", "confidence": 0.9}]})
+    completion = MagicMock(
+        side_effect=[_RateLimitError("429 Too Many Requests, slow down"), good.return_value]
+    )
+    runner = _runner(_schema(), completion)
+
+    assert [r.finding_type for r in runner.detect(TEXT, "text/plain")] == ["bad"]
+    assert completion.call_count == 2
+    assert len(sleeps) == 1
+
+
+def test_budget_max_attempts_overrides_the_environment(monkeypatch) -> None:
+    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    monkeypatch.setenv("CLASSIFYRE_LLM_MAX_ATTEMPTS", "4")
+    completion = MagicMock(side_effect=_RateLimitError("429 slow down"))
+    runner = _runner(_schema(budget=DetectorBudget(max_attempts=1)), completion)
+
+    with pytest.raises(LLMCompletionError):
+        runner.detect(TEXT, "text/plain")
+
+    assert completion.call_count == 1
+
+
+def test_provider_sdk_retries_are_disabled_so_this_loop_is_the_only_one() -> None:
+    completion = _mock_completion({"labels": []})
+    runner = _runner(_schema(), completion)
+
+    runner.detect(TEXT, "text/plain")
+
+    assert completion.call_args.kwargs["max_retries"] == 0
+
+
+def test_attempts_env_is_read_per_call_not_at_import(monkeypatch) -> None:
+    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    monkeypatch.setenv("CLASSIFYRE_LLM_MAX_ATTEMPTS", "2")
+    completion = MagicMock(side_effect=_RateLimitError("429 slow down"))
+    runner = _runner(_schema(), completion)
+
+    with pytest.raises(LLMCompletionError):
+        runner.detect(TEXT, "text/plain")
+
+    assert completion.call_count == 2
+
+
+def test_refusal_error_crosses_the_pool_boundary_with_its_type() -> None:
+    import pickle
+
+    err = LLMProviderRefusedError("LLM provider refused detector 'x' (quota exhausted): 429")
+    restored = pickle.loads(pickle.dumps(err))
+    assert isinstance(restored, ProviderRefusedError)
+    assert isinstance(restored, LLMCompletionError)
+    assert "quota exhausted" in str(restored)
 
 
 # ── Vision / file input ───────────────────────────────────────────────────────

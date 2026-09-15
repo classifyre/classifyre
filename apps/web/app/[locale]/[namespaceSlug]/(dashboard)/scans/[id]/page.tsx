@@ -35,6 +35,9 @@ import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { RunnerStatusBadge } from "@/components/runner-status-badge";
 import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
 import { getSourceIcon } from "@/lib/source-type-icon";
+import { splitRunnerErrorDetails } from "@/lib/runner-degradation";
+import { CohortYieldTable } from "@/components/cohort-yield";
+import type { TranslationKey } from "@/i18n";
 import {
   Badge,
   Button,
@@ -539,15 +542,54 @@ export default function RunnerDetailPage() {
                   </CardTitle>
                   <CardDescription>{runner.errorMessage}</CardDescription>
                 </CardHeader>
-                {runner.errorDetails && (
-                  <CardContent>
-                    <pre className="text-xs text-destructive/80 bg-destructive/5 p-2 rounded max-h-64 overflow-auto break-all whitespace-pre-wrap">
-                      {JSON.stringify(runner.errorDetails, null, 2)}
-                    </pre>
-                  </CardContent>
-                )}
+                {(() => {
+                  const { degraded, rest } = splitRunnerErrorDetails(
+                    runner.errorDetails,
+                  );
+                  return (
+                    <>
+                      {degraded.length > 0 && (
+                        <CardContent className="space-y-2">
+                          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                            {t("scans.degraded.title")}
+                          </p>
+                          <ul className="space-y-1.5 text-sm">
+                            {degraded.map((entry) => (
+                              <li key={entry.detector}>
+                                <span className="font-mono">{entry.detector}</span>{" "}
+                                {t("scans.degraded.item", {
+                                  skipped: entry.assetsSkipped.toLocaleString(),
+                                  cause: t(
+                                    `scans.degraded.cause.${entry.cause}` as TranslationKey,
+                                  ),
+                                })}
+                                {entry.reason && (
+                                  <span className="block break-words text-xs text-muted-foreground">
+                                    {entry.reason}
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="text-xs text-muted-foreground">
+                            {t("scans.degraded.retryNote")}
+                          </p>
+                        </CardContent>
+                      )}
+                      {rest && (
+                        <CardContent>
+                          <pre className="text-xs text-destructive/80 bg-destructive/5 p-2 rounded max-h-64 overflow-auto break-all whitespace-pre-wrap">
+                            {JSON.stringify(rest, null, 2)}
+                          </pre>
+                        </CardContent>
+                      )}
+                    </>
+                  );
+                })()}
               </Card>
             )}
+
+          <CohortYieldTable cohortYield={runner.cohortYield} />
 
           {(runner.assetsWithoutText > 0 ||
             runner.assetsOutOfScope > 0 ||

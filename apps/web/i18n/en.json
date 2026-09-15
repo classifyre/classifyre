@@ -980,7 +980,11 @@
       "severity": "Priority",
       "comment": "Comment",
       "noChange": "No change",
-      "commentPlaceholder": "Add a comment to all selected findings…"
+      "commentPlaceholder": "Add a comment to all selected findings…",
+      "countingExact": "Counting matching findings…",
+      "unnarrowedWarning": "These filters select every finding in this workspace. Saving applies the change to all {{count}} of them.",
+      "countChanged": "More findings match than when this panel opened, so nothing was changed. The count has been refreshed — review it and save again.",
+      "updateFailed": "Failed to update findings"
     },
     "extraction": {
       "noFields": "No fields populated",
@@ -1149,6 +1153,21 @@
       "custom": "Custom",
       "unknown": "Unknown",
       "moreCount": "+{{count}} more"
+    },
+    "bulkOperations": {
+      "running": "Updating {{processed}} of {{total}} findings in the background ({{percent}}%)",
+      "changed": "· {{count}} changed",
+      "stop": "Stop",
+      "stopping": "Stopping after the current page…",
+      "completed": "Background update finished: {{count}} findings changed.",
+      "cancelled": "Background update stopped: {{count}} findings were changed before it stopped. Nothing was undone.",
+      "failed": "Background update failed: {{message}}",
+      "dismiss": "Dismiss",
+      "queued": "{{total}} findings queued for a background update — waiting for a free worker…",
+      "retireQueued": "Retiring out-of-scope findings of {{key}} is queued — waiting for a free worker…",
+      "retireRunning": "Retiring out-of-scope findings of {{key}}: {{changed}} resolved ({{percent}}%)",
+      "retireCompleted": "Retired {{count}} out-of-scope findings of {{key}}.",
+      "retireCancelled": "Stopped retiring out-of-scope findings of {{key}}: {{count}} were resolved before it stopped. Nothing was undone."
     }
   },
   "assets": {
@@ -1212,6 +1231,10 @@
       "assetMetadata": {
         "title": "Source Properties",
         "desc": "Source-specific properties captured during ingestion.",
+        "reference": {
+          "badge": "Reference — not extracted",
+          "hint": "The connector recorded this asset without extracting its content: {{reason}}. It is findable by these properties, but its content was not scanned."
+        },
         "keys": {
           "size_bytes": "Size",
           "row_count": "Row Count",
@@ -1628,7 +1651,14 @@
       "addField": "Add field",
       "removeField": "Remove field",
       "saving": "Saving…",
-      "validationProviderRequired": "Select an AI provider"
+      "validationProviderRequired": "Select an AI provider",
+      "budgetTitle": "Run budget",
+      "budgetHint": "How much of a run this detector may spend failing. Every run already stops it after a refusal that retrying cannot fix (quota, invalid key, billing) or 10 consecutive failures. Skipped assets keep their findings and are evaluated again on the next run. Changing the budget does not re-scan anything.",
+      "budgetMaxAttempts": "Attempts per asset",
+      "budgetMaxAttemptsPlaceholder": "deployment default",
+      "budgetMaxConsecutiveFailures": "Stop after consecutive failures",
+      "budgetMaxWallClockSeconds": "Time budget per run (seconds)",
+      "budgetMaxWallClockSecondsPlaceholder": "no limit"
     },
     "startBlank": "Start blank",
     "startBlankDesc": "Configure the detector from scratch with no pre-filled values.",
@@ -1717,6 +1747,34 @@
       "usageCopy": "Copy snippet",
       "usageCopied": "Copied",
       "notSelectable": "Tag detectors do not appear in a source's detector list. Every active one is available to every Custom connector automatically."
+    },
+    "retire": {
+      "title": "Out-of-scope findings",
+      "description": "Narrowing this detector's asset kinds or removing a regex pattern stops new findings, but the ones it already produced stay open — a rescan never revisits them with this detector. Check which findings it can no longer produce, then retire them.",
+      "check": "Check out-of-scope findings",
+      "dialogTitle": "Out-of-scope findings for {{key}}",
+      "dialogDescription": "Counted against the detector's current configuration. Nothing changes until you confirm.",
+      "queued": "Queued — waiting for a free background worker…",
+      "counting": "Counting… {{percent}}% of the findings table checked",
+      "none": "Nothing to retire: every open finding of this detector is still within its scope.",
+      "candidates": "{{count}} open findings can no longer be produced by this detector.",
+      "reasonAssetKind": "Asset kind \"{{value}}\" is outside the scope",
+      "reasonPatternRemoved": "Pattern \"{{value}}\" was removed",
+      "keptCited": "Kept — cited by a case: {{count}}",
+      "keptWatched": "Kept — watched by an active inquiry: {{count}}",
+      "includeWatched": "Also retire the {{count}} findings that active inquiries watch",
+      "includeWatchedHint": "Those inquiries lose these matches. Findings a case cites are never retired.",
+      "willRetire": "{{count}} findings will be resolved. No detector feedback is recorded, and they reopen automatically if the scope is widened again.",
+      "notProvable": "What this check cannot judge",
+      "retireButton": "Retire {{count}} findings",
+      "retiring": "Retiring… {{changed}} resolved ({{percent}}%)",
+      "done": "Retired {{count}} findings.",
+      "cancelled": "Stopped after retiring {{count}} findings. Nothing was undone.",
+      "capReached": "Stopped at the reviewed count: more findings fell out of scope after the count. Check again to review them.",
+      "failed": "Could not finish: {{message}}",
+      "startFailed": "Could not start the check.",
+      "countAgain": "Check again",
+      "close": "Close"
     }
   },
   "scans": {
@@ -1856,7 +1914,17 @@
       "title": "Source Context",
       "openSource": "Open Source"
     },
-    "sourceRun": "{{source}} Run"
+    "sourceRun": "{{source}} Run",
+    "degraded": {
+      "title": "Detectors switched off during this run",
+      "item": "skipped {{skipped}} assets because {{cause}}.",
+      "retryNote": "Skipped assets keep their existing findings and are evaluated again on the next run.",
+      "cause": {
+        "provider_refused": "the AI provider refused the request (quota, key or billing)",
+        "consecutive_failures": "it failed too many times in a row",
+        "wall_clock_budget": "it used up its time budget"
+      }
+    }
   },
   "notifications": {
     "title": "Notifications",
@@ -4566,6 +4634,35 @@
       "description": "Classifyre documentation — how the app works, section by section: connect Confluence, Jira, SharePoint and more, run scans, triage findings, dedupe assets and investigate with the AI autopilot.",
       "ogTitle": "Documentation — Connect, Scan & Investigate | Classifyre",
       "ogDescription": "Connect sources, scan them, review findings and investigate what matters — with an AI autopilot doing the legwork. Guides for every workflow."
+    }
+  },
+  "cohorts": {
+    "runTitle": "Cohort selection in this run",
+    "runDescription": "What each band of the connector's ctx.cohort() visited, and how many of those keys produced a new HIGH or CRITICAL finding. The platform shifts the next runs' split toward the productive bands.",
+    "universe": "{{count}} keys in the universe",
+    "bandColumn": "Band",
+    "visited": "Visited",
+    "hits": "Hits",
+    "rate": "Hit rate",
+    "weightUsed": "Share used",
+    "exhausted": "pass complete",
+    "sourceTitle": "Cohort selection",
+    "sourceDescription": "How the next run of this source splits its budget across the bands of each cohort it walks.",
+    "lastRun": "Last run: {{bands}}",
+    "band": {
+      "newest": "Newest",
+      "oldest": "Oldest",
+      "random": "Random"
+    },
+    "mode": {
+      "auto": "Measured",
+      "fixed": "Fixed"
+    },
+    "reason": {
+      "no_history": "No runs measured yet: the connector's declared split is used.",
+      "cold_start": "Collecting evidence: the declared split stands until every band has 200 visits.",
+      "measured": "Shifted toward the bands with the higher hit rate, at most 15 points a run, never below 10% per band.",
+      "fixed": "A fixed split set on the source."
     }
   }
 }

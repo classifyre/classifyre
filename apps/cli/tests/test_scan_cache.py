@@ -144,6 +144,38 @@ def test_changing_the_model_does_invalidate_the_cache() -> None:
     )
 
 
+def test_changing_the_budget_does_not_invalidate_the_cache() -> None:
+    """A budget decides how long a detector may keep failing, not what it reports.
+
+    Hashing it would turn "retry this free-tier LLM detector once, not four
+    times" into a re-run of that detector over every asset — thousands of calls
+    against the quota the budget was set to protect.
+    """
+    base = {
+        "custom_detector_key": "fb_solvency_outlook",
+        "pipeline_schema": {"type": "LLM", "system_prompt": "Assess solvency."},
+    }
+    budgeted = {
+        **base,
+        "pipeline_schema": {
+            **base["pipeline_schema"],
+            "budget": {"max_attempts": 1, "max_consecutive_failures": 3},
+        },
+    }
+    reworded = {
+        **base,
+        "pipeline_schema": {**base["pipeline_schema"], "system_prompt": "Assess liquidity."},
+    }
+    shape: dict[str, Any] = {}
+    assert detector_fingerprint("CUSTOM", base, shape) == detector_fingerprint(
+        "CUSTOM", budgeted, shape
+    )
+    # ...while anything that does change the answer still does.
+    assert detector_fingerprint("CUSTOM", base, shape) != detector_fingerprint(
+        "CUSTOM", reworded, shape
+    )
+
+
 def test_feedback_examples_invalidate_the_cache() -> None:
     """Classifier feedback changes predictions, so it must change the fingerprint."""
     shape: dict[str, Any] = {}

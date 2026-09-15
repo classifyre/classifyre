@@ -85,6 +85,12 @@ export interface FinalizeIngestRunDto {
      * @memberof FinalizeIngestRunDto
      */
     partialCoverage?: boolean;
+    /**
+     * Per ctx.cohort() of the run: keys each band visited and the weights used. The API adds how many of those keys produced a new HIGH/CRITICAL finding.
+     * @type {object}
+     * @memberof FinalizeIngestRunDto
+     */
+    cohortStats?: object;
 }
 
 /**
@@ -117,6 +123,7 @@ export function FinalizeIngestRunDtoFromJSONTyped(json: any, ignoreDiscriminator
         'relationshipsDropped': json['relationshipsDropped'] == null ? undefined : json['relationshipsDropped'],
         'relationshipErrors': json['relationshipErrors'] == null ? undefined : json['relationshipErrors'],
         'partialCoverage': json['partialCoverage'] == null ? undefined : json['partialCoverage'],
+        'cohortStats': json['cohortStats'] == null ? undefined : json['cohortStats'],
     };
 }
 
@@ -142,6 +149,7 @@ export function FinalizeIngestRunDtoToJSONTyped(value?: FinalizeIngestRunDto | n
         'relationshipsDropped': value['relationshipsDropped'],
         'relationshipErrors': value['relationshipErrors'],
         'partialCoverage': value['partialCoverage'],
+        'cohortStats': value['cohortStats'],
     };
 }
 

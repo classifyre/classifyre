@@ -34,6 +34,7 @@ Name | Type
 `findingsRetained` | number
 `assetsWithoutText` | number
 `textCoverage` | [TextCoverageDto](TextCoverageDto.md)
+`cohortYield` | object
 `errorMessage` | string
 `errorDetails` | object
 `jobName` | string
@@ -75,6 +76,7 @@ const example = {
   "findingsRetained": null,
   "assetsWithoutText": null,
   "textCoverage": null,
+  "cohortYield": null,
   "errorMessage": null,
   "errorDetails": null,
   "jobName": null,

@@ -56,6 +56,7 @@ describe('AssetService', () => {
     },
     finding: {
       findMany: jest.fn(),
+      groupBy: jest.fn(),
       createMany: jest.fn(),
       update: jest.fn(),
     },
@@ -66,6 +67,7 @@ describe('AssetService', () => {
     },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
+    $executeRaw: jest.fn(),
   };
 
   const mockInquiryMatching = {
@@ -2656,8 +2658,6 @@ describe('AssetService', () => {
         ...overrides,
       });
 
-      let findingUpdate: jest.Mock;
-
       const runCleanup = (
         config: Record<string, any> | undefined,
         findings: Record<string, any>[],
@@ -2671,14 +2671,35 @@ describe('AssetService', () => {
           id: runnerId,
           sourceId,
         });
+        // The mock cannot evaluate the orphan predicate, so it reports every
+        // fixture's detector; the service must re-check what SQL returned.
+        mockPrismaService.finding.groupBy.mockResolvedValue(
+          findings.map((finding) => ({
+            detectorType: finding.detectorType,
+            customDetectorKey: finding.customDetectorKey,
+            _count: { _all: 1 },
+          })),
+        );
         mockPrismaService.finding.findMany.mockResolvedValue(findings);
-        findingUpdate = jest.fn().mockResolvedValue({});
-        mockPrismaService.$transaction.mockImplementation((callback: any) =>
-          callback({ finding: { update: findingUpdate } }),
+        mockPrismaService.$executeRaw.mockImplementation(
+          (_strings: unknown, ...values: unknown[]) =>
+            Promise.resolve(
+              (values.find(Array.isArray) as unknown[] | undefined)?.length ??
+                0,
+            ),
         );
         // isFullScan=false: only the cleanup path runs, nothing else.
         return service.finalizeIngestRun(sourceId, runnerId, [], false);
       };
+
+      /** Statements the cleanup wrote: SQL text plus bound values. */
+      const writes = () =>
+        mockPrismaService.$executeRaw.mock.calls.map((call: unknown[]) => ({
+          sql: (call[0] as string[]).join('?'),
+          values: call.slice(1),
+        }));
+      const resolveWrites = () =>
+        writes().filter((write) => write.sql.includes(`'RESOLVED'`));
 
       it('resolves findings from a detector that was removed from the config', async () => {
         const result = await runCleanup(
@@ -2687,15 +2708,42 @@ describe('AssetService', () => {
         );
 
         expect(result.resolvedForRemovedDetectors).toBe(1);
-        expect(findingUpdate).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { id: 'finding-llm' },
-            data: expect.objectContaining({
-              status: FindingStatus.RESOLVED,
-              resolutionReason: 'Detector removed from source configuration',
-            }),
-          }),
+        // One set-based statement for the page, not one UPDATE per finding.
+        expect(resolveWrites()).toHaveLength(1);
+        expect(resolveWrites()[0].values).toEqual(
+          expect.arrayContaining([
+            ['finding-llm'],
+            'Detector removed from source configuration',
+          ]),
         );
+        expect(resolveWrites()[0].sql).toContain(
+          `AND status = 'OPEN'::"FindingStatus"`,
+        );
+      });
+
+      it('never reads findings when no configured detector went missing', async () => {
+        // The common case at the end of every run: nothing orphaned, so the
+        // cleanup must not page through the source's findings at all.
+        mockPrismaService.finding.groupBy.mockResolvedValue([]);
+        mockPrismaService.source.findUnique.mockResolvedValue({
+          id: sourceId,
+          type: AssetType.WORDPRESS,
+          config: { detectors: [{ type: 'PII', enabled: true }] },
+        });
+        mockPrismaService.runner.findUnique.mockResolvedValue({
+          id: runnerId,
+          sourceId,
+        });
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          [],
+          false,
+        );
+
+        expect(result.resolvedForRemovedDetectors).toBe(0);
+        expect(mockPrismaService.finding.findMany).not.toHaveBeenCalled();
       });
 
       it('treats a disabled detector as removed', async () => {
@@ -2731,7 +2779,7 @@ describe('AssetService', () => {
         );
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
       });
 
       it('keeps TAG findings the source config cannot name', async () => {
@@ -2744,7 +2792,7 @@ describe('AssetService', () => {
         const result = await runCleanup({ detectors: [] }, [openFinding()]);
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
       });
 
       it('does nothing when the source opts out via the flag', async () => {
@@ -2757,14 +2805,14 @@ describe('AssetService', () => {
         );
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
       });
 
       it('skips cleanup entirely when the config has no detector list', async () => {
         const result = await runCleanup({}, [openFinding()]);
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
       });
 
       it('preserves findings with a manual status override', async () => {
@@ -2783,7 +2831,7 @@ describe('AssetService', () => {
         );
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
       });
 
       it('keeps CUSTOM findings without a detector key (unknown identity)', async () => {
@@ -2793,7 +2841,7 @@ describe('AssetService', () => {
         );
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
       });
 
       /**
@@ -2814,13 +2862,7 @@ describe('AssetService', () => {
 
           expect(result.resolvedForRemovedDetectors).toBe(0);
           expect(result.retainedForCitation).toBe(1);
-          expect(findingUpdate).not.toHaveBeenCalledWith(
-            expect.objectContaining({
-              data: expect.objectContaining({
-                status: FindingStatus.RESOLVED,
-              }),
-            }),
-          );
+          expect(resolveWrites()).toHaveLength(0);
         });
 
         it('does not resolve a finding an active inquiry watches', async () => {
@@ -2841,21 +2883,20 @@ describe('AssetService', () => {
 
           await runCleanup(detectorGone, [openFinding()]);
 
-          expect(findingUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({
-              where: { id: 'finding-llm' },
-              data: {
-                // Stored compact: `s` is the status, `x` the reason CODE.
-                // The sentence comes back through renderHistory on read.
-                history: [
-                  expect.objectContaining({
-                    s: FindingStatus.OPEN,
-                    x: '#retained',
-                  }),
-                ],
-              },
-            }),
+          const [note] = writes();
+          expect(note.sql).not.toContain(`'RESOLVED'`);
+          expect(note.values).toContainEqual(['finding-llm']);
+          const entries = JSON.parse(
+            note.values.find(
+              (value: unknown) =>
+                typeof value === 'string' && value.startsWith('['),
+            ) as string,
           );
+          // Stored compact: `s` is the status, `x` the reason CODE. The
+          // sentence comes back through renderHistory on read.
+          expect(entries).toEqual([
+            expect.objectContaining({ s: FindingStatus.OPEN, x: '#retained' }),
+          ]);
         });
 
         // The check runs at the end of every scan, so a finding cited by a
@@ -2880,7 +2921,7 @@ describe('AssetService', () => {
             }),
           ]);
 
-          expect(findingUpdate).not.toHaveBeenCalled();
+          expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
         });
 
         it('still resolves an orphaned finding nobody is relying on', async () => {

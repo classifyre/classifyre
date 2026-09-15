@@ -17,6 +17,7 @@ Name | Type
 `relationshipsDropped` | number
 `relationshipErrors` | Array&lt;string&gt;
 `partialCoverage` | boolean
+`cohortStats` | object
 
 ## Example
 
@@ -36,6 +37,7 @@ const example = {
   "relationshipsDropped": null,
   "relationshipErrors": null,
   "partialCoverage": null,
+  "cohortStats": null,
 } satisfies FinalizeIngestRunDto
 
 console.log(example)

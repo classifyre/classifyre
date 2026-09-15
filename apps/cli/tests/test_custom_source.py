@@ -8,6 +8,7 @@ notebook code away from this process's credentials.
 from __future__ import annotations
 
 import asyncio
+import base64
 from typing import Any
 
 import pytest
@@ -592,6 +593,317 @@ def test_text_only_notebook_has_no_binary_content(source) -> None:
     instance = source()
     asset = collect(instance)[0]
     assert asyncio.run(instance.fetch_content_bytes(asset.hash)) is None
+
+
+NOTE_BYTES = b"Invoice 42\nTotal: 1.234,00 EUR\n"
+
+FILE_NOTEBOOK = f'''import base64
+
+from classifyre import Asset
+
+
+def test_connection() -> dict:
+    return {{"status": "SUCCESS", "message": "ok"}}
+
+
+def extract():
+    yield Asset(
+        id="note",
+        name="note.txt",
+        url="https://example.com/note.txt",
+        content_bytes=base64.b64decode("{base64.b64encode(NOTE_BYTES).decode()}"),
+        kind="file",
+        metadata={{"folder": "inbox"}},
+    )
+'''
+
+
+def test_discovery_does_not_parse_file_bytes(source, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Parsing a PDF inline on the discovery loop stalled every asset behind
+    # each document (100 discovered, 0 processed). Discovery may only work out
+    # what the bytes are; text extraction belongs to phase 2.
+    from src.utils import file_parser
+
+    def forbidden(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("discovery parsed file bytes")
+
+    monkeypatch.setattr(file_parser, "extract_text", forbidden)
+    monkeypatch.setattr(file_parser, "parse_bytes", forbidden)
+
+    asset = collect(source(build_recipe(FILE_NOTEBOOK)))[0]
+    assert str(asset.asset_type) == "TXT"
+    assert asset.metadata["mime_type"] == "text/plain"
+    assert asset.metadata["folder"] == "inbox"
+
+
+def test_file_text_is_extracted_in_phase_two(source) -> None:
+    from src.pipeline.parsed_content_provider import ParsedContentProvider
+
+    instance = source(build_recipe(FILE_NOTEBOOK))
+    asset = collect(instance)[0]
+
+    async def pages() -> list[str]:
+        return [page async for page in ParsedContentProvider(instance).fetch_text_pages(asset.hash)]
+
+    assert "Invoice 42" in "".join(asyncio.run(pages()))
+
+
+def test_file_asset_checksum_basis_is_a_compatibility_contract(source) -> None:
+    # The basis decides whether every stored asset reads as changed. Discovery
+    # never had a file's extracted text (it read a field the parser does not
+    # set), so the basis hashes the empty string plus the bytes -- and must go
+    # on doing exactly that, or the next run re-scans a whole corpus.
+    import hashlib
+
+    instance = source(build_recipe(FILE_NOTEBOOK))
+    asset = collect(instance)[0]
+    expected = instance.calculate_checksum(
+        {
+            "id": "note",
+            "name": "note.txt",
+            "url": "https://example.com/note.txt",
+            "metadata": asset.metadata,
+            "content_length": 0,
+            "content_sha256": hashlib.sha256(b"").hexdigest(),
+            "tags": {},
+            "content_bytes_sha256": hashlib.sha256(NOTE_BYTES).hexdigest(),
+        }
+    )
+    assert asset.checksum == expected
+
+
+REFERENCE_NOTEBOOK = f'''import base64
+
+from classifyre import Asset
+
+
+def test_connection() -> dict:
+    return {{"status": "SUCCESS", "message": "ok"}}
+
+
+def extract():
+    yield Asset(
+        id="filing",
+        name="filing.txt",
+        url="https://example.com/filing.txt",
+        content_bytes=base64.b64decode("{base64.b64encode(NOTE_BYTES).decode()}"),
+        kind="file",
+        extract=False,
+        reference_reason="27 pages; converting it took 17 minutes",
+        tags={{"filed_document": "annual report"}},
+    )
+    yield Asset(id="bare", name="bare", kind="record", extract=False)
+'''
+
+
+def test_a_reference_asset_is_recorded_not_extracted(source) -> None:
+    instance = source(build_recipe(REFERENCE_NOTEBOOK))
+    filing, bare = collect(instance)
+
+    # Stated on the asset, with everything the bytes could tell cheaply.
+    assert filing.metadata["content_reference"] == "27 pages; converting it took 17 minutes"
+    assert filing.metadata["size_bytes"] == len(NOTE_BYTES)
+    assert filing.metadata["mime_type"] == "text/plain"
+    assert bare.metadata["content_reference"] == "Recorded without content extraction"
+
+    # Nothing kept to extract or scan, and the pipeline is told so.
+    assert instance.extracts_content(filing.hash) is False
+    assert asyncio.run(instance.fetch_content_bytes(filing.hash)) is None
+    assert asyncio.run(instance.fetch_content(filing.hash)) is None
+    # Tags are facts about the asset, not its content: they still apply.
+    assert instance.asset_tags(filing.hash) == {"filed_document": "annual report"}
+
+
+def test_switching_extraction_changes_the_checksum(source) -> None:
+    # Otherwise the scan cache would keep skipping an asset whose handling changed.
+    reference = collect(source(build_recipe(REFERENCE_NOTEBOOK)))[0]
+    extracted = collect(
+        source(
+            build_recipe(
+                REFERENCE_NOTEBOOK.replace(
+                    '        extract=False,\n        reference_reason="27 pages; converting it took 17 minutes",\n',
+                    "",
+                )
+            )
+        )
+    )[0]
+    assert reference.hash == extracted.hash
+    assert reference.checksum != extracted.checksum
+
+
+QUERY_NOTEBOOK = """from classifyre import Asset, AssetQueryError, ctx
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS", "message": "ok"}
+
+
+def extract():
+    page = ctx.query_assets(
+        "Firmenbuch Register",
+        kind="record",
+        where={"legal_form_code": {"in": ["GES", "AG"]}},
+        exclude_visited={"key": "firmenbuchnummer", "since_days": 90},
+        select=["firmenbuchnummer"],
+    )
+    for company in page.items:
+        fn = company.metadata["firmenbuchnummer"]
+        yield Asset(id=f"filing-{fn}", name=f"Filing {fn}", content=f"FN {fn}")
+    if ctx.var("second_page", "") and page.next_cursor:
+        try:
+            ctx.query_assets("Firmenbuch Register", cursor=page.next_cursor)
+        except AssetQueryError as exc:
+            yield Asset(id="refused", name="refused", content=str(exc))
+"""
+
+
+class _FakeResponse:
+    def __init__(self, status: int, body: dict[str, Any]) -> None:
+        self.status_code = status
+        self._body = body
+        self.text = str(body)
+
+    def json(self) -> dict[str, Any]:
+        return self._body
+
+
+def _fake_api(monkeypatch: pytest.MonkeyPatch, responses: list[_FakeResponse]):
+    import src.sources.custom.source as custom_source
+
+    calls: list[dict[str, Any]] = []
+
+    def post(url: str, **kwargs: Any) -> _FakeResponse:
+        calls.append({"url": url, **kwargs})
+        return responses.pop(0)
+
+    monkeypatch.setenv("CLASSIFYRE_OUTPUT_REST_URL", "http://api.test/ns-1")
+    monkeypatch.setenv("CLASSIFYRE_INTERNAL_KEY", "internal-key")
+    monkeypatch.setattr(custom_source.requests, "post", post)
+    return calls
+
+
+def _page(*fns: str, cursor: str | None = None) -> _FakeResponse:
+    return _FakeResponse(
+        200,
+        {
+            "items": [
+                {
+                    "assetHash": f"h-{fn}",
+                    "externalId": f"company:{fn}",
+                    "name": fn,
+                    "kind": "record",
+                    "url": "",
+                    "metadata": {"firmenbuchnummer": fn},
+                }
+                for fn in fns
+            ],
+            "nextCursor": cursor,
+            "callsRemaining": 99,
+        },
+    )
+
+
+def test_a_notebook_reads_its_cohort_through_the_parent(source, monkeypatch) -> None:
+    calls = _fake_api(monkeypatch, [_page("606601k", "008316f")])
+    instance = source(build_recipe(QUERY_NOTEBOOK))
+
+    assets = collect(instance)
+
+    assert [asset.name for asset in assets] == ["Filing 606601k", "Filing 008316f"]
+    # The parent made the call, for this run, with the credentials the
+    # notebook never had.
+    assert calls[0]["url"] == "http://api.test/ns-1/runners/run-1/assets/query"
+    assert calls[0]["headers"]["X-Classifyre-Internal-Key"] == "internal-key"
+    assert calls[0]["json"]["excludeVisited"] == {"key": "firmenbuchnummer", "sinceDays": 90}
+    assert instance.partial_coverage is True
+
+
+def test_a_refused_query_reaches_the_notebook_as_an_error_it_can_handle(
+    source, monkeypatch
+) -> None:
+    _fake_api(
+        monkeypatch,
+        [
+            _page("606601k", cursor="c-1"),
+            _FakeResponse(429, {"message": "This run has used its 100 asset queries."}),
+        ],
+    )
+    recipe = build_recipe(QUERY_NOTEBOOK)
+    recipe["optional"]["variables"]["second_page"] = "yes"
+    instance = source(recipe)
+    assets = collect(instance)
+
+    [refused] = [asset for asset in assets if asset.name == "refused"]
+    content = asyncio.run(instance.fetch_content(refused.hash))
+    assert content is not None
+    assert "refused (429)" in content[1]
+    assert "100 asset queries" in content[1]
+
+
+COHORT_NOTEBOOK = """from classifyre import Asset, ctx
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS", "message": "ok"}
+
+
+def extract():
+    universe = [f"{n:03d}" for n in range(1, 51)]
+    for item in ctx.cohort("register", universe, bands={"newest": 60, "oldest": 40}, size=5):
+        yield Asset(id=f"company:{item.key}", name=item.key, content=f"company {item.key}",
+                    cohort=item if ctx.var("stamp", "yes") == "yes" else None)
+"""
+
+
+def test_cohort_stats_reach_the_run_and_stamping_never_changes_a_checksum(source) -> None:
+    stamped_source = source(build_recipe(COHORT_NOTEBOOK))
+    stamped = {asset.name: asset for asset in collect(stamped_source)}
+    assert stamped_source.cohort_stats["register"]["bands"]["newest"]["visited"] == 3
+    assert stamped["050"].metadata["_cohort"]["band"] == "newest"
+
+    recipe = build_recipe(COHORT_NOTEBOOK)
+    recipe["optional"]["variables"]["stamp"] = "no"
+    plain = {asset.name: asset for asset in collect(source(recipe))}
+    assert "_cohort" not in plain["050"].metadata
+    assert stamped["050"].checksum == plain["050"].checksum
+
+
+def test_platform_weights_reach_the_notebook(source, monkeypatch) -> None:
+    import base64
+    import json
+
+    monkeypatch.setenv(
+        "CLASSIFYRE_COHORT_WEIGHTS",
+        base64.b64encode(json.dumps({"register": {"oldest": 100}}).encode()).decode(),
+    )
+    assets = collect(source(build_recipe(COHORT_NOTEBOOK)))
+    assert {asset.metadata["_cohort"]["band"] for asset in assets} == {"oldest"}
+
+
+def test_weights_the_api_puts_in_the_recipe_reach_the_notebook(source) -> None:
+    recipe = build_recipe(COHORT_NOTEBOOK)
+    recipe["optional"]["cohort_weights"] = {
+        "mode": "auto",
+        "effective": {"register": {"newest": 100}},
+    }
+    assets = collect(source(recipe))
+    assert {asset.metadata["_cohort"]["band"] for asset in assets} == {"newest"}
+
+
+def test_fetch_content_does_not_ask_a_notebook_that_cannot_answer(
+    source, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The pipeline asks by URL, then by hash. Neither is worth a subprocess
+    # round trip when the notebook defines no fetch_content().
+    instance = source(build_recipe(FILE_NOTEBOOK))
+    asset = collect(instance)[0]
+
+    def forbidden(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("asked the notebook")
+
+    monkeypatch.setattr(instance, "_call", forbidden)
+    assert asyncio.run(instance.fetch_content(asset.external_url)) is None
+    assert asyncio.run(instance.fetch_content(asset.hash)) is None
 
 
 # -- sampling without notebook cooperation -----------------------------------

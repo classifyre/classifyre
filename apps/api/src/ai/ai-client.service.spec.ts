@@ -6,6 +6,7 @@ import {
   AiConfigError,
   AiModelNotFoundError,
   AiProviderError,
+  AiQuotaExhaustedError,
   AiRateLimitError,
   AiSchemaError,
 } from './errors';
@@ -178,6 +179,95 @@ describe('AiClientService', () => {
       expect(result.content).toBe('Recovered');
       expect(mockProviderComplete).toHaveBeenCalledTimes(2);
       timeoutSpy.mockRestore();
+    });
+
+    describe('a spent quota', () => {
+      // Verbatim from the worker log on 2026-09-13: each of these was retried
+      // at 60, 120 and 240 s while holding one of four global worker slots.
+      const dailyQuota = () =>
+        new AiRateLimitError(
+          'OpenAI rate limit reached. Retry later. (429 Rate limit exceeded: ' +
+            'free-models-per-day. Add 10 credits to unlock 1000 free model ' +
+            'requests per day)',
+        );
+      const hi = [{ role: 'user' as const, content: 'hi' }];
+
+      afterEach(() => jest.restoreAllMocks());
+
+      it('is not retried, and says when it can be tried again', async () => {
+        mockProviderComplete.mockRejectedValueOnce(dailyQuota());
+
+        const attempt = service.completeText(hi);
+
+        await expect(attempt).rejects.toBeInstanceOf(AiQuotaExhaustedError);
+        // Still an AiRateLimitError for every existing handler.
+        await expect(attempt).rejects.toBeInstanceOf(AiRateLimitError);
+        expect(mockProviderComplete).toHaveBeenCalledTimes(1);
+      });
+
+      it('refuses the next call on the same credential without asking the provider', async () => {
+        mockProviderComplete.mockRejectedValueOnce(dailyQuota());
+        await expect(service.completeText(hi)).rejects.toThrow(
+          'free-models-per-day',
+        );
+
+        await expect(service.completeText(hi)).rejects.toThrow(
+          /not calling it again until/,
+        );
+        expect(mockProviderComplete).toHaveBeenCalledTimes(1);
+      });
+
+      it('does not cool down a different credential', async () => {
+        mockProviderComplete.mockRejectedValueOnce(dailyQuota());
+        await expect(service.completeText(hi)).rejects.toBeInstanceOf(
+          AiQuotaExhaustedError,
+        );
+
+        mockProviderConfigService.getRuntimeConfig.mockResolvedValueOnce({
+          ...mockRuntimeConfig,
+          apiKey: 'sk-paid-key',
+        });
+        mockProviderComplete.mockResolvedValueOnce('answered');
+
+        await expect(service.completeText(hi)).resolves.toMatchObject({
+          content: 'answered',
+        });
+      });
+
+      it('asks the provider again once the cooldown has passed', async () => {
+        const start = Date.now();
+        const now = jest.spyOn(Date, 'now').mockReturnValue(start);
+        mockProviderComplete.mockRejectedValueOnce(dailyQuota());
+        await expect(service.completeText(hi)).rejects.toBeInstanceOf(
+          AiQuotaExhaustedError,
+        );
+
+        now.mockReturnValue(start + 16 * 60 * 1000);
+        mockProviderComplete.mockResolvedValueOnce('reset');
+
+        await expect(service.completeText(hi)).resolves.toMatchObject({
+          content: 'reset',
+        });
+        expect(mockProviderComplete).toHaveBeenCalledTimes(2);
+      });
+
+      it('leaves an ordinary rate limit to the backoff', async () => {
+        const timeoutSpy = jest
+          .spyOn(global, 'setTimeout')
+          .mockImplementation(((cb: () => void) => {
+            cb();
+            return 0 as unknown as ReturnType<typeof setTimeout>;
+          }) as typeof setTimeout);
+        mockProviderComplete
+          .mockRejectedValueOnce(new AiRateLimitError('429 slow down'))
+          .mockResolvedValueOnce('after backoff');
+
+        await expect(service.completeText(hi)).resolves.toMatchObject({
+          content: 'after backoff',
+        });
+        expect(mockProviderComplete).toHaveBeenCalledTimes(2);
+        timeoutSpy.mockRestore();
+      });
     });
 
     it('never retries AiModelNotFoundError (genuine missing model)', async () => {

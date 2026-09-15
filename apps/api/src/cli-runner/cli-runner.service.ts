@@ -22,7 +22,13 @@ import {
 import { AUTO_SCHEDULE_QUEUE } from '../scheduler/auto-schedule.constants';
 import { ClsService } from 'nestjs-cls';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
-import { CLS_SCHEMA, CLS_NAMESPACE_ID } from '../namespace/namespace.constants';
+import { CohortWeightsService } from '../cohort/cohort-weights.service';
+import {
+  CLS_DATABASE_LANE,
+  CLS_NAMESPACE_ID,
+  CLS_SCHEMA,
+  CLS_SLUG,
+} from '../namespace/namespace.constants';
 import {
   buildNamespaceApiBaseUrl,
   resolveInternalApiBaseUrl,
@@ -79,6 +85,11 @@ import {
   BoundedOutput,
   type BoundedOutputOptions,
 } from '../utils/bounded-output';
+import {
+  describeDegradation,
+  summarizeOutcomeFailures,
+  type OutcomeFailureSummary,
+} from './detector-degradation';
 
 /** Narrow a JSONB column to a plain object, or null when it is anything else. */
 function asJsonRecord(value: unknown): Record<string, unknown> | null {
@@ -176,6 +187,8 @@ export class CliRunnerService {
     // per-namespace, which is the bug this dependency exists to fix.
     @Optional()
     private namespaceRegistry?: NamespaceRegistryService,
+    @Optional()
+    private cohortWeights?: CohortWeightsService,
   ) {}
 
   /** Current namespace UUID from CLS, if running within a namespace context. */
@@ -1466,18 +1479,24 @@ export class CliRunnerService {
         this.runnerEventsGateway.emitRunnerUpdate(runnerDto as any);
       }
 
+      // The split each ctx.cohort() of this source should use, measured from
+      // earlier runs, travels in the recipe; the stored config is not changed.
+      const recipeSource = this.cohortWeights
+        ? await this.cohortWeights.withEffectiveWeights(source)
+        : source;
+
       const environment = process.env.ENVIRONMENT || 'development';
       if (this.isKubernetesExecutionEnabled(environment)) {
         await this.executeCliInKubernetes(
           runnerId,
-          source,
+          recipeSource,
           hasSuccessfulRuns,
           namespaceId,
         );
       } else {
         await this.executeCliLocally(
           runnerId,
-          source,
+          recipeSource,
           environment,
           hasSuccessfulRuns,
           namespaceId,
@@ -2536,37 +2555,12 @@ export class CliRunnerService {
   private async summarizeDetectorFailures(
     tx: Prisma.TransactionClient,
     runnerId: string,
-  ): Promise<{ assetCount: number; detectorLabels: string[] }> {
+  ): Promise<OutcomeFailureSummary> {
     const rows = await tx.runnerAsset.findMany({
       where: { runnerId, detectorOutcomes: { not: Prisma.DbNull } },
       select: { assetHash: true, detectorOutcomes: true },
     });
-
-    const failedAssets = new Set<string>();
-    const labels = new Set<string>();
-
-    for (const row of rows) {
-      if (!Array.isArray(row.detectorOutcomes)) continue;
-      for (const outcome of row.detectorOutcomes) {
-        if (!outcome || typeof outcome !== 'object') continue;
-        const { status, detector_type, custom_detector_key } =
-          outcome as Record<string, unknown>;
-        if (status !== 'ERROR') continue;
-        failedAssets.add(row.assetHash);
-        const detectorLabel =
-          typeof custom_detector_key === 'string' && custom_detector_key
-            ? custom_detector_key
-            : typeof detector_type === 'string' && detector_type
-              ? detector_type
-              : 'unknown detector';
-        labels.add(detectorLabel);
-      }
-    }
-
-    return {
-      assetCount: failedAssets.size,
-      detectorLabels: [...labels].sort(),
-    };
+    return summarizeOutcomeFailures(rows);
   }
 
   private async transitionSourceToTerminalState(
@@ -2710,6 +2704,7 @@ export class CliRunnerService {
 
         const hasAssetErrors = errorCount > 0;
         const hasDetectorFailures = detectorFailures.assetCount > 0;
+        const hasDegradedDetectors = detectorFailures.degraded.length > 0;
         const extractionFailureCount =
           textCoverage.engineUnavailable +
           textCoverage.zeroFrames +
@@ -2729,6 +2724,7 @@ export class CliRunnerService {
         const status =
           hasAssetErrors ||
           hasDetectorFailures ||
+          hasDegradedDetectors ||
           hasExtractionFailures ||
           hasLineageFailures
             ? RunnerStatus.WARNING
@@ -2744,6 +2740,11 @@ export class CliRunnerService {
           const detectors = detectorFailures.detectorLabels.join(', ');
           messageParts.push(
             `${detectors} failed on ${detectorFailures.assetCount} of ${totalCount} assets`,
+          );
+        }
+        if (hasDegradedDetectors) {
+          messageParts.push(
+            ...describeDegradation(detectorFailures.degraded, totalCount),
           );
         }
         if (hasExtractionFailures) {
@@ -2787,6 +2788,13 @@ export class CliRunnerService {
             findingsRetained,
             textCoverage,
             ...(message && { errorMessage: message }),
+            // Structured beside the sentence, so the scan page and the harness
+            // read which detector stopped and why without parsing prose.
+            ...(hasDegradedDetectors && {
+              errorDetails: {
+                detectorsDegraded: detectorFailures.degraded,
+              } as unknown as Prisma.InputJsonValue,
+            }),
           },
         });
 
@@ -4127,6 +4135,12 @@ export class CliRunnerService {
         !Array.isArray(item.errorDetails)
           ? (item.errorDetails as Record<string, unknown>)
           : null,
+      cohortYield:
+        item.cohortYield &&
+        typeof item.cohortYield === 'object' &&
+        !Array.isArray(item.cohortYield)
+          ? (item.cohortYield as Record<string, unknown>)
+          : null,
     }));
 
     return {
@@ -4402,13 +4416,69 @@ export class CliRunnerService {
     });
   }
 
+  /**
+   * Start queued runs while there is capacity. Public for the adaptive
+   * scheduler's tick, which is where a queue that lost its promotion — a
+   * restart, a crash between completion and dequeue — gets noticed.
+   */
+  async promotePendingRunners(): Promise<void> {
+    await this.dequeueNextPendingRunner();
+  }
+
+  /**
+   * Promote the runner that has waited longest in ANY namespace.
+   *
+   * The cap is instance-wide, so the queue must be too: promoting only from the
+   * namespace whose run just finished stranded every other namespace's queue.
+   * The claim and launch then run inside the queued runner's own namespace
+   * context, exactly as a same-namespace dequeue always did.
+   */
   private async dequeueNextPendingRunner(): Promise<void> {
+    if (!this.namespaceRegistry || !this.cls) {
+      return this.dequeuePendingRunnerInCurrentNamespace();
+    }
+    if (!(await this.canStartNewRunner())) return;
+
+    let oldest: Awaited<
+      ReturnType<NamespaceRegistryService['findOldestPendingRunner']>
+    >;
+    try {
+      oldest = await this.namespaceRegistry.findOldestPendingRunner();
+    } catch (error) {
+      this.logger.warn(
+        `Cross-namespace pending lookup failed, dequeuing locally: ${String(error)}`,
+      );
+      return this.dequeuePendingRunnerInCurrentNamespace();
+    }
+    if (!oldest) return;
+
+    const target = oldest;
+    if (this.cls.get<string>(CLS_SCHEMA) === target.namespace.schemaName) {
+      return this.dequeuePendingRunnerInCurrentNamespace(target.runnerId);
+    }
+    const cls = this.cls;
+    return cls.run(() => {
+      cls.set(CLS_SCHEMA, target.namespace.schemaName);
+      cls.set(CLS_NAMESPACE_ID, target.namespace.id);
+      cls.set(CLS_SLUG, target.namespace.slug);
+      cls.set(CLS_DATABASE_LANE, 'background');
+      return this.dequeuePendingRunnerInCurrentNamespace(target.runnerId);
+    });
+  }
+
+  private async dequeuePendingRunnerInCurrentNamespace(
+    runnerId?: string,
+  ): Promise<void> {
     const schema = this.cls?.get<string>(CLS_SCHEMA);
     if (schema && this.stoppingSchemas.has(schema)) return;
     if (!(await this.canStartNewRunner())) return;
 
     const pending = await this.prisma.runner.findFirst({
-      where: { status: RunnerStatus.PENDING, startedAt: null },
+      where: {
+        status: RunnerStatus.PENDING,
+        startedAt: null,
+        ...(runnerId ? { id: runnerId } : {}),
+      },
       orderBy: { triggeredAt: 'asc' },
       include: { source: true },
     });

@@ -13,6 +13,8 @@
  * detectors.
  */
 
+import { DetectorType, Prisma } from '@prisma/client';
+
 export const CUSTOM_KEY_PREFIX = 'CUSTOM::';
 
 /** The comparison key for a finding, or null when its detector is unidentifiable. */
@@ -84,4 +86,37 @@ export function describeDetectorKey(key: string): string {
   return key.startsWith(CUSTOM_KEY_PREFIX)
     ? `custom detector "${key.slice(CUSTOM_KEY_PREFIX.length)}"`
     : `built-in ${key}`;
+}
+
+/**
+ * The SQL half of "is this finding's detector still configured?" — the
+ * `OR` branches of a `where` selecting findings whose detector is not in
+ * `configured`.
+ *
+ * A superset of the in-memory answer, never a subset: a CUSTOM finding whose
+ * key is the empty string passes here but has no identity in
+ * {@link findingDetectorConfigKey}, so callers re-check each row.
+ */
+export function orphanedDetectorWhere(
+  configured: Set<string>,
+): Prisma.FindingWhereInput[] {
+  const knownTypes = new Set<string>(Object.values(DetectorType));
+  const builtIns = [...configured].filter(
+    (key): key is DetectorType =>
+      !key.startsWith(CUSTOM_KEY_PREFIX) && knownTypes.has(key),
+  );
+  const customKeys = [...configured]
+    .filter((key) => key.startsWith(CUSTOM_KEY_PREFIX))
+    .map((key) => key.slice(CUSTOM_KEY_PREFIX.length));
+  return [
+    { detectorType: { notIn: [...builtIns, DetectorType.CUSTOM] } },
+    {
+      detectorType: DetectorType.CUSTOM,
+      // `notIn: []` would read as "no restriction" — spelled out instead.
+      customDetectorKey:
+        customKeys.length > 0
+          ? { not: null, notIn: customKeys }
+          : { not: null },
+    },
+  ];
 }

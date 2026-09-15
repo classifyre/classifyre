@@ -19,6 +19,7 @@ import type {
   BulkUpdateFindingsDto,
   BulkUpdateFindingsResponseDto,
   CreateFindingDto,
+  FindingBulkOperationDto,
   FindingResponseDto,
   FindingsDiscoveryRefreshResponseDto,
   FindingsDiscoveryResponseDto,
@@ -34,6 +35,8 @@ import {
     BulkUpdateFindingsResponseDtoToJSON,
     CreateFindingDtoFromJSON,
     CreateFindingDtoToJSON,
+    FindingBulkOperationDtoFromJSON,
+    FindingBulkOperationDtoToJSON,
     FindingResponseDtoFromJSON,
     FindingResponseDtoToJSON,
     FindingsDiscoveryRefreshResponseDtoFromJSON,
@@ -50,12 +53,20 @@ export interface FindingsControllerBulkUpdateRequest {
     bulkUpdateFindingsDto: BulkUpdateFindingsDto;
 }
 
+export interface FindingsControllerCancelBulkOperationRequest {
+    operationId: string;
+}
+
 export interface FindingsControllerCreateRequest {
     createFindingDto: CreateFindingDto;
 }
 
 export interface FindingsControllerFindOneRequest {
     id: string;
+}
+
+export interface FindingsControllerGetBulkOperationRequest {
+    operationId: string;
 }
 
 export interface FindingsControllerGetDiscoveryOverviewRequest {
@@ -82,6 +93,10 @@ export interface FindingsControllerListAssetSummariesRequest {
     skip?: number;
     limit?: number;
     sort?: FindingsControllerListAssetSummariesSortEnum;
+}
+
+export interface FindingsControllerListBulkOperationsRequest {
+    active?: boolean;
 }
 
 export interface FindingsControllerUpdateRequest {
@@ -132,6 +147,45 @@ export class FindingsApi extends runtime.BaseAPI {
      */
     async findingsControllerBulkUpdate(requestParameters: FindingsControllerBulkUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkUpdateFindingsResponseDto> {
         const response = await this.findingsControllerBulkUpdateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * A queued operation is cancelled outright; a running one stops after its current page. Findings already changed stay changed.
+     * Cancel a background bulk finding operation
+     */
+    async findingsControllerCancelBulkOperationRaw(requestParameters: FindingsControllerCancelBulkOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindingBulkOperationDto>> {
+        if (requestParameters['operationId'] == null) {
+            throw new runtime.RequiredError(
+                'operationId',
+                'Required parameter "operationId" was null or undefined when calling findingsControllerCancelBulkOperation().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/findings/bulk-operations/{operationId}/cancel`;
+        urlPath = urlPath.replace(`{${"operationId"}}`, encodeURIComponent(String(requestParameters['operationId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => FindingBulkOperationDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * A queued operation is cancelled outright; a running one stops after its current page. Findings already changed stay changed.
+     * Cancel a background bulk finding operation
+     */
+    async findingsControllerCancelBulkOperation(requestParameters: FindingsControllerCancelBulkOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindingBulkOperationDto> {
+        const response = await this.findingsControllerCancelBulkOperationRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -208,6 +262,43 @@ export class FindingsApi extends runtime.BaseAPI {
      */
     async findingsControllerFindOne(requestParameters: FindingsControllerFindOneRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindingResponseDto> {
         const response = await this.findingsControllerFindOneRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Get a background bulk finding operation
+     */
+    async findingsControllerGetBulkOperationRaw(requestParameters: FindingsControllerGetBulkOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindingBulkOperationDto>> {
+        if (requestParameters['operationId'] == null) {
+            throw new runtime.RequiredError(
+                'operationId',
+                'Required parameter "operationId" was null or undefined when calling findingsControllerGetBulkOperation().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/findings/bulk-operations/{operationId}`;
+        urlPath = urlPath.replace(`{${"operationId"}}`, encodeURIComponent(String(requestParameters['operationId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => FindingBulkOperationDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Get a background bulk finding operation
+     */
+    async findingsControllerGetBulkOperation(requestParameters: FindingsControllerGetBulkOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindingBulkOperationDto> {
+        const response = await this.findingsControllerGetBulkOperationRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -391,6 +482,41 @@ export class FindingsApi extends runtime.BaseAPI {
      */
     async findingsControllerListAssetSummaries(requestParameters: FindingsControllerListAssetSummariesRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetFindingSummaryListResponseDto> {
         const response = await this.findingsControllerListAssetSummariesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Most recent first. `active=true` returns only queued and running operations.
+     * List background bulk finding operations
+     */
+    async findingsControllerListBulkOperationsRaw(requestParameters: FindingsControllerListBulkOperationsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<FindingBulkOperationDto>>> {
+        const queryParameters: any = {};
+
+        if (requestParameters['active'] != null) {
+            queryParameters['active'] = requestParameters['active'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/findings/bulk-operations`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(FindingBulkOperationDtoFromJSON));
+    }
+
+    /**
+     * Most recent first. `active=true` returns only queued and running operations.
+     * List background bulk finding operations
+     */
+    async findingsControllerListBulkOperations(requestParameters: FindingsControllerListBulkOperationsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<FindingBulkOperationDto>> {
+        const response = await this.findingsControllerListBulkOperationsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

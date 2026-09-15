@@ -58,6 +58,8 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
 import { FindingsTable } from "@/components/findings-table";
+import { RetireOutOfScopeFindings } from "@/components/retire-out-of-scope-findings";
+import { narrowsDetector } from "@/lib/detector-narrowing";
 
 // The generated DTO is out-of-sync with the server — pipeline detectors carry
 // pipelineSchema rather than config/method. Extend locally until codegen is refreshed.
@@ -155,6 +157,58 @@ export default function CustomDetectorDetailsPage() {
       await api.updateCustomDetector(detectorId, updateRequest);
       toast.success(t("detectors.saved"));
       await load();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : t("detectors.failedToSave"),
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const [retireReviewRequested, setRetireReviewRequested] = useState(false);
+  const handleRetireReviewStarted = useCallback(
+    () => setRetireReviewRequested(false),
+    [],
+  );
+
+  /**
+   * Save a pipeline detector. A save that narrows it (fewer asset kinds, a
+   * removed regex pattern) leaves findings it can no longer produce OPEN, so
+   * the out-of-scope review opens and counts them — it retires nothing itself.
+   */
+  const savePipelineDetector = async (
+    payload: {
+      name: string;
+      key?: string;
+      description?: string;
+      isActive?: boolean;
+      pipelineSchema: Record<string, unknown>;
+    },
+    extra: { aiProviderConfigId?: string | null } = {},
+  ) => {
+    const narrowed = narrowsDetector(
+      detector?.pipelineSchema,
+      payload.pipelineSchema,
+    );
+    try {
+      setIsSaving(true);
+      // The client's update type predates pipeline detectors; the API accepts both.
+      const update: UpdateCustomDetectorDto & {
+        pipelineSchema: Record<string, unknown>;
+        aiProviderConfigId?: string | null;
+      } = {
+        name: payload.name,
+        key: payload.key,
+        description: payload.description,
+        isActive: payload.isActive,
+        pipelineSchema: payload.pipelineSchema,
+        ...extra,
+      };
+      await api.updateCustomDetector(detectorId, update);
+      toast.success(t("detectors.saved"));
+      await load();
+      if (narrowed) setRetireReviewRequested(true);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : t("detectors.failedToSave"),
@@ -405,28 +459,7 @@ export default function CustomDetectorDetailsPage() {
             initialKey={detector.key}
             initialDescription={detector.description ?? ""}
             initialIsActive={detector.isActive}
-            onSubmit={async (payload) => {
-              try {
-                setIsSaving(true);
-                await api.updateCustomDetector(detectorId, {
-                  name: payload.name,
-                  key: payload.key,
-                  description: payload.description,
-                  isActive: payload.isActive,
-                  pipelineSchema: payload.pipelineSchema,
-                } as any);
-                toast.success(t("detectors.saved"));
-                await load();
-              } catch (error) {
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : t("detectors.failedToSave"),
-                );
-              } finally {
-                setIsSaving(false);
-              }
-            }}
+            onSubmit={(payload) => savePipelineDetector(payload)}
           />
         ) : isRegexPipeline ? (
           <RegexDetectorEditor
@@ -438,28 +471,7 @@ export default function CustomDetectorDetailsPage() {
             initialName={detector.name}
             initialKey={detector.key}
             initialDescription={detector.description ?? ""}
-            onSubmit={async (payload) => {
-              try {
-                setIsSaving(true);
-                await api.updateCustomDetector(detectorId, {
-                  name: payload.name,
-                  key: payload.key,
-                  description: payload.description,
-                  isActive: payload.isActive,
-                  pipelineSchema: payload.pipelineSchema,
-                } as any);
-                toast.success(t("detectors.saved"));
-                await load();
-              } catch (error) {
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : t("detectors.failedToSave"),
-                );
-              } finally {
-                setIsSaving(false);
-              }
-            }}
+            onSubmit={(payload) => savePipelineDetector(payload)}
           />
         ) : isLLMPipeline ? (
           <LLMDetectorEditor
@@ -473,29 +485,11 @@ export default function CustomDetectorDetailsPage() {
             initialDescription={detector.description ?? ""}
             initialIsActive={detector.isActive}
             initialAiProviderConfigId={detector.aiProviderConfigId ?? null}
-            onSubmit={async (payload) => {
-              try {
-                setIsSaving(true);
-                await api.updateCustomDetector(detectorId, {
-                  name: payload.name,
-                  key: payload.key,
-                  description: payload.description,
-                  isActive: payload.isActive,
-                  pipelineSchema: payload.pipelineSchema,
-                  aiProviderConfigId: payload.aiProviderConfigId,
-                } as any);
-                toast.success(t("detectors.saved"));
-                await load();
-              } catch (error) {
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : t("detectors.failedToSave"),
-                );
-              } finally {
-                setIsSaving(false);
-              }
-            }}
+            onSubmit={(payload) =>
+              savePipelineDetector(payload, {
+                aiProviderConfigId: payload.aiProviderConfigId,
+              })
+            }
           />
         ) : (
           <PipelineDetectorEditor
@@ -507,28 +501,7 @@ export default function CustomDetectorDetailsPage() {
             initialName={detector.name}
             initialKey={detector.key}
             initialDescription={detector.description ?? ""}
-            onSubmit={async (payload) => {
-              try {
-                setIsSaving(true);
-                await api.updateCustomDetector(detectorId, {
-                  name: payload.name,
-                  key: payload.key,
-                  description: payload.description,
-                  isActive: payload.isActive,
-                  pipelineSchema: payload.pipelineSchema,
-                } as any);
-                toast.success(t("detectors.saved"));
-                await load();
-              } catch (error) {
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : t("detectors.failedToSave"),
-                );
-              } finally {
-                setIsSaving(false);
-              }
-            }}
+            onSubmit={(payload) => savePipelineDetector(payload)}
           />
         )
       ) : (
@@ -546,6 +519,15 @@ export default function CustomDetectorDetailsPage() {
           submitLabel={t("common.save")}
           isSubmitting={isSaving}
           onSubmit={handleSave}
+        />
+      )}
+
+      {isPipelineDetector && (
+        <RetireOutOfScopeFindings
+          detectorId={detectorId}
+          detectorKey={detector.key}
+          reviewRequested={retireReviewRequested}
+          onReviewStarted={handleRetireReviewStarted}
         />
       )}
 

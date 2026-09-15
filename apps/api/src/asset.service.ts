@@ -26,6 +26,7 @@ import {
   CUSTOM_KEY_PREFIX,
   configuredDetectorKeysFromConfig,
   findingDetectorConfigKey,
+  orphanedDetectorWhere,
 } from './utils/detector-config-keys';
 import { HistoryEventType } from './types/finding-history.types';
 import {
@@ -56,6 +57,10 @@ import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler
 import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
 import { FindingStatsService } from './stats/finding-stats.service';
 import { citedFindingIds as citedFindingIdsForSource } from './utils/cited-findings';
+import {
+  metadataPredicatePrisma,
+  parseMetadataWhere,
+} from './assets/asset-metadata-predicate';
 import { GraphService } from './graph.service';
 import { tryNormalizeUrn } from './graph/urn';
 
@@ -93,6 +98,9 @@ const RELATIONSHIP_ERROR_MAX_CHARS = 500;
 
 /** Duplicate asset ids named individually in a rejected bulk-ingest payload. */
 const DUPLICATE_REPORT_CAP = 5;
+
+/** Orphaned findings per page in the removed-detector cleanup (see call site). */
+const REMOVED_DETECTOR_PAGE_SIZE = 1000;
 
 const findingForAssetSelect = {
   id: true,
@@ -1210,6 +1218,15 @@ export class AssetService {
     const normalizedSourceTypes = this.normalizeSourceTypes(sourceTypes);
     if (normalizedSourceTypes && normalizedSourceTypes.length > 0) {
       where.sourceType = { in: normalizedSourceTypes };
+    }
+
+    // Equality only here: see metadataPredicatePrisma for why ranges are not.
+    const metadataPredicates = parseMetadataWhere(
+      (assetFilters as { metadata?: unknown }).metadata,
+      { operators: ['eq', 'in'] },
+    );
+    if (metadataPredicates.length > 0) {
+      where.AND = metadataPredicatePrisma(metadataPredicates);
     }
 
     const findingWhere = excludeFindings
@@ -2355,79 +2372,111 @@ export class AssetService {
     const configured = await this.configuredDetectorKeys(source.config);
     if (configured === null) return none;
 
-    // Named columns: this reads every OPEN finding on the source, and taking
-    // every scalar meant both context windows, `redactedContent`, `metadata`
-    // and `location` rode along unread. `matchedContent` is genuinely needed —
-    // the detector-feedback record quotes it.
-    const openFindings = await this.prisma.finding.findMany({
-      where: { sourceId: source.id, status: FindingStatus.OPEN },
-      select: {
-        id: true,
-        history: true,
-        sourceId: true,
-        detectorType: true,
-        findingType: true,
-        customDetectorKey: true,
-        matchedContent: true,
+    // Which detectors on this source are no longer configured, counted in SQL.
+    // This used to read every OPEN finding of the source — 465,967 rows and
+    // their history on one Register source — at the end of every run, only to
+    // discard nearly all of them in memory. The GROUP BY returns a row per
+    // orphaned detector, usually none, and has no LIMIT the planner could turn
+    // into a walk of the primary key.
+    const identities = await this.prisma.finding.groupBy({
+      by: ['detectorType', 'customDetectorKey'],
+      where: {
+        sourceId: source.id,
+        status: FindingStatus.OPEN,
+        OR: orphanedDetectorWhere(configured),
       },
+      _count: { _all: true },
     });
-
-    const orphaned = openFindings.filter((finding) => {
-      if (this.findingHasManualStatusOverride(finding)) return false;
-      const key = this.findingDetectorConfigKey(finding);
-      // Unknown identity (e.g. CUSTOM finding without a key): keep it —
-      // we cannot prove its detector was removed.
-      if (key === null) return false;
-      return !configured.has(key);
+    const orphanedIdentities = identities.filter((identity) => {
+      const key = this.findingDetectorConfigKey(identity);
+      // Unknown identity (e.g. CUSTOM finding without a key): keep it — we
+      // cannot prove its detector was removed.
+      return key !== null && !configured.has(key);
     });
-    if (orphaned.length === 0) return none;
+    if (orphanedIdentities.length === 0) return none;
 
-    const cited = await this.citedFindingIds(source.id, orphaned);
-    const removed = orphaned.filter((f) => !cited.has(f.id));
-    const retained = orphaned.filter((f) => cited.has(f.id));
+    const orphanedTypes = orphanedIdentities
+      .filter((identity) => identity.detectorType !== DetectorType.CUSTOM)
+      .map((identity) => identity.detectorType);
+    const orphanedKeys = orphanedIdentities
+      .filter((identity) => identity.detectorType === DetectorType.CUSTOM)
+      .map((identity) => identity.customDetectorKey as string);
+    const identityWhere: Prisma.FindingWhereInput[] = [
+      ...(orphanedTypes.length > 0
+        ? [{ detectorType: { in: orphanedTypes } }]
+        : []),
+      ...(orphanedKeys.length > 0
+        ? [
+            {
+              detectorType: DetectorType.CUSTOM,
+              customDetectorKey: { in: orphanedKeys },
+            },
+          ]
+        : []),
+    ];
 
+    const attached = await citedFindingIdsForSource(this.prisma, source.id);
     const reason = 'Detector removed from source configuration';
     const now = new Date();
-    if (removed.length > 0) {
-      await this.prisma.$transaction(
-        async (tx) => {
-          for (const finding of removed) {
-            const currentHistory = Array.isArray(finding.history)
-              ? finding.history
-              : [];
-            await tx.finding.update({
-              where: { id: finding.id },
-              data: {
-                status: FindingStatus.RESOLVED,
-                runnerId,
-                resolvedAt: now,
-                resolutionReason: reason,
-                history: historyColumn([
-                  ...currentHistory,
-                  historyEntryForStorage({
-                    timestamp: now,
-                    runnerId,
-                    eventType: HistoryEventType.RESOLVED,
-                    status: FindingStatus.RESOLVED,
-                    changeReason: reason,
-                  }),
-                ]),
-              },
-            });
-          }
+    let resolved = 0;
+    let retained = 0;
+    let cursor: string | undefined;
+    // Paged and set-based: one UPDATE per page, where this was one UPDATE per
+    // finding inside a single 60-second transaction.
+    for (;;) {
+      const page = await this.prisma.finding.findMany({
+        where: {
+          sourceId: source.id,
+          status: FindingStatus.OPEN,
+          OR: identityWhere,
+          ...(cursor ? { id: { gt: cursor } } : {}),
         },
-        { timeout: 60000 },
-      );
+        select: {
+          id: true,
+          history: true,
+          sourceId: true,
+          detectorType: true,
+          findingType: true,
+          customDetectorKey: true,
+          matchedContent: true,
+        },
+        orderBy: { id: 'asc' },
+        take: REMOVED_DETECTOR_PAGE_SIZE,
+      });
+      if (page.length === 0) break;
+      cursor = page[page.length - 1].id;
+
+      const orphaned = page.filter((finding) => {
+        if (this.findingHasManualStatusOverride(finding)) return false;
+        const key = this.findingDetectorConfigKey(finding);
+        return key !== null && !configured.has(key);
+      });
+      if (orphaned.length > 0) {
+        const cited = await this.citedFindingIds(orphaned, attached);
+        const removed = orphaned.filter((f) => !cited.has(f.id));
+        const kept = orphaned.filter((f) => cited.has(f.id));
+        if (removed.length > 0) {
+          resolved += await this.resolveOrphanedFindings(
+            removed.map((f) => f.id),
+            runnerId,
+            now,
+            reason,
+          );
+        }
+        await this.noteRetainedForCitation(kept, runnerId, now);
+        retained += kept.length;
+      }
+      if (page.length < REMOVED_DETECTOR_PAGE_SIZE) break;
     }
 
-    await this.noteRetainedForCitation(retained, runnerId, now);
+    if (resolved === 0 && retained === 0) return none;
 
     console.warn(
-      `[finalizeIngestRun] Source ${source.id}: resolved ${removed.length} ` +
+      `[finalizeIngestRun] Source ${source.id}: resolved ${resolved} ` +
         `finding(s) from detectors no longer configured on the source ` +
         `(cleanup_removed_detector_findings is enabled)` +
-        (retained.length > 0
-          ? `; retained ${retained.length} that a case cites or an active ` +
+        (retained > 0
+          ? `; retained ${retained} that a case cites or an active ` +
             `inquiry watches`
           : '') +
         `.`,
@@ -2438,24 +2487,48 @@ export class AssetService {
     // finding's value keeps correlating assets forever. On the live instance
     // that left 36,641 of 49,497 correlation values (74%) on assets with no
     // open finding at all, and 681k edges resting on them.
-    if (removed.length > 0) {
-      await this.scheduleCorrelationRecompute(source.id, removed.length);
+    if (resolved > 0) {
+      await this.scheduleCorrelationRecompute(source.id, resolved);
     }
 
-    return { resolved: removed.length, retained: retained.length };
+    return { resolved, retained };
+  }
+
+  /** Resolve one page of orphaned findings in a single statement. */
+  private async resolveOrphanedFindings(
+    ids: string[],
+    runnerId: string,
+    now: Date,
+    reason: string,
+  ): Promise<number> {
+    const entry = historyEntryForStorage({
+      timestamp: now,
+      runnerId,
+      eventType: HistoryEventType.RESOLVED,
+      status: FindingStatus.RESOLVED,
+      changeReason: reason,
+    });
+    return this.prisma.$executeRaw`
+      UPDATE findings
+      SET status = 'RESOLVED'::"FindingStatus",
+          runner_id = ${runnerId},
+          resolved_at = now(),
+          resolution_reason = ${reason},
+          updated_at = now(),
+          history = COALESCE(history, '[]'::jsonb) || ${JSON.stringify([entry])}::jsonb
+      WHERE id = ANY(${ids}::text[])
+        AND status = 'OPEN'::"FindingStatus"
+    `;
   }
 
   /**
    * Of these orphaned findings, the ones an investigation is relying on:
    * attached to a case, or matched by an ACTIVE inquiry.
    *
-   * The case-citation lookup is scoped to this source in SQL rather than
-   * reading every `case_findings` row: this runs at the end of every scan, and
-   * an instance with hundreds of sources scanning continuously would otherwise
-   * scan the whole table many times a minute.
+   * `attached` is the source's case citations, read once per cleanup rather
+   * than once per page: this runs at the end of every scan.
    */
   private async citedFindingIds(
-    sourceId: string,
     orphaned: Array<{
       id: string;
       sourceId: string;
@@ -2464,10 +2537,10 @@ export class AssetService {
       customDetectorKey: string | null;
       matchedContent: string | null;
     }>,
+    attached: Set<string>,
   ): Promise<Set<string>> {
     const cited = new Set<string>();
 
-    const attached = await citedFindingIdsForSource(this.prisma, sourceId);
     for (const finding of orphaned) {
       if (attached.has(finding.id)) cited.add(finding.id);
     }
@@ -2513,31 +2586,18 @@ export class AssetService {
     });
     if (needsNote.length === 0) return;
 
-    await this.prisma.$transaction(
-      async (tx) => {
-        for (const finding of needsNote) {
-          const currentHistory = Array.isArray(finding.history)
-            ? finding.history
-            : [];
-          await tx.finding.update({
-            where: { id: finding.id },
-            data: {
-              history: historyColumn([
-                ...currentHistory,
-                historyEntryForStorage({
-                  timestamp: now,
-                  runnerId,
-                  eventType: HistoryEventType.RE_DETECTED,
-                  status: FindingStatus.OPEN,
-                  changeReason: note,
-                }),
-              ]),
-            },
-          });
-        }
-      },
-      { timeout: 60000 },
-    );
+    const entry = historyEntryForStorage({
+      timestamp: now,
+      runnerId,
+      eventType: HistoryEventType.RE_DETECTED,
+      status: FindingStatus.OPEN,
+      changeReason: note,
+    });
+    await this.prisma.$executeRaw`
+      UPDATE findings
+      SET history = COALESCE(history, '[]'::jsonb) || ${JSON.stringify([entry])}::jsonb
+      WHERE id = ANY(${needsNote.map((finding) => finding.id)}::text[])
+    `;
   }
 
   /**

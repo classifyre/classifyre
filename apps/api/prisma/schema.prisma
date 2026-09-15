@@ -757,6 +757,10 @@ model Runner {
   // at 900 of 9600 objects. Opaque and source-defined; compared for equality
   // only, never interpreted.
   samplingCursor       Json?                @map("sampling_cursor") @db.JsonB
+  /// Per ctx.cohort() of the run: keys each band visited, how many of them
+  /// produced a new HIGH/CRITICAL finding, and the weights the run used. Read
+  /// to set the next run's split (cohort/cohort-weights.ts).
+  cohortYield          Json?                @map("cohort_yield") @db.JsonB
   errorMessage         String?              @map("error_message")
   errorDetails         Json?                @map("error_details")
   jobName              String?              @map("job_name")
@@ -3122,4 +3126,66 @@ model SourceGraphState {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@map("source_graph_state")
+}
+
+/// What a background bulk finding operation does to each finding it matches.
+enum FindingBulkOperationKind {
+  /// An operator's status/severity/comment change over a filter selection.
+  STATUS_CHANGE
+  /// Resolving findings a narrowed detector can no longer produce.
+  RETIRE_OUT_OF_SCOPE
+}
+
+enum FindingBulkOperationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+/// A bulk finding change too large to run inside one request.
+///
+/// A select-all over a namespace this size walked 37,428 rows per page pair
+/// and ended in one unpaged `updateMany` — longer than any client or MCP
+/// timeout, and a timeout was not a no-op: history and feedback had already
+/// been written for a change that never committed. This row is the job's
+/// durable state. Each page is one short transaction that changes the findings
+/// and advances `cursor` together, so a crash or a cancel leaves a consistent
+/// prefix and a later chunk resumes from `cursor`.
+model FindingBulkOperation {
+  id     String                     @id @default(uuid())
+  kind   FindingBulkOperationKind
+  status FindingBulkOperationStatus @default(PENDING)
+
+  /// STATUS_CHANGE: the validated findings `filters` snapshot.
+  /// RETIRE_OUT_OF_SCOPE: the detector id and retire request.
+  filters Json    @default("{}") @db.JsonB
+  /// STATUS_CHANGE: `{status?, severity?, comment?}` applied to each match.
+  target  Json    @default("{}") @db.JsonB
+  /// Keyset position: the last finding id a committed page covered.
+  cursor  String?
+
+  /// Counted when the operation was created; the corpus can move under it.
+  totalEstimate Int  @default(0) @map("total_estimate")
+  processed     Int  @default(0)
+  changed       Int  @default(0)
+  exempted      Int  @default(0)
+  /// Per-reason or per-exemption counts, e.g. `{ "citedByCase": 1 }`.
+  counts        Json @default("{}") @db.JsonB
+  warnings      Json @default("[]") @db.JsonB
+
+  errorMessage    String?   @map("error_message") @db.Text
+  cancelRequested Boolean   @default(false) @map("cancel_requested")
+  /// Held by the chunk that is running; expired leases are resumable.
+  leaseUntil      DateTime? @map("lease_until")
+
+  startedAt  DateTime? @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  createdBy  String?   @map("created_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("finding_bulk_operations")
 }

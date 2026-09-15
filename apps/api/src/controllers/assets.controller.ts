@@ -9,9 +9,11 @@ import {
   HttpStatus,
   BadRequestException,
   NotFoundException,
+  Optional,
   UseGuards,
   Res,
 } from '@nestjs/common';
+import { CohortWeightsService } from '../cohort/cohort-weights.service';
 import {
   ApiTags,
   ApiOperation,
@@ -298,6 +300,7 @@ export class SourceAssetsController {
     private readonly assetService: AssetService,
     private readonly sourceService: SourceService,
     private readonly validationService: ValidationService,
+    @Optional() private readonly cohortWeights?: CohortWeightsService,
   ) {}
 
   @Get()
@@ -486,6 +489,7 @@ export class SourceAssetsController {
       relationshipsDropped,
       relationshipErrors,
       partialCoverage,
+      cohortStats,
     } = finalizeDto;
     if (!runnerId) {
       throw new BadRequestException('runnerId is required');
@@ -550,6 +554,15 @@ export class SourceAssetsController {
       relationshipsDropped,
       relationshipErrors,
     });
+
+    // Once every finding of the run is in, so each band's hits are complete.
+    // Best-effort like the savings above: a scheduling signal must never fail
+    // the run it describes.
+    if (cohortStats && this.cohortWeights) {
+      await this.cohortWeights
+        .recordYield(runnerId, sourceId, cohortStats)
+        .catch(() => undefined);
+    }
 
     return this.assetService.finalizeIngestRun(
       sourceId,

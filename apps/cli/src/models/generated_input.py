@@ -4631,6 +4631,24 @@ class Variables(RootModel[str]):
     root: str = Field(..., max_length=8192)
 
 
+class CohortWeightsMode(StrEnum):
+    """
+    auto: measured from what each band yields. fixed: the declared or fixed split, always.
+    """
+
+    auto = 'auto'
+    fixed = 'fixed'
+
+
+class CustomCohortBandWeights(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    newest: float | None = Field(None, ge=0.0)
+    oldest: float | None = Field(None, ge=0.0)
+    random: float | None = Field(None, ge=0.0)
+
+
 class NotebookPackage(BaseModel):
     """
     A Python distribution installed before the notebook runs.
@@ -5688,53 +5706,33 @@ class GitInput(CoreInput):
     augmentation: AugmentationConfig | None = None
 
 
-class CustomOptional(BaseModel):
+class CustomCohortWeights(BaseModel):
+    """
+    How ctx.cohort() splits each run's budget across its bands. auto shifts the split toward the bands whose keys produce HIGH/CRITICAL findings, within guards: the declared split stands until every band has 200 visits, no band drops below the floor, and no band moves more than 15 points per run. fixed always uses the bands the notebook declares, or the ones given here.
+    """
+
     model_config = ConfigDict(
         extra='forbid',
     )
-    variables: (
-        dict[constr(pattern=r'^[A-Za-z_][A-Za-z0-9_]{0,62}$'), Variables] | None
-    ) = Field(
-        {},
-        description='Non-secret values the notebook reads with ctx.var("name"), such as a base URL or an account id. Stored in clear text. Keys must be valid Python identifiers.',
-        max_length=64,
-        validate_default=True,
+    mode: CohortWeightsMode | None = Field(
+        'auto',
+        description='auto: measured from what each band yields. fixed: the declared or fixed split, always.',
+        title='CohortWeightsMode',
     )
-    limits: CustomOptionalLimits | None = None
-    packages: list[NotebookPackage] | None = Field(
-        [],
-        description="Python packages installed into the run environment before any cell executes. Installed with uv; the base image's own dependencies are always present and do not need listing.",
-        max_length=50,
-        validate_default=True,
-    )
-    local_folders: list[NotebookLocalFolder] | None = Field(
-        [],
-        description='Folders the notebook reads with ctx.folder("name"). Not available in Kubernetes deployments, where files are uploaded to the source instead. This is a convenience, not a sandbox: the notebook process runs as you and can open any path you can.',
-        max_length=10,
-        validate_default=True,
-    )
-
-
-class CustomInput(CoreInput):
-    type: Literal['CUSTOM'] = Field(..., description='Type of the asset or source')
-    required: CustomRequired
-    masked: CustomMasked | None = None
-    optional: CustomOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
+    floor: float | None = Field(
         None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
+        description='The least share any band keeps under auto, as a fraction. Never below 0.1.',
+        ge=0.1,
+        le=0.5,
     )
-    sampling: SamplingConfig
-    scan_cache: ScanCacheConfig | None = None
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    fixed: dict[str, CustomCohortBandWeights] | None = Field(
+        None,
+        description='Per cohort name, the band split to use under fixed, e.g. {"register": {"newest": 60, "oldest": 30, "random": 10}}.',
     )
-    augmentation: AugmentationConfig | None = None
+    effective: dict[str, CustomCohortBandWeights] | None = Field(
+        None,
+        description="Set by the platform on each run's recipe: the split each cohort runs with. Not stored on the source.",
+    )
 
 
 class YouTubeInput(CoreInput):
@@ -5768,6 +5766,56 @@ class RedditInput(CoreInput):
         Field(..., title='RedditMasked')
     )
     optional: RedditOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
+class CustomOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    variables: (
+        dict[constr(pattern=r'^[A-Za-z_][A-Za-z0-9_]{0,62}$'), Variables] | None
+    ) = Field(
+        {},
+        description='Non-secret values the notebook reads with ctx.var("name"), such as a base URL or an account id. Stored in clear text. Keys must be valid Python identifiers.',
+        max_length=64,
+        validate_default=True,
+    )
+    limits: CustomOptionalLimits | None = None
+    packages: list[NotebookPackage] | None = Field(
+        [],
+        description="Python packages installed into the run environment before any cell executes. Installed with uv; the base image's own dependencies are always present and do not need listing.",
+        max_length=50,
+        validate_default=True,
+    )
+    local_folders: list[NotebookLocalFolder] | None = Field(
+        [],
+        description='Folders the notebook reads with ctx.folder("name"). Not available in Kubernetes deployments, where files are uploaded to the source instead. This is a convenience, not a sandbox: the notebook process runs as you and can open any path you can.',
+        max_length=10,
+        validate_default=True,
+    )
+    cohort_weights: CustomCohortWeights | None = None
+
+
+class CustomInput(CoreInput):
+    type: Literal['CUSTOM'] = Field(..., description='Type of the asset or source')
+    required: CustomRequired
+    masked: CustomMasked | None = None
+    optional: CustomOptional | None = None
     detectors: list[Detector] | None = Field(
         None, description='Detectors to run on ingested content'
     )
