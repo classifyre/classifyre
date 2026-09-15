@@ -659,9 +659,11 @@ class DetectorPipeline:
                 await _collect_done_and_flush(findings_flush_size)
 
             # Steady state: flush findings from any page that has already
-            # finished as soon as they are available, so real findings stream to
-            # the API per page instead of only once the whole asset is processed.
-            await _collect_done_and_flush()
+            # finished once the unflushed batch reaches findings_flush_size,
+            # so real findings stream to the API during the asset instead of
+            # only once it is fully processed — without an API batch per page.
+            # The remainder below the threshold drains after the last page.
+            await _collect_done_and_flush(findings_flush_size)
 
             task = asyncio.create_task(_detect_page(text_content, page_index))
             pending_tasks.add(task)
