@@ -25,6 +25,7 @@ import { computeScopeFingerprint } from './utils/scope-fingerprint';
 import {
   CUSTOM_KEY_PREFIX,
   configuredDetectorKeysFromConfig,
+  describeDetectorKey,
   findingDetectorConfigKey,
   orphanedDetectorWhere,
 } from './utils/detector-config-keys';
@@ -2371,6 +2372,7 @@ export class AssetService {
     const none = { resolved: 0, retained: 0 };
     const configured = await this.configuredDetectorKeys(source.config);
     if (configured === null) return none;
+    const { keys: configuredKeys, customOnly } = configured;
 
     // Which detectors on this source are no longer configured, counted in SQL.
     // This used to read every OPEN finding of the source — 465,967 rows and
@@ -2383,7 +2385,7 @@ export class AssetService {
       where: {
         sourceId: source.id,
         status: FindingStatus.OPEN,
-        OR: orphanedDetectorWhere(configured),
+        OR: orphanedDetectorWhere(configuredKeys),
       },
       _count: { _all: true },
     });
@@ -2391,9 +2393,35 @@ export class AssetService {
       const key = this.findingDetectorConfigKey(identity);
       // Unknown identity (e.g. CUSTOM finding without a key): keep it — we
       // cannot prove its detector was removed.
-      return key !== null && !configured.has(key);
+      if (key === null || configuredKeys.has(key)) return false;
+      // Built-in types are not configurable on a CUSTOM source carrying only
+      // custom_detectors ids, so a non-CUSTOM finding there was never in the
+      // configured set to be removed from — leave it alone.
+      if (customOnly && identity.detectorType !== DetectorType.CUSTOM) {
+        return false;
+      }
+      return true;
     });
     if (orphanedIdentities.length === 0) return none;
+
+    // Dry-run-style preview before touching anything: the first run after this
+    // cleanup starts covering CUSTOM sources resolves findings operators have
+    // seen OPEN for months, so say exactly what is about to happen. Citations
+    // and ACTIVE inquiry watchers still exempt individual findings below.
+    console.warn(
+      `[finalizeIngestRun] Source ${source.id}: ` +
+        orphanedIdentities
+          .map(
+            (identity) =>
+              `${identity._count._all} open finding(s) from ` +
+              `${describeDetectorKey(
+                this.findingDetectorConfigKey(identity) as string,
+              )} no longer configured on the source`,
+          )
+          .join('; ') +
+        `. They resolve at the end of this run unless a case cites them or ` +
+        `an active inquiry watches them.`,
+    );
 
     const orphanedTypes = orphanedIdentities
       .filter((identity) => identity.detectorType !== DetectorType.CUSTOM)
@@ -2449,7 +2477,11 @@ export class AssetService {
       const orphaned = page.filter((finding) => {
         if (this.findingHasManualStatusOverride(finding)) return false;
         const key = this.findingDetectorConfigKey(finding);
-        return key !== null && !configured.has(key);
+        if (key === null || configuredKeys.has(key)) return false;
+        if (customOnly && finding.detectorType !== DetectorType.CUSTOM) {
+          return false;
+        }
+        return true;
       });
       if (orphaned.length > 0) {
         const cited = await this.citedFindingIds(orphaned, attached);
@@ -2622,14 +2654,16 @@ export class AssetService {
   /**
    * The source's enabled detector identities as comparison keys, or null when
    * the config has no readable detector list (skip cleanup rather than treat
-   * unknown as empty).
+   * unknown as empty). `customOnly` marks a CUSTOM source carrying only
+   * `custom_detectors` ids: its non-CUSTOM findings were never configurable
+   * and must not count as orphaned.
    */
   private async configuredDetectorKeys(
     config: unknown,
-  ): Promise<Set<string> | null> {
+  ): Promise<{ keys: Set<string>; customOnly: boolean } | null> {
     const parsed = configuredDetectorKeysFromConfig(config);
     if (parsed === null) return null;
-    const { keys, legacyCustomIds } = parsed;
+    const { keys, legacyCustomIds, customOnly } = parsed;
 
     // Legacy path: recipe.custom_detectors is an array of custom-detector IDs,
     // which only the database can resolve to keys.
@@ -2662,7 +2696,7 @@ export class AssetService {
       }
     }
 
-    return keys;
+    return { keys, customOnly };
   }
 
   private findingDetectorConfigKey(finding: {

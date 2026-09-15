@@ -33,20 +33,41 @@ export function findingDetectorConfigKey(finding: {
 /**
  * The detector identities a source config asks for.
  *
- * Returns null when the config has no readable `detectors` array — callers must
- * treat that as "unknown", never as "empty", or a config shape this code does
- * not understand would look like a source that detects nothing.
+ * Returns null when the config carries no readable detector identities —
+ * callers must treat that as "unknown", never as "empty", or a config shape
+ * this code does not understand would look like a source that detects
+ * nothing.
  *
  * `legacyCustomIds` are custom-detector *row ids* from the older
  * `config.custom_detectors` shape; resolving those to keys needs the database,
  * so it stays with the caller.
+ *
+ * `customOnly` marks a config whose only readable shape is `custom_detectors`
+ * with no `detectors` array — the CUSTOM (notebook) source layout. Built-in
+ * detector types are not configurable there, so a non-CUSTOM finding on such
+ * a source was never in the configured set to be removed from: callers must
+ * leave those findings alone rather than read them as orphaned.
  */
 export function configuredDetectorKeysFromConfig(
   config: unknown,
-): { keys: Set<string>; legacyCustomIds: string[] } | null {
+): { keys: Set<string>; legacyCustomIds: string[]; customOnly: boolean } | null {
   const recipe = (config ?? {}) as Record<string, any>;
+  const legacyCustomIds = Array.isArray(recipe.custom_detectors)
+    ? recipe.custom_detectors.filter(
+        (id: unknown): id is string => typeof id === 'string',
+      )
+    : [];
+
   const detectors = recipe.detectors;
-  if (!Array.isArray(detectors)) return null;
+  if (!Array.isArray(detectors)) {
+    // CUSTOM sources name their detectors by row id only. Readable via the
+    // ids (the caller resolves them), so this must not read as "unknown" —
+    // otherwise a removed custom detector on those sources is never cleaned
+    // up. An empty id list carries no positive information, so it stays
+    // "unknown" rather than reading as "detects nothing".
+    if (legacyCustomIds.length === 0) return null;
+    return { keys: new Set<string>(), legacyCustomIds, customOnly: true };
+  }
 
   const keys = new Set<string>();
   for (const entry of detectors) {
@@ -72,13 +93,7 @@ export function configuredDetectorKeysFromConfig(
     }
   }
 
-  const legacyCustomIds = Array.isArray(recipe.custom_detectors)
-    ? recipe.custom_detectors.filter(
-        (id: unknown): id is string => typeof id === 'string',
-      )
-    : [];
-
-  return { keys, legacyCustomIds };
+  return { keys, legacyCustomIds, customOnly: false };
 }
 
 /** Human-readable form of a comparison key, for operator- and agent-facing text. */

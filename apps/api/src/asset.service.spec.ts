@@ -61,6 +61,9 @@ describe('AssetService', () => {
       createMany: jest.fn(),
       update: jest.fn(),
     },
+    customDetector: {
+      findMany: jest.fn(),
+    },
     runnerAsset: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
@@ -2825,6 +2828,106 @@ describe('AssetService', () => {
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
         expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
+      });
+
+      /**
+       * CUSTOM (notebook) sources name their detectors by row id under
+       * custom_detectors, with no detectors array. That shape used to read as
+       * "unknown", so a removed custom detector's findings were never cleaned
+       * up there.
+       */
+      describe('CUSTOM sources carrying only custom_detectors ids', () => {
+        const customOnlyConfig = { custom_detectors: ['cd-old'] };
+
+        it('resolves findings of a custom detector no longer listed', async () => {
+          mockPrismaService.customDetector.findMany.mockResolvedValue([
+            { key: 'other-screen' },
+          ]);
+
+          const result = await runCleanup(customOnlyConfig, [openFinding()]);
+
+          expect(
+            mockPrismaService.customDetector.findMany,
+          ).toHaveBeenCalledWith({
+            where: { id: { in: ['cd-old'] } },
+            select: { key: true },
+          });
+          expect(result.resolvedForRemovedDetectors).toBe(1);
+          expect(resolveWrites()).toHaveLength(1);
+        });
+
+        it('keeps findings whose custom detector id is still listed', async () => {
+          mockPrismaService.customDetector.findMany.mockResolvedValue([
+            { key: 'email-conduct-screen' },
+          ]);
+
+          const result = await runCleanup(customOnlyConfig, [openFinding()]);
+
+          expect(result.resolvedForRemovedDetectors).toBe(0);
+          expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
+        });
+
+        it('leaves built-in findings alone: they were never configurable there', async () => {
+          // Built-in types cannot be configured on a CUSTOM source, so a PII
+          // finding on one is not evidence of a removal. Without this guard
+          // the empty built-in set reads every non-CUSTOM finding as orphaned.
+          mockPrismaService.customDetector.findMany.mockResolvedValue([
+            { key: 'other-screen' },
+          ]);
+
+          const result = await runCleanup(customOnlyConfig, [
+            openFinding({
+              id: 'finding-pii',
+              detectorType: DetectorType.PII,
+              customDetectorKey: null,
+            }),
+          ]);
+
+          expect(result.resolvedForRemovedDetectors).toBe(0);
+          expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
+        });
+
+        it('keeps TAG findings via the global lookup', async () => {
+          mockPrismaService.customDetector.findMany.mockResolvedValue([
+            { key: 'other-screen' },
+          ]);
+          mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue(
+            [{ key: 'email-conduct-screen' }],
+          );
+
+          const result = await runCleanup(customOnlyConfig, [openFinding()]);
+
+          expect(result.resolvedForRemovedDetectors).toBe(0);
+          expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
+        });
+
+        it('announces what is about to resolve before touching findings', async () => {
+          mockPrismaService.customDetector.findMany.mockResolvedValue([
+            { key: 'other-screen' },
+          ]);
+          // The TAG test above overrides the global lookup; pin the default
+          // back explicitly so this test cannot depend on ordering.
+          mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue(
+            [],
+          );
+          const warn = jest
+            .spyOn(console, 'warn')
+            .mockImplementation(() => undefined);
+          try {
+            await runCleanup(customOnlyConfig, [openFinding()]);
+
+            const preview = warn.mock.calls
+              .map((call) => String(call[0]))
+              .find((line) =>
+                line.includes('no longer configured on the source'),
+              );
+            expect(preview).toContain(
+              '1 open finding(s) from custom detector "email-conduct-screen"',
+            );
+          } finally {
+            warn.mockRestore();
+          }
+        });
       });
 
       it('preserves findings with a manual status override', async () => {
