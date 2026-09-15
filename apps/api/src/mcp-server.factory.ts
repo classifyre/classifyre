@@ -87,8 +87,18 @@ const jsonObjectOrTextSchema = z.union([
 // raw shape objects can be passed to registerTool/registerPrompt without type errors.
 // Tracking issue: https://github.com/modelcontextprotocol/typescript-sdk/issues/1987
 type McpZodShape = Record<string, z.ZodTypeAny>;
+// Destructive tools pass a strict object so an unknown top-level key is a
+// 400, never a stripped typo that widens the operation (dry_run for dryRun,
+// expectedcount for expectedCount, confim for confirm). The SDK accepts a
+// full schema as well as a raw shape; the args type follows whichever was
+// passed.
+type McpToolArgs<T> = T extends McpZodShape
+  ? { [K in keyof T]: z.infer<T[K]> }
+  : T extends z.ZodTypeAny
+    ? z.infer<T>
+    : never;
 type McpServerCompat = Omit<McpServer, 'registerTool' | 'registerPrompt'> & {
-  registerTool<T extends McpZodShape>(
+  registerTool<T extends McpZodShape | z.ZodTypeAny>(
     name: string,
     config: {
       title?: string;
@@ -103,7 +113,7 @@ type McpServerCompat = Omit<McpServer, 'registerTool' | 'registerPrompt'> & {
       };
       _meta?: Record<string, unknown>;
     },
-    cb: (args: { [K in keyof T]: z.infer<T[K]> }, extra: unknown) => unknown,
+    cb: (args: McpToolArgs<T>, extra: unknown) => unknown,
   ): unknown;
   registerPrompt<T extends McpZodShape>(
     name: string,
@@ -817,10 +827,10 @@ export class McpServerFactoryService {
       {
         title: 'Delete Case Event',
         description: 'Remove an event from the case chronology.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           caseId: z.string().uuid(),
           eventId: z.string().uuid(),
-        },
+        }),
         annotations: { readOnlyHint: false, destructiveHint: true },
       },
       async ({ caseId, eventId }) => {
@@ -1211,9 +1221,9 @@ export class McpServerFactoryService {
       {
         title: 'Delete Source',
         description: 'Delete a source and its associated schedules and data.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           id: z.string().uuid(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -1475,12 +1485,12 @@ export class McpServerFactoryService {
       {
         title: 'Delete Notebook Cell',
         description: 'Remove one cell from a notebook.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           sourceId: z.string().uuid(),
           scope: scopeSchema,
           baseRevision: z.number().int().min(1),
           cellId: z.string(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -1629,10 +1639,10 @@ export class McpServerFactoryService {
       {
         title: 'Delete Notebook File',
         description: 'Delete one uploaded file from a CUSTOM source.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           sourceId: z.string().uuid(),
           fileId: z.string().uuid(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -1992,9 +2002,9 @@ export class McpServerFactoryService {
       {
         title: 'Delete Custom Detector',
         description: 'Delete a custom detector.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           id: z.string().uuid(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -2024,7 +2034,7 @@ export class McpServerFactoryService {
           'watches are never retired by this tool. Retired findings are RESOLVED ' +
           'without detector feedback; widening the scope again lets re-detection ' +
           'reopen them.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           customDetectorId: z.string().uuid(),
           dryRun: z.boolean().optional().describe('Default true: count only.'),
           sourceIds: z
@@ -2047,7 +2057,7 @@ export class McpServerFactoryService {
             .literal(true)
             .optional()
             .describe('Retire only: required.'),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           // Resolved findings leave inquiries, correlation and duplicate review.
@@ -2224,10 +2234,10 @@ export class McpServerFactoryService {
         title: 'Delete Detector Test Scenario',
         description:
           'Delete a test scenario (and its past results) from a custom detector.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           detector_id: z.string().describe('Custom detector ID'),
           scenario_id: z.string().describe('Test scenario ID to delete'),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -2499,9 +2509,9 @@ export class McpServerFactoryService {
       {
         title: 'Stop Run',
         description: 'Stop a currently running job.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           runnerId: z.string().uuid(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -2744,7 +2754,7 @@ export class McpServerFactoryService {
           'require confirm: true. A selection over 2,000 findings is queued as a ' +
           'background operation: the result carries operationId — follow it with ' +
           'get_findings_bulk_operation.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           ids: z.array(z.string().uuid()).max(1000).optional(),
           filters: searchFindingsFilters.optional(),
           status: z
@@ -2775,7 +2785,7 @@ export class McpServerFactoryService {
                 'includeResolved and excludeIds — the update would apply to ' +
                 'every finding in the namespace.',
             ),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           // A status change rewrites the evidence base: resolved findings leave
@@ -2888,12 +2898,12 @@ export class McpServerFactoryService {
           'configurations and the accumulated findings are pure noise. To clean up ' +
           'only findings from removed/disabled detectors, rely instead on the ' +
           'cleanup_removed_detector_findings source option (default on) and rescan.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           source_id: z.string().describe('Source whose findings to purge'),
           confirm: z
             .literal(true)
             .describe('Must be true — acknowledges the purge is irreversible'),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -2921,7 +2931,7 @@ export class McpServerFactoryService {
           'requires a run that saw the whole scope and found them gone — and a ' +
           'rotating-sample connector never has one. ALWAYS call once with dry_run ' +
           'first and report what it matched before deleting.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           source_id: z.string().describe('Source whose assets to purge'),
           confirm: z
             .literal(true)
@@ -2956,7 +2966,7 @@ export class McpServerFactoryService {
             .boolean()
             .optional()
             .describe('Report what matches and delete nothing'),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -3249,9 +3259,9 @@ export class McpServerFactoryService {
       {
         title: 'Delete Inquiry',
         description: 'Delete a saved question.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           id: z.string().uuid(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,

@@ -10,6 +10,7 @@ Name | Type
 `kind` | string
 `status` | string
 `totalEstimate` | number
+`expectedCount` | number
 `processed` | number
 `changed` | number
 `exempted` | number
@@ -36,6 +37,7 @@ const example = {
   "kind": null,
   "status": null,
   "totalEstimate": null,
+  "expectedCount": null,
   "processed": null,
   "changed": null,
   "exempted": null,

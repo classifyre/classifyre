@@ -70,6 +70,34 @@ def test_querying_a_cohort_declares_partial_coverage() -> None:
     assert "query_assets" in ctx.partial_coverage_reason
 
 
+def test_a_refused_query_declares_no_partial_coverage() -> None:
+    # A query the API refused read nothing, so the run still covers what it
+    # covers; only a successful response narrows the coverage claim.
+    def refused(_payload: dict[str, Any]) -> dict[str, Any]:
+        raise AssetQueryError("ctx.query_assets() was refused (429): budget spent")
+
+    ctx = Context(query_assets=refused)
+    with pytest.raises(AssetQueryError):
+        ctx.query_assets("Firmenbuch Register")
+    assert ctx.partial_coverage is False
+
+
+def test_select_as_a_bare_string_is_rejected() -> None:
+    # A string is an iterable of its characters; without this check
+    # select="firm" would ask for metadata keys "f", "i", "r", "m".
+    ctx = Context(query_assets=lambda _payload: {"items": []})
+    with pytest.raises(AssetQueryError, match="must be a list"):
+        ctx.query_assets("Firmenbuch Register", select="firmenbuchnummer")  # type: ignore[arg-type]
+
+
+def test_where_must_be_a_mapping_of_mappings() -> None:
+    ctx = Context(query_assets=lambda _payload: {"items": []})
+    with pytest.raises(AssetQueryError, match="must be a mapping"):
+        ctx.query_assets("Firmenbuch Register", where=["legal_form_code"])  # type: ignore[arg-type]
+    with pytest.raises(AssetQueryError, match="must be a mapping"):
+        ctx.query_assets("Firmenbuch Register", where={"legal_form_code": "GES"})  # type: ignore[dict-item]
+
+
 def test_it_keeps_a_reason_the_notebook_already_gave() -> None:
     ctx = Context(query_assets=lambda _payload: {"items": []})
     ctx.set_partial_coverage("weekly change feed")

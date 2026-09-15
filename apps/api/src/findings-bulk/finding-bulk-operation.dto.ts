@@ -20,6 +20,14 @@ export class FindingBulkOperationDto {
   })
   totalEstimate: number;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    type: Number,
+    description:
+      'The dry-run count the operator reviewed. Each chunk fails the operation when processed plus remaining matches exceed it. Null when no count was reviewed.',
+  })
+  expectedCount: number | null;
+
   @ApiProperty({ description: 'Findings the walk has examined so far.' })
   processed: number;
 

@@ -35,7 +35,10 @@ import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { RunnerStatusBadge } from "@/components/runner-status-badge";
 import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
 import { getSourceIcon } from "@/lib/source-type-icon";
-import { splitRunnerErrorDetails } from "@/lib/runner-degradation";
+import {
+  degradedCauseKey,
+  splitRunnerErrorDetails,
+} from "@/lib/runner-degradation";
 import { CohortYieldTable } from "@/components/cohort-yield";
 import type { TranslationKey } from "@/i18n";
 import {
@@ -560,7 +563,7 @@ export default function RunnerDetailPage() {
                                 {t("scans.degraded.item", {
                                   skipped: entry.assetsSkipped.toLocaleString(),
                                   cause: t(
-                                    `scans.degraded.cause.${entry.cause}` as TranslationKey,
+                                    `scans.degraded.cause.${degradedCauseKey(entry.cause)}` as TranslationKey,
                                   ),
                                 })}
                                 {entry.reason && (

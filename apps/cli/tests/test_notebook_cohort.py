@@ -62,8 +62,25 @@ def test_a_band_that_reaches_the_end_says_so_and_wraps() -> None:
     items, state, stats = select_cohort("r", UNIVERSE, weights=weights, size=100)
     assert len(items) == 100
     assert stats["oldest"]["exhausted"] is True
-    items, _, _ = select_cohort("r", UNIVERSE, weights=weights, size=2, state=state)
+    items, state, stats = select_cohort("r", UNIVERSE, weights=weights, size=2, state=state)
     assert keys(items) == ["000001a", "000002a"]
+    # A fresh pass from the start is not exhausted just because the last
+    # pass ended; it resumes after what it just visited.
+    assert stats["oldest"]["exhausted"] is False
+    items, _, stats = select_cohort("r", UNIVERSE, weights=weights, size=3, state=state)
+    assert keys(items) == ["000003a", "000004a", "000005a"]
+    assert stats["oldest"]["exhausted"] is False
+
+
+def test_a_wrapped_pass_reports_exhaustion_only_when_it_reaches_the_end() -> None:
+    weights = {"newest": 100}
+    _, state, stats = select_cohort("r", UNIVERSE, weights=weights, size=100)
+    assert stats["newest"]["exhausted"] is True
+    items, state, stats = select_cohort("r", UNIVERSE, weights=weights, size=2, state=state)
+    assert keys(items) == ["000100a", "000099a"]
+    assert stats["newest"]["exhausted"] is False
+    _, _, stats = select_cohort("r", UNIVERSE, weights=weights, size=98, state=state)
+    assert stats["newest"]["exhausted"] is True
 
 
 def test_random_keeps_no_cursor_and_bands_never_repeat_a_key() -> None:

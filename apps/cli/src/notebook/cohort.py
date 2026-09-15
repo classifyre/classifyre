@@ -97,7 +97,7 @@ def _directional_slice(
     band: str,
     state: Mapping[str, Any] | None,
 ) -> tuple[list[str], dict[str, Any], bool]:
-    """The next ``count`` keys of one directional band, its cursor, and whether it wrapped."""
+    """The next ``count`` keys of one directional band, its cursor, and whether it reached the end."""
     state = dict(state or {})
     size = len(universe)
     descending = band == "newest"
@@ -116,9 +116,8 @@ def _directional_slice(
         except (TypeError, ValueError):
             offset = 0
 
-    wrapped = False
     if offset >= size:
-        offset, wrapped = 0, True
+        offset = 0
 
     if descending:
         end = size - offset
@@ -127,6 +126,10 @@ def _directional_slice(
         picked = list(universe[offset : offset + count])
 
     next_offset = offset + len(picked)
+    # Exhaustion is about this pick reaching the end, not about a previous run
+    # having wrapped: a fresh pass from the start is not exhausted just
+    # because the last pass ended.
+    exhausted = next_offset >= size
     return (
         picked,
         {
@@ -134,7 +137,7 @@ def _directional_slice(
             "last_key": picked[-1] if picked else last_key,
             "covered_fraction": round(next_offset / size, 6) if size else 0.0,
         },
-        wrapped or next_offset >= size,
+        exhausted,
     )
 
 

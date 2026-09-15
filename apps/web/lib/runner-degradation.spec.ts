@@ -1,4 +1,19 @@
-import { splitRunnerErrorDetails } from "./runner-degradation";
+import { degradedCauseKey, splitRunnerErrorDetails } from "./runner-degradation";
+
+describe("degradedCauseKey", () => {
+  it("passes known breaker causes through", () => {
+    expect(degradedCauseKey("provider_refused")).toBe("provider_refused");
+    expect(degradedCauseKey("consecutive_failures")).toBe(
+      "consecutive_failures",
+    );
+    expect(degradedCauseKey("wall_clock_budget")).toBe("wall_clock_budget");
+  });
+
+  it("falls back for causes this web build does not know", () => {
+    expect(degradedCauseKey("quarantine-1")).toBe("other");
+    expect(degradedCauseKey("")).toBe("other");
+  });
+});
 
 describe("splitRunnerErrorDetails", () => {
   it("separates disabled detectors from any other error details", () => {

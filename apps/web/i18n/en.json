@@ -984,7 +984,10 @@
       "countingExact": "Counting matching findings…",
       "unnarrowedWarning": "These filters select every finding in this workspace. Saving applies the change to all {{count}} of them.",
       "countChanged": "More findings match than when this panel opened, so nothing was changed. The count has been refreshed — review it and save again.",
-      "updateFailed": "Failed to update findings"
+      "updateFailed": "Failed to update findings",
+      "updatedVsMatched": "Updated {{updated}} of {{expected}} matching findings.",
+      "shortCountNotice": "Fewer changed than the dry run counted — the rest already had the requested values.",
+      "close": "Close"
     },
     "extraction": {
       "noFields": "No fields populated",
@@ -1837,6 +1840,7 @@
     "running": "Running",
     "queued": "Queued",
     "completed": "Completed",
+    "warning": "Warning",
     "failed": "Failed",
     "noRuns": "No runs for visualization",
     "noRunsHint": "Use filters below to find runs, or start a new scan.",
@@ -1922,7 +1926,8 @@
       "cause": {
         "provider_refused": "the AI provider refused the request (quota, key or billing)",
         "consecutive_failures": "it failed too many times in a row",
-        "wall_clock_budget": "it used up its time budget"
+        "wall_clock_budget": "it used up its time budget",
+        "other": "it ran into a problem it could not recover from"
       }
     }
   },

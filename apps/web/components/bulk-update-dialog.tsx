@@ -299,6 +299,13 @@ export function BulkUpdateDialog({
   const [exactCount, setExactCount] = useState<number | null>(null);
   const [narrowed, setNarrowed] = useState<boolean | null>(null);
   const [counting, setCounting] = useState(false);
+  // The sync save result, kept when it changed fewer findings than the dry
+  // run counted — rows already at the target values are not rewrites, so the
+  // dialog stays open showing actual vs reviewed instead of closing silently.
+  const [savedSummary, setSavedSummary] = useState<{
+    updated: number;
+    expected: number;
+  } | null>(null);
 
   const selectAllFilters =
     selection?.type === "all" ? selection.filters : undefined;
@@ -330,6 +337,7 @@ export function BulkUpdateDialog({
   useEffect(() => {
     setExactCount(null);
     setNarrowed(null);
+    setSavedSummary(null);
     if (open && filtersKey !== null) void refreshExactCount();
   }, [open, filtersKey, refreshExactCount]);
 
@@ -366,10 +374,23 @@ export function BulkUpdateDialog({
       });
       if (result.async && result.operationId) {
         onQueued?.(result.operationId);
+        handleClose();
       } else {
         onSuccess?.();
+        // Select-all only: the dialog reviewed `exactCount`, so say what the
+        // save actually changed. A short count stays open with a notice
+        // rather than closing as if everything matched.
+        const updated = result.updatedCount ?? 0;
+        if (
+          selection.type === "all" &&
+          exactCount !== null &&
+          updated < exactCount
+        ) {
+          setSavedSummary({ updated, expected: exactCount });
+        } else {
+          handleClose();
+        }
       }
-      handleClose();
     } catch (err) {
       if (err instanceof ResponseError && err.response.status === 409) {
         setError(t("findings.bulkUpdate.countChanged"));
@@ -393,6 +414,7 @@ export function BulkUpdateDialog({
     setSeverity(NONE);
     setComment("");
     setError(null);
+    setSavedSummary(null);
     onOpenChange(false);
   }
 
@@ -521,7 +543,15 @@ export function BulkUpdateDialog({
 
         {/* ── Footer ── */}
         <div className="border-t px-6 py-4 flex items-center justify-between gap-4 shrink-0 flex-col">
-          {error ? (
+          {savedSummary ? (
+            <p role="status" className="text-xs text-muted-foreground">
+              {t("findings.bulkUpdate.updatedVsMatched", {
+                updated: savedSummary.updated.toLocaleString(),
+                expected: savedSummary.expected.toLocaleString(),
+              })}{" "}
+              {t("findings.bulkUpdate.shortCountNotice")}
+            </p>
+          ) : error ? (
             <p className="text-xs text-destructive">{error}</p>
           ) : (
             <p className="text-xs text-muted-foreground">
@@ -540,11 +570,15 @@ export function BulkUpdateDialog({
               {t("findings.bulkUpdate.cancel")}
             </Button>
             <Button
-              onClick={handleSave}
-              disabled={!hasChanges || isSaving || awaitingCount}
+              onClick={savedSummary ? handleClose : handleSave}
+              disabled={
+                !savedSummary && (!hasChanges || isSaving || awaitingCount)
+              }
               className="border-2 border-border rounded-[4px] bg-foreground text-background hover:bg-foreground/90"
             >
-              {isSaving ? (
+              {savedSummary ? (
+                t("findings.bulkUpdate.close")
+              ) : isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                   {t("findings.bulkUpdate.saving")}

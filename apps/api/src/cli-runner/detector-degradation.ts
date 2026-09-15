@@ -14,7 +14,7 @@
  * refusal, and the assets will be retried. So they are reported apart.
  */
 
-const BREAKER_OUTCOME = /^breaker_open\[([a-z_]+)\]:\s*([\s\S]*)$/;
+const BREAKER_OUTCOME = /^breaker_open\[([a-z0-9_-]+)\]:\s*([\s\S]*)$/;
 
 const CAUSE_LABELS: Record<string, string> = {
   provider_refused: 'the AI provider refused the request',

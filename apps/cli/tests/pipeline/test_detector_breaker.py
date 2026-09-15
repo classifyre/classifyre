@@ -263,6 +263,67 @@ async def test_wall_clock_budget_disables_a_slow_detector() -> None:
     )
 
 
+class _UnkeyedDetector(BaseDetector):
+    """No detector_type, so the scan cache has no identity for it.
+
+    Before the fail-closed key this detector ran outside any breaker: every
+    asset paid for its own refusal.
+    """
+
+    detector_type = ""
+    detector_name = "mystery"
+
+    def __init__(self) -> None:
+        super().__init__(None)
+        self.calls = 0
+
+    async def detect(self, content, content_type="text/plain") -> list[DetectionResult]:
+        self.calls += 1
+        raise ProviderRefusedError("LLM provider refused: insufficient_credit")
+
+    def get_supported_content_types(self) -> list[str]:
+        return ["text/plain"]
+
+
+@pytest.mark.asyncio
+async def test_concurrent_assets_waste_a_single_provider_call() -> None:
+    # process_stream dispatches every asset at once. The per-detector gate
+    # serializes the check → call → record window, so the first refusal trips
+    # the breaker before a second provider call goes out: one wasted call per
+    # detector per run, however many assets were in flight.
+    detector = _RefusingDetector("fb_solvency_outlook")
+    pipeline = DetectorPipeline(detectors=[detector], source=_Source(), runner_id="r")
+
+    assets = await pipeline.process([_asset(i) for i in range(8)])
+
+    assert detector.calls == 1
+    skipped = 0
+    for asset in assets:
+        outcome = _outcome(asset, DetectorType.CUSTOM)
+        assert outcome.status == Status.ERROR
+        if (outcome.error or "").startswith(f"{BREAKER_OUTCOME_PREFIX}[provider_refused]"):
+            skipped += 1
+    assert skipped == 7
+
+    [summary] = pipeline.breaker_summary()
+    assert summary["cause"] == "provider_refused"
+    assert summary["skipped_payloads"] == 7
+
+
+@pytest.mark.asyncio
+async def test_detector_without_a_cache_key_still_trips_a_default_breaker() -> None:
+    detector = _UnkeyedDetector()
+    pipeline = DetectorPipeline(detectors=[detector], source=_Source(), runner_id="r")
+
+    await _scan(pipeline, 4)
+
+    assert detector.calls == 1
+    [summary] = pipeline.breaker_summary()
+    assert summary["cause"] == "provider_refused"
+    assert summary["detector"].startswith("UNKEYED::")
+    assert summary["skipped_payloads"] == 3
+
+
 @pytest.mark.asyncio
 async def test_a_skipped_asset_carries_one_error_line_however_many_pages() -> None:
     detector = _RefusingDetector("fb_solvency_outlook")

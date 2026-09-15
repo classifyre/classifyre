@@ -57,6 +57,34 @@ describe('summarizeOutcomeFailures', () => {
     });
   });
 
+  it('accepts digits and hyphens in the breaker cause', () => {
+    const summary = summarizeOutcomeFailures([
+      {
+        assetHash: 'a1',
+        detectorOutcomes: [
+          {
+            detector_type: 'CUSTOM',
+            custom_detector_key: 'k1',
+            status: 'ERROR',
+            error:
+              'breaker_open[quarantine-1]: k1 was disabled for the rest of ' +
+              'this run and did not evaluate this asset — cooling down',
+          },
+        ],
+      },
+    ]);
+
+    expect(summary.assetCount).toBe(0);
+    expect(summary.degraded).toEqual([
+      {
+        detector: 'k1',
+        cause: 'quarantine-1',
+        reason: 'cooling down',
+        assetsSkipped: 1,
+      },
+    ]);
+  });
+
   it('labels a built-in detector by its type', () => {
     const summary = summarizeOutcomeFailures([
       {

@@ -30,6 +30,7 @@ import { FindingBulkOperationService } from './finding-bulk-operation.service';
 import {
   buildRetirePlan,
   candidatePageSql,
+  caseDriftCurrentName,
   outOfScopeReason,
   planNeedsWalk,
   resolutionReasonFor,
@@ -68,7 +69,26 @@ export interface RetireCounts {
   notProvable: NotProvableDimension[];
   /** A retire stopped at the reviewed count with candidates left. */
   capReached?: boolean;
+  /** Sources of rows the retire actually changed, not merely examined. */
+  changedBySource: Record<string, number>;
+  /**
+   * Live pattern names whose case-drifted stale identities retired. A dry-run
+   * warning dimension: renaming a pattern by case orphans the old identities,
+   * which can never be re-detected, without removing anything.
+   */
+  caseDriftedPatterns: string[];
 }
+
+/**
+ * Partial unique indexes enforcing the one-shot dry-run binding and the
+ * single active retire per detector at the database level (see the
+ * `retire_one_shot_binding` migration). Named here so the P2002 mapping below
+ * and the migration cannot drift apart silently.
+ */
+export const RETIRE_FROM_OPERATION_INDEX =
+  'finding_bulk_operations_retire_from_op_uniq';
+export const RETIRE_DETECTOR_ACTIVE_INDEX =
+  'finding_bulk_operations_retire_detector_active_uniq';
 
 const ACTIVE: FindingBulkOperationStatus[] = [
   FindingBulkOperationStatus.PENDING,
@@ -130,6 +150,7 @@ export class RetireOutOfScopeService {
       expectedCount?: unknown;
       confirm?: unknown;
       includeInquiryWatched?: unknown;
+      sourceIds?: unknown;
       createdBy?: string | null;
     },
     options: { allowInquiryOverride: boolean },
@@ -138,6 +159,11 @@ export class RetireOutOfScopeService {
     if (includeInquiryWatched && !options.allowInquiryOverride) {
       throw new BadRequestException(
         'includeInquiryWatched is an operator decision and is not available here.',
+      );
+    }
+    if (input.sourceIds !== undefined && input.sourceIds !== null) {
+      throw new BadRequestException(
+        'sourceIds is a dry-run-only parameter: start a new dry run to change the source scope.',
       );
     }
     if (typeof input.fromOperationId !== 'string' || !input.fromOperationId) {
@@ -215,8 +241,14 @@ export class RetireOutOfScopeService {
         kind: FindingBulkOperationKind.RETIRE_OUT_OF_SCOPE,
         OR: [
           // One dry run authorizes one retire: its counts describe a corpus
-          // the first retire has already changed.
-          { filters: { path: ['fromOperationId'], equals: dryRun.id } },
+          // the first retire has already changed. A retire that changed
+          // nothing and is no longer running (CANCELLED/FAILED with zero rows
+          // changed) burned nothing — the corpus is as reviewed, so the dry
+          // run stays usable.
+          {
+            filters: { path: ['fromOperationId'], equals: dryRun.id },
+            OR: [{ changed: { gt: 0 } }, { status: { in: ACTIVE } }],
+          },
           // Two retires walking the same detector at once; a dry run running
           // alongside changes nothing and blocks nothing.
           {
@@ -238,22 +270,29 @@ export class RetireOutOfScopeService {
       );
     }
 
-    return this.operations.create({
-      kind: FindingBulkOperationKind.RETIRE_OUT_OF_SCOPE,
-      filters: {
-        mode: 'retire',
-        plan: dryFilters.plan,
-        fromOperationId: dryRun.id,
-        includeInquiryWatched,
-      } satisfies RetireFilters,
-      target: { status: 'RESOLVED', cap },
-      totalEstimate: cap,
-      counts: emptyCounts(dryFilters.plan) as unknown as Record<
-        string,
-        unknown
-      >,
-      createdBy: input.createdBy ?? null,
-    });
+    try {
+      return await this.operations.create({
+        kind: FindingBulkOperationKind.RETIRE_OUT_OF_SCOPE,
+        filters: {
+          mode: 'retire',
+          plan: dryFilters.plan,
+          fromOperationId: dryRun.id,
+          includeInquiryWatched,
+        } satisfies RetireFilters,
+        target: { status: 'RESOLVED', cap },
+        totalEstimate: cap,
+        counts: emptyCounts(dryFilters.plan) as unknown as Record<
+          string,
+          unknown
+        >,
+        createdBy: input.createdBy ?? null,
+      });
+    } catch (error) {
+      // The pre-check above can race a concurrent startRetire: the database
+      // guard (partial unique indexes) wins, and its violation maps back to
+      // the same 409s.
+      throw retireCreateConflict(error, dryRun.id);
+    }
   }
 
   /** One bounded chunk of a dry run or retire. */
@@ -266,8 +305,6 @@ export class RetireOutOfScopeService {
     const retire = filters.mode === 'retire';
     const cap = retire ? capOf(operation.target) : Number.POSITIVE_INFINITY;
     const counts = parseCounts(operation.counts, plan);
-
-    await this.assertDetectorUnchanged(plan);
 
     if (
       operation.cursor === null &&
@@ -292,6 +329,11 @@ export class RetireOutOfScopeService {
     const started = Date.now();
 
     for (;;) {
+      // Re-read per page, not once per walk: a detector edit between pages
+      // must stop the walk before the next page commits under a stale plan.
+      // One indexed primary-key fetch per page.
+      await this.assertDetectorUnchanged(plan);
+
       if (block >= blocksTotal) {
         // Ingest may have appended blocks since the walk began.
         blocksTotal = await this.relationBlocks();
@@ -311,7 +353,7 @@ export class RetireOutOfScopeService {
       );
       const cited = await this.citedAmong(rows.map((row) => row.id));
 
-      const byReason = new Map<string, string[]>();
+      const byReason = new Map<string, CandidateRow[]>();
       let examined = 0;
       let exempted = 0;
       let retirable = 0;
@@ -356,9 +398,14 @@ export class RetireOutOfScopeService {
           continue;
         }
         retirable += 1;
-        const ids = byReason.get(reason) ?? [];
-        ids.push(row.id);
-        byReason.set(reason, ids);
+        const group = byReason.get(reason) ?? [];
+        group.push(row);
+        byReason.set(reason, group);
+        const drifted = caseDriftCurrentName(plan, reason);
+        if (drifted && !counts.caseDriftedPatterns.includes(drifted)) {
+          counts.caseDriftedPatterns.push(drifted);
+          counts.caseDriftedPatterns.sort();
+        }
       }
       counts.inquiries = [...inquiryCounts.values()].sort(
         (a, b) => b.count - a.count,
@@ -377,13 +424,25 @@ export class RetireOutOfScopeService {
         const pageChanged = await this.prisma.$transaction(
           async (tx) => {
             let total = 0;
-            for (const [reason, ids] of byReason) {
+            for (const [reason, candidates] of byReason) {
               let text = reasonTexts.get(reason);
               if (!text) {
                 text = resolutionReasonFor(plan, reason);
                 reasonTexts.set(reason, text);
               }
-              total += await this.retirePage(tx, plan, ids, text, actor);
+              const changedSources = await this.retirePage(
+                tx,
+                plan,
+                candidates,
+                text,
+                actor,
+                filters.includeInquiryWatched === true,
+              );
+              for (const sourceId of changedSources) {
+                counts.changedBySource[sourceId] =
+                  (counts.changedBySource[sourceId] ?? 0) + 1;
+              }
+              total += changedSources.length;
             }
             await tx.findingBulkOperation.update({
               where: { id: operation.id },
@@ -429,7 +488,11 @@ export class RetireOutOfScopeService {
     // count can have moved.
     if (!filters.includeInquiryWatched || !this.inquiryMatching) return;
     const counts = parseCounts(operation.counts, filters.plan);
-    for (const sourceId of Object.keys(counts.bySource).slice(0, 100)) {
+    // Sources this retire actually changed — not the candidate census in
+    // bySource, which also counts exempted findings nothing changed. Uncapped:
+    // every changed source's inquiry counts must refresh, however many there
+    // are.
+    for (const sourceId of Object.keys(counts.changedBySource)) {
       await this.inquiryMatching
         .processSourceCompletion(sourceId, null)
         .catch((error) =>
@@ -440,13 +503,45 @@ export class RetireOutOfScopeService {
     }
   }
 
+  /**
+   * Resolve one page of candidates, re-checking both exemptions at write time.
+   * The page snapshot (candidates, cited set, inquiry matchers) can be stale
+   * by the time this transaction commits, so the UPDATE trusts none of it:
+   * a case citation after the snapshot is closed by the NOT EXISTS below, and
+   * an inquiry watch after the snapshot by re-matching against the ACTIVE
+   * inquiries as of this transaction. Returns the sources of the rows the
+   * UPDATE actually changed.
+   */
   private async retirePage(
     tx: Prisma.TransactionClient,
     plan: RetirePlan,
-    ids: string[],
+    rows: CandidateRow[],
     reason: string,
     actor: string,
-  ): Promise<number> {
+    includeInquiryWatched: boolean,
+  ): Promise<string[]> {
+    let targets = rows;
+    if (!includeInquiryWatched) {
+      const fresh = await tx.inquiry.findMany({
+        where: { status: 'ACTIVE' },
+        select: {
+          matchAllSources: true,
+          sourceIds: true,
+          detectorTypes: true,
+          customDetectorKeys: true,
+          findingTypes: true,
+          findingTypeRegex: true,
+          findingValueRegex: true,
+        },
+      });
+      if (fresh.length > 0) {
+        const matchers = fresh.map((inquiry) => new CompiledMatcher(inquiry));
+        targets = rows.filter(
+          (row) => !matchers.some((matcher) => matcher.matches(row)),
+        );
+      }
+    }
+    if (targets.length === 0) return [];
     const entry = historyEntryForStorage({
       timestamp: new Date(),
       runnerId: 'manual',
@@ -455,17 +550,22 @@ export class RetireOutOfScopeService {
       changedBy: actor,
       changeReason: reason,
     });
-    return tx.$executeRaw`
+    const changed = await tx.$queryRaw<Array<{ sourceId: string }>>`
       UPDATE findings
       SET status = 'RESOLVED'::"FindingStatus",
           resolved_at = now(),
           resolution_reason = ${reason},
           updated_at = now(),
           history = COALESCE(history, '[]'::jsonb) || ${JSON.stringify([entry])}::jsonb
-      WHERE id = ANY(${ids}::text[])
+      WHERE id = ANY(${targets.map((row) => row.id)}::text[])
         AND status = 'OPEN'::"FindingStatus"
         AND custom_detector_key = ${plan.customDetectorKey}
+        AND NOT EXISTS (
+          SELECT 1 FROM case_findings WHERE finding_id = findings.id
+        )
+      RETURNING source_id AS "sourceId"
     `;
+    return changed.map((row) => row.sourceId);
   }
 
   private async detector(id: string) {
@@ -503,11 +603,17 @@ export class RetireOutOfScopeService {
   }
 
   private async hasStaleRegexFindings(plan: RetirePlan): Promise<boolean> {
+    // A scoped probe: without the source filter a stale finding in any other
+    // source would send a source-restricted dry run on a full walk.
+    const sources = plan.sourceIds
+      ? Prisma.sql`AND source_id = ANY(${plan.sourceIds}::text[])`
+      : Prisma.empty;
     const rows = await this.prisma.$queryRaw<Array<{ one: number }>>`
       SELECT 1 AS one FROM findings
       WHERE custom_detector_key = ${plan.customDetectorKey}
         AND status = 'OPEN'::"FindingStatus"
         AND finding_type LIKE 'regex:%'
+        ${sources}
       LIMIT 1
     `;
     return rows.length > 0;
@@ -599,7 +705,38 @@ function emptyCounts(plan: RetirePlan): RetireCounts {
     wouldRetireIncludingWatched: 0,
     sampleIds: [],
     notProvable: plan.notProvable,
+    changedBySource: {},
+    caseDriftedPatterns: [],
   };
+}
+
+/**
+ * A concurrent startRetire lost the database guard race. Maps the partial
+ * unique index violation back to the same 409 the pre-check would have
+ * raised; anything else is not ours to translate.
+ */
+function retireCreateConflict(error: unknown, dryRunId: string): Error {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: string }).code === 'P2002'
+  ) {
+    const detail =
+      `${(error as Error).message ?? ''} ` +
+      JSON.stringify((error as { meta?: unknown }).meta ?? '');
+    if (detail.includes(RETIRE_DETECTOR_ACTIVE_INDEX)) {
+      return new ConflictException(
+        'Another retire operation is already running for this detector.',
+      );
+    }
+    if (detail.includes(RETIRE_FROM_OPERATION_INDEX)) {
+      return new ConflictException(
+        `Dry run ${dryRunId} was already used by another operation. ` +
+          'Run a new dry run.',
+      );
+    }
+  }
+  throw error;
 }
 
 function parseCounts(raw: unknown, plan: RetirePlan): RetireCounts {

@@ -28,6 +28,7 @@ import {
 import { SemanticSearchMode } from './dto/search-findings-request.dto';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
+import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
 
 describe('AssetService', () => {
   let service: AssetService;
@@ -78,6 +79,11 @@ describe('AssetService', () => {
     scheduleFull: jest.fn(),
   };
 
+  const mockStatsJobs = {
+    scheduleFull: jest.fn(),
+    scheduleForDays: jest.fn(),
+  };
+
   const mockCustomDetectorExtractionsService = {
     createFromIngestion: jest.fn(),
   };
@@ -118,6 +124,10 @@ describe('AssetService', () => {
           provide: CorrelationJobScheduler,
           useValue: mockCorrelationJobs,
         },
+        {
+          provide: FindingStatsScheduler,
+          useValue: mockStatsJobs,
+        },
       ],
     }).compile();
 
@@ -133,6 +143,8 @@ describe('AssetService', () => {
     mockPrismaService.$queryRaw.mockResolvedValue([]);
     mockInquiryMatching.watchersForFindings.mockResolvedValue(new Map());
     mockCorrelationJobs.scheduleFull.mockResolvedValue(undefined);
+    mockStatsJobs.scheduleFull.mockResolvedValue(undefined);
+    mockStatsJobs.scheduleForDays.mockResolvedValue(undefined);
     mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue([]);
   });
 
@@ -2942,6 +2954,14 @@ describe('AssetService', () => {
           await runCleanup(detectorGone, [openFinding()]);
 
           expect(mockCorrelationJobs.scheduleFull).toHaveBeenCalledWith(
+            expect.stringContaining('resolved 1 finding'),
+          );
+        });
+
+        it('schedules a stats rebuild alongside the correlation recompute', async () => {
+          await runCleanup(detectorGone, [openFinding()]);
+
+          expect(mockStatsJobs.scheduleFull).toHaveBeenCalledWith(
             expect.stringContaining('resolved 1 finding'),
           );
         });

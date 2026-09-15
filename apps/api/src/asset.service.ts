@@ -2601,15 +2601,20 @@ export class AssetService {
   }
 
   /**
-   * Best-effort full correlation recompute. Mirrors the purge path in
-   * SourceService: a scheduling failure must never fail the run that already
-   * succeeded — fingerprints refresh on a later recompute.
+   * Best-effort full correlation recompute plus stats rebuild. Mirrors the
+   * purge path in SourceService and retire's afterOperation: resolving
+   * findings invalidates both derived states, and a scheduling failure must
+   * never fail the run that already succeeded — fingerprints and rollups
+   * refresh on a later recompute.
    */
   private async scheduleCorrelationRecompute(
     sourceId: string,
     resolvedCount: number,
   ): Promise<void> {
     await this.correlationJobs?.scheduleFull(
+      `source ${sourceId} resolved ${resolvedCount} finding(s)`,
+    );
+    await this.statsJobs?.scheduleFull(
       `source ${sourceId} resolved ${resolvedCount} finding(s)`,
     );
   }

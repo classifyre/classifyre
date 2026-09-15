@@ -1179,8 +1179,45 @@ export class FindingsService {
       ? dto.ids.filter((id): id is string => typeof id === 'string')
       : [];
     const confirm = dto.confirm === true || (dto.confirm as unknown) === 'true';
-    const dryRun = dto.dryRun === true || (dto.dryRun as unknown) === 'true';
+    // Fail to preview, never to execute: any truthy spelling counts as a dry
+    // run, so `dryRun: 1` from a loosely-typed caller cannot become a write.
+    const dryRunRaw = dto.dryRun as unknown;
+    const dryRun =
+      dryRunRaw === true ||
+      dryRunRaw === 'true' ||
+      dryRunRaw === 1 ||
+      dryRunRaw === '1';
     const expectedCount = this.parseExpectedCount(dto.expectedCount);
+    // ids and filters together select nothing coherent: the id list is an
+    // explicit set while the filters are a query. Refuse rather than guess
+    // which one the caller meant. No REST, MCP or UI caller sends both.
+    if (ids.length > 0 && filters !== undefined) {
+      throw new BadRequestException('Use either ids or filters, not both.');
+    }
+    // The MCP path bypasses class-validator, so an unknown status or severity
+    // would otherwise sail past admission and only fail deep inside Prisma —
+    // after history was written, or silently queued into a background
+    // operation. Reject it here, before anything is counted or written.
+    if (
+      status !== undefined &&
+      !Object.values(FindingStatus).includes(status)
+    ) {
+      throw new BadRequestException(
+        `Invalid status ${JSON.stringify(status)} — expected one of ` +
+          `${Object.values(FindingStatus).join(', ')}.`,
+      );
+    }
+    if (severity !== undefined && !Object.values(Severity).includes(severity)) {
+      throw new BadRequestException(
+        `Invalid severity ${JSON.stringify(severity)} — expected one of ` +
+          `${Object.values(Severity).join(', ')}.`,
+      );
+    }
+    if (comment !== undefined && typeof comment !== 'string') {
+      throw new BadRequestException(
+        `Invalid comment ${JSON.stringify(comment)} — expected a string.`,
+      );
+    }
     const hasChanges = Boolean(status || severity || comment !== undefined);
 
     if (ids.length > BULK_UPDATE_MAX_IDS) {
@@ -1245,6 +1282,9 @@ export class FindingsService {
             ...(comment !== undefined ? { comment } : {}),
           },
           totalEstimate: matched,
+          // The worker re-checks this per chunk and fails the operation when
+          // more match than the operator reviewed.
+          expectedCount: expectedCount ?? null,
           createdBy: userId ?? null,
         });
         return {
@@ -1285,8 +1325,17 @@ export class FindingsService {
       if (status) {
         await this.recordBulkStatusChange(where, status, severity, comment);
       }
-      const result = await this.prisma.finding.updateMany({ where, data });
-      if (status && result.count > 0) {
+      // Rows already at the target status are not changes: the history walk
+      // above skips them, so the update must too — otherwise updatedCount
+      // over-reports what actually changed.
+      const updateWhere: Prisma.FindingWhereInput = status
+        ? { AND: [where, { status: { not: status } }] }
+        : where;
+      const result = await this.prisma.finding.updateMany({
+        where: updateWhere,
+        data,
+      });
+      if ((status || severity) && result.count > 0) {
         await this.correlationJobs?.scheduleFull('bulk finding status changed');
         // Filter-based bulk update: the matched findings can span any detection
         // day, and working out which ones would cost the same scan the rollup
@@ -1443,6 +1492,30 @@ export class FindingsService {
     const statusGuard: Prisma.FindingWhereInput[] = target.status
       ? [{ status: { not: target.status } }]
       : [];
+    // The operator reviewed `expectedCount` findings. The corpus can move
+    // under a running operation, so re-count what this chunk still has ahead
+    // of it — processed so far plus remaining matches — and fail closed when
+    // that exceeds what was reviewed, before writing anything more. The
+    // cursor bounds the recount to what this chunk has not examined yet, so
+    // a severity-only change (whose rows keep matching) is not double
+    // counted. A throw here becomes a FAILED operation with this message.
+    if (
+      operation.expectedCount !== null &&
+      operation.expectedCount !== undefined
+    ) {
+      const cursorGuard: Prisma.FindingWhereInput[] =
+        operation.cursor != null ? [{ id: { gt: operation.cursor } }] : [];
+      const remaining = await this.prisma.finding.count({
+        where: { AND: [where, ...statusGuard, ...cursorGuard] },
+      });
+      if (operation.processed + remaining > operation.expectedCount) {
+        throw new Error(
+          `Bulk operation matches ${operation.processed + remaining} ` +
+            `findings, more than the ${operation.expectedCount} expected. ` +
+            `Nothing further was written.`,
+        );
+      }
+    }
     const historyEntry = target.status
       ? historyEntryForStorage({
           timestamp: new Date(),
@@ -1525,12 +1598,28 @@ export class FindingsService {
 
   /** Rebuild what a finished operation invalidated, once rather than per page. */
   async afterBulkOperation(operation: FindingBulkOperation): Promise<void> {
-    const target = this.bulkTarget(operation.target);
-    if (!target.status || operation.changed === 0) return;
+    // A FAILED or cancelled operation can carry a target that never
+    // validated; there is nothing it could have invalidated either.
+    let target: { status?: FindingStatus; severity?: Severity };
+    try {
+      target = this.bulkTarget(operation.target);
+    } catch {
+      return;
+    }
+    if ((!target.status && !target.severity) || operation.changed === 0) return;
     await this.correlationJobs?.scheduleFull('bulk finding status changed');
     await this.statsJobs?.scheduleFull('bulk finding status changed');
   }
 
+  /**
+   * The stored change of a background bulk operation, validated fail-closed.
+   *
+   * Admission already rejects bad targets at queue time, but the row outlives
+   * the request — and the previous version silently dropped what it did not
+   * recognise, so an invalid target degraded to `SET updated_at = now()` over
+   * every matching page, each counted as changed. Throw instead: the worker
+   * records the operation FAILED with this message and writes nothing.
+   */
   private bulkTarget(raw: unknown): {
     status?: FindingStatus;
     severity?: Severity;
@@ -1538,18 +1627,43 @@ export class FindingsService {
   } {
     const value =
       raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-    const status =
-      typeof value.status === 'string' ? value.status.toUpperCase() : '';
-    const severity =
-      typeof value.severity === 'string' ? value.severity.toUpperCase() : '';
+    const invalid = (message: string): never => {
+      throw new Error(`Invalid bulk operation target: ${message}`);
+    };
+    let status: FindingStatus | undefined;
+    if (value.status !== undefined) {
+      const normalized =
+        typeof value.status === 'string' ? value.status.toUpperCase() : '';
+      if (!Object.values(FindingStatus).includes(normalized as FindingStatus)) {
+        invalid(
+          `status ${JSON.stringify(value.status)} is not a FindingStatus`,
+        );
+      }
+      status = normalized as FindingStatus;
+    }
+    let severity: Severity | undefined;
+    if (value.severity !== undefined) {
+      const normalized =
+        typeof value.severity === 'string' ? value.severity.toUpperCase() : '';
+      if (!Object.values(Severity).includes(normalized as Severity)) {
+        invalid(`severity ${JSON.stringify(value.severity)} is not a Severity`);
+      }
+      severity = normalized as Severity;
+    }
+    let comment: string | undefined;
+    const rawComment: unknown = value.comment;
+    if (typeof rawComment === 'string') {
+      comment = rawComment;
+    } else if (rawComment !== undefined) {
+      invalid(`comment ${JSON.stringify(rawComment)} is not a string`);
+    }
+    if (!status && !severity && comment === undefined) {
+      invalid('no status, severity or comment to apply');
+    }
     return {
-      ...(Object.values(FindingStatus).includes(status as FindingStatus)
-        ? { status: status as FindingStatus }
-        : {}),
-      ...(Object.values(Severity).includes(severity as Severity)
-        ? { severity: severity as Severity }
-        : {}),
-      ...(typeof value.comment === 'string' ? { comment: value.comment } : {}),
+      ...(status ? { status } : {}),
+      ...(severity ? { severity } : {}),
+      ...(comment !== undefined ? { comment } : {}),
     };
   }
 

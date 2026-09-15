@@ -88,6 +88,13 @@ function normalizePercent(
 /**
  * Give every band at least `floor` percent, taking it proportionally from the
  * bands above it. Iterates because raising one band can push another under.
+ *
+ * Degenerate when the floors cannot all hold at once (`bands * floor >= 100`,
+ * e.g. three bands at a 40% min_share): no split sums to 100 with every band
+ * at its floor. Then clamp every band up to the floor and renormalize to 100.
+ * The result sits below the floors, but keeps the measured order — the most
+ * productive band still gets the most — instead of an equal split that honours
+ * neither the measurement nor the floors.
  */
 function applyFloor(
   shares: Partial<Record<CohortBand, number>>,
@@ -95,7 +102,14 @@ function applyFloor(
 ): Partial<Record<CohortBand, number>> {
   const bands = Object.keys(shares) as CohortBand[];
   if (bands.length * floorPercent >= 100) {
-    return Object.fromEntries(bands.map((b) => [b, 100 / bands.length]));
+    const clamped = bands.map((b) => Math.max(shares[b] ?? 0, floorPercent));
+    const clampedTotal = clamped.reduce((sum, share) => sum + share, 0);
+    if (clampedTotal <= 0) {
+      return Object.fromEntries(bands.map((b) => [b, 100 / bands.length]));
+    }
+    return Object.fromEntries(
+      bands.map((b, index) => [b, (clamped[index] / clampedTotal) * 100]),
+    );
   }
   let result = { ...shares };
   for (let pass = 0; pass < bands.length; pass += 1) {
