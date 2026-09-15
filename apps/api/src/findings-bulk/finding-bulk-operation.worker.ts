@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   FindingBulkOperationKind,
   FindingBulkOperationStatus,
+  type FindingBulkOperation,
 } from '@prisma/client';
 import type { Job } from 'pg-boss';
 
@@ -68,16 +69,27 @@ export class FindingBulkOperationWorker {
     // Finished, cancelled while queued, or held by a live handler elsewhere.
     if (!operation) return;
 
+    const isRetire =
+      operation.kind === FindingBulkOperationKind.RETIRE_OUT_OF_SCOPE;
+    // A committed prefix may already have invalidated derived state, so every
+    // terminal exit rebuilds it. Both rebuilds no-op when changed == 0, and a
+    // rebuild failure must not mask the terminal status, so it only warns.
+    const rebuild = (latest: FindingBulkOperation) =>
+      this.rebuildFor(isRetire, latest).catch((error) =>
+        this.logger.warn(
+          `Bulk operation ${operationId} rebuild failed: ${String(error)}`,
+        ),
+      );
+
     if (operation.cancelRequested) {
-      await this.operations.finish(
+      const finished = await this.operations.finish(
         operationId,
         FindingBulkOperationStatus.CANCELLED,
       );
+      await rebuild(finished);
       return;
     }
 
-    const isRetire =
-      operation.kind === FindingBulkOperationKind.RETIRE_OUT_OF_SCOPE;
     try {
       const { done } = isRetire
         ? await this.retire.runChunk(operation, BULK_OPERATION_CHUNK_BUDGET_MS)
@@ -106,9 +118,18 @@ export class FindingBulkOperationWorker {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Bulk operation ${operationId} failed: ${message}`);
-      await this.operations
+      const failed = await this.operations
         .finish(operationId, FindingBulkOperationStatus.FAILED, message)
         .catch(() => undefined);
+      if (failed) await rebuild(failed);
     }
+  }
+
+  private async rebuildFor(
+    isRetire: boolean,
+    latest: FindingBulkOperation,
+  ): Promise<void> {
+    if (isRetire) await this.retire.afterOperation(latest);
+    else await this.findings.afterBulkOperation(latest);
   }
 }

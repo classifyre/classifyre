@@ -668,23 +668,43 @@ class Context:
         if kind is not None:
             payload["kind"] = str(kind)
         if where:
-            payload["where"] = {str(key): dict(condition) for key, condition in where.items()}
+            if not isinstance(where, Mapping):
+                raise AssetQueryError(
+                    "ctx.query_assets() where must be a mapping like "
+                    '{"legal_form_code": {"in": ["GES", "AG"]}}, '
+                    f"got {type(where).__name__}"
+                )
+            shaped: dict[str, dict[str, Any]] = {}
+            for key, condition in where.items():
+                if not isinstance(condition, Mapping):
+                    raise AssetQueryError(
+                        f"ctx.query_assets() where[{str(key)!r}] must be a mapping of "
+                        f"operator to value, like {{'eq': 5}}, got {condition!r}"
+                    )
+                shaped[str(key)] = dict(condition)
+            payload["where"] = shaped
         if exclude_visited:
             visited = dict(exclude_visited)
             payload["excludeVisited"] = {
                 "key": visited.get("key"),
                 "sinceDays": visited.get("since_days", visited.get("sinceDays")),
             }
+        if isinstance(select, (str, bytes)):
+            raise AssetQueryError(
+                "ctx.query_assets() select must be a list of metadata keys, "
+                f"not a single string: did you mean select={[select]!r}?"
+            )
         selected = [str(key) for key in select]
         if selected:
             payload["select"] = selected
         if cursor is not None:
             payload["cursor"] = str(cursor)
 
-        if not self._partial_coverage:
-            # Never over the notebook's own reason, which says more.
-            self.set_partial_coverage("the notebook chose its cohort with ctx.query_assets()")
         response = self._query_assets(payload) or {}
+        if not self._partial_coverage:
+            # Only on success: a refused query read nothing, so the run still
+            # covers what it covers. Never over the notebook's own reason.
+            self.set_partial_coverage("the notebook chose its cohort with ctx.query_assets()")
         return AssetQueryPage(
             items=[
                 QueriedAsset(

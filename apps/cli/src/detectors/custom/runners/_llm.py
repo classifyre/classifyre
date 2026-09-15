@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import random
+import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -61,7 +62,34 @@ _RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
 # Used only if the shared marker list cannot be read, so a packaging mistake
 # degrades to "the known worst offender still fails fast" rather than to "every
 # quota refusal is retried on every asset again".
-_FALLBACK_QUOTA_MARKERS = ("free-models-per-day", "insufficient_quota")
+_FALLBACK_QUOTA_MARKERS = (
+    "insufficient_credit",
+    "insufficient balance",
+    "out of credits",
+    "resource_exhausted",
+    "resource exhausted",
+    "quota exceeded",
+    "free-models-per-day",
+    "insufficient_quota",
+)
+
+# Billing-exhaustion signals checked before the generic substring scan, with
+# word-boundary anchors so "billing" inside an unrelated word cannot trip them
+# while "you have insufficient_credit" always does. Mirrors the head of the
+# shared quota list in provider_refusal_markers.json.
+_ANCHORED_BILLING_EXHAUSTION_MARKERS = (
+    "insufficient_credit",
+    "insufficient balance",
+    "out of credits",
+)
+
+
+def _billing_exhaustion_match(text: str) -> str | None:
+    """The anchored billing marker in *text*, or None when absent."""
+    for marker in _ANCHORED_BILLING_EXHAUSTION_MARKERS:
+        if re.search(rf"(?<![a-z0-9_]){re.escape(marker)}(?![a-z0-9_])", text):
+            return marker
+    return None
 
 
 @functools.lru_cache(maxsize=1)
@@ -299,6 +327,10 @@ class LLMRunner(BaseRunner):
                 return reason
 
         text = _error_text(exc).lower()
+        # Anchored billing-exhaustion markers first: a spent balance is the
+        # most specific "retrying cannot help" signal in the shared list.
+        if _billing_exhaustion_match(text) is not None:
+            return "quota exhausted"
         if any(marker in text for marker in _quota_markers()):
             return "quota exhausted"
         return None
@@ -317,6 +349,9 @@ class LLMRunner(BaseRunner):
         )
         if retryable_types and isinstance(exc, retryable_types):
             return True
+        # Only the listed statuses are retried: an unknown 4xx (e.g. a Gemini
+        # safety-block 400) is a final answer for this input, not a busy
+        # provider. Retry stays for 5xx, plain 429s and network errors.
         return getattr(exc, "status_code", None) in _RETRYABLE_STATUS_CODES
 
     def _vision_enabled(self) -> bool:

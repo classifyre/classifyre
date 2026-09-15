@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import os
 from typing import Any
 
 import pytest
@@ -17,7 +18,7 @@ from src.notebook.contract import NotebookContractError
 from src.sources import get_source
 from src.sources.asset_metadata import is_open_kind, validate_metadata
 from src.sources.custom.env import ALLOWED_ENV_KEYS, scrubbed_environment
-from src.sources.custom.source import CustomSource
+from src.sources.custom.source import CustomSource, CustomSourceError
 from src.utils.hashing import hash_id
 
 SIMPLE_NOTEBOOK = """from classifyre import Asset, ctx
@@ -838,6 +839,28 @@ def test_a_refused_query_reaches_the_notebook_as_an_error_it_can_handle(
     assert content is not None
     assert "refused (429)" in content[1]
     assert "100 asset queries" in content[1]
+
+
+def test_a_local_run_has_no_runner_id_so_the_scan_run_guard_fires(request) -> None:
+    # A local run is not a scan run: the relay must refuse before building a
+    # URL, not query the API as a placeholder run id.
+    instance = get_source(build_recipe(QUERY_NOTEBOOK), source_id="src-1")
+    request.addfinalizer(instance.cleanup)
+    assert instance.runner_id is None
+    with pytest.raises(CustomSourceError, match="needs a scan run"):
+        instance._relay_asset_query({"source": "Firmenbuch Register"})
+
+
+def test_a_silent_notebook_trips_the_read_timeout() -> None:
+    read_fd, write_fd = os.pipe()
+    try:
+        with os.fdopen(read_fd) as reader:
+            with pytest.raises(CustomSourceError, match="did not respond within"):
+                CustomSource._wait_readable(reader, 0.05)
+            os.write(write_fd, b'{"type": "ready"}\n')
+            CustomSource._wait_readable(reader, 5.0)
+    finally:
+        os.close(write_fd)
 
 
 COHORT_NOTEBOOK = """from classifyre import Asset, ctx

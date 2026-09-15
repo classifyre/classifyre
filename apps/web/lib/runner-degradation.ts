@@ -14,6 +14,21 @@ export interface DegradedDetector {
   assetsSkipped: number;
 }
 
+/**
+ * Breaker causes the UI can name. Anything else (a newer CLI shipping a cause
+ * this web build does not know yet) falls back to `other` so the page says
+ * something instead of rendering a raw translation key.
+ */
+const KNOWN_DEGRADED_CAUSES = new Set([
+  'provider_refused',
+  'consecutive_failures',
+  'wall_clock_budget',
+]);
+
+export function degradedCauseKey(cause: string): string {
+  return KNOWN_DEGRADED_CAUSES.has(cause) ? cause : 'other';
+}
+
 function toDegraded(value: unknown): DegradedDetector | null {
   if (!value || typeof value !== "object") return null;
   const entry = value as Record<string, unknown>;

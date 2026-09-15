@@ -63,8 +63,6 @@ interface QueryInput {
  */
 @Injectable()
 export class RunnerAssetQueryService {
-  private readonly callsByRunner = new Map<string, number>();
-
   constructor(private readonly prisma: PrismaService) {}
 
   async query(
@@ -84,7 +82,10 @@ export class RunnerAssetQueryService {
       );
     }
 
-    const calls = (this.callsByRunner.get(runnerId) ?? 0) + 1;
+    // Unknown names 404 here and burn no budget; the heavy query below always
+    // burns one, even when it times out — it cost a query.
+    const target = await this.resolveSource(input.source);
+    const calls = await this.takeCall(runnerId);
     if (calls > ASSET_QUERY_CALLS_PER_RUN) {
       throw new HttpException(
         `This run has used its ${ASSET_QUERY_CALLS_PER_RUN} asset queries. ` +
@@ -92,9 +93,7 @@ export class RunnerAssetQueryService {
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
-    this.remember(runnerId, calls);
 
-    const target = await this.resolveSource(input.source);
     const rows = await this.run(target.id, runner.sourceId, input);
     const page = rows.slice(0, input.limit);
     return {
@@ -112,14 +111,28 @@ export class RunnerAssetQueryService {
     };
   }
 
-  private remember(runnerId: string, calls: number): void {
-    // Bounded: the counter only needs to outlive one run, and a long-lived
-    // API process sees many.
-    if (!this.callsByRunner.has(runnerId) && this.callsByRunner.size >= 1000) {
-      const oldest = this.callsByRunner.keys().next().value;
-      if (oldest !== undefined) this.callsByRunner.delete(oldest);
+  /**
+   * Burn one of the run's calls and return the new total. One statement, so
+   * concurrent calls cannot both read the same count: the column is the
+   * budget, and every API replica (and restart) sees it.
+   */
+  private async takeCall(runnerId: string): Promise<number> {
+    try {
+      const updated = await this.prisma.runner.update({
+        where: { id: runnerId },
+        data: { assetQueryCalls: { increment: 1 } },
+        select: { assetQueryCalls: true },
+      });
+      return updated.assetQueryCalls;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException(`Runner ${runnerId} not found`);
+      }
+      throw error;
     }
-    this.callsByRunner.set(runnerId, calls);
   }
 
   private async resolveSource(
@@ -170,14 +183,16 @@ export class RunnerAssetQueryService {
       conditions.push(metadataPredicateSql(input.where, 'a'));
     }
     if (input.excludeVisited) {
-      // Text on both sides: `#>>`, not `#>`, so the anti-join hashes a short
-      // string instead of comparing jsonb values.
+      // Strict JSON equality on both sides (`#>`, not `#>>`): the `where`
+      // predicates compare as JSON, so "5" must not equal 5 here either. jsonb
+      // `=` stays hash-joinable, and NULL never equals NULL, so an asset
+      // missing the key is never "visited".
       const { path, sinceDays } = input.excludeVisited;
       conditions.push(Prisma.sql`NOT EXISTS (
         SELECT 1 FROM assets v
         WHERE v.source_id = ${callingSourceId}
           AND v.last_scanned_at >= now() - make_interval(days => ${sinceDays})
-          AND (v.metadata #>> ${path}::text[]) = (a.metadata #>> ${path}::text[])
+          AND (v.metadata #> ${path}::text[]) = (a.metadata #> ${path}::text[])
       )`);
     }
     const selected =
@@ -314,7 +329,14 @@ function parseInput(body: unknown): QueryInput {
 
   let cursor: string | null = null;
   if (raw.cursor !== undefined && raw.cursor !== null) {
-    if (typeof raw.cursor !== 'string' || raw.cursor.length > 200) {
+    // Asset ids are uuids, compared as `a.id > $cursor`: anything else dies
+    // in Postgres as 22P02 (a 500), so reject it here as a 400.
+    if (
+      typeof raw.cursor !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        raw.cursor,
+      )
+    ) {
       throw new BadRequestException(
         'cursor must be the nextCursor of a previous page.',
       );

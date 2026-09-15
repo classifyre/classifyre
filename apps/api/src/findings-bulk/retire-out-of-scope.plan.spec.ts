@@ -1,6 +1,7 @@
 import {
   buildRetirePlan,
   candidatePageSql,
+  caseDriftCurrentName,
   outOfScopeReason,
   planNeedsWalk,
   resolutionReasonFor,
@@ -128,6 +129,44 @@ describe('outOfScopeReason', () => {
     ).toBe('pattern_removed:AT');
   });
 
+  it('retires a case-drifted identity under its own reason, not as removed', () => {
+    // The detector still has EUID (upper case); the stored finding predates a
+    // case-only rename. Nothing can produce `regex:euid` again, so retiring
+    // it is correct — but the dry run must not claim the pattern is gone.
+    const drifted = buildRetirePlan(
+      detector({ type: 'REGEX', patterns: { EUID: {} } }),
+    );
+    expect(
+      outOfScopeReason(drifted, { findingType: 'regex:euid', assetKind: 'x' }),
+    ).toBe('pattern_case_changed:euid');
+    expect(caseDriftCurrentName(drifted, 'pattern_case_changed:euid')).toBe(
+      'EUID',
+    );
+    expect(caseDriftCurrentName(drifted, 'pattern_removed:euid')).toBeNull();
+  });
+
+  it('still reports a genuinely removed pattern as removed', () => {
+    const drifted = buildRetirePlan(
+      detector({ type: 'REGEX', patterns: { EUID: {} } }),
+    );
+    expect(
+      outOfScopeReason(drifted, { findingType: 'regex:LEI', assetKind: 'x' }),
+    ).toBe('pattern_removed:LEI');
+  });
+
+  it('keeps selecting case-drifted rows in SQL, in agreement with the reason', () => {
+    const drifted = buildRetirePlan(
+      detector({ type: 'REGEX', patterns: { EUID: {} } }),
+    );
+    const sql = candidatePageSql(drifted, 0, 8192);
+    // Case-sensitive `<> ALL`, so `regex:euid` is still a candidate row; the
+    // reason function agrees by returning a non-null (case-changed) reason.
+    expect(sql.sql).toContain("f.finding_type LIKE 'regex:%'");
+    expect(
+      outOfScopeReason(drifted, { findingType: 'regex:euid', assetKind: 'x' }),
+    ).not.toBeNull();
+  });
+
   it('retires stale regex findings of a detector switched to another method', () => {
     const llm = buildRetirePlan(detector({ type: 'LLM' }));
     expect(
@@ -200,5 +239,15 @@ describe('resolutionReasonFor', () => {
     expect(resolutionReasonFor(plan, 'pattern_removed:AT:FN')).toBe(
       'Out of scope for at_company_ids: pattern "AT:FN" was removed',
     );
+  });
+
+  it('names the case change instead of claiming the pattern was removed', () => {
+    const drifted = buildRetirePlan(
+      detector({ type: 'REGEX', patterns: { EUID: {} } }),
+    );
+    const reason = resolutionReasonFor(drifted, 'pattern_case_changed:euid');
+    expect(reason).toContain('changed case');
+    expect(reason).toContain('(now "EUID")');
+    expect(reason).not.toContain('was removed');
   });
 });

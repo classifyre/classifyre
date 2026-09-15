@@ -404,3 +404,106 @@ def test_vision_unsupported_mime_skipped(monkeypatch) -> None:
 
     assert runner.detect(b"audio-bytes", "audio/mpeg") == []
     called.assert_not_called()
+
+
+# ── Shared quota/billing markers (resource + payment wording) ────────────────
+
+
+def _status_error(status: int, message: str) -> Exception:
+    err = Exception(message)
+    err.status_code = status  # type: ignore[attr-defined]
+    return err
+
+
+def test_shared_marker_list_covers_resource_and_quota_wording() -> None:
+    markers = _quota_markers()
+    for marker in (
+        "resource_exhausted",
+        "resource exhausted",
+        "quota exceeded",
+        "insufficient_credit",
+        "insufficient balance",
+        "out of credits",
+    ):
+        assert marker in markers
+    # Specific exhaustion signals are ordered before the generic matches.
+    assert markers.index("resource_exhausted") < markers.index("billing")
+    assert markers.index("insufficient_credit") < markers.index("billing")
+    # Every pre-existing marker is still there.
+    for marker in (
+        "free-models-per-day",
+        "requests per day",
+        "daily limit",
+        "insufficient_quota",
+        "credit balance",
+        "credits to unlock",
+        "billing",
+    ):
+        assert marker in markers
+
+
+@pytest.mark.parametrize(
+    "body,status,reason",
+    [
+        ("RESOURCE_EXHAUSTED: daily quota used up for this model", 429, "quota exhausted"),
+        (
+            "429 Quota exceeded for quota metric 'GenerateContent requests'",
+            429,
+            "quota exhausted",
+        ),
+        ("402 Payment Required: add funds to continue", 402, "payment required"),
+        (
+            "400 failed_precondition: insufficient_credit, balance is empty",
+            400,
+            "quota exhausted",
+        ),
+    ],
+)
+def test_exhaustion_wording_is_a_refusal_not_a_retry(
+    monkeypatch, body: str, status: int, reason: str
+) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", sleeps.append)
+    completion = MagicMock(side_effect=_status_error(status, body))
+    runner = _runner(_schema(), completion)
+
+    with pytest.raises(LLMProviderRefusedError) as raised:
+        runner.detect(TEXT, "text/plain")
+
+    assert reason in str(raised.value)
+    assert completion.call_count == 1
+    assert sleeps == []
+
+
+def test_unknown_4xx_is_final_but_not_a_refusal(monkeypatch) -> None:
+    # A Gemini safety block answers 400 for this input: retrying the same call
+    # cannot help, but it is not a quota/billing refusal either — one attempt,
+    # then the breaker (not backoff) owns the decision.
+    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    completion = MagicMock(
+        side_effect=_status_error(
+            400, "400 GenerateContent blocked for SAFETY reasons on this input"
+        )
+    )
+    runner = _runner(_schema(), completion)
+
+    with pytest.raises(LLMCompletionError) as raised:
+        runner.detect(TEXT, "text/plain")
+
+    assert not isinstance(raised.value, LLMProviderRefusedError)
+    assert completion.call_count == 1
+
+
+def test_billing_exhaustion_match_is_anchored() -> None:
+    from src.detectors.custom.runners._llm import _billing_exhaustion_match
+
+    assert (
+        _billing_exhaustion_match("error: insufficient_credit, balance empty")
+        == "insufficient_credit"
+    )
+    assert _billing_exhaustion_match("you are out of credits for today") == "out of credits"
+    assert (
+        _billing_exhaustion_match("insufficient balance: please top up") == "insufficient balance"
+    )
+    assert _billing_exhaustion_match("billing address updated") is None
+    assert _billing_exhaustion_match("all clear") is None

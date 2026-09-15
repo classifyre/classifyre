@@ -20,6 +20,7 @@ import hashlib
 import json
 import logging
 import os
+import select
 import shutil
 import subprocess
 import sys
@@ -104,8 +105,10 @@ class CustomSource(BaseSource):
         runner_id: str | None = None,
     ):
         super().__init__(recipe, source_id=source_id, runner_id=runner_id)
+        # Local runs keep runner_id None (not "local-run"): ctx.query_assets()
+        # needs a scan run, and the guard below only fires on a missing id. A
+        # placeholder would sail past it and query as run "local-run".
         self.config = CustomInput.model_validate(recipe)
-        self.runner_id = runner_id or "local-run"
 
         self._cells = [cell.model_dump(mode="json") for cell in self.config.required.notebook.cells]
         self._process: subprocess.Popen[str] | None = None
@@ -294,7 +297,12 @@ class CustomSource(BaseSource):
         if process is None or process.stdout is None:
             raise CustomSourceError("Notebook process is not running")
 
-        deadline = time.monotonic() + timeout if timeout else None
+        if timeout:
+            # Wait for output *before* reading: readline() blocks, so a
+            # deadline checked only after it returns can never fire while the
+            # child is silent — the startup timeout existed but could not
+            # trigger, and a hung notebook hung the scan forever.
+            self._wait_readable(process.stdout, timeout)
         line = process.stdout.readline()
         if not line:
             code = process.poll()
@@ -302,8 +310,6 @@ class CustomSource(BaseSource):
                 f"Notebook process exited (code {code}) before answering. "
                 "Check the scan log for the traceback."
             )
-        if deadline and time.monotonic() > deadline:
-            raise CustomSourceError(f"Notebook process did not respond within {timeout}s")
 
         try:
             frame = json.loads(line)
@@ -314,6 +320,29 @@ class CustomSource(BaseSource):
         if not isinstance(frame, dict):
             raise CustomSourceError(f"Notebook process sent a non-object frame: {line[:200]!r}")
         return frame
+
+    @staticmethod
+    def _wait_readable(stream: Any, timeout: float) -> None:
+        """Block until the child wrote something, at most ``timeout`` seconds.
+
+        A stream with no file descriptor (substituted pipes in tests) cannot
+        be waited on; then the read stays blocking and the timeout does not
+        apply.
+        """
+        try:
+            fileno = stream.fileno()
+        except (AttributeError, OSError, ValueError):
+            return
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            ready, _, _ = select.select([fileno], [], [], remaining)
+            if ready:
+                return
+            break
+        raise CustomSourceError(f"Notebook process did not respond within {timeout}s")
 
     def _call(self, command: str, **args: Any) -> Any:
         """One request/response round trip."""

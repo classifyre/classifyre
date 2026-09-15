@@ -807,10 +807,45 @@ class DetectorPipeline:
 
         When `outcome_sink` is provided, each detector's per-payload result is
         merged into it so the caller can tell a clean scan from a crashed one.
+
+        The batch runs inside the breaker's per-detector gate: assets are
+        dispatched concurrently, and without it every in-flight asset would
+        pass the skip check before the first refusal is recorded, wasting one
+        provider call per asset instead of one per run.
         """
         if not content:
             return [], [], []
+        compatible = [
+            detector
+            for detector in detectors
+            if self._supports_content_type(detector.get_supported_content_types(), content_type)
+            # A declared scope narrows what the engine already supports; it
+            # can never widen it, so this runs after the engine's own check.
+            and _detector_covers_content_type(detector, content_type)
+        ]
+        async with self._breaker.first_contact(
+            *(self._breaker_key_or_default(detector) for detector in compatible)
+        ):
+            return await self._run_detectors_inner(
+                detectors=compatible,
+                content=content,
+                content_type=content_type,
+                asset_name=asset_name,
+                page_num=page_num,
+                outcome_sink=outcome_sink,
+            )
 
+    async def _run_detectors_inner(
+        self,
+        *,
+        detectors: list[BaseDetector],
+        content: str | bytes,
+        content_type: str,
+        asset_name: str = "",
+        page_num: int | None = None,
+        outcome_sink: dict[tuple[DetectorType, str | None], DetectorOutcome] | None = None,
+    ) -> tuple[list[DetectionResult], list[DetectorType], list[str]]:
+        """Dispatch one pre-filtered, breaker-gated batch; see `_run_detectors`."""
         page_tag = f"p{page_num}" if page_num is not None else ""
         tasks: list[asyncio.Task[Any] | asyncio.Future[Any]] = []
         task_start_times: list[float] = []
@@ -819,16 +854,12 @@ class DetectorPipeline:
         errors: list[str] = []
 
         for detector in detectors:
-            supported = detector.get_supported_content_types()
-            if not self._supports_content_type(supported, content_type):
-                continue
-            # A declared scope narrows what the engine already supports; it can
-            # never widen it, so this runs after the engine's own check.
-            if not _detector_covers_content_type(detector, content_type):
-                continue
-
-            breaker_key = self._breaker_key(detector)
-            skipped = self._breaker.skip_message(breaker_key) if breaker_key else None
+            # Content-type filtering happened in `_run_detectors`; everything
+            # reaching here is compatible.
+            # Fail closed: even a detector without a cache identity gets a key
+            # with default limits, never "no breaker".
+            breaker_key = self._breaker_key_or_default(detector)
+            skipped = self._breaker.skip_message(breaker_key)
             if skipped is not None:
                 # Not dispatched, and not silent either: an ERROR outcome keeps
                 # this asset's findings and keeps the asset out of the scan
@@ -900,7 +931,7 @@ class DetectorPipeline:
             via = task_via[i]
             loc = f"{asset_name}:{page_tag}" if page_tag else asset_name
 
-            breaker_key = self._breaker_key(detector)
+            breaker_key = self._breaker_key_or_default(detector)
             if isinstance(result, Exception):
                 wall_ms = int((time.monotonic() - task_start_times[i]) * 1000)
                 logger.error(
@@ -913,17 +944,16 @@ class DetectorPipeline:
                 )
                 errors.append(f"{detector_name}: {result}")
                 self._record_outcome(outcome_sink, detector, f"{detector_name}: {result}")
-                if breaker_key:
-                    tripped = self._breaker.record(
-                        breaker_key, detector, detector_name, error=result, elapsed_ms=wall_ms
+                tripped = self._breaker.record(
+                    breaker_key, detector, detector_name, error=result, elapsed_ms=wall_ms
+                )
+                if tripped:
+                    logger.error(
+                        "%s disabled for the rest of this run: %s. Remaining assets "
+                        "record an ERROR outcome for it and are retried next run.",
+                        detector_name,
+                        tripped,
                     )
-                    if tripped:
-                        logger.error(
-                            "%s disabled for the rest of this run: %s. Remaining assets "
-                            "record an ERROR outcome for it and are retried next run.",
-                            detector_name,
-                            tripped,
-                        )
                 continue
 
             self._record_outcome(outcome_sink, detector, None)
@@ -948,21 +978,20 @@ class DetectorPipeline:
                         )
                         detector_findings.append(finding_with_meta)
 
-            if breaker_key:
-                tripped = self._breaker.record(
-                    breaker_key,
-                    detector,
+            tripped = self._breaker.record(
+                breaker_key,
+                detector,
+                detector_name,
+                error=None,
+                elapsed_ms=int(worker_elapsed),
+            )
+            if tripped:
+                logger.error(
+                    "%s disabled for the rest of this run: %s. Remaining assets "
+                    "record an ERROR outcome for it and are retried next run.",
                     detector_name,
-                    error=None,
-                    elapsed_ms=int(worker_elapsed),
+                    tripped,
                 )
-                if tripped:
-                    logger.error(
-                        "%s disabled for the rest of this run: %s. Remaining assets "
-                        "record an ERROR outcome for it and are retried next run.",
-                        detector_name,
-                        tripped,
-                    )
 
             pid_tag = f"w{worker_pid}" if worker_pid else via
             if detector_findings:
@@ -1181,6 +1210,19 @@ class DetectorPipeline:
         """Breaker identity: the scan-cache key, so one custom detector never
         trips another that shares its CUSTOM type."""
         return self.detector_cache_key(detector)
+
+    def _breaker_key_or_default(self, detector: BaseDetector) -> str:
+        """Breaker identity that fails closed.
+
+        A detector the scan cache cannot identify (no usable type/key) gets a
+        stable per-class key with default limits instead of no breaker at all:
+        an unkeyed detector that refuses on every asset must still be switched
+        off for the rest of the run.
+        """
+        key = self._breaker_key(detector)
+        if key is not None:
+            return key
+        return f"UNKEYED::{type(detector).__name__}"
 
     @classmethod
     def detector_cache_key(cls, detector: BaseDetector) -> str | None:

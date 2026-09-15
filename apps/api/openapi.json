@@ -15132,6 +15132,11 @@
             "type": "number",
             "description": "Findings matched when the operation was created. The corpus can move under a running operation, so treat it as an estimate."
           },
+          "expectedCount": {
+            "type": "number",
+            "nullable": true,
+            "description": "The dry-run count the operator reviewed. Each chunk fails the operation when processed plus remaining matches exceed it. Null when no count was reviewed."
+          },
           "processed": {
             "type": "number",
             "description": "Findings the walk has examined so far."

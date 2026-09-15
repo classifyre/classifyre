@@ -148,6 +148,19 @@ describe('CohortWeightsService', () => {
     expect(prisma.runner.update).not.toHaveBeenCalled();
   });
 
+  it('aborts with no write when the runner row is gone', async () => {
+    prisma.runner.findUnique.mockResolvedValue(null);
+    await service.recordYield('run-gone', 'src-1', {
+      register: {
+        bands: { newest: { visited: 120, exhausted: false } },
+        weightsUsed: { newest: 100 },
+        declared: { newest: 100 },
+      },
+    });
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(prisma.runner.update).not.toHaveBeenCalled();
+  });
+
   it('puts measured weights into the recipe once there is enough evidence', async () => {
     prisma.runner.findMany.mockResolvedValue([
       {

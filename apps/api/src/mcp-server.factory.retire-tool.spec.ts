@@ -46,9 +46,30 @@ describe('McpServerFactoryService retire_out_of_scope_findings', () => {
       fromOperationId: '0e2a4c6d-8f10-4a2b-9c3d-4e5f60718293',
       expectedCount: 37,
       confirm: true,
-      includeInquiryWatched: true,
     });
     expect(parsed).not.toHaveProperty('includeInquiryWatched');
+  });
+
+  it('rejects unknown top-level keys instead of stripping them', () => {
+    // A stripped key widens the operation: `dry_run` for `dryRun` would flip
+    // a retire into a dry run, `expectedcount` would drop the guard. Strict
+    // means a typo is a 400, never an unguarded execution.
+    expect(() =>
+      tool.inputSchema.parse({
+        customDetectorId: '6b0f1a4e-5f8e-4c43-9d57-0f1f4c1e2a33',
+        dryRun: false,
+        fromOperationId: '0e2a4c6d-8f10-4a2b-9c3d-4e5f60718293',
+        expectedCount: 37,
+        confirm: true,
+        includeInquiryWatched: true,
+      }),
+    ).toThrow();
+    expect(() =>
+      tool.inputSchema.parse({
+        customDetectorId: '6b0f1a4e-5f8e-4c43-9d57-0f1f4c1e2a33',
+        dry_run: false,
+      }),
+    ).toThrow();
   });
 
   it('asks the service to refuse the override, whatever the caller sends', async () => {

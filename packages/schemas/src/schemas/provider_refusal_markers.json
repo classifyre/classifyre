@@ -1,6 +1,12 @@
 {
-  "$comment": "Lower-case substrings that mark an AI provider refusal as non-retryable for the rest of a run: a daily, billing or credit quota rather than a momentary rate limit. One list, read by the CLI (apps/cli/src/detectors/custom/runners/_llm.py) and the API (apps/api/src/ai/ai-client.service.ts), so a scan and an agent agree on what 'retrying cannot help' means. Measured origin: OpenRouter's free tier answers HTTP 429 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', and retrying that for ~41s per asset held the only runner slot for 10 of 24 hours.",
+  "$comment": "Lower-case substrings that mark an AI provider refusal as non-retryable for the rest of a run: a daily, billing or credit quota rather than a momentary rate limit. One list, read by the CLI (apps/cli/src/detectors/custom/runners/_llm.py) and the API (apps/api/src/ai/ai-client.service.ts), so a scan and an agent agree on what 'retrying cannot help' means. Measured origin: OpenRouter's free tier answers HTTP 429 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day', and retrying that for ~41s per asset held the only runner slot for 10 of 24 hours. Order is load-bearing: anchored billing-exhaustion markers first, then resource/quota-exhaustion wording, then the older generic matches — both classifiers check in this order so a specific exhaustion signal wins over a generic substring.",
   "quota": [
+    "insufficient_credit",
+    "insufficient balance",
+    "out of credits",
+    "resource_exhausted",
+    "resource exhausted",
+    "quota exceeded",
     "free-models-per-day",
     "requests per day",
     "per_day",

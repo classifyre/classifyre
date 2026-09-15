@@ -984,7 +984,10 @@
       "countingExact": "Passende Befunde werden gezählt…",
       "unnarrowedWarning": "Diese Filter wählen alle Befunde dieses Arbeitsbereichs aus. Beim Speichern wird die Änderung auf alle {{count}} angewendet.",
       "countChanged": "Seit dem Öffnen passen mehr Befunde, daher wurde nichts geändert. Die Anzahl wurde aktualisiert – bitte prüfen und erneut speichern.",
-      "updateFailed": "Befunde konnten nicht aktualisiert werden"
+      "updateFailed": "Befunde konnten nicht aktualisiert werden",
+      "updatedVsMatched": "{{updated}} von {{expected}} passenden Befunden aktualisiert.",
+      "shortCountNotice": "Weniger geändert als der Probelauf gezählt hat – der Rest hatte die gewünschten Werte bereits.",
+      "close": "Schließen"
     },
     "extraction": {
       "noFields": "Keine Felder befüllt",
@@ -1837,6 +1840,7 @@
     "running": "Aktiv",
     "queued": "In Warteschlange",
     "completed": "Abgeschlossen",
+    "warning": "Warnung",
     "failed": "Fehlgeschlagen",
     "noRuns": "Keine Ausführungen zur Visualisierung",
     "noRunsHint": "Filter unten verwenden, um Ausführungen zu finden, oder einen neuen Scan starten.",
@@ -1922,7 +1926,8 @@
       "cause": {
         "provider_refused": "der KI-Anbieter die Anfrage abgelehnt hat (Kontingent, Schlüssel oder Abrechnung)",
         "consecutive_failures": "er zu oft hintereinander fehlgeschlagen ist",
-        "wall_clock_budget": "sein Zeitbudget aufgebraucht war"
+        "wall_clock_budget": "sein Zeitbudget aufgebraucht war",
+        "other": "ein nicht behebbares Problem aufgetreten ist"
       }
     }
   },

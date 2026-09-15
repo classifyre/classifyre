@@ -103,6 +103,22 @@ describe('computeCohortWeights', () => {
     expect(result.derivation.newest?.exhausted).toBe(true);
   });
 
+  it('clamp-and-renormalizes when the floors cannot all hold at once', () => {
+    // Three bands at a 40% min_share: 120% of floors in a 100% split. No
+    // answer honours every floor; keep the measured order instead of an
+    // equal split that honours neither the measurement nor the floors.
+    const result = computeCohortWeights({
+      declared,
+      history: [run(1000, { newest: 0.4, oldest: 0.05, random: 0.02 })],
+      previous: { newest: 60, oldest: 25, random: 15 },
+      minShare: 0.4,
+    });
+    expect(result.reason).toBe('measured');
+    expect(total(result.weights)).toBeCloseTo(100, 0);
+    expect(result.weights.newest).toBeGreaterThan(result.weights.oldest ?? 0);
+    expect(result.weights.oldest).toBeCloseTo(result.weights.random ?? 0, 0);
+  });
+
   it('lets a recent run outweigh an equally strong older one', () => {
     // Same evidence, opposite bands, one run apart: the newer run wins.
     const result = computeCohortWeights({

@@ -10,6 +10,7 @@ import {
 import { CorrelationJobScheduler } from '../correlation/correlation-job-scheduler.service';
 import { EmbeddingService } from '../embedding/embedding.service';
 import { QueryEmbeddingService } from '../embedding/query-embedding.service';
+import { FindingStatsScheduler } from '../stats/finding-stats-scheduler.service';
 import { FindingsService } from '../findings.service';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
@@ -34,6 +35,7 @@ const operation = (
   target: { status: FindingStatus.RESOLVED, comment: 'EUID is not a key' },
   cursor: null,
   totalEstimate: 37428,
+  expectedCount: null,
   processed: 0,
   changed: 0,
   exempted: 0,
@@ -85,6 +87,9 @@ describe('FindingsService background bulk operations', () => {
     scheduleFull: jest.fn(),
     scheduleAssets: jest.fn(),
   };
+  const statsJobs = {
+    scheduleFull: jest.fn(),
+  };
   let service: FindingsService;
 
   beforeEach(async () => {
@@ -95,6 +100,7 @@ describe('FindingsService background bulk operations', () => {
         { provide: EmbeddingService, useValue: {} },
         { provide: QueryEmbeddingService, useValue: {} },
         { provide: CorrelationJobScheduler, useValue: correlationJobs },
+        { provide: FindingStatsScheduler, useValue: statsJobs },
         { provide: FindingBulkOperationService, useValue: operations },
       ],
     }).compile();
@@ -133,6 +139,8 @@ describe('FindingsService background bulk operations', () => {
         filters: { findingType: ['regex:EUID'] },
         target: { status: 'RESOLVED', comment: 'EUID is not a key' },
         totalEstimate: BULK_UPDATE_SYNC_LIMIT + 1,
+        // No dry run preceded this queue, so there is no reviewed count.
+        expectedCount: null,
         createdBy: 'operator',
       });
       expect(prisma.finding.findMany).not.toHaveBeenCalled();
@@ -164,6 +172,40 @@ describe('FindingsService background bulk operations', () => {
 
       expect(result.updatedCount).toBe(12);
       expect(operations.create).not.toHaveBeenCalled();
+    });
+
+    it('stores the reviewed count on the queued operation', async () => {
+      prisma.finding.count.mockResolvedValue(BULK_UPDATE_SYNC_LIMIT + 1);
+      operations.create.mockResolvedValue(operation({ id: 'op-queued' }));
+
+      await service.bulkUpdate(
+        {
+          filters: { findingType: ['regex:EUID'] },
+          status: FindingStatus.RESOLVED,
+          expectedCount: BULK_UPDATE_SYNC_LIMIT + 1,
+        },
+        'operator',
+      );
+
+      expect(operations.create).toHaveBeenCalledWith(
+        expect.objectContaining({ expectedCount: BULK_UPDATE_SYNC_LIMIT + 1 }),
+      );
+    });
+
+    it('rejects an invalid status before counting or queueing', async () => {
+      prisma.finding.count.mockResolvedValue(BULK_UPDATE_SYNC_LIMIT + 1);
+
+      await expect(
+        service.bulkUpdate({
+          filters: { findingType: ['regex:EUID'] },
+          status: 'RESOLVEDD',
+          expectedCount: BULK_UPDATE_SYNC_LIMIT + 1,
+        } as never),
+      ).rejects.toThrow(/Invalid status/);
+      expect(prisma.finding.count).not.toHaveBeenCalled();
+      expect(operations.create).not.toHaveBeenCalled();
+      expect(prisma.finding.findMany).not.toHaveBeenCalled();
+      expect(prisma.finding.updateMany).not.toHaveBeenCalled();
     });
   });
 
@@ -262,6 +304,95 @@ describe('FindingsService background bulk operations', () => {
       expect(sql).not.toMatch(/history/);
       expect(tx.customDetectorFeedback.createMany).not.toHaveBeenCalled();
     });
+
+    it('fails closed when more match than the reviewed count', async () => {
+      prisma.finding.count.mockResolvedValue(100);
+
+      await expect(
+        service.runBulkOperationChunk(operation({ expectedCount: 10 }), 60_000),
+      ).rejects.toThrow(/more than the 10 expected/);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('proceeds when the recount is within the reviewed count', async () => {
+      prisma.finding.count.mockResolvedValue(2);
+      prisma.finding.findMany.mockResolvedValueOnce([row('f1'), row('f2')]);
+      tx.$executeRaw.mockResolvedValueOnce(2);
+
+      const result = await service.runBulkOperationChunk(
+        operation({ expectedCount: 2 }),
+        60_000,
+      );
+
+      expect(result).toEqual({ done: true });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('bounds the recount to what the cursor has not examined', async () => {
+      prisma.finding.count.mockResolvedValue(7);
+
+      await service.runBulkOperationChunk(
+        operation({ cursor: 'f0001', processed: 3, expectedCount: 10 }),
+        60_000,
+      );
+
+      const [args] = prisma.finding.count.mock.calls[0];
+      expect(args.where.AND).toContainEqual({ id: { gt: 'f0001' } });
+    });
+
+    it('fails a stored target it does not recognise instead of touching updated_at', async () => {
+      await expect(
+        service.runBulkOperationChunk(
+          operation({ target: { status: 'BOGUS' } }),
+          60_000,
+        ),
+      ).rejects.toThrow(/Invalid bulk operation target/);
+      expect(prisma.finding.count).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('fails an empty stored target rather than counting bare rewrites', async () => {
+      await expect(
+        service.runBulkOperationChunk(operation({ target: {} }), 60_000),
+      ).rejects.toThrow(/no status, severity or comment/);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('afterBulkOperation', () => {
+    it('rebuilds derived state when severity changed too', async () => {
+      await service.afterBulkOperation(
+        operation({ target: { severity: 'LOW' }, changed: 5 }),
+      );
+
+      expect(correlationJobs.scheduleFull).toHaveBeenCalledTimes(1);
+      expect(statsJobs.scheduleFull).toHaveBeenCalledTimes(1);
+    });
+
+    it('still rebuilds when status changed', async () => {
+      await service.afterBulkOperation(operation({ changed: 37428 }));
+
+      expect(correlationJobs.scheduleFull).toHaveBeenCalledTimes(1);
+      expect(statsJobs.scheduleFull).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips the rebuild when nothing changed', async () => {
+      await service.afterBulkOperation(
+        operation({ target: { severity: 'LOW' }, changed: 0 }),
+      );
+
+      expect(correlationJobs.scheduleFull).not.toHaveBeenCalled();
+      expect(statsJobs.scheduleFull).not.toHaveBeenCalled();
+    });
+
+    it('tolerates a target that never validated', async () => {
+      await service.afterBulkOperation(
+        operation({ target: { status: 'BOGUS' }, changed: 3 }),
+      );
+
+      expect(correlationJobs.scheduleFull).not.toHaveBeenCalled();
+      expect(statsJobs.scheduleFull).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -303,6 +434,44 @@ describe('FindingBulkOperationService', () => {
       { operationId: 'op-1' },
       { retryLimit: 0 },
     );
+  });
+
+  it('stores the reviewed count for the worker to re-check', async () => {
+    prisma.findingBulkOperation.create.mockResolvedValue(operation());
+
+    await service.create({
+      kind: FindingBulkOperationKind.STATUS_CHANGE,
+      filters: {},
+      target: {},
+      totalEstimate: 5000,
+      expectedCount: 5000,
+    });
+
+    expect(prisma.findingBulkOperation.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ expectedCount: 5000 }),
+    });
+  });
+
+  it('leaves the reviewed count null when no count was reviewed', async () => {
+    prisma.findingBulkOperation.create.mockResolvedValue(operation());
+
+    await service.create({
+      kind: FindingBulkOperationKind.STATUS_CHANGE,
+      filters: {},
+      target: {},
+      totalEstimate: 5000,
+    });
+
+    expect(prisma.findingBulkOperation.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ expectedCount: null }),
+    });
+  });
+
+  it('exposes the reviewed count for operators polling the operation', () => {
+    expect(
+      service.toDto(operation({ expectedCount: 5000 })).expectedCount,
+    ).toBe(5000);
+    expect(service.toDto(operation()).expectedCount).toBeNull();
   });
 
   it('claims only an active operation whose lease is free or expired', async () => {
@@ -475,5 +644,60 @@ describe('FindingBulkOperationWorker', () => {
       'deadlock',
     );
     expect(operations.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('rebuilds derived state when a cancel lands before the first chunk', async () => {
+    const cancelled = operation({ cancelRequested: true, changed: 4 });
+    operations.claim.mockResolvedValue(cancelled);
+    operations.finish.mockResolvedValue(cancelled);
+
+    await worker.runChunk('op-1');
+
+    expect(operations.finish).toHaveBeenCalledWith(
+      'op-1',
+      FindingBulkOperationStatus.CANCELLED,
+    );
+    expect(findings.runBulkOperationChunk).not.toHaveBeenCalled();
+    expect(findings.afterBulkOperation).toHaveBeenCalledWith(cancelled);
+  });
+
+  it('rebuilds derived state when the chunk fails', async () => {
+    const op = operation({ changed: 4 });
+    const failed = operation({
+      changed: 4,
+      status: FindingBulkOperationStatus.FAILED,
+      errorMessage: 'deadlock',
+    });
+    operations.claim.mockResolvedValue(op);
+    findings.runBulkOperationChunk.mockRejectedValue(new Error('deadlock'));
+    operations.finish.mockResolvedValue(failed);
+
+    await worker.runChunk('op-1');
+
+    expect(operations.finish).toHaveBeenCalledWith(
+      'op-1',
+      FindingBulkOperationStatus.FAILED,
+      'deadlock',
+    );
+    expect(findings.afterBulkOperation).toHaveBeenCalledWith(failed);
+  });
+
+  it('rebuilds a retire when the chunk fails', async () => {
+    const retireOp = operation({
+      kind: FindingBulkOperationKind.RETIRE_OUT_OF_SCOPE,
+      changed: 2,
+    });
+    const failed = {
+      ...retireOp,
+      status: FindingBulkOperationStatus.FAILED,
+    };
+    operations.claim.mockResolvedValue(retireOp);
+    retire.runChunk.mockRejectedValue(new Error('deadlock'));
+    operations.finish.mockResolvedValue(failed);
+
+    await worker.runChunk('op-1');
+
+    expect(retire.afterOperation).toHaveBeenCalledWith(failed);
+    expect(findings.afterBulkOperation).not.toHaveBeenCalled();
   });
 });

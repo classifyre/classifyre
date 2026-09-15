@@ -57,6 +57,7 @@ export interface CandidateRow {
 }
 
 const REGEX_PREFIX = 'regex:';
+const PATTERN_CASE_CHANGED_PREFIX = 'pattern_case_changed:';
 
 export function buildRetirePlan(
   detector: {
@@ -207,10 +208,17 @@ export function candidatePageSql(
 }
 
 /**
- * Why a candidate is out of scope, as a stable key: `asset_kind:<kind>` or
- * `pattern_removed:<name>`. Kind wins when both apply, so every candidate is
- * counted under exactly one reason. Null when the row is not a candidate —
- * the SQL and this function must agree, and the spec holds them to it.
+ * Why a candidate is out of scope, as a stable key: `asset_kind:<kind>`,
+ * `pattern_removed:<name>`, or `pattern_case_changed:<name>`. Kind wins when
+ * both apply, so every candidate is counted under exactly one reason. Null
+ * when the row is not a candidate — the SQL and this function must agree, and
+ * the spec holds them to it.
+ *
+ * Case drift is NOT "still produced": a pattern renamed only by case produces
+ * findings under its current-case name, so the stale identity below can never
+ * be re-detected and retiring it is correct. It still gets its own reason —
+ * reporting it as plain removed would mislead the dry run into suggesting the
+ * pattern is gone.
  */
 export function outOfScopeReason(
   plan: RetirePlan,
@@ -221,20 +229,58 @@ export function outOfScopeReason(
   }
   if (row.findingType.startsWith(REGEX_PREFIX)) {
     const name = row.findingType.slice(REGEX_PREFIX.length);
-    if (!plan.patternKeys.includes(name)) return `pattern_removed:${name}`;
+    if (!plan.patternKeys.includes(name)) {
+      if (
+        plan.patternKeys.some((key) => key.toLowerCase() === name.toLowerCase())
+      ) {
+        return `${PATTERN_CASE_CHANGED_PREFIX}${name}`;
+      }
+      return `pattern_removed:${name}`;
+    }
   }
   return null;
+}
+
+/**
+ * The live pattern name behind a `pattern_case_changed:<name>` reason, or
+ * null for any other reason. The dry run collects these as its case-drift
+ * warning dimension.
+ */
+export function caseDriftCurrentName(
+  plan: RetirePlan,
+  reason: string,
+): string | null {
+  if (!reason.startsWith(PATTERN_CASE_CHANGED_PREFIX)) return null;
+  const name = reason.slice(PATTERN_CASE_CHANGED_PREFIX.length);
+  return (
+    plan.patternKeys.find((key) => key.toLowerCase() === name.toLowerCase()) ??
+    null
+  );
 }
 
 /** The resolution reason written on a retired finding. */
 export function resolutionReasonFor(plan: RetirePlan, reason: string): string {
   const [kind, ...rest] = reason.split(':');
   const value = rest.join(':');
-  const why =
-    kind === 'asset_kind'
-      ? `asset kind "${value}" is outside its scope`
-      : `pattern "${value}" was removed`;
-  return `Out of scope for ${plan.customDetectorKey}: ${why}`;
+  if (kind === 'asset_kind') {
+    return (
+      `Out of scope for ${plan.customDetectorKey}: ` +
+      `asset kind "${value}" is outside its scope`
+    );
+  }
+  if (kind === 'pattern_case_changed') {
+    const current = caseDriftCurrentName(plan, reason);
+    return (
+      `Out of scope for ${plan.customDetectorKey}: ` +
+      `pattern "${value}" changed case` +
+      (current ? ` (now "${current}")` : '') +
+      ` and its old findings cannot be re-detected`
+    );
+  }
+  return (
+    `Out of scope for ${plan.customDetectorKey}: ` +
+    `pattern "${value}" was removed`
+  );
 }
 
 /**

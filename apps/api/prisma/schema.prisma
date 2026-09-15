@@ -761,6 +761,10 @@ model Runner {
   /// produced a new HIGH/CRITICAL finding, and the weights the run used. Read
   /// to set the next run's split (cohort/cohort-weights.ts).
   cohortYield          Json?                @map("cohort_yield") @db.JsonB
+  // ctx.query_assets() calls this run has made, against
+  // ASSET_QUERY_CALLS_PER_RUN. A column, not memory: API replicas do not share
+  // a Map, and a restart must not refund the budget.
+  assetQueryCalls      Int                  @default(0) @map("asset_query_calls")
   errorMessage         String?              @map("error_message")
   errorDetails         Json?                @map("error_details")
   jobName              String?              @map("job_name")
@@ -3168,6 +3172,12 @@ model FindingBulkOperation {
 
   /// Counted when the operation was created; the corpus can move under it.
   totalEstimate Int  @default(0) @map("total_estimate")
+  /// The dry-run count the operator reviewed (STATUS_CHANGE only). Each chunk
+  /// re-counts its remaining matches and fails the operation when
+  /// processed + remaining exceeds this, instead of changing findings nobody
+  /// reviewed. Null for operations created before the guard existed and for
+  /// kinds that carry their own count (a retire's is in `counts`).
+  expectedCount Int? @map("expected_count")
   processed     Int  @default(0)
   changed       Int  @default(0)
   exempted      Int  @default(0)

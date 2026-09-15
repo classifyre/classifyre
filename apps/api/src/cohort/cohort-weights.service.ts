@@ -65,7 +65,14 @@ export class CohortWeightsService {
       where: { id: runnerId },
       select: { startedAt: true, triggeredAt: true },
     });
-    const since = runner?.startedAt ?? runner?.triggeredAt ?? new Date(0);
+    // A missing runner row means the run is gone: writing its yield would
+    // fail on the update below, and falling back to the epoch would count
+    // every finding ever as this run's hits. Abort with no write instead.
+    if (!runner) {
+      this.logger.warn(`Cohort yield not recorded: runner ${runnerId} gone`);
+      return;
+    }
+    const since = runner.startedAt ?? runner.triggeredAt ?? new Date(0);
     const hits = await this.prisma.$queryRaw<
       Array<{ cohort: string; band: string; hits: number }>
     >`

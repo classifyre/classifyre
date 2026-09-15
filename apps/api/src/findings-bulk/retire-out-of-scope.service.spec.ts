@@ -19,6 +19,8 @@ import { RETIRE_SCAN_BLOCKS } from './finding-bulk-operation.constants';
 import type { FindingBulkOperationService } from './finding-bulk-operation.service';
 import { buildRetirePlan, type CandidateRow } from './retire-out-of-scope.plan';
 import {
+  RETIRE_DETECTOR_ACTIVE_INDEX,
+  RETIRE_FROM_OPERATION_INDEX,
   RetireOutOfScopeService,
   type RetireCounts,
 } from './retire-out-of-scope.service';
@@ -57,6 +59,7 @@ const op = (
   target: {},
   cursor: null,
   totalEstimate: 0,
+  expectedCount: null,
   processed: 0,
   changed: 0,
   exempted: 0,
@@ -133,6 +136,24 @@ describe('RetireOutOfScopeService', () => {
         const text = sqlText(first);
         if (text.includes('pg_relation_size')) {
           return Promise.resolve([{ blocks: relationBlocks }]);
+        }
+        // The resolving UPDATE, before the snapshot citation read: it
+        // re-checks the citation in-WHERE and returns the sources it actually
+        // changed, so the mock honors write-time truth.
+        if (text.includes('UPDATE findings')) {
+          const ids =
+            (values.find(Array.isArray) as string[] | undefined) ?? [];
+          const sourceOf = new Map<string, string>();
+          for (const rows of pages.values()) {
+            for (const candidate of rows) {
+              sourceOf.set(candidate.id, candidate.sourceId);
+            }
+          }
+          return Promise.resolve(
+            ids
+              .filter((id) => !citedIds.includes(id))
+              .map((id) => ({ sourceId: sourceOf.get(id) ?? 'src-register' })),
+          );
         }
         if (text.includes('case_findings')) {
           const ids = values[0] as string[];
@@ -310,6 +331,13 @@ describe('RetireOutOfScopeService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    it('400s a retire that carries the dry-run-only sourceIds', async () => {
+      await expect(
+        service.startRetire('det-1', { ...valid, sourceIds: ['s1'] }, operator),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(operations.create).not.toHaveBeenCalled();
+    });
+
     it('lets one dry run authorize exactly one retire', async () => {
       prisma.findingBulkOperation.findFirst.mockResolvedValue({
         id: 'op-earlier',
@@ -318,6 +346,92 @@ describe('RetireOutOfScopeService', () => {
       await expect(
         service.startRetire('det-1', valid, operator),
       ).rejects.toThrow(/already used/);
+    });
+
+    it('restricts the previous-use check to retires that burned the dry run', async () => {
+      await service.startRetire('det-1', valid, operator);
+
+      const where =
+        prisma.findingBulkOperation.findFirst.mock.calls[0][0].where;
+      expect(where.OR[0]).toEqual({
+        filters: { path: ['fromOperationId'], equals: 'op-dry' },
+        OR: [
+          { changed: { gt: 0 } },
+          { status: { in: ['PENDING', 'RUNNING'] } },
+        ],
+      });
+    });
+
+    it.each([
+      ['CANCELLED', FindingBulkOperationStatus.CANCELLED],
+      ['FAILED', FindingBulkOperationStatus.FAILED],
+      ['COMPLETED', FindingBulkOperationStatus.COMPLETED],
+    ])(
+      'reuses a dry run whose only retire %s with zero rows changed',
+      async (_label, _status) => {
+        // No burning previous use: a terminal zero-change retire is not one.
+        prisma.findingBulkOperation.findFirst.mockResolvedValue(null);
+
+        await service.startRetire('det-1', valid, operator);
+
+        expect(operations.create).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('still refuses a dry run whose retire changed rows', async () => {
+      prisma.findingBulkOperation.findFirst.mockResolvedValue({
+        id: 'op-earlier',
+        status: FindingBulkOperationStatus.FAILED,
+      });
+      await expect(
+        service.startRetire('det-1', valid, operator),
+      ).rejects.toThrow(/already used/);
+    });
+
+    it('409s a concurrent double start on the database guard', async () => {
+      operations.create.mockRejectedValueOnce(
+        Object.assign(
+          new Error(
+            'Unique constraint failed on the constraint: ' +
+              `\`${RETIRE_FROM_OPERATION_INDEX}\``,
+          ),
+          {
+            code: 'P2002',
+            meta: { target: [RETIRE_FROM_OPERATION_INDEX] },
+          },
+        ),
+      );
+
+      await expect(
+        service.startRetire('det-1', valid, operator),
+      ).rejects.toThrow(/already used/);
+    });
+
+    it('409s a concurrent same-detector start as already running', async () => {
+      operations.create.mockRejectedValueOnce(
+        Object.assign(
+          new Error(
+            'Unique constraint failed on the constraint: ' +
+              `\`${RETIRE_DETECTOR_ACTIVE_INDEX}\``,
+          ),
+          {
+            code: 'P2002',
+            meta: { target: [RETIRE_DETECTOR_ACTIVE_INDEX] },
+          },
+        ),
+      );
+
+      await expect(
+        service.startRetire('det-1', valid, operator),
+      ).rejects.toThrow(/already running/);
+    });
+
+    it('does not translate an unrelated create failure', async () => {
+      operations.create.mockRejectedValueOnce(new Error('connection lost'));
+
+      await expect(
+        service.startRetire('det-1', valid, operator),
+      ).rejects.toThrow('connection lost');
     });
 
     it('is blocked by a retire already running, not by a dry run', async () => {
@@ -423,19 +537,36 @@ describe('RetireOutOfScopeService', () => {
 
     /** The finding ids each retire UPDATE was given. */
     const retiredIds = () =>
-      prisma.$executeRaw.mock.calls.flatMap(
-        // Past the template strings, which are an array too.
-        (call: unknown[]) => call.slice(1).find(Array.isArray) as string[],
-      );
+      prisma.$queryRaw.mock.calls
+        .filter((call: unknown[]) =>
+          sqlText(call[0]).includes('UPDATE findings'),
+        )
+        .flatMap(
+          // Past the template strings, which are an array too.
+          (call: unknown[]) => call.slice(1).find(Array.isArray) as string[],
+        );
+
+    /** The raw SQL of every retire UPDATE issued. */
+    const retireSql = () =>
+      prisma.$queryRaw.mock.calls
+        .filter((call: unknown[]) =>
+          sqlText(call[0]).includes('UPDATE findings'),
+        )
+        .map((call: unknown[]) => sqlText(call[0]));
 
     it('retire: resolves only unexempted findings, as RESOLVED, with no feedback', async () => {
       await service.runChunk(retireOp(false, 2), 60_000);
 
       expect(retiredIds().sort()).toEqual(['f-euid', 'f-table']);
-      const [strings, ...values] = prisma.$executeRaw.mock.calls[0];
-      expect((strings as string[]).join('?')).toContain(
-        `AND status = 'OPEN'::"FindingStatus"`,
-      );
+      const updateCall = prisma.$queryRaw.mock.calls.find((call: unknown[]) =>
+        sqlText(call[0]).includes('UPDATE findings'),
+      ) as unknown[];
+      const [strings, ...values] = updateCall;
+      const sql = (strings as string[]).join('?');
+      expect(sql).toContain(`AND status = 'OPEN'::"FindingStatus"`);
+      // The resolving UPDATE re-checks the case citation at write time.
+      expect(sql).toContain('NOT EXISTS');
+      expect(sql).toContain('case_findings');
       const entry = JSON.parse(
         values.find(
           (value: unknown) =>
@@ -454,6 +585,114 @@ describe('RetireOutOfScopeService', () => {
         exempted: { increment: 2 },
         cursor: String(RETIRE_SCAN_BLOCKS),
       });
+      // Inquiry refresh is driven by actually-changed rows, per source.
+      expect(lastCounts().changedBySource).toEqual({ 'src-register': 2 });
+    });
+
+    it('never resolves a finding cited after its page snapshot', async () => {
+      citedIds = [];
+      pages.set(0, [
+        row('f-euid', { findingType: 'regex:EUID', assetKind: 'record' }),
+        row('f-table', { findingType: 'regex:LEI', assetKind: 'table' }),
+      ]);
+      // The snapshot read sees no citation; the resolving UPDATE re-checks
+      // in-WHERE, where f-euid has since been cited.
+      const raw = prisma.$queryRaw;
+      const base = raw.getMockImplementation() as (
+        ...args: unknown[]
+      ) => unknown;
+      raw.mockImplementation((first: unknown, ...values: unknown[]) => {
+        const text = sqlText(first);
+        if (
+          text.includes('case_findings') &&
+          !text.includes('UPDATE findings')
+        ) {
+          return Promise.resolve([]);
+        }
+        if (text.includes('UPDATE findings')) {
+          const ids =
+            (values.find(Array.isArray) as string[] | undefined) ?? [];
+          return Promise.resolve(
+            ids
+              .filter((id) => id !== 'f-euid')
+              .map(() => ({ sourceId: 'src-register' })),
+          );
+        }
+        return base(first, ...values);
+      });
+
+      await service.runChunk(retireOp(false, 2), 60_000);
+
+      expect(retireSql()[0]).toContain('NOT EXISTS');
+      const pageWrite = prisma.findingBulkOperation.update.mock.calls
+        .map((call: [{ data: Record<string, unknown> }]) => call[0].data)
+        .find((data: Record<string, unknown>) => 'changed' in data);
+      expect(pageWrite).toMatchObject({ changed: { increment: 1 } });
+      expect(lastCounts().changedBySource).toEqual({ 'src-register': 1 });
+    });
+
+    it('never resolves a finding watched after its page snapshot', async () => {
+      citedIds = [];
+      pages.set(0, [
+        row('f-new', { findingType: 'regex:EUID', assetKind: 'record' }),
+      ]);
+      const euidWatcher = {
+        id: 'inq-euid',
+        title: 'EUID watch',
+        matchAllSources: true,
+        sourceIds: [],
+        detectorTypes: [],
+        customDetectorKeys: ['at_company_ids'],
+        findingTypes: ['regex:EUID'],
+        findingTypeRegex: [],
+        findingValueRegex: [],
+      };
+      // The snapshot sees no inquiries; the write-time re-match sees the new
+      // watch.
+      prisma.inquiry.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([euidWatcher]);
+
+      await service.runChunk(retireOp(false, 1), 60_000);
+
+      expect(retireSql()).toHaveLength(0);
+      // Counted at snapshot time, but never resolved.
+      expect(lastCounts()).toMatchObject({
+        wouldRetire: 1,
+        wouldRetireIncludingWatched: 1,
+      });
+    });
+
+    it('retires case-drifted identities with their own reason and warning dimension', async () => {
+      citedIds = [];
+      prisma.inquiry.findMany.mockResolvedValue([]);
+      pages.set(0, [
+        row('f-drift', {
+          findingType: 'regex:at_firmenbuchnummer',
+          assetKind: 'record',
+        }),
+      ]);
+
+      await service.runChunk(retireOp(false, 1), 60_000);
+
+      expect(retiredIds()).toEqual(['f-drift']);
+      expect(lastCounts()).toMatchObject({
+        candidates: 1,
+        byReason: { 'pattern_case_changed:at_firmenbuchnummer': 1 },
+        caseDriftedPatterns: ['AT_FIRMENBUCHNUMMER'],
+        wouldRetire: 1,
+      });
+      const updateCall = prisma.$queryRaw.mock.calls.find((call: unknown[]) =>
+        sqlText(call[0]).includes('UPDATE findings'),
+      ) as unknown[];
+      const reasonText = updateCall
+        .slice(1)
+        .find(
+          (value: unknown) =>
+            typeof value === 'string' && value.startsWith('Out of scope'),
+        ) as string;
+      expect(reasonText).toContain('changed case');
+      expect(reasonText).not.toContain('was removed');
     });
 
     it('retire with the operator override still never touches cited evidence', async () => {
@@ -511,7 +750,31 @@ describe('RetireOutOfScopeService', () => {
       await expect(service.runChunk(op(), 60_000)).rejects.toThrow(
         /changed while this operation ran/,
       );
-      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      // The per-page guard fires before any candidate page or resolve.
+      expect(
+        prisma.$queryRaw.mock.calls.some((call: unknown[]) =>
+          sqlText(call[0]).includes('f.ctid >='),
+        ),
+      ).toBe(false);
+      expect(retireSql()).toHaveLength(0);
+    });
+
+    it('re-checks the detector on every page, not just at walk start', async () => {
+      relationBlocks = RETIRE_SCAN_BLOCKS * 2;
+      pages.set(RETIRE_SCAN_BLOCKS, [
+        row('f-later', { findingType: 'regex:EUID', assetKind: 'record' }),
+      ]);
+      prisma.customDetector.findUnique
+        .mockResolvedValueOnce(DETECTOR)
+        .mockResolvedValue({ key: 'at_company_ids', version: 3 });
+
+      await expect(service.runChunk(op(), 60_000)).rejects.toThrow(
+        /changed while this operation ran/,
+      );
+      const pageCalls = prisma.$queryRaw.mock.calls.filter((call: unknown[]) =>
+        sqlText(call[0]).includes('f.ctid >='),
+      );
+      expect(pageCalls).toHaveLength(1);
     });
 
     it('skips the walk for an unscoped non-REGEX detector with no stale regex findings', async () => {
@@ -537,6 +800,43 @@ describe('RetireOutOfScopeService', () => {
           sqlText(call[0]).includes('f.ctid >='),
         ),
       ).toBe(false);
+      const probe = prisma.$queryRaw.mock.calls.find((call: unknown[]) =>
+        sqlText(call[0]).includes('LIMIT 1'),
+      ) as unknown[];
+      expect(sqlText(probe[0])).not.toContain('source_id = ANY');
+    });
+
+    it('scopes the stale-regex probe to the dry run sources', async () => {
+      const scoped = buildRetirePlan(
+        { ...DETECTOR, pipelineSchema: { type: 'LLM' } },
+        ['s1'],
+      );
+
+      const result = await service.runChunk(
+        op({
+          filters: {
+            mode: 'dry_run',
+            plan: scoped,
+          } as unknown as Prisma.JsonValue,
+        }),
+        60_000,
+      );
+
+      // No stale finding in scope, so the walk is still skipped.
+      expect(result).toEqual({ done: true });
+      const probe = prisma.$queryRaw.mock.calls.find((call: unknown[]) =>
+        sqlText(call[0]).includes('LIMIT 1'),
+      ) as unknown[];
+      const fragment = probe
+        .slice(1)
+        .find(
+          (value): value is Prisma.Sql =>
+            !!value && typeof value === 'object' && 'values' in value,
+        );
+      // The source filter travels in the nested fragment, collapsed to `?`
+      // in the outer text.
+      expect(String(fragment?.sql)).toContain('source_id = ANY');
+      expect(fragment?.values).toContainEqual(['s1']);
     });
   });
 
@@ -550,7 +850,7 @@ describe('RetireOutOfScopeService', () => {
             includeInquiryWatched: false,
           } as unknown as Prisma.JsonValue,
           changed: 5,
-          counts: { bySource: { 'src-register': 7 } },
+          counts: { changedBySource: { 'src-register': 5 } },
         }),
       );
 
@@ -569,12 +869,60 @@ describe('RetireOutOfScopeService', () => {
             includeInquiryWatched: true,
           } as unknown as Prisma.JsonValue,
           changed: 5,
-          counts: { bySource: { 'src-register': 7 } },
+          counts: { changedBySource: { 'src-register': 5 } },
         }),
       );
 
       expect(inquiryMatching.processSourceCompletion).toHaveBeenCalledWith(
         'src-register',
+        null,
+      );
+    });
+
+    it('refreshes every changed source, with no cap', async () => {
+      const changedBySource = Object.fromEntries(
+        Array.from({ length: 150 }, (_, i) => [`src-${i}`, 1]),
+      );
+      await service.afterOperation(
+        op({
+          filters: {
+            mode: 'retire',
+            plan: PLAN,
+            includeInquiryWatched: true,
+          } as unknown as Prisma.JsonValue,
+          changed: 150,
+          counts: { changedBySource },
+        }),
+      );
+
+      expect(inquiryMatching.processSourceCompletion).toHaveBeenCalledTimes(
+        150,
+      );
+      expect(inquiryMatching.processSourceCompletion).toHaveBeenCalledWith(
+        'src-149',
+        null,
+      );
+    });
+
+    it('ignores candidate sources nothing changed', async () => {
+      await service.afterOperation(
+        op({
+          filters: {
+            mode: 'retire',
+            plan: PLAN,
+            includeInquiryWatched: true,
+          } as unknown as Prisma.JsonValue,
+          changed: 1,
+          counts: {
+            bySource: { 'src-examined': 7 },
+            changedBySource: { 'src-changed': 1 },
+          },
+        }),
+      );
+
+      expect(inquiryMatching.processSourceCompletion).toHaveBeenCalledTimes(1);
+      expect(inquiryMatching.processSourceCompletion).toHaveBeenCalledWith(
+        'src-changed',
         null,
       );
     });

@@ -17,10 +17,23 @@ a message starting ``breaker_open[<cause>]``. That is load-bearing twice over:
 the API resolves a finding for absence only on an OK outcome, so the skipped
 assets keep their findings; and the scan cache never banks an errored detector,
 so the next run retries them. The API reads the prefix to report the cause.
+
+Concurrency bound: a run dispatches assets concurrently, so several payloads
+for one detector can each pass the pre-dispatch ``skip_message`` check before
+any of them records a refusal — without coordination the wasted provider calls
+would equal the number of assets in flight, not one. The pipeline therefore
+holds a per-detector gate (``first_contact``) across the whole
+check → call → record window, so at most one payload per detector key is
+undecided at a time: the first refusal trips the breaker and every later
+payload skips without a provider call. The real bound is one wasted call per
+detector per run, never "the first asset decides for free".
 """
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -82,6 +95,26 @@ class DetectorBreaker:
 
     def __init__(self) -> None:
         self._states: dict[str, _BreakerState] = {}
+        self._gates: dict[str, asyncio.Lock] = {}
+
+    @asynccontextmanager
+    async def first_contact(self, *keys: str) -> AsyncIterator[None]:
+        """Hold one detector's check → call → record window.
+
+        The pipeline wraps each dispatch batch in this so payloads for the
+        same detector key never overlap: the pre-dispatch ``skip_message``
+        check and the post-call ``record`` for one payload complete before
+        the next payload's check runs. Keys are taken in sorted order so
+        batches covering different detectors cannot deadlock each other.
+        """
+        gates = [self._gates.setdefault(key, asyncio.Lock()) for key in sorted(set(keys))]
+        for gate in gates:
+            await gate.acquire()
+        try:
+            yield
+        finally:
+            for gate in reversed(gates):
+                gate.release()
 
     def _state(self, key: str, detector: BaseDetector, label: str) -> _BreakerState:
         state = self._states.get(key)

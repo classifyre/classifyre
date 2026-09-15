@@ -44,6 +44,12 @@ export interface FindingBulkOperationDto {
      */
     totalEstimate: number;
     /**
+     * The dry-run count the operator reviewed. Each chunk fails the operation when processed plus remaining matches exceed it. Null when no count was reviewed.
+     * @type {number}
+     * @memberof FindingBulkOperationDto
+     */
+    expectedCount?: number | null;
+    /**
      * Findings the walk has examined so far.
      * @type {number}
      * @memberof FindingBulkOperationDto
@@ -187,6 +193,7 @@ export function FindingBulkOperationDtoFromJSONTyped(json: any, ignoreDiscrimina
         'kind': json['kind'],
         'status': json['status'],
         'totalEstimate': json['totalEstimate'],
+        'expectedCount': json['expectedCount'] == null ? undefined : json['expectedCount'],
         'processed': json['processed'],
         'changed': json['changed'],
         'exempted': json['exempted'],
@@ -219,6 +226,7 @@ export function FindingBulkOperationDtoToJSONTyped(value?: FindingBulkOperationD
         'kind': value['kind'],
         'status': value['status'],
         'totalEstimate': value['totalEstimate'],
+        'expectedCount': value['expectedCount'],
         'processed': value['processed'],
         'changed': value['changed'],
         'exempted': value['exempted'],

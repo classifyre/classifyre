@@ -41,6 +41,7 @@ export class FindingBulkOperationService {
     filters: Record<string, unknown>;
     target: Record<string, unknown>;
     totalEstimate: number;
+    expectedCount?: number | null;
     counts?: Record<string, unknown>;
     createdBy?: string | null;
   }): Promise<FindingBulkOperation> {
@@ -50,6 +51,7 @@ export class FindingBulkOperationService {
         filters: input.filters as Prisma.InputJsonValue,
         target: input.target as Prisma.InputJsonValue,
         totalEstimate: input.totalEstimate,
+        expectedCount: input.expectedCount ?? null,
         ...(input.counts
           ? { counts: input.counts as Prisma.InputJsonValue }
           : {}),
@@ -213,6 +215,7 @@ export class FindingBulkOperationService {
       kind: operation.kind,
       status: operation.status,
       totalEstimate: operation.totalEstimate,
+      expectedCount: operation.expectedCount,
       processed: operation.processed,
       changed: operation.changed,
       exempted: operation.exempted,
