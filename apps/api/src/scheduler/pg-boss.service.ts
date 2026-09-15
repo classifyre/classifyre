@@ -10,7 +10,22 @@ import {
 
 import type { Job } from 'pg-boss';
 import { NamespaceJobConcurrencyService } from './namespace-job-concurrency.service';
-import { WorkerQueueRegistryService } from './worker-queue-registry.service';
+import {
+  WorkerQueueRegistryService,
+  type PausedQueuesSnapshot,
+} from './worker-queue-registry.service';
+
+/**
+ * One live pg-boss subscription, re-established on resume without
+ * re-registering the worker. `subscribe` closes over the boss, queue,
+ * options and wrapped handler captured at registration.
+ */
+interface QueueSubscription {
+  namespaceId: string;
+  queue: string;
+  subscribed: boolean;
+  subscribe: () => Promise<void>;
+}
 
 /** Depth of one queue as reported by pg-boss itself. */
 export interface QueueDepth {
@@ -22,18 +37,34 @@ export interface QueueDepth {
 }
 
 /**
- * Thrown when a paused queue receives a batch.
+ * Thrown when a batch parked for a paused queue outwaits the hold cap.
  *
- * Pausing must not lose work, so the batch is refused rather than dropped;
- * pg-boss marks the job failed and retries it, and it runs for real once the
- * queue is resumed.
+ * Pause holds work rather than failing it (see {@link PgBossService.work}),
+ * so reaching this means the queue stayed paused past the cap: pg-boss marks
+ * the job failed and retries it, and the retried job then waits safely,
+ * because nothing is fetching while the queue is paused.
  */
 export class QueuePausedError extends Error {
   constructor(queue: string) {
-    super(`Queue '${queue}' is paused; pg-boss will retry this job`);
+    super(
+      `Queue '${queue}' stayed paused past the hold window; pg-boss will retry this job`,
+    );
     this.name = 'QueuePausedError';
   }
 }
+
+/**
+ * How long a batch fetched just as its queue paused parks before giving up.
+ *
+ * Far below the shortest job expiry the codebase assumes (900s, see
+ * `releaseAbandonedJobs`), so a parked batch is never reaped mid-wait. No
+ * concurrency slot is held while parked — the park sits before the slot
+ * wait — so a paused queue occupies nothing but its claimed rows.
+ */
+const PAUSED_BATCH_HOLD_MS = 60_000;
+
+/** Pause-cache poll while a batch is parked. */
+const PAUSED_BATCH_POLL_MS = 250;
 
 type PgBossModule = typeof import('pg-boss');
 type PgBossInstance = InstanceType<PgBossModule['PgBoss']>;
@@ -82,6 +113,15 @@ const MAINTENANCE_INTERVAL_SECONDS = 600;
 export class PgBossService implements OnApplicationShutdown {
   private readonly logger = new Logger(PgBossService.name);
   private readonly bosses = new Map<string, PgBossInstance>();
+  /**
+   * Live pg-boss subscriptions per namespace schema, so a paused queue can be
+   * unsubscribed and a resumed one re-subscribed without re-registering the
+   * worker. Entries are pruned when their namespace stops.
+   */
+  private readonly subscriptions = new Map<
+    string,
+    Map<string, QueueSubscription>
+  >();
 
   constructor(
     private readonly cls: ClsService,
@@ -98,6 +138,14 @@ export class PgBossService implements OnApplicationShutdown {
           queue: identity.queue,
         });
       }
+    });
+    // Pause holds work instead of failing it: every pause-cache refresh stops
+    // fetching paused queues and re-subscribes resumed ones. Batches caught
+    // mid-fetch park in the work wrapper (see work).
+    this.queueRegistry.onPausesRefreshed((paused) => {
+      void this.syncPauseSubscriptions(paused).catch((error: unknown) =>
+        this.logger.warn(`Pause subscription sync failed: ${String(error)}`),
+      );
     });
   }
 
@@ -291,6 +339,7 @@ export class PgBossService implements OnApplicationShutdown {
     const boss = this.bosses.get(schema);
     if (!boss) return;
     this.bosses.delete(schema);
+    this.subscriptions.delete(schema);
     await boss.stop({ graceful: true, timeout: 10_000 });
     this.logger.log(`pg-boss stopped for namespace schema '${schema}'`);
   }
@@ -357,10 +406,13 @@ export class PgBossService implements OnApplicationShutdown {
     }
 
     const wrapped = async (jobs: Job<T>[]): Promise<unknown> => {
-      // Refuse before taking a slot: a paused queue must not occupy one of the
-      // few global slots just to fail.
+      // Hold before taking a slot: a batch fetched in the race between the
+      // pause landing and the unsubscribe parks here without occupying one of
+      // the few global slots, burns no retry, and runs once resumed. Past the
+      // hold cap the normal retry path applies — and the retried job then
+      // waits safely, because nothing is fetching while paused.
       if (observed && this.queueRegistry.isPaused(observed)) {
-        throw new QueuePausedError(queue);
+        await this.waitForResume(queue, observed);
       }
       try {
         const result = await this.namespaceConcurrency.withSlot(
@@ -390,13 +442,120 @@ export class PgBossService implements OnApplicationShutdown {
     };
     // pg-boss's overloaded work() signatures don't unify with a generic
     // wrapper; the runtime contract (queue, options, batch handler) is correct.
-    return (
-      boss.work as unknown as (
-        q: string,
-        o: Record<string, unknown>,
-        h: (jobs: Job<T>[]) => Promise<unknown>,
-      ) => Promise<string>
-    )(queue, options, wrapped);
+    const subscribe = () =>
+      (
+        boss.work as unknown as (
+          q: string,
+          o: Record<string, unknown>,
+          h: (jobs: Job<T>[]) => Promise<unknown>,
+        ) => Promise<string>
+      )(queue, options, wrapped);
+    const workerId = await subscribe();
+    if (observed && namespaceId) {
+      let queues = this.subscriptions.get(schema);
+      if (!queues) {
+        queues = new Map();
+        this.subscriptions.set(schema, queues);
+      }
+      const subscription: QueueSubscription = {
+        namespaceId,
+        queue,
+        subscribed: true,
+        subscribe: () => subscribe().then(() => undefined),
+      };
+      queues.set(queue, subscription);
+      // A queue paused before this worker (re)started must not fetch its
+      // first batch: read the pauses table directly rather than waiting for
+      // the next flush to unsubscribe us.
+      try {
+        if ((await this.queueRegistry.listPaused(namespaceId)).has(queue)) {
+          await boss.offWork(queue);
+          subscription.subscribed = false;
+          this.logger.log(
+            `Queue '${queue}' in '${schema}' is paused: not fetching until resume`,
+          );
+        }
+      } catch (error) {
+        // Assume running; the flush reconcile corrects us within one interval.
+        this.logger.warn(
+          `Could not read pause state for queue '${queue}' in '${schema}': ` +
+            `${String(error)}`,
+        );
+      }
+    }
+    return workerId;
+  }
+
+  /**
+   * Stop fetching paused queues and re-subscribe resumed ones, driven by the
+   * pause-cache refresh. Jobs pg-boss already handed out stay `active` but
+   * park in the work wrapper without holding a concurrency slot; everything
+   * still queued stays `created` and is fetched on resume. A failed
+   * unsubscribe keeps its subscription so the next refresh retries it.
+   */
+  async syncPauseSubscriptions(paused: PausedQueuesSnapshot): Promise<void> {
+    for (const [schema, queues] of this.subscriptions) {
+      const boss = this.bosses.get(schema);
+      if (!boss) {
+        this.subscriptions.delete(schema);
+        continue;
+      }
+      for (const subscription of queues.values()) {
+        const isPaused = paused.some(
+          (key) =>
+            key.namespaceId === subscription.namespaceId &&
+            key.queue === subscription.queue,
+        );
+        if (isPaused && subscription.subscribed) {
+          try {
+            await boss.offWork(subscription.queue);
+          } catch (error) {
+            this.logger.warn(
+              `Could not stop fetching paused queue '${subscription.queue}' ` +
+                `in '${schema}': ${String(error)} — retrying on the next refresh`,
+            );
+            continue;
+          }
+          subscription.subscribed = false;
+          this.logger.log(
+            `Queue '${subscription.queue}' in '${schema}' paused: workers ` +
+              `stopped fetching; queued jobs wait for resume`,
+          );
+        } else if (!isPaused && !subscription.subscribed) {
+          try {
+            await subscription.subscribe();
+          } catch (error) {
+            this.logger.warn(
+              `Could not resume fetching queue '${subscription.queue}' ` +
+                `in '${schema}': ${String(error)} — retrying on the next refresh`,
+            );
+            continue;
+          }
+          subscription.subscribed = true;
+          this.logger.log(
+            `Queue '${subscription.queue}' in '${schema}' resumed: workers fetching again`,
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Park a fetched batch while its queue is paused, without taking a slot.
+   * Throws {@link QueuePausedError} (normal pg-boss retry) only when the
+   * queue stays paused past the hold cap.
+   */
+  private async waitForResume(
+    queue: string,
+    key: { namespaceId: string; queue: string },
+  ): Promise<void> {
+    const startedAt = Date.now();
+    while (this.queueRegistry.isPaused(key)) {
+      if (Date.now() - startedAt >= PAUSED_BATCH_HOLD_MS) {
+        throw new QueuePausedError(queue);
+      }
+      await delay(PAUSED_BATCH_POLL_MS);
+    }
   }
 
   /**
@@ -438,4 +597,11 @@ export class PgBossService implements OnApplicationShutdown {
     }
     return boss;
   }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    timer.unref?.();
+  });
 }
