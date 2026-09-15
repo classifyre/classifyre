@@ -134,7 +134,7 @@ export function HarnessBrief() {
             </div>
           </div>
         ) : (
-          <article className="brief-prose rounded-[6px] border-2 border-border bg-card p-5 font-serif text-[15px] leading-relaxed shadow-[2px_2px_0_var(--color-border)]">
+          <article className="brief-prose rounded-[6px] border-2 border-border bg-card p-5 font-serif text-[15px] leading-relaxed">
             {brief?.content?.trim() ? (
               <Markdown>{brief.content.trim()}</Markdown>
             ) : (
@@ -153,7 +153,7 @@ export function HarnessBrief() {
             {facts.map(([key, value]) => (
               <div
                 key={key}
-                className="rounded-[4px] border-2 border-border bg-card px-3 py-2.5 shadow-[2px_2px_0_var(--color-border)]"
+                className="rounded-[4px] border-2 border-border bg-card px-3 py-2.5"
               >
                 <p className="font-serif text-2xl font-black tabular-nums">
                   {typeof value === "number" || typeof value === "string"
@@ -242,7 +242,7 @@ function MemorySection({
         {entries.map((e) => (
           <li
             key={e.key}
-            className="rounded-[4px] border-2 border-border bg-card px-3 py-2 text-sm shadow-[2px_2px_0_var(--color-border)]"
+            className="rounded-[4px] border-2 border-border bg-card px-3 py-2 text-sm"
           >
             <span className="font-mono text-[12px] font-semibold">
               {e.key}
@@ -269,7 +269,7 @@ function SetupRow({ item }: { item: BriefSetupItemDto }) {
         ? "text-[#d97706]"
         : "text-muted-foreground";
   return (
-    <li className="flex items-start gap-2 rounded-[4px] border-2 border-border bg-card px-3 py-2 text-sm shadow-[2px_2px_0_var(--color-border)]">
+    <li className="flex items-start gap-2 rounded-[4px] border-2 border-border bg-card px-3 py-2 text-sm">
       <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} />
       <span>
         <span className="font-semibold">{item.label}</span>

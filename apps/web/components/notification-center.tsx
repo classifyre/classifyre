@@ -207,7 +207,7 @@ export function NotificationCenter() {
 
       <PopoverContent
         align="end"
-        className="flex h-[min(70vh,560px)] w-[min(420px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[6px] border-2 border-border bg-card p-0 shadow-[6px_6px_0_var(--color-border)]"
+        className="flex h-[min(70vh,560px)] w-[min(420px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[6px] border-2 border-border bg-card p-0"
       >
         <div className="shrink-0 border-b-2 border-border bg-foreground px-4 py-3 text-primary-foreground">
           <div className="flex items-center justify-between gap-2">

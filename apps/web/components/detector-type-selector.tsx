@@ -57,7 +57,7 @@ function DetectorTypeCard({
       type="button"
       data-testid={`method-card-${kind}`}
       onClick={() => onSelect(kind)}
-      className="group relative flex flex-col items-start rounded-[6px] border-2 border-border bg-background p-5 text-left shadow-[4px_4px_0_var(--color-border)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_var(--color-border)] cursor-pointer"
+      className="group relative flex flex-col items-start rounded-[6px] border-2 border-border bg-background p-5 text-left transition-all hover:-translate-y-0.5 cursor-pointer"
     >
       {/* Visual-detector pill — marks detectors that scan images, not text */}
       {isVisual && (
@@ -70,7 +70,7 @@ function DetectorTypeCard({
       )}
 
       {/* Icon */}
-      <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-[4px] border-2 border-border bg-accent shadow-[2px_2px_0_var(--color-border)] group-hover:shadow-[3px_3px_0_var(--color-border)]">
+      <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-[4px] border-2 border-border bg-accent">
         <Icon className="h-4 w-4 text-accent-foreground" />
       </div>
 
@@ -103,7 +103,7 @@ function DetectorTypeCard({
 
       {/* Select arrow */}
       <div className="mt-4 self-end">
-        <span className="rounded-[4px] border-2 border-border bg-accent px-3 py-1 text-[11px] font-mono font-bold uppercase tracking-[0.08em] text-accent-foreground shadow-[2px_2px_0_var(--color-border)] group-hover:shadow-[3px_3px_0_var(--color-border)] transition-shadow">
+        <span className="rounded-[4px] border-2 border-border bg-accent px-3 py-1 text-[11px] font-mono font-bold uppercase tracking-[0.08em] text-accent-foreground transition-shadow">
           {t("detectors.select")}
         </span>
       </div>

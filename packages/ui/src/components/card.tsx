@@ -11,9 +11,8 @@ function Card({ className, clickable = false, ...props }: CardProps) {
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-4 rounded-[6px] border-2 border-border py-4 shadow-[4px_4px_0_var(--color-border)] transition-all",
-        clickable &&
-          "cursor-pointer hover:-translate-x-px hover:-translate-y-px hover:shadow-[5px_5px_0_var(--color-border)]",
+        "bg-card text-card-foreground flex flex-col gap-4 rounded-[6px] border-2 border-border py-4",
+        clickable && "cursor-pointer",
         className,
       )}
       {...props}

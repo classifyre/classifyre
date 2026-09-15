@@ -7,7 +7,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@workspace/ui/lib/utils";
 
 const toggleVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-[4px] border-2 border-black bg-background text-sm font-medium text-foreground shadow-[2px_2px_0_#000] hover:bg-muted disabled:pointer-events-none disabled:opacity-50 data-[state=on]:border-[#0b0f0a] data-[state=on]:bg-[#0b0f0a] data-[state=on]:text-[#b7ff00] data-[state=on]:shadow-[2px_2px_0_#1b2a12] data-[state=on]:hover:bg-[#111a09] [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none transition-[color,background-color,box-shadow,border-color] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive whitespace-nowrap",
+  "inline-flex items-center justify-center gap-2 rounded-[4px] border-2 border-black bg-background text-sm font-medium text-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-50 data-[state=on]:border-[#0b0f0a] data-[state=on]:bg-[#0b0f0a] data-[state=on]:text-[#b7ff00] data-[state=on]: data-[state=on]:hover:bg-[#111a09] [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none transition-[color,background-color,box-shadow,border-color] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive whitespace-nowrap",
   {
     variants: {
       variant: {

@@ -82,7 +82,7 @@ export function VersionSidebarNotifier() {
       <PopoverContent
         side="top"
         align="start"
-        className="w-72 rounded-[6px] border-2 border-border bg-card p-0 shadow-[4px_4px_0_var(--color-border)]"
+        className="w-72 rounded-[6px] border-2 border-border bg-card p-0"
       >
         <div className="border-b-2 border-border bg-foreground px-4 py-3 text-primary-foreground">
           <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-primary-foreground/70">

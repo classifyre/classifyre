@@ -130,7 +130,7 @@ export function GraphContextMenu(props: GraphContextMenuProps) {
       <div
         ref={ref}
         style={style}
-        className="fixed z-50 min-w-[220px] border-2 border-border bg-popover py-1 text-sm shadow-[4px_4px_0_0_var(--color-border)]"
+        className="fixed z-50 min-w-[220px] border-2 border-border bg-popover py-1 text-sm"
       >
         <div className="mb-1 border-b-2 border-border px-3 py-1.5">
           <span className="block font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -163,7 +163,7 @@ export function GraphContextMenu(props: GraphContextMenuProps) {
     <div
       ref={ref}
       style={style}
-      className="fixed z-50 min-w-[240px] border-2 border-border bg-popover py-1 text-sm shadow-[4px_4px_0_0_var(--color-border)]"
+      className="fixed z-50 min-w-[240px] border-2 border-border bg-popover py-1 text-sm"
     >
       <div className="mb-1 border-b-2 border-border px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
         {node.type} · <span className="text-foreground">{node.label.slice(0, 32)}</span>

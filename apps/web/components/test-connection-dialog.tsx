@@ -46,7 +46,7 @@ export function TestConnectionDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)] sm:max-w-md"
+        className="rounded-[6px] border-2 border-border sm:max-w-md"
       >
         <DialogHeader className="gap-3 text-left">
           <div className="flex items-center gap-2">

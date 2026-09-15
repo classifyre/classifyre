@@ -65,7 +65,7 @@ export function TransformerExampleSelector({
         >
           <Card
             clickable
-            className="h-full border-border bg-background p-4 shadow-[4px_4px_0_var(--color-border)]"
+            className="h-full border-border bg-background p-4"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border-2 border-border bg-card">
