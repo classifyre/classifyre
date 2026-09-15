@@ -113,6 +113,8 @@ const MAINTENANCE_INTERVAL_SECONDS = 600;
 export class PgBossService implements OnApplicationShutdown {
   private readonly logger = new Logger(PgBossService.name);
   private readonly bosses = new Map<string, PgBossInstance>();
+  /** In-flight starts, so concurrent callers share one boss per schema. */
+  private readonly starting = new Map<string, Promise<PgBossInstance>>();
   /**
    * Live pg-boss subscriptions per namespace schema, so a paused queue can be
    * unsubscribed and a resumed one re-subscribed without re-registering the
@@ -149,14 +151,32 @@ export class PgBossService implements OnApplicationShutdown {
     });
   }
 
-  /** Start (idempotently) the pg-boss instance for a namespace schema. */
+  /**
+   * Start (idempotently) the pg-boss instance for a namespace schema.
+   *
+   * Concurrent callers share one in-flight start: without this two racing
+   * callers each built a boss, one orphaned instance kept its timers against
+   * a schema it no longer owned, and its errors looked like a sick namespace.
+   */
   async startForNamespace(
     schema: string,
     namespaceId: string,
   ): Promise<PgBossInstance> {
     const existing = this.bosses.get(schema);
     if (existing) return existing;
+    const inflight = this.starting.get(schema);
+    if (inflight) return inflight;
+    const task = this.doStart(schema, namespaceId).finally(() => {
+      if (this.starting.get(schema) === task) this.starting.delete(schema);
+    });
+    this.starting.set(schema, task);
+    return task;
+  }
 
+  private async doStart(
+    schema: string,
+    namespaceId: string,
+  ): Promise<PgBossInstance> {
     const { PgBoss } = await import('pg-boss');
     const boss = new PgBoss({
       connectionString: process.env.DATABASE_URL,
@@ -175,6 +195,22 @@ export class PgBossService implements OnApplicationShutdown {
       maintenanceIntervalSeconds: MAINTENANCE_INTERVAL_SECONDS,
     });
     boss.on('error', (error) => {
+      // A boss whose connection is gone must not stay cached: every later
+      // send/work through it fails the same way (the continuous `assertDb:
+      // Database connection is not opened` noise from idle namespaces), while
+      // nothing ever restarts it. Drop it so the next use starts a fresh one.
+      if (isConnectionGone(error)) {
+        this.logger.warn(
+          `pg-boss connection for '${schema}' is gone; dropping the cached ` +
+            `instance so the next use restarts it: ${String(error)}`,
+        );
+        if (this.bosses.get(schema) === boss) {
+          this.bosses.delete(schema);
+        }
+        this.subscriptions.delete(schema);
+        void boss.stop().catch(() => undefined);
+        return;
+      }
       this.logger.error(`pg-boss error [${schema}]:`, error);
     });
     await boss.start();
@@ -604,4 +640,23 @@ function delay(ms: number): Promise<void> {
     const timer = setTimeout(resolve, ms);
     timer.unref?.();
   });
+}
+
+/**
+ * Whether a pg-boss error means its connection is gone rather than one query
+ * failing. Only these evict the cached instance: evicting on any error would
+ * restart a healthy boss under every transient query failure.
+ */
+export function isConnectionGone(error: unknown): boolean {
+  const message =
+    error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return (
+    /database connection is not opened/i.test(message) ||
+    /client has encountered a connection error and is not queryable/i.test(
+      message,
+    ) ||
+    /connection terminated/i.test(message) ||
+    /server closed the connection/i.test(message) ||
+    /ECONNRESET|ECONNREFUSED/i.test(message)
+  );
 }

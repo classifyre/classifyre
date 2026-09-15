@@ -577,14 +577,26 @@ describe('RetireOutOfScopeService', () => {
       // scope again lets re-detection reopen the finding.
       expect(entry).toMatchObject({ e: 'R', s: 'RESOLVED' });
       expect(prisma.customDetectorFeedback.createMany).not.toHaveBeenCalled();
-      const pageWrite = prisma.findingBulkOperation.update.mock.calls
+      const writes = prisma.findingBulkOperation.update.mock.calls
         .map((call: [{ data: Record<string, unknown> }]) => call[0].data)
-        .find((data: Record<string, unknown>) => 'changed' in data);
+        .filter((data: Record<string, unknown>) => 'changed' in data);
+      // Two reason groups, two write batches; the page-completing write
+      // carries the cursor and the page's examined/exempted totals.
+      expect(writes).toHaveLength(2);
+      const pageWrite = writes.find((data) => 'cursor' in data);
       expect(pageWrite).toMatchObject({
-        changed: { increment: 2 },
+        changed: { increment: 1 },
         exempted: { increment: 2 },
         cursor: String(RETIRE_SCAN_BLOCKS),
       });
+      const totalChanged = writes.reduce(
+        (sum, data) =>
+          sum +
+          ((data.changed as { increment?: number } | undefined)?.increment ??
+            0),
+        0,
+      );
+      expect(totalChanged).toBe(2);
       // Inquiry refresh is driven by actually-changed rows, per source.
       expect(lastCounts().changedBySource).toEqual({ 'src-register': 2 });
     });
@@ -624,10 +636,19 @@ describe('RetireOutOfScopeService', () => {
       await service.runChunk(retireOp(false, 2), 60_000);
 
       expect(retireSql()[0]).toContain('NOT EXISTS');
-      const pageWrite = prisma.findingBulkOperation.update.mock.calls
+      const writes = prisma.findingBulkOperation.update.mock.calls
         .map((call: [{ data: Record<string, unknown> }]) => call[0].data)
-        .find((data: Record<string, unknown>) => 'changed' in data);
-      expect(pageWrite).toMatchObject({ changed: { increment: 1 } });
+        .filter((data: Record<string, unknown>) => 'changed' in data);
+      const totalChanged = writes.reduce(
+        (sum, data) =>
+          sum +
+          ((data.changed as { increment?: number } | undefined)?.increment ??
+            0),
+        0,
+      );
+      // The late-cited row's batch changed nothing; the other batch changed
+      // one. Only the changed row lands in changedBySource.
+      expect(totalChanged).toBe(1);
       expect(lastCounts().changedBySource).toEqual({ 'src-register': 1 });
     });
 
@@ -837,6 +858,90 @@ describe('RetireOutOfScopeService', () => {
       // in the outer text.
       expect(String(fragment?.sql)).toContain('source_id = ANY');
       expect(fragment?.values).toContainEqual(['s1']);
+    });
+
+    describe('write batching (field regression: 2,000-row page vs 30 s budget)', () => {
+      const manyRows = (count: number) =>
+        Array.from({ length: count }, (_, i) =>
+          row(`f-batch-${String(i).padStart(4, '0')}`),
+        );
+
+      /** Sizes of the id arrays handed to each retire UPDATE, in order. */
+      const updateSizes = () =>
+        prisma.$queryRaw.mock.calls
+          .filter((call: unknown[]) =>
+            sqlText(call[0]).includes('UPDATE findings'),
+          )
+          .map(
+            (call: unknown[]) =>
+              (call.slice(1).find(Array.isArray) as string[]).length,
+          );
+
+      /** Every findingBulkOperation.update payload, in order. */
+      const progressWrites = () =>
+        prisma.findingBulkOperation.update.mock.calls.map(
+          (call: [{ data: Record<string, unknown> }]) => call[0].data,
+        );
+
+      beforeEach(() => {
+        citedIds = [];
+        prisma.inquiry.findMany.mockResolvedValue([]);
+      });
+
+      it('splits a large reason group into write-batch transactions', async () => {
+        pages.set(0, manyRows(600));
+
+        const result = await service.runChunk(retireOp(false, 600), 60_000);
+
+        expect(result).toEqual({ done: true });
+        // 600 rows at 250 per batch: three UPDATEs, three transactions.
+        expect(updateSizes()).toEqual([250, 250, 100]);
+        expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+        // The cursor advances only with the last batch; every batch commits
+        // its own changed increment.
+        const writes = progressWrites().filter((data) => 'changed' in data);
+        expect(writes).toHaveLength(3);
+        expect(writes.slice(0, 2).every((data) => !('cursor' in data))).toBe(
+          true,
+        );
+        expect(writes[2]).toMatchObject({
+          cursor: String(RETIRE_SCAN_BLOCKS),
+          changed: { increment: 100 },
+        });
+      });
+
+      it('fetches fresh inquiry matchers once per page, not per reason group', async () => {
+        pages.set(0, [
+          row('f-page', { assetKind: 'page' }),
+          row('f-table', {
+            findingType: 'regex:LEI',
+            assetKind: 'table',
+          }),
+        ]);
+
+        await service.runChunk(retireOp(false, 2), 60_000);
+
+        // Once for the snapshot, once fresh before the page's writes — not
+        // once per reason group inside the transaction.
+        expect(prisma.inquiry.findMany).toHaveBeenCalledTimes(2);
+        expect(updateSizes().sort()).toEqual([1, 1]);
+      });
+
+      it('names the batch budget when a write outlives its transaction', async () => {
+        pages.set(0, manyRows(10));
+        prisma.$transaction.mockRejectedValueOnce(
+          new Error(
+            'Transaction API error: A query cannot be executed on an expired ' +
+              'transaction. The timeout for this transaction was 30000 ms.',
+          ),
+        );
+
+        await expect(
+          service.runChunk(retireOp(false, 10), 60_000),
+        ).rejects.toThrow(
+          /write batch of 10 findings exceeded the 30000 ms transaction budget.*reduce BULK_OPERATION_WRITE_BATCH_SIZE/,
+        );
+      });
     });
   });
 
