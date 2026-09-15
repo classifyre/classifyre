@@ -22,6 +22,9 @@ export interface WorkerQueueKey {
   queue: string;
 }
 
+/** Pause state as delivered to {@link WorkerQueueRegistryService.onPausesRefreshed} observers. */
+export type PausedQueuesSnapshot = WorkerQueueKey[];
+
 /** One worker process's view of one queue, as stored in `public`. */
 export interface WorkerQueueRow {
   instanceId: string;
@@ -80,7 +83,10 @@ export class WorkerQueueRegistryService implements OnApplicationShutdown {
   private readonly logger = new Logger(WorkerQueueRegistryService.name);
   private readonly instanceId = `${os.hostname()}:${process.pid}`;
   private readonly counters = new Map<string, QueueCounters>();
-  private readonly pausedQueues = new Set<string>();
+  private readonly pausedQueues = new Map<string, WorkerQueueKey>();
+  private readonly pauseObservers = new Set<
+    (paused: PausedQueuesSnapshot) => unknown
+  >();
   private pool: Pool | null = null;
   private flushTimer?: NodeJS.Timeout;
   private flushing = false;
@@ -166,6 +172,17 @@ export class WorkerQueueRegistryService implements OnApplicationShutdown {
     return this.pausedQueues.has(cacheKey(key.namespaceId, key.queue));
   }
 
+  /**
+   * Observe the pause cache after every flush refresh.
+   *
+   * Workers use this to stop fetching paused queues (and resume them) without
+   * polling the pauses table themselves: the flush tick is the one cadence
+   * every worker already runs on, so a pause takes effect within one interval.
+   */
+  onPausesRefreshed(observer: (paused: PausedQueuesSnapshot) => unknown): void {
+    this.pauseObservers.add(observer);
+  }
+
   /** Pause or resume a queue across every worker replica. */
   async setPaused(key: WorkerQueueKey, paused: boolean): Promise<void> {
     const pool = this.requirePool();
@@ -176,7 +193,10 @@ export class WorkerQueueRegistryService implements OnApplicationShutdown {
          ON CONFLICT (namespace_id, queue) DO NOTHING`,
         [key.namespaceId, key.queue],
       );
-      this.pausedQueues.add(cacheKey(key.namespaceId, key.queue));
+      this.pausedQueues.set(cacheKey(key.namespaceId, key.queue), {
+        namespaceId: key.namespaceId,
+        queue: key.queue,
+      });
       return;
     }
     await pool.query(
@@ -267,6 +287,7 @@ export class WorkerQueueRegistryService implements OnApplicationShutdown {
         ]);
       }
       await this.refreshPauses(pool);
+      await this.notifyPauseObservers();
     } catch (error) {
       // Observability must never take the worker down with it.
       this.logger.warn(`Worker queue state flush failed: ${String(error)}`);
@@ -303,7 +324,23 @@ export class WorkerQueueRegistryService implements OnApplicationShutdown {
     );
     this.pausedQueues.clear();
     for (const row of rows) {
-      this.pausedQueues.add(cacheKey(row.namespace_id, row.queue));
+      this.pausedQueues.set(cacheKey(row.namespace_id, row.queue), {
+        namespaceId: row.namespace_id,
+        queue: row.queue,
+      });
+    }
+  }
+
+  private async notifyPauseObservers(): Promise<void> {
+    if (this.pauseObservers.size === 0) return;
+    const snapshot: PausedQueuesSnapshot = [...this.pausedQueues.values()];
+    for (const observer of this.pauseObservers) {
+      try {
+        await observer(snapshot);
+      } catch (error) {
+        // Subscription bookkeeping must never break the state flush.
+        this.logger.warn(`Pause observer failed: ${String(error)}`);
+      }
     }
   }
 

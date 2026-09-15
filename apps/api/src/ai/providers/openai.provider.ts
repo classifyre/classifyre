@@ -8,6 +8,7 @@ import {
   AiAuthError,
   AiModelNotFoundError,
   AiProviderError,
+  AiQuotaExhaustedError,
   AiRateLimitError,
 } from '../errors';
 import type {
@@ -115,6 +116,20 @@ function isUnsupportedResponseFormat(err: unknown): boolean {
 }
 
 /**
+ * Anchored billing-exhaustion signals: a spent balance is quota gone whatever
+ * status carried it. Mirrors the head of the shared quota list in
+ * provider_refusal_markers.json.
+ */
+function hasBillingExhaustionText(message: string): boolean {
+  const text = message.toLowerCase();
+  return (
+    /(?<![a-z0-9_])insufficient_credit(?![a-z0-9_])/.test(text) ||
+    /(?<![a-z0-9_])insufficient balance(?![a-z0-9_])/.test(text) ||
+    /(?<![a-z0-9_])out of credits(?![a-z0-9_])/.test(text)
+  );
+}
+
+/**
  * A 404 is a genuinely-missing model only when the response body says so — an
  * OpenAI-style `code: "model_not_found"` or a body that names the model. A 404
  * with no body (`err.error` unset) is a gateway/routing miss and is treated as
@@ -166,7 +181,20 @@ function mapOpenAiError(err: unknown): Error {
     );
   }
   if (err instanceof OpenAI.APIError) {
+    // HTTP 402 is "payment required" and a billing-exhaustion body means the
+    // allowance itself is gone: both are quota exhausted, never retried, and
+    // both start the credential cooldown in the client.
+    if (err.status === 402 || hasBillingExhaustionText(err.message)) {
+      return new AiQuotaExhaustedError(
+        `OpenAI quota exhausted. (${err.message})`,
+      );
+    }
     return new AiProviderError(err.message, err.status);
+  }
+  if (err instanceof Error && hasBillingExhaustionText(err.message)) {
+    return new AiQuotaExhaustedError(
+      `OpenAI quota exhausted. (${err.message})`,
+    );
   }
   return err instanceof Error
     ? new AiProviderError(err.message)

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   BulkUpdateFindingsDtoSeverityEnum,
   BulkUpdateFindingsDtoStatusEnum,
+  ResponseError,
   type FindingResponseDto,
 } from "@workspace/api-client";
 import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severity";
@@ -39,6 +40,7 @@ import { getSourceIcon } from "../lib/source-type-icon";
 import type { FindingSelection } from "./findings-table";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
+import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -274,6 +276,8 @@ type BulkUpdateDialogProps = {
   onOpenChange: (open: boolean) => void;
   selection: FindingSelection | null;
   onSuccess?: () => void;
+  /** The selection was too large to change in one request and was queued. */
+  onQueued?: (operationId: string) => void;
 };
 
 export function BulkUpdateDialog({
@@ -281,6 +285,7 @@ export function BulkUpdateDialog({
   onOpenChange,
   selection,
   onSuccess,
+  onQueued,
 }: BulkUpdateDialogProps) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<StatusValue | typeof NONE>(NONE);
@@ -288,32 +293,116 @@ export function BulkUpdateDialog({
   const [comment, setComment] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Select-all only. The table's total stops counting at 10,000, so it cannot
+  // be the number a destructive update is checked against: a dry run returns
+  // the exact count, and whether the filters narrow anything at all.
+  const [exactCount, setExactCount] = useState<number | null>(null);
+  const [narrowed, setNarrowed] = useState<boolean | null>(null);
+  const [counting, setCounting] = useState(false);
+  // The sync save result, kept when it changed fewer findings than the dry
+  // run counted — rows already at the target values are not rewrites, so the
+  // dialog stays open showing actual vs reviewed instead of closing silently.
+  const [savedSummary, setSavedSummary] = useState<{
+    updated: number;
+    expected: number;
+  } | null>(null);
 
-  const total = selection?.total ?? 0;
+  const selectAllFilters =
+    selection?.type === "all" ? selection.filters : undefined;
+  // The page can hand over a new selection object carrying the same filters;
+  // keying on the serialised value keeps that from re-counting on each render.
+  const filtersKey = selectAllFilters ? JSON.stringify(selectAllFilters) : null;
+  const filtersRef = useRef(selectAllFilters);
+  filtersRef.current = selectAllFilters;
+
+  const refreshExactCount = useCallback(async () => {
+    const filters = filtersRef.current;
+    if (!filters) return;
+    setCounting(true);
+    try {
+      const preview = await api.findings.findingsControllerBulkUpdate({
+        bulkUpdateFindingsDto: { filters, dryRun: true },
+      });
+      setExactCount(preview.wouldUpdate ?? null);
+      setNarrowed(preview.narrowed ?? null);
+    } catch (err) {
+      setError(
+        await extractApiErrorMessage(err, t("findings.bulkUpdate.updateFailed")),
+      );
+    } finally {
+      setCounting(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    setExactCount(null);
+    setNarrowed(null);
+    setSavedSummary(null);
+    if (open && filtersKey !== null) void refreshExactCount();
+  }, [open, filtersKey, refreshExactCount]);
+
+  const total =
+    selection?.type === "all"
+      ? (exactCount ?? selection.total)
+      : (selection?.total ?? 0);
   const hasChanges =
     status !== NONE || severity !== NONE || comment.trim().length > 0;
+  const awaitingCount = selection?.type === "all" && exactCount === null;
 
   async function handleSave() {
-    if (!hasChanges || !selection) return;
+    if (!hasChanges || !selection || awaitingCount) return;
     setIsSaving(true);
     setError(null);
     try {
-      await api.findings.findingsControllerBulkUpdate({
+      const result = await api.findings.findingsControllerBulkUpdate({
         bulkUpdateFindingsDto: {
           ...(selection.type === "ids"
             ? { ids: selection.findings.map((f) => f.id) }
-            : { filters: selection.filters }),
+            : {
+                filters: selection.filters,
+                // If more findings match by the time this lands, the API
+                // refuses (409) instead of widening what was reviewed here.
+                expectedCount: exactCount ?? undefined,
+                // Filters that narrow nothing apply to the whole workspace;
+                // the warning above says so, and saving is the confirmation.
+                confirm: narrowed === false ? true : undefined,
+              }),
           status: status !== NONE ? status : undefined,
           severity: severity !== NONE ? severity : undefined,
           comment: comment.trim() || undefined,
         },
       });
-      onSuccess?.();
-      handleClose();
+      if (result.async && result.operationId) {
+        onQueued?.(result.operationId);
+        handleClose();
+      } else {
+        onSuccess?.();
+        // Select-all only: the dialog reviewed `exactCount`, so say what the
+        // save actually changed. A short count stays open with a notice
+        // rather than closing as if everything matched.
+        const updated = result.updatedCount ?? 0;
+        if (
+          selection.type === "all" &&
+          exactCount !== null &&
+          updated < exactCount
+        ) {
+          setSavedSummary({ updated, expected: exactCount });
+        } else {
+          handleClose();
+        }
+      }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update findings",
-      );
+      if (err instanceof ResponseError && err.response.status === 409) {
+        setError(t("findings.bulkUpdate.countChanged"));
+        await refreshExactCount();
+      } else {
+        setError(
+          await extractApiErrorMessage(
+            err,
+            t("findings.bulkUpdate.updateFailed"),
+          ),
+        );
+      }
     } finally {
       setIsSaving(false);
     }
@@ -325,6 +414,7 @@ export function BulkUpdateDialog({
     setSeverity(NONE);
     setComment("");
     setError(null);
+    setSavedSummary(null);
     onOpenChange(false);
   }
 
@@ -349,7 +439,23 @@ export function BulkUpdateDialog({
             </span>
             {selection?.type === "all" && ` ${t("findings.bulkUpdate.matchingFilters")}`}
             {t("findings.bulkUpdate.onlyFilledFields")}
+            {counting && (
+              <span className="ml-2 inline-flex items-center gap-1 text-xs">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {t("findings.bulkUpdate.countingExact")}
+              </span>
+            )}
           </DrawerDescription>
+          {narrowed === false && exactCount !== null && (
+            <p
+              role="alert"
+              className="mt-2 border-l-2 border-destructive pl-3 text-sm text-destructive"
+            >
+              {t("findings.bulkUpdate.unnarrowedWarning", {
+                count: exactCount.toLocaleString(),
+              })}
+            </p>
+          )}
         </DrawerHeader>
 
         {/* ── Controls ── */}
@@ -437,7 +543,15 @@ export function BulkUpdateDialog({
 
         {/* ── Footer ── */}
         <div className="border-t px-6 py-4 flex items-center justify-between gap-4 shrink-0 flex-col">
-          {error ? (
+          {savedSummary ? (
+            <p role="status" className="text-xs text-muted-foreground">
+              {t("findings.bulkUpdate.updatedVsMatched", {
+                updated: savedSummary.updated.toLocaleString(),
+                expected: savedSummary.expected.toLocaleString(),
+              })}{" "}
+              {t("findings.bulkUpdate.shortCountNotice")}
+            </p>
+          ) : error ? (
             <p className="text-xs text-destructive">{error}</p>
           ) : (
             <p className="text-xs text-muted-foreground">
@@ -456,11 +570,15 @@ export function BulkUpdateDialog({
               {t("findings.bulkUpdate.cancel")}
             </Button>
             <Button
-              onClick={handleSave}
-              disabled={!hasChanges || isSaving}
+              onClick={savedSummary ? handleClose : handleSave}
+              disabled={
+                !savedSummary && (!hasChanges || isSaving || awaitingCount)
+              }
               className="border-2 border-border rounded-[4px] bg-foreground text-background hover:bg-foreground/90"
             >
-              {isSaving ? (
+              {savedSummary ? (
+                t("findings.bulkUpdate.close")
+              ) : isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                   {t("findings.bulkUpdate.saving")}

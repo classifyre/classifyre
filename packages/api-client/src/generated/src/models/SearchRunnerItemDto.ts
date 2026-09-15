@@ -203,6 +203,12 @@ export interface SearchRunnerItemDto {
      */
     textCoverage?: TextCoverageDto | null;
     /**
+     * Per ctx.cohort() the run walked: {bands: {newest|oldest|random: {visited, hits, exhausted}}, weightsUsed, declared, minShare, universeSize}. hits = keys with a new HIGH/CRITICAL finding.
+     * @type {object}
+     * @memberof SearchRunnerItemDto
+     */
+    cohortYield?: object | null;
+    /**
      * 
      * @type {string}
      * @memberof SearchRunnerItemDto
@@ -336,6 +342,7 @@ export function SearchRunnerItemDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'findingsRetained': json['findingsRetained'],
         'assetsWithoutText': json['assetsWithoutText'],
         'textCoverage': json['textCoverage'] == null ? undefined : TextCoverageDtoFromJSON(json['textCoverage']),
+        'cohortYield': json['cohortYield'] == null ? undefined : json['cohortYield'],
         'errorMessage': json['errorMessage'] == null ? undefined : json['errorMessage'],
         'errorDetails': json['errorDetails'] == null ? undefined : json['errorDetails'],
         'jobName': json['jobName'] == null ? undefined : json['jobName'],
@@ -383,6 +390,7 @@ export function SearchRunnerItemDtoToJSONTyped(value?: SearchRunnerItemDto | nul
         'findingsRetained': value['findingsRetained'],
         'assetsWithoutText': value['assetsWithoutText'],
         'textCoverage': TextCoverageDtoToJSON(value['textCoverage']),
+        'cohortYield': value['cohortYield'],
         'errorMessage': value['errorMessage'],
         'errorDetails': value['errorDetails'],
         'jobName': value['jobName'],

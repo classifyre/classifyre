@@ -28,6 +28,7 @@ import {
 import { SemanticSearchMode } from './dto/search-findings-request.dto';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
+import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
 
 describe('AssetService', () => {
   let service: AssetService;
@@ -56,8 +57,12 @@ describe('AssetService', () => {
     },
     finding: {
       findMany: jest.fn(),
+      groupBy: jest.fn(),
       createMany: jest.fn(),
       update: jest.fn(),
+    },
+    customDetector: {
+      findMany: jest.fn(),
     },
     runnerAsset: {
       findMany: jest.fn(),
@@ -66,6 +71,7 @@ describe('AssetService', () => {
     },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
+    $executeRaw: jest.fn(),
   };
 
   const mockInquiryMatching = {
@@ -74,6 +80,11 @@ describe('AssetService', () => {
 
   const mockCorrelationJobs = {
     scheduleFull: jest.fn(),
+  };
+
+  const mockStatsJobs = {
+    scheduleFull: jest.fn(),
+    scheduleForDays: jest.fn(),
   };
 
   const mockCustomDetectorExtractionsService = {
@@ -116,6 +127,10 @@ describe('AssetService', () => {
           provide: CorrelationJobScheduler,
           useValue: mockCorrelationJobs,
         },
+        {
+          provide: FindingStatsScheduler,
+          useValue: mockStatsJobs,
+        },
       ],
     }).compile();
 
@@ -131,6 +146,8 @@ describe('AssetService', () => {
     mockPrismaService.$queryRaw.mockResolvedValue([]);
     mockInquiryMatching.watchersForFindings.mockResolvedValue(new Map());
     mockCorrelationJobs.scheduleFull.mockResolvedValue(undefined);
+    mockStatsJobs.scheduleFull.mockResolvedValue(undefined);
+    mockStatsJobs.scheduleForDays.mockResolvedValue(undefined);
     mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue([]);
   });
 
@@ -2656,8 +2673,6 @@ describe('AssetService', () => {
         ...overrides,
       });
 
-      let findingUpdate: jest.Mock;
-
       const runCleanup = (
         config: Record<string, any> | undefined,
         findings: Record<string, any>[],
@@ -2671,14 +2686,35 @@ describe('AssetService', () => {
           id: runnerId,
           sourceId,
         });
+        // The mock cannot evaluate the orphan predicate, so it reports every
+        // fixture's detector; the service must re-check what SQL returned.
+        mockPrismaService.finding.groupBy.mockResolvedValue(
+          findings.map((finding) => ({
+            detectorType: finding.detectorType,
+            customDetectorKey: finding.customDetectorKey,
+            _count: { _all: 1 },
+          })),
+        );
         mockPrismaService.finding.findMany.mockResolvedValue(findings);
-        findingUpdate = jest.fn().mockResolvedValue({});
-        mockPrismaService.$transaction.mockImplementation((callback: any) =>
-          callback({ finding: { update: findingUpdate } }),
+        mockPrismaService.$executeRaw.mockImplementation(
+          (_strings: unknown, ...values: unknown[]) =>
+            Promise.resolve(
+              (values.find(Array.isArray) as unknown[] | undefined)?.length ??
+                0,
+            ),
         );
         // isFullScan=false: only the cleanup path runs, nothing else.
         return service.finalizeIngestRun(sourceId, runnerId, [], false);
       };
+
+      /** Statements the cleanup wrote: SQL text plus bound values. */
+      const writes = () =>
+        mockPrismaService.$executeRaw.mock.calls.map((call: unknown[]) => ({
+          sql: (call[0] as string[]).join('?'),
+          values: call.slice(1),
+        }));
+      const resolveWrites = () =>
+        writes().filter((write) => write.sql.includes(`'RESOLVED'`));
 
       it('resolves findings from a detector that was removed from the config', async () => {
         const result = await runCleanup(
@@ -2687,15 +2723,42 @@ describe('AssetService', () => {
         );
 
         expect(result.resolvedForRemovedDetectors).toBe(1);
-        expect(findingUpdate).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { id: 'finding-llm' },
-            data: expect.objectContaining({
-              status: FindingStatus.RESOLVED,
-              resolutionReason: 'Detector removed from source configuration',
-            }),
-          }),
+        // One set-based statement for the page, not one UPDATE per finding.
+        expect(resolveWrites()).toHaveLength(1);
+        expect(resolveWrites()[0].values).toEqual(
+          expect.arrayContaining([
+            ['finding-llm'],
+            'Detector removed from source configuration',
+          ]),
         );
+        expect(resolveWrites()[0].sql).toContain(
+          `AND status = 'OPEN'::"FindingStatus"`,
+        );
+      });
+
+      it('never reads findings when no configured detector went missing', async () => {
+        // The common case at the end of every run: nothing orphaned, so the
+        // cleanup must not page through the source's findings at all.
+        mockPrismaService.finding.groupBy.mockResolvedValue([]);
+        mockPrismaService.source.findUnique.mockResolvedValue({
+          id: sourceId,
+          type: AssetType.WORDPRESS,
+          config: { detectors: [{ type: 'PII', enabled: true }] },
+        });
+        mockPrismaService.runner.findUnique.mockResolvedValue({
+          id: runnerId,
+          sourceId,
+        });
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          [],
+          false,
+        );
+
+        expect(result.resolvedForRemovedDetectors).toBe(0);
+        expect(mockPrismaService.finding.findMany).not.toHaveBeenCalled();
       });
 
       it('treats a disabled detector as removed', async () => {
@@ -2731,7 +2794,7 @@ describe('AssetService', () => {
         );
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
       });
 
       it('keeps TAG findings the source config cannot name', async () => {
@@ -2744,7 +2807,7 @@ describe('AssetService', () => {
         const result = await runCleanup({ detectors: [] }, [openFinding()]);
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
       });
 
       it('does nothing when the source opts out via the flag', async () => {
@@ -2757,14 +2820,114 @@ describe('AssetService', () => {
         );
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
       });
 
       it('skips cleanup entirely when the config has no detector list', async () => {
         const result = await runCleanup({}, [openFinding()]);
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
+      });
+
+      /**
+       * CUSTOM (notebook) sources name their detectors by row id under
+       * custom_detectors, with no detectors array. That shape used to read as
+       * "unknown", so a removed custom detector's findings were never cleaned
+       * up there.
+       */
+      describe('CUSTOM sources carrying only custom_detectors ids', () => {
+        const customOnlyConfig = { custom_detectors: ['cd-old'] };
+
+        it('resolves findings of a custom detector no longer listed', async () => {
+          mockPrismaService.customDetector.findMany.mockResolvedValue([
+            { key: 'other-screen' },
+          ]);
+
+          const result = await runCleanup(customOnlyConfig, [openFinding()]);
+
+          expect(
+            mockPrismaService.customDetector.findMany,
+          ).toHaveBeenCalledWith({
+            where: { id: { in: ['cd-old'] } },
+            select: { key: true },
+          });
+          expect(result.resolvedForRemovedDetectors).toBe(1);
+          expect(resolveWrites()).toHaveLength(1);
+        });
+
+        it('keeps findings whose custom detector id is still listed', async () => {
+          mockPrismaService.customDetector.findMany.mockResolvedValue([
+            { key: 'email-conduct-screen' },
+          ]);
+
+          const result = await runCleanup(customOnlyConfig, [openFinding()]);
+
+          expect(result.resolvedForRemovedDetectors).toBe(0);
+          expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
+        });
+
+        it('leaves built-in findings alone: they were never configurable there', async () => {
+          // Built-in types cannot be configured on a CUSTOM source, so a PII
+          // finding on one is not evidence of a removal. Without this guard
+          // the empty built-in set reads every non-CUSTOM finding as orphaned.
+          mockPrismaService.customDetector.findMany.mockResolvedValue([
+            { key: 'other-screen' },
+          ]);
+
+          const result = await runCleanup(customOnlyConfig, [
+            openFinding({
+              id: 'finding-pii',
+              detectorType: DetectorType.PII,
+              customDetectorKey: null,
+            }),
+          ]);
+
+          expect(result.resolvedForRemovedDetectors).toBe(0);
+          expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
+        });
+
+        it('keeps TAG findings via the global lookup', async () => {
+          mockPrismaService.customDetector.findMany.mockResolvedValue([
+            { key: 'other-screen' },
+          ]);
+          mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue(
+            [{ key: 'email-conduct-screen' }],
+          );
+
+          const result = await runCleanup(customOnlyConfig, [openFinding()]);
+
+          expect(result.resolvedForRemovedDetectors).toBe(0);
+          expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
+        });
+
+        it('announces what is about to resolve before touching findings', async () => {
+          mockPrismaService.customDetector.findMany.mockResolvedValue([
+            { key: 'other-screen' },
+          ]);
+          // The TAG test above overrides the global lookup; pin the default
+          // back explicitly so this test cannot depend on ordering.
+          mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue(
+            [],
+          );
+          const warn = jest
+            .spyOn(console, 'warn')
+            .mockImplementation(() => undefined);
+          try {
+            await runCleanup(customOnlyConfig, [openFinding()]);
+
+            const preview = warn.mock.calls
+              .map((call) => String(call[0]))
+              .find((line) =>
+                line.includes('no longer configured on the source'),
+              );
+            expect(preview).toContain(
+              '1 open finding(s) from custom detector "email-conduct-screen"',
+            );
+          } finally {
+            warn.mockRestore();
+          }
+        });
       });
 
       it('preserves findings with a manual status override', async () => {
@@ -2783,7 +2946,7 @@ describe('AssetService', () => {
         );
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
       });
 
       it('keeps CUSTOM findings without a detector key (unknown identity)', async () => {
@@ -2793,7 +2956,7 @@ describe('AssetService', () => {
         );
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
-        expect(findingUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
       });
 
       /**
@@ -2814,13 +2977,7 @@ describe('AssetService', () => {
 
           expect(result.resolvedForRemovedDetectors).toBe(0);
           expect(result.retainedForCitation).toBe(1);
-          expect(findingUpdate).not.toHaveBeenCalledWith(
-            expect.objectContaining({
-              data: expect.objectContaining({
-                status: FindingStatus.RESOLVED,
-              }),
-            }),
-          );
+          expect(resolveWrites()).toHaveLength(0);
         });
 
         it('does not resolve a finding an active inquiry watches', async () => {
@@ -2841,21 +2998,20 @@ describe('AssetService', () => {
 
           await runCleanup(detectorGone, [openFinding()]);
 
-          expect(findingUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({
-              where: { id: 'finding-llm' },
-              data: {
-                // Stored compact: `s` is the status, `x` the reason CODE.
-                // The sentence comes back through renderHistory on read.
-                history: [
-                  expect.objectContaining({
-                    s: FindingStatus.OPEN,
-                    x: '#retained',
-                  }),
-                ],
-              },
-            }),
+          const [note] = writes();
+          expect(note.sql).not.toContain(`'RESOLVED'`);
+          expect(note.values).toContainEqual(['finding-llm']);
+          const entries = JSON.parse(
+            note.values.find(
+              (value: unknown) =>
+                typeof value === 'string' && value.startsWith('['),
+            ) as string,
           );
+          // Stored compact: `s` is the status, `x` the reason CODE. The
+          // sentence comes back through renderHistory on read.
+          expect(entries).toEqual([
+            expect.objectContaining({ s: FindingStatus.OPEN, x: '#retained' }),
+          ]);
         });
 
         // The check runs at the end of every scan, so a finding cited by a
@@ -2880,7 +3036,7 @@ describe('AssetService', () => {
             }),
           ]);
 
-          expect(findingUpdate).not.toHaveBeenCalled();
+          expect(mockPrismaService.$executeRaw).not.toHaveBeenCalled();
         });
 
         it('still resolves an orphaned finding nobody is relying on', async () => {
@@ -2901,6 +3057,14 @@ describe('AssetService', () => {
           await runCleanup(detectorGone, [openFinding()]);
 
           expect(mockCorrelationJobs.scheduleFull).toHaveBeenCalledWith(
+            expect.stringContaining('resolved 1 finding'),
+          );
+        });
+
+        it('schedules a stats rebuild alongside the correlation recompute', async () => {
+          await runCleanup(detectorGone, [openFinding()]);
+
+          expect(mockStatsJobs.scheduleFull).toHaveBeenCalledWith(
             expect.stringContaining('resolved 1 finding'),
           );
         });

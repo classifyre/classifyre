@@ -107,6 +107,47 @@ describe('supervisor capability groups', () => {
     );
   });
 
+  it('files a corpus-wide status change with hygiene, off by default', () => {
+    // The `findings` catalog group belongs to no capability, so without a name
+    // here this tool would be withheld only by accident of being unclassified.
+    expect(groupForTool('mcp.builtin.bulk_update_findings')?.id).toBe(
+      'corpus_hygiene',
+    );
+    const bulk = {
+      name: 'mcp.builtin.bulk_update_findings',
+      description: 'x',
+      inputSchema: {},
+      sideEffect: 'mutate' as const,
+      handler: () => Promise.resolve({}),
+    };
+    expect(grantedToolNames([bulk], DEFAULT_ENABLED_GROUP_IDS)).toEqual([]);
+    expect(
+      grantedToolNames(
+        [bulk],
+        [...DEFAULT_ENABLED_GROUP_IDS, 'corpus_hygiene'],
+      ),
+    ).toEqual(['mcp.builtin.bulk_update_findings']);
+  });
+
+  it("withholds retiring a detector's findings from detector authoring", () => {
+    // Its catalog group is custom_detectors, which detector_authoring (on by
+    // default) grants wholesale; the exact name must win.
+    expect(groupForTool('mcp.builtin.retire_out_of_scope_findings')?.id).toBe(
+      'corpus_hygiene',
+    );
+    expect(groupForTool('mcp.builtin.update_custom_detector')?.id).toBe(
+      'detector_authoring',
+    );
+    const retire = {
+      name: 'mcp.builtin.retire_out_of_scope_findings',
+      description: 'x',
+      inputSchema: {},
+      sideEffect: 'mutate' as const,
+      handler: () => Promise.resolve({}),
+    };
+    expect(grantedToolNames([retire], DEFAULT_ENABLED_GROUP_IDS)).toEqual([]);
+  });
+
   it('routes an external MCP server tool to the external group', () => {
     expect(groupForTool('mcp.acme.do_thing')?.id).toBe('external_mcp');
   });

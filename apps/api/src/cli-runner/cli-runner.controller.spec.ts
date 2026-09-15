@@ -15,6 +15,9 @@ describe('CliRunnerController endpoint access metadata', () => {
       'updateRunnerStatus',
       'registerDiscoveredAssets',
       'updateRunnerAssetStatuses',
+      // Reads the namespace on a connector's behalf; the notebook never
+      // gets credentials, so neither may the public proxy.
+      'queryAssets',
     ]) {
       expect(Reflect.getMetadata(INTERNAL_ONLY_KEY, handler(name))).toBe(true);
     }

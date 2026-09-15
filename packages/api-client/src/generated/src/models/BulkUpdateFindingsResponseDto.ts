@@ -31,6 +31,42 @@ export interface BulkUpdateFindingsResponseDto {
      * @memberof BulkUpdateFindingsResponseDto
      */
     ids: Array<string>;
+    /**
+     * dryRun only: the exact number of findings the request would update.
+     * @type {number}
+     * @memberof BulkUpdateFindingsResponseDto
+     */
+    wouldUpdate?: number;
+    /**
+     * dryRun only: whether the filters select a subset of the corpus. When false, the real request needs confirm: true.
+     * @type {boolean}
+     * @memberof BulkUpdateFindingsResponseDto
+     */
+    narrowed?: boolean;
+    /**
+     * True when nothing was written.
+     * @type {boolean}
+     * @memberof BulkUpdateFindingsResponseDto
+     */
+    dryRun?: boolean;
+    /**
+     * Set when the selection was too large to change inside the request: the change runs as a background operation. Poll GET /findings/bulk-operations/{operationId}.
+     * @type {string}
+     * @memberof BulkUpdateFindingsResponseDto
+     */
+    operationId?: string;
+    /**
+     * True when the change was queued rather than applied.
+     * @type {boolean}
+     * @memberof BulkUpdateFindingsResponseDto
+     */
+    async?: boolean;
+    /**
+     * Findings the queued operation matched when it was created.
+     * @type {number}
+     * @memberof BulkUpdateFindingsResponseDto
+     */
+    total?: number;
 }
 
 /**
@@ -54,6 +90,12 @@ export function BulkUpdateFindingsResponseDtoFromJSONTyped(json: any, ignoreDisc
         
         'updatedCount': json['updatedCount'],
         'ids': json['ids'],
+        'wouldUpdate': json['wouldUpdate'] == null ? undefined : json['wouldUpdate'],
+        'narrowed': json['narrowed'] == null ? undefined : json['narrowed'],
+        'dryRun': json['dryRun'] == null ? undefined : json['dryRun'],
+        'operationId': json['operationId'] == null ? undefined : json['operationId'],
+        'async': json['async'] == null ? undefined : json['async'],
+        'total': json['total'] == null ? undefined : json['total'],
     };
 }
 
@@ -70,6 +112,12 @@ export function BulkUpdateFindingsResponseDtoToJSONTyped(value?: BulkUpdateFindi
         
         'updatedCount': value['updatedCount'],
         'ids': value['ids'],
+        'wouldUpdate': value['wouldUpdate'],
+        'narrowed': value['narrowed'],
+        'dryRun': value['dryRun'],
+        'operationId': value['operationId'],
+        'async': value['async'],
+        'total': value['total'],
     };
 }
 

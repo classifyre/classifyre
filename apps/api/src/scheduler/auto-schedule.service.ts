@@ -478,6 +478,14 @@ export class AutoScheduleService {
     }
 
     if (budget <= 0) {
+      // A queued run counts as in flight, so a queue nobody promotes looks
+      // exactly like a busy instance from here and would be yielded to
+      // forever. Promotion is a no-op while the runner slots really are full.
+      await this.cliRunner
+        .promotePendingRunners()
+        .catch((error) =>
+          this.logger.warn(`Pending runner promotion failed: ${String(error)}`),
+        );
       // Logged rather than silent: "why has my catch-up sweep stalled" should
       // be answerable from the log without reading this code.
       this.logger.debug(

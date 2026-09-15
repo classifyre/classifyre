@@ -1888,4 +1888,402 @@ describe('CliRunnerService', () => {
       );
     });
   });
+
+  /**
+   * The runner cap counts across namespaces; the queue did not. A run finishing
+   * in one namespace promoted only that namespace's queue, so a run queued
+   * anywhere else waited for a completion in its own namespace that nothing
+   * would ever produce.
+   */
+  describe('cross-namespace queue', () => {
+    const originalCap = process.env.MAX_CONCURRENT_RUNNERS;
+    afterEach(() => {
+      if (originalCap === undefined) delete process.env.MAX_CONCURRENT_RUNNERS;
+      else process.env.MAX_CONCURRENT_RUNNERS = originalCap;
+    });
+
+    const build = (oldest: unknown, running = 0) => {
+      process.env.MAX_CONCURRENT_RUNNERS = '1';
+      let store: Record<string, unknown> = {
+        schemaName: 'ns_a',
+        namespaceId: 'a',
+      };
+      const cls = {
+        get: jest.fn((key: string) => store[key]),
+        set: jest.fn((key: string, value: unknown) => {
+          store[key] = value;
+        }),
+        run: jest.fn(async (fn: () => Promise<unknown>) => {
+          const saved = store;
+          store = {};
+          try {
+            return await fn();
+          } finally {
+            store = saved;
+          }
+        }),
+      };
+      const registry = {
+        countRowsAcrossNamespaces: jest.fn().mockResolvedValue(running),
+        findOldestPendingRunner: jest.fn().mockResolvedValue(oldest),
+      };
+      const service = new CliRunnerService(
+        {} as any,
+        {} as any,
+        new MaskedConfigCryptoService(),
+        {} as any,
+        {} as any,
+        undefined,
+        undefined,
+        undefined,
+        cls as any,
+        registry as any,
+      );
+      const seen: Array<{ runnerId?: string; schema: unknown; slug: unknown }> =
+        [];
+      jest
+        .spyOn(service as any, 'dequeuePendingRunnerInCurrentNamespace')
+        .mockImplementation((runnerId?: unknown) => {
+          seen.push({
+            runnerId: runnerId as string | undefined,
+            schema: cls.get('schemaName'),
+            slug: cls.get('slug'),
+          });
+          return Promise.resolve();
+        });
+      return { service, cls, registry, seen };
+    };
+
+    const namespace = (id: string) => ({
+      id,
+      slug: `ws-${id}`,
+      schemaName: `ns_${id}`,
+    });
+
+    it('promotes the oldest queued run from another namespace, inside that namespace', async () => {
+      const { service, seen } = build({
+        namespace: namespace('b'),
+        runnerId: 'runner-b',
+        triggeredAt: new Date('2026-09-14T11:36:44Z'),
+      });
+
+      await service.promotePendingRunners();
+
+      expect(seen).toEqual([
+        { runnerId: 'runner-b', schema: 'ns_b', slug: 'ws-b' },
+      ]);
+    });
+
+    it('stays in the current context when the oldest queued run is local', async () => {
+      const { service, cls, seen } = build({
+        namespace: namespace('a'),
+        runnerId: 'runner-a',
+        triggeredAt: new Date(),
+      });
+
+      await service.promotePendingRunners();
+
+      expect(cls.run).not.toHaveBeenCalled();
+      expect(seen).toEqual([
+        { runnerId: 'runner-a', schema: 'ns_a', slug: undefined },
+      ]);
+    });
+
+    it('starts nothing while the instance-wide slots are full', async () => {
+      const { service, registry, seen } = build(
+        {
+          namespace: namespace('b'),
+          runnerId: 'runner-b',
+          triggeredAt: new Date(),
+        },
+        1,
+      );
+
+      await service.promotePendingRunners();
+
+      expect(registry.findOldestPendingRunner).not.toHaveBeenCalled();
+      expect(seen).toEqual([]);
+    });
+
+    it('does nothing when no namespace has a queued run', async () => {
+      const { service, seen } = build(null);
+
+      await service.promotePendingRunners();
+
+      expect(seen).toEqual([]);
+    });
+
+    /**
+     * A worker process that has just restarted, over an in-memory runners
+     * table. Reconciliation, the instance-wide count and the queue lookup all
+     * read the same rows, so a runner that promotion claims holds its slot
+     * immediately, as it does in Postgres.
+     */
+    const restartedWorker = (options: {
+      cap: number;
+      runners: Array<Record<string, any>>;
+      liveJobs?: string[];
+    }) => {
+      process.env.MAX_CONCURRENT_RUNNERS = String(options.cap);
+      const rows = options.runners;
+      const liveJobs = new Set(options.liveJobs ?? []);
+      const crypto = new MaskedConfigCryptoService();
+      const matches = (row: Record<string, any>, where: Record<string, any>) =>
+        Object.entries(where).every(([key, expected]) => {
+          if (expected && typeof expected === 'object') {
+            if ('in' in expected) return expected.in.includes(row[key]);
+            if ('lt' in expected) return row[key] < expected.lt;
+          }
+          return row[key] === expected;
+        });
+      const oldestFirst = (a: any, b: any) => a.triggeredAt - b.triggeredAt;
+      // Answers asynchronously, like the client it stands in for.
+      const query = <T>(fn: (args: any) => T) =>
+        jest.fn((args: any) => Promise.resolve(fn(args)));
+      const prisma: Record<string, any> = {
+        runner: {
+          findMany: query(({ where }) =>
+            rows.filter((r) => matches(r, where)).map((r) => ({ ...r })),
+          ),
+          findUnique: query(({ where }) => {
+            const found = rows.find((r) => r.id === where.id);
+            return found ? { ...found } : null;
+          }),
+          findFirst: query(({ where, include }) => {
+            const [head] = rows
+              .filter((r) => matches(r, where))
+              .sort(oldestFirst);
+            if (!head) return null;
+            return include?.source
+              ? {
+                  ...head,
+                  source: {
+                    id: head.sourceId,
+                    config: crypto.encryptMaskedConfig({
+                      type: 'POSTGRESQL',
+                      required: { host: 'db.local', port: 5432 },
+                    }),
+                  },
+                }
+              : { ...head };
+          }),
+          update: query(({ where, data }) =>
+            Object.assign(rows.find((r) => r.id === where.id)!, data),
+          ),
+          updateMany: query(({ where, data }) => {
+            const hit = rows.filter((r) => matches(r, where));
+            hit.forEach((r) => Object.assign(r, data));
+            return { count: hit.length };
+          }),
+        },
+        source: {
+          // startRun marks a source RUNNING as soon as its run exists, queued
+          // or not, and a terminal runner releases it.
+          findMany: query(() =>
+            rows
+              .filter((r) =>
+                [RunnerStatus.PENDING, RunnerStatus.RUNNING].includes(r.status),
+              )
+              .map((r) => ({
+                id: r.sourceId,
+                name: r.sourceId,
+                currentRunnerId: r.id,
+              })),
+          ),
+          update: jest.fn(),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
+      };
+      const store: Record<string, unknown> = {
+        schemaName: 'ns_a',
+        namespaceId: 'a',
+      };
+      const registry = {
+        countRowsAcrossNamespaces: query(
+          () => rows.filter((r) => r.status === RunnerStatus.RUNNING).length,
+        ),
+        findOldestPendingRunner: query(() => {
+          const [head] = rows
+            .filter((r) => r.status === RunnerStatus.PENDING && !r.startedAt)
+            .sort(oldestFirst);
+          return head
+            ? {
+                namespace: namespace('a'),
+                runnerId: head.id,
+                triggeredAt: head.triggeredAt,
+              }
+            : null;
+        }),
+      };
+      const service = new CliRunnerService(
+        prisma as any,
+        {} as any,
+        crypto,
+        {} as any,
+        {
+          initializeRunner: jest.fn().mockResolvedValue(undefined),
+          finalizeRunner: jest.fn().mockResolvedValue(undefined),
+        } as any,
+        {
+          isEnabled: () => true,
+          isJobActive: query((jobName: string) => liveJobs.has(jobName)),
+        } as any,
+        undefined,
+        undefined,
+        { get: jest.fn((key: string) => store[key]) } as any,
+        registry as any,
+      );
+      jest
+        .spyOn(service as any, 'hydrateCustomDetectorsForRun')
+        .mockImplementation((_sourceId: unknown, config: unknown) =>
+          Promise.resolve(config),
+        );
+      const launched: string[] = [];
+      jest
+        .spyOn(service as any, 'executeCliAsync')
+        .mockImplementation((runnerId: unknown) => {
+          launched.push(runnerId as string);
+          return Promise.resolve();
+        });
+      const row = (id: string) => rows.find((r) => r.id === id)!;
+      return { service, launched, row };
+    };
+
+    const hoursAgo = (hours: number) =>
+      new Date(Date.now() - hours * 60 * 60 * 1000);
+    const queuedRunner = (id: string, queuedHoursAgo: number) => ({
+      id,
+      sourceId: `source-${id}`,
+      status: RunnerStatus.PENDING,
+      executionMode: RunnerExecutionMode.KUBERNETES,
+      jobName: null,
+      jobNamespace: null,
+      triggeredAt: hoursAgo(queuedHoursAgo),
+      startedAt: null,
+    });
+    const runningRunner = (id: string, jobName: string) => ({
+      ...queuedRunner(id, 3),
+      status: RunnerStatus.RUNNING,
+      jobName,
+      jobNamespace: 'classifyre-dev',
+      startedAt: hoursAgo(3),
+    });
+    // Promotion after startup reconciliation is not awaited by it.
+    const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+    it('keeps a run queued across a restart and starts it once a slot frees', async () => {
+      // A queued run is only a row waiting for a slot, with no Job or process
+      // that a restart could take down, yet startup failed it with "Runner was
+      // left pending during application restart". On classifyre-dev a
+      // `bun --watch` reload is a restart, so every run queued behind a long
+      // scan died on the next API edit.
+      const { service, launched, row } = restartedWorker({
+        cap: 1,
+        runners: [
+          runningRunner('running', 'job-running'),
+          queuedRunner('queued', 2),
+        ],
+        liveJobs: ['job-running'],
+      });
+
+      await service.reconcileOnStartup();
+      await settle();
+
+      expect(row('queued').status).toBe(RunnerStatus.PENDING);
+      expect(row('queued').errorMessage).toBeUndefined();
+      expect(row('running').status).toBe(RunnerStatus.RUNNING);
+      expect(launched).toEqual([]);
+
+      // The scan it was queued behind finishes.
+      row('running').status = RunnerStatus.COMPLETED;
+      await service.promotePendingRunners();
+
+      expect(row('queued')).toMatchObject({
+        status: RunnerStatus.RUNNING,
+        startedAt: expect.any(Date),
+      });
+      expect(launched).toEqual(['queued']);
+    });
+
+    it('still fails a RUNNING runner whose Job vanished, and gives its slot to the queue', async () => {
+      const { service, launched, row } = restartedWorker({
+        cap: 1,
+        runners: [runningRunner('lost', 'job-lost'), queuedRunner('queued', 2)],
+        liveJobs: [],
+      });
+
+      await service.reconcileOnStartup();
+      await settle();
+
+      expect(row('lost')).toMatchObject({
+        status: RunnerStatus.ERROR,
+        errorMessage:
+          'Runner was orphaned (application restarted while running)',
+      });
+      expect(row('queued').status).toBe(RunnerStatus.RUNNING);
+      expect(launched).toEqual(['queued']);
+    });
+
+    it('fills every slot a restart freed, oldest queued run first', async () => {
+      // A restart can free several slots at once -- every local scan dies with
+      // the process. Promoting one per call left the others idle while runs
+      // waited.
+      const { service, launched, row } = restartedWorker({
+        cap: 2,
+        runners: [
+          queuedRunner('newest', 1),
+          queuedRunner('oldest', 3),
+          queuedRunner('middle', 2),
+        ],
+      });
+
+      await service.reconcileOnStartup();
+      await settle();
+
+      expect(launched).toEqual(['oldest', 'middle']);
+      expect(row('newest').status).toBe(RunnerStatus.PENDING);
+    });
+
+    it('drops a queued run that has waited past the bound, saying why', async () => {
+      const { service, launched, row } = restartedWorker({
+        cap: 1,
+        runners: [
+          runningRunner('running', 'job-running'),
+          queuedRunner('abandoned', 80),
+          queuedRunner('queued', 2),
+        ],
+        liveJobs: ['job-running'],
+      });
+
+      await service.reconcileOnStartup();
+      await settle();
+
+      expect(row('abandoned')).toMatchObject({
+        status: RunnerStatus.ERROR,
+        completedAt: expect.any(Date),
+        errorMessage:
+          'Runner expired in the queue (waited more than 72 hours for a free runner slot)',
+      });
+      expect(row('queued').status).toBe(RunnerStatus.PENDING);
+      expect(launched).toEqual([]);
+    });
+
+    it('does not fail a queued run when a live reconcile retires another runner', async () => {
+      // reconcileStaleInFlight leaves PENDING rows alone, but whenever it
+      // retired anything it re-checked every RUNNING source, and a source is
+      // RUNNING while its run is queued -- so the queued run was failed there
+      // instead, with no restart involved.
+      const { service, row } = restartedWorker({
+        cap: 1,
+        runners: [runningRunner('lost', 'job-lost'), queuedRunner('queued', 2)],
+        liveJobs: [],
+      });
+
+      await expect(service.reconcileStaleInFlight()).resolves.toBe(1);
+
+      expect(row('lost').status).toBe(RunnerStatus.ERROR);
+      expect(row('queued').status).toBe(RunnerStatus.PENDING);
+    });
+  });
 });

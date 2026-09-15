@@ -74,7 +74,7 @@ No authorization required
 
 Pause or resume a background queue
 
-Pausing is database-backed, so it applies to every worker replica rather than only the pod that served this request. A batch handed to a paused queue is refused and retried by pg-boss, so nothing is lost. Jobs already running cannot be cancelled — pause and let them drain, or restart the worker.
+Pausing is database-backed, so it applies to every worker replica rather than only the pod that served this request. A paused queue stops fetching: queued jobs wait safely and run after resume instead of burning retries, and a batch fetched just as the pause landed waits for resume rather than failing. Jobs already running cannot be cancelled — pause and let them drain, or restart the worker.
 
 ### Example
 

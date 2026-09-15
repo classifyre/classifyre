@@ -8,6 +8,12 @@ Name | Type
 ------------ | -------------
 `updatedCount` | number
 `ids` | Array&lt;string&gt;
+`wouldUpdate` | number
+`narrowed` | boolean
+`dryRun` | boolean
+`operationId` | string
+`async` | boolean
+`total` | number
 
 ## Example
 
@@ -18,6 +24,12 @@ import type { BulkUpdateFindingsResponseDto } from '@workspace/api-client'
 const example = {
   "updatedCount": null,
   "ids": null,
+  "wouldUpdate": null,
+  "narrowed": null,
+  "dryRun": null,
+  "operationId": null,
+  "async": null,
+  "total": null,
 } satisfies BulkUpdateFindingsResponseDto
 
 console.log(example)

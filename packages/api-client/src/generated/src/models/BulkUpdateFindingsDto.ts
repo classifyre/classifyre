@@ -28,17 +28,35 @@ import {
  */
 export interface BulkUpdateFindingsDto {
     /**
-     * Explicit finding IDs to update. Use either ids or filters, not both.
+     * Explicit finding IDs to update (at most 1000). Use either ids or filters, not both.
      * @type {Array<string>}
      * @memberof BulkUpdateFindingsDto
      */
     ids?: Array<string>;
     /**
-     * Filter to update all matching findings (select-all mode).
+     * Filter to update all matching findings (select-all mode). Unknown keys are rejected with 400 rather than ignored.
      * @type {SearchFindingsFiltersInputDto}
      * @memberof BulkUpdateFindingsDto
      */
     filters?: SearchFindingsFiltersInputDto;
+    /**
+     * Must be true when the filters narrow nothing beyond status, includeResolved and excludeIds — that is, when the update would apply to every finding in the namespace.
+     * @type {boolean}
+     * @memberof BulkUpdateFindingsDto
+     */
+    confirm?: boolean;
+    /**
+     * How many findings the caller expects the filters to match, e.g. from a dryRun. If more match when the update runs, it is refused with 409 and nothing is written.
+     * @type {number}
+     * @memberof BulkUpdateFindingsDto
+     */
+    expectedCount?: number;
+    /**
+     * Count what would be updated, and report whether the filters narrow the corpus, without writing anything.
+     * @type {boolean}
+     * @memberof BulkUpdateFindingsDto
+     */
+    dryRun?: boolean;
     /**
      * 
      * @type {string}
@@ -103,6 +121,9 @@ export function BulkUpdateFindingsDtoFromJSONTyped(json: any, ignoreDiscriminato
         
         'ids': json['ids'] == null ? undefined : json['ids'],
         'filters': json['filters'] == null ? undefined : SearchFindingsFiltersInputDtoFromJSON(json['filters']),
+        'confirm': json['confirm'] == null ? undefined : json['confirm'],
+        'expectedCount': json['expectedCount'] == null ? undefined : json['expectedCount'],
+        'dryRun': json['dryRun'] == null ? undefined : json['dryRun'],
         'status': json['status'] == null ? undefined : json['status'],
         'severity': json['severity'] == null ? undefined : json['severity'],
         'comment': json['comment'] == null ? undefined : json['comment'],
@@ -122,6 +143,9 @@ export function BulkUpdateFindingsDtoToJSONTyped(value?: BulkUpdateFindingsDto |
         
         'ids': value['ids'],
         'filters': SearchFindingsFiltersInputDtoToJSON(value['filters']),
+        'confirm': value['confirm'],
+        'expectedCount': value['expectedCount'],
+        'dryRun': value['dryRun'],
         'status': value['status'],
         'severity': value['severity'],
         'comment': value['comment'],

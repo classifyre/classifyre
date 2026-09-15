@@ -18,6 +18,8 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { FindingsService } from './findings.service';
+import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operation.service';
+import { FindingBulkOperationDto } from './findings-bulk/finding-bulk-operation.dto';
 import { CreateFindingDto } from './dto/create-finding.dto';
 import { UpdateFindingDto } from './dto/update-finding.dto';
 import {
@@ -37,7 +39,10 @@ import {
 @ApiTags('findings')
 @Controller('findings')
 export class FindingsController {
-  constructor(private readonly findingsService: FindingsService) {}
+  constructor(
+    private readonly findingsService: FindingsService,
+    private readonly bulkOperations: FindingBulkOperationService,
+  ) {}
 
   @Post('create')
   @HttpCode(HttpStatus.CREATED)
@@ -68,6 +73,50 @@ export class FindingsController {
     @Body() dto: BulkUpdateFindingsDto,
   ): Promise<BulkUpdateFindingsResponseDto> {
     return this.findingsService.bulkUpdate(dto);
+  }
+
+  @Get('bulk-operations')
+  @ApiOperation({
+    summary: 'List background bulk finding operations',
+    description:
+      'Most recent first. `active=true` returns only queued and running operations.',
+  })
+  @ApiQuery({ name: 'active', required: false, type: Boolean })
+  @ApiResponse({ status: 200, type: [FindingBulkOperationDto] })
+  async listBulkOperations(
+    @Query('active') active?: string,
+  ): Promise<FindingBulkOperationDto[]> {
+    const rows = await this.bulkOperations.list({
+      activeOnly: active === 'true',
+    });
+    return rows.map((row) => this.bulkOperations.toDto(row));
+  }
+
+  @Get('bulk-operations/:operationId')
+  @ApiOperation({ summary: 'Get a background bulk finding operation' })
+  @ApiResponse({ status: 200, type: FindingBulkOperationDto })
+  async getBulkOperation(
+    @Param('operationId') operationId: string,
+  ): Promise<FindingBulkOperationDto> {
+    return this.bulkOperations.toDto(
+      await this.bulkOperations.get(operationId),
+    );
+  }
+
+  @Post('bulk-operations/:operationId/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cancel a background bulk finding operation',
+    description:
+      'A queued operation is cancelled outright; a running one stops after its current page. Findings already changed stay changed.',
+  })
+  @ApiResponse({ status: 200, type: FindingBulkOperationDto })
+  async cancelBulkOperation(
+    @Param('operationId') operationId: string,
+  ): Promise<FindingBulkOperationDto> {
+    return this.bulkOperations.toDto(
+      await this.bulkOperations.requestCancel(operationId),
+    );
   }
 
   @Get('stats')

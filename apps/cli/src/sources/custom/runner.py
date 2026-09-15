@@ -14,6 +14,7 @@ code away from those; an AST check is not.
 from __future__ import annotations
 
 import base64
+import itertools
 import json
 import random
 import signal
@@ -26,7 +27,14 @@ from ...notebook.contract import validate_module
 from ...notebook.execute import cell_filename
 from ...notebook.files import local_folders
 from ...notebook.redact import RedactingStream, Redactor
-from ...notebook.sdk import Asset, Context, iter_assets, iter_relationships, namespace
+from ...notebook.sdk import (
+    Asset,
+    AssetQueryError,
+    Context,
+    iter_assets,
+    iter_relationships,
+    namespace,
+)
 from ...notebook.serialize import (
     cell_id_of,
     cell_source_of,
@@ -38,6 +46,8 @@ ITEM = "item"
 END = "end"
 ERROR = "error"
 READY = "ready"
+NEED = "need"
+PROVIDE = "provide"
 
 #: Flipped from a signal handler, so it is a container rather than a rebindable
 #: module global.
@@ -61,6 +71,35 @@ def _on_terminate(_signum: int, _frame: Any) -> None:
 def _emit(payload: dict[str, Any]) -> None:
     sys.stdout.write(json.dumps(payload) + "\n")
     sys.stdout.flush()
+
+
+_NEED_IDS = itertools.count(1)
+
+
+def _need(op: str, args: dict[str, Any]) -> Any:
+    """Ask the parent for something only it can do, and wait for the answer.
+
+    The reverse direction of the channel: the parent holds the API credentials
+    this process is kept away from, so it performs the call and sends back only
+    the data. Each request names its id and the reply must carry it, so a
+    confused stream fails loudly instead of handing one answer to the wrong
+    question.
+    """
+    request_id = next(_NEED_IDS)
+    _emit({"type": NEED, "op": op, "id": request_id, "args": args})
+    line = sys.stdin.readline()
+    if not line:
+        raise AssetQueryError(f"The scan stopped before answering {op}")
+    frame = json.loads(line)
+    if frame.get("type") != PROVIDE or frame.get("id") != request_id:
+        raise AssetQueryError(f"Unexpected reply to {op}: {line[:200]!r}")
+    if frame.get("error"):
+        raise AssetQueryError(str(frame["error"]))
+    return frame.get("value")
+
+
+def _query_assets(args: dict[str, Any]) -> Any:
+    return _need("query_assets", args)
 
 
 def _error_payload(exc: BaseException) -> dict[str, Any]:
@@ -95,6 +134,7 @@ class NotebookRuntime:
         cursor: dict[str, Any] | None = None,
         offset: int = 0,
         files_dir: str | None = None,
+        cohort_weights: dict[str, Any] | None = None,
     ) -> None:
         self.recipe = recipe
         notebook = _section(recipe, "required", "notebook")
@@ -111,6 +151,8 @@ class NotebookRuntime:
             folders=local_folders(recipe),
             logger=self._log,
             should_abort=_aborted,
+            query_assets=_query_assets,
+            cohort_weights=cohort_weights if isinstance(cohort_weights, dict) else None,
         )
         self.globals: dict[str, Any] = {}
 
@@ -214,6 +256,7 @@ class NotebookRuntime:
             "offsetHandledByNotebook": self.context.offset_consumed,
             "partialCoverage": self.context.partial_coverage,
             "partialCoverageReason": self.context.partial_coverage_reason,
+            "cohortStats": self.context.cohort_stats,
         }
 
     def _extract_reservoir(self, size: int) -> dict[str, Any]:
@@ -253,6 +296,7 @@ class NotebookRuntime:
             "cursor": self.context.next_cursor,
             "partialCoverage": self.context.partial_coverage,
             "partialCoverageReason": self.context.partial_coverage_reason,
+            "cohortStats": self.context.cohort_stats,
         }
 
     def relationships(self) -> list[dict[str, Any]]:
@@ -339,6 +383,7 @@ def main() -> int:
         cursor=payload.get("cursor"),
         offset=int(payload.get("offset") or 0),
         files_dir=payload.get("filesDir") or None,
+        cohort_weights=payload.get("cohortWeights") or None,
     )
     try:
         runtime.load()

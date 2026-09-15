@@ -350,6 +350,55 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     return counts.reduce((sum, n) => sum + n, 0);
   }
 
+  /**
+   * The runner that has waited longest, across every namespace.
+   *
+   * The concurrency cap spans namespaces (see countRowsAcrossNamespaces), so
+   * the queue has to as well. Promoting only within the namespace whose run
+   * just finished left every other namespace's queued runs stranded: nothing
+   * in their own namespace ever finished to promote them, and the adaptive
+   * scheduler counts a PENDING run as in flight and yields to it. Observed on
+   * 2026-09-14: two queued runs in two namespaces, an idle runner slot, and
+   * nothing started for as long as anyone waited.
+   */
+  async findOldestPendingRunner(): Promise<{
+    namespace: Namespace;
+    runnerId: string;
+    triggeredAt: Date;
+  } | null> {
+    const namespaces = await this.list();
+    const heads = await Promise.all(
+      namespaces.map(async (namespace) => {
+        try {
+          const { rows } = await this.pool.query<{
+            id: string;
+            triggered_at: Date;
+          }>(
+            `SELECT id, triggered_at FROM "${namespace.schemaName}"."runners"
+               WHERE status = 'PENDING' AND started_at IS NULL
+               ORDER BY triggered_at ASC LIMIT 1`,
+          );
+          const row = rows[0];
+          return row
+            ? { namespace, runnerId: row.id, triggeredAt: row.triggered_at }
+            : null;
+        } catch (error) {
+          this.logger.warn(
+            `Pending-runner lookup on "${namespace.schemaName}" failed, skipping it: ${String(error)}`,
+          );
+          return null;
+        }
+      }),
+    );
+    return heads.reduce<(typeof heads)[number]>(
+      (oldest, head) =>
+        head && (!oldest || head.triggeredAt < oldest.triggeredAt)
+          ? head
+          : oldest,
+      null,
+    );
+  }
+
   /** Raw thumbnail bytes for the streaming endpoint, or null when unset. */
   async getThumbnail(
     id: string,

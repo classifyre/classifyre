@@ -25,6 +25,7 @@ import {
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import { preserveDetectorScope } from "@/lib/detector-scope";
+import { regexPatternKey } from "@/lib/regex-pattern-key";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ function parseInitialPatterns(
 function toApiSchema(patterns: RegexPatternState[]): Record<string, unknown> {
   const apiPatterns: Record<string, unknown> = {};
   for (const p of patterns) {
-    const key = p.name.trim().replace(/\s+/g, "_").toLowerCase();
+    const key = regexPatternKey(p.name);
     if (!key) continue;
     const entry: Record<string, unknown> = { pattern: p.pattern };
     if (p.description) entry.description = p.description;
@@ -126,7 +127,7 @@ function runTestMatches(
 
   for (const p of patterns) {
     if (!p.pattern) continue;
-    const patternKey = p.name.trim().replace(/\s+/g, "_").toLowerCase() || "unnamed";
+    const patternKey = regexPatternKey(p.name) || "unnamed";
     try {
       let flags = "g";
       if (!p.case_sensitive) flags += "i";
@@ -513,7 +514,7 @@ function TestPlayground({
         <div className="space-y-3">
           {Object.entries(matchesByPattern).map(([patternName, patternMatches]) => {
             const patternDef = patterns.find(
-              (p) => (p.name.trim().replace(/\s+/g, "_").toLowerCase() || "unnamed") === patternName,
+              (p) => (regexPatternKey(p.name) || "unnamed") === patternName,
             );
             return (
               <div

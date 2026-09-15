@@ -16,6 +16,8 @@ import { CliRunnerService } from './cli-runner/cli-runner.service';
 import { CustomDetectorsService } from './custom-detectors.service';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
 import { FindingsService } from './findings.service';
+import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operation.service';
+import { RetireOutOfScopeService } from './findings-bulk/retire-out-of-scope.service';
 import { MCP_CAPABILITY_GROUPS, MCP_PROMPTS } from './mcp-catalog';
 import { NotebookService } from './notebook/notebook.service';
 import { NotebookExecutionService } from './notebook/notebook-execution.service';
@@ -85,8 +87,18 @@ const jsonObjectOrTextSchema = z.union([
 // raw shape objects can be passed to registerTool/registerPrompt without type errors.
 // Tracking issue: https://github.com/modelcontextprotocol/typescript-sdk/issues/1987
 type McpZodShape = Record<string, z.ZodTypeAny>;
+// Destructive tools pass a strict object so an unknown top-level key is a
+// 400, never a stripped typo that widens the operation (dry_run for dryRun,
+// expectedcount for expectedCount, confim for confirm). The SDK accepts a
+// full schema as well as a raw shape; the args type follows whichever was
+// passed.
+type McpToolArgs<T> = T extends McpZodShape
+  ? { [K in keyof T]: z.infer<T[K]> }
+  : T extends z.ZodTypeAny
+    ? z.infer<T>
+    : never;
 type McpServerCompat = Omit<McpServer, 'registerTool' | 'registerPrompt'> & {
-  registerTool<T extends McpZodShape>(
+  registerTool<T extends McpZodShape | z.ZodTypeAny>(
     name: string,
     config: {
       title?: string;
@@ -101,7 +113,7 @@ type McpServerCompat = Omit<McpServer, 'registerTool' | 'registerPrompt'> & {
       };
       _meta?: Record<string, unknown>;
     },
-    cb: (args: { [K in keyof T]: z.infer<T[K]> }, extra: unknown) => unknown,
+    cb: (args: McpToolArgs<T>, extra: unknown) => unknown,
   ): unknown;
   registerPrompt<T extends McpZodShape>(
     name: string,
@@ -279,6 +291,8 @@ export class McpServerFactoryService {
     private readonly notebookExecutionService: NotebookExecutionService,
     private readonly sourceFilesService: SourceFilesService,
     private readonly graphService: GraphService,
+    private readonly findingBulkOperations: FindingBulkOperationService,
+    private readonly retireOutOfScope: RetireOutOfScopeService,
   ) {}
 
   /**
@@ -813,10 +827,10 @@ export class McpServerFactoryService {
       {
         title: 'Delete Case Event',
         description: 'Remove an event from the case chronology.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           caseId: z.string().uuid(),
           eventId: z.string().uuid(),
-        },
+        }),
         annotations: { readOnlyHint: false, destructiveHint: true },
       },
       async ({ caseId, eventId }) => {
@@ -1207,9 +1221,9 @@ export class McpServerFactoryService {
       {
         title: 'Delete Source',
         description: 'Delete a source and its associated schedules and data.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           id: z.string().uuid(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -1471,12 +1485,12 @@ export class McpServerFactoryService {
       {
         title: 'Delete Notebook Cell',
         description: 'Remove one cell from a notebook.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           sourceId: z.string().uuid(),
           scope: scopeSchema,
           baseRevision: z.number().int().min(1),
           cellId: z.string(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -1625,10 +1639,10 @@ export class McpServerFactoryService {
       {
         title: 'Delete Notebook File',
         description: 'Delete one uploaded file from a CUSTOM source.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           sourceId: z.string().uuid(),
           fileId: z.string().uuid(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -1988,9 +2002,9 @@ export class McpServerFactoryService {
       {
         title: 'Delete Custom Detector',
         description: 'Delete a custom detector.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           id: z.string().uuid(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -1999,6 +2013,79 @@ export class McpServerFactoryService {
       async ({ id }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(await this.customDetectorsService.delete(id));
+      },
+    );
+
+    server.registerTool(
+      'retire_out_of_scope_findings',
+      {
+        title: 'Retire Out-of-Scope Findings',
+        description:
+          'Resolve OPEN findings a custom detector can no longer produce because ' +
+          'its scope.asset_kinds was narrowed or regex patterns were removed — ' +
+          'a rescan never resolves those. Two steps, each a background operation ' +
+          '(follow the returned id with get_findings_bulk_operation): ' +
+          '(1) dryRun (default) changes nothing and reports, under counts: ' +
+          'candidates, byReason, citedByCase, watchedByInquiries, inquiries, ' +
+          'wouldRetire and notProvable. ' +
+          '(2) dryRun: false with fromOperationId (that COMPLETED dry run), ' +
+          'expectedCount (its wouldRetire) and confirm: true. It never retires ' +
+          'more than expectedCount. Findings a case cites or an ACTIVE inquiry ' +
+          'watches are never retired by this tool. Retired findings are RESOLVED ' +
+          'without detector feedback; widening the scope again lets re-detection ' +
+          'reopen them.',
+        inputSchema: z.strictObject({
+          customDetectorId: z.string().uuid(),
+          dryRun: z.boolean().optional().describe('Default true: count only.'),
+          sourceIds: z
+            .array(z.string())
+            .max(100)
+            .optional()
+            .describe('Dry run only: restrict to these sources.'),
+          fromOperationId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe('Retire only: the completed dry run operation id.'),
+          expectedCount: z
+            .number()
+            .int()
+            .min(0)
+            .optional()
+            .describe("Retire only: the dry run's counts.wouldRetire."),
+          confirm: z
+            .literal(true)
+            .optional()
+            .describe('Retire only: required.'),
+        }),
+        annotations: {
+          readOnlyHint: false,
+          // Resolved findings leave inquiries, correlation and duplicate review.
+          destructiveHint: true,
+        },
+      },
+      async ({
+        customDetectorId,
+        dryRun,
+        sourceIds,
+        fromOperationId,
+        expectedCount,
+        confirm,
+      }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        const operation =
+          dryRun === false
+            ? await this.retireOutOfScope.startRetire(
+                customDetectorId,
+                { fromOperationId, expectedCount, confirm, createdBy: 'mcp' },
+                // Emptying what an investigation watches is an operator call.
+                { allowInquiryOverride: false },
+              )
+            : await this.retireOutOfScope.startDryRun(customDetectorId, {
+                sourceIds,
+                createdBy: 'mcp',
+              });
+        return jsonResult(this.findingBulkOperations.toDto(operation));
       },
     );
 
@@ -2147,10 +2234,10 @@ export class McpServerFactoryService {
         title: 'Delete Detector Test Scenario',
         description:
           'Delete a test scenario (and its past results) from a custom detector.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           detector_id: z.string().describe('Custom detector ID'),
           scenario_id: z.string().describe('Test scenario ID to delete'),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -2422,9 +2509,9 @@ export class McpServerFactoryService {
       {
         title: 'Stop Run',
         description: 'Stop a currently running job.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           runnerId: z.string().uuid(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -2657,10 +2744,19 @@ export class McpServerFactoryService {
       {
         title: 'Bulk Update Findings',
         description:
-          'Bulk update findings by IDs or by filters, including status, severity, and comment.',
-        inputSchema: {
-          ids: z.array(z.string().uuid()).optional(),
-          filters: jsonObjectSchema.optional(),
+          'Bulk update findings by IDs (at most 1,000) or by filters, including ' +
+          'status, severity, and comment. Filters use the same keys as ' +
+          'search_findings; an unknown key is an error, never a wider match. ' +
+          'Run with dryRun: true first — it returns the exact count ' +
+          '(wouldUpdate) and whether the filters narrow the corpus — then pass ' +
+          'that count as expectedCount: if more findings match when the update ' +
+          'runs, nothing is written. Filters that narrow nothing beyond status ' +
+          'require confirm: true. A selection over 2,000 findings is queued as a ' +
+          'background operation: the result carries operationId — follow it with ' +
+          'get_findings_bulk_operation.',
+        inputSchema: z.strictObject({
+          ids: z.array(z.string().uuid()).max(1000).optional(),
+          filters: searchFindingsFilters.optional(),
           status: z
             .enum(['OPEN', 'RESOLVED', 'FALSE_POSITIVE', 'IGNORED'])
             .optional(),
@@ -2668,15 +2764,93 @@ export class McpServerFactoryService {
             .enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'])
             .optional(),
           comment: z.string().optional(),
-        },
+          dryRun: z
+            .boolean()
+            .optional()
+            .describe('Count what would be updated without writing anything.'),
+          expectedCount: z
+            .number()
+            .int()
+            .min(0)
+            .optional()
+            .describe(
+              'The dryRun count. If more findings match at update time, the ' +
+                'update is refused (409) and nothing is written.',
+            ),
+          confirm: z
+            .boolean()
+            .optional()
+            .describe(
+              'Required (true) when the filters narrow nothing beyond status, ' +
+                'includeResolved and excludeIds — the update would apply to ' +
+                'every finding in the namespace.',
+            ),
+        }),
         annotations: {
           readOnlyHint: false,
-          destructiveHint: false,
+          // A status change rewrites the evidence base: resolved findings leave
+          // inquiries, correlation and the review queue.
+          destructiveHint: true,
         },
       },
       async (args) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.findingsService.bulkUpdate(args));
+        // zod carries the filter dates as ISO strings where the DTO declares
+        // Date; Prisma takes either for a DateTime comparison, as search does.
+        return jsonResult(
+          await this.findingsService.bulkUpdate(
+            args as unknown as Parameters<FindingsService['bulkUpdate']>[0],
+          ),
+        );
+      },
+    );
+
+    server.registerTool(
+      'get_findings_bulk_operation',
+      {
+        title: 'Get Findings Bulk Operation',
+        description:
+          'Progress of a background bulk finding operation — the operationId ' +
+          'bulk_update_findings returns when a selection is too large to change ' +
+          'in one request, and the id retire_out_of_scope_findings returns for ' +
+          'its dry run and its retire. Reports status (PENDING, RUNNING, ' +
+          'COMPLETED, FAILED, CANCELLED), how many findings were examined, ' +
+          'changed and exempted, percent, and operation-specific counts (a ' +
+          'retire dry run puts wouldRetire and its exemptions there).',
+        inputSchema: { operationId: z.string().uuid() },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ operationId }) =>
+        jsonResult(
+          this.findingBulkOperations.toDto(
+            await this.findingBulkOperations.get(operationId),
+          ),
+        ),
+    );
+
+    server.registerTool(
+      'cancel_findings_bulk_operation',
+      {
+        title: 'Cancel Findings Bulk Operation',
+        description:
+          'Stop a background bulk finding operation. A queued one is cancelled ' +
+          'outright; a running one stops after its current page. Findings it ' +
+          'already changed stay changed — this stops the operation, it does not ' +
+          'undo it.',
+        inputSchema: { operationId: z.string().uuid() },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: true,
+        },
+      },
+      async ({ operationId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          this.findingBulkOperations.toDto(
+            await this.findingBulkOperations.requestCancel(operationId),
+          ),
+        );
       },
     );
 
@@ -2724,12 +2898,12 @@ export class McpServerFactoryService {
           'configurations and the accumulated findings are pure noise. To clean up ' +
           'only findings from removed/disabled detectors, rely instead on the ' +
           'cleanup_removed_detector_findings source option (default on) and rescan.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           source_id: z.string().describe('Source whose findings to purge'),
           confirm: z
             .literal(true)
             .describe('Must be true — acknowledges the purge is irreversible'),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -2757,7 +2931,7 @@ export class McpServerFactoryService {
           'requires a run that saw the whole scope and found them gone — and a ' +
           'rotating-sample connector never has one. ALWAYS call once with dry_run ' +
           'first and report what it matched before deleting.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           source_id: z.string().describe('Source whose assets to purge'),
           confirm: z
             .literal(true)
@@ -2792,7 +2966,7 @@ export class McpServerFactoryService {
             .boolean()
             .optional()
             .describe('Report what matches and delete nothing'),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -3085,9 +3259,9 @@ export class McpServerFactoryService {
       {
         title: 'Delete Inquiry',
         description: 'Delete a saved question.',
-        inputSchema: {
+        inputSchema: z.strictObject({
           id: z.string().uuid(),
-        },
+        }),
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,

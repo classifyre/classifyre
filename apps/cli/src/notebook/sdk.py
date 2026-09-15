@@ -42,6 +42,7 @@ from ..graph.edges import (
     uses,
 )
 from ..utils.urn import Urn
+from .cohort import CohortItem, normalize_bands, select_cohort
 from .files import DEFAULT_PAGE_SIZE, ParsedContent, pages, parse
 
 MODULE_NAME = "classifyre"
@@ -95,6 +96,23 @@ class Asset:
     #: over the content could only re-derive it less reliably. A key with no
     #: matching Tag detector is reported as a scan warning and skipped.
     tags: dict[str, str] = field(default_factory=dict)
+    #: ``False`` records the asset without extracting or scanning its content:
+    #: ``Asset(id=..., metadata={...}, extract=False, reference_reason="...")``.
+    #: Use it for an artefact whose existence and metadata matter but whose
+    #: parsing would cost more than it is worth -- a 27-page filing that takes
+    #: 17 minutes to convert. The asset is complete, searchable by metadata,
+    #: takes part in lineage, and still gets its ``tags`` findings; it simply
+    #: does not go through text extraction or the content detectors. Passing
+    #: ``content_bytes`` too is allowed and fills in size, MIME type and page
+    #: count, but the bytes are not kept.
+    extract: bool = True
+    #: Why this asset was recorded without extraction, shown on the asset and
+    #: stored as ``metadata["content_reference"]``. Only with ``extract=False``.
+    reference_reason: str | None = None
+    #: The ``ctx.cohort()`` item this asset was produced for. Records which band
+    #: chose it (``metadata["_cohort"]``), which is how the platform measures
+    #: each band's yield. Never part of the asset's checksum.
+    cohort: CohortItem | None = None
 
     def __post_init__(self) -> None:
         self.id = str(self.id).strip()
@@ -122,6 +140,30 @@ class Asset:
             )
         self.links = [str(link) for link in self.links if str(link).strip()]
         self.tags = _normalize_tags(self.tags)
+        if self.cohort is not None:
+            if not isinstance(self.cohort, CohortItem):
+                raise TypeError("Asset.cohort must be an item from ctx.cohort()")
+            self.metadata = {
+                **self.metadata,
+                "_cohort": {
+                    "name": self.cohort.cohort,
+                    "band": self.cohort.band,
+                    "key": self.cohort.key,
+                },
+            }
+        if not isinstance(self.extract, bool):
+            raise TypeError(f"Asset.extract must be True or False (got {self.extract!r})")
+        reason = str(self.reference_reason).strip() if self.reference_reason is not None else ""
+        self.reference_reason = reason or None
+        if self.extract:
+            if self.reference_reason is not None:
+                raise ValueError("Asset.reference_reason only applies with extract=False")
+        elif self.content:
+            # Content that is never scanned would be silently dropped.
+            raise ValueError(
+                "Asset.content is not scanned when extract=False; put what you "
+                "know about the asset in metadata, or leave extract=True"
+            )
 
 
 def _normalize_tags(value: Any) -> dict[str, str]:
@@ -188,6 +230,36 @@ def urn_for(platform: str, authority: str, *path: str) -> str:
 
 
 @dataclass(frozen=True)
+class QueriedAsset:
+    """An asset already in the namespace, as ``ctx.query_assets()`` returns it."""
+
+    #: The platform's id for the asset.
+    asset_hash: str
+    #: The id the writing connector gave it (``Asset.id``), when it had one.
+    external_id: str | None
+    name: str
+    kind: str
+    url: str
+    #: Only the keys you asked for with ``select``.
+    metadata: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class AssetQueryPage:
+    """One page of ``ctx.query_assets()``. Pass ``next_cursor`` back for the next."""
+
+    items: list[QueriedAsset]
+    #: None once there is nothing more to read.
+    next_cursor: str | None
+    #: Queries this run has left; each call counts, whatever its size.
+    calls_remaining: int
+
+
+class AssetQueryError(RuntimeError):
+    """``ctx.query_assets()`` was refused; the message says why and what to change."""
+
+
+@dataclass(frozen=True)
 class NotebookFile:
     """One file this source can read, already on local disk.
 
@@ -242,6 +314,8 @@ class Context:
         folders: Mapping[str, str] | None = None,
         logger: Callable[[str], None] | None = None,
         should_abort: Callable[[], bool] | None = None,
+        query_assets: Callable[[dict[str, Any]], Any] | None = None,
+        cohort_weights: Mapping[str, Mapping[str, float]] | None = None,
     ) -> None:
         self._variables = dict(variables or {})
         self._secrets = dict(secrets or {})
@@ -256,6 +330,16 @@ class Context:
         self._partial_coverage_reason: str = ""
         self._logger = logger or print
         self._should_abort = should_abort or (lambda: False)
+        # Wired only for a scan: the runtime relays the call through the parent
+        # process, which holds the credentials the notebook never sees.
+        self._query_assets = query_assets
+        # Band weights the platform measured for each named cohort, when the
+        # source leaves the split to it. Absent: the notebook's declared bands.
+        self._cohort_weights = {
+            str(name): dict(weights) for name, weights in (cohort_weights or {}).items()
+        }
+        self._cohort_state: dict[str, Any] = {}
+        self._cohort_stats: dict[str, Any] = {}
 
     # -- configuration -------------------------------------------------------
 
@@ -427,7 +511,83 @@ class Context:
 
     @property
     def next_cursor(self) -> dict[str, Any] | None:
-        return None if self._next_cursor is None else dict(self._next_cursor)
+        if not self._cohort_state:
+            return None if self._next_cursor is None else dict(self._next_cursor)
+        # A cohort's position is kept in the same cursor, beside whatever the
+        # notebook stores -- or, when it stores nothing this run, beside what
+        # the previous run left, which would otherwise be dropped.
+        base = self._next_cursor if self._next_cursor is not None else self._cursor
+        stored = base.get("cohort")
+        previous: dict[str, Any] = stored if isinstance(stored, dict) else {}
+        return {**base, "cohort": {**previous, **self._cohort_state}}
+
+    @property
+    def cohort_stats(self) -> dict[str, Any]:
+        """Per cohort, per band: keys visited this run and whether the band ran out."""
+        return {name: dict(stats) for name, stats in self._cohort_stats.items()}
+
+    def cohort(
+        self,
+        name: str,
+        universe: Iterable[Any],
+        *,
+        bands: Mapping[str, float] | None = None,
+        size: int,
+        min_share: float | None = None,
+    ) -> list[CohortItem]:
+        """This run's slice of a large ordered universe, resumable across runs.
+
+        ::
+
+            for item in ctx.cohort("register", all_company_numbers,
+                                   bands={"newest": 60, "oldest": 30, "random": 10},
+                                   size=1200):
+                yield Asset(id=item.key, ..., cohort=item)
+
+        ``universe`` is every key the connector could visit; it is sorted, so
+        ``newest`` means the end of that order. ``newest`` walks down from it,
+        ``oldest`` walks up from the start, ``random`` samples the whole
+        universe with no cursor. Each directional band resumes after the last
+        key it visited, so a universe republished at a different length keeps
+        its place, and wraps once it reaches the end.
+
+        ``bands`` is your split. When the source's cohort weights are set to
+        ``auto``, the platform replaces it with a split measured from what each
+        band actually yielded, never giving a band less than ``min_share`` (and
+        never less than 10%). Pass ``cohort=item`` to each Asset so that
+        measurement has something to count.
+
+        Calling it declares this run's coverage partial.
+        """
+        declared = normalize_bands(bands)
+        weights = declared
+        measured = self._cohort_weights.get(str(name))
+        if measured:
+            try:
+                weights = normalize_bands(
+                    {band: measured[band] for band in measured if band in declared}
+                )
+            except ValueError:
+                weights = declared
+        if min_share is not None and not 0 <= float(min_share) < 1:
+            raise ValueError("min_share is a fraction between 0 and 1")
+
+        previous = self._cursor.get("cohort")
+        state = previous.get(str(name)) if isinstance(previous, dict) else None
+        items, next_state, stats = select_cohort(
+            str(name), universe, weights=weights, size=int(size), state=state
+        )
+        self._cohort_state[str(name)] = next_state
+        self._cohort_stats[str(name)] = {
+            "bands": stats,
+            "weightsUsed": weights,
+            "declared": declared,
+            "minShare": min_share,
+            "universeSize": next_state.get("universe_size", 0),
+        }
+        if not self._partial_coverage:
+            self.set_partial_coverage(f"the notebook walks a cohort ({name}) of a larger universe")
+        return items
 
     def set_partial_coverage(self, reason: str = "") -> None:
         """Declare that this run looked at only part of the source.
@@ -458,6 +618,108 @@ class Context:
     @property
     def partial_coverage_reason(self) -> str:
         return self._partial_coverage_reason
+
+    def query_assets(
+        self,
+        source: str,
+        *,
+        kind: str | None = None,
+        where: Mapping[str, Mapping[str, Any]] | None = None,
+        exclude_visited: Mapping[str, Any] | None = None,
+        select: Iterable[str] = (),
+        limit: int = 1000,
+        cursor: str | None = None,
+    ) -> AssetQueryPage:
+        """Read assets another source in this namespace already wrote.
+
+        Work the queue of things already known to be interesting instead of
+        sweeping an external universe::
+
+            page = ctx.query_assets(
+                "Firmenbuch Register",
+                kind="record",
+                where={"filing_count": {"gt": 0},
+                       "legal_form_code": {"in": ["GES", "AG", "SE", "FKG"]}},
+                exclude_visited={"key": "firmenbuchnummer", "since_days": 90},
+                select=["firmenbuchnummer", "legal_form_code"],
+                limit=1200,
+            )
+            for company in page.items:
+                fn = company.metadata["firmenbuchnummer"]
+
+        ``source`` is a source's id or exact name. ``where`` filters metadata
+        with ``eq``, ``in``, ``exists``, ``gt``, ``gte``, ``lt`` and ``lte``;
+        values compare as JSON, so ``{"eq": 5}`` matches the number 5 and not
+        the string "5". ``exclude_visited`` leaves out every asset whose
+        ``metadata[key]`` matches an asset *this* source scanned in the last
+        ``since_days``. Page with ``cursor=page.next_cursor``.
+
+        Read-only, and bounded: at most 5,000 assets a page and 100 calls a run.
+        Calling it declares this run's coverage partial, since a connector that
+        picks its cohort from a query never sees the rest of its source.
+        Available during scans only, not when running a cell in the editor.
+        """
+        if self._query_assets is None:
+            raise AssetQueryError(
+                "ctx.query_assets() is available during scans only; running a "
+                "cell in the editor has no scan to read the namespace for"
+            )
+        payload: dict[str, Any] = {"source": str(source), "limit": int(limit)}
+        if kind is not None:
+            payload["kind"] = str(kind)
+        if where:
+            if not isinstance(where, Mapping):
+                raise AssetQueryError(
+                    "ctx.query_assets() where must be a mapping like "
+                    '{"legal_form_code": {"in": ["GES", "AG"]}}, '
+                    f"got {type(where).__name__}"
+                )
+            shaped: dict[str, dict[str, Any]] = {}
+            for key, condition in where.items():
+                if not isinstance(condition, Mapping):
+                    raise AssetQueryError(
+                        f"ctx.query_assets() where[{str(key)!r}] must be a mapping of "
+                        f"operator to value, like {{'eq': 5}}, got {condition!r}"
+                    )
+                shaped[str(key)] = dict(condition)
+            payload["where"] = shaped
+        if exclude_visited:
+            visited = dict(exclude_visited)
+            payload["excludeVisited"] = {
+                "key": visited.get("key"),
+                "sinceDays": visited.get("since_days", visited.get("sinceDays")),
+            }
+        if isinstance(select, (str, bytes)):
+            raise AssetQueryError(
+                "ctx.query_assets() select must be a list of metadata keys, "
+                f"not a single string: did you mean select={[select]!r}?"
+            )
+        selected = [str(key) for key in select]
+        if selected:
+            payload["select"] = selected
+        if cursor is not None:
+            payload["cursor"] = str(cursor)
+
+        response = self._query_assets(payload) or {}
+        if not self._partial_coverage:
+            # Only on success: a refused query read nothing, so the run still
+            # covers what it covers. Never over the notebook's own reason.
+            self.set_partial_coverage("the notebook chose its cohort with ctx.query_assets()")
+        return AssetQueryPage(
+            items=[
+                QueriedAsset(
+                    asset_hash=str(item.get("assetHash") or ""),
+                    external_id=item.get("externalId"),
+                    name=str(item.get("name") or ""),
+                    kind=str(item.get("kind") or ""),
+                    url=str(item.get("url") or ""),
+                    metadata=dict(item.get("metadata") or {}),
+                )
+                for item in response.get("items") or []
+            ],
+            next_cursor=response.get("nextCursor"),
+            calls_remaining=int(response.get("callsRemaining") or 0),
+        )
 
     @property
     def should_abort(self) -> bool:
@@ -492,6 +754,10 @@ def build_module(context: Context) -> types.ModuleType:
     module.urn_for = urn_for  # type: ignore[attr-defined]
     module.Context = Context  # type: ignore[attr-defined]
     module.NotebookFile = NotebookFile  # type: ignore[attr-defined]
+    module.QueriedAsset = QueriedAsset  # type: ignore[attr-defined]
+    module.CohortItem = CohortItem  # type: ignore[attr-defined]
+    module.AssetQueryPage = AssetQueryPage  # type: ignore[attr-defined]
+    module.AssetQueryError = AssetQueryError  # type: ignore[attr-defined]
     module.ParsedContent = ParsedContent  # type: ignore[attr-defined]
     module.ctx = context  # type: ignore[attr-defined]
     module.parse = parse  # type: ignore[attr-defined]

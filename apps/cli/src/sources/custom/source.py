@@ -19,6 +19,8 @@ import binascii
 import hashlib
 import json
 import logging
+import os
+import select
 import shutil
 import subprocess
 import sys
@@ -45,6 +47,7 @@ from ...models.generated_single_asset_scan_results import (
 from ...notebook.contract import NotebookContractError, validate_notebook
 from ...notebook.groups import warm_declared_groups
 from ...notebook.packages import install as install_packages
+from ...outputs.rest import internal_key_headers
 from ...utils.hashing import hash_id, unhash_id
 from ...utils.source_files import api_base_url, download_source_files
 from ...utils.urn import normalize_urn_or_none
@@ -59,11 +62,17 @@ logger = logging.getLogger(__name__)
 KNOWN_KINDS = frozenset({"record", "document", "page", "file", "table"})
 FALLBACK_KIND = "record"
 
+#: `metadata["content_reference"]` for an `Asset(extract=False)` that gave no reason.
+DEFAULT_REFERENCE_REASON = "Recorded without content extraction"
+
 #: How long a terminated child gets to leave its loop before it is killed.
 ABORT_GRACE_SECONDS = 5
 
 #: How long to wait for the notebook's definitions to execute.
 STARTUP_TIMEOUT_SECONDS = 120
+
+#: Read timeout for one ctx.query_assets() call; the API bounds the query at 15 s.
+ASSET_QUERY_TIMEOUT_SECONDS = 60
 
 
 class CustomSourceError(RuntimeError):
@@ -96,8 +105,10 @@ class CustomSource(BaseSource):
         runner_id: str | None = None,
     ):
         super().__init__(recipe, source_id=source_id, runner_id=runner_id)
+        # Local runs keep runner_id None (not "local-run"): ctx.query_assets()
+        # needs a scan run, and the guard below only fires on a missing id. A
+        # placeholder would sail past it and query as run "local-run".
         self.config = CustomInput.model_validate(recipe)
-        self.runner_id = runner_id or "local-run"
 
         self._cells = [cell.model_dump(mode="json") for cell in self.config.required.notebook.cells]
         self._process: subprocess.Popen[str] | None = None
@@ -107,6 +118,12 @@ class CustomSource(BaseSource):
         self._url_by_hash: dict[str, str] = {}
         self._mime_by_hash: dict[str, str] = {}
         self._tags_by_hash: dict[str, dict[str, str]] = {}
+        # Parsed once: asked per asset in phase 2, and the cells never change mid-run.
+        self._defined_functions: frozenset[str] | None = None
+        # Assets the notebook recorded with extract=False, until they are processed.
+        self._reference_hashes: set[str] = set()
+        #: What each ctx.cohort() band visited this run, reported on finalize.
+        self.cohort_stats: dict[str, Any] = {}
         self._stats = {"produced": 0, "seen": 0}
         self._packages_installed = False
 
@@ -187,6 +204,7 @@ class CustomSource(BaseSource):
                 # A path, not a URL: the child has no way to reach the API and
                 # is not meant to have one.
                 "filesDir": str(files_dir) if files_dir else None,
+                "cohortWeights": self._cohort_weights(),
             }
         )
 
@@ -279,7 +297,12 @@ class CustomSource(BaseSource):
         if process is None or process.stdout is None:
             raise CustomSourceError("Notebook process is not running")
 
-        deadline = time.monotonic() + timeout if timeout else None
+        if timeout:
+            # Wait for output *before* reading: readline() blocks, so a
+            # deadline checked only after it returns can never fire while the
+            # child is silent — the startup timeout existed but could not
+            # trigger, and a hung notebook hung the scan forever.
+            self._wait_readable(process.stdout, timeout)
         line = process.stdout.readline()
         if not line:
             code = process.poll()
@@ -287,8 +310,6 @@ class CustomSource(BaseSource):
                 f"Notebook process exited (code {code}) before answering. "
                 "Check the scan log for the traceback."
             )
-        if deadline and time.monotonic() > deadline:
-            raise CustomSourceError(f"Notebook process did not respond within {timeout}s")
 
         try:
             frame = json.loads(line)
@@ -300,14 +321,81 @@ class CustomSource(BaseSource):
             raise CustomSourceError(f"Notebook process sent a non-object frame: {line[:200]!r}")
         return frame
 
+    @staticmethod
+    def _wait_readable(stream: Any, timeout: float) -> None:
+        """Block until the child wrote something, at most ``timeout`` seconds.
+
+        A stream with no file descriptor (substituted pipes in tests) cannot
+        be waited on; then the read stays blocking and the timeout does not
+        apply.
+        """
+        try:
+            fileno = stream.fileno()
+        except (AttributeError, OSError, ValueError):
+            return
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            ready, _, _ = select.select([fileno], [], [], remaining)
+            if ready:
+                return
+            break
+        raise CustomSourceError(f"Notebook process did not respond within {timeout}s")
+
     def _call(self, command: str, **args: Any) -> Any:
         """One request/response round trip."""
         self._start()
         self._send({"command": command, **args})
         frame = self._read_frame()
+        while frame.get("type") == "need":
+            self._serve_need(frame)
+            frame = self._read_frame()
         if frame.get("type") == "error":
             raise CustomSourceError(_describe(frame.get("error")))
         return frame.get("result")
+
+    def _serve_need(self, frame: dict[str, Any]) -> None:
+        """Answer a notebook's request for something only this process can do.
+
+        Every request gets a reply, an error included: the notebook is blocked
+        reading its stdin until one arrives.
+        """
+        request_id = frame.get("id")
+        try:
+            if frame.get("op") != "query_assets":
+                raise CustomSourceError(f"Unsupported request {frame.get('op')!r}")
+            value = self._relay_asset_query(frame.get("args") or {})
+        except Exception as exc:  # reported to the notebook, which raises it
+            self._send({"type": "provide", "id": request_id, "error": str(exc)})
+            return
+        self._send({"type": "provide", "id": request_id, "value": value})
+
+    def _relay_asset_query(self, args: dict[str, Any]) -> Any:
+        """``ctx.query_assets()``, performed with this process's credentials.
+
+        The API scopes the read to this run: it must be RUNNING, and the
+        namespace comes from the callback URL the job was given.
+        """
+        if not self.runner_id:
+            raise CustomSourceError("ctx.query_assets() needs a scan run")
+        response = requests.post(
+            f"{api_base_url()}/runners/{self.runner_id}/assets/query",
+            json=args,
+            headers={**internal_key_headers(), "Connection": "close"},
+            timeout=(10, ASSET_QUERY_TIMEOUT_SECONDS),
+        )
+        if response.status_code >= 400:
+            try:
+                detail = response.json().get("message")
+            except ValueError:
+                detail = None
+            raise CustomSourceError(
+                f"ctx.query_assets() was refused ({response.status_code}): "
+                f"{detail or response.text[:500]}"
+            )
+        return response.json()
 
     def _terminate(self) -> None:
         process, self._process = self._process, None
@@ -383,6 +471,8 @@ class CustomSource(BaseSource):
                     "produced": int(frame.get("produced") or 0),
                     "seen": int(frame.get("seen") or 0),
                 }
+                cohort_stats = frame.get("cohortStats")
+                self.cohort_stats = cohort_stats if isinstance(cohort_stats, dict) else {}
                 self._record_cursor(cursor_key, skip, frame)
                 if frame.get("partialCoverage"):
                     self.declare_partial_coverage(
@@ -390,6 +480,10 @@ class CustomSource(BaseSource):
                         or "the notebook called ctx.set_partial_coverage()"
                     )
                 break
+
+            if frame_type == "need":
+                self._serve_need(frame)
+                continue
 
             if frame_type != "item":
                 logger.debug("Ignoring unexpected frame from notebook: %s", frame_type)
@@ -515,20 +609,45 @@ class CustomSource(BaseSource):
         raw_bytes = _decode_bytes(data.get("content_b64"))
         content = str(data.get("content") or "")
         mime_type = str(data.get("mime_type") or "") or None
+        # Absent means extract: a notebook written before the flag existed, or
+        # an older runtime, must behave exactly as it always has.
+        extract = data.get("extract") is not False
 
         if raw_bytes is not None:
             # A notebook that fetched a file should get what every other file
             # source gets: text extraction, normalized file metadata, and the
             # binary/image detectors -- without having to parse anything itself.
-            parsed = self.parse_asset_bytes(raw_bytes, declared_mime_type=mime_type, file_name=name)
-            mime_type = getattr(parsed, "mime_type", None) or mime_type
-            if not content:
-                content = getattr(parsed, "text", "") or ""
+            #
+            # Discovery only works out what the bytes are. Text is extracted in
+            # phase 2, from the spilled bytes, by the same fallback every file
+            # source uses (`ParsedContentProvider.fetch_text_pages`), which runs
+            # it off the event loop and only for assets the scan cache did not
+            # skip. This used to run the full parser (docling for a PDF) inline
+            # on the discovery loop, stalling every asset behind each document --
+            # and its text was never used: it read `parsed.text`, a field
+            # `ParsedBytes` does not have, so phase 2 parsed every file again.
+            # The MIME type comes from the same resolver the parser called, so
+            # the metadata, the asset type and the checksum are unchanged.
+            mime_type = _resolve_mime_type(raw_bytes, mime_type, name)
             metadata = {
                 **_file_metadata(raw_bytes, mime_type, name),
                 **metadata,  # the notebook's own keys win
             }
-            self._cache_bytes(asset_hash, raw_bytes, mime_type)
+            if extract:
+                self._cache_bytes(asset_hash, raw_bytes, mime_type)
+
+        if extract:
+            self._reference_hashes.discard(asset_hash)
+        else:
+            # Recorded, deliberately not scanned. Stated on the asset rather
+            # than implied by missing bytes, which reads as a failed fetch to
+            # anything that does not know the convention. Part of the checksum
+            # basis through metadata, so switching extraction on or off re-scans.
+            content = ""
+            metadata["content_reference"] = (
+                str(data.get("reference_reason") or "").strip() or DEFAULT_REFERENCE_REASON
+            )
+            self._reference_hashes.add(asset_hash)
 
         self._cache_content(asset_hash, content)
         self._id_by_hash[asset_hash] = asset_id
@@ -559,7 +678,9 @@ class CustomSource(BaseSource):
             "id": asset_id,
             "name": name,
             "url": external_url,
-            "metadata": metadata,
+            # Which cohort band chose the asset says nothing about the asset:
+            # stamping it must never make an unchanged asset read as changed.
+            "metadata": {key: value for key, value in metadata.items() if key != "_cohort"},
             "content_length": len(content),
             "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
             # Tags belong in the checksum: they are the only part of a tagged
@@ -647,6 +768,21 @@ class CustomSource(BaseSource):
             return
         self._mime_by_hash[asset_hash] = mime_type or "application/octet-stream"
 
+    def _cohort_weights(self) -> dict[str, Any] | None:
+        """The band split the platform measured for this run's cohorts, if any.
+
+        The API writes it into the recipe (`optional.cohort_weights.effective`)
+        when it starts the run; the environment variable is for runs started
+        some other way.
+        """
+        settings = (
+            getattr(self.config.optional, "cohort_weights", None) if self.config.optional else None
+        )
+        effective = getattr(settings, "effective", None) if settings is not None else None
+        if effective:
+            return {name: bands.model_dump(exclude_none=True) for name, bands in effective.items()}
+        return _cohort_weights_from_env()
+
     def declares_relationships(self) -> bool:
         """Whether the notebook defines ``relationships()`` at all.
 
@@ -710,11 +846,15 @@ class CustomSource(BaseSource):
         relationships — costs nothing rather than a subprocess round trip that
         returns an empty list.
         """
-        try:
-            return function in validate_notebook(self._cells).defined_functions
-        except Exception:
-            # A notebook that will not parse has already failed louder elsewhere.
-            return False
+        if self._defined_functions is None:
+            try:
+                self._defined_functions = frozenset(
+                    validate_notebook(self._cells).defined_functions
+                )
+            except Exception:
+                # A notebook that will not parse has already failed louder elsewhere.
+                self._defined_functions = frozenset()
+        return function in self._defined_functions
 
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         """Raw bytes for the binary and image detectors.
@@ -740,7 +880,11 @@ class CustomSource(BaseSource):
         merged.update(self._tags_by_hash.get(asset_hash, {}))
         return merged
 
+    def extracts_content(self, asset_hash: str) -> bool:
+        return asset_hash not in self._reference_hashes
+
     def evict_asset_cache(self, asset_hash: str) -> None:
+        self._reference_hashes.discard(asset_hash)
         if not self._content_dir:
             return
         for suffix in (".txt", ".bin"):
@@ -756,7 +900,13 @@ class CustomSource(BaseSource):
             return cached, cached
 
         # Nothing cached: the notebook may still be able to produce it on
-        # demand, which is what fetch_content() is for.
+        # demand, which is what fetch_content() is for -- when it defines one,
+        # and for an asset it yielded. The pipeline asks by URL first and by
+        # hash second, and a file asset has no cached text until phase 2 parses
+        # its bytes, so without these checks every file cost two subprocess
+        # round trips and two warnings, each ending in "not defined".
+        if asset_id not in self._id_by_hash or not self._notebook_defines("fetch_content"):
+            return None
         try:
             result = self._call("fetch_content", assetId=self._id_by_hash.get(asset_id, asset_id))
         except (CustomSourceError, NotebookContractError) as exc:
@@ -805,6 +955,23 @@ class CustomSource(BaseSource):
                 setattr(self, attribute, None)
 
 
+def _cohort_weights_from_env() -> dict[str, Any] | None:
+    """Band weights the API measured for this source's cohorts, if it sent any.
+
+    Base64 JSON, so the value survives the job environment verbatim. A value
+    that does not decode is ignored: the notebook's declared bands still work.
+    """
+    raw = os.environ.get("CLASSIFYRE_COHORT_WEIGHTS", "").strip()
+    if not raw:
+        return None
+    try:
+        decoded = json.loads(base64.b64decode(raw))
+    except (ValueError, binascii.Error) as exc:
+        logger.warning("Ignoring unreadable CLASSIFYRE_COHORT_WEIGHTS: %s", exc)
+        return None
+    return decoded if isinstance(decoded, dict) else None
+
+
 def _describe(error: Any) -> str:
     if not isinstance(error, dict):
         return str(error)
@@ -822,6 +989,13 @@ def _decode_bytes(value: Any) -> bytes | None:
     except (ValueError, binascii.Error) as exc:
         logger.warning("Ignoring malformed asset bytes: %s", exc)
         return None
+
+
+def _resolve_mime_type(raw: bytes, declared_mime_type: str | None, file_name: str) -> str:
+    """What the bytes are: the resolver the full parser starts with, and nothing more."""
+    from ...utils.file_parser import resolve_mime_type
+
+    return resolve_mime_type(raw, declared_mime_type=declared_mime_type, file_name=file_name)
 
 
 def _file_metadata(raw: bytes, mime_type: str | None, file_name: str) -> dict[str, Any]:

@@ -67,6 +67,9 @@ interface LLMFormState {
   labels: LabelRow[];
   severityRules: SeverityRule[];
   outputFields: OutputFieldRow[];
+  budgetMaxAttempts: string;
+  budgetMaxConsecutiveFailures: string;
+  budgetMaxWallClockSeconds: string;
 }
 
 const SEVERITY_LEVELS: SeverityLevel[] = ["critical", "high", "medium", "low", "info"];
@@ -156,7 +159,33 @@ function initFromSchema(
     labels,
     severityRules: rules,
     outputFields: fields,
+    ...budgetFromSchema(r.budget),
   };
+}
+
+function budgetFromSchema(
+  raw: unknown,
+): Pick<
+  LLMFormState,
+  "budgetMaxAttempts" | "budgetMaxConsecutiveFailures" | "budgetMaxWallClockSeconds"
+> {
+  const budget =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const text = (value: unknown) =>
+    typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+  return {
+    budgetMaxAttempts: text(budget.max_attempts),
+    budgetMaxConsecutiveFailures: text(budget.max_consecutive_failures),
+    budgetMaxWallClockSeconds: text(budget.max_wall_clock_seconds),
+  };
+}
+
+/** A whole number within [min, max], or undefined when blank or invalid. */
+function boundedInt(value: string, min: number, max?: number): number | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min) return undefined;
+  return max !== undefined ? Math.min(max, parsed) : parsed;
 }
 
 function buildPipelineSchema(s: LLMFormState): Record<string, unknown> {
@@ -193,6 +222,17 @@ function buildPipelineSchema(s: LLMFormState): Record<string, unknown> {
       ...(f.description.trim() ? { description: f.description.trim() } : {}),
     }));
   if (fields.length > 0) schema.output_fields = fields;
+
+  // Always written — as an object or as null — so clearing every field removes
+  // a stored budget instead of preserveDetectorScope copying the old one back.
+  const budget: Record<string, number> = {};
+  const attempts = boundedInt(s.budgetMaxAttempts, 1, 10);
+  if (attempts !== undefined) budget.max_attempts = attempts;
+  const failures = boundedInt(s.budgetMaxConsecutiveFailures, 1, 10000);
+  if (failures !== undefined) budget.max_consecutive_failures = failures;
+  const wallClock = boundedInt(s.budgetMaxWallClockSeconds, 1);
+  if (wallClock !== undefined) budget.max_wall_clock_seconds = wallClock;
+  schema.budget = Object.keys(budget).length > 0 ? budget : null;
 
   return schema;
 }
@@ -246,6 +286,9 @@ export const LLMDetectorEditor = React.forwardRef<
     labels: schemaDefaults.labels ?? [],
     severityRules: schemaDefaults.severityRules ?? [],
     outputFields: schemaDefaults.outputFields ?? [],
+    budgetMaxAttempts: schemaDefaults.budgetMaxAttempts ?? "",
+    budgetMaxConsecutiveFailures: schemaDefaults.budgetMaxConsecutiveFailures ?? "",
+    budgetMaxWallClockSeconds: schemaDefaults.budgetMaxWallClockSeconds ?? "",
   });
 
   const [providers, setProviders] = useState<AiProviderConfigResponseDto[]>([]);
@@ -480,6 +523,66 @@ export const LLMDetectorEditor = React.forwardRef<
                   {t("detectors.llm.providerVisionHint")}
                 </p>
               ) : null}
+            </div>
+
+            <div className="space-y-3 border-t-2 border-border pt-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold">
+                  {t("detectors.llm.budgetTitle")}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {t("detectors.llm.budgetHint")}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="llm-budget-attempts">
+                    {t("detectors.llm.budgetMaxAttempts")}
+                  </Label>
+                  <Input
+                    id="llm-budget-attempts"
+                    type="number"
+                    min={1}
+                    max={10}
+                    inputMode="numeric"
+                    value={form.budgetMaxAttempts}
+                    placeholder={t("detectors.llm.budgetMaxAttemptsPlaceholder")}
+                    onChange={(e) => patch({ budgetMaxAttempts: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="llm-budget-failures">
+                    {t("detectors.llm.budgetMaxConsecutiveFailures")}
+                  </Label>
+                  <Input
+                    id="llm-budget-failures"
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={form.budgetMaxConsecutiveFailures}
+                    placeholder="10"
+                    onChange={(e) =>
+                      patch({ budgetMaxConsecutiveFailures: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="llm-budget-wall-clock">
+                    {t("detectors.llm.budgetMaxWallClockSeconds")}
+                  </Label>
+                  <Input
+                    id="llm-budget-wall-clock"
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={form.budgetMaxWallClockSeconds}
+                    placeholder={t("detectors.llm.budgetMaxWallClockSecondsPlaceholder")}
+                    onChange={(e) =>
+                      patch({ budgetMaxWallClockSeconds: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
             </div>
           </Card>
         </div>
