@@ -24,6 +24,7 @@ import {
 } from "@workspace/ui/components";
 import { api, type AiProviderConfigResponseDto } from "@workspace/api-client";
 import { AiProviderForm } from "@/components/ai-provider-form";
+import { StickyActionToolbar } from "@/components/sticky-action-toolbar";
 import { VerticalCustomDetectorStepperNav } from "@/components/custom-detector-stepper";
 import { useTranslation } from "@/hooks/use-translation";
 import { preserveDetectorScope } from "@/lib/detector-scope";
@@ -403,7 +404,7 @@ export const LLMDetectorEditor = React.forwardRef<
       <div className="space-y-6 min-w-0">
         {/* ── Identity ── */}
         <div ref={identityRef} id="section-identity">
-          <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+          <Card className="p-6 space-y-4 border-2 border-border">
             <h2 className="font-serif font-black uppercase tracking-wide text-base">
               {t("detectors.llm.identityTitle")}
             </h2>
@@ -455,7 +456,7 @@ export const LLMDetectorEditor = React.forwardRef<
 
         {/* ── Provider ── */}
         <div ref={providerRef} id="section-provider">
-          <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+          <Card className="p-6 space-y-4 border-2 border-border">
             <h2 className="font-serif font-black uppercase tracking-wide text-base">
               {t("detectors.llm.providerTitle")}
             </h2>
@@ -500,7 +501,7 @@ export const LLMDetectorEditor = React.forwardRef<
                     setEditingProvider(selectedProvider);
                     setProviderFormOpen(true);
                   }}
-                  className="rounded-[4px] border-2 border-border shadow-[2px_2px_0_var(--color-border)]"
+                  className="rounded-[4px] border-2 border-border"
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -512,7 +513,7 @@ export const LLMDetectorEditor = React.forwardRef<
                     setEditingProvider(null);
                     setProviderFormOpen(true);
                   }}
-                  className="rounded-[4px] border-2 border-border shadow-[2px_2px_0_var(--color-border)]"
+                  className="rounded-[4px] border-2 border-border"
                 >
                   <Plus className="mr-1.5 h-3.5 w-3.5" />
                   {t("detectors.llm.newProvider")}
@@ -589,7 +590,7 @@ export const LLMDetectorEditor = React.forwardRef<
 
         {/* ── Prompt ── */}
         <div ref={promptRef} id="section-prompt">
-          <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+          <Card className="p-6 space-y-4 border-2 border-border">
             <h2 className="font-serif font-black uppercase tracking-wide text-base">
               {t("detectors.llm.promptTitle")}
             </h2>
@@ -645,7 +646,7 @@ export const LLMDetectorEditor = React.forwardRef<
 
         {/* ── Labels ── */}
         <div ref={labelsRef} id="section-labels">
-          <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+          <Card className="p-6 space-y-4 border-2 border-border">
             <h2 className="font-serif font-black uppercase tracking-wide text-base">
               {t("detectors.llm.labelsTitle")}
             </h2>
@@ -690,7 +691,7 @@ export const LLMDetectorEditor = React.forwardRef<
                 variant="outline"
                 size="sm"
                 onClick={() => patch({ labels: [...form.labels, { name: "", description: "" }] })}
-                className="rounded-[4px] border-2 border-border shadow-[2px_2px_0_var(--color-border)]"
+                className="rounded-[4px] border-2 border-border"
               >
                 <Plus className="mr-2 h-3.5 w-3.5" />
                 {t("detectors.llm.addLabel")}
@@ -709,7 +710,7 @@ export const LLMDetectorEditor = React.forwardRef<
 
         {/* ── Severity ── */}
         <div ref={severityRef} id="section-severity">
-          <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+          <Card className="p-6 space-y-4 border-2 border-border">
             <h2 className="font-serif font-black uppercase tracking-wide text-base">
               {t("detectors.llm.severityTitle")}
             </h2>
@@ -803,7 +804,7 @@ export const LLMDetectorEditor = React.forwardRef<
                   severityRules: [...form.severityRules, { pattern: "", severity: "medium" }],
                 })
               }
-              className="rounded-[4px] border-2 border-border shadow-[2px_2px_0_var(--color-border)]"
+              className="rounded-[4px] border-2 border-border"
             >
               <Plus className="mr-2 h-3.5 w-3.5" />
               {t("detectors.llm.addRule")}
@@ -813,7 +814,7 @@ export const LLMDetectorEditor = React.forwardRef<
 
         {/* ── Output fields ── */}
         <div ref={outputRef} id="section-output">
-          <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+          <Card className="p-6 space-y-4 border-2 border-border">
             <h2 className="font-serif font-black uppercase tracking-wide text-base">
               {t("detectors.llm.outputTitle")}
             </h2>
@@ -885,7 +886,7 @@ export const LLMDetectorEditor = React.forwardRef<
                   ],
                 })
               }
-              className="rounded-[4px] border-2 border-border shadow-[2px_2px_0_var(--color-border)]"
+              className="rounded-[4px] border-2 border-border"
             >
               <Plus className="mr-2 h-3.5 w-3.5" />
               {t("detectors.llm.addField")}
@@ -893,24 +894,23 @@ export const LLMDetectorEditor = React.forwardRef<
           </Card>
         </div>
 
-        {/* ── Sticky toolbar ── */}
+        {/* ── Sticky toolbar — shared with source create/edit ── */}
         {!embedded && (
-          <Card className="sticky bottom-0 z-30 p-4 border-t-2 border-border">
-            <div className="flex items-center justify-end gap-3">
-              {!canSubmit && form.aiProviderConfigId.length === 0 && (
+          <StickyActionToolbar
+            onSaveAndRun={() => void handleSubmit()}
+            saveAndRunLabel={
+              isSubmitting ? t("detectors.llm.saving") : submitLabel
+            }
+            hint={
+              !canSubmit && form.aiProviderConfigId.length === 0 ? (
                 <Badge variant="secondary" className="font-mono text-xs">
                   {t("detectors.llm.validationProviderRequired")}
                 </Badge>
-              )}
-              <Button
-                onClick={() => void handleSubmit()}
-                disabled={!canSubmit}
-                className="rounded-[4px] border-2 border-border bg-accent text-accent-foreground shadow-[3px_3px_0_var(--color-border)] hover:bg-accent/90"
-              >
-                {isSubmitting ? t("detectors.llm.saving") : submitLabel}
-              </Button>
-            </div>
-          </Card>
+              ) : undefined
+            }
+            isBusy={isSubmitting}
+            saveAndRunDisabled={!canSubmit}
+          />
         )}
       </div>
 

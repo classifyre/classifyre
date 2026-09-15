@@ -233,7 +233,7 @@ export function AssistantWorkflowPanel({
   return (
     <section
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-hidden rounded-[8px] border-2 border-border bg-card text-card-foreground shadow-[8px_8px_0_var(--color-border)]",
+        "flex h-full min-h-0 flex-col overflow-hidden rounded-[8px] border-2 border-border bg-card text-card-foreground ",
         className,
       )}
     >
@@ -353,7 +353,7 @@ export function AssistantWorkflowPanel({
               >
                 <div
                   className={cn(
-                    "min-w-0 max-w-[92%] rounded-[6px] border-2 px-4 py-3 shadow-[4px_4px_0_var(--color-border)]",
+                    "min-w-0 max-w-[92%] rounded-[6px] border-2 px-4 py-3 ",
                     message.role === "user"
                       ? "border-black bg-foreground text-primary-foreground"
                       : "border-border bg-card",
@@ -398,7 +398,7 @@ export function AssistantWorkflowPanel({
 
         {pendingConfirmation ? (
           <div className="shrink-0 border-t-2 border-border px-4 py-4">
-            <div className="rounded-[6px] border-2 border-black bg-[var(--color-accent)] px-4 py-3 text-[var(--color-accent-foreground)] shadow-[4px_4px_0_var(--color-border)]">
+            <div className="rounded-[6px] border-2 border-black bg-[var(--color-accent)] px-4 py-3 text-[var(--color-accent-foreground)]">
               <div className="text-[11px] font-mono uppercase tracking-[0.16em]">
                 Confirmation required
               </div>
@@ -413,7 +413,7 @@ export function AssistantWorkflowPanel({
                   type="button"
                   onClick={onConfirm}
                   disabled={submitting || !onConfirm}
-                  className="rounded-[4px] border-2 border-black bg-foreground text-primary-foreground shadow-[3px_3px_0_var(--color-border)]"
+                  className="rounded-[4px] border-2 border-black bg-foreground text-primary-foreground"
                 >
                   Confirm
                 </Button>
@@ -422,7 +422,7 @@ export function AssistantWorkflowPanel({
                   variant="outline"
                   onClick={onCancelConfirmation}
                   disabled={submitting || !onCancelConfirmation}
-                  className="rounded-[4px] border-2 border-black bg-background shadow-[3px_3px_0_var(--color-border)]"
+                  className="rounded-[4px] border-2 border-black bg-background"
                 >
                   Cancel
                 </Button>
@@ -436,7 +436,7 @@ export function AssistantWorkflowPanel({
             <div className="relative">
               {mentionActive && mentionQuery ? (
                 <div
-                  className="absolute bottom-full left-0 z-10 mb-1 max-h-56 w-full overflow-y-auto rounded-[6px] border-2 border-black bg-popover text-popover-foreground shadow-[4px_4px_0_var(--color-border)]"
+                  className="absolute bottom-full left-0 z-10 mb-1 max-h-56 w-full overflow-y-auto rounded-[6px] border-2 border-black bg-popover text-popover-foreground"
                   data-testid="assistant-mention-menu"
                 >
                   {mentionMatches.map((mention, index) => (
@@ -525,7 +525,7 @@ export function AssistantWorkflowPanel({
                 }}
                 disabled={disabled}
                 placeholder={placeholder}
-                className="min-h-[108px] rounded-[6px] border-2 border-black bg-background shadow-[4px_4px_0_var(--color-border)]"
+                className="min-h-[108px] rounded-[6px] border-2 border-black bg-background"
                 data-testid="assistant-input"
               />
             </div>
@@ -551,7 +551,7 @@ export function AssistantWorkflowPanel({
                     variant="outline"
                     onClick={onUploadClick}
                     disabled={uploadDisabled}
-                    className="rounded-[4px] border-2 border-border bg-background shadow-[3px_3px_0_var(--color-border)]"
+                    className="rounded-[4px] border-2 border-border bg-background"
                   >
                     {uploadingFile ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -566,7 +566,7 @@ export function AssistantWorkflowPanel({
                     type="button"
                     variant="outline"
                     disabled
-                    className="rounded-[4px] border-2 border-border bg-background text-muted-foreground shadow-[3px_3px_0_var(--color-border)]"
+                    className="rounded-[4px] border-2 border-border bg-background text-muted-foreground"
                   >
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Processing
@@ -576,7 +576,7 @@ export function AssistantWorkflowPanel({
                   type="button"
                   onClick={onSend}
                   disabled={!canSend}
-                  className="rounded-[4px] border-2 border-black bg-foreground text-primary-foreground shadow-[3px_3px_0_var(--color-border)]"
+                  className="rounded-[4px] border-2 border-black bg-foreground text-primary-foreground"
                 >
                   <Send className="mr-2 h-4 w-4" />
                   Send

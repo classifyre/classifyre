@@ -75,7 +75,7 @@ function StepIndicator({
       className={cn(
         "flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px] border-2 text-[10px] font-bold transition-colors",
         status === "active" &&
-          "border-border bg-accent text-accent-foreground shadow-[2px_2px_0_var(--color-border)]",
+          "border-border bg-accent text-accent-foreground ",
         status === "done" &&
           "border-border bg-black text-white dark:border-white dark:bg-white dark:text-accent-foreground",
         status === "upcoming" &&

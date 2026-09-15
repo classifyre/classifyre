@@ -288,7 +288,7 @@ export function ScheduleCard({
   return (
     <div
       className={cn(
-        "border-2 border-border rounded-[6px] shadow-[6px_6px_0_var(--color-border)] bg-card overflow-hidden",
+        "border-2 border-border rounded-[6px] bg-card overflow-hidden",
         disabled && "opacity-60 pointer-events-none",
         className,
       )}
@@ -369,7 +369,7 @@ export function ScheduleCard({
                   className={cn(
                     "flex flex-col items-start gap-0.5 rounded-[4px] border-2 px-3 py-2 text-left transition-all",
                     active
-                      ? "border-border bg-foreground text-primary-foreground shadow-[2px_2px_0_var(--color-border)]"
+                      ? "border-border bg-foreground text-primary-foreground "
                       : "border-border/20 hover:border-border hover:bg-foreground/5",
                   )}
                 >
@@ -452,7 +452,7 @@ export function ScheduleCard({
                       className={cn(
                         "group relative flex flex-col items-start gap-0.5 rounded-[4px] border-2 px-3 py-2 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
                         active
-                          ? "border-border bg-accent text-accent-foreground shadow-[2px_2px_0_var(--color-border)]"
+                          ? "border-border bg-accent text-accent-foreground "
                           : "border-border/20 hover:border-border hover:bg-foreground/5",
                       )}
                     >

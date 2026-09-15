@@ -932,7 +932,7 @@ function SourceEditStepperContent({
         {/* Scrollable content */}
         <div className="min-w-0 flex-1 space-y-16 pb-32">
           <section ref={configRef}>
-            <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
+            <Card className="rounded-[6px] border-2 border-border">
               <CardHeader>
                 <CardTitle className="uppercase tracking-[0.06em]">
                   {t("sources.edit.configuration")}

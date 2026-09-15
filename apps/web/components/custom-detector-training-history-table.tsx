@@ -240,7 +240,7 @@ export function CustomDetectorTrainingHistoryTable({
         </Select>
       </div>
 
-      <div className="overflow-hidden rounded-[6px] border-2 border-border bg-background shadow-[6px_6px_0_var(--color-border)]">
+      <div className="overflow-hidden rounded-[6px] border-2 border-border bg-background">
         <Table>
           <TableHeader>
             <TableRow>
