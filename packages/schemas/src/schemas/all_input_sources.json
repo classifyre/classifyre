@@ -3608,6 +3608,10 @@
               "type": "string",
               "description": "Identifier of the record in the system the notebook read from"
             },
+            "content_reference": {
+              "type": "string",
+              "description": "Set when the connector recorded this asset without extracting its content (Asset(extract=False)); the value says why. Such an asset is complete and searchable by metadata, takes part in lineage and tags, and is deliberately not text-scanned."
+            },
             "collection": {
               "type": "string",
               "description": "Container the record came from (table, index, folder, board, ...)"
@@ -3626,6 +3630,10 @@
             "external_id": {
               "type": "string",
               "description": "Identifier of the record in the system the notebook read from"
+            },
+            "content_reference": {
+              "type": "string",
+              "description": "Set when the connector recorded this asset without extracting its content (Asset(extract=False)); the value says why. Such an asset is complete and searchable by metadata, takes part in lineage and tags, and is deliberately not text-scanned."
             },
             "collection": {
               "type": "string",
@@ -3654,6 +3662,10 @@
               "type": "string",
               "description": "Identifier of the record in the system the notebook read from"
             },
+            "content_reference": {
+              "type": "string",
+              "description": "Set when the connector recorded this asset without extracting its content (Asset(extract=False)); the value says why. Such an asset is complete and searchable by metadata, takes part in lineage and tags, and is deliberately not text-scanned."
+            },
             "collection": {
               "type": "string",
               "description": "Container the record came from (table, index, folder, board, ...)"
@@ -3681,6 +3693,10 @@
               "type": "string",
               "description": "Identifier of the record in the system the notebook read from"
             },
+            "content_reference": {
+              "type": "string",
+              "description": "Set when the connector recorded this asset without extracting its content (Asset(extract=False)); the value says why. Such an asset is complete and searchable by metadata, takes part in lineage and tags, and is deliberately not text-scanned."
+            },
             "collection": {
               "type": "string",
               "description": "Container the record came from (table, index, folder, board, ...)"
@@ -3707,6 +3723,10 @@
             "external_id": {
               "type": "string",
               "description": "Identifier of the record in the system the notebook read from"
+            },
+            "content_reference": {
+              "type": "string",
+              "description": "Set when the connector recorded this asset without extracting its content (Asset(extract=False)); the value says why. Such an asset is complete and searchable by metadata, takes part in lineage and tags, and is deliberately not text-scanned."
             },
             "collection": {
               "type": "string",
@@ -12670,7 +12690,56 @@
             "$ref": "#/definitions/NotebookLocalFolder"
           },
           "description": "Folders the notebook reads with ctx.folder(\"name\"). Not available in Kubernetes deployments, where files are uploaded to the source instead. This is a convenience, not a sandbox: the notebook process runs as you and can open any path you can."
+        },
+        "cohort_weights": {
+          "$ref": "#/definitions/CustomCohortWeights"
         }
+      },
+      "additionalProperties": false
+    },
+    "CustomCohortWeights": {
+      "title": "CustomCohortWeights",
+      "label": "Cohort Selection",
+      "type": "object",
+      "description": "How ctx.cohort() splits each run's budget across its bands. auto shifts the split toward the bands whose keys produce HIGH/CRITICAL findings, within guards: the declared split stands until every band has 200 visits, no band drops below the floor, and no band moves more than 15 points per run. fixed always uses the bands the notebook declares, or the ones given here.",
+      "properties": {
+        "mode": {
+          "title": "CohortWeightsMode",
+          "type": "string",
+          "enum": ["auto", "fixed"],
+          "default": "auto",
+          "description": "auto: measured from what each band yields. fixed: the declared or fixed split, always."
+        },
+        "floor": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 0.5,
+          "description": "The least share any band keeps under auto, as a fraction. Never below 0.1."
+        },
+        "fixed": {
+          "type": "object",
+          "description": "Per cohort name, the band split to use under fixed, e.g. {\"register\": {\"newest\": 60, \"oldest\": 30, \"random\": 10}}.",
+          "additionalProperties": {
+            "$ref": "#/definitions/CustomCohortBandWeights"
+          }
+        },
+        "effective": {
+          "type": "object",
+          "description": "Set by the platform on each run's recipe: the split each cohort runs with. Not stored on the source.",
+          "additionalProperties": {
+            "$ref": "#/definitions/CustomCohortBandWeights"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomCohortBandWeights": {
+      "title": "CustomCohortBandWeights",
+      "type": "object",
+      "properties": {
+        "newest": { "type": "number", "minimum": 0 },
+        "oldest": { "type": "number", "minimum": 0 },
+        "random": { "type": "number", "minimum": 0 }
       },
       "additionalProperties": false
     },

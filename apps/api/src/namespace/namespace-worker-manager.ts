@@ -25,6 +25,7 @@ import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { McpClientService } from '../autopilot/mcp-client/mcp-client.service';
 import { PgStreamService } from '../export/pg-stream.service';
 import { DataTransferWorker } from '../data-transfer/data-transfer.worker';
+import { FindingBulkOperationWorker } from '../findings-bulk/finding-bulk-operation.worker';
 import { FindingStatsWorker } from '../stats/finding-stats.worker';
 import { SourceGraphWorker } from '../stats/source-graph.worker';
 import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
@@ -99,6 +100,7 @@ export class NamespaceWorkerManager
     private readonly mcpClient: McpClientService,
     private readonly pgStream: PgStreamService,
     private readonly dataTransfer: DataTransferWorker,
+    private readonly findingBulkOperations: FindingBulkOperationWorker,
     private readonly findingStats: FindingStatsWorker,
     private readonly sourceGraph: SourceGraphWorker,
     private readonly runnerEvents: RunnerEventsGateway,
@@ -229,6 +231,7 @@ export class NamespaceWorkerManager
         await this.supervisor.registerForNamespace();
         await this.embedding.registerForNamespace();
         await this.dataTransfer.registerForNamespace();
+        await this.findingBulkOperations.registerForNamespace();
         await this.findingStats.registerForNamespace();
         await this.sourceGraph.registerForNamespace();
         this.dataTransfer.schedulePurge(e.schemaName);

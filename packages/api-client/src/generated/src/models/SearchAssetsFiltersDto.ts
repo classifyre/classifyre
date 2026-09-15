@@ -49,6 +49,12 @@ export interface SearchAssetsFiltersDto {
      * @memberof SearchAssetsFiltersDto
      */
     sourceTypes?: Array<SearchAssetsFiltersDtoSourceTypesEnum>;
+    /**
+     * Match connector metadata exactly: {"legal_form_code": {"in": ["GES", "AG"]}, "register_status": {"eq": "active"}}. Values compare as JSON (a number matches only a number). Operators here: eq, in. An unknown operator or key shape is a 400.
+     * @type {object}
+     * @memberof SearchAssetsFiltersDto
+     */
+    metadata?: object;
 }
 
 
@@ -138,6 +144,7 @@ export function SearchAssetsFiltersDtoFromJSONTyped(json: any, ignoreDiscriminat
         'runnerId': json['runnerId'] == null ? undefined : json['runnerId'],
         'status': json['status'] == null ? undefined : json['status'],
         'sourceTypes': json['sourceTypes'] == null ? undefined : json['sourceTypes'],
+        'metadata': json['metadata'] == null ? undefined : json['metadata'],
     };
 }
 
@@ -157,6 +164,7 @@ export function SearchAssetsFiltersDtoToJSONTyped(value?: SearchAssetsFiltersDto
         'runnerId': value['runnerId'],
         'status': value['status'],
         'sourceTypes': value['sourceTypes'],
+        'metadata': value['metadata'],
     };
 }
 

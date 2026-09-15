@@ -99,6 +99,20 @@
       "type": "Context",
       "members": [
         {
+          "label": "cohort",
+          "kind": "method",
+          "detail": "(name: 'str', universe: 'Iterable[Any]', *, bands: 'Mapping[str, float] | None' = None, size: 'int', min_share: 'float | None' = None) -> 'list[CohortItem]'",
+          "documentation": "This run's slice of a large ordered universe, resumable across runs.\n\n::\n\n    for item in ctx.cohort(\"register\", all_company_numbers,\n                           bands={\"newest\": 60, \"oldest\": 30, \"random\": 10},\n                           size=1200):\n        yield Asset(id=item.key, ..., cohort=item)\n\n``universe`` is every key the connector could visit; it is sorted, so\n``newest`` means the end of that order. ``newest`` walks down from it,\n``oldest`` walks up from the start, ``random`` samples the whole\nuniverse with no cursor. Each directional band resumes after the last\nkey it visited, so a universe republished at a different length keeps\nits place, and wraps once it reaches the end.\n\n``bands`` is your split. When the source's cohort weights are set to\n``auto``, the platform replaces it with a split measured from what each\nband actually yielded, never giving a band less than ``min_share`` (and\nnever less than 10%). Pass ``cohort=item`` to each Asset so that\nmeasurement has something to count.\n\nCalling it declares this run's coverage partial.",
+          "insertText": "cohort(${1:name}, ${2:universe}, size=${3:size})"
+        },
+        {
+          "label": "cohort_stats",
+          "kind": "property",
+          "detail": "dict[str, Any]",
+          "documentation": "Per cohort, per band: keys visited this run and whether the band ran out.",
+          "insertText": "cohort_stats"
+        },
+        {
           "label": "cursor",
           "kind": "property",
           "detail": "dict[str, Any]",
@@ -181,6 +195,13 @@
           "detail": "int",
           "documentation": "",
           "insertText": "page_size"
+        },
+        {
+          "label": "query_assets",
+          "kind": "method",
+          "detail": "(source: 'str', *, kind: 'str | None' = None, where: 'Mapping[str, Mapping[str, Any]] | None' = None, exclude_visited: 'Mapping[str, Any] | None' = None, select: 'Iterable[str]' = (), limit: 'int' = 1000, cursor: 'str | None' = None) -> 'AssetQueryPage'",
+          "documentation": "Read assets another source in this namespace already wrote.\n\nWork the queue of things already known to be interesting instead of\nsweeping an external universe::\n\n    page = ctx.query_assets(\n        \"Firmenbuch Register\",\n        kind=\"record\",\n        where={\"filing_count\": {\"gt\": 0},\n               \"legal_form_code\": {\"in\": [\"GES\", \"AG\", \"SE\", \"FKG\"]}},\n        exclude_visited={\"key\": \"firmenbuchnummer\", \"since_days\": 90},\n        select=[\"firmenbuchnummer\", \"legal_form_code\"],\n        limit=1200,\n    )\n    for company in page.items:\n        fn = company.metadata[\"firmenbuchnummer\"]\n\n``source`` is a source's id or exact name. ``where`` filters metadata\nwith ``eq``, ``in``, ``exists``, ``gt``, ``gte``, ``lt`` and ``lte``;\nvalues compare as JSON, so ``{\"eq\": 5}`` matches the number 5 and not\nthe string \"5\". ``exclude_visited`` leaves out every asset whose\n``metadata[key]`` matches an asset *this* source scanned in the last\n``since_days``. Page with ``cursor=page.next_cursor``.\n\nRead-only, and bounded: at most 5,000 assets a page and 100 calls a run.\nCalling it declares this run's coverage partial, since a connector that\npicks its cohort from a query never sees the rest of its source.\nAvailable during scans only, not when running a cell in the editor.",
+          "insertText": "query_assets(${1:source})"
         },
         {
           "label": "sampling",
@@ -515,6 +536,27 @@
           "detail": "dict[str, str]",
           "required": false,
           "insertText": "tags="
+        },
+        {
+          "label": "extract",
+          "kind": "field",
+          "detail": "bool",
+          "required": false,
+          "insertText": "extract="
+        },
+        {
+          "label": "reference_reason",
+          "kind": "field",
+          "detail": "str | None",
+          "required": false,
+          "insertText": "reference_reason="
+        },
+        {
+          "label": "cohort",
+          "kind": "field",
+          "detail": "CohortItem | None",
+          "required": false,
+          "insertText": "cohort="
         }
       ]
     },

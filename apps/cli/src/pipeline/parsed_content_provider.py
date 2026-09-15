@@ -83,6 +83,9 @@ class ParsedContentProvider:
     def asset_tags(self, asset_hash: str) -> Mapping[str, str]:
         return self._source.asset_tags(asset_hash)
 
+    def extracts_content(self, asset_hash: str) -> bool:
+        return self._source.extracts_content(asset_hash)
+
     def enrich_finding_location(
         self,
         finding: DetectionResult,

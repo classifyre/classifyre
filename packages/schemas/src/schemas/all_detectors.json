@@ -1486,6 +1486,31 @@
       },
       "additionalProperties": false
     },
+    "DetectorBudget": {
+      "title": "DetectorBudget",
+      "type": "object",
+      "description": "How much of a run this detector may spend failing.\n\nWithout a budget a detector keeps being called after it has stopped working: an LLM detector on a provider that refused its key retried every asset for 15-40 seconds and held the only runner slot for 10 hours a day, failing on 451 of 451 assets. Every run already disables a detector after a non-retryable provider refusal (quota, auth, billing) and after 10 consecutive failures; these fields tighten or loosen that per detector.\n\nA disabled detector records an ERROR outcome on the assets it skipped, so their existing findings are kept and the assets are retried on the next run. Changing the budget never invalidates the scan cache.",
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "LLM detectors only: provider calls per asset, including the first. Overrides CLASSIFYRE_LLM_MAX_ATTEMPTS. A non-retryable refusal is never retried regardless."
+        },
+        "max_consecutive_failures": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "Disable the detector for the rest of the run after this many consecutive failed payloads. Defaults to 10."
+        },
+        "max_wall_clock_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Disable the detector for the rest of the run once it has spent this long, summed over every payload it ran on. Unset means no limit."
+        }
+      },
+      "additionalProperties": false
+    },
     "GLiNER2PipelineSchema": {
       "title": "GLiNER2PipelineSchema",
       "type": "object",
@@ -1497,6 +1522,14 @@
           ],
           "default": null,
           "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
+        "budget": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorBudget" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures."
         },
         "type": {
           "type": "string",
@@ -1535,6 +1568,14 @@
           ],
           "default": null,
           "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
+        "budget": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorBudget" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures."
         },
         "type": {
           "type": "string",
@@ -1663,6 +1704,14 @@
           ],
           "default": null,
           "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
+        "budget": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorBudget" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures."
         },
         "type": {
           "type": "string",
@@ -1795,6 +1844,14 @@
           "default": null,
           "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
         },
+        "budget": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorBudget" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures."
+        },
         "type": {
           "type": "string",
           "enum": ["TEXT_CLASSIFICATION"],
@@ -1882,6 +1939,14 @@
           "default": null,
           "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
         },
+        "budget": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorBudget" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures."
+        },
         "type": {
           "type": "string",
           "enum": ["IMAGE_CLASSIFICATION"],
@@ -1948,6 +2013,14 @@
           ],
           "default": null,
           "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
+        "budget": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorBudget" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures."
         },
         "type": {
           "type": "string",
@@ -2020,6 +2093,14 @@
           ],
           "default": null,
           "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
+        "budget": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorBudget" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures."
         },
         "type": {
           "type": "string",

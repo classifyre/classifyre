@@ -16,6 +16,8 @@ import { CliRunnerService } from './cli-runner/cli-runner.service';
 import { CustomDetectorsService } from './custom-detectors.service';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
 import { FindingsService } from './findings.service';
+import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operation.service';
+import { RetireOutOfScopeService } from './findings-bulk/retire-out-of-scope.service';
 import { MCP_CAPABILITY_GROUPS, MCP_PROMPTS } from './mcp-catalog';
 import { NotebookService } from './notebook/notebook.service';
 import { NotebookExecutionService } from './notebook/notebook-execution.service';
@@ -279,6 +281,8 @@ export class McpServerFactoryService {
     private readonly notebookExecutionService: NotebookExecutionService,
     private readonly sourceFilesService: SourceFilesService,
     private readonly graphService: GraphService,
+    private readonly findingBulkOperations: FindingBulkOperationService,
+    private readonly retireOutOfScope: RetireOutOfScopeService,
   ) {}
 
   /**
@@ -2003,6 +2007,79 @@ export class McpServerFactoryService {
     );
 
     server.registerTool(
+      'retire_out_of_scope_findings',
+      {
+        title: 'Retire Out-of-Scope Findings',
+        description:
+          'Resolve OPEN findings a custom detector can no longer produce because ' +
+          'its scope.asset_kinds was narrowed or regex patterns were removed — ' +
+          'a rescan never resolves those. Two steps, each a background operation ' +
+          '(follow the returned id with get_findings_bulk_operation): ' +
+          '(1) dryRun (default) changes nothing and reports, under counts: ' +
+          'candidates, byReason, citedByCase, watchedByInquiries, inquiries, ' +
+          'wouldRetire and notProvable. ' +
+          '(2) dryRun: false with fromOperationId (that COMPLETED dry run), ' +
+          'expectedCount (its wouldRetire) and confirm: true. It never retires ' +
+          'more than expectedCount. Findings a case cites or an ACTIVE inquiry ' +
+          'watches are never retired by this tool. Retired findings are RESOLVED ' +
+          'without detector feedback; widening the scope again lets re-detection ' +
+          'reopen them.',
+        inputSchema: {
+          customDetectorId: z.string().uuid(),
+          dryRun: z.boolean().optional().describe('Default true: count only.'),
+          sourceIds: z
+            .array(z.string())
+            .max(100)
+            .optional()
+            .describe('Dry run only: restrict to these sources.'),
+          fromOperationId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe('Retire only: the completed dry run operation id.'),
+          expectedCount: z
+            .number()
+            .int()
+            .min(0)
+            .optional()
+            .describe("Retire only: the dry run's counts.wouldRetire."),
+          confirm: z
+            .literal(true)
+            .optional()
+            .describe('Retire only: required.'),
+        },
+        annotations: {
+          readOnlyHint: false,
+          // Resolved findings leave inquiries, correlation and duplicate review.
+          destructiveHint: true,
+        },
+      },
+      async ({
+        customDetectorId,
+        dryRun,
+        sourceIds,
+        fromOperationId,
+        expectedCount,
+        confirm,
+      }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        const operation =
+          dryRun === false
+            ? await this.retireOutOfScope.startRetire(
+                customDetectorId,
+                { fromOperationId, expectedCount, confirm, createdBy: 'mcp' },
+                // Emptying what an investigation watches is an operator call.
+                { allowInquiryOverride: false },
+              )
+            : await this.retireOutOfScope.startDryRun(customDetectorId, {
+                sourceIds,
+                createdBy: 'mcp',
+              });
+        return jsonResult(this.findingBulkOperations.toDto(operation));
+      },
+    );
+
+    server.registerTool(
       'train_custom_detector',
       {
         title: 'Train Custom Detector',
@@ -2657,10 +2734,19 @@ export class McpServerFactoryService {
       {
         title: 'Bulk Update Findings',
         description:
-          'Bulk update findings by IDs or by filters, including status, severity, and comment.',
+          'Bulk update findings by IDs (at most 1,000) or by filters, including ' +
+          'status, severity, and comment. Filters use the same keys as ' +
+          'search_findings; an unknown key is an error, never a wider match. ' +
+          'Run with dryRun: true first — it returns the exact count ' +
+          '(wouldUpdate) and whether the filters narrow the corpus — then pass ' +
+          'that count as expectedCount: if more findings match when the update ' +
+          'runs, nothing is written. Filters that narrow nothing beyond status ' +
+          'require confirm: true. A selection over 2,000 findings is queued as a ' +
+          'background operation: the result carries operationId — follow it with ' +
+          'get_findings_bulk_operation.',
         inputSchema: {
-          ids: z.array(z.string().uuid()).optional(),
-          filters: jsonObjectSchema.optional(),
+          ids: z.array(z.string().uuid()).max(1000).optional(),
+          filters: searchFindingsFilters.optional(),
           status: z
             .enum(['OPEN', 'RESOLVED', 'FALSE_POSITIVE', 'IGNORED'])
             .optional(),
@@ -2668,15 +2754,93 @@ export class McpServerFactoryService {
             .enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'])
             .optional(),
           comment: z.string().optional(),
+          dryRun: z
+            .boolean()
+            .optional()
+            .describe('Count what would be updated without writing anything.'),
+          expectedCount: z
+            .number()
+            .int()
+            .min(0)
+            .optional()
+            .describe(
+              'The dryRun count. If more findings match at update time, the ' +
+                'update is refused (409) and nothing is written.',
+            ),
+          confirm: z
+            .boolean()
+            .optional()
+            .describe(
+              'Required (true) when the filters narrow nothing beyond status, ' +
+                'includeResolved and excludeIds — the update would apply to ' +
+                'every finding in the namespace.',
+            ),
         },
         annotations: {
           readOnlyHint: false,
-          destructiveHint: false,
+          // A status change rewrites the evidence base: resolved findings leave
+          // inquiries, correlation and the review queue.
+          destructiveHint: true,
         },
       },
       async (args) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.findingsService.bulkUpdate(args));
+        // zod carries the filter dates as ISO strings where the DTO declares
+        // Date; Prisma takes either for a DateTime comparison, as search does.
+        return jsonResult(
+          await this.findingsService.bulkUpdate(
+            args as unknown as Parameters<FindingsService['bulkUpdate']>[0],
+          ),
+        );
+      },
+    );
+
+    server.registerTool(
+      'get_findings_bulk_operation',
+      {
+        title: 'Get Findings Bulk Operation',
+        description:
+          'Progress of a background bulk finding operation — the operationId ' +
+          'bulk_update_findings returns when a selection is too large to change ' +
+          'in one request, and the id retire_out_of_scope_findings returns for ' +
+          'its dry run and its retire. Reports status (PENDING, RUNNING, ' +
+          'COMPLETED, FAILED, CANCELLED), how many findings were examined, ' +
+          'changed and exempted, percent, and operation-specific counts (a ' +
+          'retire dry run puts wouldRetire and its exemptions there).',
+        inputSchema: { operationId: z.string().uuid() },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ operationId }) =>
+        jsonResult(
+          this.findingBulkOperations.toDto(
+            await this.findingBulkOperations.get(operationId),
+          ),
+        ),
+    );
+
+    server.registerTool(
+      'cancel_findings_bulk_operation',
+      {
+        title: 'Cancel Findings Bulk Operation',
+        description:
+          'Stop a background bulk finding operation. A queued one is cancelled ' +
+          'outright; a running one stops after its current page. Findings it ' +
+          'already changed stay changed — this stops the operation, it does not ' +
+          'undo it.',
+        inputSchema: { operationId: z.string().uuid() },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: true,
+        },
+      },
+      async ({ operationId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          this.findingBulkOperations.toDto(
+            await this.findingBulkOperations.requestCancel(operationId),
+          ),
+        );
       },
     );
 

@@ -1,4 +1,6 @@
+import { createHash } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
+import providerRefusalMarkers from '@workspace/schemas/provider_refusal_markers';
 import { AiProviderConfigService } from '../ai-provider-config.service';
 import type { AiSchemaAttempt } from './errors';
 import {
@@ -6,6 +8,7 @@ import {
   AiConfigError,
   AiModelNotFoundError,
   AiProviderError,
+  AiQuotaExhaustedError,
   AiRateLimitError,
   AiSchemaError,
 } from './errors';
@@ -22,12 +25,47 @@ import type {
   JsonSchema,
 } from './types';
 
+/**
+ * Wording that turns a 429 from "slow down" into "the allowance is gone". One
+ * list in packages/schemas, shared with the CLI's LLM detector runner, so a
+ * scan and an agent agree on when retrying cannot help.
+ */
+const QUOTA_MARKERS: readonly string[] = (providerRefusalMarkers.quota ?? [])
+  .map((marker) => String(marker).trim().toLowerCase())
+  .filter((marker) => marker.length > 0);
+
+const DEFAULT_QUOTA_COOLDOWN_MS = 15 * 60 * 1000;
+
+/**
+ * How long a credential is left alone after its quota runs out. Short enough
+ * that a reset is noticed within the quarter hour, long enough that a backlog
+ * of agent jobs does not re-ask the provider once per job.
+ */
+function quotaCooldownMs(): number {
+  const seconds = Number(process.env.AI_QUOTA_COOLDOWN_SECONDS);
+  return Number.isFinite(seconds) && seconds > 0
+    ? seconds * 1000
+    : DEFAULT_QUOTA_COOLDOWN_MS;
+}
+
+/** Whether a provider error is a spent quota rather than a busy provider. */
+export function isQuotaExhausted(err: unknown): boolean {
+  const rateLimited =
+    err instanceof AiRateLimitError ||
+    (err instanceof AiProviderError && err.statusCode === 429);
+  if (!rateLimited) return false;
+  const text = err.message.toLowerCase();
+  return QUOTA_MARKERS.some((marker) => text.includes(marker));
+}
+
 const JSON_SYSTEM_HINT =
   'You MUST respond with valid JSON only — no explanation, no markdown fences, no extra text.';
 
 @Injectable()
 export class AiClientService {
   private readonly logger = new Logger(AiClientService.name);
+  /** Credential -> epoch ms before which calls are refused locally. */
+  private readonly quotaCooldownUntil = new Map<string, number>();
 
   constructor(
     private readonly providerConfigService: AiProviderConfigService,
@@ -182,11 +220,37 @@ export class AiClientService {
   ): Promise<AiProviderResult> {
     const retries = options.rateLimitRetries ?? 3;
     const delaysMs = [60_000, 120_000, 240_000];
+    const credential = this.credentialKey(config);
+
+    const until = this.quotaCooldownUntil.get(credential);
+    if (until !== undefined) {
+      if (Date.now() < until) {
+        throw new AiQuotaExhaustedError(
+          `AI provider quota exhausted for this credential; not calling it ` +
+            `again until ${new Date(until).toISOString()}.`,
+          new Date(until),
+        );
+      }
+      this.quotaCooldownUntil.delete(credential);
+    }
 
     for (let attempt = 0; ; attempt++) {
       try {
         return await provider.complete(messages, config, options);
       } catch (err) {
+        // A spent quota is the one 429 that retrying cannot fix. Retrying it
+        // was 60 + 120 + 240 s per call, each held on one of the few global
+        // worker slots while every other background job waited behind it.
+        if (isQuotaExhausted(err)) {
+          const retryAfter = new Date(Date.now() + quotaCooldownMs());
+          this.quotaCooldownUntil.set(credential, retryAfter.getTime());
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Provider quota exhausted (${message}); not retrying, and no ` +
+              `further calls on this credential until ${retryAfter.toISOString()}.`,
+          );
+          throw new AiQuotaExhaustedError(message, retryAfter);
+        }
         const retryable =
           err instanceof AiRateLimitError ||
           (err instanceof AiProviderError &&
@@ -211,6 +275,15 @@ export class AiClientService {
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
+  }
+
+  /** Which quota a call spends: the credential, never the raw key itself. */
+  private credentialKey(config: AiProviderRuntimeConfig): string {
+    const keyDigest = createHash('sha256')
+      .update(config.apiKey ?? '')
+      .digest('hex')
+      .slice(0, 16);
+    return `${config.provider}|${config.baseUrl ?? ''}|${keyDigest}`;
   }
 
   private async getRuntimeConfig(

@@ -48,7 +48,10 @@ import {
   RegisterDiscoveredAssetsResponseDto,
   UpdateRunnerAssetStatusDto,
   RunnerAssetProgressDto,
+  RunnerAssetQueryDto,
+  RunnerAssetQueryResponseDto,
 } from './dto';
+import { RunnerAssetQueryService } from './runner-asset-query.service';
 import { SearchRunnersRequestDto } from '../dto/search-runners-request.dto';
 import { SearchRunnersResponseDto } from '../dto/search-runners-response.dto';
 import { SearchRunnersChartsRequestDto } from '../dto/search-runners-charts-request.dto';
@@ -59,7 +62,10 @@ import { SearchRunnersAssetsResponseDto } from '../dto/search-runners-assets-res
 @ApiTags('Runners')
 @Controller()
 export class CliRunnerController {
-  constructor(private cliRunnerService: CliRunnerService) {}
+  constructor(
+    private cliRunnerService: CliRunnerService,
+    private readonly runnerAssetQuery: RunnerAssetQueryService,
+  ) {}
 
   @Post('sources/:sourceId/run')
   @ApiOperation({ summary: 'Start CLI runner for source' })
@@ -180,6 +186,27 @@ export class CliRunnerController {
   ) {
     await this.cliRunnerService.updateRunnerAssetStatuses(runnerId, dto.assets);
     return { updated: dto.assets.length };
+  }
+
+  @UseGuards(CliBackpressureGuard)
+  @InternalOnly()
+  @Post('runners/:runnerId/assets/query')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Read assets of a source in this namespace, for a running connector',
+    description:
+      'Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the ' +
+      'call so the notebook never holds API credentials. Only while the run is ' +
+      'RUNNING; at most 100 calls per run, 5,000 assets per page, 15 s per query.',
+  })
+  @ApiBody({ type: RunnerAssetQueryDto })
+  @ApiResponse({ status: 200, type: RunnerAssetQueryResponseDto })
+  async queryAssets(
+    @Param('runnerId') runnerId: string,
+    @Body() body: RunnerAssetQueryDto,
+  ): Promise<RunnerAssetQueryResponseDto> {
+    return this.runnerAssetQuery.query(runnerId, body);
   }
 
   @AllowInDemoMode()

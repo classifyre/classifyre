@@ -25,6 +25,24 @@ export class AiRateLimitError extends Error {
   }
 }
 
+/**
+ * A rate limit that means the allowance itself is gone — a daily, credit or
+ * billing quota — not "slow down". Every call until the provider resets gets
+ * the same answer, so it is never retried, and further calls on the same
+ * credential are refused locally until `retryAfter`.
+ *
+ * Subclasses AiRateLimitError so every existing handler still recognises it.
+ */
+export class AiQuotaExhaustedError extends AiRateLimitError {
+  constructor(
+    message: string,
+    public readonly retryAfter: Date | null = null,
+  ) {
+    super(message);
+    this.name = 'AiQuotaExhaustedError';
+  }
+}
+
 /** Requested model not found (HTTP 404). */
 export class AiModelNotFoundError extends Error {
   readonly code = 'AI_MODEL_NOT_FOUND' as const;

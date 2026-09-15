@@ -980,7 +980,11 @@
       "severity": "Priorität",
       "comment": "Kommentar",
       "noChange": "Keine Änderung",
-      "commentPlaceholder": "Kommentar zu allen ausgewählten Befunden hinzufügen…"
+      "commentPlaceholder": "Kommentar zu allen ausgewählten Befunden hinzufügen…",
+      "countingExact": "Passende Befunde werden gezählt…",
+      "unnarrowedWarning": "Diese Filter wählen alle Befunde dieses Arbeitsbereichs aus. Beim Speichern wird die Änderung auf alle {{count}} angewendet.",
+      "countChanged": "Seit dem Öffnen passen mehr Befunde, daher wurde nichts geändert. Die Anzahl wurde aktualisiert – bitte prüfen und erneut speichern.",
+      "updateFailed": "Befunde konnten nicht aktualisiert werden"
     },
     "extraction": {
       "noFields": "Keine Felder befüllt",
@@ -1149,6 +1153,21 @@
       "custom": "Benutzerdefiniert",
       "unknown": "Unbekannt",
       "moreCount": "+{{count}} weitere"
+    },
+    "bulkOperations": {
+      "running": "{{processed}} von {{total}} Befunden werden im Hintergrund aktualisiert ({{percent}} %)",
+      "changed": "· {{count}} geändert",
+      "stop": "Stoppen",
+      "stopping": "Wird nach der aktuellen Seite gestoppt…",
+      "completed": "Hintergrund-Aktualisierung abgeschlossen: {{count}} Befunde geändert.",
+      "cancelled": "Hintergrund-Aktualisierung gestoppt: {{count}} Befunde wurden vorher geändert. Nichts wurde rückgängig gemacht.",
+      "failed": "Hintergrund-Aktualisierung fehlgeschlagen: {{message}}",
+      "dismiss": "Schließen",
+      "queued": "{{total}} Befunde für eine Hintergrund-Aktualisierung eingereiht – warte auf einen freien Worker…",
+      "retireQueued": "Das Zurückziehen von Befunden außerhalb des Geltungsbereichs von {{key}} ist eingereiht — wartet auf einen freien Worker…",
+      "retireRunning": "Befunde außerhalb des Geltungsbereichs von {{key}} werden zurückgezogen: {{changed}} erledigt ({{percent}} %)",
+      "retireCompleted": "{{count}} Befunde außerhalb des Geltungsbereichs von {{key}} zurückgezogen.",
+      "retireCancelled": "Zurückziehen für {{key}} gestoppt: {{count}} Befunde wurden vorher erledigt. Nichts wurde rückgängig gemacht."
     }
   },
   "assets": {
@@ -1212,6 +1231,10 @@
       "assetMetadata": {
         "title": "Quelleneigenschaften",
         "desc": "Quellenspezifische Eigenschaften, die bei der Erfassung erfasst wurden.",
+        "reference": {
+          "badge": "Referenz — nicht extrahiert",
+          "hint": "Der Connector hat dieses Asset ohne Inhaltsextraktion erfasst: {{reason}}. Es ist über diese Eigenschaften auffindbar, sein Inhalt wurde aber nicht gescannt."
+        },
         "keys": {
           "size_bytes": "Größe",
           "row_count": "Zeilenanzahl",
@@ -1628,7 +1651,14 @@
       "addField": "Feld hinzufügen",
       "removeField": "Feld entfernen",
       "saving": "Wird gespeichert…",
-      "validationProviderRequired": "KI-Anbieter auswählen"
+      "validationProviderRequired": "KI-Anbieter auswählen",
+      "budgetTitle": "Laufbudget",
+      "budgetHint": "Wie viel eines Laufs dieser Detektor mit Fehlschlägen verbringen darf. Jeder Lauf stoppt ihn bereits nach einer Ablehnung, die kein Wiederholen behebt (Kontingent, ungültiger Schlüssel, Abrechnung), oder nach 10 Fehlschlägen in Folge. Übersprungene Assets behalten ihre Befunde und werden im nächsten Lauf erneut geprüft. Eine Budgetänderung löst keinen erneuten Scan aus.",
+      "budgetMaxAttempts": "Versuche pro Asset",
+      "budgetMaxAttemptsPlaceholder": "Standard der Installation",
+      "budgetMaxConsecutiveFailures": "Stopp nach Fehlschlägen in Folge",
+      "budgetMaxWallClockSeconds": "Zeitbudget pro Lauf (Sekunden)",
+      "budgetMaxWallClockSecondsPlaceholder": "kein Limit"
     },
     "startBlank": "Leer beginnen",
     "startBlankDesc": "Detektor ohne vorausgefüllte Werte von Grund auf konfigurieren.",
@@ -1717,6 +1747,34 @@
       "usageCopy": "Snippet kopieren",
       "usageCopied": "Kopiert",
       "notSelectable": "Tag-Detektoren erscheinen nicht in der Detektorliste einer Quelle. Jeder aktive steht automatisch jedem Custom-Connector zur Verfügung."
+    },
+    "retire": {
+      "title": "Befunde außerhalb des Geltungsbereichs",
+      "description": "Wenn Sie die Asset-Arten dieses Detektors einschränken oder ein Regex-Muster entfernen, entstehen keine neuen Befunde mehr — die bereits erzeugten bleiben aber offen, denn ein erneuter Scan prüft sie mit diesem Detektor nie wieder. Prüfen Sie, welche Befunde er nicht mehr erzeugen kann, und ziehen Sie sie zurück.",
+      "check": "Befunde außerhalb des Geltungsbereichs prüfen",
+      "dialogTitle": "Befunde außerhalb des Geltungsbereichs für {{key}}",
+      "dialogDescription": "Gezählt gegen die aktuelle Konfiguration des Detektors. Nichts ändert sich, bevor Sie bestätigen.",
+      "queued": "Eingereiht — wartet auf einen freien Hintergrund-Worker…",
+      "counting": "Zählt… {{percent}} % der Befundtabelle geprüft",
+      "none": "Nichts zurückzuziehen: Alle offenen Befunde dieses Detektors liegen noch im Geltungsbereich.",
+      "candidates": "{{count}} offene Befunde kann dieser Detektor nicht mehr erzeugen.",
+      "reasonAssetKind": "Asset-Art \"{{value}}\" liegt außerhalb des Geltungsbereichs",
+      "reasonPatternRemoved": "Muster \"{{value}}\" wurde entfernt",
+      "keptCited": "Behalten — in einem Fall zitiert: {{count}}",
+      "keptWatched": "Behalten — von einer aktiven Anfrage beobachtet: {{count}}",
+      "includeWatched": "Auch die {{count}} Befunde zurückziehen, die aktive Anfragen beobachten",
+      "includeWatchedHint": "Diese Anfragen verlieren diese Treffer. In einem Fall zitierte Befunde werden nie zurückgezogen.",
+      "willRetire": "{{count}} Befunde werden als erledigt markiert. Es wird kein Detektor-Feedback gespeichert, und sie öffnen sich automatisch wieder, wenn der Geltungsbereich erneut erweitert wird.",
+      "notProvable": "Was diese Prüfung nicht beurteilen kann",
+      "retireButton": "{{count}} Befunde zurückziehen",
+      "retiring": "Wird zurückgezogen… {{changed}} erledigt ({{percent}} %)",
+      "done": "{{count}} Befunde zurückgezogen.",
+      "cancelled": "Nach {{count}} zurückgezogenen Befunden gestoppt. Nichts wurde rückgängig gemacht.",
+      "capReached": "Bei der geprüften Anzahl gestoppt: Nach der Zählung sind weitere Befunde aus dem Geltungsbereich gefallen. Prüfen Sie erneut, um sie zu sehen.",
+      "failed": "Konnte nicht abgeschlossen werden: {{message}}",
+      "startFailed": "Die Prüfung konnte nicht gestartet werden.",
+      "countAgain": "Erneut prüfen",
+      "close": "Schließen"
     }
   },
   "scans": {
@@ -1856,7 +1914,17 @@
       "title": "Quellkontext",
       "openSource": "Quelle öffnen"
     },
-    "sourceRun": "{{source}}-Ausführung"
+    "sourceRun": "{{source}}-Ausführung",
+    "degraded": {
+      "title": "In diesem Lauf abgeschaltete Detektoren",
+      "item": "hat {{skipped}} Assets übersprungen, weil {{cause}}.",
+      "retryNote": "Übersprungene Assets behalten ihre bisherigen Befunde und werden im nächsten Lauf erneut geprüft.",
+      "cause": {
+        "provider_refused": "der KI-Anbieter die Anfrage abgelehnt hat (Kontingent, Schlüssel oder Abrechnung)",
+        "consecutive_failures": "er zu oft hintereinander fehlgeschlagen ist",
+        "wall_clock_budget": "sein Zeitbudget aufgebraucht war"
+      }
+    }
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -4566,6 +4634,35 @@
       "description": "Die Classifyre-Dokumentation — wie die Anwendung Abschnitt für Abschnitt funktioniert: Confluence, Jira, SharePoint und mehr anbinden, Scans ausführen, Funde triagieren, Assets entdoppeln und mit dem KI-Autopiloten ermitteln.",
       "ogTitle": "Dokumentation — anbinden, scannen & ermitteln | Classifyre",
       "ogDescription": "Quellen anbinden, scannen, Funde prüfen und dem Wesentlichen nachgehen — mit einem KI-Autopiloten, der die Laufarbeit übernimmt. Anleitungen für jeden Arbeitsablauf."
+    }
+  },
+  "cohorts": {
+    "runTitle": "Kohortenauswahl in diesem Lauf",
+    "runDescription": "Was jedes Band von ctx.cohort() des Connectors besucht hat und wie viele dieser Schlüssel einen neuen HIGH- oder CRITICAL-Befund ergeben haben. Die Plattform verschiebt die Aufteilung der nächsten Läufe zu den ergiebigen Bändern.",
+    "universe": "{{count}} Schlüssel im Universum",
+    "bandColumn": "Band",
+    "visited": "Besucht",
+    "hits": "Treffer",
+    "rate": "Trefferquote",
+    "weightUsed": "Verwendeter Anteil",
+    "exhausted": "Durchlauf abgeschlossen",
+    "sourceTitle": "Kohortenauswahl",
+    "sourceDescription": "Wie der nächste Lauf dieser Quelle sein Budget auf die Bänder jeder Kohorte aufteilt.",
+    "lastRun": "Letzter Lauf: {{bands}}",
+    "band": {
+      "newest": "Neueste",
+      "oldest": "Älteste",
+      "random": "Zufällig"
+    },
+    "mode": {
+      "auto": "Gemessen",
+      "fixed": "Fest"
+    },
+    "reason": {
+      "no_history": "Noch keine gemessenen Läufe: Die vom Connector deklarierte Aufteilung gilt.",
+      "cold_start": "Belege werden gesammelt: Die deklarierte Aufteilung gilt, bis jedes Band 200 Besuche hat.",
+      "measured": "Zu den Bändern mit höherer Trefferquote verschoben, höchstens 15 Punkte pro Lauf, nie unter 10 % pro Band.",
+      "fixed": "Eine an der Quelle festgelegte Aufteilung."
     }
   }
 }

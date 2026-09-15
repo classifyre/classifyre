@@ -1,17 +1,35 @@
-import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { renderReasons } from './embedding/reason-labels';
 import { CreateFindingDto } from './dto/create-finding.dto';
 import { UpdateFindingDto } from './dto/update-finding.dto';
 import {
+  BULK_UPDATE_MAX_IDS,
   BulkUpdateFindingsDto,
   BulkUpdateFindingsResponseDto,
 } from './dto/bulk-update-findings.dto';
 import {
+  assertKnownFindingFilterKeys,
+  findingFiltersNarrow,
+} from './utils/finding-filter-keys';
+import {
   QueryFindingsAssetsDto,
   AssetFindingsSort,
 } from './dto/query-findings-assets.dto';
-import { DetectorType, FindingStatus, Prisma, Severity } from '@prisma/client';
+import {
+  DetectorType,
+  FindingBulkOperationKind,
+  FindingStatus,
+  Prisma,
+  Severity,
+  type FindingBulkOperation,
+} from '@prisma/client';
 import {
   HistoryEventType,
   type FindingHistoryEntry,
@@ -44,6 +62,12 @@ import {
 } from './stats/finding-stats.service';
 import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
 import { FINDING_TOTAL_CAP } from './stats/finding-stats.constants';
+import {
+  BULK_OPERATION_PAGE_PAUSE_MS,
+  BULK_OPERATION_PAGE_SIZE,
+  BULK_UPDATE_SYNC_LIMIT,
+} from './findings-bulk/finding-bulk-operation.constants';
+import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operation.service';
 
 /**
  * Findings a filter-mode bulk update processes per page.
@@ -65,6 +89,7 @@ export class FindingsService {
     @Optional() private readonly correlationJobs?: CorrelationJobScheduler,
     @Optional() private readonly stats?: FindingStatsService,
     @Optional() private readonly statsJobs?: FindingStatsScheduler,
+    @Optional() private readonly bulkOperations?: FindingBulkOperationService,
   ) {}
 
   private readonly searchFindingSelect = {
@@ -149,6 +174,10 @@ export class FindingsService {
   private buildBaseFindingsWhere(
     filters?: SearchFindingsRequestDto['filters'],
   ): { where: Prisma.FindingWhereInput; search: string } {
+    // Every findings query funnels through here, so this one check covers
+    // search, charts, detector options and bulk update alike. A key this
+    // builder does not read would otherwise drop out and widen the match.
+    assertKnownFindingFilterKeys(filters);
     const where: Prisma.FindingWhereInput = {};
     const includeResolved = filters?.includeResolved ?? false;
 
@@ -349,6 +378,8 @@ export class FindingsService {
       matchedContent: string;
     }>,
     status: FindingStatus,
+    client: Pick<Prisma.TransactionClient, 'customDetectorFeedback'> = this
+      .prisma,
   ): Promise<void> {
     if (!this.shouldRecordFeedbackStatus(status)) {
       return;
@@ -378,7 +409,7 @@ export class FindingsService {
       return;
     }
 
-    await this.prisma.customDetectorFeedback.createMany({ data: rows });
+    await client.customDetectorFeedback.createMany({ data: rows });
   }
 
   private startOfDay(date: Date) {
@@ -1141,15 +1172,90 @@ export class FindingsService {
     dto: BulkUpdateFindingsDto,
     userId?: string,
   ): Promise<BulkUpdateFindingsResponseDto> {
-    const { ids, filters, status, severity, comment } = dto;
+    const { filters, status, severity, comment } = dto;
+    // No global ValidationPipe runs here, and the MCP tool passes raw JSON, so
+    // none of these can be trusted to have their declared types.
+    const ids = Array.isArray(dto.ids)
+      ? dto.ids.filter((id): id is string => typeof id === 'string')
+      : [];
+    const confirm = dto.confirm === true || (dto.confirm as unknown) === 'true';
+    const dryRun = dto.dryRun === true || (dto.dryRun as unknown) === 'true';
+    const expectedCount = this.parseExpectedCount(dto.expectedCount);
+    const hasChanges = Boolean(status || severity || comment !== undefined);
 
-    if (!status && !severity && comment === undefined) {
-      return { updatedCount: 0, ids: [] };
+    if (ids.length > BULK_UPDATE_MAX_IDS) {
+      throw new BadRequestException(
+        `At most ${BULK_UPDATE_MAX_IDS} ids per request (got ${ids.length}). ` +
+          'For a larger set, select it with filters and pass the dryRun count ' +
+          'as expectedCount.',
+      );
     }
 
     // ── Filter-based mode (select-all): use updateMany for efficiency ──────────
-    if (filters && !ids?.length) {
+    if (filters && !ids.length) {
+      // Rejects unknown filter keys before anything is counted or written.
       const where = await this.buildSearchFindingsWhere(filters);
+      const narrowed = findingFiltersNarrow(filters);
+
+      if (dryRun) {
+        const wouldUpdate = await this.prisma.finding.count({ where });
+        return {
+          updatedCount: 0,
+          ids: [],
+          wouldUpdate,
+          narrowed,
+          dryRun: true,
+        };
+      }
+      if (!hasChanges) return { updatedCount: 0, ids: [] };
+
+      // An empty `where` on a destructive operation means "everything". That is
+      // the most dangerous available default, so it has to be asked for.
+      if (!narrowed && !confirm) {
+        throw new BadRequestException({
+          message:
+            'These filters narrow nothing beyond status, includeResolved and ' +
+            'excludeIds, so the update would apply to every finding in the ' +
+            'namespace. Pass confirm: true if that is intended — ideally with ' +
+            'expectedCount taken from a dryRun.',
+          narrowed: false,
+        });
+      }
+      const matched = await this.prisma.finding.count({ where });
+      if (expectedCount !== undefined && matched > expectedCount) {
+        throw new ConflictException({
+          message:
+            `The filters match ${matched} findings, more than the ` +
+            `${expectedCount} expected. Nothing was written.`,
+          expectedCount,
+          actualCount: matched,
+        });
+      }
+
+      // Too large for one request: the walk and the one-shot `updateMany`
+      // below outlasted every client and MCP timeout on a corpus this size,
+      // and a timeout left history written for a change that never landed.
+      if (matched > BULK_UPDATE_SYNC_LIMIT && this.bulkOperations) {
+        const operation = await this.bulkOperations.create({
+          kind: FindingBulkOperationKind.STATUS_CHANGE,
+          filters: filters as Record<string, unknown>,
+          target: {
+            ...(status ? { status } : {}),
+            ...(severity ? { severity } : {}),
+            ...(comment !== undefined ? { comment } : {}),
+          },
+          totalEstimate: matched,
+          createdBy: userId ?? null,
+        });
+        return {
+          updatedCount: 0,
+          ids: [],
+          operationId: operation.id,
+          async: true,
+          total: matched,
+        };
+      }
+
       const data: Prisma.FindingUpdateManyMutationInput = {};
       if (status) data.status = status;
       if (severity) data.severity = severity;
@@ -1191,8 +1297,33 @@ export class FindingsService {
     }
 
     // ── ID-based mode: update with per-finding history tracking ───────────────
-    if (!ids?.length) return { updatedCount: 0, ids: [] };
+    if (!ids.length) return { updatedCount: 0, ids: [] };
+    if (dryRun) {
+      const wouldUpdate = await this.prisma.finding.count({
+        where: { id: { in: ids } },
+      });
+      return {
+        updatedCount: 0,
+        ids: [],
+        wouldUpdate,
+        narrowed: true,
+        dryRun: true,
+      };
+    }
+    if (!hasChanges) return { updatedCount: 0, ids: [] };
     return this.bulkUpdateByIds(ids, status, severity, comment, userId);
+  }
+
+  /** `expectedCount` as a non-negative integer, or undefined when absent. */
+  private parseExpectedCount(value: unknown): number | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    const parsed = typeof value === 'number' ? value : Number(value);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      throw new BadRequestException(
+        `expectedCount must be a non-negative integer (got ${JSON.stringify(value)}).`,
+      );
+    }
+    return parsed;
   }
 
   /**
@@ -1282,6 +1413,184 @@ export class FindingsService {
       if (page.length < BULK_STATUS_PAGE_SIZE) return;
       cursor = page.at(-1)?.id;
     }
+  }
+
+  /**
+   * Run one bounded chunk of a background bulk operation.
+   *
+   * Pages by keyset on `id`; each page is ONE short transaction that changes
+   * the findings, appends their history, records feedback and advances the
+   * operation's cursor together. That is the difference from the synchronous
+   * path, where history and feedback land first and a failure before the final
+   * `updateMany` leaves findings claiming a status change that never happened.
+   * Here a crash or a cancel leaves a consistent prefix, and the next chunk
+   * resumes from `cursor`.
+   *
+   * Each finding is rewritten once per page, not twice (history pass, then
+   * status pass) — half the dead tuples and WAL on a table with 18 indexes.
+   */
+  async runBulkOperationChunk(
+    operation: FindingBulkOperation,
+    budgetMs: number,
+  ): Promise<{ done: boolean }> {
+    if (operation.kind !== FindingBulkOperationKind.STATUS_CHANGE) {
+      throw new Error(`Unsupported bulk operation kind ${operation.kind}`);
+    }
+    const target = this.bulkTarget(operation.target);
+    const where = await this.buildSearchFindingsWhere(
+      operation.filters as SearchFindingsRequestDto['filters'],
+    );
+    const statusGuard: Prisma.FindingWhereInput[] = target.status
+      ? [{ status: { not: target.status } }]
+      : [];
+    const historyEntry = target.status
+      ? historyEntryForStorage({
+          timestamp: new Date(),
+          runnerId: 'manual',
+          eventType: HistoryEventType.STATUS_CHANGED,
+          status: target.status,
+          ...(target.severity ? { severity: target.severity } : {}),
+          changedBy: operation.createdBy ?? 'system',
+          changeReason: target.comment || 'Bulk status change',
+        })
+      : null;
+    const wantsFeedback =
+      target.status !== undefined &&
+      this.shouldRecordFeedbackStatus(target.status);
+
+    const started = Date.now();
+    let cursor = operation.cursor ?? undefined;
+    for (;;) {
+      const page = await this.prisma.finding.findMany({
+        where: {
+          AND: [
+            where,
+            ...statusGuard,
+            ...(cursor ? [{ id: { gt: cursor } }] : []),
+          ],
+        },
+        select: {
+          id: true,
+          sourceId: true,
+          detectorType: true,
+          customDetectorId: true,
+          customDetectorKey: true,
+          customDetectorName: true,
+          findingType: true,
+          matchedContent: true,
+        },
+        orderBy: { id: 'asc' },
+        take: BULK_OPERATION_PAGE_SIZE,
+      });
+      if (page.length === 0) return { done: true };
+
+      const ids = page.map((row) => row.id);
+      const lastId = ids[ids.length - 1];
+      await this.prisma.$transaction(
+        async (tx) => {
+          const changed = await this.applyBulkTargetToPage(
+            tx,
+            ids,
+            target,
+            historyEntry,
+          );
+          if (wantsFeedback && target.status) {
+            await this.recordCustomDetectorFeedback(page, target.status, tx);
+          }
+          await tx.findingBulkOperation.update({
+            where: { id: operation.id },
+            data: {
+              cursor: lastId,
+              processed: { increment: page.length },
+              changed: { increment: changed },
+            },
+          });
+        },
+        { timeout: 30_000 },
+      );
+      cursor = lastId;
+
+      if (page.length < BULK_OPERATION_PAGE_SIZE) return { done: true };
+      if (Date.now() - started >= budgetMs) return { done: false };
+      const latest = await this.prisma.findingBulkOperation.findUnique({
+        where: { id: operation.id },
+        select: { cancelRequested: true },
+      });
+      if (latest?.cancelRequested) return { done: true };
+      await new Promise((resolve) =>
+        setTimeout(resolve, BULK_OPERATION_PAGE_PAUSE_MS),
+      );
+    }
+  }
+
+  /** Rebuild what a finished operation invalidated, once rather than per page. */
+  async afterBulkOperation(operation: FindingBulkOperation): Promise<void> {
+    const target = this.bulkTarget(operation.target);
+    if (!target.status || operation.changed === 0) return;
+    await this.correlationJobs?.scheduleFull('bulk finding status changed');
+    await this.statsJobs?.scheduleFull('bulk finding status changed');
+  }
+
+  private bulkTarget(raw: unknown): {
+    status?: FindingStatus;
+    severity?: Severity;
+    comment?: string;
+  } {
+    const value =
+      raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+    const status =
+      typeof value.status === 'string' ? value.status.toUpperCase() : '';
+    const severity =
+      typeof value.severity === 'string' ? value.severity.toUpperCase() : '';
+    return {
+      ...(Object.values(FindingStatus).includes(status as FindingStatus)
+        ? { status: status as FindingStatus }
+        : {}),
+      ...(Object.values(Severity).includes(severity as Severity)
+        ? { severity: severity as Severity }
+        : {}),
+      ...(typeof value.comment === 'string' ? { comment: value.comment } : {}),
+    };
+  }
+
+  /** One UPDATE for one page: the fields, the history entry and updated_at. */
+  private async applyBulkTargetToPage(
+    tx: Prisma.TransactionClient,
+    ids: string[],
+    target: { status?: FindingStatus; severity?: Severity; comment?: string },
+    historyEntry: unknown,
+  ): Promise<number> {
+    const sets: Prisma.Sql[] = [Prisma.sql`updated_at = now()`];
+    if (target.status) {
+      sets.push(Prisma.sql`status = ${target.status}::"FindingStatus"`);
+      if (
+        target.status === FindingStatus.RESOLVED ||
+        target.status === FindingStatus.FALSE_POSITIVE
+      ) {
+        sets.push(Prisma.sql`resolved_at = now()`);
+        if (target.comment) {
+          sets.push(Prisma.sql`resolution_reason = ${target.comment}`);
+        }
+      } else if (target.status === FindingStatus.OPEN) {
+        sets.push(Prisma.sql`resolved_at = NULL`);
+      }
+      sets.push(
+        Prisma.sql`history = COALESCE(history, '[]'::jsonb) || ${JSON.stringify([historyEntry])}::jsonb`,
+      );
+    }
+    if (target.severity) {
+      sets.push(Prisma.sql`severity = ${target.severity}::"Severity"`);
+    }
+    if (target.comment !== undefined) {
+      sets.push(Prisma.sql`comment = ${target.comment}`);
+    }
+    const statusGuard = target.status
+      ? Prisma.sql` AND status <> ${target.status}::"FindingStatus"`
+      : Prisma.empty;
+    return tx.$executeRaw`
+      UPDATE findings SET ${Prisma.join(sets, ', ')}
+      WHERE id = ANY(${ids}::text[])${statusGuard}
+    `;
   }
 
   private async bulkUpdateByIds(

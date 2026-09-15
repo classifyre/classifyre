@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import base64
+import functools
 import json
 import logging
 import os
 import random
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 # Quiet litellm's import-time provider preload warnings (bedrock/sagemaker need
@@ -22,6 +24,7 @@ from ....models.generated_single_asset_scan_results import (
 )
 from ....utils.file_to_images import render_to_images, supported_mime_type
 from ...dependencies import require_module
+from ...errors import ProviderRefusedError
 from ._base import _IMAGE_CONTENT_TYPES, _TEXT_CONTENT_TYPES, BaseRunner, _resolve_pipeline_severity
 
 logger = logging.getLogger(__name__)
@@ -48,10 +51,33 @@ _COMPLETION_TIMEOUT_SECONDS = float(os.environ.get("CLASSIFYRE_LLM_TIMEOUT_SECON
 # Retry budget for transient provider failures (429 rate limits, 5xx, timeouts).
 # Exponential backoff with jitter, honouring Retry-After when the provider
 # sends one, so a saturated endpoint is backed off from instead of hammered.
-_MAX_COMPLETION_ATTEMPTS = max(1, int(os.environ.get("CLASSIFYRE_LLM_MAX_ATTEMPTS", "4")))
+# The attempt count is read per call (see `_max_attempts`), so a detector's own
+# `budget.max_attempts` can override it.
+_DEFAULT_MAX_COMPLETION_ATTEMPTS = 4
 _RETRY_BACKOFF_BASE_SECONDS = float(os.environ.get("CLASSIFYRE_LLM_RETRY_BASE_SECONDS", "2"))
 _RETRY_BACKOFF_MAX_SECONDS = 60.0
 _RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+
+# Used only if the shared marker list cannot be read, so a packaging mistake
+# degrades to "the known worst offender still fails fast" rather than to "every
+# quota refusal is retried on every asset again".
+_FALLBACK_QUOTA_MARKERS = ("free-models-per-day", "insufficient_quota")
+
+
+@functools.lru_cache(maxsize=1)
+def _quota_markers() -> tuple[str, ...]:
+    """Substrings that make a refusal non-retryable; shared with the API."""
+    try:
+        import schemas
+
+        path = Path(schemas.__file__).parent / "provider_refusal_markers.json"
+        markers = json.loads(path.read_text(encoding="utf-8")).get("quota", [])
+        loaded = tuple(str(m).strip().lower() for m in markers if str(m).strip())
+        if loaded:
+            return loaded
+    except Exception as exc:  # pragma: no cover - packaging failure
+        logger.warning("provider_refusal_markers.json unavailable (%s); using fallback", exc)
+    return _FALLBACK_QUOTA_MARKERS
 
 
 class LLMCompletionError(RuntimeError):
@@ -60,6 +86,14 @@ class LLMCompletionError(RuntimeError):
     Carries only a string message so it survives pickling across the detector
     worker-pool process boundary; the pipeline records the detector's outcome
     as ERROR instead of a silent empty result.
+    """
+
+
+class LLMProviderRefusedError(LLMCompletionError, ProviderRefusedError):
+    """The provider refused in a way no retry can fix (quota, auth, billing).
+
+    Raised on the first such response, never after retries. The pipeline
+    disables the detector for the rest of the run when it sees one.
     """
 
 
@@ -153,6 +187,10 @@ class LLMRunner(BaseRunner):
             response = self._complete_with_backoff(messages)
             raw = response.choices[0].message.content or "{}"
             parsed = self._parse_json(raw)
+        except LLMProviderRefusedError:
+            # Already names the detector, the model and the refusal. No stack
+            # trace: it is expected, and it will be the same on every asset.
+            raise
         except Exception as exc:
             logger.error(
                 "llm detector error (detector=%s, model=%s): %s",
@@ -173,7 +211,8 @@ class LLMRunner(BaseRunner):
 
     def _complete_with_backoff(self, messages: list[dict[str, Any]]) -> Any:
         schema = self._schema
-        for attempt in range(1, _MAX_COMPLETION_ATTEMPTS + 1):
+        max_attempts = self._max_attempts()
+        for attempt in range(1, max_attempts + 1):
             try:
                 return self._litellm.completion(
                     model=self._model_string(),
@@ -184,9 +223,26 @@ class LLMRunner(BaseRunner):
                     messages=messages,
                     response_format={"type": "json_object"},
                     timeout=_COMPLETION_TIMEOUT_SECONDS,
+                    # One retry layer, and it is this loop. litellm hands the
+                    # OpenAI client its own default of 2 retries, which hid
+                    # ~30 s of backoff inside every single attempt: a daily-quota
+                    # refusal measured 30.2 s before this loop ever saw it.
+                    max_retries=0,
                 )
             except Exception as exc:
-                if attempt >= _MAX_COMPLETION_ATTEMPTS or not self._is_retryable(exc):
+                refusal = self._refusal_reason(exc)
+                if refusal is not None:
+                    logger.warning(
+                        "llm provider refused (detector=%s, model=%s): %s — not retrying",
+                        self._detector_key,
+                        self._runtime.model,
+                        refusal,
+                    )
+                    raise LLMProviderRefusedError(
+                        f"LLM provider refused detector '{self._detector_key}' "
+                        f"(model={self._runtime.model}, {refusal}): {exc}"
+                    ) from None
+                if attempt >= max_attempts or not self._is_retryable(exc):
                     raise
                 delay = min(
                     _RETRY_BACKOFF_MAX_SECONDS,
@@ -202,12 +258,50 @@ class LLMRunner(BaseRunner):
                     self._detector_key,
                     self._runtime.model,
                     attempt,
-                    _MAX_COMPLETION_ATTEMPTS,
+                    max_attempts,
                     delay,
                     exc,
                 )
                 time.sleep(delay)
         raise LLMCompletionError("unreachable")  # pragma: no cover
+
+    def _max_attempts(self) -> int:
+        """The detector's own budget first, then the deployment default."""
+        budget = getattr(self._schema, "budget", None)
+        configured = getattr(budget, "max_attempts", None)
+        if isinstance(configured, int) and configured >= 1:
+            return configured
+        raw = os.environ.get("CLASSIFYRE_LLM_MAX_ATTEMPTS", "")
+        try:
+            return max(1, int(raw)) if raw.strip() else _DEFAULT_MAX_COMPLETION_ATTEMPTS
+        except ValueError:
+            return _DEFAULT_MAX_COMPLETION_ATTEMPTS
+
+    def _refusal_reason(self, exc: Exception) -> str | None:
+        """Why retrying this error cannot help, or None when it might.
+
+        A 429 is usually "slow down" and is retried. It is a refusal only when the
+        provider says the allowance itself is gone — a daily or credit quota — and
+        then every further call until the reset is the same answer, paid for again.
+        """
+        status = getattr(exc, "status_code", None)
+        if status in (401, 403):
+            return "authentication refused"
+        if status == 402:
+            return "payment required"
+        for type_name, reason in (
+            ("AuthenticationError", "authentication refused"),
+            ("PermissionDeniedError", "permission denied"),
+            ("BudgetExceededError", "budget exceeded"),
+        ):
+            error_type = getattr(self._litellm, type_name, None)
+            if isinstance(error_type, type) and isinstance(exc, error_type):
+                return reason
+
+        text = _error_text(exc).lower()
+        if any(marker in text for marker in _quota_markers()):
+            return "quota exhausted"
+        return None
 
     def _is_retryable(self, exc: Exception) -> bool:
         retryable_types = tuple(
@@ -389,6 +483,16 @@ class LLMRunner(BaseRunner):
     @staticmethod
     def _coerce_fields(raw: Any) -> dict[str, Any]:
         return {str(k): v for k, v in raw.items()} if isinstance(raw, dict) else {}
+
+
+def _error_text(exc: Exception) -> str:
+    """Everything a provider exception says about itself, for marker matching."""
+    parts = [str(exc), str(getattr(exc, "message", "") or "")]
+    response = getattr(exc, "response", None)
+    body = getattr(response, "text", None)
+    if isinstance(body, str):
+        parts.append(body)
+    return " ".join(parts)
 
 
 def _retry_after_seconds(exc: Exception) -> float | None:

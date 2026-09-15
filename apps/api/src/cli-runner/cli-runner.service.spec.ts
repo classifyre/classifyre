@@ -1888,4 +1888,129 @@ describe('CliRunnerService', () => {
       );
     });
   });
+
+  /**
+   * The runner cap counts across namespaces; the queue did not. A run finishing
+   * in one namespace promoted only that namespace's queue, so a run queued
+   * anywhere else waited for a completion in its own namespace that nothing
+   * would ever produce.
+   */
+  describe('cross-namespace queue', () => {
+    const originalCap = process.env.MAX_CONCURRENT_RUNNERS;
+    afterEach(() => {
+      if (originalCap === undefined) delete process.env.MAX_CONCURRENT_RUNNERS;
+      else process.env.MAX_CONCURRENT_RUNNERS = originalCap;
+    });
+
+    const build = (oldest: unknown, running = 0) => {
+      process.env.MAX_CONCURRENT_RUNNERS = '1';
+      let store: Record<string, unknown> = {
+        schemaName: 'ns_a',
+        namespaceId: 'a',
+      };
+      const cls = {
+        get: jest.fn((key: string) => store[key]),
+        set: jest.fn((key: string, value: unknown) => {
+          store[key] = value;
+        }),
+        run: jest.fn(async (fn: () => Promise<unknown>) => {
+          const saved = store;
+          store = {};
+          try {
+            return await fn();
+          } finally {
+            store = saved;
+          }
+        }),
+      };
+      const registry = {
+        countRowsAcrossNamespaces: jest.fn().mockResolvedValue(running),
+        findOldestPendingRunner: jest.fn().mockResolvedValue(oldest),
+      };
+      const service = new CliRunnerService(
+        {} as any,
+        {} as any,
+        new MaskedConfigCryptoService(),
+        {} as any,
+        {} as any,
+        undefined,
+        undefined,
+        undefined,
+        cls as any,
+        registry as any,
+      );
+      const seen: Array<{ runnerId?: string; schema: unknown; slug: unknown }> =
+        [];
+      jest
+        .spyOn(service as any, 'dequeuePendingRunnerInCurrentNamespace')
+        .mockImplementation((runnerId?: unknown) => {
+          seen.push({
+            runnerId: runnerId as string | undefined,
+            schema: cls.get('schemaName'),
+            slug: cls.get('slug'),
+          });
+          return Promise.resolve();
+        });
+      return { service, cls, registry, seen };
+    };
+
+    const namespace = (id: string) => ({
+      id,
+      slug: `ws-${id}`,
+      schemaName: `ns_${id}`,
+    });
+
+    it('promotes the oldest queued run from another namespace, inside that namespace', async () => {
+      const { service, seen } = build({
+        namespace: namespace('b'),
+        runnerId: 'runner-b',
+        triggeredAt: new Date('2026-09-14T11:36:44Z'),
+      });
+
+      await service.promotePendingRunners();
+
+      expect(seen).toEqual([
+        { runnerId: 'runner-b', schema: 'ns_b', slug: 'ws-b' },
+      ]);
+    });
+
+    it('stays in the current context when the oldest queued run is local', async () => {
+      const { service, cls, seen } = build({
+        namespace: namespace('a'),
+        runnerId: 'runner-a',
+        triggeredAt: new Date(),
+      });
+
+      await service.promotePendingRunners();
+
+      expect(cls.run).not.toHaveBeenCalled();
+      expect(seen).toEqual([
+        { runnerId: 'runner-a', schema: 'ns_a', slug: undefined },
+      ]);
+    });
+
+    it('starts nothing while the instance-wide slots are full', async () => {
+      const { service, registry, seen } = build(
+        {
+          namespace: namespace('b'),
+          runnerId: 'runner-b',
+          triggeredAt: new Date(),
+        },
+        1,
+      );
+
+      await service.promotePendingRunners();
+
+      expect(registry.findOldestPendingRunner).not.toHaveBeenCalled();
+      expect(seen).toEqual([]);
+    });
+
+    it('does nothing when no namespace has a queued run', async () => {
+      const { service, seen } = build(null);
+
+      await service.promotePendingRunners();
+
+      expect(seen).toEqual([]);
+    });
+  });
 });
