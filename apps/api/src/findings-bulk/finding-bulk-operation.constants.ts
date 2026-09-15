@@ -9,11 +9,31 @@ export const FINDING_BULK_OPERATION_QUEUE = 'findings.bulk-operation';
 export const BULK_UPDATE_SYNC_LIMIT = 2000;
 
 /**
- * Findings changed per page. Each page is one short transaction — the status,
- * the history entry and the cursor move together — so it must stay small enough
- * never to hold locks or block vacuum for long.
+ * Findings read per page. Read pages stay large: the scan is sequential and
+ * cheap, and fewer pages means fewer round trips.
  */
 export const BULK_OPERATION_PAGE_SIZE = 2000;
+
+/**
+ * Findings written per transaction. The write — not the scan — is what must
+ * fit the transaction budget.
+ *
+ * Field-measured on a 2,743 MB `findings` heap (18 indexes, four including
+ * `status`, so no HOT updates) against 768 MB of `shared_buffers`: a 2,000-row
+ * UPDATE took 11.1 s / 33.4 s / 43.4 s across three identical runs, so two of
+ * three exceeded the 30 s budget. The spread is the point — cache residency
+ * varies run to run — which is why this is a much smaller batch rather than a
+ * larger timeout: any timeout derived from one measurement fails on a colder
+ * cache. 250 rows measured ~6–7 s, leaving ~4× margin inside the budget.
+ */
+export const BULK_OPERATION_WRITE_BATCH_SIZE = 250;
+
+/**
+ * Budget for one write-batch transaction. Do NOT raise this to fit a slow
+ * page: shrink the write batch instead (see above). A fixed timeout can only
+ * ever fit the runs already measured, never the next colder cache.
+ */
+export const BULK_OPERATION_TX_TIMEOUT_MS = 30_000;
 
 /**
  * How long one handler invocation works before handing the rest to a new job.

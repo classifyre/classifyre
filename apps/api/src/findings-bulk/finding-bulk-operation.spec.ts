@@ -18,6 +18,8 @@ import { renderHistory } from '../types/finding-history';
 import { HistoryEventType } from '../types/finding-history.types';
 import {
   BULK_OPERATION_PAGE_SIZE,
+  BULK_OPERATION_TX_TIMEOUT_MS,
+  BULK_OPERATION_WRITE_BATCH_SIZE,
   BULK_UPDATE_SYNC_LIMIT,
   FINDING_BULK_OPERATION_QUEUE,
 } from './finding-bulk-operation.constants';
@@ -249,6 +251,59 @@ describe('FindingsService background bulk operations', () => {
       // Feedback rides the same transaction, so it cannot outlive a rollback.
       expect(tx.customDetectorFeedback.createMany).toHaveBeenCalledTimes(1);
       expect(prisma.customDetectorFeedback.createMany).not.toHaveBeenCalled();
+    });
+
+    it('holds the write batch inside the transaction budget, with margin', () => {
+      // Field regression guard: a 2,000-row UPDATE measured 11.1–43.4 s
+      // against a 30 s budget (46 rows/s at its slowest). The write batch at
+      // that same throughput takes ~5.4 s — this pins the pairing so the two
+      // constants cannot silently drift apart again. Budget per row must stay
+      // above 100 ms (≈10 rows/s, ~5× slower than the slowest measurement).
+      expect(BULK_OPERATION_WRITE_BATCH_SIZE).toBeLessThanOrEqual(
+        BULK_OPERATION_PAGE_SIZE,
+      );
+      expect(
+        BULK_OPERATION_TX_TIMEOUT_MS / BULK_OPERATION_WRITE_BATCH_SIZE,
+      ).toBeGreaterThanOrEqual(100);
+    });
+
+    it('splits a large page into write-batch transactions, cursor only on last', async () => {
+      const rows = Array.from({ length: 600 }, (_, i) =>
+        row(`w${String(i).padStart(4, '0')}`),
+      );
+      prisma.finding.findMany.mockResolvedValueOnce(rows);
+      tx.$executeRaw.mockResolvedValue(250);
+
+      const result = await service.runBulkOperationChunk(operation(), 60_000);
+
+      expect(result).toEqual({ done: true });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+      const writes = tx.findingBulkOperation.update.mock.calls.map(
+        (call: [{ data: Record<string, unknown> }]) => call[0].data,
+      );
+      expect(writes).toHaveLength(3);
+      expect(writes.slice(0, 2).every((data) => !('cursor' in data))).toBe(
+        true,
+      );
+      expect(writes[2]).toMatchObject({
+        cursor: 'w0599',
+        processed: { increment: 600 },
+      });
+    });
+
+    it('names the batch budget when a bulk write outlives its transaction', async () => {
+      prisma.finding.findMany.mockResolvedValueOnce([row('f1')]);
+      (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
+        new Error(
+          'Transaction API error: A query cannot be executed on an expired transaction.',
+        ),
+      );
+
+      await expect(
+        service.runBulkOperationChunk(operation(), 60_000),
+      ).rejects.toThrow(
+        /write batch of 1 findings exceeded the 30000 ms transaction budget.*reduce BULK_OPERATION_WRITE_BATCH_SIZE/,
+      );
     });
 
     it('resumes after the stored cursor, by keyset not offset', async () => {

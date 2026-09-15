@@ -25,6 +25,8 @@ Name | Type
 `createdAt` | Date
 `startedAt` | Date
 `finishedAt` | Date
+`updatedAt` | Date
+`leaseUntil` | Date
 
 ## Example
 
@@ -52,6 +54,8 @@ const example = {
   "createdAt": null,
   "startedAt": null,
   "finishedAt": null,
+  "updatedAt": null,
+  "leaseUntil": null,
 } satisfies FindingBulkOperationDto
 
 console.log(example)

@@ -15193,6 +15193,17 @@
             "format": "date-time",
             "type": "string",
             "nullable": true
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last persisted progress write. Together with the scan/processed counts this distinguishes \"working on a slow page\" from dead: a recent updatedAt with an old cursor is a slow page, not a hang."
+          },
+          "leaseUntil": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "Until when the current handler holds this operation. Past this time with no updatedAt movement, another handler may reclaim it."
           }
         },
         "required": [
@@ -15209,7 +15220,8 @@
           "filters",
           "target",
           "cancelRequested",
-          "createdAt"
+          "createdAt",
+          "updatedAt"
         ]
       },
       "TrainingExampleDto": {
