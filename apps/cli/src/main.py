@@ -768,6 +768,22 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 f" asset(s) after retries: {preview}"
                             )
 
+                    # A detector the breaker disabled is not a crash and not a
+                    # clean run; the API reports it from the per-asset
+                    # `breaker_open[...]` outcomes, and this is the log line an
+                    # operator reads first.
+                    for degraded in pipeline.breaker_summary():
+                        logger.warning(
+                            "Detector %s was disabled mid-run (%s): %s. %d payload(s) "
+                            "attempted, %d skipped; the skipped assets keep their "
+                            "findings and are retried on the next run.",
+                            degraded["label"],
+                            degraded["cause"],
+                            degraded["reason"],
+                            degraded["attempted_payloads"],
+                            degraded["skipped_payloads"],
+                        )
+
                     # Persist the advanced AUTOMATIC sampling cursor (no-op for
                     # other strategies, which return None). Only on the normal
                     # completion path — a timed-out run must not advance it.
@@ -777,6 +793,10 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     # A connector that covered a slice must say so before
                     # finish(), which is what decides whether absence retires
                     # an asset.
+                    cohort_stats = getattr(source, "cohort_stats", None)
+                    if cohort_stats and hasattr(sink, "set_cohort_stats"):
+                        sink.set_cohort_stats(cohort_stats)
+
                     if getattr(source, "partial_coverage", False) and hasattr(
                         sink, "set_partial_coverage"
                     ):

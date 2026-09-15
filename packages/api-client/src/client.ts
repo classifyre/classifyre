@@ -62,6 +62,7 @@ export { AssetsApi } from "./generated/src/apis/AssetsApi";
 export { HealthApi } from "./generated/src/apis/HealthApi";
 export { RunnersApi } from "./generated/src/apis/RunnersApi";
 export { FindingsApi } from "./generated/src/apis/FindingsApi";
+export { CustomDetectorsApi } from "./generated/src/apis/CustomDetectorsApi";
 export { NotificationsApi } from "./generated/src/apis/NotificationsApi";
 export { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
 export { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
@@ -197,6 +198,10 @@ export type {
 export {
   ChatBotResponseDtoPlatformEnum,
   CreateChatBotDtoPlatformEnum,
+} from "./generated/src/models";
+export {
+  FindingBulkOperationDtoKindEnum,
+  FindingBulkOperationDtoStatusEnum,
 } from "./generated/src/models";
 export type {
   AgentRunDto,
@@ -440,6 +445,10 @@ export type {
   UpdateFindingDto,
   BulkUpdateFindingsDto,
   BulkUpdateFindingsResponseDto,
+  FindingBulkOperationDto,
+  RetireOutOfScopeFindingsDto,
+  CohortWeightsPreviewDto,
+  CohortRunYieldDto,
   SearchFindingsFiltersInputDto,
   FindingLocationDto,
   MarkAllReadDto,
@@ -1171,6 +1180,7 @@ import { AssetsApi } from "./generated/src/apis/AssetsApi";
 import { HealthApi } from "./generated/src/apis/HealthApi";
 import { RunnersApi } from "./generated/src/apis/RunnersApi";
 import { FindingsApi } from "./generated/src/apis/FindingsApi";
+import { CustomDetectorsApi } from "./generated/src/apis/CustomDetectorsApi";
 import { NotificationsApi } from "./generated/src/apis/NotificationsApi";
 import { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
 import { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
@@ -1587,6 +1597,7 @@ class ApiClient {
   public health: HealthApi;
   public runners: RunnersApi;
   public findings: FindingsApi;
+  public customDetectors: CustomDetectorsApi;
   public notifications: NotificationsApi;
   public instanceSettings: InstanceSettingsApi;
   public aiProviderConfigs: AIProviderConfigsApi;
@@ -1614,6 +1625,7 @@ class ApiClient {
     this.health = new HealthApi(this.config);
     this.runners = new RunnersApi(this.config);
     this.findings = new FindingsApi(this.config);
+    this.customDetectors = new CustomDetectorsApi(this.config);
     this.notifications = new NotificationsApi(this.config);
     this.instanceSettings = new InstanceSettingsApi(this.config);
     this.aiProviderConfigs = new AIProviderConfigsApi(this.config);

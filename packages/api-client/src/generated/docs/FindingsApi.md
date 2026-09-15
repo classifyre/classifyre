@@ -5,12 +5,15 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**findingsControllerBulkUpdate**](FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings |
+| [**findingsControllerCancelBulkOperation**](FindingsApi.md#findingscontrollercancelbulkoperation) | **POST** /findings/bulk-operations/{operationId}/cancel | Cancel a background bulk finding operation |
 | [**findingsControllerCreate**](FindingsApi.md#findingscontrollercreate) | **POST** /findings/create | Create a new finding |
 | [**findingsControllerFindOne**](FindingsApi.md#findingscontrollerfindone) | **GET** /findings/{id} | Get a finding by ID |
+| [**findingsControllerGetBulkOperation**](FindingsApi.md#findingscontrollergetbulkoperation) | **GET** /findings/bulk-operations/{operationId} | Get a background bulk finding operation |
 | [**findingsControllerGetDiscoveryOverview**](FindingsApi.md#findingscontrollergetdiscoveryoverview) | **GET** /findings/discovery | Get discovery dashboard overview data |
 | [**findingsControllerGetStats**](FindingsApi.md#findingscontrollergetstats) | **GET** /findings/stats | Get finding statistics |
 | [**findingsControllerGetStatsFreshness**](FindingsApi.md#findingscontrollergetstatsfreshness) | **GET** /findings/stats/freshness | Freshness of the pre-aggregated finding statistics shared by the dashboard charts |
 | [**findingsControllerListAssetSummaries**](FindingsApi.md#findingscontrollerlistassetsummaries) | **GET** /findings/assets | List asset finding summaries with optional filters |
+| [**findingsControllerListBulkOperations**](FindingsApi.md#findingscontrollerlistbulkoperations) | **GET** /findings/bulk-operations | List background bulk finding operations |
 | [**findingsControllerRefreshDiscoveryStats**](FindingsApi.md#findingscontrollerrefreshdiscoverystats) | **POST** /findings/discovery/refresh | Queue a full rebuild of the pre-aggregated finding statistics |
 | [**findingsControllerUpdate**](FindingsApi.md#findingscontrollerupdate) | **PATCH** /findings/{id} | Update a finding |
 
@@ -79,6 +82,73 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | Findings updated successfully |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## findingsControllerCancelBulkOperation
+
+> FindingBulkOperationDto findingsControllerCancelBulkOperation(operationId)
+
+Cancel a background bulk finding operation
+
+A queued operation is cancelled outright; a running one stops after its current page. Findings already changed stay changed.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  FindingsApi,
+} from '@workspace/api-client';
+import type { FindingsControllerCancelBulkOperationRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new FindingsApi();
+
+  const body = {
+    // string
+    operationId: operationId_example,
+  } satisfies FindingsControllerCancelBulkOperationRequest;
+
+  try {
+    const data = await api.findingsControllerCancelBulkOperation(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **operationId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**FindingBulkOperationDto**](FindingBulkOperationDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -210,6 +280,71 @@ No authorization required
 |-------------|-------------|------------------|
 | **200** | Finding found |  -  |
 | **404** | Finding not found |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## findingsControllerGetBulkOperation
+
+> FindingBulkOperationDto findingsControllerGetBulkOperation(operationId)
+
+Get a background bulk finding operation
+
+### Example
+
+```ts
+import {
+  Configuration,
+  FindingsApi,
+} from '@workspace/api-client';
+import type { FindingsControllerGetBulkOperationRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new FindingsApi();
+
+  const body = {
+    // string
+    operationId: operationId_example,
+  } satisfies FindingsControllerGetBulkOperationRequest;
+
+  try {
+    const data = await api.findingsControllerGetBulkOperation(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **operationId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**FindingBulkOperationDto**](FindingBulkOperationDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -504,6 +639,73 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | List of asset finding summaries |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## findingsControllerListBulkOperations
+
+> Array&lt;FindingBulkOperationDto&gt; findingsControllerListBulkOperations(active)
+
+List background bulk finding operations
+
+Most recent first. &#x60;active&#x3D;true&#x60; returns only queued and running operations.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  FindingsApi,
+} from '@workspace/api-client';
+import type { FindingsControllerListBulkOperationsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new FindingsApi();
+
+  const body = {
+    // boolean (optional)
+    active: true,
+  } satisfies FindingsControllerListBulkOperationsRequest;
+
+  try {
+    const data = await api.findingsControllerListBulkOperations(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **active** | `boolean` |  | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**Array&lt;FindingBulkOperationDto&gt;**](FindingBulkOperationDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

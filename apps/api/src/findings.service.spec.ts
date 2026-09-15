@@ -1,12 +1,22 @@
+import 'reflect-metadata';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { FindingsService } from './findings.service';
 import { PrismaService } from './prisma.service';
 import { FindingStatus, Severity } from '@prisma/client';
+import { BULK_UPDATE_MAX_IDS } from './dto/bulk-update-findings.dto';
+import { SearchFindingsFiltersInputDto } from './dto/search-findings-request.dto';
+import { searchFindingsFilters } from './mcp-tool-schemas';
+import {
+  FINDING_FILTER_KEYS,
+  type FindingFilterKey,
+} from './utils/finding-filter-keys';
 import { HistoryEventType } from './types/finding-history.types';
 import { lastEntryOfType, renderHistory } from './types/finding-history';
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
+import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
 
 describe('FindingsService', () => {
   let service: FindingsService;
@@ -259,10 +269,16 @@ describe('FindingsService', () => {
  * tool, which accepts the same `filters`.
  */ describe('FindingsService bulk update by filter', () => {
   const prisma = {
-    finding: { findMany: jest.fn(), updateMany: jest.fn() },
+    finding: { findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
     customDetectorFeedback: { createMany: jest.fn() },
     $executeRaw: jest.fn(),
+    $queryRaw: jest.fn(),
   };
+  const correlationJobs = {
+    scheduleFull: jest.fn(),
+    scheduleAssets: jest.fn(),
+  };
+  const statsJobs = { scheduleFull: jest.fn() };
   let service: FindingsService;
 
   beforeEach(async () => {
@@ -280,7 +296,11 @@ describe('FindingsService', () => {
         },
         {
           provide: CorrelationJobScheduler,
-          useValue: { scheduleFull: jest.fn(), scheduleAssets: jest.fn() },
+          useValue: correlationJobs,
+        },
+        {
+          provide: FindingStatsScheduler,
+          useValue: statsJobs,
         },
       ],
     }).compile();
@@ -290,6 +310,8 @@ describe('FindingsService', () => {
     prisma.finding.updateMany.mockResolvedValue({ count: 0 });
     prisma.customDetectorFeedback.createMany.mockResolvedValue({ count: 0 });
     prisma.$executeRaw.mockResolvedValue(1);
+    prisma.finding.count.mockResolvedValue(0);
+    prisma.$queryRaw.mockResolvedValue([]);
   });
 
   /** The SQL text of an $executeRaw call, template strings joined. */
@@ -319,12 +341,15 @@ describe('FindingsService', () => {
       findingType: 'insolvenzgefahr_hoch',
     });
 
+  // `status`, not `statuses`: this fixture used to carry the plural key, which
+  // the builder never read, so these tests resolved "everything" without
+  // saying so — the same silent widening the key check below now refuses.
   const bulkResolve = (over: Record<string, unknown> = {}) =>
     service.bulkUpdate({
-      filters: { statuses: [FindingStatus.OPEN] },
+      filters: { customDetectorKey: ['insolvenzgefahr'] },
       status: FindingStatus.RESOLVED,
       ...over,
-    } as never);
+    });
 
   it('stamps STATUS_CHANGED on every finding it resolves', async () => {
     prisma.finding.findMany.mockResolvedValueOnce([row('f1'), row('f2')]);
@@ -371,6 +396,7 @@ describe('FindingsService', () => {
     await service.bulkUpdate({
       filters: {},
       severity: Severity.LOW,
+      confirm: true,
     });
 
     expect(prisma.$executeRaw).not.toHaveBeenCalled();
@@ -458,6 +484,7 @@ describe('FindingsService', () => {
       await service.bulkUpdate({
         filters: {},
         status: FindingStatus.OPEN,
+        confirm: true,
       });
 
       // Re-opening is not a judgement about the detector being wrong.
@@ -479,5 +506,344 @@ describe('FindingsService', () => {
         'f2',
       ]);
     });
+  });
+
+  /**
+   * 2026-09-14, firmenbuch-test-2: `findingTypes` (plural) was not a key the
+   * builder reads, so it dropped out, the `where` collapsed to `status: OPEN`,
+   * and a bulk resolve meant for 37,428 findings began walking all 686,943.
+   */
+  describe('fails closed', () => {
+    const nothingWritten = () => {
+      expect(prisma.finding.findMany).not.toHaveBeenCalled();
+      expect(prisma.finding.updateMany).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(prisma.customDetectorFeedback.createMany).not.toHaveBeenCalled();
+    };
+
+    it('rejects the incident payload and names the key it meant', async () => {
+      const attempt = service.bulkUpdate({
+        filters: { findingTypes: ['regex:EUID'], status: 'OPEN' },
+        status: FindingStatus.RESOLVED,
+      } as never);
+
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toThrow(/findingTypes.*"findingType"/);
+      expect(prisma.finding.count).not.toHaveBeenCalled();
+      nothingWritten();
+    });
+
+    it('rejects an unknown key on a read, too', async () => {
+      await expect(
+        service.searchFindings({
+          filters: { severities: ['HIGH'] },
+        } as never),
+      ).rejects.toThrow(/severities.*"severity"/);
+    });
+
+    it('refuses filters that narrow nothing without confirm', async () => {
+      const attempt = service.bulkUpdate({
+        filters: { status: [FindingStatus.OPEN] },
+        status: FindingStatus.RESOLVED,
+      });
+
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toThrow(/every finding in the namespace/);
+      nothingWritten();
+    });
+
+    it('proceeds on unnarrowed filters once confirmed', async () => {
+      prisma.finding.updateMany.mockResolvedValue({ count: 3 });
+
+      const result = await service.bulkUpdate({
+        filters: { status: [FindingStatus.OPEN] },
+        status: FindingStatus.RESOLVED,
+        confirm: true,
+      });
+
+      expect(result.updatedCount).toBe(3);
+    });
+
+    it('treats excludeIds as subtracting, not narrowing', async () => {
+      await expect(
+        service.bulkUpdate({
+          filters: { excludeIds: ['f1'] },
+          status: FindingStatus.RESOLVED,
+        }),
+      ).rejects.toThrow(/every finding in the namespace/);
+    });
+
+    it('refuses with 409 when more findings match than expected', async () => {
+      prisma.finding.count.mockResolvedValue(686943);
+
+      const attempt = bulkResolve({ expectedCount: 37428 });
+
+      await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+      await expect(attempt).rejects.toThrow(/686943.*37428/);
+      nothingWritten();
+    });
+
+    it('proceeds when the match is within the expected count', async () => {
+      prisma.finding.count.mockResolvedValue(37428);
+      prisma.finding.updateMany.mockResolvedValue({ count: 37428 });
+
+      const result = await bulkResolve({ expectedCount: 37428 });
+
+      expect(result.updatedCount).toBe(37428);
+    });
+
+    it('accepts expectedCount and confirm as strings, since nothing coerces them', async () => {
+      prisma.finding.count.mockResolvedValue(5);
+      prisma.finding.updateMany.mockResolvedValue({ count: 5 });
+
+      const result = await service.bulkUpdate({
+        filters: { status: [FindingStatus.OPEN] },
+        status: FindingStatus.RESOLVED,
+        confirm: 'true',
+        expectedCount: '5',
+      } as never);
+
+      expect(result.updatedCount).toBe(5);
+    });
+
+    it('rejects an expectedCount that is not a non-negative integer', async () => {
+      await expect(bulkResolve({ expectedCount: -1 })).rejects.toThrow(
+        /expectedCount/,
+      );
+      await expect(bulkResolve({ expectedCount: 'many' })).rejects.toThrow(
+        /expectedCount/,
+      );
+    });
+
+    it('dry-runs: counts, reports narrowing, writes nothing', async () => {
+      prisma.finding.count.mockResolvedValue(37428);
+
+      const result = await service.bulkUpdate({
+        filters: { findingType: ['regex:EUID'], status: [FindingStatus.OPEN] },
+        status: FindingStatus.RESOLVED,
+        dryRun: true,
+      });
+
+      expect(result).toMatchObject({
+        updatedCount: 0,
+        wouldUpdate: 37428,
+        narrowed: true,
+        dryRun: true,
+      });
+      nothingWritten();
+    });
+
+    it('dry-run reports an unnarrowed filter so a client knows to confirm', async () => {
+      prisma.finding.count.mockResolvedValue(686943);
+
+      const result = await service.bulkUpdate({
+        filters: { status: [FindingStatus.OPEN] },
+        dryRun: true,
+      });
+
+      expect(result).toMatchObject({ wouldUpdate: 686943, narrowed: false });
+    });
+
+    it('caps an explicit id list', async () => {
+      const ids = Array.from(
+        { length: BULK_UPDATE_MAX_IDS + 1 },
+        (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+      );
+
+      await expect(
+        service.bulkUpdate({ ids, status: FindingStatus.RESOLVED }),
+      ).rejects.toThrow(/At most 1000 ids/);
+      nothingWritten();
+    });
+
+    it('refuses ids together with filters', async () => {
+      const attempt = service.bulkUpdate({
+        ids: ['00000000-0000-4000-8000-000000000001'],
+        filters: { customDetectorKey: ['insolvenzgefahr'] },
+        status: FindingStatus.RESOLVED,
+      });
+
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toThrow(/either ids or filters/);
+      expect(prisma.finding.count).not.toHaveBeenCalled();
+      nothingWritten();
+    });
+
+    it('rejects an unknown status before counting or writing', async () => {
+      const attempt = service.bulkUpdate({
+        filters: { customDetectorKey: ['insolvenzgefahr'] },
+        status: 'RESOLVEDD',
+      } as never);
+
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toThrow(/Invalid status/);
+      expect(prisma.finding.count).not.toHaveBeenCalled();
+      nothingWritten();
+    });
+
+    it('rejects an unknown severity before counting or writing', async () => {
+      const attempt = service.bulkUpdate({
+        filters: { customDetectorKey: ['insolvenzgefahr'] },
+        severity: 'CRITICALITY',
+      } as never);
+
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toThrow(/Invalid severity/);
+      expect(prisma.finding.count).not.toHaveBeenCalled();
+      nothingWritten();
+    });
+
+    it('rejects a non-string comment before counting or writing', async () => {
+      const attempt = service.bulkUpdate({
+        filters: { customDetectorKey: ['insolvenzgefahr'] },
+        status: FindingStatus.RESOLVED,
+        comment: 42,
+      } as never);
+
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toThrow(/Invalid comment/);
+      expect(prisma.finding.count).not.toHaveBeenCalled();
+      nothingWritten();
+    });
+
+    it.each([1, '1'])(
+      'treats dryRun %p as a preview, never a write',
+      async (dryRun) => {
+        prisma.finding.count.mockResolvedValue(37428);
+
+        const result = await service.bulkUpdate({
+          filters: {
+            findingType: ['regex:EUID'],
+            status: [FindingStatus.OPEN],
+          },
+          status: FindingStatus.RESOLVED,
+          dryRun,
+        } as never);
+
+        expect(result).toMatchObject({
+          updatedCount: 0,
+          wouldUpdate: 37428,
+          dryRun: true,
+        });
+        nothingWritten();
+      },
+    );
+
+    it('updates only rows not already at the target status', async () => {
+      prisma.finding.findMany.mockResolvedValueOnce([row('f1')]);
+      prisma.finding.count.mockResolvedValue(10);
+      prisma.finding.updateMany.mockResolvedValue({ count: 7 });
+
+      const result = await bulkResolve();
+
+      const [args] = prisma.finding.updateMany.mock.calls[0];
+      expect(args.where).toEqual({
+        AND: [expect.anything(), { status: { not: FindingStatus.RESOLVED } }],
+      });
+      expect(result.updatedCount).toBe(7);
+    });
+
+    it('rebuilds derived state when only severity changes', async () => {
+      prisma.finding.count.mockResolvedValue(5);
+      prisma.finding.updateMany.mockResolvedValue({ count: 5 });
+
+      await service.bulkUpdate({
+        filters: { customDetectorKey: ['insolvenzgefahr'] },
+        severity: Severity.HIGH,
+      });
+
+      expect(correlationJobs.scheduleFull).toHaveBeenCalledTimes(1);
+      expect(statsJobs.scheduleFull).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips the rebuild when a severity change touches nothing', async () => {
+      prisma.finding.count.mockResolvedValue(5);
+      prisma.finding.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.bulkUpdate({
+        filters: { customDetectorKey: ['insolvenzgefahr'] },
+        severity: Severity.HIGH,
+      });
+
+      expect(correlationJobs.scheduleFull).not.toHaveBeenCalled();
+      expect(statsJobs.scheduleFull).not.toHaveBeenCalled();
+    });
+  });
+});
+
+/**
+ * The filter contract in three places — the builder, the REST DTO and the MCP
+ * schema — held to one list. Adding a key to one and not the others is how a
+ * filter ends up accepted but ignored.
+ */
+describe('finding filter key conformance', () => {
+  let service: FindingsService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        FindingsService,
+        { provide: PrismaService, useValue: {} },
+        { provide: EmbeddingService, useValue: {} },
+        { provide: QueryEmbeddingService, useValue: {} },
+      ],
+    }).compile();
+    service = module.get(FindingsService);
+  });
+
+  const sample: Record<FindingFilterKey, unknown> = {
+    search: 'x',
+    sourceId: ['s'],
+    assetId: ['a'],
+    runnerId: ['r'],
+    detectorType: ['CUSTOM'],
+    customDetectorKey: ['k'],
+    findingType: ['t'],
+    category: ['c'],
+    severity: ['HIGH'],
+    status: ['OPEN'],
+    includeResolved: true,
+    detectionIdentity: ['d'],
+    firstDetectedAfter: new Date('2026-01-01'),
+    lastDetectedBefore: new Date('2026-01-02'),
+    excludeIds: ['f'],
+  };
+
+  const build = (filters: Record<string, unknown>) =>
+    (
+      service as unknown as {
+        buildBaseFindingsWhere: (f: unknown) => {
+          where: unknown;
+          search: string;
+        };
+      }
+    ).buildBaseFindingsWhere(filters);
+
+  it.each(FINDING_FILTER_KEYS.map((key) => [key]))(
+    'the builder reads %s',
+    (key) => {
+      const empty = build({});
+      const withKey = build({ [key]: sample[key] });
+      expect(withKey).not.toEqual(empty);
+    },
+  );
+
+  it('the REST DTO declares exactly these keys', () => {
+    const declared = (
+      Reflect.getMetadata(
+        'swagger/apiModelPropertiesArray',
+        SearchFindingsFiltersInputDto.prototype,
+      ) as string[]
+    ).map((entry) => entry.replace(/^:/, ''));
+    expect([...declared].sort()).toEqual([...FINDING_FILTER_KEYS].sort());
+  });
+
+  it('the MCP schema declares exactly these keys, and rejects any other', () => {
+    expect(Object.keys(searchFindingsFilters.shape).sort()).toEqual(
+      [...FINDING_FILTER_KEYS].sort(),
+    );
+    expect(
+      searchFindingsFilters.safeParse({ findingTypes: ['regex:EUID'] }).success,
+    ).toBe(false);
   });
 });

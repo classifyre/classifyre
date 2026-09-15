@@ -538,6 +538,16 @@ class BaseSource(ABC):
         """
         return None
 
+    def extracts_content(self, asset_hash: str) -> bool:
+        """Whether this asset's content is meant to be extracted and scanned.
+
+        False for an asset its connector recorded on purpose without content
+        (``Asset(extract=False)``): the pipeline then runs no text or binary
+        pass, reports no empty-text warning, and records text extraction as
+        not applicable. Every asset of every built-in source is extracted.
+        """
+        return True
+
     async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
         """
         Async generator yielding (raw_content, text_content) pages for an asset.

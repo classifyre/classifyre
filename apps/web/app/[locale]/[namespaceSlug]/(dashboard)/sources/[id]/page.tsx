@@ -77,6 +77,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useEntityDocumentTitle } from "@/components/document-title-updater";
 import { useFormatDuration } from "@/hooks/use-format-duration";
 import { summarizeTextCoverage } from "@/lib/text-coverage";
+import { CohortSelectionCard } from "@/components/cohort-yield";
 
 const EMPTY_CHARTS: SearchAssetsChartsResponseDto = {
   totals: {
@@ -622,6 +623,8 @@ export default function SourceViewPage() {
               </Card>
             ))}
           </div>
+
+          <CohortSelectionCard sourceId={sourceId} />
 
           <div>
             <h2 className="mb-2 font-serif text-sm font-black uppercase tracking-[0.08em]">

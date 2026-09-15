@@ -105,6 +105,8 @@ docs/ChatBotsApi.md
 docs/CliRunnerControllerUpdateRunnerStatusRequest.md
 docs/CloseCaseDto.md
 docs/CloseCaseResponseDto.md
+docs/CohortRunYieldDto.md
+docs/CohortWeightsPreviewDto.md
 docs/ColumnLineageDto.md
 docs/ColumnLineageResponseDto.md
 docs/ColumnLineageStepDto.md
@@ -176,6 +178,7 @@ docs/ExclusionRuleDto.md
 docs/ExpandGraphDto.md
 docs/FieldMappingDto.md
 docs/FinalizeIngestRunDto.md
+docs/FindingBulkOperationDto.md
 docs/FindingEvidenceAnalysisDto.md
 docs/FindingHistoryEntryDto.md
 docs/FindingLocationDto.md
@@ -286,6 +289,7 @@ docs/RelationTypesResponseDto.md
 docs/RematchResponseDto.md
 docs/ReopenDecisionsDto.md
 docs/ReopenDecisionsResponseDto.md
+docs/RetireOutOfScopeFindingsDto.md
 docs/RevertResultDto.md
 docs/ReviewCaseLeadDto.md
 docs/ReviewClusterRowDto.md
@@ -312,6 +316,9 @@ docs/ReviewWaterfallDto.md
 docs/ReviewWaterfallRowDto.md
 docs/RunnerAssetItemDto.md
 docs/RunnerAssetProgressDto.md
+docs/RunnerAssetQueryDto.md
+docs/RunnerAssetQueryItemDto.md
+docs/RunnerAssetQueryResponseDto.md
 docs/RunnerAssetStatusUpdateItem.md
 docs/RunnerDto.md
 docs/RunnerLogEntryDto.md
@@ -581,6 +588,8 @@ src/models/ChatBotTestResultDto.ts
 src/models/CliRunnerControllerUpdateRunnerStatusRequest.ts
 src/models/CloseCaseDto.ts
 src/models/CloseCaseResponseDto.ts
+src/models/CohortRunYieldDto.ts
+src/models/CohortWeightsPreviewDto.ts
 src/models/ColumnLineageDto.ts
 src/models/ColumnLineageResponseDto.ts
 src/models/ColumnLineageStepDto.ts
@@ -645,6 +654,7 @@ src/models/ExclusionRuleDto.ts
 src/models/ExpandGraphDto.ts
 src/models/FieldMappingDto.ts
 src/models/FinalizeIngestRunDto.ts
+src/models/FindingBulkOperationDto.ts
 src/models/FindingEvidenceAnalysisDto.ts
 src/models/FindingHistoryEntryDto.ts
 src/models/FindingLocationDto.ts
@@ -746,6 +756,7 @@ src/models/RelationTypesResponseDto.ts
 src/models/RematchResponseDto.ts
 src/models/ReopenDecisionsDto.ts
 src/models/ReopenDecisionsResponseDto.ts
+src/models/RetireOutOfScopeFindingsDto.ts
 src/models/RevertResultDto.ts
 src/models/ReviewCaseLeadDto.ts
 src/models/ReviewClusterRowDto.ts
@@ -772,6 +783,9 @@ src/models/ReviewWaterfallDto.ts
 src/models/ReviewWaterfallRowDto.ts
 src/models/RunnerAssetItemDto.ts
 src/models/RunnerAssetProgressDto.ts
+src/models/RunnerAssetQueryDto.ts
+src/models/RunnerAssetQueryItemDto.ts
+src/models/RunnerAssetQueryResponseDto.ts
 src/models/RunnerAssetStatusUpdateItem.ts
 src/models/RunnerDto.ts
 src/models/RunnerLogEntryDto.ts

@@ -21,6 +21,7 @@ import type {
   BulkRunSourcesResponseDto,
   BulkUpdateSourcesDto,
   BulkUpdateSourcesResponseDto,
+  CohortWeightsPreviewDto,
   CreateSourceDto,
   FinalizeIngestRunDto,
   PurgeSourceAssetsResponseDto,
@@ -47,6 +48,8 @@ import {
     BulkUpdateSourcesDtoToJSON,
     BulkUpdateSourcesResponseDtoFromJSON,
     BulkUpdateSourcesResponseDtoToJSON,
+    CohortWeightsPreviewDtoFromJSON,
+    CohortWeightsPreviewDtoToJSON,
     CreateSourceDtoFromJSON,
     CreateSourceDtoToJSON,
     FinalizeIngestRunDtoFromJSON,
@@ -72,6 +75,10 @@ import {
     UploadedSourceFileDtoFromJSON,
     UploadedSourceFileDtoToJSON,
 } from '../models/index';
+
+export interface CohortControllerPreviewRequest {
+    id: string;
+}
 
 export interface SearchSourcesControllerSearchSourcesRequest {
     searchSourcesRequestDto: SearchSourcesRequestDto;
@@ -181,6 +188,45 @@ export interface SourcesControllerUpdateStatusOperationRequest {
  * 
  */
 export class SourcesApi extends runtime.BaseAPI {
+
+    /**
+     * For each ctx.cohort() the source walks: the weights its next run would use, why (no_history, cold_start, measured or fixed), the per-band rates they came from, and the yield of recent runs.
+     * Preview the band split of a source\'s cohorts for its next run
+     */
+    async cohortControllerPreviewRaw(requestParameters: CohortControllerPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<CohortWeightsPreviewDto>>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling cohortControllerPreview().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sources/{id}/cohort-weights`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(CohortWeightsPreviewDtoFromJSON));
+    }
+
+    /**
+     * For each ctx.cohort() the source walks: the weights its next run would use, why (no_history, cold_start, measured or fixed), the per-band rates they came from, and the yield of recent runs.
+     * Preview the band split of a source\'s cohorts for its next run
+     */
+    async cohortControllerPreview(requestParameters: CohortControllerPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<CohortWeightsPreviewDto>> {
+        const response = await this.cohortControllerPreviewRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Paginated search over data sources with optional filters. Returns source details with the latest runner summary and aggregate totals (total, healthy, errors, running).

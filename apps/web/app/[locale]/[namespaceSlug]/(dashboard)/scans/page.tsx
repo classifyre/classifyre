@@ -188,6 +188,11 @@ export default function ScansPage() {
         value: baseCharts.totals.completed,
       },
       {
+        key: "WARNING" as StatusPanelKey,
+        label: t("scans.warning"),
+        value: baseCharts.totals.warning,
+      },
+      {
         key: "ERROR" as StatusPanelKey,
         label: t("scans.failed"),
         value: baseCharts.totals.failed,
@@ -354,7 +359,7 @@ export default function ScansPage() {
         </div>
       ) : (
         <>
-          <div className="relative grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="relative grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
             {panels.map((panel) => {
               const isActive =
                 panel.key === "TOTAL"

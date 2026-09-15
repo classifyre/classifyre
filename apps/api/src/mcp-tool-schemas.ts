@@ -45,8 +45,15 @@ const isoDate = (context: string) =>
 
 // ── Findings ────────────────────────────────────────────────────────────────
 
+/**
+ * Strict on purpose: zod's default object strips unknown keys, and a stripped
+ * filter key does not narrow the match — it widens it. `findingTypes` (plural,
+ * the inquiry spelling) silently collapsing to "every finding" is the incident
+ * this exists to prevent. Keys must equal FINDING_FILTER_KEYS; a spec holds
+ * them together.
+ */
 export const searchFindingsFilters = z
-  .object({
+  .strictObject({
     search: z
       .string()
       .max(200)
@@ -94,20 +101,32 @@ export const searchFindingsFilters = z
       .array(findingStatusEnum)
       .optional()
       .describe(
-        'Restrict to these statuses. RESOLVED/IGNORED are excluded by default unless includeResolved is true.',
+        'Restrict to these statuses. Without it, RESOLVED findings are excluded unless includeResolved is true.',
       ),
     includeResolved: z
       .boolean()
       .optional()
-      .describe('Include RESOLVED and IGNORED findings. Defaults to false.'),
+      .describe(
+        'Include RESOLVED findings when no status is given. Defaults to false.',
+      ),
+    detectionIdentity: z
+      .array(z.string())
+      .optional()
+      .describe('Restrict to these detection identities.'),
     firstDetectedAfter: isoDate(
       'Only findings first detected at or after this.',
     ),
     lastDetectedBefore: isoDate(
       'Only findings last detected at or before this.',
     ),
+    excludeIds: z
+      .array(z.string())
+      .optional()
+      .describe('Leave out these finding ids.'),
   })
-  .describe('Finding filters. Omit entirely to match all findings.');
+  .describe(
+    'Finding filters. Omit entirely to match all findings. Unknown keys are rejected.',
+  );
 
 export const searchFindingsPage = z
   .object({
@@ -254,6 +273,28 @@ export const searchAssetsAssetFilters = z
       .array(z.string())
       .optional()
       .describe('Restrict to these source type ids. See list_source_types.'),
+    metadata: z
+      .record(
+        z.string(),
+        z
+          .strictObject({
+            eq: z.union([z.string(), z.number(), z.boolean()]).optional(),
+            in: z
+              .array(z.union([z.string(), z.number(), z.boolean()]))
+              .min(1)
+              .max(1000)
+              .optional(),
+          })
+          .refine((condition) => Object.keys(condition).length > 0, {
+            message: 'give eq or in',
+          }),
+      )
+      .optional()
+      .describe(
+        'Match connector-authored metadata exactly, e.g. ' +
+          '{"legal_form_code": {"in": ["GES", "AG"]}}. Values compare as JSON: ' +
+          'a number matches only a number. Keys may be nested with dots.',
+      ),
   })
   .describe('Asset-level filters. Omit entirely to match all assets.');
 

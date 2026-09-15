@@ -10,6 +10,7 @@ All URIs are relative to *http://localhost*
 | [**cliRunnerControllerGetRunnerAssetProgress**](RunnersApi.md#clirunnercontrollergetrunnerassetprogress) | **GET** /runners/{runnerId}/assets/progress | Get runner asset processing progress |
 | [**cliRunnerControllerListRunners**](RunnersApi.md#clirunnercontrollerlistrunners) | **GET** /runners | List all runners |
 | [**cliRunnerControllerListSourceRunners**](RunnersApi.md#clirunnercontrollerlistsourcerunners) | **GET** /sources/{sourceId}/runners | List runners for source |
+| [**cliRunnerControllerQueryAssets**](RunnersApi.md#clirunnercontrollerqueryassets) | **POST** /runners/{runnerId}/assets/query | Read assets of a source in this namespace, for a running connector |
 | [**cliRunnerControllerRegisterDiscoveredAssets**](RunnersApi.md#clirunnercontrollerregisterdiscoveredassets) | **POST** /runners/{runnerId}/assets/discover | Register discovered asset hashes for a runner |
 | [**cliRunnerControllerSearchRunnerLogs**](RunnersApi.md#clirunnercontrollersearchrunnerlogs) | **POST** /runners/{runnerId}/logs | Search runner logs with server-side filtering, full-text search, and sort |
 | [**cliRunnerControllerStartRunner**](RunnersApi.md#clirunnercontrollerstartrunner) | **POST** /sources/{sourceId}/run | Start CLI runner for source |
@@ -427,6 +428,76 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## cliRunnerControllerQueryAssets
+
+> RunnerAssetQueryResponseDto cliRunnerControllerQueryAssets(runnerId, runnerAssetQueryDto)
+
+Read assets of a source in this namespace, for a running connector
+
+Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; at most 100 calls per run, 5,000 assets per page, 15 s per query.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerQueryAssetsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+    // RunnerAssetQueryDto
+    runnerAssetQueryDto: ...,
+  } satisfies CliRunnerControllerQueryAssetsRequest;
+
+  try {
+    const data = await api.cliRunnerControllerQueryAssets(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+| **runnerAssetQueryDto** | [RunnerAssetQueryDto](RunnerAssetQueryDto.md) |  | |
+
+### Return type
+
+[**RunnerAssetQueryResponseDto**](RunnerAssetQueryResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
 - **Accept**: `application/json`
 
 

@@ -1,11 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AiClientService } from './ai-client.service';
+import {
+  AiClientService,
+  backoffDelaysMs,
+  isQuotaExhausted,
+} from './ai-client.service';
 import { validateAgainstSchema } from './schema-validate';
 import {
   AiAuthError,
   AiConfigError,
   AiModelNotFoundError,
   AiProviderError,
+  AiQuotaExhaustedError,
   AiRateLimitError,
   AiSchemaError,
 } from './errors';
@@ -178,6 +183,154 @@ describe('AiClientService', () => {
       expect(result.content).toBe('Recovered');
       expect(mockProviderComplete).toHaveBeenCalledTimes(2);
       timeoutSpy.mockRestore();
+    });
+
+    describe('a spent quota', () => {
+      // Verbatim from the worker log on 2026-09-13: each of these was retried
+      // at 60, 120 and 240 s while holding one of four global worker slots.
+      const dailyQuota = () =>
+        new AiRateLimitError(
+          'OpenAI rate limit reached. Retry later. (429 Rate limit exceeded: ' +
+            'free-models-per-day. Add 10 credits to unlock 1000 free model ' +
+            'requests per day)',
+        );
+      const hi = [{ role: 'user' as const, content: 'hi' }];
+
+      afterEach(() => jest.restoreAllMocks());
+
+      it('is not retried, and says when it can be tried again', async () => {
+        mockProviderComplete.mockRejectedValueOnce(dailyQuota());
+
+        const attempt = service.completeText(hi);
+
+        await expect(attempt).rejects.toBeInstanceOf(AiQuotaExhaustedError);
+        // Still an AiRateLimitError for every existing handler.
+        await expect(attempt).rejects.toBeInstanceOf(AiRateLimitError);
+        expect(mockProviderComplete).toHaveBeenCalledTimes(1);
+      });
+
+      it('refuses the next call on the same credential without asking the provider', async () => {
+        mockProviderComplete.mockRejectedValueOnce(dailyQuota());
+        await expect(service.completeText(hi)).rejects.toThrow(
+          'free-models-per-day',
+        );
+
+        await expect(service.completeText(hi)).rejects.toThrow(
+          /not calling it again until/,
+        );
+        expect(mockProviderComplete).toHaveBeenCalledTimes(1);
+      });
+
+      it('does not cool down a different credential', async () => {
+        mockProviderComplete.mockRejectedValueOnce(dailyQuota());
+        await expect(service.completeText(hi)).rejects.toBeInstanceOf(
+          AiQuotaExhaustedError,
+        );
+
+        mockProviderConfigService.getRuntimeConfig.mockResolvedValueOnce({
+          ...mockRuntimeConfig,
+          apiKey: 'sk-paid-key',
+        });
+        mockProviderComplete.mockResolvedValueOnce('answered');
+
+        await expect(service.completeText(hi)).resolves.toMatchObject({
+          content: 'answered',
+        });
+      });
+
+      it('asks the provider again once the cooldown has passed', async () => {
+        const start = Date.now();
+        const now = jest.spyOn(Date, 'now').mockReturnValue(start);
+        mockProviderComplete.mockRejectedValueOnce(dailyQuota());
+        await expect(service.completeText(hi)).rejects.toBeInstanceOf(
+          AiQuotaExhaustedError,
+        );
+
+        // The 15-minute expiry is jittered ±10%, so wait past its ceiling.
+        now.mockReturnValue(start + 20 * 60 * 1000);
+        mockProviderComplete.mockResolvedValueOnce('reset');
+
+        await expect(service.completeText(hi)).resolves.toMatchObject({
+          content: 'reset',
+        });
+        expect(mockProviderComplete).toHaveBeenCalledTimes(2);
+      });
+
+      it('names the stored provider message in the cooldown refusal', async () => {
+        mockProviderComplete.mockRejectedValueOnce(dailyQuota());
+        await expect(service.completeText(hi)).rejects.toBeInstanceOf(
+          AiQuotaExhaustedError,
+        );
+
+        const refusal = service.completeText(hi);
+        await expect(refusal).rejects.toThrow('free-models-per-day');
+        await expect(refusal).rejects.toThrow(/not calling it again until/);
+        expect(mockProviderComplete).toHaveBeenCalledTimes(1);
+      });
+
+      it('treats HTTP 402 as quota exhausted, never retried', async () => {
+        mockProviderComplete.mockRejectedValueOnce(
+          new AiProviderError('402 Payment Required: add funds', 402),
+        );
+
+        await expect(service.completeText(hi)).rejects.toBeInstanceOf(
+          AiQuotaExhaustedError,
+        );
+        expect(mockProviderComplete).toHaveBeenCalledTimes(1);
+
+        // And the cooldown fires for it too.
+        await expect(service.completeText(hi)).rejects.toThrow(
+          /not calling it again until/,
+        );
+        expect(mockProviderComplete).toHaveBeenCalledTimes(1);
+      });
+
+      it('treats a billing-exhaustion body as quota exhausted whatever the status', async () => {
+        mockProviderComplete.mockRejectedValueOnce(
+          new AiProviderError(
+            '400 failed_precondition: insufficient_credit, balance empty',
+            400,
+          ),
+        );
+
+        await expect(service.completeText(hi)).rejects.toBeInstanceOf(
+          AiQuotaExhaustedError,
+        );
+        expect(mockProviderComplete).toHaveBeenCalledTimes(1);
+      });
+
+      it('leaves an ordinary 400 to fail without a cooldown', async () => {
+        mockProviderComplete
+          .mockRejectedValueOnce(new AiProviderError('400 bad request', 400))
+          .mockRejectedValueOnce(new AiProviderError('400 bad request', 400));
+
+        await expect(
+          service.completeText(hi, { rateLimitRetries: 0 }),
+        ).rejects.toBeInstanceOf(AiProviderError);
+        await expect(
+          service.completeText(hi, { rateLimitRetries: 0 }),
+        ).rejects.toBeInstanceOf(AiProviderError);
+        // No cooldown: the provider was asked again.
+        expect(mockProviderComplete).toHaveBeenCalledTimes(2);
+      });
+
+      it('leaves an ordinary rate limit to the backoff', async () => {
+        const timeoutSpy = jest
+          .spyOn(global, 'setTimeout')
+          .mockImplementation(((cb: () => void) => {
+            cb();
+            return 0 as unknown as ReturnType<typeof setTimeout>;
+          }) as typeof setTimeout);
+        mockProviderComplete
+          .mockRejectedValueOnce(new AiRateLimitError('429 slow down'))
+          .mockResolvedValueOnce('after backoff');
+
+        await expect(service.completeText(hi)).resolves.toMatchObject({
+          content: 'after backoff',
+        });
+        expect(mockProviderComplete).toHaveBeenCalledTimes(2);
+        timeoutSpy.mockRestore();
+      });
     });
 
     it('never retries AiModelNotFoundError (genuine missing model)', async () => {
@@ -364,6 +517,72 @@ describe('AiClientService', () => {
  * "try just the pipeline_schema", "try absolute minimal REGEX schema"), burned
  * its whole iteration budget, and authored nothing.
  */
+describe('isQuotaExhausted', () => {
+  it('passes through an already-classified quota error', () => {
+    expect(isQuotaExhausted(new AiQuotaExhaustedError('gone', null))).toBe(
+      true,
+    );
+  });
+
+  it('matches the new resource/quota wording on a 429', () => {
+    expect(
+      isQuotaExhausted(
+        new AiRateLimitError('RESOURCE_EXHAUSTED: quota used up'),
+      ),
+    ).toBe(true);
+    expect(
+      isQuotaExhausted(new AiRateLimitError('Quota exceeded for metric X')),
+    ).toBe(true);
+  });
+
+  it('matches HTTP 402 without any marker wording', () => {
+    expect(isQuotaExhausted(new AiProviderError('Payment Required', 402))).toBe(
+      true,
+    );
+  });
+
+  it('matches billing-exhaustion bodies whatever the status', () => {
+    expect(
+      isQuotaExhausted(new AiProviderError('insufficient_credit: empty', 400)),
+    ).toBe(true);
+    expect(
+      isQuotaExhausted(new AiProviderError('you are out of credits', 429)),
+    ).toBe(true);
+  });
+
+  it('rejects ordinary rate limits and provider errors', () => {
+    expect(isQuotaExhausted(new AiRateLimitError('429 slow down'))).toBe(false);
+    expect(isQuotaExhausted(new AiProviderError('boom', 500))).toBe(false);
+    expect(isQuotaExhausted(new AiProviderError('bad request', 400))).toBe(
+      false,
+    );
+  });
+});
+
+describe('backoffDelaysMs', () => {
+  const previousEnv = process.env;
+
+  afterEach(() => {
+    process.env = previousEnv;
+  });
+
+  it('keeps the 60/120/240 shape by default', () => {
+    process.env = { ...previousEnv };
+    delete process.env.AI_RATE_LIMIT_BACKOFF_BUDGET_MS;
+    expect(backoffDelaysMs()).toEqual([60_000, 120_000, 240_000]);
+  });
+
+  it('scales the shape to fit under a smaller budget', () => {
+    process.env = {
+      ...previousEnv,
+      AI_RATE_LIMIT_BACKOFF_BUDGET_MS: '42000',
+    };
+    const delays = backoffDelaysMs();
+    expect(delays).toEqual([6_000, 12_000, 24_000]);
+    expect(delays.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(42_000);
+  });
+});
+
 describe('schema error messages name what was wrong', () => {
   const objectSchema = {
     type: 'object',

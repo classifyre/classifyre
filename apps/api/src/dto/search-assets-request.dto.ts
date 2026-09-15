@@ -20,7 +20,18 @@ import { SemanticFindingsSearchDto } from './search-findings-request.dto';
 export class SearchAssetsFiltersDto extends OmitType(QueryAssetsDto, [
   'skip',
   'limit',
-] as const) {}
+] as const) {
+  @ApiPropertyOptional({
+    type: Object,
+    description:
+      'Match connector metadata exactly: {"legal_form_code": {"in": ["GES", "AG"]}, ' +
+      '"register_status": {"eq": "active"}}. Values compare as JSON (a number matches ' +
+      'only a number). Operators here: eq, in. An unknown operator or key shape is a 400.',
+    example: { legal_form_code: { in: ['GES', 'AG'] } },
+  })
+  @IsOptional()
+  metadata?: Record<string, { eq?: unknown; in?: unknown[] }>;
+}
 
 const normalizeToStringArray = (value: unknown, uppercase = false) => {
   const raw = Array.isArray(value)

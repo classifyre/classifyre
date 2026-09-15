@@ -357,7 +357,23 @@ api:
         memory: 7Gi
         ephemeral-storage: 1Gi
       limits:
-        cpu: "2"
+        # 4, not 2: compute_pool_workers() sizes the detector pool as
+        # `cpus - 1` from the cgroup quota, so 4 gives detection 3 workers.
+        #
+        # It was raised for "100 assets discovered, 0 processed for ten
+        # minutes", but CPU was never that fix, only a way to shorten it. The
+        # CUSTOM source parsed each fetched file inline on the discovery loop
+        # -- a 27-page Konzernabschluss took 17.4 minutes in docling -- so
+        # discovery froze the moment a conversion started, whatever the pool
+        # size, and the text it produced was then thrown away and parsed again.
+        # Discovery now only sniffs the MIME type; text is extracted in phase 2,
+        # after the scan cache, off the event loop.
+        #
+        # The node has room: 10 CPUs allocatable against 3300m requested. CPU is
+        # compressible, so this cannot evict anything the way the memory request
+        # below deliberately does -- that stays 7Gi, and it remains the reason
+        # only one extract pod is ever scheduled.
+        cpu: "4"
         # 4Gi was not enough for a real scanned PDF: a filing with no text layer
         # falls through to docling's StandardPdfPipeline (layout transformer +
         # TableFormer, on CPU), which OOMKilled the job (exit 137) mid-scan.

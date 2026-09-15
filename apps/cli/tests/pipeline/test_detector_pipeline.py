@@ -786,3 +786,39 @@ async def test_sources_without_tags_are_unaffected() -> None:
 
     assert len(results[0].findings or []) == 1
     assert detector.seen == ["hello world"]
+
+
+# ── Reference assets: recorded on purpose without content ───────────────────
+
+
+class ReferenceSource(TaggingSource):
+    """A source whose connector recorded asset "1" with Asset(extract=False)."""
+
+    def extracts_content(self, asset_hash: str) -> bool:
+        return asset_hash != "1"
+
+    async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
+        raise AssertionError("fetched content of a reference asset")
+
+
+@pytest.mark.asyncio
+async def test_a_reference_asset_is_not_scanned_and_not_a_coverage_gap() -> None:
+    from src.models.generated_single_asset_scan_results import TextExtractionStatus
+
+    source = ReferenceSource({"type": "DUMMY"}, {"1": {"cardholder_data": "pan"}})
+    text_detector = RecordingDetector(["text/plain"])
+    tag_detector = make_tag_detector("cardholder_data", "Cardholder Data", "Cardholder data")
+
+    pipeline = DetectorPipeline(
+        detectors=[text_detector, tag_detector], source=source, runner_id="runner-ref"
+    )
+    [asset] = await pipeline.process([make_asset()])
+
+    assert text_detector.seen == []
+    stats = asset.scan_stats
+    assert stats is not None
+    assert stats.empty_text is False
+    assert stats.text_extraction_status == TextExtractionStatus.NOT_APPLICABLE
+    assert not any("no text" in warning.lower() for warning in (stats.warnings or []))
+    # Tags are about the asset, not its content, so they still become findings.
+    assert [finding.finding_type for finding in asset.findings or []] == ["tag:Cardholder data"]

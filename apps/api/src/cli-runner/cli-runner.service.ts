@@ -22,7 +22,13 @@ import {
 import { AUTO_SCHEDULE_QUEUE } from '../scheduler/auto-schedule.constants';
 import { ClsService } from 'nestjs-cls';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
-import { CLS_SCHEMA, CLS_NAMESPACE_ID } from '../namespace/namespace.constants';
+import { CohortWeightsService } from '../cohort/cohort-weights.service';
+import {
+  CLS_DATABASE_LANE,
+  CLS_NAMESPACE_ID,
+  CLS_SCHEMA,
+  CLS_SLUG,
+} from '../namespace/namespace.constants';
 import {
   buildNamespaceApiBaseUrl,
   resolveInternalApiBaseUrl,
@@ -79,6 +85,11 @@ import {
   BoundedOutput,
   type BoundedOutputOptions,
 } from '../utils/bounded-output';
+import {
+  describeDegradation,
+  summarizeOutcomeFailures,
+  type OutcomeFailureSummary,
+} from './detector-degradation';
 
 /** Narrow a JSONB column to a plain object, or null when it is anything else. */
 function asJsonRecord(value: unknown): Record<string, unknown> | null {
@@ -136,6 +147,22 @@ const DEFAULT_MAX_CONCURRENT_RUNNERS = 2;
 const RUNNER_LAUNCH_GRACE_MS = 2 * 60 * 1000;
 
 /**
+ * How long a run may wait in the queue before a restart gives up on it.
+ *
+ * A queued run survives a restart intact -- it has no Job or child process yet,
+ * only a row -- so startup reconciliation leaves it for promotion to start. That
+ * removes the one thing that ever cleared a queue entry nothing would start:
+ * failing the whole queue on every boot. This bound puts a limit back, on the
+ * abandoned entries only.
+ *
+ * Generous on purpose, because a legitimate wait is long: a Job may run for 24
+ * hours (the chart's activeDeadlineSeconds), and under a cap of one runner the
+ * next run queues behind all of it. Applied by the startup sweep only; while a
+ * process is up, completions and the scheduler's tick keep draining the queue.
+ */
+const QUEUED_RUNNER_MAX_AGE_MS = 72 * 60 * 60 * 1000;
+
+/**
  * When this process started, used as the upper bound of the startup sweep.
  *
  * Derived from `process.uptime()` rather than from module-load time on purpose:
@@ -176,6 +203,8 @@ export class CliRunnerService {
     // per-namespace, which is the bug this dependency exists to fix.
     @Optional()
     private namespaceRegistry?: NamespaceRegistryService,
+    @Optional()
+    private cohortWeights?: CohortWeightsService,
   ) {}
 
   /** Current namespace UUID from CLS, if running within a namespace context. */
@@ -489,8 +518,26 @@ export class CliRunnerService {
 
     let recoveredRunners = 0;
     let preservedActiveRunners = 0;
+    let queuedRunners = 0;
 
     for (const runner of inFlightRunners) {
+      // A queued run loses nothing in a restart: it has no Job or child process
+      // that could have died with the old process, only a row waiting for a
+      // slot. It used to be failed here with "Runner was left pending during
+      // application restart", which dropped the entire queue on every deploy.
+      // On classifyre-dev a `bun --watch` reload is a restart, so saving any API
+      // file killed every run queued behind a long scan (seen repeatedly on
+      // 2026-09-14). It stays queued for the promotion below, unless it has
+      // waited so long that nobody is expecting it any more.
+      if (this.isQueuedRunner(runner)) {
+        if (!this.hasExpiredInQueue(runner)) {
+          queuedRunners += 1;
+        } else if (await this.expireQueuedRunner(runner)) {
+          recoveredRunners += 1;
+        }
+        continue;
+      }
+
       if (await this.isRunnerExecutionActive(runner)) {
         preservedActiveRunners += 1;
         continue;
@@ -515,7 +562,7 @@ export class CliRunnerService {
         runner.id,
         runner.sourceId,
         runner.status === RunnerStatus.PENDING
-          ? 'Runner was left pending during application restart'
+          ? 'Runner was orphaned (application restarted while it was starting)'
           : 'Runner was orphaned (application restarted while running)',
       );
     }
@@ -534,7 +581,17 @@ export class CliRunnerService {
       );
     }
 
-    void this.dequeueNextPendingRunner();
+    if (queuedRunners > 0) {
+      this.logger.log(
+        `Kept ${queuedRunners} queued runner(s) across startup reconciliation; they start as runner slots free up`,
+      );
+    }
+
+    void this.promotePendingRunners().catch((error: unknown) =>
+      this.logger.warn(
+        `Pending runner promotion after startup failed: ${String(error)}`,
+      ),
+    );
   }
 
   private isTerminalRunnerStatus(status: RunnerStatus): boolean {
@@ -722,6 +779,71 @@ export class CliRunnerService {
     return Date.now() - launchedAt.getTime() < RUNNER_LAUNCH_GRACE_MS;
   }
 
+  /**
+   * Is this runner waiting for a slot, with nothing launched for it yet?
+   *
+   * The rows promotion picks from (PENDING, never started) that also carry no
+   * Job name. Such a runner has no execution by design, so no reconcile pass
+   * may read its missing execution as a vanished one: it is not stranded, it is
+   * queued, and promotion is what starts it.
+   */
+  private isQueuedRunner(runner: {
+    status: RunnerStatus;
+    jobName: string | null;
+    startedAt: Date | null;
+  }): boolean {
+    return (
+      runner.status === RunnerStatus.PENDING &&
+      !runner.jobName &&
+      !runner.startedAt
+    );
+  }
+
+  private hasExpiredInQueue(runner: { triggeredAt: Date | null }): boolean {
+    if (!runner.triggeredAt) return false;
+    return Date.now() - runner.triggeredAt.getTime() > QUEUED_RUNNER_MAX_AGE_MS;
+  }
+
+  /**
+   * Fail a queued runner that waited past QUEUED_RUNNER_MAX_AGE_MS. Resolves
+   * whether it did.
+   *
+   * Conditional on the runner still being queued, unlike markRunnerAsOrphaned:
+   * promotion is instance-wide and nobody awaits it, so another namespace's
+   * startup can claim this very runner between the sweep's read and this write.
+   * An unconditional update would mark ERROR a scan whose Job is being created.
+   */
+  private async expireQueuedRunner(runner: {
+    id: string;
+    sourceId: string;
+  }): Promise<boolean> {
+    const hours = QUEUED_RUNNER_MAX_AGE_MS / (60 * 60 * 1000);
+    const expired = await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.runner.updateMany({
+        where: { id: runner.id, status: RunnerStatus.PENDING, startedAt: null },
+        data: {
+          status: RunnerStatus.ERROR,
+          completedAt: new Date(),
+          errorMessage: `Runner expired in the queue (waited more than ${hours} hours for a free runner slot)`,
+        },
+      });
+      if (count !== 1) return false;
+      await this.transitionSourceToTerminalState(
+        tx,
+        runner.sourceId,
+        runner.id,
+        RunnerStatus.ERROR,
+      );
+      return true;
+    });
+    if (expired) {
+      await Promise.resolve(
+        this.runnerLogStorage.finalizeRunner(runner.sourceId, runner.id),
+      ).catch(() => undefined);
+    }
+    return expired;
+  }
+
   private async isRunnerExecutionActive(
     runner: ActiveExecutionRecord,
   ): Promise<boolean> {
@@ -882,6 +1004,16 @@ export class CliRunnerService {
         continue;
       }
 
+      // startRun marks the source RUNNING before it knows whether a slot is
+      // free, so this is also exactly what a source with a queued run looks
+      // like. Its runner has no execution yet by design. This pass used to fail
+      // it for lacking one, and not only at startup: reconcileStaleInFlight runs
+      // it live whenever it retires anything, so losing one Job also failed
+      // every run that had been queued for longer than the launch grace.
+      if (this.isQueuedRunner(runner)) {
+        continue;
+      }
+
       if (await this.isRunnerExecutionActive(runner)) {
         continue;
       }
@@ -898,7 +1030,7 @@ export class CliRunnerService {
         runner.id,
         source.id,
         runner.status === RunnerStatus.PENDING
-          ? 'Runner was left pending during application restart'
+          ? 'Runner was orphaned (application restarted while it was starting)'
           : 'Runner execution could not be reconciled after restart',
       );
     }
@@ -1466,18 +1598,24 @@ export class CliRunnerService {
         this.runnerEventsGateway.emitRunnerUpdate(runnerDto as any);
       }
 
+      // The split each ctx.cohort() of this source should use, measured from
+      // earlier runs, travels in the recipe; the stored config is not changed.
+      const recipeSource = this.cohortWeights
+        ? await this.cohortWeights.withEffectiveWeights(source)
+        : source;
+
       const environment = process.env.ENVIRONMENT || 'development';
       if (this.isKubernetesExecutionEnabled(environment)) {
         await this.executeCliInKubernetes(
           runnerId,
-          source,
+          recipeSource,
           hasSuccessfulRuns,
           namespaceId,
         );
       } else {
         await this.executeCliLocally(
           runnerId,
-          source,
+          recipeSource,
           environment,
           hasSuccessfulRuns,
           namespaceId,
@@ -2536,37 +2674,12 @@ export class CliRunnerService {
   private async summarizeDetectorFailures(
     tx: Prisma.TransactionClient,
     runnerId: string,
-  ): Promise<{ assetCount: number; detectorLabels: string[] }> {
+  ): Promise<OutcomeFailureSummary> {
     const rows = await tx.runnerAsset.findMany({
       where: { runnerId, detectorOutcomes: { not: Prisma.DbNull } },
       select: { assetHash: true, detectorOutcomes: true },
     });
-
-    const failedAssets = new Set<string>();
-    const labels = new Set<string>();
-
-    for (const row of rows) {
-      if (!Array.isArray(row.detectorOutcomes)) continue;
-      for (const outcome of row.detectorOutcomes) {
-        if (!outcome || typeof outcome !== 'object') continue;
-        const { status, detector_type, custom_detector_key } =
-          outcome as Record<string, unknown>;
-        if (status !== 'ERROR') continue;
-        failedAssets.add(row.assetHash);
-        const detectorLabel =
-          typeof custom_detector_key === 'string' && custom_detector_key
-            ? custom_detector_key
-            : typeof detector_type === 'string' && detector_type
-              ? detector_type
-              : 'unknown detector';
-        labels.add(detectorLabel);
-      }
-    }
-
-    return {
-      assetCount: failedAssets.size,
-      detectorLabels: [...labels].sort(),
-    };
+    return summarizeOutcomeFailures(rows);
   }
 
   private async transitionSourceToTerminalState(
@@ -2710,6 +2823,7 @@ export class CliRunnerService {
 
         const hasAssetErrors = errorCount > 0;
         const hasDetectorFailures = detectorFailures.assetCount > 0;
+        const hasDegradedDetectors = detectorFailures.degraded.length > 0;
         const extractionFailureCount =
           textCoverage.engineUnavailable +
           textCoverage.zeroFrames +
@@ -2729,6 +2843,7 @@ export class CliRunnerService {
         const status =
           hasAssetErrors ||
           hasDetectorFailures ||
+          hasDegradedDetectors ||
           hasExtractionFailures ||
           hasLineageFailures
             ? RunnerStatus.WARNING
@@ -2744,6 +2859,11 @@ export class CliRunnerService {
           const detectors = detectorFailures.detectorLabels.join(', ');
           messageParts.push(
             `${detectors} failed on ${detectorFailures.assetCount} of ${totalCount} assets`,
+          );
+        }
+        if (hasDegradedDetectors) {
+          messageParts.push(
+            ...describeDegradation(detectorFailures.degraded, totalCount),
           );
         }
         if (hasExtractionFailures) {
@@ -2787,6 +2907,13 @@ export class CliRunnerService {
             findingsRetained,
             textCoverage,
             ...(message && { errorMessage: message }),
+            // Structured beside the sentence, so the scan page and the harness
+            // read which detector stopped and why without parsing prose.
+            ...(hasDegradedDetectors && {
+              errorDetails: {
+                detectorsDegraded: detectorFailures.degraded,
+              } as unknown as Prisma.InputJsonValue,
+            }),
           },
         });
 
@@ -4127,6 +4254,12 @@ export class CliRunnerService {
         !Array.isArray(item.errorDetails)
           ? (item.errorDetails as Record<string, unknown>)
           : null,
+      cohortYield:
+        item.cohortYield &&
+        typeof item.cohortYield === 'object' &&
+        !Array.isArray(item.cohortYield)
+          ? (item.cohortYield as Record<string, unknown>)
+          : null,
     }));
 
     return {
@@ -4402,17 +4535,86 @@ export class CliRunnerService {
     });
   }
 
-  private async dequeueNextPendingRunner(): Promise<void> {
+  /**
+   * Start queued runs while there is capacity. Public for the adaptive
+   * scheduler's tick, which is where a queue that lost its promotion — a
+   * restart, a crash between completion and dequeue — gets noticed.
+   *
+   * Promotes until the slots are full or the queue is empty. This used to
+   * promote one run per call, which is enough where one slot frees at a time
+   * (a completion, a failure, a stop), but a restart frees several at once --
+   * every local scan dies with the process -- and one promotion left the other
+   * slots idle while runs waited. Each claim counts against the cap as soon as
+   * it is made, so the loop ends on its own; the bound only matters when the
+   * cross-namespace count under-reports, as it does for a schema whose count
+   * query fails.
+   */
+  async promotePendingRunners(): Promise<void> {
+    const limit = this.resolveMaxConcurrentRunners();
+    for (let promoted = 0; limit === 0 || promoted < limit; promoted += 1) {
+      if (!(await this.dequeueNextPendingRunner())) return;
+    }
+  }
+
+  /**
+   * Promote the runner that has waited longest in ANY namespace. Resolves
+   * whether a runner was claimed.
+   *
+   * The cap is instance-wide, so the queue must be too: promoting only from the
+   * namespace whose run just finished stranded every other namespace's queue.
+   * The claim and launch then run inside the queued runner's own namespace
+   * context, exactly as a same-namespace dequeue always did.
+   */
+  private async dequeueNextPendingRunner(): Promise<boolean> {
+    if (!this.namespaceRegistry || !this.cls) {
+      return this.dequeuePendingRunnerInCurrentNamespace();
+    }
+    if (!(await this.canStartNewRunner())) return false;
+
+    let oldest: Awaited<
+      ReturnType<NamespaceRegistryService['findOldestPendingRunner']>
+    >;
+    try {
+      oldest = await this.namespaceRegistry.findOldestPendingRunner();
+    } catch (error) {
+      this.logger.warn(
+        `Cross-namespace pending lookup failed, dequeuing locally: ${String(error)}`,
+      );
+      return this.dequeuePendingRunnerInCurrentNamespace();
+    }
+    if (!oldest) return false;
+
+    const target = oldest;
+    if (this.cls.get<string>(CLS_SCHEMA) === target.namespace.schemaName) {
+      return this.dequeuePendingRunnerInCurrentNamespace(target.runnerId);
+    }
+    const cls = this.cls;
+    return cls.run(() => {
+      cls.set(CLS_SCHEMA, target.namespace.schemaName);
+      cls.set(CLS_NAMESPACE_ID, target.namespace.id);
+      cls.set(CLS_SLUG, target.namespace.slug);
+      cls.set(CLS_DATABASE_LANE, 'background');
+      return this.dequeuePendingRunnerInCurrentNamespace(target.runnerId);
+    });
+  }
+
+  private async dequeuePendingRunnerInCurrentNamespace(
+    runnerId?: string,
+  ): Promise<boolean> {
     const schema = this.cls?.get<string>(CLS_SCHEMA);
-    if (schema && this.stoppingSchemas.has(schema)) return;
-    if (!(await this.canStartNewRunner())) return;
+    if (schema && this.stoppingSchemas.has(schema)) return false;
+    if (!(await this.canStartNewRunner())) return false;
 
     const pending = await this.prisma.runner.findFirst({
-      where: { status: RunnerStatus.PENDING, startedAt: null },
+      where: {
+        status: RunnerStatus.PENDING,
+        startedAt: null,
+        ...(runnerId ? { id: runnerId } : {}),
+      },
       orderBy: { triggeredAt: 'asc' },
       include: { source: true },
     });
-    if (!pending) return;
+    if (!pending) return false;
 
     const claimed = await this.prisma.runner.updateMany({
       where: { id: pending.id, status: RunnerStatus.PENDING },
@@ -4425,7 +4627,7 @@ export class CliRunnerService {
       // run that had waited more than two minutes, before it ever started.
       data: { status: RunnerStatus.RUNNING, startedAt: new Date() },
     });
-    if (claimed.count !== 1) return;
+    if (claimed.count !== 1) return false;
 
     try {
       const source = pending.source;
@@ -4460,6 +4662,9 @@ export class CliRunnerService {
       );
       await this.failRunner(pending.id, String(error), { source: 'dequeue' });
     }
+    // Claimed either way: a failed launch has still taken the runner out of
+    // the queue, and its slot is free again for the next one.
+    return true;
   }
 
   async searchRunnerAssets(
