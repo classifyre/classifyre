@@ -86,7 +86,7 @@ export function SourceCatalog({
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Search sources, categories, or capabilities"
-            className="h-10 rounded-[4px] border-2 border-black pl-9 text-sm shadow-[3px_3px_0_#000] focus-visible:ring-0"
+            className="h-10 rounded-[4px] border-2 border-black pl-9 text-sm focus-visible:ring-0"
           />
           {searchQuery ? (
             <Button
@@ -102,7 +102,7 @@ export function SourceCatalog({
       </Card>
 
       {groupedEntries.length === 0 ? (
-        <Card className="border-dashed border-black bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_#000]">
+        <Card className="border-dashed border-black bg-muted/30 px-6 py-8 text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.08em]">
             {emptyTitle}
           </p>
@@ -127,7 +127,7 @@ export function SourceCatalog({
                         {categoryMeta.description}
                       </p>
                     </div>
-                    <Badge className="w-fit rounded-[4px] border-2 border-black bg-[#b7ff00] text-[10px] uppercase tracking-[0.16em] text-black shadow-[3px_3px_0_#000]">
+                    <Badge className="w-fit rounded-[4px] border-2 border-black bg-[#b7ff00] text-[10px] uppercase tracking-[0.16em] text-black">
                       {categoryEntries.length} Sources
                     </Badge>
                   </div>
@@ -142,7 +142,7 @@ export function SourceCatalog({
                       const innerContent = (
                         <Card
                           clickable
-                          className="h-full p-3 shadow-[4px_4px_0_#000]"
+                          className="h-full p-3"
                         >
                           <div className="flex items-center gap-3">
                             <div className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border-2 border-black bg-card">

@@ -31,6 +31,7 @@ import {
 import { FindingsTrendChart } from "@/components/findings-trend-chart";
 import { FindingsTable } from "@/components/findings-table";
 import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
+import { FindingsBulkOperationsBanner } from "@/components/findings-bulk-operations-banner";
 
 import { useTranslation } from "@/hooks/use-translation";
 import { StatsFreshness } from "@/components/stats-freshness";
@@ -92,6 +93,7 @@ function FindingsPageContent() {
   const [selection, setSelection] = useState<FindingSelection | null>(null);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [tableKey, setTableKey] = useState(0);
+  const [bulkOperationsKey, setBulkOperationsKey] = useState(0);
 
   const windowDaysValue =
     windowDays === "7" ? 7 : windowDays === "90" ? 90 : 30;
@@ -220,6 +222,15 @@ function FindingsPageContent() {
     setSelection(null);
     setTableKey((k) => k + 1);
   }
+
+  function handleBulkQueued() {
+    setSelection(null);
+    setBulkOperationsKey((k) => k + 1);
+  }
+
+  const handleBulkOperationSettled = useCallback(() => {
+    setTableKey((k) => k + 1);
+  }, []);
 
   const isLoading = isBaseLoading && baseCharts === EMPTY_CHARTS;
 
@@ -372,7 +383,11 @@ function FindingsPageContent() {
           )}
         </div>
 
-        <div className="order-1 lg:order-2">
+        <div className="order-1 space-y-3 lg:order-2">
+          <FindingsBulkOperationsBanner
+            refreshKey={bulkOperationsKey}
+            onSettled={handleBulkOperationSettled}
+          />
           <FindingsTable
             key={tableKey}
             severities={selectedSeverities}
@@ -389,6 +404,7 @@ function FindingsPageContent() {
         onOpenChange={setBulkDialogOpen}
         selection={selection}
         onSuccess={handleBulkSuccess}
+        onQueued={handleBulkQueued}
       />
     </div>
   );

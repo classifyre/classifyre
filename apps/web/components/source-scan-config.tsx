@@ -882,7 +882,7 @@ export const SourceScanConfig = React.forwardRef<
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder={t("sources.scanConfig.searchPlaceholder")}
-              className="h-10 rounded-[4px] border-2 border-border bg-background pl-9 text-sm shadow-[3px_3px_0_var(--color-border)] focus-visible:ring-0"
+              className="h-10 rounded-[4px] border-2 border-border bg-background pl-9 text-sm focus-visible:ring-0"
             />
             {searchQuery ? (
               <Button
@@ -900,7 +900,7 @@ export const SourceScanConfig = React.forwardRef<
             value={typeFilter}
             onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}
           >
-            <SelectTrigger className="h-10 w-[150px] rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)] text-xs">
+            <SelectTrigger className="h-10 w-[150px] rounded-[4px] border-2 border-border text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -913,7 +913,7 @@ export const SourceScanConfig = React.forwardRef<
       </Card>
 
       {!hasAnyVisibleResults && searchTerm ? (
-        <Card className="border-dashed border-border bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_var(--color-border)]">
+        <Card className="border-dashed border-border bg-muted/30 px-6 py-8 text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.08em]">
             {t("sources.scanConfig.noResults")}
           </p>
@@ -941,7 +941,7 @@ export const SourceScanConfig = React.forwardRef<
                   </Link>
                 </Button>
               )}
-              <Badge className="w-fit rounded-[4px] border-2 border-border bg-accent text-[10px] uppercase tracking-[0.16em] text-accent-foreground shadow-[3px_3px_0_var(--color-border)]">
+              <Badge className="w-fit rounded-[4px] border-2 border-border bg-accent text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
                 {t("sources.edit.enabled", { count: enabledCount })}
               </Badge>
             </div>
@@ -1046,14 +1046,14 @@ export const SourceScanConfig = React.forwardRef<
         <Button
           type="button"
           variant="outline"
-          className="w-full rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
+          className="w-full rounded-[4px] border-2 border-border"
           onClick={handleOpenCreator}
         >
           <Plus className="mr-2 h-4 w-4" />
           {t("detectors.addNew")}
         </Button>
       ) : (
-        <Card className="border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+        <Card className="border-2 border-border">
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-serif text-lg font-black uppercase tracking-[0.06em]">

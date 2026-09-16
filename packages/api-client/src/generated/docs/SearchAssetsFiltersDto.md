@@ -11,6 +11,7 @@ Name | Type
 `runnerId` | string
 `status` | Array&lt;string&gt;
 `sourceTypes` | Array&lt;string&gt;
+`metadata` | object
 
 ## Example
 
@@ -24,6 +25,7 @@ const example = {
   "runnerId": null,
   "status": null,
   "sourceTypes": null,
+  "metadata": {"legal_form_code":{"in":["GES","AG"]}},
 } satisfies SearchAssetsFiltersDto
 
 console.log(example)

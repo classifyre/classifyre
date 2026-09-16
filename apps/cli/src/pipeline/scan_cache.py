@@ -104,6 +104,20 @@ def detector_cache_key(detector_type: str, config: Any) -> str:
     return normalized
 
 
+def _without_budget(config: dict[str, Any]) -> dict[str, Any]:
+    """Drop ``pipeline_schema.budget``: it decides how long a detector may keep
+    failing, never what it reports. Hashing it would make tuning an LLM detector's
+    retry budget re-run that detector across the whole corpus — thousands of
+    provider calls against the very quota the budget exists to protect."""
+    schema = config.get("pipeline_schema")
+    if isinstance(schema, dict) and "budget" in schema:
+        return {
+            **config,
+            "pipeline_schema": {key: value for key, value in schema.items() if key != "budget"},
+        }
+    return config
+
+
 def detector_fingerprint(
     detector_type: str,
     config: Any,
@@ -118,7 +132,7 @@ def detector_fingerprint(
     return calculate_checksum(
         {
             "type": detector_type.strip().upper(),
-            "config": _scrub(config if isinstance(config, dict) else {}),
+            "config": _scrub(_without_budget(config) if isinstance(config, dict) else {}),
             "engine": detector_engine_version(detector_type),
             "parser": PARSER_ENGINE_VERSION,
             "content_shape": content_shape,

@@ -22,7 +22,7 @@ import { LLMDetectorEditor } from "@/components/llm-detector-editor";
 import type { LLMDetectorEditorHandle } from "@/components/llm-detector-editor";
 import { TagDetectorEditor } from "@/components/tag-detector-editor";
 import type { TagDetectorEditorHandle } from "@/components/tag-detector-editor";
-import { TAG_PIPELINE_TYPE } from "@/lib/custom-detector-badge";
+import { resolveDetectorKind } from "@/lib/detector-kind";
 import { useTranslation } from "@/hooks/use-translation";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -41,11 +41,7 @@ export interface DetectorEditorFormProps {
   onSaved?: () => void;
 }
 
-const TRANSFORMER_PIPELINE_TYPES = new Set<string>([
-  "TEXT_CLASSIFICATION",
-  "IMAGE_CLASSIFICATION",
-  "OBJECT_DETECTION",
-]);
+
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -63,20 +59,19 @@ export const DetectorEditorForm = React.forwardRef<
   const tagRef = React.useRef<TagDetectorEditorHandle>(null);
   const customRef = React.useRef<CustomDetectorEditorHandle>(null);
 
-  const isPipelineDetector = Boolean(
-    detector.pipelineSchema && Object.keys(detector.pipelineSchema).length > 0,
+  // Resolved through the shared helper so this form and the details page
+  // can never disagree about which editor a detector gets.
+  const detectorKind = resolveDetectorKind(
+    detector.pipelineSchema as Record<string, unknown> | null,
   );
   const pipelineSchemaType = (
     detector.pipelineSchema as Record<string, unknown>
   )?.type as string | undefined;
-  const isRegexPipeline = isPipelineDetector && pipelineSchemaType === "REGEX";
-  const isLLMPipeline = isPipelineDetector && pipelineSchemaType === "LLM";
-  const isTagPipeline =
-    isPipelineDetector && pipelineSchemaType === TAG_PIPELINE_TYPE;
-  const isTransformerPipeline =
-    isPipelineDetector &&
-    !!pipelineSchemaType &&
-    TRANSFORMER_PIPELINE_TYPES.has(pipelineSchemaType);
+  const isPipelineDetector = detectorKind !== "legacy";
+  const isRegexPipeline = detectorKind === "regex";
+  const isLLMPipeline = detectorKind === "llm";
+  const isTagPipeline = detectorKind === "tag";
+  const isTransformerPipeline = detectorKind === "transformer";
 
   const handleSave = useCallback(
     async (payload: {

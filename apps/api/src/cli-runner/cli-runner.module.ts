@@ -15,6 +15,9 @@ import { InstanceSettingsService } from '../instance-settings.service';
 import { DemoModeService } from '../demo-mode.service';
 import { InternalApiKeyService } from '../internal-api-key.service';
 import { ExportModule } from '../export/export.module';
+import { RunnerAssetQueryService } from './runner-asset-query.service';
+import { CohortWeightsService } from '../cohort/cohort-weights.service';
+import { CohortController } from '../cohort/cohort.controller';
 
 @Module({
   imports: [ExportModule],
@@ -30,10 +33,13 @@ import { ExportModule } from '../export/export.module';
     DemoModeService,
     InternalApiKeyService,
     RunnerLogStorageService,
+    RunnerAssetQueryService,
+    CohortWeightsService,
   ],
-  controllers: [CliRunnerController, SearchRunnersController],
+  controllers: [CliRunnerController, SearchRunnersController, CohortController],
   exports: [
     CliRunnerService,
+    CohortWeightsService,
     RunnerLogStorageService,
     KubernetesCliJobService,
     AiProviderConfigService,

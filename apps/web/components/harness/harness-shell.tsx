@@ -109,7 +109,7 @@ export function HarnessShell() {
       {/* ── Masthead ── */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-[6px] border-2 border-border bg-card shadow-[3px_3px_0_var(--color-border)]">
+          <span className="flex h-11 w-11 items-center justify-center rounded-[6px] border-2 border-border bg-card">
             <Bot className="h-5 w-5 text-[#d97706]" />
           </span>
           <div>

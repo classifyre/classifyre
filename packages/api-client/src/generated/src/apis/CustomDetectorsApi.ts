@@ -19,7 +19,9 @@ import type {
   CustomDetectorExampleDto,
   CustomDetectorResponseDto,
   CustomDetectorTrainingRunDto,
+  FindingBulkOperationDto,
   ParseTrainingExamplesResponseDto,
+  RetireOutOfScopeFindingsDto,
   SaveTrainingExamplesDto,
   TrainCustomDetectorDto,
   TrainingExampleDto,
@@ -35,8 +37,12 @@ import {
     CustomDetectorResponseDtoToJSON,
     CustomDetectorTrainingRunDtoFromJSON,
     CustomDetectorTrainingRunDtoToJSON,
+    FindingBulkOperationDtoFromJSON,
+    FindingBulkOperationDtoToJSON,
     ParseTrainingExamplesResponseDtoFromJSON,
     ParseTrainingExamplesResponseDtoToJSON,
+    RetireOutOfScopeFindingsDtoFromJSON,
+    RetireOutOfScopeFindingsDtoToJSON,
     SaveTrainingExamplesDtoFromJSON,
     SaveTrainingExamplesDtoToJSON,
     TrainCustomDetectorDtoFromJSON,
@@ -80,6 +86,11 @@ export interface CustomDetectorsControllerListTrainingExamplesRequest {
 
 export interface CustomDetectorsControllerParseTrainingExamplesRequest {
     file: Blob;
+}
+
+export interface CustomDetectorsControllerRetireOutOfScopeFindingsRequest {
+    id: string;
+    retireOutOfScopeFindingsDto: RetireOutOfScopeFindingsDto;
 }
 
 export interface CustomDetectorsControllerSaveTrainingExamplesRequest {
@@ -473,6 +484,55 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
      */
     async customDetectorsControllerParseTrainingExamples(requestParameters: CustomDetectorsControllerParseTrainingExamplesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ParseTrainingExamplesResponseDto> {
         const response = await this.customDetectorsControllerParseTrainingExamplesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * After narrowing scope.asset_kinds or removing regex patterns, the old findings stay OPEN. Both steps run in the background; follow the returned operation with GET /findings/bulk-operations/:operationId. (1) dryRun (default) counts candidates by reason, case citations and inquiry matches. (2) dryRun: false with fromOperationId, expectedCount and confirm: true resolves them. Findings a case cites are never retired; findings an ACTIVE inquiry watches only with includeInquiryWatched.
+     * Retire findings this detector can no longer produce
+     */
+    async customDetectorsControllerRetireOutOfScopeFindingsRaw(requestParameters: CustomDetectorsControllerRetireOutOfScopeFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindingBulkOperationDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling customDetectorsControllerRetireOutOfScopeFindings().'
+            );
+        }
+
+        if (requestParameters['retireOutOfScopeFindingsDto'] == null) {
+            throw new runtime.RequiredError(
+                'retireOutOfScopeFindingsDto',
+                'Required parameter "retireOutOfScopeFindingsDto" was null or undefined when calling customDetectorsControllerRetireOutOfScopeFindings().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/custom-detectors/{id}/retire-out-of-scope-findings`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RetireOutOfScopeFindingsDtoToJSON(requestParameters['retireOutOfScopeFindingsDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => FindingBulkOperationDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * After narrowing scope.asset_kinds or removing regex patterns, the old findings stay OPEN. Both steps run in the background; follow the returned operation with GET /findings/bulk-operations/:operationId. (1) dryRun (default) counts candidates by reason, case citations and inquiry matches. (2) dryRun: false with fromOperationId, expectedCount and confirm: true resolves them. Findings a case cites are never retired; findings an ACTIVE inquiry watches only with includeInquiryWatched.
+     * Retire findings this detector can no longer produce
+     */
+    async customDetectorsControllerRetireOutOfScopeFindings(requestParameters: CustomDetectorsControllerRetireOutOfScopeFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindingBulkOperationDto> {
+        const response = await this.customDetectorsControllerRetireOutOfScopeFindingsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

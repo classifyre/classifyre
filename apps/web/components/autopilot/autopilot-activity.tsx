@@ -226,7 +226,7 @@ export function AutopilotActivity({
                 className={cn(
                   "w-full rounded-[4px] border-2 bg-card px-3 py-2.5 text-left transition-colors",
                   selected
-                    ? "border-foreground/50 shadow-[2px_2px_0_var(--color-border)]"
+                    ? "border-foreground/50 "
                     : "border-border hover:border-foreground/30",
                 )}
               >

@@ -17,6 +17,7 @@ import {
   Textarea,
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
+import { StickyActionToolbar } from "@/components/sticky-action-toolbar";
 import { TAG_PIPELINE_TYPE } from "@/lib/custom-detector-badge";
 import { preserveDetectorScope } from "@/lib/detector-scope";
 
@@ -167,7 +168,7 @@ export const TagDetectorEditor = React.forwardRef<
   return (
     <div className="space-y-6">
       {/* ── Identity ── */}
-      <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+      <Card className="p-6 space-y-4 border-2 border-border">
         <h2 className="font-serif font-black uppercase tracking-wide text-base">
           {t("detectors.tag.identityTitle")}
         </h2>
@@ -221,7 +222,7 @@ export const TagDetectorEditor = React.forwardRef<
       </Card>
 
       {/* ── What the tag records ── */}
-      <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+      <Card className="p-6 space-y-4 border-2 border-border">
         <h2 className="font-serif font-black uppercase tracking-wide text-base">
           {t("detectors.tag.tagTitle")}
         </h2>
@@ -263,7 +264,7 @@ export const TagDetectorEditor = React.forwardRef<
       </Card>
 
       {/* ── How to use it ── */}
-      <Card className="p-6 space-y-3 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+      <Card className="p-6 space-y-3 border-2 border-border">
         <div className="flex items-center gap-2">
           <TagIcon className="h-4 w-4 text-muted-foreground" />
           <h2 className="font-serif font-black uppercase tracking-wide text-base">
@@ -299,18 +300,14 @@ export const TagDetectorEditor = React.forwardRef<
         </p>
       </Card>
 
+      {/* Sticky toolbar — shared with source create/edit */}
       {!embedded && (
-        <Card className="sticky bottom-0 z-30 p-4 border-t-2 border-border">
-          <div className="flex items-center justify-end gap-3">
-            <Button
-              onClick={() => void handleSubmit()}
-              disabled={!canSubmit}
-              className="rounded-[4px] border-2 border-border bg-accent text-accent-foreground shadow-[3px_3px_0_var(--color-border)] hover:bg-accent/90"
-            >
-              {submitLabel}
-            </Button>
-          </div>
-        </Card>
+        <StickyActionToolbar
+          onSaveAndRun={() => void handleSubmit()}
+          saveAndRunLabel={submitLabel}
+          isBusy={isSubmitting}
+          saveAndRunDisabled={!canSubmit}
+        />
       )}
     </div>
   );

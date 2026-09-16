@@ -206,7 +206,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
-      className="rounded-[4px] border-2 border-border p-4 shadow-[3px_3px_0_var(--color-border)] space-y-4 bg-background"
+      className="rounded-[4px] border-2 border-border p-4 space-y-4 bg-background"
     >
       <p className="font-serif font-black uppercase tracking-wide text-sm">
         New Test Scenario

@@ -1,6 +1,6 @@
 {
   "name": "@workspace/schemas",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "private": true,
   "type": "module",
   "exports": {
@@ -19,7 +19,8 @@
     "./assistant_knowledge": "./src/schemas/assistant_knowledge.json",
     "./assistant_contexts": "./src/schemas/assistant_contexts.json",
     "./notebook_completions": "./src/schemas/notebook_completions.json",
-    "./notebook_runtime_packages": "./src/schemas/notebook_runtime_packages.json"
+    "./notebook_runtime_packages": "./src/schemas/notebook_runtime_packages.json",
+    "./provider_refusal_markers": "./src/schemas/provider_refusal_markers.json"
   },
   "files": [
     "src"

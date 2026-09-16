@@ -6,7 +6,6 @@ import { Plus, Trash2, Play, AlertTriangle } from "lucide-react";
 import {
   Badge,
   Button,
-  Card,
   Input,
   Label,
   Select,
@@ -18,6 +17,7 @@ import {
   Textarea,
 } from "@workspace/ui/components";
 import { AiAssistedCard } from "@/components/ai-assisted-card";
+import { StickyActionToolbar } from "@/components/sticky-action-toolbar";
 import {
   VerticalCustomDetectorStepperNav,
   HorizontalCustomDetectorStepperNav,
@@ -25,6 +25,7 @@ import {
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import { preserveDetectorScope } from "@/lib/detector-scope";
+import { regexPatternKey } from "@/lib/regex-pattern-key";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ function parseInitialPatterns(
 function toApiSchema(patterns: RegexPatternState[]): Record<string, unknown> {
   const apiPatterns: Record<string, unknown> = {};
   for (const p of patterns) {
-    const key = p.name.trim().replace(/\s+/g, "_").toLowerCase();
+    const key = regexPatternKey(p.name);
     if (!key) continue;
     const entry: Record<string, unknown> = { pattern: p.pattern };
     if (p.description) entry.description = p.description;
@@ -126,7 +127,7 @@ function runTestMatches(
 
   for (const p of patterns) {
     if (!p.pattern) continue;
-    const patternKey = p.name.trim().replace(/\s+/g, "_").toLowerCase() || "unnamed";
+    const patternKey = regexPatternKey(p.name) || "unnamed";
     try {
       let flags = "g";
       if (!p.case_sensitive) flags += "i";
@@ -513,7 +514,7 @@ function TestPlayground({
         <div className="space-y-3">
           {Object.entries(matchesByPattern).map(([patternName, patternMatches]) => {
             const patternDef = patterns.find(
-              (p) => (p.name.trim().replace(/\s+/g, "_").toLowerCase() || "unnamed") === patternName,
+              (p) => (regexPatternKey(p.name) || "unnamed") === patternName,
             );
             return (
               <div
@@ -829,28 +830,28 @@ export const RegexDetectorEditor = React.forwardRef<
         </aside>
       </div>
 
-      {/* Sticky bottom action toolbar */}
+      {/* Sticky bottom action toolbar — shared with source create/edit */}
       {!embedded && (
-        <Card className="sticky bottom-0 z-30 mt-6 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              {errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {errors.length === 1 ? errors[0] : t("detectors.regex.errorsCount", { count: errors.length })}
-                </p>
-              )}
-            </div>
-            <Button
-              type="button"
-              data-testid="regex-submit-btn"
-              onClick={() => void handleSubmit()}
-              disabled={isSubmitting}
-              className="h-10 rounded-[4px] border-2 border-border bg-accent text-accent-foreground shadow-[4px_4px_0_var(--color-border)] hover:-translate-y-[1px] hover:shadow-[6px_6px_0_var(--color-border)] transition-all font-mono font-bold uppercase tracking-[0.12em]"
-            >
-              {isSubmitting ? t("detectors.regex.saving") : submitLabel}
-            </Button>
-          </div>
-        </Card>
+        <StickyActionToolbar
+          onSaveAndRun={() => void handleSubmit()}
+          saveAndRunLabel={
+            isSubmitting ? t("detectors.regex.saving") : submitLabel
+          }
+          hint={
+            errors.length > 0 ? (
+              <span className="text-sm text-destructive">
+                {errors.length === 1
+                  ? errors[0]
+                  : t("detectors.regex.errorsCount", {
+                      count: errors.length,
+                    })}
+              </span>
+            ) : undefined
+          }
+          isBusy={isSubmitting}
+          saveAndRunTestId="regex-submit-btn"
+          className="mt-6"
+        />
       )}
     </div>
   );

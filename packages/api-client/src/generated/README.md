@@ -189,6 +189,7 @@ All URIs are relative to *http://localhost*
 *CustomDetectorsApi* | [**customDetectorsControllerListExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerlistexamples) | **GET** /custom-detectors/examples | List custom detector starter examples
 *CustomDetectorsApi* | [**customDetectorsControllerListTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerlisttrainingexamples) | **GET** /custom-detectors/{id}/training-examples | List stored training examples for a detector
 *CustomDetectorsApi* | [**customDetectorsControllerParseTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerparsetrainingexamples) | **POST** /custom-detectors/training-examples/parse | Parse uploaded training examples file
+*CustomDetectorsApi* | [**customDetectorsControllerRetireOutOfScopeFindings**](docs/CustomDetectorsApi.md#customdetectorscontrollerretireoutofscopefindings) | **POST** /custom-detectors/{id}/retire-out-of-scope-findings | Retire findings this detector can no longer produce
 *CustomDetectorsApi* | [**customDetectorsControllerSaveTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollersavetrainingexamples) | **POST** /custom-detectors/{id}/training-examples | Save training examples for a detector
 *CustomDetectorsApi* | [**customDetectorsControllerTrain**](docs/CustomDetectorsApi.md#customdetectorscontrollertrain) | **POST** /custom-detectors/{id}/train | Trigger custom detector training
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingExamplesStats**](docs/CustomDetectorsApi.md#customdetectorscontrollertrainingexamplesstats) | **GET** /custom-detectors/{id}/training-examples/stats | Get training example counts grouped by label
@@ -214,12 +215,15 @@ All URIs are relative to *http://localhost*
 *EmbeddingsApi* | [**embeddingControllerStatus**](docs/EmbeddingsApi.md#embeddingcontrollerstatus) | **GET** /embeddings/status | Get semantic storage and search capability
 *EmbeddingsApi* | [**embeddingControllerUpdateSettings**](docs/EmbeddingsApi.md#embeddingcontrollerupdatesettings) | **PUT** /embeddings/settings | Change embedding configuration; redefining the vector space purges the corpus and re-embeds it
 *FindingsApi* | [**findingsControllerBulkUpdate**](docs/FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings
+*FindingsApi* | [**findingsControllerCancelBulkOperation**](docs/FindingsApi.md#findingscontrollercancelbulkoperation) | **POST** /findings/bulk-operations/{operationId}/cancel | Cancel a background bulk finding operation
 *FindingsApi* | [**findingsControllerCreate**](docs/FindingsApi.md#findingscontrollercreate) | **POST** /findings/create | Create a new finding
 *FindingsApi* | [**findingsControllerFindOne**](docs/FindingsApi.md#findingscontrollerfindone) | **GET** /findings/{id} | Get a finding by ID
+*FindingsApi* | [**findingsControllerGetBulkOperation**](docs/FindingsApi.md#findingscontrollergetbulkoperation) | **GET** /findings/bulk-operations/{operationId} | Get a background bulk finding operation
 *FindingsApi* | [**findingsControllerGetDiscoveryOverview**](docs/FindingsApi.md#findingscontrollergetdiscoveryoverview) | **GET** /findings/discovery | Get discovery dashboard overview data
 *FindingsApi* | [**findingsControllerGetStats**](docs/FindingsApi.md#findingscontrollergetstats) | **GET** /findings/stats | Get finding statistics
 *FindingsApi* | [**findingsControllerGetStatsFreshness**](docs/FindingsApi.md#findingscontrollergetstatsfreshness) | **GET** /findings/stats/freshness | Freshness of the pre-aggregated finding statistics shared by the dashboard charts
 *FindingsApi* | [**findingsControllerListAssetSummaries**](docs/FindingsApi.md#findingscontrollerlistassetsummaries) | **GET** /findings/assets | List asset finding summaries with optional filters
+*FindingsApi* | [**findingsControllerListBulkOperations**](docs/FindingsApi.md#findingscontrollerlistbulkoperations) | **GET** /findings/bulk-operations | List background bulk finding operations
 *FindingsApi* | [**findingsControllerRefreshDiscoveryStats**](docs/FindingsApi.md#findingscontrollerrefreshdiscoverystats) | **POST** /findings/discovery/refresh | Queue a full rebuild of the pre-aggregated finding statistics
 *FindingsApi* | [**findingsControllerUpdate**](docs/FindingsApi.md#findingscontrollerupdate) | **PATCH** /findings/{id} | Update a finding
 *GlossaryApi* | [**glossaryControllerBulkUpdate**](docs/GlossaryApi.md#glossarycontrollerbulkupdate) | **POST** /glossary/bulk | Bulk verify/unverify or retype glossary terms (operator)
@@ -290,6 +294,7 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**cliRunnerControllerGetRunnerAssetProgress**](docs/RunnersApi.md#clirunnercontrollergetrunnerassetprogress) | **GET** /runners/{runnerId}/assets/progress | Get runner asset processing progress
 *RunnersApi* | [**cliRunnerControllerListRunners**](docs/RunnersApi.md#clirunnercontrollerlistrunners) | **GET** /runners | List all runners
 *RunnersApi* | [**cliRunnerControllerListSourceRunners**](docs/RunnersApi.md#clirunnercontrollerlistsourcerunners) | **GET** /sources/{sourceId}/runners | List runners for source
+*RunnersApi* | [**cliRunnerControllerQueryAssets**](docs/RunnersApi.md#clirunnercontrollerqueryassets) | **POST** /runners/{runnerId}/assets/query | Read assets of a source in this namespace, for a running connector
 *RunnersApi* | [**cliRunnerControllerRegisterDiscoveredAssets**](docs/RunnersApi.md#clirunnercontrollerregisterdiscoveredassets) | **POST** /runners/{runnerId}/assets/discover | Register discovered asset hashes for a runner
 *RunnersApi* | [**cliRunnerControllerSearchRunnerLogs**](docs/RunnersApi.md#clirunnercontrollersearchrunnerlogs) | **POST** /runners/{runnerId}/logs | Search runner logs with server-side filtering, full-text search, and sort
 *RunnersApi* | [**cliRunnerControllerStartRunner**](docs/RunnersApi.md#clirunnercontrollerstartrunner) | **POST** /sources/{sourceId}/run | Start CLI runner for source
@@ -303,6 +308,7 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**searchRunnersControllerSearchRunnersCharts**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview
 *SitemapApi* | [**sitemapControllerGetEntries**](docs/SitemapApi.md#sitemapcontrollergetentries) | **GET** /sitemap/entries | One chunk of detail-page ids + last-modified dates
 *SitemapApi* | [**sitemapControllerGetIndex**](docs/SitemapApi.md#sitemapcontrollergetindex) | **GET** /sitemap | Sitemap index: per-entity chunk counts and last-modified dates
+*SourcesApi* | [**cohortControllerPreview**](docs/SourcesApi.md#cohortcontrollerpreview) | **GET** /sources/{id}/cohort-weights | Preview the band split of a source\&#39;s cohorts for its next run
 *SourcesApi* | [**searchSourcesControllerSearchSources**](docs/SourcesApi.md#searchsourcescontrollersearchsources) | **POST** /search/sources | Search data sources
 *SourcesApi* | [**sourceAssetsControllerBulkIngest**](docs/SourcesApi.md#sourceassetscontrollerbulkingest) | **POST** /sources/{sourceId}/assets/bulk | Bulk ingest assets
 *SourcesApi* | [**sourceAssetsControllerFinalizeIngest**](docs/SourcesApi.md#sourceassetscontrollerfinalizeingest) | **POST** /sources/{sourceId}/assets/finalize | Finalize ingest run
@@ -436,6 +442,8 @@ All URIs are relative to *http://localhost*
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
 - [CloseCaseDto](docs/CloseCaseDto.md)
 - [CloseCaseResponseDto](docs/CloseCaseResponseDto.md)
+- [CohortRunYieldDto](docs/CohortRunYieldDto.md)
+- [CohortWeightsPreviewDto](docs/CohortWeightsPreviewDto.md)
 - [ColumnLineageDto](docs/ColumnLineageDto.md)
 - [ColumnLineageResponseDto](docs/ColumnLineageResponseDto.md)
 - [ColumnLineageStepDto](docs/ColumnLineageStepDto.md)
@@ -500,6 +508,7 @@ All URIs are relative to *http://localhost*
 - [ExpandGraphDto](docs/ExpandGraphDto.md)
 - [FieldMappingDto](docs/FieldMappingDto.md)
 - [FinalizeIngestRunDto](docs/FinalizeIngestRunDto.md)
+- [FindingBulkOperationDto](docs/FindingBulkOperationDto.md)
 - [FindingEvidenceAnalysisDto](docs/FindingEvidenceAnalysisDto.md)
 - [FindingHistoryEntryDto](docs/FindingHistoryEntryDto.md)
 - [FindingLocationDto](docs/FindingLocationDto.md)
@@ -601,6 +610,7 @@ All URIs are relative to *http://localhost*
 - [RematchResponseDto](docs/RematchResponseDto.md)
 - [ReopenDecisionsDto](docs/ReopenDecisionsDto.md)
 - [ReopenDecisionsResponseDto](docs/ReopenDecisionsResponseDto.md)
+- [RetireOutOfScopeFindingsDto](docs/RetireOutOfScopeFindingsDto.md)
 - [RevertResultDto](docs/RevertResultDto.md)
 - [ReviewCaseLeadDto](docs/ReviewCaseLeadDto.md)
 - [ReviewClusterRowDto](docs/ReviewClusterRowDto.md)
@@ -627,6 +637,9 @@ All URIs are relative to *http://localhost*
 - [ReviewWaterfallRowDto](docs/ReviewWaterfallRowDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
 - [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
+- [RunnerAssetQueryDto](docs/RunnerAssetQueryDto.md)
+- [RunnerAssetQueryItemDto](docs/RunnerAssetQueryItemDto.md)
+- [RunnerAssetQueryResponseDto](docs/RunnerAssetQueryResponseDto.md)
 - [RunnerAssetStatusUpdateItem](docs/RunnerAssetStatusUpdateItem.md)
 - [RunnerDto](docs/RunnerDto.md)
 - [RunnerLogEntryDto](docs/RunnerLogEntryDto.md)

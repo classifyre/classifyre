@@ -4,6 +4,7 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**cohortControllerPreview**](SourcesApi.md#cohortcontrollerpreview) | **GET** /sources/{id}/cohort-weights | Preview the band split of a source\&#39;s cohorts for its next run |
 | [**searchSourcesControllerSearchSources**](SourcesApi.md#searchsourcescontrollersearchsources) | **POST** /search/sources | Search data sources |
 | [**sourceAssetsControllerBulkIngest**](SourcesApi.md#sourceassetscontrollerbulkingest) | **POST** /sources/{sourceId}/assets/bulk | Bulk ingest assets |
 | [**sourceAssetsControllerFinalizeIngest**](SourcesApi.md#sourceassetscontrollerfinalizeingest) | **POST** /sources/{sourceId}/assets/finalize | Finalize ingest run |
@@ -27,6 +28,73 @@ All URIs are relative to *http://localhost*
 | [**sourcesControllerUpdateSource**](SourcesApi.md#sourcescontrollerupdatesource) | **PUT** /sources/{id} | Update a data source |
 | [**sourcesControllerUpdateStatus**](SourcesApi.md#sourcescontrollerupdatestatusoperation) | **PATCH** /sources/{id}/status | Update runner status |
 
+
+
+## cohortControllerPreview
+
+> Array&lt;CohortWeightsPreviewDto&gt; cohortControllerPreview(id)
+
+Preview the band split of a source\&#39;s cohorts for its next run
+
+For each ctx.cohort() the source walks: the weights its next run would use, why (no_history, cold_start, measured or fixed), the per-band rates they came from, and the yield of recent runs.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SourcesApi,
+} from '@workspace/api-client';
+import type { CohortControllerPreviewRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SourcesApi();
+
+  const body = {
+    // string | Source UUID
+    id: id_example,
+  } satisfies CohortControllerPreviewRequest;
+
+  try {
+    const data = await api.cohortControllerPreview(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` | Source UUID | [Defaults to `undefined`] |
+
+### Return type
+
+[**Array&lt;CohortWeightsPreviewDto&gt;**](CohortWeightsPreviewDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## searchSourcesControllerSearchSources

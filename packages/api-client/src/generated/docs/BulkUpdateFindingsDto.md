@@ -8,6 +8,9 @@ Name | Type
 ------------ | -------------
 `ids` | Array&lt;string&gt;
 `filters` | [SearchFindingsFiltersInputDto](SearchFindingsFiltersInputDto.md)
+`confirm` | boolean
+`expectedCount` | number
+`dryRun` | boolean
 `status` | string
 `severity` | string
 `comment` | string
@@ -21,6 +24,9 @@ import type { BulkUpdateFindingsDto } from '@workspace/api-client'
 const example = {
   "ids": null,
   "filters": null,
+  "confirm": null,
+  "expectedCount": null,
+  "dryRun": null,
   "status": null,
   "severity": null,
   "comment": null,

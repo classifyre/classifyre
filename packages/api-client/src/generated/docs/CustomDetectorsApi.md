@@ -13,6 +13,7 @@ All URIs are relative to *http://localhost*
 | [**customDetectorsControllerListExamples**](CustomDetectorsApi.md#customdetectorscontrollerlistexamples) | **GET** /custom-detectors/examples | List custom detector starter examples |
 | [**customDetectorsControllerListTrainingExamples**](CustomDetectorsApi.md#customdetectorscontrollerlisttrainingexamples) | **GET** /custom-detectors/{id}/training-examples | List stored training examples for a detector |
 | [**customDetectorsControllerParseTrainingExamples**](CustomDetectorsApi.md#customdetectorscontrollerparsetrainingexamples) | **POST** /custom-detectors/training-examples/parse | Parse uploaded training examples file |
+| [**customDetectorsControllerRetireOutOfScopeFindings**](CustomDetectorsApi.md#customdetectorscontrollerretireoutofscopefindings) | **POST** /custom-detectors/{id}/retire-out-of-scope-findings | Retire findings this detector can no longer produce |
 | [**customDetectorsControllerSaveTrainingExamples**](CustomDetectorsApi.md#customdetectorscontrollersavetrainingexamples) | **POST** /custom-detectors/{id}/training-examples | Save training examples for a detector |
 | [**customDetectorsControllerTrain**](CustomDetectorsApi.md#customdetectorscontrollertrain) | **POST** /custom-detectors/{id}/train | Trigger custom detector training |
 | [**customDetectorsControllerTrainingExamplesStats**](CustomDetectorsApi.md#customdetectorscontrollertrainingexamplesstats) | **GET** /custom-detectors/{id}/training-examples/stats | Get training example counts grouped by label |
@@ -599,6 +600,76 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## customDetectorsControllerRetireOutOfScopeFindings
+
+> FindingBulkOperationDto customDetectorsControllerRetireOutOfScopeFindings(id, retireOutOfScopeFindingsDto)
+
+Retire findings this detector can no longer produce
+
+After narrowing scope.asset_kinds or removing regex patterns, the old findings stay OPEN. Both steps run in the background; follow the returned operation with GET /findings/bulk-operations/:operationId. (1) dryRun (default) counts candidates by reason, case citations and inquiry matches. (2) dryRun: false with fromOperationId, expectedCount and confirm: true resolves them. Findings a case cites are never retired; findings an ACTIVE inquiry watches only with includeInquiryWatched.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CustomDetectorsApi,
+} from '@workspace/api-client';
+import type { CustomDetectorsControllerRetireOutOfScopeFindingsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CustomDetectorsApi();
+
+  const body = {
+    // string | Custom detector UUID
+    id: id_example,
+    // RetireOutOfScopeFindingsDto
+    retireOutOfScopeFindingsDto: ...,
+  } satisfies CustomDetectorsControllerRetireOutOfScopeFindingsRequest;
+
+  try {
+    const data = await api.customDetectorsControllerRetireOutOfScopeFindings(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` | Custom detector UUID | [Defaults to `undefined`] |
+| **retireOutOfScopeFindingsDto** | [RetireOutOfScopeFindingsDto](RetireOutOfScopeFindingsDto.md) |  | |
+
+### Return type
+
+[**FindingBulkOperationDto**](FindingBulkOperationDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **202** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

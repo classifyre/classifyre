@@ -966,6 +966,37 @@ class DetectorScope(BaseModel):
     )
 
 
+class DetectorBudget(BaseModel):
+    """
+    How much of a run this detector may spend failing.
+
+    Without a budget a detector keeps being called after it has stopped working: an LLM detector on a provider that refused its key retried every asset for 15-40 seconds and held the only runner slot for 10 hours a day, failing on 451 of 451 assets. Every run already disables a detector after a non-retryable provider refusal (quota, auth, billing) and after 10 consecutive failures; these fields tighten or loosen that per detector.
+
+    A disabled detector records an ERROR outcome on the assets it skipped, so their existing findings are kept and the assets are retried on the next run. Changing the budget never invalidates the scan cache.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    max_attempts: int | None = Field(
+        None,
+        description='LLM detectors only: provider calls per asset, including the first. Overrides CLASSIFYRE_LLM_MAX_ATTEMPTS. A non-retryable refusal is never retried regardless.',
+        ge=1,
+        le=10,
+    )
+    max_consecutive_failures: int | None = Field(
+        None,
+        description='Disable the detector for the rest of the run after this many consecutive failed payloads. Defaults to 10.',
+        ge=1,
+        le=10000,
+    )
+    max_wall_clock_seconds: int | None = Field(
+        None,
+        description='Disable the detector for the rest of the run once it has spent this long, summed over every payload it ran on. Unset means no limit.',
+        ge=1,
+    )
+
+
 class Type1(StrEnum):
     GLINER2 = 'GLINER2'
 
@@ -977,6 +1008,10 @@ class GLiNER2PipelineSchema(BaseModel):
     scope: DetectorScope | None = Field(
         None,
         description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
+    )
+    budget: DetectorBudget | None = Field(
+        None,
+        description='Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures.',
     )
     type: Literal['GLINER2'] = 'GLINER2'
     entities: dict[str, PipelineEntityDefinition] | None = None
@@ -996,6 +1031,10 @@ class RegexPipelineSchema(BaseModel):
     scope: DetectorScope | None = Field(
         None,
         description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
+    )
+    budget: DetectorBudget | None = Field(
+        None,
+        description='Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures.',
     )
     type: Literal['REGEX'] = 'REGEX'
     patterns: dict[str, RegexPatternDefinition] | None = None
@@ -1105,6 +1144,10 @@ class LLMPipelineSchema(BaseModel):
         None,
         description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
     )
+    budget: DetectorBudget | None = Field(
+        None,
+        description='Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures.',
+    )
     type: Literal['LLM'] = 'LLM'
     system_prompt: str = Field(
         ...,
@@ -1205,6 +1248,10 @@ class TextClassificationPipelineSchema(BaseModel):
         None,
         description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
     )
+    budget: DetectorBudget | None = Field(
+        None,
+        description='Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures.',
+    )
     type: Literal['TEXT_CLASSIFICATION']
     model: str = Field(
         ...,
@@ -1279,6 +1326,10 @@ class ImageClassificationPipelineSchema(BaseModel):
         None,
         description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
     )
+    budget: DetectorBudget | None = Field(
+        None,
+        description='Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures.',
+    )
     type: Literal['IMAGE_CLASSIFICATION']
     model: str | None = Field(
         None,
@@ -1334,6 +1385,10 @@ class ObjectDetectionPipelineSchema(BaseModel):
     scope: DetectorScope | None = Field(
         None,
         description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
+    )
+    budget: DetectorBudget | None = Field(
+        None,
+        description='Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures.',
     )
     type: Literal['OBJECT_DETECTION']
     model: str = Field(
@@ -1398,6 +1453,10 @@ class TagPipelineSchema(BaseModel):
     scope: DetectorScope | None = Field(
         None,
         description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
+    )
+    budget: DetectorBudget | None = Field(
+        None,
+        description='Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures.',
     )
     type: Literal['TAG'] = 'TAG'
     label: str | None = Field(

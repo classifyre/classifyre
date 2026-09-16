@@ -16,7 +16,10 @@ jest.mock('@prisma/client', () => ({
   }),
 }));
 
-import { PrismaClientManager } from './prisma-client-manager';
+import {
+  PrismaClientManager,
+  connectionBudgetVerdict,
+} from './prisma-client-manager';
 
 describe('PrismaClientManager workload lanes', () => {
   const originalEnv = { ...process.env };
@@ -74,5 +77,25 @@ describe('PrismaClientManager workload lanes', () => {
     manager.get('ns_acme', 'background');
 
     expect(mockAdapterConfigs[0]?.max).toBe(10);
+  });
+});
+
+describe('connectionBudgetVerdict', () => {
+  it('stays quiet when the worst case fits the server', () => {
+    // 16 × 8 pooled + 40 pg-boss = 168 ≤ 200.
+    expect(connectionBudgetVerdict(16, 8, 200)).toBeNull();
+  });
+
+  it('names the numbers when the chart arithmetic is violated', () => {
+    // The dev outage shape: 16 × 8 + 40 = 168 against the 100 default.
+    const verdict = connectionBudgetVerdict(16, 8, 100);
+    expect(verdict).toContain('168');
+    expect(verdict).toContain('max_connections=100');
+    expect(verdict).toMatch(/too many clients/);
+    expect(verdict).toMatch(/PRISMA_POOL_MAX/);
+  });
+
+  it('stays quiet when the server value is unreadable', () => {
+    expect(connectionBudgetVerdict(16, 20, NaN)).toBeNull();
   });
 });

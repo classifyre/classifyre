@@ -140,6 +140,15 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
       `${BUILTIN_MCP_PREFIX}purge_source_findings`,
       `${BUILTIN_MCP_PREFIX}purge_source_assets`,
       `${BUILTIN_MCP_PREFIX}delete_source`,
+      // A corpus-wide status change rewrites the evidence base as surely as a
+      // purge does. Named here so it is withheld until hygiene is switched on,
+      // not merely unclassified.
+      `${BUILTIN_MCP_PREFIX}bulk_update_findings`,
+      `${BUILTIN_MCP_PREFIX}cancel_findings_bulk_operation`,
+      // Catalogued with custom detectors, but resolving a detector's findings
+      // is a corpus change: by group alone detector_authoring — on by default —
+      // would grant it.
+      `${BUILTIN_MCP_PREFIX}retire_out_of_scope_findings`,
     ],
   },
   {
