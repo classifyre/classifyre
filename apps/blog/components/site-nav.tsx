@@ -1,6 +1,6 @@
 import { Button, SourceIcon, ThemeToggle } from "@workspace/ui/components";
 
-import { demoUrl, repoUrl, routes } from "@/lib/site";
+import { repoUrl, routes, showcaseUrl } from "@/lib/site";
 
 /**
  * The action end of the navbar.
@@ -8,7 +8,7 @@ import { demoUrl, repoUrl, routes } from "@/lib/site";
  * Navigation itself is not here — Product, Blog, and Documentation come from
  * `app/_meta.js`, so Nextra renders them with its own menu and folds them into
  * its mobile drawer below `md`. This component only adds what the theme has no
- * concept of: the download CTA, the demo link, and the repo.
+ * concept of: the download CTA, the showcase link, and the repo.
  *
  * The download button stays visible at every width because it is the page's
  * primary action; the rest collapse into the drawer with the nav links.
@@ -30,8 +30,8 @@ export function SiteNav() {
         size="sm"
         className="hidden border-2 border-border hover:border-accent md:inline-flex"
       >
-        <a href={demoUrl} target="_blank" rel="noreferrer">
-          Demo
+        <a href={showcaseUrl} target="_blank" rel="noreferrer">
+          Showcase
         </a>
       </Button>
 

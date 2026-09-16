@@ -33,7 +33,7 @@ Two modes:
 | Mode            | Database                        | Demo mode             | Use it to                                           |
 | --------------- | ------------------------------- | --------------------- | --------------------------------------------------- |
 | `dev` (default) | embedded Postgres in-cluster    | per `helm/develop/values-dev.yaml` | Normal feature work on throwaway local data         |
-| `dev-vps-db`    | the **VPS instance's** Postgres | forced off            | Administer the public demo while it stays read-only |
+| `dev-vps-db`    | the **VPS instance's** Postgres | forced off            | Administer the public showcase while it stays read-only |
 
 ## Prerequisites
 
@@ -72,7 +72,7 @@ in-cluster web to serve `/`. Both the API port-forward and the ingress reach
 the same API pod; the port-forward is convenient for direct API clients and
 `psql` reaches Postgres the same way.
 
-## Editing the demo instance
+## Editing the showcase instance
 
 The public VPS instance runs with `DEMO_MODE=true`, so its own UI cannot create
 sources or change settings. Rather than flipping the public instance out of demo

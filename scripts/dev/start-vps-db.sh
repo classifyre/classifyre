@@ -3,7 +3,7 @@
 #
 # The VPS instance is deployed read-only (DEMO_MODE=true). This gives you a
 # writable local deployment of the same chart pointed at the same database, so
-# you can create sources and change settings for the demo without taking the
+# you can create sources and change settings for the showcase without taking the
 # public instance out of demo mode.
 #
 #   ./scripts/dev/start-vps-db.sh            # deploy and watch (Ctrl-C to stop)
@@ -49,7 +49,7 @@ if ! k3d cluster list --no-headers 2>/dev/null | awk '{print $1}' | grep -qx cla
   exit 1
 fi
 
-echo "This deploys a WRITABLE local instance against the VPS demo database."
+echo "This deploys a WRITABLE local instance against the VPS showcase database."
 echo "  VPS kubeconfig: ${KUBECONFIG_VPS}"
 echo "  VPS namespace:  ${VPS_NAMESPACE}"
 if [[ "${ALLOW_MIGRATE}" -eq 1 ]]; then
