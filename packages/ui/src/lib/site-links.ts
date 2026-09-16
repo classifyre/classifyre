@@ -8,13 +8,13 @@
 
 export const marketingSiteUrl = "https://www.classifyre.com";
 export const docsSiteUrl = "https://docs.classifyre.com";
-export const demoSiteUrl = "https://demo.classifyre.com";
+export const showcaseSiteUrl = "https://showcase.classifyre.com";
 
 /** Absolute URL of the privacy & cookie policy (apps/blog/app/privacy). */
 export const privacyPolicyUrl = `${marketingSiteUrl}/privacy/`;
 
 /**
- * The two ways to get an own instance. Linked from the app itself (the demo
+ * The two ways to get an own instance. Linked from the app itself (a demo-mode
  * deployment turns every blocked action into a pointer at these) as well as
  * from the marketing site, so they belong here rather than in either app.
  */

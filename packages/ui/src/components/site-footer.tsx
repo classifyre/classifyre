@@ -4,7 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 import { cn } from "../lib/utils";
 import {
   contactEmail,
-  demoSiteUrl,
+  showcaseSiteUrl,
   docsSiteUrl,
   marketingPaths,
   repositoryUrl,
@@ -99,7 +99,7 @@ export function SiteFooter({
   const marketing = (path: string) => `${origin}${path}`;
 
   /* Mirrors the header: the Product menu, Blog, Documentation, and the two
-     actions that live as buttons up there (Demo, GitHub). */
+     actions that live as buttons up there (Showcase, GitHub). */
   const navigation: readonly FooterLink[] = [
     { label: "Home", href: marketing(marketingPaths.home) },
     { label: "Get Classifyre", href: marketing(marketingPaths.get) },
@@ -110,7 +110,7 @@ export function SiteFooter({
     },
     { label: "Blog", href: marketing(marketingPaths.blog) },
     { label: "Documentation", href: `${docsSiteUrl}/`, external: true },
-    { label: "Live demo", href: `${demoSiteUrl}/`, external: true },
+    { label: "Live showcase", href: `${showcaseSiteUrl}/`, external: true },
     { label: "GitHub", href: repositoryUrl, external: true },
   ];
 

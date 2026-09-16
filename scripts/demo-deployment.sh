@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Deploy or update the demo Helm release in the classifyre namespace.
+# Deploy or update the showcase Helm release in the classifyre namespace.
 #
-# This script is purpose-built for the demo instance (classifyre namespace).
+# This script is purpose-built for the showcase instance (classifyre namespace).
 # It uses helm/develop/values-vps.yaml (NodePort 30100) so it never collides with the
 # develop instance on NodePort 30101.
 #
@@ -69,7 +69,7 @@ normalize_bool() {
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
-# Demo instance defaults
+# Showcase instance defaults
 IMAGE_TAG="main"
 HELM_NAMESPACE="classifyre"
 HELM_RELEASE_NAME="classifyre"
@@ -138,7 +138,7 @@ fi
 
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
-echo "║  Demo deploy: tag=${IMAGE_TAG}"
+echo "║  Showcase deploy: tag=${IMAGE_TAG}"
 echo "║  Namespace: ${HELM_NAMESPACE}"
 echo "║  Release: ${HELM_RELEASE_NAME}"
 echo "║  Demo mode: ${DEMO_MODE}"

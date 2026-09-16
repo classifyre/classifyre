@@ -1,7 +1,7 @@
-# VPS demo/test values
+# VPS showcase values
 # Single-node K3s, no ingress, NodePort access for web only.
 # API remains ClusterIP — Next.js proxies /api calls server-side.
-# Access: https://demo.classifyre.com
+# Access: https://showcase.classifyre.com
 
 api:
   image:
@@ -82,9 +82,9 @@ frontend:
     enabled: true
     policyUrl: "https://www.classifyre.com/privacy/"
 
-  # This instance is deliberately public (read-only demo), so it is the one
+  # This instance is deliberately public (read-only showcase), so it is the one
   # deployment that publishes a sitemap and invites crawlers. URLs are built
-  # from the request's forwarded host, which is https://demo.classifyre.com
+  # from the request's forwarded host, which is https://showcase.classifyre.com
   # behind the node's reverse proxy — set `baseUrl` here if that ever stops
   # being what reaches the pod.
   sitemap:

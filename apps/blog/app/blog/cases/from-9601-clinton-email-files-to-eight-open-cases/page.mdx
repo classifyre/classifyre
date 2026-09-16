@@ -78,16 +78,16 @@ twitter:
     {
       "@type": "SoftwareApplication",
       name: "Classifyre",
-      url: "https://demo.classifyre.com/hillary-clinton-emails",
+      url: "https://showcase.classifyre.com/hillary-clinton-emails",
       applicationCategory: "Data classification software",
     },
   ]}
-  liveCaseUrl="https://demo.classifyre.com/hillary-clinton-emails"
+  liveCaseUrl="https://showcase.classifyre.com/hillary-clinton-emails"
   liveCaseName="Hillary Clinton email investigation"
 />
 
 <LiveCaseLink
-  href="https://demo.classifyre.com/hillary-clinton-emails"
+  href="https://showcase.classifyre.com/hillary-clinton-emails"
   caseName="Hillary Clinton email investigation"
 />
 
@@ -118,7 +118,7 @@ substantive markings, opened seven standing inquiries, and assembled eight
 cases for review.
 
 You can inspect the resulting
-[Clinton email investigation in the Classifyre demo](https://demo.classifyre.com/hillary-clinton-emails).
+[Clinton email investigation in the Classifyre showcase](https://showcase.classifyre.com/hillary-clinton-emails).
 The namespace exposes the detectors, inquiries, cases, hypotheses, discussion
 threads, and timelines described below.
 
@@ -156,7 +156,7 @@ source alone, settle why it appears, whether the underlying document is
 authentic in every respect, or what legal conclusion follows.
 
 You can follow the ingestion history yourself in the
-[full scan log](https://demo.classifyre.com/hillary-clinton-emails/scans/) for
+[full scan log](https://showcase.classifyre.com/hillary-clinton-emails/scans/) for
 the namespace. The first scan used the built-in PII detector. That gave the harness names,
 places, dates, addresses, URLs, and other entities to work with. It also gave
 it a great deal of rubbish. Ordinary words such as “Thankfully,” “OBITUARY,”
@@ -175,7 +175,7 @@ scepticism; email addresses were the cleaner starting signal.
 ### Evidence ranking made the noise visible
 
 One
-[LOCATION finding](https://demo.classifyre.com/hillary-clinton-emails/findings/be9415ac-d93d-49ee-8064-33de0fb83b99/)
+[LOCATION finding](https://showcase.classifyre.com/hillary-clinton-emails/findings/be9415ac-d93d-49ee-8064-33de0fb83b99/)
 shows why. The PII detector had flagged the word `OBITUARY` at 85% confidence,
 and Classifyre's evidence ranking scored it importance 97 and evidence quality
 88 — high on paper, boosted by readable context and a value that looked unique
@@ -221,7 +221,7 @@ more of the comparison.
 
 By Day Four, the audit trail contained 743 agent runs, each one inspectable as
 a flight in the
-[AI harness activity log](https://demo.classifyre.com/hillary-clinton-emails/harness/?tab=activity):
+[AI harness activity log](https://showcase.classifyre.com/hillary-clinton-emails/harness/?tab=activity):
 
 | Run type | Runs |
 | --- | ---: |
@@ -277,7 +277,7 @@ The whole run was cheap. Every agent: detector author, inquiry agent, case
 agent, ran on DeepSeek V4 Flash, and the four-day investigation across
 9,601 assets, 20 detectors, seven inquiries, and eight cases cost **$4.91**
 in total model spend. The full run-by-run breakdown is visible in the
-[harness usage graph](https://demo.classifyre.com/hillary-clinton-emails/harness/?tab=usage).
+[harness usage graph](https://showcase.classifyre.com/hillary-clinton-emails/harness/?tab=usage).
 
 ![DeepSeek V4 Flash cost breakdown for the Classifyre AI harness running the Hillary Clinton email investigation](/blog/assets/images/deepseek-v4-ai-harness-classifyre-investigation.webp)
 
@@ -349,7 +349,7 @@ The harness created 20 detector concepts over the three-day review. Fourteen
 are active now. Thirteen currently have findings; the newest compartmented-
 access detector has none. The live configuration for all of them is browsable
 in the
-[custom detectors list](https://demo.classifyre.com/hillary-clinton-emails/detectors/).
+[custom detectors list](https://showcase.classifyre.com/hillary-clinton-emails/detectors/).
 
 These are the active detectors at the article snapshot. “Finding rows” is the
 API’s current count, not a count of people, offences, or unique documents.
@@ -404,7 +404,7 @@ and still needs a completed review or retirement decision.”
 The agents proposed a glossary as they encountered names, aliases, damaged
 spellings, release codes, and institutional references. Operators verified all
 17 current entries, which you can browse in the
-[live glossary](https://demo.classifyre.com/hillary-clinton-emails/glossary/).
+[live glossary](https://showcase.classifyre.com/hillary-clinton-emails/glossary/).
 
 The glossary is small enough to inspect:
 
@@ -433,7 +433,7 @@ case.
 An inquiry is a saved monitor, not a case. It answers: “Which new findings
 belong to this question?” The seven active inquiries currently contain the
 following match rows, and are browsable directly in the
-[inquiries tab](https://demo.classifyre.com/hillary-clinton-emails/investigations/?tab=inquiries):
+[inquiries tab](https://showcase.classifyre.com/hillary-clinton-emails/investigations/?tab=inquiries):
 
 | Inquiry | Current matches | What it watches |
 | --- | ---: | --- |
@@ -470,7 +470,7 @@ each is linked to the case or cases that explain why the monitor exists.
 Cases are narrower and more demanding than inquiries. They hold selected
 evidence, attached findings, hypotheses, notes, and links back to their
 monitors. The harness opened all eight current cases, which you can review in
-the [live case list](https://demo.classifyre.com/hillary-clinton-emails/investigations/).
+the [live case list](https://showcase.classifyre.com/hillary-clinton-emails/investigations/).
 
 | Case | Status | Severity | Evidence assets / attached findings |
 | --- | --- | --- | ---: |
@@ -719,7 +719,7 @@ updated, or challenged after the model run ends.
 ### Where can I inspect the investigation?
 
 Open the
-[live Classifyre demo namespace](https://demo.classifyre.com/hillary-clinton-emails)
+[live Classifyre showcase namespace](https://showcase.classifyre.com/hillary-clinton-emails)
 to inspect the current detectors, inquiries, cases, hypotheses, threads, and
 timelines.
 
