@@ -21,6 +21,23 @@ def _declared_groups() -> set[str]:
     return set(data.get("dependency-groups", {}).keys())
 
 
+def test_requires_python_has_an_upper_bound() -> None:
+    """requires-python must stay capped (e.g. <3.15).
+
+    required-environments forces uv to resolve every platform for every
+    supported Python. Without an upper bound, uv probes not-yet-released
+    Pythons (3.15+) for which onnxruntime has no wheels, so `uv lock` fails
+    and the release workflow breaks. See the comment on requires-python in
+    pyproject.toml before lifting the cap.
+    """
+    data = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
+    requires_python = data["project"]["requires-python"]
+    assert "<" in requires_python, (
+        f"requires-python ({requires_python!r}) must declare an exclusive "
+        "upper bound so `uv lock` never resolves unsupported future Pythons"
+    )
+
+
 def test_every_detector_type_is_mapped() -> None:
     for detector_type in DetectorType:
         assert detector_type.value in DETECTOR_TYPE_GROUPS, (

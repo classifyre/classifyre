@@ -3,7 +3,12 @@ name = "classifyre-cli"
 version = "0.5.5.dev0"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
-requires-python = ">=3.12"
+# Upper bound is load-bearing: onnxruntime publishes no cp315 wheels (notably
+# linux/aarch64, which required-environments forces uv to resolve), so an
+# unbounded range makes `uv lock` fail for the python>=3.15 split and breaks
+# the release workflow and Dependabot's uv updates. Lift to <3.16 once
+# onnxruntime ships cp315 wheels for all required-environments platforms.
+requires-python = ">=3.12,<3.15"
 license = { text = "MIT" }
 keywords = ["data", "metadata", "ingestion", "unstructured", "pii", "secrets"]
 dependencies = [
