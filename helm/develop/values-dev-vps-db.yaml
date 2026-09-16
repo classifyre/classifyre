@@ -1,9 +1,9 @@
-# Local k3d overlay that runs the app against the VPS demo instance's database.
+# Local k3d overlay that runs the app against the VPS showcase instance's database.
 #
 # Purpose: the VPS instance is deployed with DEMO_MODE=true, so its own UI is
 # read-only. This overlay gives you a *local* deployment of the same chart, in
 # NON-demo mode, whose Postgres is the VPS one — so you can create sources,
-# change instance settings and tune the autopilot against the real demo data
+# change instance settings and tune the autopilot against the real showcase data
 # while the public instance stays read-only.
 #
 # Layered on top of values-dev.yaml. Not usable on its own: the database host

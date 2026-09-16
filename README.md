@@ -14,7 +14,7 @@
 
 Classifyre turns the data scattered across the systems you already run into **investigations you can act on**. Connect a source, let detectors surface the evidence, and work the results like an analyst — standing questions, duplicate detection, cases, and hypotheses — with an **AI autopilot** doing the legwork in between.
 
-[Documentation](https://docs.classifyre.com/) · [Live Demo](https://demo.classifyre.com/)
+[Documentation](https://docs.classifyre.com/) · [Live Showcase](https://showcase.classifyre.com/)
 
 </div>
 

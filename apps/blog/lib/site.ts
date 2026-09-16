@@ -15,7 +15,7 @@ import {
 /** The GitHub release page, shared with the docs site's install pages. */
 export { releasesLatestUrl };
 export const repoUrl = "https://github.com/classifyre/classifyre";
-export const demoUrl = "https://demo.classifyre.com/";
+export const showcaseUrl = "https://showcase.classifyre.com/";
 export const enterpriseContactEmail = "contact@classifyre.com";
 
 /**

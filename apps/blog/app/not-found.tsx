@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Button } from "@workspace/ui/components";
 
 import { PageHero, SectionHead, SectionShell } from "@/components/page-kit";
-import { demoUrl, docs, routes } from "@/lib/site";
+import { docs, routes, showcaseUrl } from "@/lib/site";
 
 import "./landing.css";
 
@@ -77,8 +77,8 @@ export default function NotFound() {
               variant="secondary"
               className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
             >
-              <a href={demoUrl} target="_blank" rel="noreferrer">
-                Try the live demo
+              <a href={showcaseUrl} target="_blank" rel="noreferrer">
+                Try the live showcase
               </a>
             </Button>
           </>

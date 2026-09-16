@@ -70,10 +70,10 @@ describe("sitemap-config", () => {
     it("prefers the forwarded host and protocol", () => {
       const headers = new Headers({
         host: "web.svc.cluster.local:3100",
-        "x-forwarded-host": "demo.classifyre.com",
+        "x-forwarded-host": "showcase.classifyre.com",
         "x-forwarded-proto": "https,http",
       });
-      expect(resolveBaseUrl(headers)).toBe("https://demo.classifyre.com");
+      expect(resolveBaseUrl(headers)).toBe("https://showcase.classifyre.com");
     });
 
     it("falls back to Host, assuming https off-localhost", () => {
@@ -98,7 +98,7 @@ describe("sitemap-config", () => {
   });
 
   describe("URL building", () => {
-    const base = "https://demo.classifyre.com";
+    const base = "https://showcase.classifyre.com";
 
     it("emits the trailing-slash form the app actually serves", () => {
       // next.config.mjs sets trailingSlash: true — the slash-less form 308s.
@@ -255,17 +255,17 @@ describe("sitemap-config", () => {
 
     it("invites crawlers and advertises the index once enabled", () => {
       process.env.SITEMAP_ENABLED = "true";
-      const body = renderRobots("https://demo.classifyre.com");
+      const body = renderRobots("https://showcase.classifyre.com");
 
       expect(body).toContain("Allow: /");
-      expect(body).toContain("Sitemap: https://demo.classifyre.com/sitemap.xml");
+      expect(body).toContain("Sitemap: https://showcase.classifyre.com/sitemap.xml");
       expect(body).toContain("Disallow: /api/");
       expect(body).toContain("Disallow: /*/settings/");
     });
 
     it("covers the locale-prefixed form of every namespace-scoped rule", () => {
       process.env.SITEMAP_ENABLED = "true";
-      const body = renderRobots("https://demo.classifyre.com");
+      const body = renderRobots("https://showcase.classifyre.com");
 
       // `/*/settings/` wildcards one segment (the namespace slug) and so does
       // not reach `/de/<ns>/settings/`.
