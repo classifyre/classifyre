@@ -50,6 +50,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { getDetectorSchemas } from "@/lib/detector-schema-loader";
 import { setValueAtPath } from "@/lib/assistant-form-utils";
 import { CustomDetectorTests } from "@/components/custom-detector-tests";
+import { StickyActionToolbar } from "@/components/sticky-action-toolbar";
 import {
   HorizontalCustomDetectorStepperNav,
   VerticalCustomDetectorStepperNav,
@@ -594,8 +595,7 @@ function StarterCard({
       onClick={onClick}
       data-testid={testId}
       className={cn(
-        "group cursor-pointer text-left border-2 border-border rounded-[6px] bg-background p-4 shadow-[4px_4px_0_var(--color-border)] transition-all",
-        "hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[5px_5px_0_var(--color-border)]",
+        "group cursor-pointer text-left border-2 border-border rounded-[6px] bg-background p-4 transition-all",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2",
       )}
     >
@@ -1467,7 +1467,7 @@ export const CustomDetectorEditor = React.forwardRef<
 
     return (
       <div className="space-y-4">
-        <div className="border-2 border-border rounded-[6px] bg-background p-4 shadow-[4px_4px_0_var(--color-border)]">
+        <div className="border-2 border-border rounded-[6px] bg-background p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
@@ -1487,7 +1487,7 @@ export const CustomDetectorEditor = React.forwardRef<
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder={t("detectors.editor.searchExamples")}
-              className="h-10 rounded-[4px] border-2 border-border pl-9 text-sm shadow-[3px_3px_0_var(--color-border)] focus-visible:ring-0"
+              className="h-10 rounded-[4px] border-2 border-border pl-9 text-sm focus-visible:ring-0"
             />
             {searchQuery ? (
               <Button
@@ -1503,7 +1503,7 @@ export const CustomDetectorEditor = React.forwardRef<
         </div>
 
         {groupEntries.length === 0 ? (
-          <div className="border-2 border-dashed border-border rounded-[6px] bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_var(--color-border)]">
+          <div className="border-2 border-dashed border-border rounded-[6px] bg-muted/30 px-6 py-8 text-center">
             <p className="text-sm font-semibold uppercase tracking-[0.08em]">
               {t("detectors.editor.noTemplates")}
             </p>
@@ -1516,7 +1516,7 @@ export const CustomDetectorEditor = React.forwardRef<
             {groupEntries.map(([methodType, starters]) => (
               <section
                 key={methodType}
-                className="border-2 border-border rounded-[6px] bg-card overflow-hidden shadow-[6px_6px_0_var(--color-border)]"
+                className="border-2 border-border rounded-[6px] bg-card overflow-hidden"
               >
                 <div className="flex flex-col gap-2 border-b-2 border-border bg-foreground px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -1527,7 +1527,7 @@ export const CustomDetectorEditor = React.forwardRef<
                       {METHOD_META[methodType].description}
                     </p>
                   </div>
-                  <Badge className="w-fit rounded-[4px] border-2 border-border bg-accent text-[10px] uppercase tracking-[0.16em] text-accent-foreground shadow-[3px_3px_0_var(--color-border)]">
+                  <Badge className="w-fit rounded-[4px] border-2 border-border bg-accent text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
                     {starters.length} {t("detectors.editor.options")}
                   </Badge>
                 </div>
@@ -1604,7 +1604,7 @@ export const CustomDetectorEditor = React.forwardRef<
       </div>
 
       {isJsonMode ? (
-        <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
+        <Card className="rounded-[6px] border-2 border-border">
           <CardHeader>
             <CardTitle className="uppercase tracking-[0.06em]">
               JSON Editor
@@ -1633,20 +1633,15 @@ export const CustomDetectorEditor = React.forwardRef<
               className="min-h-[520px] font-mono text-xs"
               placeholder='{"method":"RULESET"}'
             />
-            <Card className="sticky bottom-0 z-30 p-4">
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
-                  onClick={() => void handleSubmit()}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting
-                    ? `${mode === "create" ? "Creating" : "Saving"}...`
-                    : submitLabel}
-                </Button>
-              </div>
-            </Card>
+            <StickyActionToolbar
+              onSaveAndRun={() => void handleSubmit()}
+              saveAndRunLabel={
+                isSubmitting
+                  ? `${mode === "create" ? "Creating" : "Saving"}...`
+                  : submitLabel
+              }
+              isBusy={isSubmitting}
+            />
           </CardContent>
         </Card>
       ) : (
@@ -1678,7 +1673,7 @@ export const CustomDetectorEditor = React.forwardRef<
               ) : null}
 
               <section ref={stepRefs.method}>
-                <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
+                <Card className="rounded-[6px] border-2 border-border">
                   <CardHeader>
                     <CardTitle className="uppercase tracking-[0.06em]">
                       Method setup
@@ -2382,7 +2377,7 @@ export const CustomDetectorEditor = React.forwardRef<
               </section>
 
               <section ref={stepRefs.policy}>
-                <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
+                <Card className="rounded-[6px] border-2 border-border">
                   <CardHeader>
                     <CardTitle className="uppercase tracking-[0.06em]">
                       Pattern & severity
@@ -2668,7 +2663,7 @@ export const CustomDetectorEditor = React.forwardRef<
               </section>
 
               <section ref={stepRefs.tests}>
-                <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
+                <Card className="rounded-[6px] border-2 border-border">
                   <CardHeader>
                     <CardTitle className="uppercase tracking-[0.06em]">
                       Test scenarios
@@ -2697,21 +2692,17 @@ export const CustomDetectorEditor = React.forwardRef<
               </section>
 
               {!embedded && (
-                <Card className="sticky bottom-0 z-30 p-4">
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
-                      onClick={() => void handleSubmit()}
-                      disabled={isSubmitting || isLoadingExistingDetectors}
-                      data-testid="btn-save-detector"
-                    >
-                      {isSubmitting
-                        ? `${mode === "create" ? "Creating" : "Saving"}...`
-                        : submitLabel}
-                    </Button>
-                  </div>
-                </Card>
+                <StickyActionToolbar
+                  onSaveAndRun={() => void handleSubmit()}
+                  saveAndRunLabel={
+                    isSubmitting
+                      ? `${mode === "create" ? "Creating" : "Saving"}...`
+                      : submitLabel
+                  }
+                  isBusy={isSubmitting}
+                  disabled={isLoadingExistingDetectors}
+                  saveAndRunTestId="btn-save-detector"
+                />
               )}
             </div>
 

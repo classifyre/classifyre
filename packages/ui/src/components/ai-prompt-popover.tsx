@@ -171,7 +171,7 @@ export function AiPromptPopover({
     return (
       <div
         className={cn(
-          "space-y-2 rounded-[6px] border-2 border-border bg-popover p-3 shadow-[4px_4px_0_var(--color-border)]",
+          "space-y-2 rounded-[6px] border-2 border-border bg-popover p-3 ",
           popoverClassName,
         )}
       >
@@ -223,7 +223,7 @@ export function AiPromptPopover({
       <PopoverContent
         align="end"
         className={cn(
-          "w-80 space-y-2 rounded-[6px] border-2 border-border bg-popover p-3 shadow-[4px_4px_0_var(--color-border)]",
+          "w-80 space-y-2 rounded-[6px] border-2 border-border bg-popover p-3 ",
           popoverClassName,
         )}
       >

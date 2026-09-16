@@ -80,7 +80,7 @@ export function HypothesisLegend({
               onClick={() => onToggleFocus(h.id)}
               title={focused ? t("caseGraph.sidebar.clearFocus") : t("caseGraph.sidebar.focusHypothesis")}
               className={`w-full border-2 bg-card p-2 text-left transition-colors ${
-                focused ? "border-foreground shadow-[3px_3px_0_0_var(--color-border)]" : "border-border hover:border-foreground/50"
+                focused ? "border-foreground " : "border-border hover:border-foreground/50"
               }`}
             >
               <div className="flex items-center gap-2">

@@ -57,3 +57,4 @@ dump_files/
 
 # Local corpus + credentials used for manual testing; never part of the repo.
 firmenbuch_data/
+genesis/

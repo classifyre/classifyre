@@ -3,10 +3,10 @@
  *
  * Before this there were six: the case badge and the runner badge each had
  * their own near-identical map, the assets table passed raw `Badge` variants
- * (so an asset's status rendered as the acid-green *default* badge, complete
- * with a hard black drop shadow), the runner-assets table computed inline
- * styles from `--accent`, and the detectors table combined the runner tones
- * with the default variant's black border. Same idea, five different pictures.
+ * (so an asset's status rendered as the acid-green *default* badge), the
+ * runner-assets table computed inline styles from `--accent`, and the
+ * detectors table combined the runner tones with the default variant's black
+ * border. Same idea, five different pictures.
  *
  * Two rules hold the scale together:
  *
@@ -16,8 +16,8 @@
  *     dark mode inverts the ground.
  *  2. Every tone is border + tinted background + ink, sized and shaped by
  *     `statusBadgeClass`, and applied to `<Badge variant="outline">`. The
- *     default variant paints its own background, border and shadow, which
- *     fights a tinted pill.
+ *     default variant paints its own background and border, which fights a
+ *     tinted pill.
  */
 export const STATUS_TONE = {
   /** Live, in flight, the thing you are waiting on. */
@@ -49,9 +49,8 @@ export type StatusTone = keyof typeof STATUS_TONE;
 /**
  * Shared chrome for a status pill.
  *
- * `shadow-none` is load-bearing: `Badge`'s default variant carries
- * `shadow-[3px_3px_0_#000]`, and a tinted pill wearing a hard black drop shadow
- * inside a dense table reads as a rendering bug.
+ * `shadow-none` keeps tinted pills flat: a hard drop shadow inside a dense
+ * table reads as a rendering bug.
  */
 export const statusBadgeClass =
   "rounded-[4px] border shadow-none font-mono text-[10px] uppercase tracking-[0.08em]";

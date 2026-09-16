@@ -1012,7 +1012,7 @@ export function FingerprintsGraph({
             onBackgroundClick={onBackgroundClick}
           />
           {focus && (
-            <div className="absolute left-3 top-3 z-10 flex items-center gap-2 rounded-[4px] border-2 border-foreground bg-background px-3 py-1.5 text-xs shadow-[3px_3px_0_#000]">
+            <div className="absolute left-3 top-3 z-10 flex items-center gap-2 rounded-[4px] border-2 border-foreground bg-background px-3 py-1.5 text-xs">
               <span className="font-mono font-semibold uppercase tracking-wide">
                 {focus.label}
               </span>

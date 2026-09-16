@@ -173,9 +173,9 @@ function getHighestSeverity(findings: SearchAssetFindingDto[]): string | null {
  * Asset status → the shared status scale.
  *
  * These were raw `Badge` variants, which meant NEW rendered as the *default*
- * badge: acid-green fill, 2px black border, hard drop shadow — the loudest
- * object on the page, sitting in a column next to two other status pills drawn
- * three other ways.
+ * badge: acid-green fill with a 2px black border — the loudest object on the
+ * page, sitting in a column next to two other status pills drawn three other
+ * ways.
  */
 const ASSET_STATUS_TONE: Record<AssetListItemDtoStatusEnum, StatusTone> = {
   NEW: "fresh",

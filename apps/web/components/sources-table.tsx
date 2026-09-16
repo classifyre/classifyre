@@ -49,18 +49,6 @@ import {
   MultiSelectItem,
   MultiSelectTrigger,
   MultiSelectValue,
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Table,
   TableBody,
   TableCell,
@@ -72,6 +60,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components";
+import { DataTableFooter } from "@/components/data-table-footer";
 import { getSourceLabel } from "@workspace/schemas/source-labels";
 import { getSourceIcon } from "../lib/source-type-icon";
 import { RunnerStatusBadge } from "./runner-status-badge";
@@ -156,16 +145,6 @@ function formatDuration(ms?: number | null) {
   const minutes = Math.floor(ms / 60_000);
   const seconds = Math.round((ms % 60_000) / 1000);
   return `${minutes}m ${seconds}s`;
-}
-
-function getPageItems(current: number, total: number) {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-  const pages = new Set<number>([1, current, total]);
-  if (current > 2) pages.add(current - 1);
-  if (current < total - 1) pages.add(current + 1);
-  return Array.from(pages).sort((a, b) => a - b);
 }
 
 function formatCronSchedule(
@@ -433,12 +412,6 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     Math.ceil(total / Math.max(1, resolvedPageSize)),
   );
   const clampedPage = Math.min(page, totalPages);
-  const canPrev = clampedPage > 1;
-  const canNext = clampedPage < totalPages;
-  const pageItems = useMemo(
-    () => getPageItems(clampedPage, totalPages),
-    [clampedPage, totalPages],
-  );
 
   const currentFilters = useMemo<SearchSourcesRequestDto["filters"]>(
     () => ({
@@ -1136,91 +1109,17 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
         )}
       </div>
 
-      {/* Footer: page size + pagination */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t pt-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">
-            {t("common.rowsPerPage")}
-          </span>
-          <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
-              <SelectValue placeholder={t("common.rowsPerPage")} />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {t("common.rows", { size })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground">
-            {total > 0
-              ? `${((clampedPage - 1) * resolvedPageSize + 1).toLocaleString()}–${Math.min(clampedPage * resolvedPageSize, total).toLocaleString()} ${t("common.of")} ${total.toLocaleString()}`
-              : t("common.noItems", { label: t("common.sources") })}
-          </span>
-        </div>
-
-        {totalPages > 1 && (
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  label={t("common.pagination.previous")}
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (canPrev) setPage(clampedPage - 1);
-                  }}
-                  className={
-                    !canPrev ? "pointer-events-none opacity-50" : undefined
-                  }
-                />
-              </PaginationItem>
-              {pageItems.map((pageNumber, index) => {
-                const prev = pageItems[index - 1];
-                const showEllipsis = prev && pageNumber - prev > 1;
-                return (
-                  <Fragment key={`page-group-${pageNumber}`}>
-                    {showEllipsis && (
-                      <PaginationItem>
-                        <PaginationEllipsis
-                          label={t("common.pagination.morePages")}
-                        />
-                      </PaginationItem>
-                    )}
-                    <PaginationItem>
-                      <PaginationLink
-                        href="#"
-                        isActive={pageNumber === clampedPage}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setPage(pageNumber);
-                        }}
-                      >
-                        {pageNumber}
-                      </PaginationLink>
-                    </PaginationItem>
-                  </Fragment>
-                );
-              })}
-              <PaginationItem>
-                <PaginationNext
-                  label={t("common.pagination.next")}
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (canNext) setPage(clampedPage + 1);
-                  }}
-                  className={
-                    !canNext ? "pointer-events-none opacity-50" : undefined
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        )}
-      </div>
+      <DataTableFooter
+        page={clampedPage}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        totalLabel={total.toLocaleString()}
+        emptyLabel={t("common.noItems", { label: t("common.sources") })}
+      />
 
       <BulkUpdateSourcesDialog
         open={bulkDialogOpen}

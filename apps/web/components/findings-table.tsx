@@ -40,13 +40,6 @@ import {
   MultiSelectItem,
   MultiSelectTrigger,
   MultiSelectValue,
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
   Select,
   SelectContent,
   SelectItem,
@@ -64,6 +57,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components";
+import { DataTableFooter } from "@/components/data-table-footer";
 import { getSourceIcon } from "../lib/source-type-icon";
 import { CsvExportButton, filtersToSearchParams } from "./csv-export-button";
 import { useUrlParams } from "../lib/url-filters";
@@ -175,14 +169,6 @@ function severityColor(severity: string) {
   return (
     FINDING_SEVERITY_COLOR_BY_ENUM[key] ?? FINDING_SEVERITY_COLOR_BY_ENUM.INFO
   );
-}
-
-function getPageItems(current: number, total: number) {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const pages = new Set<number>([1, current, total]);
-  if (current > 2) pages.add(current - 1);
-  if (current < total - 1) pages.add(current + 1);
-  return Array.from(pages).sort((a, b) => a - b);
 }
 
 function buildRequest({
@@ -647,12 +633,6 @@ export function FindingsTable({
     Math.ceil(total / Math.max(1, resolvedPageSize)),
   );
   const clampedPage = Math.min(page, totalPages);
-  const canPrev = clampedPage > 1;
-  const canNext = clampedPage < totalPages;
-  const pageItems = useMemo(
-    () => getPageItems(clampedPage, totalPages),
-    [clampedPage, totalPages],
-  );
   const selectionCount = isAllSelected ? currentTotal : selectionMap.size;
 
   const sourceOptions = useMemo(
@@ -1517,91 +1497,17 @@ export function FindingsTable({
         )}
       </div>
 
-      {/* ── Footer: page size + pagination ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t pt-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">
-            {t("common.rowsPerPage")}
-          </span>
-          <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
-              <SelectValue placeholder={t("common.rowsPerPage")} />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {t("common.rows", { size })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground">
-            {total > 0
-              ? `${((clampedPage - 1) * resolvedPageSize + 1).toLocaleString()}–${Math.min(clampedPage * resolvedPageSize, total).toLocaleString()} of ${totalLabel}`
-              : "0 findings"}
-          </span>
-        </div>
-
-        {totalPages > 1 && (
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  label={t("common.pagination.previous")}
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (canPrev) setPage(clampedPage - 1);
-                  }}
-                  className={
-                    !canPrev ? "pointer-events-none opacity-50" : undefined
-                  }
-                />
-              </PaginationItem>
-              {pageItems.map((pageNumber, index) => {
-                const prev = pageItems[index - 1];
-                const showEllipsis = prev && pageNumber - prev > 1;
-                return (
-                  <Fragment key={`page-group-${pageNumber}`}>
-                    {showEllipsis && (
-                      <PaginationItem>
-                        <PaginationEllipsis
-                          label={t("common.pagination.morePages")}
-                        />
-                      </PaginationItem>
-                    )}
-                    <PaginationItem>
-                      <PaginationLink
-                        href="#"
-                        isActive={pageNumber === clampedPage}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setPage(pageNumber);
-                        }}
-                      >
-                        {pageNumber}
-                      </PaginationLink>
-                    </PaginationItem>
-                  </Fragment>
-                );
-              })}
-              <PaginationItem>
-                <PaginationNext
-                  label={t("common.pagination.next")}
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (canNext) setPage(clampedPage + 1);
-                  }}
-                  className={
-                    !canNext ? "pointer-events-none opacity-50" : undefined
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        )}
-      </div>
+      <DataTableFooter
+        page={clampedPage}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        totalLabel={totalLabel}
+        emptyLabel="0 findings"
+      />
     </div>
   );
 }

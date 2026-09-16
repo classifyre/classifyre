@@ -237,6 +237,8 @@ export class FindingBulkOperationService {
       createdAt: operation.createdAt,
       startedAt: operation.startedAt,
       finishedAt: operation.finishedAt,
+      updatedAt: operation.updatedAt,
+      leaseUntil: operation.leaseUntil,
     };
   }
 }

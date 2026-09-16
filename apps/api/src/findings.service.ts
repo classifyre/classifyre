@@ -65,6 +65,8 @@ import { FINDING_TOTAL_CAP } from './stats/finding-stats.constants';
 import {
   BULK_OPERATION_PAGE_PAUSE_MS,
   BULK_OPERATION_PAGE_SIZE,
+  BULK_OPERATION_TX_TIMEOUT_MS,
+  BULK_OPERATION_WRITE_BATCH_SIZE,
   BULK_UPDATE_SYNC_LIMIT,
 } from './findings-bulk/finding-bulk-operation.constants';
 import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operation.service';
@@ -1559,28 +1561,68 @@ export class FindingsService {
 
       const ids = page.map((row) => row.id);
       const lastId = ids[ids.length - 1];
-      await this.prisma.$transaction(
-        async (tx) => {
-          const changed = await this.applyBulkTargetToPage(
-            tx,
-            ids,
-            target,
-            historyEntry,
-          );
-          if (wantsFeedback && target.status) {
-            await this.recordCustomDetectorFeedback(page, target.status, tx);
-          }
-          await tx.findingBulkOperation.update({
-            where: { id: operation.id },
-            data: {
-              cursor: lastId,
-              processed: { increment: page.length },
-              changed: { increment: changed },
+      // One page is many small transactions, never one page-wide one: the
+      // page UPDATE is what must fit the transaction budget (a 2,000-row
+      // UPDATE measured 11–43 s on a large corpus against 30 s), while the
+      // read page stays large. The cursor advances only with the last batch.
+      for (
+        let start = 0;
+        start < ids.length;
+        start += BULK_OPERATION_WRITE_BATCH_SIZE
+      ) {
+        const batchIds = ids.slice(
+          start,
+          start + BULK_OPERATION_WRITE_BATCH_SIZE,
+        );
+        const last = start + BULK_OPERATION_WRITE_BATCH_SIZE >= ids.length;
+        try {
+          await this.prisma.$transaction(
+            async (tx) => {
+              const changed = await this.applyBulkTargetToPage(
+                tx,
+                batchIds,
+                target,
+                historyEntry,
+              );
+              if (last && wantsFeedback && target.status) {
+                await this.recordCustomDetectorFeedback(
+                  page,
+                  target.status,
+                  tx,
+                );
+              }
+              await tx.findingBulkOperation.update({
+                where: { id: operation.id },
+                data: last
+                  ? {
+                      cursor: lastId,
+                      processed: { increment: page.length },
+                      changed: { increment: changed },
+                    }
+                  : { changed: { increment: changed } },
+              });
+              return changed;
             },
-          });
-        },
-        { timeout: 30_000 },
-      );
+            { timeout: BULK_OPERATION_TX_TIMEOUT_MS },
+          );
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          if (
+            /expired transaction|transaction.*timed? ?out|timed out/i.test(
+              message,
+            )
+          ) {
+            throw new Error(
+              `Bulk write batch of ${batchIds.length} findings exceeded the ` +
+                `${BULK_OPERATION_TX_TIMEOUT_MS} ms transaction budget ` +
+                `(${message}). Do not raise the timeout to fit it: reduce ` +
+                'BULK_OPERATION_WRITE_BATCH_SIZE.',
+            );
+          }
+          throw error;
+        }
+      }
       cursor = lastId;
 
       if (page.length < BULK_OPERATION_PAGE_SIZE) return { done: true };

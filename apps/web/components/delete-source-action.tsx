@@ -94,7 +94,7 @@ export function DeleteSourceAction({
               size="sm"
               disabled={isDeleting}
               className={cn(
-                "rounded-[4px] border-2 border-border bg-destructive text-white shadow-[3px_3px_0_var(--color-border)] hover:bg-destructive/90",
+                "rounded-[4px] border-2 border-border bg-destructive text-white hover:bg-destructive/90",
                 className,
               )}
               data-testid="btn-delete-source"
@@ -131,7 +131,7 @@ export function DeleteSourceAction({
             variant="destructive"
             disabled={isDeleting}
             onClick={handleDelete}
-            className="rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
+            className="rounded-[4px] border-2 border-border"
             data-testid="btn-delete-confirm"
           >
             {isDeleting ? t("common.deleting") : t("sources.deleteSource")}

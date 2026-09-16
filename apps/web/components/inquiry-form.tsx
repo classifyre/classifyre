@@ -59,7 +59,7 @@ function Chip({
       onClick={onClick}
       className={`flex items-center gap-1 rounded-[4px] border-2 px-2.5 py-1 text-xs font-medium transition-all ${
         active
-          ? "border-border bg-foreground text-background shadow-[2px_2px_0_var(--color-border)]"
+          ? "border-border bg-foreground text-background "
           : "border-border text-muted-foreground hover:bg-accent"
       }`}
     >
@@ -410,7 +410,7 @@ export const InquiryForm = React.forwardRef<
         <Button
           variant="outline"
           onClick={back}
-          className="mb-4 rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
+          className="mb-4 rounded-[4px] border-2 border-border"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           {isEdit
