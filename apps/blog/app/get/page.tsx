@@ -18,11 +18,11 @@ import {
 } from "@/components/page-kit";
 import { Reveal } from "@/components/reveal";
 import {
-  demoUrl,
   docs,
   helmChartRef,
   repoUrl,
   routes,
+  showcaseUrl,
   softwareVersion,
 } from "@/lib/site";
 
@@ -506,8 +506,8 @@ export default function GetPage() {
                 variant="secondary"
                 className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
               >
-                <a href={demoUrl} target="_blank" rel="noreferrer">
-                  Try the live demo
+                <a href={showcaseUrl} target="_blank" rel="noreferrer">
+                  Try the live showcase
                 </a>
               </Button>
             </div>
