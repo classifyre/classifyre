@@ -205,11 +205,10 @@
     --destructive: color-mix(in srgb, #ff5f5f 78%, var(--background));
   }
 
-  /* Adaptive brutalist card border: 2px solid border + offset shadow,
-     both driven by --color-border so they flip automatically in dark mode. */
+  /* Panel card border: 2px solid border driven by --color-border so it
+     flips automatically in dark mode. The offset shadow is gone on purpose. */
   .panel-card {
     border: 2px solid var(--color-border);
-    box-shadow: 4px 4px 0 0 var(--color-border);
   }
 
   .landing-grid {

@@ -133,6 +133,18 @@ export interface FindingBulkOperationDto {
      * @memberof FindingBulkOperationDto
      */
     finishedAt?: Date | null;
+    /**
+     * Last persisted progress write. Together with the scan/processed counts this distinguishes "working on a slow page" from dead: a recent updatedAt with an old cursor is a slow page, not a hang.
+     * @type {Date}
+     * @memberof FindingBulkOperationDto
+     */
+    updatedAt: Date;
+    /**
+     * Until when the current handler holds this operation. Past this time with no updatedAt movement, another handler may reclaim it.
+     * @type {Date}
+     * @memberof FindingBulkOperationDto
+     */
+    leaseUntil?: Date | null;
 }
 
 
@@ -176,6 +188,7 @@ export function instanceOfFindingBulkOperationDto(value: object): value is Findi
     if (!('target' in value) || value['target'] === undefined) return false;
     if (!('cancelRequested' in value) || value['cancelRequested'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
+    if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
 }
 
@@ -208,6 +221,8 @@ export function FindingBulkOperationDtoFromJSONTyped(json: any, ignoreDiscrimina
         'createdAt': (new Date(json['createdAt'])),
         'startedAt': json['startedAt'] == null ? undefined : (new Date(json['startedAt'])),
         'finishedAt': json['finishedAt'] == null ? undefined : (new Date(json['finishedAt'])),
+        'updatedAt': (new Date(json['updatedAt'])),
+        'leaseUntil': json['leaseUntil'] == null ? undefined : (new Date(json['leaseUntil'])),
     };
 }
 
@@ -241,6 +256,8 @@ export function FindingBulkOperationDtoToJSONTyped(value?: FindingBulkOperationD
         'createdAt': value['createdAt'].toISOString(),
         'startedAt': value['startedAt'] == null ? value['startedAt'] : value['startedAt'].toISOString(),
         'finishedAt': value['finishedAt'] == null ? value['finishedAt'] : value['finishedAt'].toISOString(),
+        'updatedAt': value['updatedAt'].toISOString(),
+        'leaseUntil': value['leaseUntil'] == null ? value['leaseUntil'] : value['leaseUntil'].toISOString(),
     };
 }
 

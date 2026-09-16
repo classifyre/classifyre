@@ -343,7 +343,7 @@ export default function RunnerDetailPage() {
             <p className="text-muted-foreground mb-4">{error}</p>
             <Button
               variant="outline"
-              className="rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
+              className="rounded-[4px] border-2 border-black"
               onClick={() => router.push(nsPath("/scans"))}
             >
               View All Scans

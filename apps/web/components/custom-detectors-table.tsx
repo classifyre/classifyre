@@ -24,13 +24,6 @@ import {
     Button,
     EmptyState,
     Input,
-    Pagination,
-    PaginationContent,
-    PaginationEllipsis,
-    PaginationItem,
-    PaginationLink,
-    PaginationNext,
-    PaginationPrevious,
     Select,
     SelectContent,
     SelectItem,
@@ -42,11 +35,11 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-    ToneBadge,
     statusBadgeClass,
 } from "@workspace/ui/components";
 import {formatDate, formatRelative} from "@/lib/date";
-import {detectorCatalogStatusLabel, detectorCatalogStatusToRunnerStatus, isVisualDetector,} from "@/lib/custom-detector-badge";
+import {TAG_PIPELINE_TYPE, detectorCatalogStatusLabel, detectorCatalogStatusToRunnerStatus, isVisualDetector,} from "@/lib/custom-detector-badge";
+import {DataTableFooter} from "@/components/data-table-footer";
 import {getRunnerStatusBadgeTone} from "@/lib/runner-status-badge";
 import {CustomDetectorTypeBadge, VisualScanBadge} from "@/components/detector-type-badge";
 import {useDetectorVision} from "@/hooks/use-detector-vision";
@@ -60,21 +53,9 @@ type SortBy =
     | "status"
     | "findingsCount"
     | "sourcesUsingCount"
-    | "sourcesWithFindingsCount"
-    | "lastTrainedAt";
+    | "sourcesWithFindingsCount";
 
 type SortOrder = "asc" | "desc";
-
-function getPageItems(current: number, total: number) {
-    if (total <= 7) {
-        return Array.from({length: total}, (_, i) => i + 1);
-    }
-
-    const pages = new Set<number>([1, current, total]);
-    if (current > 2) pages.add(current - 1);
-    if (current < total - 1) pages.add(current + 1);
-    return Array.from(pages).sort((a, b) => a - b);
-}
 
 function compareNullableDate(
     left?: string | null,
@@ -102,8 +83,6 @@ function sortRows(
                 return a.sourcesUsingCount - b.sourcesUsingCount;
             case "sourcesWithFindingsCount":
                 return a.sourcesWithFindingsCount - b.sourcesWithFindingsCount;
-            case "lastTrainedAt":
-                return compareNullableDate(a.lastTrainedAt, b.lastTrainedAt);
             case "updatedAt":
             default:
                 return compareNullableDate(a.updatedAt, b.updatedAt);
@@ -267,13 +246,6 @@ export function CustomDetectorsTable() {
         }
     }, [expandedDetectorId, pagedRows]);
 
-    const pageItems = useMemo(
-        () => getPageItems(clampedPage, totalPages),
-        [clampedPage, totalPages],
-    );
-    const canPrev = clampedPage > 1;
-    const canNext = clampedPage < totalPages;
-
     const onSort = (field: SortBy) => {
         setPage(1);
         if (sortBy === field) {
@@ -310,12 +282,9 @@ export function CustomDetectorsTable() {
 
     if (isLoading && rows.length === 0) {
         return (
-            <div
-                className="rounded-[6px] border-2 border-border bg-background p-12 shadow-[6px_6px_0_var(--color-border)]">
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin"/>
-                    {t("common.loading")}
-                </div>
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin"/>
+                {t("common.loading")}
             </div>
         );
     }
@@ -374,8 +343,7 @@ export function CustomDetectorsTable() {
                     }}
                 />
             ) : (
-                <div
-                    className="overflow-hidden rounded-[6px] border-2 border-border bg-background shadow-[6px_6px_0_var(--color-border)]">
+                <div className="overflow-hidden rounded-[4px] bg-white dark:bg-card">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -392,9 +360,6 @@ export function CustomDetectorsTable() {
                                     {renderSortHead("Results", "findingsCount")}
                                 </TableHead>
                                 <TableHead>
-                                    {renderSortHead(t("detectors.lastTrained"), "lastTrainedAt")}
-                                </TableHead>
-                                <TableHead>
                                     {renderSortHead(t("common.updated"), "updatedAt")}
                                 </TableHead>
                             </TableRow>
@@ -402,7 +367,7 @@ export function CustomDetectorsTable() {
                         <TableBody>
                             {pagedRows.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8}>
+                                    <TableCell colSpan={7}>
                                         <EmptyState
                                             title={t("detectors.noDetectors")}
                                             description={t("detectors.noDetectorsHint")}
@@ -412,6 +377,11 @@ export function CustomDetectorsTable() {
                             ) : (
                                 pagedRows.map((row) => {
                                     const isExpanded = expandedDetectorId === row.id;
+                                    // Tags are never selectable on a source, so a
+                                    // sources count would always read zero.
+                                    const rowPipelineType = ((row as any).pipelineSchema?.type as string | undefined)?.toUpperCase();
+                                    const isTagRow = rowPipelineType === TAG_PIPELINE_TYPE;
+                                    const sourcesUsing = row.sourcesUsing ?? [];
 
                                     return (
                                     <Fragment key={row.id}>
@@ -478,8 +448,7 @@ export function CustomDetectorsTable() {
                                         <TableCell>
                                             {/* Was the runner tones applied on top of Badge's
                                                 default variant, so the tone's background fought a
-                                                2px black border and a drop shadow. Same tone, the
-                                                shared chrome. */}
+                                                2px black border. Same tone, the shared chrome. */}
                                             <Badge
                                                 variant="outline"
                                                 className={`${statusBadgeClass} ${getRunnerStatusBadgeTone(
@@ -490,33 +459,54 @@ export function CustomDetectorsTable() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="space-y-1">
+                                            {isTagRow ? (
+                                                <p
+                                                    className="text-sm text-muted-foreground"
+                                                    title={t("detectors.tag.notSelectable")}
+                                                >
+                                                    —
+                                                </p>
+                                            ) : sourcesUsing.length === 0 ? (
+                                                <p className="text-xs text-muted-foreground">
+                                                    No source binding yet
+                                                </p>
+                                            ) : (
+                                            <div className="min-w-0 space-y-1">
                                                 <p className="text-sm font-medium">
                                                     {row.sourcesUsingCount}
                                                 </p>
-                                                {row.recentSourceNames.length > 0 ? (
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {row.recentSourceNames.slice(0, 2).map((name) => (
-                                                            <ToneBadge
-                                                                key={`${row.id}-${name}`}
-                                                                tone="neutral"
-                                                                className="max-w-[140px] truncate"
-                                                            >
-                                                                {name}
-                                                            </ToneBadge>
-                                                        ))}
-                                                        {row.recentSourceNames.length > 2 ? (
-                                                            <ToneBadge tone="neutral">
-                                                                +{row.recentSourceNames.length - 2}
-                                                            </ToneBadge>
-                                                        ) : null}
-                                                    </div>
-                                                ) : (
+                                                <ul className="max-w-[240px] space-y-0.5">
+                                                    {sourcesUsing.map((source) => (
+                                                        <li key={source.id || source.name} className="min-w-0">
+                                                            {source.id ? (
+                                                                <button
+                                                                    type="button"
+                                                                    title={source.name}
+                                                                    onClick={() =>
+                                                                        router.push(nsPath(`/sources/${source.id}`))
+                                                                    }
+                                                                    className="block max-w-full truncate text-left text-xs underline underline-offset-2 hover:text-foreground/70"
+                                                                >
+                                                                    {source.name}
+                                                                </button>
+                                                            ) : (
+                                                                <span
+                                                                    title={source.name}
+                                                                    className="block max-w-full truncate text-xs text-muted-foreground"
+                                                                >
+                                                                    {source.name}
+                                                                </span>
+                                                            )}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                                {row.sourcesUsingCount > sourcesUsing.length ? (
                                                     <p className="text-xs text-muted-foreground">
-                                                        No source binding yet
+                                                        +{row.sourcesUsingCount - sourcesUsing.length} more
                                                     </p>
-                                                )}
+                                                ) : null}
                                             </div>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             <div className="space-y-1">
@@ -531,22 +521,6 @@ export function CustomDetectorsTable() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {row.lastTrainedAt ? (
-                                                <div className="space-y-0.5">
-                                                    <p className="text-sm">
-                                                        {formatDate(row.lastTrainedAt)}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {formatRelative(row.lastTrainedAt)}
-                                                    </p>
-                                                </div>
-                                            ) : (
-                                                <p className="text-xs text-muted-foreground">
-                                                    {t("detectors.never")}
-                                                </p>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
                                             <div className="space-y-0.5">
                                                 <p className="text-sm">{formatDate(row.updatedAt)}</p>
                                                 <p className="text-xs text-muted-foreground">
@@ -558,7 +532,7 @@ export function CustomDetectorsTable() {
                                     {isExpanded ? (
                                         <TableRow data-testid="detector-findings-row">
                                             <TableCell
-                                                colSpan={8}
+                                                colSpan={7}
                                                 className="bg-muted/15 p-4 whitespace-normal"
                                             >
                                                 <DetectorFindings detectorKey={row.key} />
@@ -574,90 +548,17 @@ export function CustomDetectorsTable() {
                 </div>
             )}
 
-            <div
-                className="flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-border/20 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-        <span>
-          Showing <strong>{pagedRows.length}</strong> of{" "}
-            <strong>{total}</strong> detectors
-        </span>
-                <div className="flex items-center gap-2">
-                    <span>Rows</span>
-                    <Select value={String(safePageSize)} onValueChange={setPageSize}>
-                        <SelectTrigger
-                            className="h-8 w-[88px] rounded-[4px] border border-border/30 bg-background text-xs">
-                            <SelectValue/>
-                        </SelectTrigger>
-                        <SelectContent>
-                            {PAGE_SIZE_OPTIONS.map((size) => (
-                                <SelectItem key={size} value={String(size)}>
-                                    {size}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-
-            <Pagination>
-                <PaginationContent>
-                    <PaginationItem>
-                        <PaginationPrevious
-                            label={t("common.pagination.previous")}
-                            href="#"
-                            aria-disabled={!canPrev}
-                            tabIndex={canPrev ? 0 : -1}
-                            className={!canPrev ? "pointer-events-none opacity-50" : ""}
-                            onClick={(event) => {
-                                event.preventDefault();
-                                if (!canPrev) return;
-                                setPage((current) => Math.max(1, current - 1));
-                            }}
-                        />
-                    </PaginationItem>
-
-                    {pageItems.map((item, index) => {
-                        const previous = pageItems[index - 1];
-                        const showEllipsis = previous !== undefined && item - previous > 1;
-
-                        return (
-                            <Fragment key={item}>
-                                {showEllipsis ? (
-                                    <PaginationItem>
-                                        <PaginationEllipsis label={t("common.pagination.morePages")}/>
-                                    </PaginationItem>
-                                ) : null}
-                                <PaginationItem>
-                                    <PaginationLink
-                                        href="#"
-                                        isActive={item === clampedPage}
-                                        onClick={(event) => {
-                                            event.preventDefault();
-                                            setPage(item);
-                                        }}
-                                    >
-                                        {item}
-                                    </PaginationLink>
-                                </PaginationItem>
-                            </Fragment>
-                        );
-                    })}
-
-                    <PaginationItem>
-                        <PaginationNext
-                            label={t("common.pagination.next")}
-                            href="#"
-                            aria-disabled={!canNext}
-                            tabIndex={canNext ? 0 : -1}
-                            className={!canNext ? "pointer-events-none opacity-50" : ""}
-                            onClick={(event) => {
-                                event.preventDefault();
-                                if (!canNext) return;
-                                setPage((current) => Math.min(totalPages, current + 1));
-                            }}
-                        />
-                    </PaginationItem>
-                </PaginationContent>
-            </Pagination>
+            <DataTableFooter
+                page={clampedPage}
+                totalPages={totalPages}
+                total={total}
+                pageSize={pageSize}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                totalLabel={total.toLocaleString()}
+                emptyLabel="0 detectors"
+            />
         </div>
     );
 }

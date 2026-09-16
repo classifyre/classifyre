@@ -2752,7 +2752,7 @@ export const JsonSchemaForm = React.forwardRef<
           <Accordion type="multiple" defaultValue={["optional-parameters"]}>
             <AccordionItem
               value="optional-parameters"
-              className="border-border/70 shadow-[6px_6px_0_var(--color-border)]"
+              className="border-border/70"
             >
               <AccordionTrigger
                 className="hover:no-underline"

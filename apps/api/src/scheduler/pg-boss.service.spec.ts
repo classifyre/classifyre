@@ -1,4 +1,8 @@
-import { PgBossService, QueuePausedError } from './pg-boss.service';
+import {
+  PgBossService,
+  QueuePausedError,
+  isConnectionGone,
+} from './pg-boss.service';
 import {
   CLS_NAMESPACE_ID,
   CLS_SCHEMA,
@@ -228,5 +232,33 @@ describe('PgBossService pause holds work', () => {
     await firePauseRefresh([QUEUE]);
 
     expect(boss.offWork).not.toHaveBeenCalled();
+  });
+});
+
+describe('isConnectionGone', () => {
+  it('matches the pg-boss assertDb noise from dead instances', () => {
+    // The exact error the field report saw repeating for idle namespaces.
+    const assertDb = new Error('Database connection is not opened');
+    assertDb.name = 'AssertionError [ERR_ASSERTION]';
+    expect(isConnectionGone(assertDb)).toBe(true);
+  });
+
+  it.each([
+    'Connection terminated unexpectedly',
+    'Client has encountered a connection error and is not queryable',
+    'read ECONNRESET',
+    'connect ECONNREFUSED 127.0.0.1:5432',
+  ])('treats %p as a gone connection', (message) => {
+    expect(isConnectionGone(new Error(message))).toBe(true);
+  });
+
+  it.each([
+    'remaining connection slots are reserved for superusers',
+    'duplicate key value violates unique constraint',
+    'timeout expired',
+  ])('keeps the instance on %p', (message) => {
+    // "too many clients" is a server-side ceiling, not a dead boss:
+    // restarting the instance would not free a single connection.
+    expect(isConnectionGone(new Error(message))).toBe(false);
   });
 });

@@ -20,6 +20,7 @@
       <excludeFolder url="file://$MODULE_DIR$/.claude/worktrees/asset-hash-scan-cache-ebdd20/apps/cli/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/.claude/worktrees/asset-hash-scan-cache-ebdd20/packages/schemas/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/firmenbuch_data/gisa/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/genesis/.venv" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
   </component>

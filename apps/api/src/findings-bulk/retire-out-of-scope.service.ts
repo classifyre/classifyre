@@ -22,6 +22,8 @@ import { historyEntryForStorage } from '../types/finding-history';
 import { HistoryEventType } from '../types/finding-history.types';
 import {
   BULK_OPERATION_PAGE_PAUSE_MS,
+  BULK_OPERATION_TX_TIMEOUT_MS,
+  BULK_OPERATION_WRITE_BATCH_SIZE,
   RETIRE_DRY_RUN_MAX_AGE_MS,
   RETIRE_SAMPLE_IDS,
   RETIRE_SCAN_BLOCKS,
@@ -334,6 +336,16 @@ export class RetireOutOfScopeService {
       // One indexed primary-key fetch per page.
       await this.assertDetectorUnchanged(plan);
 
+      // Heartbeat before the expensive part of the page (scan SQL, classify,
+      // writes): a slow page otherwise looks exactly like a dead worker while
+      // watching progress. The final chunk of one dry run sat unchanged for
+      // eleven minutes this way.
+      counts.scan = { blocksScanned: block, blocksTotal };
+      await this.prisma.findingBulkOperation.update({
+        where: { id: operation.id },
+        data: { counts: countsJson(counts) },
+      });
+
       if (block >= blocksTotal) {
         // Ingest may have appended blocks since the walk began.
         blocksTotal = await this.relationBlocks();
@@ -421,41 +433,76 @@ export class RetireOutOfScopeService {
         exempted: { increment: exempted },
       };
       if (byReason.size > 0) {
-        const pageChanged = await this.prisma.$transaction(
-          async (tx) => {
-            let total = 0;
-            for (const [reason, candidates] of byReason) {
-              let text = reasonTexts.get(reason);
-              if (!text) {
-                text = resolutionReasonFor(plan, reason);
-                reasonTexts.set(reason, text);
-              }
-              const changedSources = await this.retirePage(
-                tx,
-                plan,
-                candidates,
-                text,
-                actor,
-                filters.includeInquiryWatched === true,
-              );
-              for (const sourceId of changedSources) {
-                counts.changedBySource[sourceId] =
-                  (counts.changedBySource[sourceId] ?? 0) + 1;
-              }
-              total += changedSources.length;
-            }
-            await tx.findingBulkOperation.update({
-              where: { id: operation.id },
-              data: {
-                ...progress,
-                changed: { increment: total },
-                counts: countsJson(counts),
+        // One page is many small transactions, never one page-wide one. A
+        // 2,000-row UPDATE measured 11–43 s on a real corpus against a 30 s
+        // budget, failing deterministically; 250-row batches measured ~6–7 s.
+        // Page-level atomicity buys nothing here: each row's status and
+        // history move together in its batch, and the walk resumes from its
+        // block cursor. After a crash mid-page the next walk re-scans these
+        // blocks, so the candidacy census may over-count; `changed` stays
+        // exact because every batch commits its own increment.
+        const freshMatchers =
+          filters.includeInquiryWatched === true
+            ? null
+            : await this.freshInquiryMatchers();
+        const batches: Array<{ text: string; rows: CandidateRow[] }> = [];
+        for (const [reason, candidates] of byReason) {
+          let text = reasonTexts.get(reason);
+          if (!text) {
+            text = resolutionReasonFor(plan, reason);
+            reasonTexts.set(reason, text);
+          }
+          for (const rows of splitIntoBatches(
+            candidates,
+            BULK_OPERATION_WRITE_BATCH_SIZE,
+          )) {
+            batches.push({ text, rows });
+          }
+        }
+        let pageChanged = 0;
+        for (let index = 0; index < batches.length; index += 1) {
+          const batch = batches[index];
+          const last = index === batches.length - 1;
+          try {
+            const batchChanged = await this.prisma.$transaction(
+              async (tx) => {
+                const changedSources = await this.retireBatch(
+                  tx,
+                  plan,
+                  batch.rows,
+                  batch.text,
+                  actor,
+                  freshMatchers,
+                );
+                for (const sourceId of changedSources) {
+                  counts.changedBySource[sourceId] =
+                    (counts.changedBySource[sourceId] ?? 0) + 1;
+                }
+                await tx.findingBulkOperation.update({
+                  where: { id: operation.id },
+                  // The cursor advances only with the last batch: earlier
+                  // batches commit their `changed` increment, but the page is
+                  // not done until every batch is.
+                  data: last
+                    ? {
+                        ...progress,
+                        changed: { increment: changedSources.length },
+                        counts: countsJson(counts),
+                      }
+                    : {
+                        changed: { increment: changedSources.length },
+                        counts: countsJson(counts),
+                      },
+                });
+                return changedSources.length;
               },
-            });
-            return total;
-          },
-          { timeout: 30_000 },
-        );
+              { timeout: BULK_OPERATION_TX_TIMEOUT_MS },
+            );
+            pageChanged += batchChanged;
+          } catch (error) {
+            throw retireWriteError(error, batch.rows.length);
+          }
+        }
         changed += pageChanged;
       } else {
         await this.prisma.findingBulkOperation.update({
@@ -504,42 +551,49 @@ export class RetireOutOfScopeService {
   }
 
   /**
-   * Resolve one page of candidates, re-checking both exemptions at write time.
-   * The page snapshot (candidates, cited set, inquiry matchers) can be stale
-   * by the time this transaction commits, so the UPDATE trusts none of it:
-   * a case citation after the snapshot is closed by the NOT EXISTS below, and
-   * an inquiry watch after the snapshot by re-matching against the ACTIVE
-   * inquiries as of this transaction. Returns the sources of the rows the
-   * UPDATE actually changed.
+   * ACTIVE inquiry matchers as of now, fetched OUTSIDE any write transaction.
+   * This used to reload and recompile every ACTIVE inquiry matcher once per
+   * reason group inside the page transaction — avoidable work in the most
+   * expensive place. One fetch per page is as fresh as the batch that uses it.
    */
-  private async retirePage(
+  private async freshInquiryMatchers(): Promise<CompiledMatcher[]> {
+    const fresh = await this.prisma.inquiry.findMany({
+      where: { status: 'ACTIVE' },
+      select: {
+        matchAllSources: true,
+        sourceIds: true,
+        detectorTypes: true,
+        customDetectorKeys: true,
+        findingTypes: true,
+        findingTypeRegex: true,
+        findingValueRegex: true,
+      },
+    });
+    return fresh.map((inquiry) => new CompiledMatcher(inquiry));
+  }
+
+  /**
+   * Resolve one write batch of candidates, re-checking both exemptions at
+   * write time. The page snapshot (candidates, cited set, inquiry matchers)
+   * can be stale by the time this transaction commits, so the UPDATE trusts
+   * none of it: a case citation after the snapshot is closed by the NOT EXISTS
+   * below, and an inquiry watch after the snapshot by re-matching against the
+   * matchers fetched just before this batch. Returns the sources of the rows
+   * the UPDATE actually changed.
+   */
+  private async retireBatch(
     tx: Prisma.TransactionClient,
     plan: RetirePlan,
     rows: CandidateRow[],
     reason: string,
     actor: string,
-    includeInquiryWatched: boolean,
+    freshMatchers: CompiledMatcher[] | null,
   ): Promise<string[]> {
     let targets = rows;
-    if (!includeInquiryWatched) {
-      const fresh = await tx.inquiry.findMany({
-        where: { status: 'ACTIVE' },
-        select: {
-          matchAllSources: true,
-          sourceIds: true,
-          detectorTypes: true,
-          customDetectorKeys: true,
-          findingTypes: true,
-          findingTypeRegex: true,
-          findingValueRegex: true,
-        },
-      });
-      if (fresh.length > 0) {
-        const matchers = fresh.map((inquiry) => new CompiledMatcher(inquiry));
-        targets = rows.filter(
-          (row) => !matchers.some((matcher) => matcher.matches(row)),
-        );
-      }
+    if (freshMatchers && freshMatchers.length > 0) {
+      targets = rows.filter(
+        (row) => !freshMatchers.some((matcher) => matcher.matches(row)),
+      );
     }
     if (targets.length === 0) return [];
     const entry = historyEntryForStorage({
@@ -747,6 +801,33 @@ function parseCounts(raw: unknown, plan: RetirePlan): RetireCounts {
 
 function countsJson(counts: RetireCounts): Prisma.InputJsonValue {
   return counts as unknown as Prisma.InputJsonValue;
+}
+
+function splitIntoBatches<T>(rows: T[], size: number): T[][] {
+  const batches: T[][] = [];
+  for (let start = 0; start < rows.length; start += size) {
+    batches.push(rows.slice(start, start + size));
+  }
+  return batches;
+}
+
+/**
+ * Name the real cause when a write batch outlives its transaction: the batch
+ * is too large for this corpus, not the query it happened to be running. The
+ * previous error ("Transaction expired at tx.inquiry.findMany") sent the
+ * investigation to the wrong line — the cost is the page UPDATE itself.
+ */
+function retireWriteError(error: unknown, batchSize: number): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/expired transaction|transaction.*timed? ?out|timed out/i.test(message)) {
+    return new Error(
+      `Retire write batch of ${batchSize} findings exceeded the ` +
+        `${BULK_OPERATION_TX_TIMEOUT_MS} ms transaction budget (${message}). ` +
+        'Do not raise the timeout to fit it: reduce ' +
+        'BULK_OPERATION_WRITE_BATCH_SIZE.',
+    );
+  }
+  return error instanceof Error ? error : new Error(message);
 }
 
 function capOf(target: unknown): number {

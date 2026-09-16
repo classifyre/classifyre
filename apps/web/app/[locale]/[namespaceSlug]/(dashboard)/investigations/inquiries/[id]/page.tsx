@@ -266,7 +266,7 @@ function InquiryDetailInner() {
           <ArrowLeft className="h-4 w-4" /> {t("investigations.page.tabInquiries")}
         </Button>
         <div className="flex flex-wrap items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-[4px] border-2 border-border bg-card shadow-[2px_2px_0_var(--color-border)]">
+          <span className="flex h-9 w-9 items-center justify-center rounded-[4px] border-2 border-border bg-card">
             <Sparkles className="h-4 w-4 text-[color:var(--color-amber-600,#d97706)]" />
           </span>
           <h1 className="font-serif text-2xl font-black uppercase tracking-[0.03em]">

@@ -76,4 +76,22 @@ export class FindingBulkOperationDto {
 
   @ApiPropertyOptional({ nullable: true, type: Date })
   finishedAt: Date | null;
+
+  @ApiProperty({
+    type: Date,
+    description:
+      'Last persisted progress write. Together with the scan/processed ' +
+      'counts this distinguishes "working on a slow page" from dead: a ' +
+      'recent updatedAt with an old cursor is a slow page, not a hang.',
+  })
+  updatedAt: Date;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    type: Date,
+    description:
+      'Until when the current handler holds this operation. Past this time ' +
+      'with no updatedAt movement, another handler may reclaim it.',
+  })
+  leaseUntil: Date | null;
 }

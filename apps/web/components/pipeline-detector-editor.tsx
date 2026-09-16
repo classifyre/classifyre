@@ -6,7 +6,6 @@ import { Plus, Trash2, Info, Upload, X, CheckCircle2, XCircle, Loader2 } from "l
 import {
   Badge,
   Button,
-  Card,
   Input,
   Label,
   Select,
@@ -18,6 +17,7 @@ import {
   Textarea,
 } from "@workspace/ui/components";
 import { AiAssistedCard } from "@/components/ai-assisted-card";
+import { StickyActionToolbar } from "@/components/sticky-action-toolbar";
 import {
   VerticalCustomDetectorStepperNav,
   HorizontalCustomDetectorStepperNav,
@@ -1302,28 +1302,24 @@ export const PipelineDetectorEditor = React.forwardRef<
         </aside>
       </div>
 
-      {/* Sticky bottom action toolbar */}
+      {/* Sticky bottom action toolbar — shared with source create/edit */}
       {!embedded && (
-        <Card className="sticky bottom-0 z-30 mt-6 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              {errors.length > 0 && (
-                <p className="text-sm text-destructive">
-                  {errors.length === 1 ? errors[0] : `${errors.length} errors — fix them before saving`}
-                </p>
-              )}
-            </div>
-            <Button
-              type="button"
-              data-testid="gliner2-submit-btn"
-              onClick={() => void handleSubmit()}
-              disabled={isSubmitting}
-              className="h-10 rounded-[4px] border-2 border-border bg-accent text-accent-foreground shadow-[4px_4px_0_var(--color-border)] hover:-translate-y-[1px] hover:shadow-[6px_6px_0_var(--color-border)] transition-all font-mono font-bold uppercase tracking-[0.12em]"
-            >
-              {isSubmitting ? "Saving…" : submitLabel}
-            </Button>
-          </div>
-        </Card>
+        <StickyActionToolbar
+          onSaveAndRun={() => void handleSubmit()}
+          saveAndRunLabel={isSubmitting ? "Saving…" : submitLabel}
+          hint={
+            errors.length > 0 ? (
+              <span className="text-sm text-destructive">
+                {errors.length === 1
+                  ? errors[0]
+                  : `${errors.length} errors — fix them before saving`}
+              </span>
+            ) : undefined
+          }
+          isBusy={isSubmitting}
+          saveAndRunTestId="gliner2-submit-btn"
+          className="mt-6"
+        />
       )}
     </div>
   );

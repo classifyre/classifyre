@@ -49,6 +49,20 @@ export class PrismaClientManager implements OnModuleDestroy {
     16,
   );
   /**
+   * Worst-case arithmetic these pools are sized against. The rule lives in the
+   * chart values ("poolMax × maxResidentNamespaces per pod, summed over API +
+   * worker replicas, under max_connections, plus 5 pg-boss connections per
+   * active workspace") — but nothing enforced it, and dev violated it until a
+   * stuck queue led back here. Verified once per process at boot (see
+   * {@link verifyConnectionBudget}); loud, never fatal.
+   */
+  private readonly maxResidentNamespaces = parsePositiveInteger(
+    'PRISMA_MAX_RESIDENT',
+    process.env.PRISMA_MAX_RESIDENT,
+    20,
+  );
+  private budgetVerified = false;
+  /**
    * In API-capable processes, reserve part of each namespace's connection
    * budget for browser/API traffic. Authenticated CLI callbacks and in-process
    * workers use the remainder, so an ingest burst cannot occupy every
@@ -74,7 +88,6 @@ export class PrismaClientManager implements OnModuleDestroy {
    */
   private readonly interactivePoolMax = this.resolveInteractivePoolMax();
   private readonly backgroundPoolMax = this.resolveBackgroundPoolMax();
-  private readonly maxResident = Number(process.env.PRISMA_MAX_RESIDENT ?? 20);
   /** Fail an acquire that hangs rather than blocking a request forever. */
   private readonly connectionTimeoutMs = Number(
     process.env.PRISMA_CONNECTION_TIMEOUT_MS ?? 10_000,
@@ -130,6 +143,7 @@ export class PrismaClientManager implements OnModuleDestroy {
         timeout: this.txTimeoutMs,
       },
     });
+    this.verifyConnectionBudget(client);
     this.clients.set(schema, {
       ...namespaceClients,
       [lane]: client,
@@ -224,12 +238,47 @@ export class PrismaClientManager implements OnModuleDestroy {
   }
 
   private evictIfNeeded(): void {
-    if (this.clients.size <= this.maxResident) return;
+    if (this.clients.size <= this.maxResidentNamespaces) return;
     for (const schema of [...this.clients.keys()]) {
-      if (this.clients.size <= this.maxResident) break;
+      if (this.clients.size <= this.maxResidentNamespaces) break;
       if (this.pins.has(schema)) continue;
       void this.drop(schema);
     }
+  }
+
+  /**
+   * Compare the chart's pool arithmetic against the server's
+   * `max_connections`, once per process. Loud (error log naming the numbers
+   * and the fix) but never fatal: pools open lazily and reap after
+   * `idleTimeoutMs`, so a worst case nobody reaches costs nothing — while the
+   * symptom of a real violation is a stuck queue, not an error naming the
+   * cause. Runs on the first client creation, when a pooled connection first
+   * exists to ask with.
+   */
+  private verifyConnectionBudget(client: PrismaClient): void {
+    if (this.budgetVerified) return;
+    this.budgetVerified = true;
+    // In tests the client is a stub without $queryRaw; skip there.
+    if (typeof client.$queryRaw !== 'function') return;
+    void (async () => {
+      try {
+        // Called as a method: detached, $queryRaw loses its `this`.
+        const rows = await client.$queryRaw<
+          Array<{ max_connections?: string }>
+        >`SHOW max_connections`;
+        const maxConnections = Number(rows?.[0]?.max_connections);
+        const verdict = connectionBudgetVerdict(
+          this.poolMax,
+          this.maxResidentNamespaces,
+          maxConnections,
+        );
+        if (verdict) this.logger.error(verdict);
+      } catch (error) {
+        this.logger.warn(
+          `Could not verify the Postgres connection budget: ${String(error)}`,
+        );
+      }
+    })().catch(() => undefined);
   }
 
   private poolMaxFor(lane: DatabaseLane): number {
@@ -252,6 +301,37 @@ export class PrismaClientManager implements OnModuleDestroy {
     if (serviceRole() === 'worker') return this.poolMax;
     return Math.max(1, this.poolMax - this.interactivePoolMax);
   }
+}
+
+/**
+ * The chart's pool rule as a checkable verdict. Worst case per pod is
+ * `poolMax × maxResidentNamespaces`, plus pg-boss's 5 connections per active
+ * workspace outside these pools; keep that, summed over API + worker
+ * replicas, under the server's `max_connections`.
+ *
+ * Returns the loud boot message when the worst case exceeds the server, or
+ * null when it fits (or when the server value is unreadable, which the caller
+ * reports separately).
+ */
+export function connectionBudgetVerdict(
+  poolMax: number,
+  maxResidentNamespaces: number,
+  maxConnections: number,
+): string | null {
+  if (!Number.isFinite(maxConnections) || maxConnections < 1) return null;
+  const prismaWorst = poolMax * maxResidentNamespaces;
+  const pgBossExtra = 5 * maxResidentNamespaces;
+  const worst = prismaWorst + pgBossExtra;
+  if (worst <= maxConnections) return null;
+  return (
+    `Postgres connection budget violated: worst case ${worst} per pod ` +
+    `(${poolMax} × ${maxResidentNamespaces} pooled + ` +
+    `${pgBossExtra} pg-boss) exceeds max_connections=${maxConnections}. ` +
+    `Sum over API + worker replicas. Pools open lazily, so this may never ` +
+    `bite — but when it does, the symptom is a stuck queue ("too many ` +
+    `clients"), not this message. Fix: raise the server's max_connections ` +
+    `or lower PRISMA_POOL_MAX / PRISMA_MAX_RESIDENT.`
+  );
 }
 
 function parsePositiveInteger(

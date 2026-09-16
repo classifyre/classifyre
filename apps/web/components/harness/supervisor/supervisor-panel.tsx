@@ -100,7 +100,7 @@ export function SupervisorPanel() {
       <div className="rounded-[4px] border-2 border-border bg-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] border-2 border-border bg-card shadow-[3px_3px_0_var(--color-border)]">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] border-2 border-border bg-card">
               <Bot className="h-5 w-5 text-[#d97706]" />
             </div>
             <div className="max-w-2xl">
