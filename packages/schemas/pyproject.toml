@@ -2,7 +2,10 @@
 name = "classifyre-schemas"
 version = "0.5.5.dev0"
 description = "Shared JSON schemas for Classifyre monorepo"
-requires-python = ">=3.12"
+# Kept in sync with apps/cli: both ship in the same images on the same
+# interpreter, and an unbounded range breaks `uv lock` / Dependabot updates
+# (see the note on requires-python in apps/cli/pyproject.toml).
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "fastjsonschema==2.22.2",
 ]
