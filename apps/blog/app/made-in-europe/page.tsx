@@ -14,11 +14,11 @@ import {
 } from "@/components/page-kit";
 import { Reveal } from "@/components/reveal";
 import {
-  demoUrl,
   docs,
   enterpriseContactEmail,
   repoUrl,
   routes,
+  showcaseUrl,
 } from "@/lib/site";
 
 import "../landing.css";
@@ -416,12 +416,12 @@ export default function MadeInEuropePage() {
                 <a href={routes.editions}>Open source vs Enterprise</a>
               </Button>
               <a
-                href={demoUrl}
+                href={showcaseUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50 underline-offset-4 hover:text-accent hover:underline"
               >
-                Or poke at the live demo
+                Or poke at the live showcase
               </a>
             </div>
           </div>

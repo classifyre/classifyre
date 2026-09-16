@@ -836,7 +836,7 @@ frontend:
     # Off by default: a Classifyre instance is normally private and reached
     # only by people who already have a contract with its operator, where a
     # public-website consent bar is noise. Turn it on for deliberately public
-    # deployments — the demo instance does (see helm/develop/values-vps.yaml). The
+    # deployments — the showcase instance does (see helm/develop/values-vps.yaml). The
     # all-in-one image never shows it: it ships no analytics at all.
     #
     # Turning it on does not, by itself, make a deployment compliant: the

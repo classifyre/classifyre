@@ -189,7 +189,7 @@ jobs:
           echo "SCALE_DOWN=true → parking ${HELM_RELEASE_NAME} at zero replicas."
 
           # Never run this against the prod (classifyre) namespace — it takes
-          # the demo offline. The step is opt-out via scale_down=false.
+          # the showcase offline. The step is opt-out via scale_down=false.
           if [[ "${HELM_NAMESPACE}" == "classifyre" ]]; then
             echo "Refusing to park the prod namespace. Pass scale_down=false to deploy it running." >&2
             exit 1

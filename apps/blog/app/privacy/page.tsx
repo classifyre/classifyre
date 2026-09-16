@@ -5,11 +5,11 @@ import { CookieSettingsButton } from "@workspace/ui/components";
 
 import { Marker, PageHero, SectionShell } from "@/components/page-kit";
 import {
-  demoUrl,
   enterpriseContactEmail,
   marketingSiteUrl,
   repoUrl,
   routes,
+  showcaseUrl,
 } from "@/lib/site";
 
 import "../landing.css";
@@ -263,8 +263,8 @@ export default function PrivacyPage() {
                   — the documentation site.
                 </>,
                 <>
-                  <strong className="text-foreground">demo.classifyre.com</strong>{" "}
-                  — the public read-only demo, covered in section 08.
+                  <strong className="text-foreground">showcase.classifyre.com</strong>{" "}
+                  — the public read-only showcase, covered in section 08.
                 </>,
               ]}
             />
@@ -477,7 +477,7 @@ export default function PrivacyPage() {
           <Clause
             id="self-hosted"
             number="08"
-            title="Self-hosted deployments and the demo"
+            title="Self-hosted deployments and the showcase"
           >
             <p>
               <strong className="text-foreground">Your own installation.</strong>{" "}
@@ -489,8 +489,8 @@ export default function PrivacyPage() {
               warranty and liability terms; nothing on this page adds to them.
             </p>
             <p>
-              <strong className="text-foreground">The public demo.</strong>{" "}
-              <ExternalLink href={demoUrl}>demo.classifyre.com</ExternalLink> is
+              <strong className="text-foreground">The public showcase.</strong>{" "}
+              <ExternalLink href={showcaseUrl}>showcase.classifyre.com</ExternalLink> is
               a deliberately public, read-only instance we operate so people can
               look around before installing anything. It is a shop window, not a
               vault: treat everything in it as public, and do not upload real

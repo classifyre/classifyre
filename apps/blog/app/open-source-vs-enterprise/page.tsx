@@ -12,11 +12,11 @@ import {
   SectionShell,
 } from "@/components/page-kit";
 import {
-  demoUrl,
   docs,
   enterpriseContactEmail,
   repoUrl,
   routes,
+  showcaseUrl,
 } from "@/lib/site";
 
 import "../landing.css";
@@ -179,7 +179,7 @@ const COMPARISON: readonly RowGroup[] = [
       },
       {
         capability: "Onboarding",
-        oss: "Docs and the demo",
+        oss: "Docs and the showcase",
         ent: "Guided pilot, architecture review",
       },
       {
@@ -574,12 +574,12 @@ export default function EditionsPage() {
               </Button>
             </div>
             <a
-              href={demoUrl}
+              href={showcaseUrl}
               target="_blank"
               rel="noreferrer"
               className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50 underline-offset-4 hover:text-accent hover:underline"
             >
-              Or poke at the live demo first
+              Or poke at the live showcase first
             </a>
           </div>
         </SectionShell>
