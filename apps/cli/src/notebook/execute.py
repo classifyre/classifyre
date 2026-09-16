@@ -561,6 +561,8 @@ def _call_extract(
                     "contentLength": len(asset.content),
                     "metadata": asset.metadata,
                     "links": asset.links,
+                    "extract": asset.extract,
+                    "referenceReason": asset.reference_reason,
                 }
             )
         )

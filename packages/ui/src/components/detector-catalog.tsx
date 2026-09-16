@@ -168,7 +168,7 @@ export function DetectorCatalog({
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Search detectors, categories, or finding types"
-            className="h-10 rounded-[4px] border-2 border-black pl-9 text-sm shadow-[3px_3px_0_#000] focus-visible:ring-0"
+            className="h-10 rounded-[4px] border-2 border-black pl-9 text-sm focus-visible:ring-0"
           />
           {searchQuery ? (
             <Button
@@ -184,7 +184,7 @@ export function DetectorCatalog({
       </Card>
 
       {groupedEntries.length === 0 ? (
-        <Card className="border-dashed border-black bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_#000]">
+        <Card className="border-dashed border-black bg-muted/30 px-6 py-8 text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.08em]">
             No detectors found
           </p>

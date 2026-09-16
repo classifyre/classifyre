@@ -12,6 +12,9 @@ import { SourceService } from './source.service';
 import { SourceFilesService } from './source-files.service';
 import { AssetService } from './asset.service';
 import { FindingsService } from './findings.service';
+import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operation.service';
+import { FindingBulkOperationWorker } from './findings-bulk/finding-bulk-operation.worker';
+import { RetireOutOfScopeService } from './findings-bulk/retire-out-of-scope.service';
 import { NotificationsService } from './notifications.service';
 import { ValidationService } from './validation.service';
 import { CustomDetectorsService } from './custom-detectors.service';
@@ -157,6 +160,9 @@ import {
     SourceFilesService,
     AssetService,
     FindingsService,
+    FindingBulkOperationService,
+    FindingBulkOperationWorker,
+    RetireOutOfScopeService,
     NotificationsService,
     ValidationService,
     CustomDetectorsService,

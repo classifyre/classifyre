@@ -55,6 +55,29 @@ api:
       done
       exec bun --watch src/main.ts
 
+  database:
+    # 8, down from the chart default of 20, because this cluster has exactly 8
+    # namespace schemas and a pool for a namespace that does not exist is a
+    # number in the budget check rather than a connection anyone opens.
+    #
+  # #285's boot check does the arithmetic out loud: at 20 it reported
+    # "worst case 420 per pod (16 × 20 pooled + 100 pg-boss) exceeds
+    # max_connections=200". At 8 that is 16 × 8 + 40 = 168 per pod, under the
+    # 200 a single pod may use.
+  #
+    # The two-pod sum (336) still exceeds 200. The boot check is per-pod only,
+    # so at 8 it stays quiet and this residual is accepted deliberately, not
+    # overlooked:
+    #   * it needs every namespace hot on both pods at once, which cannot
+    #     happen with MAX_CONCURRENT_RUNNERS=1 and one browser;
+    #   * measured peak is 104 of 200, and pools close after idleTimeoutMs=10s;
+    #   * the alternative — raising max_connections toward 420 — is the one
+    #     thing this box cannot afford. Postgres already sits at 2,334Mi of a
+    #     3Gi limit serving 104 connections; ~5MB per additional backend spends
+    #     headroom it does not have, and trades a stuck queue for an OOM kill.
+    # Production must satisfy the rule properly rather than inherit this.
+    maxResidentNamespaces: 8
+
   env:
     NODE_ENV: development
     PORT: "8000"
@@ -322,6 +345,33 @@ api:
     workDir: /app/apps/cli
     cleanupPolicy: failed
     backoffLimit: 0
+    extraEnv:
+      # One attempt, not four.
+      #
+      # The default (CLASSIFYRE_LLM_MAX_ATTEMPTS=4) assumes a retry is worth
+      # paying for, which is true against a provider that is briefly busy and
+      # false against one that is refusing this key outright. Measured on the
+      # Bilanzanalyse source, whose fb_solvency_outlook detector runs on the
+      # free OpenRouter tier:
+      #
+      #   09-13 07:30   157 min   failed on 451 of 451 assets
+      #   09-13 02:03   121 min   failed on 352 of 358
+      #   09-12 22:20   142 min   failed on 383 of 431
+      #
+      # Four attempts with exponential backoff is ~15-20s per asset, so a
+      # 450-asset run spends over two hours retrying its way to the same
+      # answer. The retries changed nothing -- 451 of 451 still failed.
+      #
+      # The cost is not confined to that source. MAX_CONCURRENT_RUNNERS is 1
+      # here (one extract pod fits the node, see the resources block below), so
+      # those two hours are two hours in which the register sweep, EVI and GISA
+      # all wait. It is why Bilanzanalyse sits at 0.06% register coverage while
+      # EVI is at 11.5%.
+      #
+      # Raise it again when a paid provider is configured: against a provider
+      # that actually answers, retrying is the right behaviour.
+      - name: CLASSIFYRE_LLM_MAX_ATTEMPTS
+        value: "1"
     extraVolumeMounts:
       - name: cli-development-source
         mountPath: /app/apps/cli/src
@@ -357,7 +407,23 @@ api:
         memory: 7Gi
         ephemeral-storage: 1Gi
       limits:
-        cpu: "2"
+        # 4, not 2: compute_pool_workers() sizes the detector pool as
+        # `cpus - 1` from the cgroup quota, so 4 gives detection 3 workers.
+        #
+        # It was raised for "100 assets discovered, 0 processed for ten
+        # minutes", but CPU was never that fix, only a way to shorten it. The
+        # CUSTOM source parsed each fetched file inline on the discovery loop
+        # -- a 27-page Konzernabschluss took 17.4 minutes in docling -- so
+        # discovery froze the moment a conversion started, whatever the pool
+        # size, and the text it produced was then thrown away and parsed again.
+        # Discovery now only sniffs the MIME type; text is extracted in phase 2,
+        # after the scan cache, off the event loop.
+        #
+        # The node has room: 10 CPUs allocatable against 3300m requested. CPU is
+        # compressible, so this cannot evict anything the way the memory request
+        # below deliberately does -- that stays 7Gi, and it remains the reason
+        # only one extract pod is ever scheduled.
+        cpu: "4"
         # 4Gi was not enough for a real scanned PDF: a filing with no text layer
         # falls through to docling's StandardPdfPipeline (layout transformer +
         # TableFormer, on CPU), which OOMKilled the job (exit 137) mid-scan.
@@ -472,6 +538,28 @@ postgres:
       # "temporary file size exceeds temp_file_limit" instead of sinking the
       # node. 10GB is ~625x work_mem -- generous for legit sorts on this box.
       temp_file_limit: 10GB
+      # 2026-09-15: 100 (the Postgres default) is below what this chart's own
+      # pool arithmetic asks for, and #284 added enough concurrent background
+      # work to start reaching it.
+      #
+      # values.yaml states the rule: "Worst case per pod is `poolMax ×
+      # maxResidentNamespaces`; keep that (summed over API + worker replicas)
+      # under the server's `max_connections`. pg-boss holds a further 5
+      # connections per active workspace outside these pools."
+      #
+      # Here that is PRISMA_POOL_MAX=16 × 8 resident schemas × 2 pods = 256,
+      # plus pg-boss, against 100. Measured live: connections burst to 92/100
+      # and the worker logged "sorry, too many clients already" — which left a
+      # RETIRE_OUT_OF_SCOPE operation stuck PENDING, backed up 289
+      # finding-stats-refresh jobs, and made the bulk-operation worker
+      # re-register its queue every few seconds instead of running.
+      #
+      # 200 rather than 256: the worst case assumes every namespace is hot at
+      # once, which does not happen here, and each backend costs roughly 5MB
+      # against a 3Gi limit that already spends 768MB on shared_buffers.
+      # Measured demand peaks near 100, so this is ~2x observed rather than
+      # provisioning for the theoretical ceiling.
+      max_connections: 200
     resources:
       # Request == limit puts Postgres in the Guaranteed QoS class, and that is
       # the point of this whole block. Requests are what the kernel and kubelet

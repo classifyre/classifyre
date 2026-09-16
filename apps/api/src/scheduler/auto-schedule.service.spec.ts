@@ -32,7 +32,11 @@ describe('AutoScheduleService', () => {
     instanceSettings: { findUnique: jest.fn() },
   };
   const pgBoss = { getBossAsync: jest.fn() };
-  const cliRunner = { startRun: jest.fn(), reconcileStaleInFlight: jest.fn() };
+  const cliRunner = {
+    startRun: jest.fn(),
+    reconcileStaleInFlight: jest.fn(),
+    promotePendingRunners: jest.fn(),
+  };
   const notifications = { create: jest.fn() };
 
   const service = new AutoScheduleService(
@@ -74,6 +78,7 @@ describe('AutoScheduleService', () => {
 
   beforeEach(() => {
     cliRunner.reconcileStaleInFlight.mockResolvedValue(0);
+    cliRunner.promotePendingRunners.mockResolvedValue(undefined);
     jest.clearAllMocks();
     prisma.source.updateMany.mockResolvedValue({ count: 1 });
   });
@@ -450,6 +455,17 @@ describe('AutoScheduleService', () => {
       await service.tick();
 
       expect(cliRunner.startRun).not.toHaveBeenCalled();
+    });
+
+    it('promotes queued runs while yielding, so a stranded queue cannot pass for a busy one', async () => {
+      // Observed 2026-09-14: two PENDING runs in two namespaces and an idle
+      // runner slot. Each namespace's tick counted its own PENDING run as in
+      // flight and yielded to it; nothing ever promoted either.
+      prisma.source.count.mockResolvedValue(2);
+
+      await service.tick();
+
+      expect(cliRunner.promotePendingRunners).toHaveBeenCalledTimes(1);
     });
 
     // Fair rotation among adaptive sources: longest-overdue first, so a source

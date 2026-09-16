@@ -27,7 +27,7 @@ export function AiAssistedCard({
     <div
       className={cn(
         "overflow-hidden rounded-[6px] border-2 border-border bg-card",
-        withShadow && "shadow-[6px_6px_0_var(--color-border)]",
+        withShadow && "",
       )}
     >
       {showHeader ? (

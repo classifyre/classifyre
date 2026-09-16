@@ -1,12 +1,11 @@
 export const aiAccentBase =
-  "text-accent-foreground bg-accent border-2 border-border rounded-[4px] shadow-[4px_4px_0_var(--color-border)]";
+  "text-accent-foreground bg-accent border-2 border-border rounded-[4px]";
 
 export const aiAccentHoverYellow =
-  "hover:bg-accent/80 hover:text-white dark:hover:text-white hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[3px_3px_0_var(--color-border)]";
+  "hover:bg-accent/80 hover:text-white dark:hover:text-white";
 
-/** Brutalist card container — hard black border + offset shadow */
-export const aiAccentCard =
-  "border-2 border-border rounded-[4px] shadow-[4px_4px_0_var(--color-border)]";
+/** Accent card container — hard border, no offset shadow */
+export const aiAccentCard = "border-2 border-border rounded-[4px]";
 
 /** Acid-green card header — use as the top section of aiAccentCard */
 export const aiAccentCardHeader =

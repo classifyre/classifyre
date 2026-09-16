@@ -130,4 +130,13 @@ export class FinalizeIngestRunDto {
   @IsOptional()
   @IsBoolean()
   partialCoverage?: boolean;
+
+  @ApiPropertyOptional({
+    type: Object,
+    description:
+      'Per ctx.cohort() of the run: keys each band visited and the weights used. ' +
+      'The API adds how many of those keys produced a new HIGH/CRITICAL finding.',
+  })
+  @IsOptional()
+  cohortStats?: Record<string, unknown>;
 }

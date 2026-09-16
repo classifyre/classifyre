@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Optional, Logger } from '@nestjs/common';
 import {
   AgentDecisionAction,
   AutoSchedulePhase,
+  Prisma,
   Severity,
   SourceScheduleMode,
 } from '@prisma/client';
@@ -20,6 +21,7 @@ import {
   STEADY_MAX_SECONDS,
 } from '../../../scheduler/auto-schedule.constants';
 import { DecisionApplierService } from '../../decision-applier.service';
+import { CohortWeightsService } from '../../../cohort/cohort-weights.service';
 import { AI_ACTOR, MAX_COVERAGE_SOURCE_ROWS } from '../../autopilot.constants';
 import type { Tool, ToolContext, ToolGate } from '../tool.types';
 
@@ -48,6 +50,7 @@ export class ScheduleToolset {
     private readonly autoSchedule: AutoScheduleService,
     private readonly applier: DecisionApplierService,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly cohortWeights?: CohortWeightsService,
   ) {}
 
   private sourceGate = async (
@@ -86,6 +89,38 @@ export class ScheduleToolset {
     }
   }
 
+  /** Band split and last yield per cohort, only for sources that walk one. */
+  private async cohortSummaries(
+    autoSourceIds: string[],
+  ): Promise<Map<string, unknown[]>> {
+    const summaries = new Map<string, unknown[]>();
+    if (!this.cohortWeights || autoSourceIds.length === 0) return summaries;
+    const walking = await this.prisma.runner.findMany({
+      where: {
+        sourceId: { in: autoSourceIds },
+        cohortYield: { not: Prisma.DbNull },
+      },
+      distinct: ['sourceId'],
+      select: { sourceId: true },
+    });
+    for (const { sourceId } of walking) {
+      const previews = await this.cohortWeights
+        .preview(sourceId)
+        .catch(() => []);
+      summaries.set(
+        sourceId,
+        previews.map((preview) => ({
+          name: preview.name,
+          mode: preview.mode,
+          nextWeights: preview.weights,
+          reason: preview.reason,
+          lastRun: preview.runs[0]?.bands ?? null,
+        })),
+      );
+    }
+    return summaries;
+  }
+
   list(): Tool[] {
     return [
       {
@@ -97,7 +132,10 @@ export class ScheduleToolset {
           'sweep converged — only new data is picked up now), BACKOFF (scans are failing) or ' +
           'PAUSED (stopped after repeated failures; needs an operator). A source in CATCH_UP has ' +
           'NOT finished ingesting: treat its findings as a partial view of that source and do not ' +
-          'conclude anything from their absence.',
+          'conclude anything from their absence. For an AUTO source that walks a cohort ' +
+          '(ctx.cohort), `cohorts` shows the band split its next run will use, why, and what each ' +
+          'band yielded last run (visited keys, hits = keys with a new HIGH/CRITICAL finding). ' +
+          'Change the split only through config.tune_source (optional.cohort_weights).',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -121,6 +159,11 @@ export class ScheduleToolset {
             orderBy: { updatedAt: 'desc' },
             take: MAX_COVERAGE_SOURCE_ROWS,
           });
+          const cohorts = await this.cohortSummaries(
+            rows
+              .filter((r) => r.scheduleMode === SourceScheduleMode.AUTO)
+              .map((r) => r.id),
+          );
           return rows.map((r) => ({
             id: r.id,
             name: r.name,
@@ -145,6 +188,7 @@ export class ScheduleToolset {
             lastRunAt: r.lastRunAt,
             consecutiveFailures: r.consecutiveFailures,
             reason: r.autoReason,
+            ...(cohorts.has(r.id) ? { cohorts: cohorts.get(r.id) } : {}),
           }));
         },
       },

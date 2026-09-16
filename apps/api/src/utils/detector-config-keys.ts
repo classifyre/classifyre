@@ -13,6 +13,8 @@
  * detectors.
  */
 
+import { DetectorType, Prisma } from '@prisma/client';
+
 export const CUSTOM_KEY_PREFIX = 'CUSTOM::';
 
 /** The comparison key for a finding, or null when its detector is unidentifiable. */
@@ -31,20 +33,41 @@ export function findingDetectorConfigKey(finding: {
 /**
  * The detector identities a source config asks for.
  *
- * Returns null when the config has no readable `detectors` array — callers must
- * treat that as "unknown", never as "empty", or a config shape this code does
- * not understand would look like a source that detects nothing.
+ * Returns null when the config carries no readable detector identities —
+ * callers must treat that as "unknown", never as "empty", or a config shape
+ * this code does not understand would look like a source that detects
+ * nothing.
  *
  * `legacyCustomIds` are custom-detector *row ids* from the older
  * `config.custom_detectors` shape; resolving those to keys needs the database,
  * so it stays with the caller.
+ *
+ * `customOnly` marks a config whose only readable shape is `custom_detectors`
+ * with no `detectors` array — the CUSTOM (notebook) source layout. Built-in
+ * detector types are not configurable there, so a non-CUSTOM finding on such
+ * a source was never in the configured set to be removed from: callers must
+ * leave those findings alone rather than read them as orphaned.
  */
 export function configuredDetectorKeysFromConfig(
   config: unknown,
-): { keys: Set<string>; legacyCustomIds: string[] } | null {
+): { keys: Set<string>; legacyCustomIds: string[]; customOnly: boolean } | null {
   const recipe = (config ?? {}) as Record<string, any>;
+  const legacyCustomIds = Array.isArray(recipe.custom_detectors)
+    ? recipe.custom_detectors.filter(
+        (id: unknown): id is string => typeof id === 'string',
+      )
+    : [];
+
   const detectors = recipe.detectors;
-  if (!Array.isArray(detectors)) return null;
+  if (!Array.isArray(detectors)) {
+    // CUSTOM sources name their detectors by row id only. Readable via the
+    // ids (the caller resolves them), so this must not read as "unknown" —
+    // otherwise a removed custom detector on those sources is never cleaned
+    // up. An empty id list carries no positive information, so it stays
+    // "unknown" rather than reading as "detects nothing".
+    if (legacyCustomIds.length === 0) return null;
+    return { keys: new Set<string>(), legacyCustomIds, customOnly: true };
+  }
 
   const keys = new Set<string>();
   for (const entry of detectors) {
@@ -70,13 +93,7 @@ export function configuredDetectorKeysFromConfig(
     }
   }
 
-  const legacyCustomIds = Array.isArray(recipe.custom_detectors)
-    ? recipe.custom_detectors.filter(
-        (id: unknown): id is string => typeof id === 'string',
-      )
-    : [];
-
-  return { keys, legacyCustomIds };
+  return { keys, legacyCustomIds, customOnly: false };
 }
 
 /** Human-readable form of a comparison key, for operator- and agent-facing text. */
@@ -84,4 +101,37 @@ export function describeDetectorKey(key: string): string {
   return key.startsWith(CUSTOM_KEY_PREFIX)
     ? `custom detector "${key.slice(CUSTOM_KEY_PREFIX.length)}"`
     : `built-in ${key}`;
+}
+
+/**
+ * The SQL half of "is this finding's detector still configured?" — the
+ * `OR` branches of a `where` selecting findings whose detector is not in
+ * `configured`.
+ *
+ * A superset of the in-memory answer, never a subset: a CUSTOM finding whose
+ * key is the empty string passes here but has no identity in
+ * {@link findingDetectorConfigKey}, so callers re-check each row.
+ */
+export function orphanedDetectorWhere(
+  configured: Set<string>,
+): Prisma.FindingWhereInput[] {
+  const knownTypes = new Set<string>(Object.values(DetectorType));
+  const builtIns = [...configured].filter(
+    (key): key is DetectorType =>
+      !key.startsWith(CUSTOM_KEY_PREFIX) && knownTypes.has(key),
+  );
+  const customKeys = [...configured]
+    .filter((key) => key.startsWith(CUSTOM_KEY_PREFIX))
+    .map((key) => key.slice(CUSTOM_KEY_PREFIX.length));
+  return [
+    { detectorType: { notIn: [...builtIns, DetectorType.CUSTOM] } },
+    {
+      detectorType: DetectorType.CUSTOM,
+      // `notIn: []` would read as "no restriction" — spelled out instead.
+      customDetectorKey:
+        customKeys.length > 0
+          ? { not: null, notIn: customKeys }
+          : { not: null },
+    },
+  ];
 }

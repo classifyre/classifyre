@@ -289,6 +289,16 @@ export class RunnerDto {
   @ApiProperty({ type: TextCoverageDto, required: false, nullable: true })
   textCoverage?: TextCoverageDto | null;
 
+  @ApiProperty({
+    type: Object,
+    required: false,
+    nullable: true,
+    description:
+      'Per ctx.cohort() the run walked: {bands: {newest|oldest|random: {visited, hits, exhausted}}, ' +
+      'weightsUsed, declared, minShare, universeSize}. hits = keys with a new HIGH/CRITICAL finding.',
+  })
+  cohortYield?: Record<string, unknown> | null;
+
   @ApiProperty({ required: false, nullable: true })
   errorMessage?: string | null;
 
@@ -660,4 +670,71 @@ export class RunnerAssetProgressDto {
 
   @ApiProperty()
   total: number;
+}
+
+/** `ctx.query_assets()` from a CUSTOM notebook, relayed by the CLI. */
+export class RunnerAssetQueryDto {
+  @ApiProperty({
+    description: 'Id or exact name of the source whose assets to read.',
+  })
+  source!: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Asset kind, e.g. "record".',
+  })
+  kind?: string;
+
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description:
+      'Metadata predicates: {"legal_form_code": {"in": ["GES", "AG"]}, "filing_count": {"gt": 0}}. ' +
+      'Operators: eq, in, exists, gt, gte, lt, lte. Values compare as JSON: a number matches only a number.',
+  })
+  where?: Record<string, Record<string, unknown>>;
+
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description:
+      'Leave out assets whose metadata[key] matches an asset the calling source scanned within sinceDays: {"key": "firmenbuchnummer", "sinceDays": 90}.',
+  })
+  excludeVisited?: { key: string; sinceDays: number };
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'Metadata keys to return with each asset (at most 20).',
+  })
+  select?: string[];
+
+  @ApiProperty({ required: false, default: 1000, maximum: 5000 })
+  limit?: number;
+
+  @ApiProperty({
+    required: false,
+    description: 'nextCursor from the previous page.',
+  })
+  cursor?: string;
+}
+
+export class RunnerAssetQueryItemDto {
+  @ApiProperty() assetHash!: string;
+  @ApiProperty({ nullable: true, type: String }) externalId!: string | null;
+  @ApiProperty() name!: string;
+  @ApiProperty() kind!: string;
+  @ApiProperty() url!: string;
+  @ApiProperty({ type: Object }) metadata!: Record<string, unknown>;
+}
+
+export class RunnerAssetQueryResponseDto {
+  @ApiProperty({ type: [RunnerAssetQueryItemDto] })
+  items!: RunnerAssetQueryItemDto[];
+
+  @ApiProperty({ nullable: true, type: String })
+  nextCursor!: string | null;
+
+  @ApiProperty({ description: 'Asset queries this run has left.' })
+  callsRemaining!: number;
 }

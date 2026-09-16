@@ -38,12 +38,18 @@ import {
   TrainingExamplesStatsDto,
 } from '../dto/training-example.dto';
 import { AllowInDemoMode } from '../demo-mode.decorator';
+import { RetireOutOfScopeFindingsDto } from '../dto/retire-out-of-scope-findings.dto';
+import { FindingBulkOperationDto } from '../findings-bulk/finding-bulk-operation.dto';
+import { FindingBulkOperationService } from '../findings-bulk/finding-bulk-operation.service';
+import { RetireOutOfScopeService } from '../findings-bulk/retire-out-of-scope.service';
 
 @ApiTags('Custom Detectors')
 @Controller('custom-detectors')
 export class CustomDetectorsController {
   constructor(
     private readonly customDetectorsService: CustomDetectorsService,
+    private readonly retireOutOfScope: RetireOutOfScopeService,
+    private readonly findingBulkOperations: FindingBulkOperationService,
   ) {}
 
   @Get('examples')
@@ -171,6 +177,36 @@ export class CustomDetectorsController {
   @ApiResponse({ status: 200, schema: { example: { deleted: true } } })
   async delete(@Param('id') id: string): Promise<{ deleted: true }> {
     return this.customDetectorsService.delete(id);
+  }
+
+  @Post(':id/retire-out-of-scope-findings')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Retire findings this detector can no longer produce',
+    description:
+      'After narrowing scope.asset_kinds or removing regex patterns, the old ' +
+      'findings stay OPEN. Both steps run in the background; follow the ' +
+      'returned operation with GET /findings/bulk-operations/:operationId. ' +
+      '(1) dryRun (default) counts candidates by reason, case citations and ' +
+      'inquiry matches. (2) dryRun: false with fromOperationId, expectedCount ' +
+      'and confirm: true resolves them. Findings a case cites are never ' +
+      'retired; findings an ACTIVE inquiry watches only with includeInquiryWatched.',
+  })
+  @ApiParam({ name: 'id', description: 'Custom detector UUID' })
+  @ApiBody({ type: RetireOutOfScopeFindingsDto })
+  @ApiResponse({ status: 202, type: FindingBulkOperationDto })
+  async retireOutOfScopeFindings(
+    @Param('id') id: string,
+    @Body() dto: RetireOutOfScopeFindingsDto,
+  ): Promise<FindingBulkOperationDto> {
+    const body = dto ?? {};
+    const operation =
+      body.dryRun === false
+        ? await this.retireOutOfScope.startRetire(id, body, {
+            allowInquiryOverride: true,
+          })
+        : await this.retireOutOfScope.startDryRun(id, body);
+    return this.findingBulkOperations.toDto(operation);
   }
 
   // ── Training examples ──────────────────────────────────────────────────────

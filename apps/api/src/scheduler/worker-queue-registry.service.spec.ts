@@ -168,6 +168,30 @@ describe('WorkerQueueRegistryService', () => {
     expect(service.isPaused({ namespaceId, queue: 'embedding' })).toBe(true);
   });
 
+  it('notifies pause observers with the refreshed pause set on every flush', async () => {
+    const { service } = serviceWith((sql) => {
+      if (sql.includes('FROM public.worker_queue_pauses')) {
+        return Promise.resolve({
+          rows: [{ namespace_id: namespaceId, queue: 'embedding' }],
+        });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+    const seen: unknown[][] = [];
+    service.onPausesRefreshed((paused) => {
+      seen.push(paused);
+    });
+
+    service.register({ namespaceId, queue: 'embedding' });
+    await service.flush();
+    await service.flush();
+
+    expect(seen).toEqual([
+      [{ namespaceId, queue: 'embedding' }],
+      [{ namespaceId, queue: 'embedding' }],
+    ]);
+  });
+
   // Observability failing must never be able to take a worker down with it.
   it('swallows flush failures', async () => {
     const { service } = serviceWith(() =>

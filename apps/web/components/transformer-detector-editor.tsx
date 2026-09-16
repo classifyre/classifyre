@@ -24,6 +24,7 @@ import {
   Textarea,
 } from "@workspace/ui/components";
 import { VerticalCustomDetectorStepperNav } from "@/components/custom-detector-stepper";
+import { StickyActionToolbar } from "@/components/sticky-action-toolbar";
 import { useTranslation } from "@/hooks/use-translation";
 import { preserveDetectorScope } from "@/lib/detector-scope";
 
@@ -355,7 +356,7 @@ export const TransformerDetectorEditor = React.forwardRef<
       <div className="space-y-6 min-w-0">
         {/* ── Section: identity ── */}
         <div ref={identityRef} id="section-identity">
-          <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+          <Card className="p-6 space-y-4 border-2 border-border">
             <h2 className="font-serif font-black uppercase tracking-wide text-base">
               {t("detectors.transformer.identityTitle")}
             </h2>
@@ -421,7 +422,7 @@ export const TransformerDetectorEditor = React.forwardRef<
 
         {/* ── Section: model ── */}
         <div ref={modelRef} id="section-model">
-          <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+          <Card className="p-6 space-y-4 border-2 border-border">
             <h2 className="font-serif font-black uppercase tracking-wide text-base">
               {t("detectors.transformer.modelTitle")}
             </h2>
@@ -675,7 +676,7 @@ export const TransformerDetectorEditor = React.forwardRef<
         {/* ── Section: severity map ── */}
         {hasSeverityMap(pipelineType) && (
           <div ref={severityRef} id="section-severity">
-            <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+            <Card className="p-6 space-y-4 border-2 border-border">
               <h2 className="font-serif font-black uppercase tracking-wide text-base">
                 {t("detectors.transformer.severityTitle")}
               </h2>
@@ -756,7 +757,7 @@ export const TransformerDetectorEditor = React.forwardRef<
                     ],
                   })
                 }
-                className="rounded-[4px] border-2 border-border shadow-[2px_2px_0_var(--color-border)]"
+                className="rounded-[4px] border-2 border-border"
               >
                 <Plus className="mr-2 h-3.5 w-3.5" />
                 {t("detectors.transformer.addRule")}
@@ -765,19 +766,16 @@ export const TransformerDetectorEditor = React.forwardRef<
           </div>
         )}
 
-        {/* ── Sticky toolbar ── */}
+        {/* ── Sticky toolbar — shared with source create/edit ── */}
         {!embedded && (
-          <Card className="sticky bottom-0 z-30 p-4 border-t-2 border-border">
-            <div className="flex items-center justify-end">
-              <Button
-                onClick={() => void handleSubmit()}
-                disabled={!canSubmit}
-                className="rounded-[4px] border-2 border-border bg-accent text-accent-foreground shadow-[3px_3px_0_var(--color-border)] hover:bg-accent/90"
-              >
-                {isSubmitting ? t("detectors.transformer.saving") : submitLabel}
-              </Button>
-            </div>
-          </Card>
+          <StickyActionToolbar
+            onSaveAndRun={() => void handleSubmit()}
+            saveAndRunLabel={
+              isSubmitting ? t("detectors.transformer.saving") : submitLabel
+            }
+            isBusy={isSubmitting}
+            saveAndRunDisabled={!canSubmit}
+          />
         )}
       </div>
 

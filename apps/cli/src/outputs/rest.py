@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 INTERNAL_KEY_HEADER = "X-Classifyre-Internal-Key"
 
 
-def _internal_key_headers() -> dict[str, str]:
+def internal_key_headers() -> dict[str, str]:
     key = os.environ.get("CLASSIFYRE_INTERNAL_KEY", "").strip()
     return {INTERNAL_KEY_HEADER: key} if key else {}
 
@@ -200,6 +200,8 @@ class FinalizeIngestRunRequest(BaseModel):
     # "This run covered a slice of the source." Suppresses retirement: absence
     # from a cohort run is not evidence that an asset is gone.
     partial_coverage: bool | None = Field(None, serialization_alias="partialCoverage")
+    # Per ctx.cohort(): keys each band visited, and the weights it ran with.
+    cohort_stats: dict[str, Any] | None = Field(None, serialization_alias="cohortStats")
 
 
 class UpdateRunnerStatusRequest(BaseModel):
@@ -239,7 +241,7 @@ class RestOutputSink:
         # a pod restart or server-side keep-alive timeout.  Each request opens
         # a fresh TCP connection, which is cheap enough for our batch cadence.
         self.session.headers.update({"Connection": "close"})
-        self.session.headers.update(_internal_key_headers())
+        self.session.headers.update(internal_key_headers())
         adapter = HTTPAdapter(max_retries=_RETRY_POLICY)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
@@ -249,6 +251,7 @@ class RestOutputSink:
         self._scan_cache_savings: tuple[int, int] | None = None
         self._partial_coverage: bool = False
         self._partial_coverage_reason: str = ""
+        self._cohort_stats: dict[str, Any] | None = None
         self.relationship_report = RelationshipReport()
 
     def set_sampling_cursor(self, cursor: dict[str, Any] | None) -> None:
@@ -260,6 +263,10 @@ class RestOutputSink:
         self._partial_coverage = True
         if reason:
             self._partial_coverage_reason = str(reason)
+
+    def set_cohort_stats(self, stats: dict[str, Any]) -> None:
+        """Record what each cohort band visited, to report on finalize."""
+        self._cohort_stats = dict(stats) if stats else None
 
     def set_scan_cache_savings(self, assets_skipped: int, detector_runs_skipped: int) -> None:
         """Record what the scan cache saved, to report on finalize."""
@@ -368,6 +375,7 @@ class RestOutputSink:
             relationships_dropped=lineage.dropped,
             relationship_errors=lineage.errors or None,
             partial_coverage=True if self._partial_coverage else None,
+            cohort_stats=self._cohort_stats,
         )
         self._request_json(
             "POST",

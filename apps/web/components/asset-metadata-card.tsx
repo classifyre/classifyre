@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { JsonValue } from "@workspace/ui/components/json-value";
+import { ToneBadge } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
@@ -161,10 +162,19 @@ export function AssetMetadataCard({ metadata }: Props) {
   if (!metadata || typeof metadata !== "object") return null;
 
   const columns = asColumns(metadata["columns"]);
+  // Set by a connector that recorded the asset without extracting its content
+  // (Asset(extract=False)). Shown as a statement, not as one property among
+  // many: without it the missing text reads as a failed fetch.
+  const reference =
+    typeof metadata["content_reference"] === "string" &&
+    metadata["content_reference"].trim()
+      ? metadata["content_reference"].trim()
+      : null;
 
   const entries = Object.entries(metadata).filter(([key, value]) => {
     // Rendered separately as a column schema table.
     if (key === "columns") return false;
+    if (key === "content_reference") return false;
     return (
       value !== null &&
       value !== undefined &&
@@ -173,7 +183,7 @@ export function AssetMetadataCard({ metadata }: Props) {
     );
   });
 
-  if (entries.length === 0 && !columns) return null;
+  if (entries.length === 0 && !columns && !reference) return null;
 
   function formatKey(key: string): string {
     const i18nKey = METADATA_KEY_TO_I18N[key];
@@ -190,6 +200,21 @@ export function AssetMetadataCard({ metadata }: Props) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {reference && (
+          <div
+            className="flex flex-wrap items-start gap-2 rounded-[4px] border border-border/40 px-3 py-2 text-sm"
+            data-testid="asset-content-reference"
+          >
+            <ToneBadge tone="neutral">
+              {t("assets.detail.assetMetadata.reference.badge")}
+            </ToneBadge>
+            <span className="min-w-0 flex-1 text-muted-foreground">
+              {t("assets.detail.assetMetadata.reference.hint", {
+                reason: reference,
+              })}
+            </span>
+          </div>
+        )}
         {entries.length > 0 && (
           <dl className="grid gap-2">
             {entries.map(([key, value]) => {

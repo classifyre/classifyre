@@ -23,6 +23,8 @@ import type {
   RegisterDiscoveredAssetsDto,
   RegisterDiscoveredAssetsResponseDto,
   RunnerAssetProgressDto,
+  RunnerAssetQueryDto,
+  RunnerAssetQueryResponseDto,
   RunnerDto,
   RunnerLogsResponseDto,
   SearchRunnerLogsBodyDto,
@@ -53,6 +55,10 @@ import {
     RegisterDiscoveredAssetsResponseDtoToJSON,
     RunnerAssetProgressDtoFromJSON,
     RunnerAssetProgressDtoToJSON,
+    RunnerAssetQueryDtoFromJSON,
+    RunnerAssetQueryDtoToJSON,
+    RunnerAssetQueryResponseDtoFromJSON,
+    RunnerAssetQueryResponseDtoToJSON,
     RunnerDtoFromJSON,
     RunnerDtoToJSON,
     RunnerLogsResponseDtoFromJSON,
@@ -109,6 +115,11 @@ export interface CliRunnerControllerListSourceRunnersRequest {
     status?: CliRunnerControllerListSourceRunnersStatusEnum;
     skip?: number;
     take?: number;
+}
+
+export interface CliRunnerControllerQueryAssetsRequest {
+    runnerId: string;
+    runnerAssetQueryDto: RunnerAssetQueryDto;
 }
 
 export interface CliRunnerControllerRegisterDiscoveredAssetsRequest {
@@ -417,6 +428,55 @@ export class RunnersApi extends runtime.BaseAPI {
      */
     async cliRunnerControllerListSourceRunners(requestParameters: CliRunnerControllerListSourceRunnersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ListRunnersResponseDto> {
         const response = await this.cliRunnerControllerListSourceRunnersRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; at most 100 calls per run, 5,000 assets per page, 15 s per query.
+     * Read assets of a source in this namespace, for a running connector
+     */
+    async cliRunnerControllerQueryAssetsRaw(requestParameters: CliRunnerControllerQueryAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerAssetQueryResponseDto>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerQueryAssets().'
+            );
+        }
+
+        if (requestParameters['runnerAssetQueryDto'] == null) {
+            throw new runtime.RequiredError(
+                'runnerAssetQueryDto',
+                'Required parameter "runnerAssetQueryDto" was null or undefined when calling cliRunnerControllerQueryAssets().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/{runnerId}/assets/query`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RunnerAssetQueryDtoToJSON(requestParameters['runnerAssetQueryDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RunnerAssetQueryResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; at most 100 calls per run, 5,000 assets per page, 15 s per query.
+     * Read assets of a source in this namespace, for a running connector
+     */
+    async cliRunnerControllerQueryAssets(requestParameters: CliRunnerControllerQueryAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerAssetQueryResponseDto> {
+        const response = await this.cliRunnerControllerQueryAssetsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

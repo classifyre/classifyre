@@ -75,7 +75,13 @@ export class FindingStatsScheduler {
         singletonKey,
         singletonSeconds: FINDING_STATS_COALESCE_SECONDS,
         singletonNextSlot: true,
-        expireInSeconds: 3600,
+        // A job stuck `active` across a worker restart is only released once
+        // it is older than this (startup recovery honours each job's own
+        // expiry). An hour left five such jobs blocking the queue with no
+        // recovery in sight; thirty minutes bounds the blind window while
+        // still far above any healthy queue wait. The days stay marked dirty,
+        // so an expiry only delays a refresh, never loses one.
+        expireInSeconds: 1800,
         retryLimit: 3,
         retryDelay: 30,
         retryBackoff: true,

@@ -709,7 +709,7 @@ export default function NewSourcePage() {
         <Button
           variant="outline"
           onClick={() => router.push(nsPath("/sources"))}
-          className="mb-4 rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
+          className="mb-4 rounded-[4px] border-2 border-border"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           {t("sources.new.backToSources")}

@@ -7,6 +7,7 @@ import type { PrismaService } from '../../../prisma.service';
 import type { AutoScheduleService } from '../../../scheduler/auto-schedule.service';
 import type { NotificationsService } from '../../../notifications.service';
 import type { DecisionApplierService } from '../../decision-applier.service';
+import type { CohortWeightsService } from '../../../cohort/cohort-weights.service';
 import type { Tool, ToolContext } from '../tool.types';
 
 describe('ScheduleToolset', () => {
@@ -69,6 +70,103 @@ describe('ScheduleToolset', () => {
       phase: null,
       sweepConverged: null,
     });
+  });
+
+  it('adds the next cohort split only to AUTO sources that walked a cohort', async () => {
+    const source = (id: string, scheduleMode: string) => ({
+      id,
+      name: id,
+      scheduleMode,
+      scheduleCron: scheduleMode === 'CRON' ? '0 2 * * *' : null,
+      autoPhase: 'CATCH_UP',
+      autoIntervalSeconds: STEADY_MIN_SECONDS,
+      autoReason: null,
+      scheduleNextAt: null,
+      lastRunAt: null,
+      consecutiveFailures: 0,
+    });
+    const cohortPrisma = {
+      source: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            source('walks', 'AUTO'),
+            source('plain', 'AUTO'),
+            source('broken', 'AUTO'),
+            source('cron', 'CRON'),
+          ]),
+      },
+      runner: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ sourceId: 'walks' }, { sourceId: 'broken' }]),
+      },
+    };
+    const lastRun = {
+      newest: { visited: 204, hits: 69, exhausted: false },
+      oldest: { visited: 198, hits: 2, exhausted: false },
+    };
+    const cohortWeights = {
+      preview: jest.fn((sourceId: string) =>
+        sourceId === 'broken'
+          ? Promise.reject(new Error('boom'))
+          : Promise.resolve([
+              {
+                name: 'register',
+                mode: 'auto',
+                weights: { newest: 64, oldest: 36 },
+                reason: 'measured',
+                derivation: {},
+                runs: [
+                  {
+                    runnerId: 'run-2',
+                    triggeredAt: new Date(),
+                    bands: lastRun,
+                    weightsUsed: { newest: 49, oldest: 51 },
+                  },
+                ],
+              },
+            ]),
+      ),
+    };
+    const withCohorts = new ScheduleToolset(
+      cohortPrisma as unknown as PrismaService,
+      autoSchedule as unknown as AutoScheduleService,
+      applier as unknown as DecisionApplierService,
+      notifications as unknown as NotificationsService,
+      cohortWeights as unknown as CohortWeightsService,
+    );
+    const cohortList = withCohorts
+      .list()
+      .find((t) => t.name === 'schedule.list') as Tool;
+
+    const rows = (await cohortList.handler({}, tc)) as Array<
+      Record<string, unknown>
+    >;
+
+    // Only AUTO sources are probed; the cron source never reaches the query.
+    expect(cohortPrisma.runner.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          sourceId: { in: ['walks', 'plain', 'broken'] },
+        }),
+      }),
+    );
+    expect(cohortWeights.preview).toHaveBeenCalledTimes(2);
+    expect(rows.find((r) => r.id === 'walks')?.cohorts).toEqual([
+      {
+        name: 'register',
+        mode: 'auto',
+        nextWeights: { newest: 64, oldest: 36 },
+        reason: 'measured',
+        lastRun,
+      },
+    ]);
+    // A source that never walked a cohort carries no key at all.
+    expect(rows.find((r) => r.id === 'plain')).not.toHaveProperty('cohorts');
+    expect(rows.find((r) => r.id === 'cron')).not.toHaveProperty('cohorts');
+    // A failing preview degrades to "no cohorts", never fails the listing.
+    expect(rows.find((r) => r.id === 'broken')?.cohorts).toEqual([]);
   });
 
   it('refuses to touch a source an operator put on a cron schedule', async () => {

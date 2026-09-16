@@ -106,7 +106,7 @@ export function PurgeFindingsAction({
             variant="destructive"
             disabled={isPurging}
             onClick={handlePurge}
-            className="rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
+            className="rounded-[4px] border-2 border-border"
             data-testid="btn-purge-findings-confirm"
           >
             {t("sources.purgeFindings.confirm")}

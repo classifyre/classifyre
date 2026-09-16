@@ -2740,6 +2740,49 @@
         ]
       }
     },
+    "/custom-detectors/{id}/retire-out-of-scope-findings": {
+      "post": {
+        "description": "After narrowing scope.asset_kinds or removing regex patterns, the old findings stay OPEN. Both steps run in the background; follow the returned operation with GET /findings/bulk-operations/:operationId. (1) dryRun (default) counts candidates by reason, case citations and inquiry matches. (2) dryRun: false with fromOperationId, expectedCount and confirm: true resolves them. Findings a case cites are never retired; findings an ACTIVE inquiry watches only with includeInquiryWatched.",
+        "operationId": "CustomDetectorsController_retireOutOfScopeFindings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Custom detector UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetireOutOfScopeFindingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingBulkOperationDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Retire findings this detector can no longer produce",
+        "tags": [
+          "Custom Detectors"
+        ]
+      }
+    },
     "/custom-detectors/{id}/training-examples": {
       "get": {
         "operationId": "CustomDetectorsController_listTrainingExamples",
@@ -3277,6 +3320,104 @@
           }
         },
         "summary": "Bulk update findings",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/findings/bulk-operations": {
+      "get": {
+        "description": "Most recent first. `active=true` returns only queued and running operations.",
+        "operationId": "FindingsController_listBulkOperations",
+        "parameters": [
+          {
+            "name": "active",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FindingBulkOperationDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List background bulk finding operations",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/findings/bulk-operations/{operationId}": {
+      "get": {
+        "operationId": "FindingsController_getBulkOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingBulkOperationDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get a background bulk finding operation",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/findings/bulk-operations/{operationId}/cancel": {
+      "post": {
+        "description": "A queued operation is cancelled outright; a running one stops after its current page. Findings already changed stay changed.",
+        "operationId": "FindingsController_cancelBulkOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingBulkOperationDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel a background bulk finding operation",
         "tags": [
           "findings"
         ]
@@ -7483,7 +7624,7 @@
     },
     "/worker-queues/{queue}/paused": {
       "put": {
-        "description": "Pausing is database-backed, so it applies to every worker replica rather than only the pod that served this request. A batch handed to a paused queue is refused and retried by pg-boss, so nothing is lost. Jobs already running cannot be cancelled — pause and let them drain, or restart the worker.",
+        "description": "Pausing is database-backed, so it applies to every worker replica rather than only the pod that served this request. A paused queue stops fetching: queued jobs wait safely and run after resume instead of burning retries, and a batch fetched just as the pause landed waits for resume rather than failing. Jobs already running cannot be cancelled — pause and let them drain, or restart the worker.",
         "operationId": "WorkerQueuesController_setPaused",
         "parameters": [
           {
@@ -7810,6 +7951,48 @@
           }
         },
         "summary": "Update processing status of runner assets",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/{runnerId}/assets/query": {
+      "post": {
+        "description": "Backs ctx.query_assets() in CUSTOM notebooks. Internal: the CLI relays the call so the notebook never holds API credentials. Only while the run is RUNNING; at most 100 calls per run, 5,000 assets per page, 15 s per query.",
+        "operationId": "CliRunnerController_queryAssets",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunnerAssetQueryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerAssetQueryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read assets of a source in this namespace, for a running connector",
         "tags": [
           "Runners"
         ]
@@ -8254,6 +8437,42 @@
         "summary": "Search runner assets",
         "tags": [
           "Runners"
+        ]
+      }
+    },
+    "/sources/{id}/cohort-weights": {
+      "get": {
+        "description": "For each ctx.cohort() the source walks: the weights its next run would use, why (no_history, cold_start, measured or fixed), the per-band rates they came from, and the yield of recent runs.",
+        "operationId": "CohortController_preview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Source UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CohortWeightsPreviewDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Preview the band split of a source's cohorts for its next run",
+        "tags": [
+          "Sources"
         ]
       }
     },
@@ -12922,6 +13141,18 @@
                 "CUSTOM"
               ]
             }
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Match connector metadata exactly: {\"legal_form_code\": {\"in\": [\"GES\", \"AG\"]}, \"register_status\": {\"eq\": \"active\"}}. Values compare as JSON (a number matches only a number). Operators here: eq, in. An unknown operator or key shape is a 400.",
+            "example": {
+              "legal_form_code": {
+                "in": [
+                  "GES",
+                  "AG"
+                ]
+              }
+            }
           }
         }
       },
@@ -14433,6 +14664,10 @@
           "partialCoverage": {
             "type": "boolean",
             "description": "The connector covered only a slice of the source this run, so absence from seenHashes proves nothing and no asset is retired. Set it when the connector chooses its own cohort — a change feed, a resumable sweep, a date window — which the sampling strategy cannot express: strategy=ALL describes what the RUNTIME does with the stream, not how much of the source the connector decided to ask for."
+          },
+          "cohortStats": {
+            "type": "object",
+            "description": "Per ctx.cohort() of the run: keys each band visited and the weights used. The API adds how many of those keys produced a new HIGH/CRITICAL finding."
           }
         },
         "required": [
@@ -14835,6 +15070,160 @@
           }
         }
       },
+      "RetireOutOfScopeFindingsDto": {
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean",
+            "description": "Default true: count what would be retired, by reason and exemption, as a background operation. Changes nothing.",
+            "default": true
+          },
+          "sourceIds": {
+            "description": "Dry run only: restrict to these sources. A retire inherits the dry run’s sources.",
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fromOperationId": {
+            "type": "string",
+            "description": "Retire only: the completed dry run this retire carries out. It must be for the same, unchanged detector, less than 24 hours old, and not used before."
+          },
+          "expectedCount": {
+            "type": "number",
+            "description": "Retire only: the dry run's wouldRetire (or wouldRetireIncludingWatched with includeInquiryWatched). The retire never changes more findings than this.",
+            "minimum": 0
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Retire only: must be true."
+          },
+          "includeInquiryWatched": {
+            "type": "boolean",
+            "description": "Retire only, operator decision: also retire findings an ACTIVE inquiry watches. Findings a case cites are never retired."
+          }
+        }
+      },
+      "FindingBulkOperationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "STATUS_CHANGE",
+              "RETIRE_OUT_OF_SCOPE"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "CANCELLED"
+            ]
+          },
+          "totalEstimate": {
+            "type": "number",
+            "description": "Findings matched when the operation was created. The corpus can move under a running operation, so treat it as an estimate."
+          },
+          "expectedCount": {
+            "type": "number",
+            "nullable": true,
+            "description": "The dry-run count the operator reviewed. Each chunk fails the operation when processed plus remaining matches exceed it. Null when no count was reviewed."
+          },
+          "processed": {
+            "type": "number",
+            "description": "Findings the walk has examined so far."
+          },
+          "changed": {
+            "type": "number",
+            "description": "Findings actually changed so far."
+          },
+          "exempted": {
+            "type": "number",
+            "description": "Findings deliberately left alone (e.g. cited by a case). Always 0 for a plain status change."
+          },
+          "percent": {
+            "type": "number",
+            "description": "0-100; 100 only once COMPLETED."
+          },
+          "counts": {
+            "type": "object",
+            "description": "Operation-specific tallies. A retire dry run reports byReason, exempt, wouldRetire and notProvable here."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "type": "object"
+          },
+          "target": {
+            "type": "object"
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelRequested": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last persisted progress write. Together with the scan/processed counts this distinguishes \"working on a slow page\" from dead: a recent updatedAt with an old cursor is a slow page, not a hang."
+          },
+          "leaseUntil": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "Until when the current handler holds this operation. Past this time with no updatedAt movement, another handler may reclaim it."
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "totalEstimate",
+          "processed",
+          "changed",
+          "exempted",
+          "percent",
+          "counts",
+          "warnings",
+          "filters",
+          "target",
+          "cancelRequested",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "TrainingExampleDto": {
         "type": "object",
         "properties": {
@@ -15068,19 +15457,33 @@
         "type": "object",
         "properties": {
           "ids": {
-            "description": "Explicit finding IDs to update. Use either ids or filters, not both.",
+            "description": "Explicit finding IDs to update (at most 1000). Use either ids or filters, not both.",
+            "maxItems": 1000,
             "type": "array",
             "items": {
               "type": "string"
             }
           },
           "filters": {
-            "description": "Filter to update all matching findings (select-all mode).",
+            "description": "Filter to update all matching findings (select-all mode). Unknown keys are rejected with 400 rather than ignored.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/SearchFindingsFiltersInputDto"
               }
             ]
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true when the filters narrow nothing beyond status, includeResolved and excludeIds — that is, when the update would apply to every finding in the namespace."
+          },
+          "expectedCount": {
+            "type": "number",
+            "description": "How many findings the caller expects the filters to match, e.g. from a dryRun. If more match when the update runs, it is refused with 409 and nothing is written.",
+            "minimum": 0
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Count what would be updated, and report whether the filters narrow the corpus, without writing anything."
           },
           "status": {
             "type": "string",
@@ -15120,6 +15523,30 @@
             "items": {
               "type": "string"
             }
+          },
+          "wouldUpdate": {
+            "type": "number",
+            "description": "dryRun only: the exact number of findings the request would update."
+          },
+          "narrowed": {
+            "type": "boolean",
+            "description": "dryRun only: whether the filters select a subset of the corpus. When false, the real request needs confirm: true."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "True when nothing was written."
+          },
+          "operationId": {
+            "type": "string",
+            "description": "Set when the selection was too large to change inside the request: the change runs as a background operation. Poll GET /findings/bulk-operations/{operationId}."
+          },
+          "async": {
+            "type": "boolean",
+            "description": "True when the change was queued rather than applied."
+          },
+          "total": {
+            "type": "number",
+            "description": "Findings the queued operation matched when it was created."
           }
         },
         "required": [
@@ -21884,6 +22311,11 @@
               }
             ]
           },
+          "cohortYield": {
+            "type": "object",
+            "nullable": true,
+            "description": "Per ctx.cohort() the run walked: {bands: {newest|oldest|random: {visited, hits, exhausted}}, weightsUsed, declared, minShare, universeSize}. hits = keys with a new HIGH/CRITICAL finding."
+          },
           "errorMessage": {
             "type": "string",
             "nullable": true
@@ -22171,6 +22603,102 @@
         },
         "required": [
           "assets"
+        ]
+      },
+      "RunnerAssetQueryDto": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Id or exact name of the source whose assets to read."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Asset kind, e.g. \"record\"."
+          },
+          "where": {
+            "type": "object",
+            "description": "Metadata predicates: {\"legal_form_code\": {\"in\": [\"GES\", \"AG\"]}, \"filing_count\": {\"gt\": 0}}. Operators: eq, in, exists, gt, gte, lt, lte. Values compare as JSON: a number matches only a number."
+          },
+          "excludeVisited": {
+            "type": "object",
+            "description": "Leave out assets whose metadata[key] matches an asset the calling source scanned within sinceDays: {\"key\": \"firmenbuchnummer\", \"sinceDays\": 90}."
+          },
+          "select": {
+            "description": "Metadata keys to return with each asset (at most 20).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "limit": {
+            "type": "number",
+            "default": 1000,
+            "maximum": 5000
+          },
+          "cursor": {
+            "type": "string",
+            "description": "nextCursor from the previous page."
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "RunnerAssetQueryItemDto": {
+        "type": "object",
+        "properties": {
+          "assetHash": {
+            "type": "string"
+          },
+          "externalId": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "assetHash",
+          "externalId",
+          "name",
+          "kind",
+          "url",
+          "metadata"
+        ]
+      },
+      "RunnerAssetQueryResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunnerAssetQueryItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "callsRemaining": {
+            "type": "number",
+            "description": "Asset queries this run has left."
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "callsRemaining"
         ]
       },
       "RunnerAssetProgressDto": {
@@ -22676,6 +23204,11 @@
               }
             ]
           },
+          "cohortYield": {
+            "type": "object",
+            "nullable": true,
+            "description": "Per ctx.cohort() the run walked: {bands: {newest|oldest|random: {visited, hits, exhausted}}, weightsUsed, declared, minShare, universeSize}. hits = keys with a new HIGH/CRITICAL finding."
+          },
           "errorMessage": {
             "type": "string",
             "nullable": true
@@ -23074,6 +23607,79 @@
           "total",
           "skip",
           "limit"
+        ]
+      },
+      "CohortRunYieldDto": {
+        "type": "object",
+        "properties": {
+          "runnerId": {
+            "type": "string"
+          },
+          "triggeredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "bands": {
+            "type": "object",
+            "description": "Per band: {visited, hits, exhausted}."
+          },
+          "weightsUsed": {
+            "type": "object",
+            "description": "Percent per band."
+          }
+        },
+        "required": [
+          "runnerId",
+          "triggeredAt",
+          "bands",
+          "weightsUsed"
+        ]
+      },
+      "CohortWeightsPreviewDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name the notebook passed to ctx.cohort()."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "fixed"
+            ]
+          },
+          "weights": {
+            "type": "object",
+            "description": "Percent per band for the next run."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "no_history",
+              "cold_start",
+              "measured",
+              "fixed"
+            ]
+          },
+          "derivation": {
+            "type": "object",
+            "description": "Per band: visits and hits over the last runs, their decayed values and the rate used."
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CohortRunYieldDto"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "mode",
+          "weights",
+          "reason",
+          "derivation",
+          "runs"
         ]
       },
       "NotebookCellDto": {

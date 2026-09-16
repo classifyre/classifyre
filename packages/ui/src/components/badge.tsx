@@ -8,9 +8,9 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "w-fit rounded-[4px] border-2 border-black bg-[#b7ff00] text-[10px] uppercase tracking-[0.16em] text-black shadow-[3px_3px_0_#000]",
+        default: "w-fit rounded-[4px] border-2 border-black bg-[#b7ff00] text-[10px] uppercase tracking-[0.16em] text-black",
         secondary:
-          "bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 w-fit rounded-[4px] border-2 border-black text-[10px] uppercase tracking-[0.16em] shadow-[3px_3px_0_#000]",
+          "bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 w-fit rounded-[4px] border-2 border-black text-[10px] uppercase tracking-[0.16em]",
         destructive:
           "bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:
