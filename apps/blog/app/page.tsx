@@ -32,12 +32,12 @@ import {
   SourceMarquee,
 } from "@/components/source-showcase";
 import {
-  demoUrl,
   docs,
   enterpriseContactEmail,
   helmInstallCommand,
   repoUrl,
   routes,
+  showcaseUrl,
   softwareVersion,
 } from "@/lib/site";
 
@@ -366,8 +366,8 @@ export default function HomePage() {
                   variant="secondary"
                   className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
                 >
-                  <a href={demoUrl} target="_blank" rel="noreferrer">
-                    Try the live demo
+                  <a href={showcaseUrl} target="_blank" rel="noreferrer">
+                    Try the live showcase
                   </a>
                 </Button>
               </div>
@@ -958,8 +958,8 @@ export default function HomePage() {
                     variant="secondary"
                     className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
                   >
-                    <a href={demoUrl} target="_blank" rel="noreferrer">
-                      Try the live demo
+                    <a href={showcaseUrl} target="_blank" rel="noreferrer">
+                      Try the live showcase
                     </a>
                   </Button>
                 </div>

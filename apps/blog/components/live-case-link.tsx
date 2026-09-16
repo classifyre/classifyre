@@ -61,7 +61,7 @@ export function LiveCaseLink({ href, caseName }: LiveCaseLinkProps) {
     return () => observer.disconnect();
   }, []);
 
-  const ariaLabel = `Open the live ${caseName} case file in the Classifyre demo (opens in a new tab)`;
+  const ariaLabel = `Open the live ${caseName} case file in the Classifyre showcase (opens in a new tab)`;
 
   return (
     <>
