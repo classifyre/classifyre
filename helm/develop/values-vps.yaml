@@ -40,6 +40,20 @@ api:
     UNDER_PRESSURE_MAX_RSS_BYTES: "0" # 0 = disabled
     UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY: "2000" # 2 s event-loop lag = genuinely stuck
 
+  # Operator writes without turning DEMO_MODE off: a request carrying
+  # `X-Bypass-Demo: <key>` passes demo mode, on REST and on MCP write tools.
+  # The secret is created by hand, outside the chart; `optional` keeps the pods
+  # starting without it, and with no key the header is ignored.
+  #   kubectl -n classifyre get secret classifyre-demo-bypass \
+  #     -o jsonpath='{.data.DEMO_MODE_BYPASS_KEY}' | base64 -d
+  extraEnv:
+    - name: DEMO_MODE_BYPASS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: classifyre-demo-bypass
+          key: DEMO_MODE_BYPASS_KEY
+          optional: true
+
   # Single-node VPS: cap replicas so CLI jobs don't trigger runaway HPA scale-out.
   # 10 API pods on one node causes memory pressure → liveness probe failures →
   # RemoteDisconnected errors mid-request → asset failures.

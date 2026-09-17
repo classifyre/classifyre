@@ -59,8 +59,40 @@ const nextConfig = {
         // `england` 404s.
         beforeFiles: [
           { source: "/", destination: `/${DEFAULT_LOCALE}` },
+          // Namespace-scoped MCP endpoint, served through this frontend in two
+          // shapes: `/mcp/<namespace>` (collision-proof) and the canonical
+          // `/<namespace>/mcp` (the URL the API, the Helm ingress and the
+          // all-in-one proxy serve). Both rewrite onto the `/api/[...path]`
+          // proxy, which forwards method, headers and body to the API
+          // verbatim — the API resolves `/<namespace>/mcp` itself, see
+          // apps/api/src/main.ts. Placed ahead of the locale rule with `mcp/`
+          // excluded from it, exactly like `api/`: otherwise MCP paths are
+          // locale-rewritten into `/en/…`, where no `mcp` route exists, and
+          // end in a Next.js 404. Because both shapes work here, the settings
+          // card and the docs keep showing the canonical one everywhere.
+          // Internal rewrites, so the client sees a direct 200 — modulo the
+          // site-wide trailingSlash 308, so MCP clients must use the
+          // trailing-slash URL. No page or route handler uses a
+          // `/<segment>/mcp` path, and every first-segment collision
+          // (`/api/mcp`, `/_next/mcp`, …) 404s with or without these rules.
           {
-            source: `/:path((?!(?:${LOCALE_ALTERNATION})(?:/|$)|api/|_next/|sitemap/|sitemap\\.xml|robots\\.txt|manifest\\.json|classifyre-cfg|classifyre-usr/|favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|docs/.|[^/]+\\.[a-zA-Z0-9]+$).*)`,
+            source: "/mcp/:namespace",
+            destination: "/api/:namespace/mcp",
+          },
+          {
+            source: "/mcp/:namespace/:path*",
+            destination: "/api/:namespace/mcp/:path*",
+          },
+          {
+            source: "/:namespace/mcp",
+            destination: "/api/:namespace/mcp",
+          },
+          {
+            source: "/:namespace/mcp/:path*",
+            destination: "/api/:namespace/mcp/:path*",
+          },
+          {
+            source: `/:path((?!(?:${LOCALE_ALTERNATION})(?:/|$)|api/|mcp/|_next/|sitemap/|sitemap\\.xml|robots\\.txt|manifest\\.json|classifyre-cfg|classifyre-usr/|favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|docs/.|[^/]+\\.[a-zA-Z0-9]+$).*)`,
             destination: `/${DEFAULT_LOCALE}/:path`,
           },
         ],

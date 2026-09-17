@@ -21,7 +21,12 @@ from .sources.dropbox.auth import (  # noqa: E402
     add_dropbox_auth_arguments,
     run_dropbox_auth_command,
 )
-from .utils.validation import validate_input, validate_test_connection  # noqa: E402
+from .utils.redaction import Redactor, redact_generic, sanitize_for_logging  # noqa: E402
+from .utils.validation import (  # noqa: E402
+    RecipeValidationError,
+    validate_input,
+    validate_test_connection,
+)
 
 logger = logging.getLogger(__name__)
 _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
@@ -54,6 +59,53 @@ def _sanitize_for_json(value: Any) -> Any:
     if isinstance(value, dict):
         return {key: _sanitize_for_json(item) for key, item in value.items()}
     return value
+
+
+def _safe_text(text: Any, redactor: Redactor | None) -> str:
+    """Render ``text`` for logs or stored run errors without secrets.
+
+    Value-based redaction (exact ``masked`` leaves from the recipe) runs
+    first, then credential-shaped patterns, so short secrets and
+    driver-echoed connection strings are hidden even when the exact value
+    is unknown.
+    """
+    raw = text if isinstance(text, str) else str(text)
+    if redactor is not None:
+        raw = redactor.redact(raw)
+    return redact_generic(raw)
+
+
+def _safe_error_copy(exc: Exception, redactor: Redactor | None) -> Exception:
+    """Copy ``exc`` with redacted args so ``str()`` of it is log-safe.
+
+    Preserves the exception type name used by ``sink.fail()``. Falls back
+    to a plain RuntimeError when the copy cannot be made.
+    """
+    import copy as _copy
+
+    try:
+        clone = _copy.copy(exc)
+        clone.args = tuple(
+            _safe_text(arg, redactor) if isinstance(arg, str) else arg for arg in exc.args
+        )
+        return clone
+    except Exception:
+        return RuntimeError(_safe_text(exc, redactor))
+
+
+def _log_debug_traceback(
+    log: Any, message: str, exc: BaseException, redactor: Redactor | None
+) -> None:
+    """Log a traceback at debug without leaking secrets through exc_info.
+
+    ``logger.debug(..., exc_info=True)`` formats the original exception,
+    bypassing any redaction. Formatting first and redacting the text keeps
+    the traceback useful while hiding credential values.
+    """
+    import traceback as _traceback
+
+    formatted = "".join(_traceback.format_exception(type(exc), exc, exc.__traceback__))
+    log.debug("%s\n%s", message, _safe_text(formatted, redactor))
 
 
 async def _emit_text_chunks_with_retry(
@@ -178,7 +230,7 @@ def _asset_to_payload(asset: Any) -> dict[str, Any]:
     raise TypeError(f"Unsupported asset payload type: {type(asset)}")
 
 
-async def _flush_buffered_edges(source: Any, sink: Any) -> None:
+async def _flush_buffered_edges(source: Any, sink: Any, redactor: Redactor | None = None) -> None:
     """Emit edges buffered so far, without asking for end-of-run relationships.
 
     Augmentation can produce an edge per asset; holding a whole scan's lineage
@@ -192,7 +244,10 @@ async def _flush_buffered_edges(source: Any, sink: Any) -> None:
     try:
         edges = source.drain_edges()
     except Exception as drain_error:
-        logger.warning("Could not drain buffered edges (non-fatal): %s", drain_error)
+        logger.warning(
+            "Could not drain buffered edges (non-fatal): %s",
+            _safe_text(drain_error, redactor),
+        )
         return
     if not edges:
         return
@@ -203,12 +258,12 @@ async def _flush_buffered_edges(source: Any, sink: Any) -> None:
         logger.warning(
             "Buffered relationship emission failed, %d edge(s) lost (non-fatal): %s",
             len(edges),
-            emit_error,
+            _safe_text(emit_error, redactor),
         )
         if report is not None:
             report.record_lost(
                 len(edges),
-                f"{type(emit_error).__name__}: {emit_error}",
+                _safe_text(f"{type(emit_error).__name__}: {emit_error}", redactor),
             )
         return
     tally = result if isinstance(result, dict) else {}
@@ -219,7 +274,13 @@ async def _flush_buffered_edges(source: Any, sink: Any) -> None:
         )
 
 
-async def _emit_relationships(source: Any, sink: Any, *, partial: bool = False) -> None:
+async def _emit_relationships(
+    source: Any,
+    sink: Any,
+    *,
+    partial: bool = False,
+    redactor: Redactor | None = None,
+) -> None:
     """Send everything the connector learned about how its assets relate.
 
     Two sources, one flush: edges buffered mid-scan via ``add_edge`` and edges a
@@ -252,10 +313,13 @@ async def _emit_relationships(source: Any, sink: Any, *, partial: bool = False) 
         # The connector's relationship code raised. How many edges that cost is
         # unknowable — it never got to say — so this is counted as one failed
         # relationship pass rather than as N lost edges.
-        logger.warning("Could not collect relationships (non-fatal): %s", collect_error)
+        logger.warning(
+            "Could not collect relationships (non-fatal): %s",
+            _safe_text(collect_error, redactor),
+        )
         if report is not None:
             report.record_failure(
-                f"{type(collect_error).__name__}: {collect_error}",
+                _safe_text(f"{type(collect_error).__name__}: {collect_error}", redactor),
             )
 
     # A connector that declares relationships() but produced nothing is not the
@@ -274,12 +338,12 @@ async def _emit_relationships(source: Any, sink: Any, *, partial: bool = False) 
         logger.warning(
             "Relationship emission failed, %d edge(s) lost (non-fatal): %s",
             len(edges),
-            emit_error,
+            _safe_text(emit_error, redactor),
         )
         if report is not None:
             report.record_lost(
                 len(edges),
-                f"{type(emit_error).__name__}: {emit_error}",
+                _safe_text(f"{type(emit_error).__name__}: {emit_error}", redactor),
             )
         return
 
@@ -333,11 +397,16 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
     # before phase 2; every later use is None-guarded.
     augmentation: Any = None
 
+    # Built before any logging or error formatting: every message below that
+    # touches the recipe, a driver error, or a notebook verdict goes through
+    # it, so secrets never reach runner logs or stored run errors.
+    redactor = Redactor.from_recipe(recipe)
+
     try:
         try:
             source = get_source(recipe, source_id=source_id, runner_id=runner_id)
         except ValueError as e:
-            logger.error("Failed to initialize source: %s", e)
+            logger.error("Failed to initialize source: %s", _safe_text(e, redactor))
             sys.exit(1)
 
         try:
@@ -348,27 +417,46 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     validate_test_connection(result)
                     logger.info("Test connection output is valid")
                 except Exception as validation_error:
-                    logger.warning("Test connection output validation failed: %s", validation_error)
+                    logger.warning(
+                        "Test connection output validation failed: %s",
+                        _safe_text(validation_error, redactor),
+                    )
 
-                print(json.dumps(result, indent=2))
+                print(
+                    json.dumps(
+                        sanitize_for_logging(result, redactor),
+                        indent=2,
+                    )
+                )
                 if result.get("status") == "FAILURE":
                     sys.exit(1)
 
             elif args.command == "discover":
                 result = source.test_connection()
                 if result.get("status") == "FAILURE":
-                    logger.error("Aborting: Connection test failed: %s", result.get("message"))
+                    logger.error(
+                        "Aborting: Connection test failed: %s",
+                        _safe_text(result.get("message"), redactor),
+                    )
                     sys.exit(1)
 
                 logger.info("Discovering resources...")
                 data = source.discover()
-                print(json.dumps(data, indent=2))
+                print(
+                    json.dumps(
+                        sanitize_for_logging(data, redactor),
+                        indent=2,
+                    )
+                )
 
             elif args.command == "extract":
                 result = source.test_connection()
                 if result.get("status") == "FAILURE":
                     msg = result.get("message", "")
-                    logger.error("Aborting: Connection test failed: %s", msg)
+                    logger.error(
+                        "Aborting: Connection test failed: %s",
+                        _safe_text(msg, redactor),
+                    )
                     sys.exit(1)
 
                 logger.info("Starting extraction...")
@@ -420,7 +508,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             if not warm_ok:
                                 logger.warning(
                                     "Dependency warm-up incomplete (workers will retry): %s",
-                                    warm_detail,
+                                    _safe_text(warm_detail, redactor),
                                 )
 
                         worker_pool = DetectorWorkerPool(max_workers=pool_workers)
@@ -598,7 +686,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     await augmentation.augment(asset)
                                     if augmentation.flush_requested:
                                         augmentation.clear_flush_request()
-                                        await _flush_buffered_edges(source, sink)
+                                        await _flush_buffered_edges(source, sink, redactor)
 
                                 if hasattr(sink, "update_asset_status"):
                                     await sink.update_asset_status(asset_hash, "PROCESSING")
@@ -653,13 +741,15 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                             # cannot mistake missing embeddings for a
                                             # healthy completed scan.
                                             chunks_ok = False
-                                            detail = f"{asset_hash}: {chunk_exc}"
+                                            detail = _safe_text(
+                                                f"{asset_hash}: {chunk_exc}", redactor
+                                            )
                                             chunk_errors.append(detail)
                                             logger.error(
                                                 "Text-chunk emission exhausted retries"
                                                 " for asset %s: %s",
                                                 asset_hash,
-                                                chunk_exc,
+                                                _safe_text(chunk_exc, redactor),
                                             )
 
                                 f_total, f_by_sev, f_by_det = _compute_findings_counts(
@@ -714,10 +804,16 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 processed_count += 1
                             except Exception as exc:
                                 error_count += 1
-                                logger.error("Asset %s failed: %s", asset_hash, exc)
+                                logger.error(
+                                    "Asset %s failed: %s",
+                                    asset_hash,
+                                    _safe_text(exc, redactor),
+                                )
                                 if hasattr(sink, "update_asset_status"):
                                     try:
-                                        error_msg = str(exc) or type(exc).__name__
+                                        error_msg = _safe_text(
+                                            str(exc) or type(exc).__name__, redactor
+                                        )
                                         await sink.update_asset_status(
                                             asset_hash, "ERROR", error_message=error_msg
                                         )
@@ -779,7 +875,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             "findings and are retried on the next run.",
                             degraded["label"],
                             degraded["cause"],
-                            degraded["reason"],
+                            _safe_text(degraded["reason"], redactor),
                             degraded["attempted_payloads"],
                             degraded["skipped_payloads"],
                         )
@@ -810,7 +906,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     # Relationships go *before* finish(): finish() finalizes the
                     # run and marks it COMPLETED, and edges that land after that
                     # belong to a run that already claimed to be done.
-                    await _emit_relationships(source, sink)
+                    await _emit_relationships(source, sink, redactor=redactor)
 
                     await sink.finish()
                     logger.info(
@@ -822,12 +918,12 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     if _is_timeout_error(extraction_error):
                         logger.warning(
                             "Source timed out during extraction, partial results flushed: %s",
-                            extraction_error,
+                            _safe_text(extraction_error, redactor),
                         )
                         # The assets this run did ingest keep their
                         # relationships. Dropping them here is what made a slow
                         # warehouse scan produce a graph with no lineage at all.
-                        await _emit_relationships(source, sink, partial=True)
+                        await _emit_relationships(source, sink, partial=True, redactor=redactor)
                         # A run that timed out mid-extraction did not visit the
                         # rest of the source, so absence from it proves nothing.
                         # Without this the timeout retires every asset the run
@@ -842,10 +938,17 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         return
                     if sink_started:
                         try:
-                            await sink.fail(extraction_error)
+                            # Redacted copy: sink.fail stores the message on
+                            # the run record, which is readable beyond the
+                            # operator who holds the credential.
+                            await sink.fail(_safe_error_copy(extraction_error, redactor))
                         except Exception as sink_error:
                             logger.error(
-                                "Failed to mark sink failure: %s", sink_error, exc_info=True
+                                "Failed to mark sink failure: %s",
+                                _safe_text(sink_error, redactor),
+                            )
+                            _log_debug_traceback(
+                                logger, "Sink failure traceback:", sink_error, redactor
                             )
                     raise
                 finally:
@@ -855,17 +958,19 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         worker_pool.shutdown(wait=True)
 
         except Exception as e:
-            logger.debug("Traceback for %s failure:", args.command, exc_info=True)
+            _log_debug_traceback(logger, f"Traceback for {args.command} failure:", e, redactor)
             if _is_timeout_error(e):
-                logger.warning("SCAN TIMED OUT (source unreachable): %s", e)
+                logger.warning("SCAN TIMED OUT (source unreachable): %s", _safe_text(e, redactor))
                 return
-            logger.error("SCAN FAILED: %s", e)
+            logger.error("SCAN FAILED: %s", _safe_text(e, redactor))
             sys.exit(1)
         finally:
             source.cleanup()
     except Exception as e:
-        logger.debug("Traceback for fatal error:", exc_info=True)
-        logger.error("FATAL: %s", e)
+        # No recipe redactor here (failure happened before the recipe was
+        # usable): generic patterns still hide credential-shaped values.
+        _log_debug_traceback(logger, "Traceback for fatal error:", e, None)
+        logger.error("FATAL: %s", _safe_text(e, None))
         sys.exit(1)
 
 
@@ -971,7 +1076,8 @@ def run_evaluate_file_command(args: argparse.Namespace) -> None:
             output["detector_errors"] = runner.detector_errors
         print(json.dumps(_sanitize_for_json(output), ensure_ascii=False))
     except Exception as e:
-        logger.error("File evaluation failed: %s", e, exc_info=True)
+        logger.error("File evaluation failed: %s", _safe_text(e, None))
+        _log_debug_traceback(logger, "File evaluation traceback:", e, None)
         sys.exit(1)
 
 
@@ -1153,8 +1259,16 @@ def main() -> None:
     try:
         validate_input(recipe, source_type)
         logger.info("Recipe is valid")
+    except RecipeValidationError as e:
+        # Already log-safe by construction (masked values hidden); the extra
+        # pass only guards credential-shaped patterns in driver text.
+        logger.error("%s", _safe_text(e, Redactor.from_recipe(recipe)))
+        sys.exit(1)
     except Exception as e:
-        logger.error("Recipe validation failed: %s", e)
+        logger.error(
+            "Recipe validation failed: %s",
+            _safe_text(e, Redactor.from_recipe(recipe)),
+        )
         sys.exit(1)
 
     run_command(args, recipe)

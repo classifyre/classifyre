@@ -394,7 +394,12 @@ class RestOutputSink:
         if not self._runner_id:
             return
 
-        error_message = f"{type(error).__name__}: {error}"
+        # Defense in depth: the caller already redacts known recipe values,
+        # but the sink is the last point before the message is stored on the
+        # run record, so credential-shaped patterns are hidden here as well.
+        from ..utils.redaction import redact_generic
+
+        error_message = redact_generic(f"{type(error).__name__}: {error}")
         try:
             payload = UpdateRunnerStatusRequest(status="ERROR", error_message=error_message)
             self._request_json(
@@ -405,8 +410,8 @@ class RestOutputSink:
         except Exception as update_error:
             logger.warning(
                 "Failed to update runner status to ERROR after failure %s: %s",
-                error,
-                update_error,
+                redact_generic(str(error)),
+                redact_generic(str(update_error)),
             )
 
     async def emit_edges(self, edges: list[IngestEdge]) -> dict[str, Any]:
@@ -451,11 +456,14 @@ class RestOutputSink:
                 # Edge emission is best-effort: log and continue — but a chunk
                 # the API rejected is lost, not dropped, so the run is
                 # downgraded rather than reporting an unqualified success.
+                # Redacted: these messages land on the run record.
+                from ..utils.redaction import redact_generic as _redact_generic
+
                 totals["lost"] += len(chunk)
-                message = f"{type(exc).__name__}: {exc}"
+                message = _redact_generic(f"{type(exc).__name__}: {exc}")
                 if message not in errors:
                     errors.append(message)
-                logger.warning("Failed to emit edges to graph: %s", exc)
+                logger.warning("Failed to emit edges to graph: %s", _redact_generic(str(exc)))
         if errors:
             totals["errors"] = errors
         return totals
@@ -562,7 +570,9 @@ class RestOutputSink:
         )
 
         if response.status_code >= 400:
-            body_preview = response.text.strip()[:400]
+            from ..utils.redaction import redact_generic as _redact_generic2
+
+            body_preview = _redact_generic2(response.text.strip()[:400])
             raise RuntimeError(
                 f"REST output request failed ({method} {url}): "
                 f"{response.status_code} {response.reason} {body_preview}"

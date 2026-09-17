@@ -90,6 +90,13 @@ import {
   summarizeOutcomeFailures,
   type OutcomeFailureSummary,
 } from './detector-degradation';
+import {
+  boundLongDetailStrings,
+  redactDeepStrings,
+  redactDeepWithSecrets,
+  sanitizeStoredErrorMessage,
+  sanitizeWithSecrets,
+} from './runner-error-safety';
 
 /** Narrow a JSONB column to a plain object, or null when it is anything else. */
 function asJsonRecord(value: unknown): Record<string, unknown> | null {
@@ -2890,6 +2897,12 @@ export class CliRunnerService {
         }
         const message =
           messageParts.length > 0 ? messageParts.join('; ') : undefined;
+        // Counts and detector labels, but scrubbed like every stored error:
+        // labels are connector-controlled text.
+        const safeMessage =
+          message === undefined
+            ? undefined
+            : sanitizeStoredErrorMessage(message);
 
         await tx.runner.update({
           where: { id: runnerId },
@@ -2906,13 +2919,14 @@ export class CliRunnerService {
             findingsResolved,
             findingsRetained,
             textCoverage,
-            ...(message && { errorMessage: message }),
+            ...(safeMessage && { errorMessage: safeMessage }),
             // Structured beside the sentence, so the scan page and the harness
             // read which detector stopped and why without parsing prose.
+            // Scrubbed: degradation reasons are connector-controlled text.
             ...(hasDegradedDetectors && {
-              errorDetails: {
+              errorDetails: redactDeepStrings({
                 detectorsDegraded: detectorFailures.degraded,
-              } as unknown as Prisma.InputJsonValue,
+              }) as Prisma.InputJsonValue,
             }),
           },
         });
@@ -2934,7 +2948,10 @@ export class CliRunnerService {
         consecutiveFailures: 0,
         lastRunStatus: finalStatus,
         lastRunAt: completedAt,
-        lastErrorMessage: warningMessage ?? null,
+        lastErrorMessage:
+          warningMessage === undefined || warningMessage === null
+            ? null
+            : sanitizeStoredErrorMessage(warningMessage, 2000),
       },
     });
 
@@ -3071,24 +3088,55 @@ export class CliRunnerService {
     void this.dequeueNextPendingRunner();
   }
 
+  /**
+   * The source's masked secret values, decrypted for exact-value redaction
+   * of stored error text. Best-effort by design: a failure must still be
+   * recorded when the config cannot be read, and credential-shaped patterns
+   * still apply downstream without the exact values.
+   */
+  private async sourceSecretValues(sourceId: string): Promise<string[]> {
+    try {
+      const row = await this.prisma.source.findUnique({
+        where: { id: sourceId },
+        select: { config: true },
+      });
+      const config = asJsonRecord(row?.config);
+      const leaves = [
+        ...this.secretLeaves(config?.['masked']),
+        ...this.secretLeaves(
+          asJsonRecord(config?.['augmentation'])?.['secrets'],
+        ),
+      ];
+      const values: string[] = [];
+      for (const leaf of leaves) {
+        try {
+          values.push(this.maskedConfigCryptoService.decryptString(leaf));
+        } catch {
+          values.push(leaf);
+        }
+      }
+      return values;
+    } catch {
+      return [];
+    }
+  }
+
+  private secretLeaves(node: unknown): string[] {
+    if (typeof node === 'string') return [node];
+    if (Array.isArray(node)) {
+      return node.flatMap((item) => this.secretLeaves(item));
+    }
+    if (node && typeof node === 'object') {
+      return Object.values(node).flatMap((item) => this.secretLeaves(item));
+    }
+    return [];
+  }
+
   private async failRunner(
     runnerId: string,
     errorMessage: string,
     errorDetails: any,
   ) {
-    const normalizedMessage =
-      typeof errorMessage === 'string' && errorMessage.trim().length > 0
-        ? errorMessage.slice(0, 4000)
-        : 'Unknown error';
-    const normalizedDetails = this.toSerializableErrorDetails(errorDetails);
-
-    const errorDetailsForDb:
-      | Prisma.InputJsonValue
-      | Prisma.NullableJsonNullValueInput =
-      normalizedDetails === null
-        ? Prisma.JsonNull
-        : (normalizedDetails as Prisma.InputJsonValue);
-
     const runnerRef = await this.prisma.runner.findUnique({
       where: { id: runnerId },
       select: { sourceId: true },
@@ -3097,6 +3145,30 @@ export class CliRunnerService {
       this.logger.warn(`Runner ${runnerId} disappeared before it could fail`);
       return;
     }
+
+    // Exact secret values first (the source's own masked bag, decrypted),
+    // credential shapes second. Stored error text must stay actionable --
+    // kind, codes, paths -- without ever carrying a live credential.
+    const secretValues = await this.sourceSecretValues(runnerRef.sourceId);
+    const normalizedMessage =
+      typeof errorMessage === 'string' && errorMessage.trim().length > 0
+        ? sanitizeStoredErrorMessage(
+            sanitizeWithSecrets(errorMessage, secretValues),
+          )
+        : 'Unknown error';
+    // Bound before redact: one unbounded string (a full multi-MB job log
+    // embedded as `output`) must not reach the JSONB column or the UI.
+    const normalizedDetails = redactDeepWithSecrets(
+      boundLongDetailStrings(this.toSerializableErrorDetails(errorDetails)),
+      secretValues,
+    ) as Record<string, unknown> | string | null;
+
+    const errorDetailsForDb:
+      | Prisma.InputJsonValue
+      | Prisma.NullableJsonNullValueInput =
+      normalizedDetails === null
+        ? Prisma.JsonNull
+        : (normalizedDetails as Prisma.InputJsonValue);
 
     await this.runnerLogStorage
       .finalizeRunner(runnerRef.sourceId, runnerId)
@@ -3622,9 +3694,13 @@ export class CliRunnerService {
           data: {
             status,
             ...(isProcessing ? { startedAt: now } : { completedAt: now }),
+            // Scrubbed like every stored error: asset failures carry
+            // driver/notebook text verbatim.
             errorMessage: isProcessing
               ? undefined
-              : update.errorMessage?.slice(0, 4000),
+              : update.errorMessage === undefined
+                ? undefined
+                : sanitizeStoredErrorMessage(update.errorMessage),
             ...(update.findingsTotal !== undefined && {
               findingsTotal: update.findingsTotal,
             }),
