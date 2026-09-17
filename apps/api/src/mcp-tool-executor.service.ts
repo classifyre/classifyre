@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ClsService } from 'nestjs-cls';
 import { DemoModeService } from './demo-mode.service';
 import { DemoModeException } from './demo-mode.exception';
 import { CliRunnerService } from './cli-runner/cli-runner.service';
@@ -11,6 +12,7 @@ import { CustomDetectorTestsService } from './custom-detector-tests.service';
 import { SchedulerService } from './scheduler/scheduler.service';
 import { SourceService } from './source.service';
 import { ValidationService } from './validation.service';
+import { CLS_DEMO_MODE_BYPASS } from './namespace/namespace.constants';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -56,13 +58,14 @@ export class McpToolExecutorService {
     private readonly cliRunnerService: CliRunnerService,
     private readonly schedulerService: SchedulerService,
     private readonly demoMode: DemoModeService,
+    private readonly cls: ClsService,
   ) {}
 
   /** Guard for any mutating MCP tool. Public so the factory can call it
    * directly for tools that talk to a domain service without an executor
-   * passthrough method. */
+   * passthrough method. Passes when the MCP request carried the bypass key. */
   assertNotDemoMode(): void {
-    if (this.demoMode.isDemoMode) {
+    if (this.demoMode.isDemoMode && !this.cls.get(CLS_DEMO_MODE_BYPASS)) {
       throw new DemoModeException();
     }
   }
