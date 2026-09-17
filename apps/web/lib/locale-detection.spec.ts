@@ -6,6 +6,7 @@ import { localeSwitchHref } from "./app-path";
 import {
   DEFAULT_LOCALE,
   LOCALES,
+  autoRedirectTarget,
   isLocale,
   languageToLocale,
   localeHtmlLang,
@@ -152,6 +153,38 @@ describe("resolveLanguage", () => {
       configurable: true,
     });
     expect(resolveLanguage("AUTOMATIC")).toBe("ENGLISH");
+  });
+});
+
+// ─── autoRedirectTarget ────────────────────────────────────────────
+
+describe("autoRedirectTarget", () => {
+  it("redirects an unprefixed workspace URL to German when resolved so", () => {
+    expect(autoRedirectTarget("/acme/discovery/", "GERMAN")).toBe(
+      "/de/acme/discovery/",
+    );
+  });
+
+  it("redirects the directory root to the German directory", () => {
+    expect(autoRedirectTarget("/", "GERMAN")).toBe("/de/");
+  });
+
+  it("stays put when the resolved language is the default one", () => {
+    expect(autoRedirectTarget("/acme/discovery/", "ENGLISH")).toBeNull();
+    expect(autoRedirectTarget("/", "ENGLISH")).toBeNull();
+  });
+
+  it.each([
+    "/de/acme/discovery/",
+    "/de/",
+    "/de/acme/findings/abc",
+    "/de/namespaces/categories",
+  ])("never switches away from an explicit %s, even to GERMAN", (pathname) => {
+    expect(autoRedirectTarget(pathname, "GERMAN")).toBeNull();
+  });
+
+  it("never switches an explicit German URL even when English wins", () => {
+    expect(autoRedirectTarget("/de/acme/discovery/", "ENGLISH")).toBeNull();
   });
 });
 

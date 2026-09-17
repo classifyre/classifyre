@@ -97,6 +97,18 @@ describe("seo metadata", () => {
   });
 
   describe("entity titles", () => {
+    // Detail pages sit one layout deeper than section pages, and that middle
+    // layout's string title resets Next's stashed title template — so entity
+    // titles carry the site suffix as `absolute` (template-immune) instead of
+    // relying on the template.
+    const absoluteTitle = (meta: Metadata): string => {
+      const title = meta.title;
+      if (title && typeof title === "object" && "absolute" in title) {
+        return title.absolute ?? "";
+      }
+      return typeof title === "string" ? title : "";
+    };
+
     it("uses the real name when one is known", async () => {
       const meta = await entityMetadata(
         "en",
@@ -108,9 +120,19 @@ describe("seo metadata", () => {
         },
       );
 
-      expect(meta.title).toContain("Invoices Q3");
+      expect(absoluteTitle(meta)).toContain("Invoices Q3");
       expect(meta.description).toContain("Invoices Q3");
       expect(meta.description).not.toContain("{{");
+    });
+
+    it("carries the site suffix exactly once, like section pages", async () => {
+      const meta = await entityMetadata("en", "seo.assetDetail", "Invoices Q3", {
+        namespaceSlug: "acme",
+        path: "/assets/abc",
+      });
+
+      expect(absoluteTitle(meta)).toBe("Invoices Q3 — Asset Details | Classifyre");
+      expect(absoluteTitle(meta).match(/\| Classifyre/g)).toHaveLength(1);
     });
 
     it("falls back to the generic section copy rather than showing an id", async () => {
@@ -131,8 +153,8 @@ describe("seo metadata", () => {
       const en = await entityMetadata("en", "seo.sourceDetail", "Wiki", {});
       const de = await entityMetadata("de", "seo.sourceDetail", "Wiki", {});
 
-      expect(de.title).toContain("Wiki");
-      expect(de.title).not.toBe(en.title);
+      expect(absoluteTitle(de)).toContain("Wiki");
+      expect(absoluteTitle(de)).not.toBe(absoluteTitle(en));
     });
   });
 });
