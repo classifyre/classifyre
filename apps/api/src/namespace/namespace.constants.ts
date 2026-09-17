@@ -144,3 +144,5 @@ export const CLS_SCHEMA = 'schemaName';
 export const CLS_NAMESPACE_ID = 'namespaceId';
 export const CLS_SLUG = 'slug';
 export const CLS_DATABASE_LANE = 'databaseLane';
+/** Set by the MCP handler when the request carried the demo-mode bypass key. */
+export const CLS_DEMO_MODE_BYPASS = 'demoModeBypass';
