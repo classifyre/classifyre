@@ -17,6 +17,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
+import { useLocalePath } from "@/lib/app-path";
 
 /** The card's loading twin, so a grid of them keeps its rhythm while data lands. */
 export function WorkspaceCardSkeleton() {
@@ -54,6 +55,7 @@ export function WorkspaceCard({
   onDelete?: (namespace: Namespace) => void;
 }) {
   const { t } = useTranslation();
+  const localePath = useLocalePath();
   const initial = ns.name.trim().charAt(0).toUpperCase() || "?";
 
   return (
@@ -110,7 +112,7 @@ export function WorkspaceCard({
               onClick={(event) => event.stopPropagation()}
             >
               <Link
-                href={`/namespaces/${ns.id}/settings`}
+                href={localePath(`/namespaces/${ns.id}/settings`)}
                 aria-label={t("workspaces.settingsAria", { name: ns.name })}
               >
                 <Settings className="h-4 w-4" />
