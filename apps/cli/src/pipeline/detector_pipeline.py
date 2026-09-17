@@ -25,6 +25,7 @@ from ..models.generated_single_asset_scan_results import (
 )
 from ..sources.base import BaseSource
 from ..utils.file_parser import TextExtractionCoverageError, resolve_mime_type
+from ..utils.redaction import Redactor, redact_generic, short_id_for_log
 from .content_provider import ContentProvider
 from .detector_breaker import DetectorBreaker
 from .text_artifact import TextArtifact
@@ -132,6 +133,10 @@ class DetectorPipeline:
         self.detectors = detectors
         self.source = source
         self.runner_id = runner_id
+        # Built once: candidate ids logged per asset below can embed
+        # credential material (a reversible base64 asset hash over a secret
+        # bearing notebook id), so every id rendered to logs goes through it.
+        self._redactor = Redactor.from_recipe(getattr(source, "recipe", None))
         self._worker_pool = worker_pool
         self._detector_info: dict[int, _DetectorInfo] = {}
         if content_provider is not None:
@@ -696,10 +701,16 @@ class DetectorPipeline:
                 continue
             candidate_ids.append(value)
 
+        # Candidate ids are logged redacted and shortened: the second
+        # candidate is the asset hash, which is reversible base64 over the
+        # connector's raw id -- and a notebook that builds ids from secrets
+        # turns this line into a credential leak. The head still identifies
+        # the document, which is all debugging needs.
         logger.info(
-            "_iter_text_content_pages(%s): trying candidates %s",
+            "_iter_text_content_pages(%s): trying %d candidate(s) %s",
             asset.name,
-            candidate_ids,
+            len(candidate_ids),
+            [short_id_for_log(item, self._redactor) for item in candidate_ids],
         )
 
         for candidate_id in candidate_ids:
@@ -714,7 +725,14 @@ class DetectorPipeline:
                 # Text extraction failure must not discard independent link or
                 # binary detector results. The structured empty-text coverage
                 # signal still records that this asset was not embedded.
-                message = f"Text extraction failed for {candidate_id}: {exc}"
+                # Redacted like the candidates above: this message is stored
+                # on the run's scan stats.
+                safe_cause = redact_generic(self._redactor.redact(str(exc)))
+                message = (
+                    f"Text extraction failed for "
+                    f"{short_id_for_log(candidate_id, self._redactor)}: "
+                    f"{safe_cause}"
+                )
                 logger.warning(message)
                 self._text_extraction_errors.setdefault(str(asset.hash), []).append(message)
                 self._text_extraction_statuses[str(asset.hash)] = TextExtractionStatus(

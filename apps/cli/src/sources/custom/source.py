@@ -49,6 +49,7 @@ from ...notebook.groups import warm_declared_groups
 from ...notebook.packages import install as install_packages
 from ...outputs.rest import internal_key_headers
 from ...utils.hashing import hash_id, unhash_id
+from ...utils.redaction import Redactor, redact_generic
 from ...utils.source_files import api_base_url, download_source_files
 from ...utils.urn import normalize_urn_or_none
 from ..base import BaseSource
@@ -105,6 +106,10 @@ class CustomSource(BaseSource):
         runner_id: str | None = None,
     ):
         super().__init__(recipe, source_id=source_id, runner_id=runner_id)
+        # Redacts this run's secrets from every error and log line below.
+        # The child already redacts what it sends back; this covers what the
+        # parent adds (query refusals, install output, unexpected frames).
+        self._redactor = Redactor.from_recipe(self.recipe)
         # Local runs keep runner_id None (not "local-run"): ctx.query_assets()
         # needs a scan run, and the guard below only fires on a missing id. A
         # placeholder would sail past it and query as run "local-run".
@@ -134,6 +139,11 @@ class CustomSource(BaseSource):
         )
 
     # -- recipe helpers ------------------------------------------------------
+
+    def _safe(self, text: Any) -> str:
+        """Render ``text`` for errors and logs without secret values."""
+        raw = text if isinstance(text, str) else str(text)
+        return redact_generic(self._redactor.redact(raw))
 
     def _plain_recipe(self) -> dict[str, Any]:
         """The recipe as plain JSON for the child process.
@@ -211,10 +221,12 @@ class CustomSource(BaseSource):
         frame = self._read_frame(timeout=STARTUP_TIMEOUT_SECONDS)
         if frame.get("type") == "error":
             self._terminate()
-            raise CustomSourceError(_describe(frame.get("error")))
+            raise CustomSourceError(self._safe(_describe(frame.get("error"))))
         if frame.get("type") != "ready":
             self._terminate()
-            raise CustomSourceError(f"Notebook process sent an unexpected frame: {frame!r}")
+            raise CustomSourceError(
+                self._safe(f"Notebook process sent an unexpected frame: {frame!r}")
+            )
 
         return process
 
@@ -231,7 +243,9 @@ class CustomSource(BaseSource):
 
         report = install_packages([package.model_dump() for package in declared])
         if report.error:
-            raise CustomSourceError(f"Could not install the notebook's packages: {report.error}")
+            raise CustomSourceError(
+                self._safe(f"Could not install the notebook's packages: {report.error}")
+            )
         if report.skipped_reason:
             logger.warning("%s", report.skipped_reason)
 
@@ -274,7 +288,10 @@ class CustomSource(BaseSource):
         except Exception as exc:
             # A connector that talks to an API and ignores ctx.files should not
             # fail because the files endpoint was unreachable.
-            logger.warning("Could not fetch uploaded files for this source: %s", exc)
+            logger.warning(
+                "Could not fetch uploaded files for this source: %s",
+                self._safe(exc),
+            )
             shutil.rmtree(destination, ignore_errors=True)
             return None
         finally:
@@ -353,7 +370,7 @@ class CustomSource(BaseSource):
             self._serve_need(frame)
             frame = self._read_frame()
         if frame.get("type") == "error":
-            raise CustomSourceError(_describe(frame.get("error")))
+            raise CustomSourceError(self._safe(_describe(frame.get("error"))))
         return frame.get("result")
 
     def _serve_need(self, frame: dict[str, Any]) -> None:
@@ -392,8 +409,10 @@ class CustomSource(BaseSource):
             except ValueError:
                 detail = None
             raise CustomSourceError(
-                f"ctx.query_assets() was refused ({response.status_code}): "
-                f"{detail or response.text[:500]}"
+                self._safe(
+                    f"ctx.query_assets() was refused ({response.status_code}): "
+                    f"{detail or response.text[:500]}"
+                )
             )
         return response.json()
 
@@ -439,7 +458,7 @@ class CustomSource(BaseSource):
         try:
             return self._call("discover") or {}
         except (CustomSourceError, NotebookContractError) as exc:
-            logger.warning("Notebook discover() failed: %s", exc)
+            logger.warning("Notebook discover() failed: %s", self._safe(exc))
             return {}
 
     async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
@@ -464,7 +483,7 @@ class CustomSource(BaseSource):
             frame_type = frame.get("type")
 
             if frame_type == "error":
-                raise CustomSourceError(_describe(frame.get("error")))
+                raise CustomSourceError(self._safe(_describe(frame.get("error"))))
 
             if frame_type == "end":
                 self._stats = {
@@ -910,7 +929,7 @@ class CustomSource(BaseSource):
         try:
             result = self._call("fetch_content", assetId=self._id_by_hash.get(asset_id, asset_id))
         except (CustomSourceError, NotebookContractError) as exc:
-            logger.warning("Notebook fetch_content(%s) failed: %s", asset_id, exc)
+            logger.warning("Notebook fetch_content(%s) failed: %s", asset_id, self._safe(exc))
             return None
         if not isinstance(result, dict):
             return None
