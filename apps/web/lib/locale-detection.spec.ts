@@ -447,6 +447,47 @@ describe("next.config.mjs locale table", () => {
         expect(pattern.test(path)).toBe(false);
       }
     });
+
+    it("leaves MCP paths alone", () => {
+      // `/mcp/<namespace>` is API traffic (see the MCP rewrite below): if the
+      // locale rule grabbed it, it would land in `/en/…` where no `mcp`
+      // route exists and 404.
+      for (const path of ["mcp/firmenbuch-austria", "mcp/ns/extra"]) {
+        expect(pattern.test(path)).toBe(false);
+      }
+    });
+  });
+
+  describe("the beforeFiles MCP rewrite", () => {
+    // Both MCP shapes must reach the `/api/[...path]` proxy (which forwards
+    // to the API verbatim), not the locale tree — so the rules sit ahead of
+    // the locale rewrite, exactly like `api/`.
+    it("rewrites /mcp/<namespace> onto the /api proxy", () => {
+      expect(config).toContain('source: "/mcp/:namespace",');
+      expect(config).toContain('destination: "/api/:namespace/mcp",');
+      expect(config).toContain('source: "/mcp/:namespace/:path*",');
+      expect(config).toContain('destination: "/api/:namespace/mcp/:path*",');
+    });
+
+    it("rewrites the canonical /<namespace>/mcp onto the /api proxy", () => {
+      expect(config).toContain('source: "/:namespace/mcp",');
+      expect(config).toContain('destination: "/api/:namespace/mcp",');
+      expect(config).toContain('source: "/:namespace/mcp/:path*",');
+      expect(config).toContain('destination: "/api/:namespace/mcp/:path*",');
+    });
+
+    it("is placed ahead of the locale rewrite", () => {
+      const localeRule = config.indexOf("source: `/:path(");
+      expect(localeRule).toBeGreaterThan(-1);
+      for (const rule of [
+        'source: "/mcp/:namespace",',
+        'source: "/:namespace/mcp",',
+      ]) {
+        const mcpRule = config.indexOf(rule);
+        expect(mcpRule).toBeGreaterThan(-1);
+        expect(mcpRule).toBeLessThan(localeRule);
+      }
+    });
   });
 });
 

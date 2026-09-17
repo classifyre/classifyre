@@ -29,15 +29,18 @@ function contextFor(
   } as unknown as ExecutionContext & { reflector: Reflector };
 }
 
-function guards(env: { key?: string; demo?: boolean }) {
+function guards(env: { key?: string; demo?: boolean; bypass?: string }) {
   const previousKey = process.env.CLASSIFYRE_INTERNAL_KEY;
   const previousDemo = process.env.DEMO_MODE;
+  const previousBypass = process.env.DEMO_MODE_BYPASS_KEY;
   process.env.CLASSIFYRE_INTERNAL_KEY = env.key ?? '';
   process.env.DEMO_MODE = env.demo ? 'true' : 'false';
+  process.env.DEMO_MODE_BYPASS_KEY = env.bypass ?? '';
   const internalApiKey = new InternalApiKeyService();
   const demoMode = new DemoModeService();
   process.env.CLASSIFYRE_INTERNAL_KEY = previousKey;
   process.env.DEMO_MODE = previousDemo;
+  process.env.DEMO_MODE_BYPASS_KEY = previousBypass;
   return { internalApiKey, demoMode };
 }
 
@@ -140,5 +143,47 @@ describe('DemoModeGuard with an internal key', () => {
     );
 
     expect(guard.canActivate(ctx)).toBe(true);
+  });
+});
+
+describe('DemoModeGuard with the bypass header', () => {
+  const BYPASS = 'test-bypass-key-0123456789';
+
+  function demoGuard(ctx: ExecutionContext, bypass?: string) {
+    const { internalApiKey, demoMode } = guards({ demo: true, bypass });
+    return new DemoModeGuard(
+      demoMode,
+      internalApiKey,
+      (ctx as unknown as { reflector: Reflector }).reflector,
+    );
+  }
+
+  it('lets an operator write to a demo instance', () => {
+    const ctx = contextFor({
+      method: 'DELETE',
+      headers: { 'x-bypass-demo': BYPASS },
+    });
+
+    expect(demoGuard(ctx, BYPASS).canActivate(ctx)).toBe(true);
+  });
+
+  it('rejects a wrong bypass key', () => {
+    const ctx = contextFor({
+      method: 'POST',
+      headers: { 'x-bypass-demo': 'nope' },
+    });
+
+    expect(() => demoGuard(ctx, BYPASS).canActivate(ctx)).toThrow(
+      DemoModeException,
+    );
+  });
+
+  it('ignores the header when no bypass key is configured', () => {
+    const ctx = contextFor({
+      method: 'POST',
+      headers: { 'x-bypass-demo': '' },
+    });
+
+    expect(() => demoGuard(ctx).canActivate(ctx)).toThrow(DemoModeException);
   });
 });
