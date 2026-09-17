@@ -36,6 +36,12 @@ export class DemoModeGuard implements CanActivate {
       return true;
     }
 
+    // Operators write to a demo instance with the bypass header instead of
+    // flipping DEMO_MODE off, which would open it to everyone.
+    if (this.demoMode.isBypassRequest(request.headers)) {
+      return true;
+    }
+
     const allowed = this.reflector.getAllAndOverride<boolean>(
       ALLOW_IN_DEMO_MODE_KEY,
       [context.getHandler(), context.getClass()],
