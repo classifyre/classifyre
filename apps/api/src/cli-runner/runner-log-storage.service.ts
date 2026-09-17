@@ -18,6 +18,11 @@ import { Readable } from 'stream';
 import { promises as fsp, createReadStream } from 'fs';
 import * as path from 'path';
 import { type LogLevel, RunnerLogEntryDto, RunnerLogsResponseDto } from './dto';
+import {
+  redactSecretsForStorage,
+  sanitizeStoredLogLine,
+  splitPersistWindow,
+} from './runner-error-safety';
 
 type RunnerLogStream = 'stderr' | 'stdout' | 'combined';
 
@@ -284,6 +289,13 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
   private maxBytesPerRun = 50 * 1024 * 1024;
   // Total local storage cap in bytes (0 = disabled; local store only)
   private maxTotalBytes = 0;
+  // Persisted snapshot window (0 = persist everything buffered). Big runs
+  // are not saved big: persistence keeps the head (startup context) and the
+  // tail (where the failure is) with an explicit marker for the gap.
+  private maxPersistLines = 10_000;
+  private persistHeadLines = 1_000;
+  // Single stored log lines are cut beyond this many chars (0 = disabled).
+  private maxLineChars = 16 * 1024;
 
   // Per-runner persistence sync timers (periodic snapshot during active run)
   private readonly syncTimers = new Map<string, NodeJS.Timeout>();
@@ -307,6 +319,15 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     );
     this.maxBytesPerRun =
       this.readIntEnv('RUNNER_LOG_MAX_MB_PER_RUN', 50) * 1024 * 1024;
+    this.maxPersistLines = this.readIntEnv(
+      'RUNNER_LOG_MAX_PERSIST_LINES',
+      10_000,
+    );
+    this.persistHeadLines = this.readIntEnv(
+      'RUNNER_LOG_PERSIST_HEAD_LINES',
+      1_000,
+    );
+    this.maxLineChars = this.readIntEnv('RUNNER_LOG_MAX_LINE_CHARS', 16 * 1024);
 
     const localDir = process.env.RUNNER_LOG_DIR;
     const bucket = process.env.S3_BUCKET;
@@ -672,15 +693,46 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     return next;
   }
 
-  /** Serialise the in-memory buffer and write it as a single object. */
+  /**
+   * Serialise the in-memory buffer and write it as a single object.
+   *
+   * Big runs are not saved big: beyond the persist window only the head
+   * (startup context) and the tail (where the failure is) are stored, with
+   * an explicit marker entry for the omitted middle.
+   */
   private async doSync(sourceId: string, runnerId: string): Promise<void> {
     if (!this.store) return;
     const entries = this.inMemoryLogs.get(runnerId);
     if (entries === undefined) return; // Already finalized or not on this replica
     const truncation = this.truncationEntry(runnerId);
     const all = truncation ? [truncation, ...entries] : entries;
-    const ndjson = all.map((e) => this.encodeEntry(e)).join('');
+    const ndjson = this.encodeEntriesForPersist(all).join('');
     await this.store.put(sourceId, runnerId, ndjson);
+  }
+
+  private encodeEntriesForPersist(entries: StoredRunnerLogEntry[]): string[] {
+    if (this.maxPersistLines <= 0 || entries.length <= this.maxPersistLines) {
+      return entries.map((e) => this.encodeEntry(e));
+    }
+    const tailLines = Math.max(
+      0,
+      this.maxPersistLines - Math.max(0, this.persistHeadLines),
+    );
+    const { head, tail, omitted } = splitPersistWindow(
+      entries,
+      this.persistHeadLines,
+      tailLines,
+    );
+    const marker: StoredRunnerLogEntry = {
+      timestamp: new Date().toISOString(),
+      stream: 'combined',
+      message:
+        `[log truncated] ${omitted.toLocaleString()} middle lines were ` +
+        `omitted from stored logs (per-run persist cap of ` +
+        `${this.maxPersistLines.toLocaleString()} lines). ` +
+        `Live tail view during the run was unaffected.`,
+    };
+    return [...head, marker, ...tail].map((e) => this.encodeEntry(e));
   }
 
   private startSyncTimer(sourceId: string, runnerId: string): void {
@@ -892,11 +944,21 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
 
   // ── Entry encoding / decoding ─────────────────────────────────────────────
 
+  /**
+   * Build a stored entry. The message is redacted and single-line bounded
+   * here -- the single choke point for live streaming, websocket fan-out
+   * and persistence -- so a secret echoed by a driver or notebook never
+   * reaches any reader, and one pathological line cannot dominate storage.
+   */
   private createEntry(
     message: string,
     stream: RunnerLogStream,
   ): StoredRunnerLogEntry {
-    return { timestamp: new Date().toISOString(), stream, message };
+    const safe =
+      this.maxLineChars > 0
+        ? sanitizeStoredLogLine(message, this.maxLineChars)
+        : redactSecretsForStorage(message);
+    return { timestamp: new Date().toISOString(), stream, message: safe };
   }
 
   private encodeEntry(entry: StoredRunnerLogEntry): string {
@@ -918,6 +980,11 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /**
+   * Decode one persisted line. Redaction runs on read as well as on write:
+   * objects stored before server-side scrubbing shipped may still carry
+   * credential-shaped values, and they must not reach readers.
+   */
   private decodeEntryAtIndex(
     rawLine: string,
     index: number,
@@ -927,10 +994,11 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
       const stream = this.normalizeStream(parsed.stream);
       const timestamp =
         typeof parsed.timestamp === 'string' ? parsed.timestamp : null;
-      const rawMessage =
+      const rawMessage = redactSecretsForStorage(
         typeof parsed.message === 'string'
           ? parsed.message
-          : JSON.stringify(parsed);
+          : JSON.stringify(parsed),
+      );
       const structured = this.tryParseJson(rawMessage);
       return {
         cursor: String(index),
@@ -944,7 +1012,7 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
         cursor: String(index),
         timestamp: null,
         stream: 'combined',
-        message: rawLine,
+        message: redactSecretsForStorage(rawLine),
         level: 'UNKNOWN',
       };
     }
