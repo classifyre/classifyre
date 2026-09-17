@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator, Mapping
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
 from ..sources.base import BaseSource
+from ..utils.redaction import Redactor, short_id_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,10 @@ class ParsedContentProvider:
 
     def __init__(self, source: BaseSource) -> None:
         self._source = source
+        # asset_id here is often the reversible asset hash (see
+        # detector_pipeline._iter_text_content_pages), so it is never
+        # logged raw.
+        self._redactor = Redactor.from_recipe(getattr(source, "recipe", None))
 
     async def fetch_text_pages(self, asset_id: str) -> AsyncGenerator[str, None]:
         saw_text = False
@@ -43,19 +48,22 @@ class ParsedContentProvider:
         if isinstance(pages_processed, set) and asset_id in pages_processed:
             logger.info(
                 "fetch_text_pages(%s): source already processed, skipping fallback",
-                asset_id,
+                short_id_for_log(asset_id, self._redactor),
             )
             return
 
         result = await self._source.fetch_content_bytes(asset_id)
         if result is None:
-            logger.info("fetch_text_pages(%s): fetch_content_bytes returned None", asset_id)
+            logger.info(
+                "fetch_text_pages(%s): fetch_content_bytes returned None",
+                short_id_for_log(asset_id, self._redactor),
+            )
             return
 
         raw_bytes, mime = result
         logger.info(
             "fetch_text_pages(%s): fallback iter_asset_pages path (%s, %d bytes)",
-            asset_id,
+            short_id_for_log(asset_id, self._redactor),
             mime,
             len(raw_bytes),
         )
