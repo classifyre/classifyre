@@ -18,20 +18,28 @@ import {
   enterpriseContactEmail,
   repoUrl,
   routes,
-  showcaseUrl,
+  showcaseUrlFor,
 } from "@/lib/site";
+import { withLocalePrefix } from "@/lib/locale";
 
-import "../landing.css";
+import "../../../landing.css";
 
 export const metadata: Metadata = {
   title: "Made in Austria",
   description:
-    "Classifyre is built in Austria, in the European Union, and released as open source under Apache-2.0. The software runs on your own machines — your data stays where you put it, under the rules we work under ourselves.",
-  alternates: { canonical: routes.madeInEurope },
+    "Classifyre wird in Österreich, in der Europäischen Union, gebaut und als Open Source unter Apache-2.0 veröffentlicht. Die Software läuft auf Ihren eigenen Maschinen — Ihre Daten bleiben, wo Sie sie hingelegt haben, unter den Regeln, unter denen wir selbst arbeiten.",
+  alternates: {
+    canonical: "/de/made-in-europe/",
+    languages: {
+      en: "/made-in-europe/",
+      de: "/de/made-in-europe/",
+      "x-default": "/made-in-europe/",
+    },
+  },
   openGraph: {
-    title: "Classifyre — Made in Austria, built in the open",
+    title: "Classifyre — Made in Austria, offen gebaut",
     description:
-      "An Austrian, European, Apache-2.0 open-source investigation platform. Your data never has to leave your infrastructure — or the continent.",
+      "Eine österreichische, europäische Open-Source-Ermittlungsplattform unter Apache-2.0. Ihre Daten müssen Ihre Infrastruktur — oder den Kontinent — nie verlassen.",
     type: "website",
   },
 };
@@ -111,32 +119,32 @@ const consequences: readonly {
   hrefLabel?: string;
 }[] = [
   {
-    marker: "Residency",
-    title: "Your data never has to leave the building",
-    body: "Classifyre is software you run, not a service you upload to. The Docker image keeps everything on one machine; the Helm chart keeps everything inside your cluster. There is no vendor tenancy to pick a region for, because there is no vendor tenancy.",
+    marker: "Residenz",
+    title: "Ihre Daten müssen das Haus nie verlassen",
+    body: "Classifyre ist Software, die Sie betreiben, kein Dienst, zu dem Sie hochladen. Das Docker-Image hält alles auf einer Maschine; der Helm-Chart hält alles in Ihrem Cluster. Es gibt keine Anbieter-Mandantschaft, für die man eine Region wählen müsste — denn es gibt keine Anbieter-Mandantschaft.",
     href: docs.deployment,
-    hrefLabel: "Deployment options",
+    hrefLabel: "Deployment-Optionen",
   },
   {
-    marker: "Sovereignty",
-    title: "No dependency on a non-EU cloud",
-    body: "Nothing in the stack requires a hyperscaler account. PostgreSQL and Kubernetes are the only hard dependencies, so the whole platform runs on an EU provider, on-premises hardware, or an air-gapped rack — the same build either way.",
+    marker: "Souveränität",
+    title: "Keine Abhängigkeit von einer Nicht-EU-Cloud",
+    body: "Nichts im Stack verlangt ein Hyperscaler-Konto. PostgreSQL und Kubernetes sind die einzigen harten Abhängigkeiten — die gesamte Plattform läuft bei einem EU-Anbieter, auf eigener Hardware oder in einem air-gapped Rack, immer derselbe Build.",
     href: docs.kubernetes,
-    hrefLabel: "Run it on Kubernetes",
+    hrefLabel: "Auf Kubernetes betreiben",
   },
   {
-    marker: "AI on your terms",
-    title: "You choose the model, and where it runs",
-    body: "AI providers are configuration, not a hardwired vendor. Point the autopilot and the LLM detectors at a European endpoint, at a model you host yourself, or at nothing at all — the rule-based and local-model detectors work without any provider configured.",
+    marker: "KI zu Ihren Bedingungen",
+    title: "Sie wählen das Modell — und wo es läuft",
+    body: "KI-Anbieter sind Konfiguration, kein fest verdrahteter Hersteller. Richten Sie Autopilot und LLM-Detektoren auf einen europäischen Endpunkt, auf ein selbst gehostetes Modell oder auf gar nichts — die regelbasierten Detektoren und die lokalen Modelle arbeiten ohne jeden konfigurierten Anbieter.",
     href: docs.aiProviders,
-    hrefLabel: "AI providers",
+    hrefLabel: "KI-Anbieter",
   },
   {
-    marker: "Same rulebook",
-    title: "We work under the regulations you do",
-    body: "GDPR, NIS2, DORA, and the AI Act are not an export checklist for us — they are the law where we sit. That shapes the product's defaults: audit trails on cases, encrypted credentials, workspace isolation, and telemetry you can switch off.",
+    marker: "Gleiches Regelwerk",
+    title: "Wir arbeiten unter den Regeln, unter denen Sie arbeiten",
+    body: "DSGVO, NIS2, DORA und der AI Act sind für uns keine Export-Checkliste — sie sind das Recht, wo wir sitzen. Das prägt die Produkt-Defaults: Audit-Trails auf Fällen, verschlüsselte Zugangsdaten, Workspace-Isolierung und Telemetrie zum Abschalten.",
     href: docs.telemetry,
-    hrefLabel: "What telemetry sends",
+    hrefLabel: "Was die Telemetrie sendet",
   },
 ];
 
@@ -147,22 +155,22 @@ const openSourceFacts: readonly {
   detail: string;
 }[] = [
   {
-    label: "License",
+    label: "Lizenz",
     value: "Apache-2.0",
     detail:
-      "Permissive, patent-granting, and boring on purpose. Fork it, ship it, run it commercially.",
+      "Permissiv, mit Patentgrant und absichtlich langweilig. Forken, ausliefern, kommerziell betreiben.",
   },
   {
-    label: "Scope",
-    value: "The whole engine",
+    label: "Umfang",
+    value: "Die ganze Engine",
     detail:
-      "Connectors, detectors, investigations, autopilot, Docker image, and Helm chart — not a stripped demo.",
+      "Konnektoren, Detektoren, Ermittlungen, Autopilot, Docker-Image und Helm-Chart — keine abgespeckte Demo.",
   },
   {
-    label: "Development",
-    value: "In the open",
+    label: "Entwicklung",
+    value: "In der Öffentlichkeit",
     detail:
-      "Issues, pull requests, and releases all happen on the public repository, in public.",
+      "Issues, Pull Requests und Releases passieren alle im öffentlichen Repository, öffentlich.",
   },
 ];
 
@@ -249,7 +257,10 @@ function Coordinate({
   );
 }
 
-export default function MadeInEuropePage() {
+export default function MadeInEuropePageDe() {
+  const getHref = `${withLocalePrefix("de", routes.get)}/`;
+  const editionsHref = `${withLocalePrefix("de", routes.editions)}/`;
+
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
       <PageHero
@@ -259,16 +270,16 @@ export default function MadeInEuropePage() {
             Made in Austria.
             <br />
             <span className="inline-block bg-accent px-[0.12em] text-black">
-              Open to everyone.
+              Offen für alle.
             </span>
           </>
         }
         lede={
           <>
-            Classifyre is built in Austria, in the European Union, and released
-            as open source under Apache-2.0. We are not a European brand on top
-            of somebody else&apos;s cloud — the software runs on your machines,
-            under the same rules we work under ourselves.
+            Classifyre wird in Österreich, in der Europäischen Union, gebaut und
+            als Open Source unter Apache-2.0 veröffentlicht. Wir sind keine
+            europäische Marke auf fremder Cloud — die Software läuft auf Ihren
+            Maschinen, unter denselben Regeln, unter denen wir selbst arbeiten.
           </>
         }
         actions={
@@ -279,7 +290,7 @@ export default function MadeInEuropePage() {
               className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
             >
               <a href={repoUrl} target="_blank" rel="noreferrer">
-                Read the source
+                Quellcode lesen
               </a>
             </Button>
             <Button
@@ -288,7 +299,7 @@ export default function MadeInEuropePage() {
               variant="secondary"
               className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
             >
-              <a href={routes.get}>Get Classifyre</a>
+              <a href={getHref}>Classifyre holen</a>
             </Button>
           </>
         }
@@ -298,10 +309,10 @@ export default function MadeInEuropePage() {
               <AustrianFlag className="shrink-0" />
               <div className="space-y-1">
                 <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
-                  Built in
+                  Gebaut in
                 </p>
                 <p className="font-serif text-xl font-black uppercase tracking-[0.04em] text-white">
-                  Austria
+                  Österreich
                 </p>
               </div>
             </div>
@@ -309,10 +320,10 @@ export default function MadeInEuropePage() {
               <EuropeanStars className="shrink-0 text-accent" />
               <div className="space-y-1">
                 <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
-                  Under the rules of
+                  Nach den Regeln von
                 </p>
                 <p className="font-serif text-xl font-black uppercase tracking-[0.04em] text-white">
-                  The European Union
+                  Der Europäischen Union
                 </p>
               </div>
             </div>
@@ -326,18 +337,19 @@ export default function MadeInEuropePage() {
           <div className="space-y-8">
             <SectionHead
               id="where-title"
-              marker="Coordinates"
+              marker="Koordinaten"
               illustration="feet"
-              title="A small European team, working in public"
-              lede="No offshore development shop, no anonymous maintainer account."
+              title="Ein kleines europäisches Team, arbeitet öffentlich"
+              lede="Keine Offshore-Entwicklungsfabrik, kein anonymes Maintainer-Konto."
             />
 
             <div className="flex flex-wrap items-center gap-4 border-2 border-border bg-muted/30 p-5">
-              <Marker label="Say hello" />
+              <Marker label="Hallo sagen" />
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                Questions about a rollout, a connector you need, or where the
-                project is going next? Write to us — the same address reaches
-                the people who wrote the code.
+                Fragen zu einem Rollout, einem Konnektor, den Sie brauchen, oder
+                dazu, wohin sich das Projekt entwickelt? Schreiben Sie uns —
+                dieselbe Adresse erreicht die Menschen, die den Code geschrieben
+                haben.
               </p>
               <Button
                 asChild
@@ -359,10 +371,10 @@ export default function MadeInEuropePage() {
           <div className="space-y-8">
             <SectionHead
               id="consequences-title"
-              marker="What it changes"
+              marker="Was es ändert"
               illustration="binders"
-              title="Being European"
-              lede="Plenty of tools claim EU hosting and then ask you to ship your most sensitive data to them anyway. Classifyre is built the other way round: the software travels to the data."
+              title="Europäisch sein"
+              lede="Viele Tools behaupten EU-Hosting und bitten Sie dann trotzdem, Ihre sensibelsten Daten zu ihnen zu schicken. Classifyre ist andersherum gebaut: Die Software reist zu den Daten."
             />
 
             <div className="grid gap-4 lg:grid-cols-2">
@@ -374,15 +386,16 @@ export default function MadeInEuropePage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-4 border-2 border-border bg-background p-5">
-              <Marker label="Straight answer" />
+              <Marker label="Klare Antwort" />
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                We are not going to tell you a piece of software makes you
-                GDPR-compliant — no software does that. What we can say is that
-                Classifyre never needs a copy of your data, and that every
-                design decision above was made so a European compliance review
-                is a short conversation instead of a project.
+                Wir werden Ihnen nicht erzählen, eine Software mache Sie
+                DSGVO-konform — das tut keine Software. Was wir sagen können:
+                Classifyre braucht nie eine Kopie Ihrer Daten, und jede
+                Designentscheidung oben wurde so getroffen, dass eine
+                europäische Compliance-Prüfung ein kurzes Gespräch statt eines
+                Projekts ist.
               </p>
-              <DocsLink href={docs.deployment}>Deployment docs</DocsLink>
+              <DocsLink href={docs.deployment}>Deployment-Doku</DocsLink>
             </div>
           </div>
         </SectionShell>
@@ -405,7 +418,7 @@ export default function MadeInEuropePage() {
                 className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
               >
                 <a href={repoUrl} target="_blank" rel="noreferrer">
-                  Browse the repository
+                  Repository durchstöbern
                 </a>
               </Button>
               <Button
@@ -413,15 +426,15 @@ export default function MadeInEuropePage() {
                 variant="secondary"
                 className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
               >
-                <a href={routes.editions}>Open source vs Enterprise</a>
+                <a href={editionsHref}>Open Source vs. Enterprise</a>
               </Button>
               <a
-                href={showcaseUrl}
+                href={showcaseUrlFor("de")}
                 target="_blank"
                 rel="noreferrer"
                 className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50 underline-offset-4 hover:text-accent hover:underline"
               >
-                Or poke at the live showcase
+                Oder die Live-Showcase ausprobieren
               </a>
             </div>
           </div>
@@ -440,15 +453,16 @@ export default function MadeInEuropePage() {
               id="europe-cta-title"
               className="font-hero text-[clamp(2.5rem,7vw,5rem)] uppercase leading-[0.88] tracking-[0.01em]"
             >
-              Built here.{" "}
+              Hier gebaut.{" "}
               <span className="inline-block bg-accent px-[0.12em] text-black">
-                Run anywhere.
+                Läuft überall.
               </span>
             </h2>
             <p className="max-w-xl text-base leading-7 text-white/70">
-              Run it and point it at something real. Nothing
-              is uploaded, nothing phones a foreign cloud, and everything you
-              build carries over when you move to Kubernetes.
+              Betreiben Sie es und richten Sie es auf etwas Echtes. Nichts wird
+              hochgeladen, nichts telefoniert mit einer ausländischen Cloud, und
+              alles, was Sie aufbauen, tragen Sie mit, wenn Sie zu Kubernetes
+              wechseln.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Button
@@ -456,8 +470,8 @@ export default function MadeInEuropePage() {
                 size="lg"
                 className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
               >
-                <a href={routes.get}>
-                  Get Classifyre
+                <a href={getHref}>
+                  Classifyre holen
                 </a>
               </Button>
               <Button
@@ -466,7 +480,7 @@ export default function MadeInEuropePage() {
                 variant="secondary"
                 className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
               >
-                <a href={`mailto:${enterpriseContactEmail}`}>Talk to us</a>
+                <a href={`mailto:${enterpriseContactEmail}`}>Sprechen Sie mit uns</a>
               </Button>
             </div>
           </div>

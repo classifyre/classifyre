@@ -1,0 +1,655 @@
+---
+title: "Mit wem habe ich es eigentlich zu tun? Österreichs Firmenbuch, zur Antwort gebracht"
+description: Zwei österreichische Firmen, beide 1992 gegründet, beide „aktiv“. Die eine hat 21 Jahresabschlüsse eingereicht, die andere in 34 Jahren keinen einzigen. So haben wir den Namespace gebaut, der sie unterscheidet.
+date: 2026-09-08T00:00:00.000Z
+tags:
+  - investigations
+  - detector-design
+  - public-data
+  - lineage
+categories:
+  - Field Notes
+author: Banandre
+image: /blog/assets/images/austrian-firmenbuch-counterparty-due-diligence.jpg
+keywords:
+  - Firmenbuch
+  - Austrian company register
+  - counterparty due diligence
+  - shell company detection
+  - Jahresabschluss analysis
+  - custom detectors
+  - data lineage
+  - Classifyre
+alternates:
+  canonical: /de/blog/cases/austrian-firmenbuch-counterparty-due-diligence
+  languages:
+    en: /blog/cases/austrian-firmenbuch-counterparty-due-diligence/
+    de: /de/blog/cases/austrian-firmenbuch-counterparty-due-diligence/
+    x-default: /blog/cases/austrian-firmenbuch-counterparty-due-diligence/
+openGraph:
+  type: article
+  title: "Mit wem habe ich es eigentlich zu tun? Österreichs Firmenbuch, zur Antwort gebracht"
+  description: Zwei österreichische Firmen, beide 1992 gegründet, beide „aktiv“. Die eine hat 21 Jahresabschlüsse eingereicht, die andere in 34 Jahren keinen einzigen. So haben wir den Namespace gebaut, der sie unterscheidet.
+  url: /de/blog/cases/austrian-firmenbuch-counterparty-due-diligence
+  siteName: Classifyre
+  publishedTime: 2026-09-08T00:00:00.000Z
+  modifiedTime: 2026-09-08T00:00:00.000Z
+  authors:
+    - Banandre
+  section: Field Notes
+  tags:
+    - counterparty due diligence
+    - company register
+    - custom detectors
+    - data lineage
+  images:
+    - /blog/assets/images/austrian-firmenbuch-counterparty-due-diligence.jpg
+twitter:
+  card: summary
+  title: "Mit wem habe ich es eigentlich zu tun? Österreichs Firmenbuch, zur Antwort gebracht"
+  description: Zwei österreichische Firmen, beide 1992 gegründet, beide „aktiv“. Die eine hat 21 Jahresabschlüsse eingereicht, die andere in 34 Jahren keinen einzigen.
+  images:
+    - /blog/assets/images/austrian-firmenbuch-counterparty-due-diligence.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/austrian-firmenbuch-counterparty-due-diligence.jpg"
+  eyebrow="Feldnotizen"
+  title="Mit wem habe ich es eigentlich zu tun?"
+  description="Zwei österreichische Firmen, beide 1992 gegründet, beide als aktiv geführt. Die eine hat 21 Jahresabschlüsse eingereicht. Die andere in 34 Jahren keinen einzigen. So haben wir den Namespace gebaut, der sie unterscheidet."
+/>
+
+<ArticleJsonLd
+  headline="Mit wem habe ich es eigentlich zu tun? Österreichs Firmenbuch, zur Antwort gebracht"
+  description="Zwei österreichische Firmen, beide 1992 gegründet, beide aktiv. Die eine hat 21 Jahresabschlüsse eingereicht, die andere in 34 Jahren keinen. So haben wir den Namespace gebaut, der sie unterscheidet."
+  path="/de/blog/cases/austrian-firmenbuch-counterparty-due-diligence"
+  datePublished="2026-09-08T00:00:00.000Z"
+  dateModified="2026-09-08T00:00:00.000Z"
+  authorName="Banandre"
+  articleSection="Field Notes"
+  about={[
+    "Counterparty-Due-Diligence",
+    "Österreichisches Firmenbuch",
+    "Erkennung von Mantelgesellschaften",
+    "Jahresabschluss-Analyse",
+  ]}
+  mentions={[
+    {
+      "@type": "Dataset",
+      name: "Firmenbuch HVD - FBW-WebServices (justizonline.gv.at)",
+      url: "https://justizonline.gv.at/jop/web/firmenbuchabfrage",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://showcase.classifyre.com/de/firmenbuch-austria",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://showcase.classifyre.com/de/firmenbuch-austria"
+  liveCaseName="Österreichische Firmenbuch-Ermittlung"
+/>
+
+<LiveCaseLink
+  href="https://showcase.classifyre.com/de/firmenbuch-austria"
+  caseName="Österreichischer Firmenbuch-Namespace"
+  locale="de"
+/>
+
+<ArticleSideRail
+  title="Mit wem habe ich es eigentlich zu tun?"
+  path="/de/blog/cases/austrian-firmenbuch-counterparty-due-diligence/"
+  tags={["investigations", "detector-design", "public-data", "lineage"]}
+  backHref="/de/blog/cases"
+  backLabel="Alle Fallakten"
+  locale="de"
+/>
+
+Zwei österreichische Firmen.
+
+Beide sind eine Kommanditgesellschaft. Beide wurden 1992 ins Firmenbuch
+eingetragen. Beide stehen heute als **aktiv** drin. Wenn Ihre
+Lieferantenprüfung fragt „existiert diese Firma und ist sie registriert?“,
+kommen beide sauber zurück.
+
+Die eine hat 21 Jahresabschlüsse eingereicht, den jüngsten für das Jahr zum
+31. Dezember 2024, und ist zu 96,8 % aus eigenen Mitteln finanziert.
+
+Die andere hat **nichts eingereicht, jemals**. Ihr Registerakt ist seit
+1. August 1995 unberührt. Ihre eingetragene Adresse lautet „5020 Salzburg“ —
+eine Postleitzahl und eine Stadt, keine Straße. Sieben andere Firmen teilen sie
+sich.
+
+> **Die kurze Antwort:** Wir haben Österreichs Firmenbuch in einen Namespace
+> verwandelt, der „mit wem habe ich es zu tun“ beantwortet — sechs verlinkte
+> Quellen, 22 eigene Detektoren, bisher 21.475 Firmen und 363.252 Befunde. Jede
+> Schlussfolgerung ist ein Registerfaktum oder eine eingereichte Zahl. Drei
+> Dinge, die er bewusst nicht sagen kann, stehen so laut da wie die, die er kann.
+
+Dies ist die Aufzeichnung, wie er gebaut wurde und was er wirklich kann.
+
+## Die Frage, für die dieser Namespace existiert
+
+Die meisten Firmendatenprodukte beantworten *„existiert diese Firma?“*. Das ist
+die Frage, für die das Register gebaut ist, und sie ist allein fast nutzlos —
+wie die beiden Firmen oben zeigen.
+
+Die Frage, die ein Business wirklich hat, ist härter:
+
+- Ist das ein echtes operatives Unternehmen oder eine Registrierung?
+- Kann es zahlen? Wird es stärker oder schwächer?
+- Wer kontrolliert es, und was kontrollieren die noch?
+- Hat sich kürzlich etwas geändert, das ich wissen sollte?
+- **Und was kann ich nicht herausfinden?**
+
+Diese letzte stellt sich als so wichtig heraus wie der Rest.
+
+## Wie der Namespace funktioniert
+
+Ein **Namespace** (*Namensraum*) in Classifyre ist ein abgeschlossener
+Workspace: eigene Daten, eigene Detektoren, eigene Ermittlungen. Dieser hier ist
+Österreichs Firmenbuch. Nichts daran ist Firmenbuch-bespoke — es ist die
+Standardmaschinerie, gerichtet auf ein öffentliches Register.
+
+Seine Form, Ende zu Ende:
+
+| Schicht | Was sie hier ist |
+|---|---|
+| **Source** (*Datenquelle*) | Sechs Konnektoren, jeder zieht ein Register nach eigenem Zeitplan |
+| **Asset** (*Datenobjekt*) | Eines pro Firma, pro Person, pro hinterlegtem Dokument, pro Geschäftsjahr |
+| **Finding** (*Befund*) | Ein einzelnes untersuchenswertes Faktum, getypt und gereiht |
+| **Edge** (*Kante*) | Ein getypter Link — wer was besitzt, welche Zahl aus welcher Einreichung kam |
+| **Inquiry** (*stehende Frage*) | Eine gespeicherte Frage, die weiter neue Daten matcht, wie sie eintreffen |
+| **Case** (*Fall*) | Die Ermittlung selbst: Threads, Hypothesen, angehängte Beweise |
+| **Glossary** (*Glossar*) | Das eigene Vokabular des Registers, damit Begriffe eines bedeuten |
+
+Von oben nach unten gelesen ist das das ganze Produkt: **Etwas wird geholt, es
+wird ein Objekt, Fakten darüber werden Befunde, Befunde beantworten stehende
+Fragen, und Fragen, die sich als wichtig herausstellen, werden Fälle.**
+
+{/* SCREENSHOT: the namespace overview — source list with last-run status,
+    asset counts and the findings-by-severity breakdown. This is the single
+    best "what am I looking at" image for the whole article. */}
+
+### Die Schleife, die ihn aktuell hält
+
+Das Register steht nicht still. Gemessen am Veränderungsfeed trägt eine einzige
+Woche grob 3.300 bis 6.000 Einträge — Neueintragungen, Löschungen, geänderte
+Adressen, geänderte Geschäftsführung, frisch eingereichte Abschlüsse.
+
+Also läuft jede Source kontinuierlich und fragt zweierlei zugleich ab:
+
+- **den Veränderungsfeed** — was sich wirklich bewegt hat, und was eine
+  Geschäftspartnerprüfung aktuell hält;
+- **den Volldurchlauf** — einen fortsetzbaren Gang durch alle 326.871
+  Firmenbuchnummern, und der einzige Weg zu einer Firma, die seit 1992 nichts
+  eingereicht hat und darum nie in einem Feed auftaucht.
+
+Keines allein genügt, und das sei blunt gesagt: Ein Feed-only-Namespace ist
+gegenüber ruhenden Firmen permanent blind, und ein Sweep-only-Namespace weiß
+nichts über die Firma, die jemand letzte Woche gründete — meist die mit der
+dünnsten Historie und dem meisten Grund, geprüft zu werden.
+
+Eine Subtilität, die mehr zählt, als es klingt: Weil ein einzelner Lauf nur
+einen Ausschnitt des Registers abdeckt, **deklariert jeder Lauf, dass er nur
+einen Teil des Universums sah**. Eine Firma, die nicht in diesem Lauf-Ausschnitt
+war, gilt nicht als gelöscht. Ohne diese Deklaration beerdigt ein Teils scan
+still alles, was er zufällig nicht besuchte.
+
+### Was Sie sonst selbst bauen müssten
+
+Das Register ist öffentlich. Jeder kann dieselben APIs rufen. Die Arbeit, die
+nicht offensichtlich ist, bis man es versucht:
+
+**Identität, die Out-of-order-Ankunft überlebt.** Sechs Quellen laufen in sechs
+verschiedenen Geschwindigkeiten. GISA beschreibt vielleicht eine Firma, die der
+Register-Konnektor noch nicht erreicht hat. Jede Source rechnet denselben String —
+`company://at/firmenbuchnummer/<fn>` — und eine Kante auf eine Firma, die noch
+nicht existiert, wird *behalten* und im Moment ihres Eintreffens gejoint. Keine
+geteilte Tabelle, keine Ordnungsanforderung, kein verlorener Link.
+
+**Fakten als Objekte statt als Spalten.** Rechtsform, Shell-Score, Distress-Urteil
+sind keine Felder in einer Zeile — sie sind Befunde. Das ist der Unterschied
+zwischen Daten, die man abrufen kann, und Daten, mit denen man *ermitteln* kann:
+Ein Befund lässt sich filtern, als Beweis an einen Fall hängen, von einer
+stehenden Frage matchen und semantisch suchen. Eine Spalte kann nichts davon.
+
+**Provenienz, die hält.** Jede abgeleitete Zahl trägt eine getypte Kante zurück
+zum hinterlegten Dokument, aus dem sie gelesen wurde — „warum sagen Sie, das
+Eigenkapital ist negativ?“ ist also ein Klick, kein Streit.
+
+**Fragen, die sich selbst weiter beantworten.** Eine einmal geschriebene Anfrage
+matcht weiter Firmen, die Monate später aufgenommen werden. Die Ermittlung
+veraltet nicht am Tag, an dem der Scan endet.
+
+**Lücken, die sichtbar sind.** Wo eine Source die Antwort verweigert, wird die
+Weigerung als Befund vermerkt statt als Log-Zeile — damit keine Schlussfolgerung
+still auf einer Annahme ruhen kann, die niemand sehen kann. Das stellte sich als
+die wertvollste Designentscheidung im ganzen Namespace heraus, und sie ist unten
+vollständig abgedeckt.
+
+{/* SCREENSHOT: one company asset page — tags/findings down one side, the
+    lineage graph showing Jahresabschluss → Bilanzanalyse on the other. Shows
+    "fact becomes finding" and "number keeps its provenance" in one frame. */}
+
+Der Rest dieses Artikels sind die Details: woher die Daten kommen, warum es
+sechs Quellen statt einer sind, was die Detektoren tun, und zwei echte Firmen,
+durch das Ganze durchgereicht.
+
+## Woher die Daten kommen
+
+Alles ist öffentlich, und alles ist österreichische Primärquelle. Keine
+gescrapeten Aggregatoren, keine weiterverkauften Datenbanken.
+
+| Source | Was sie ist | Zugang |
+|---|---|---|
+| **Firmenbuch HVD** — [FBW-WebServices](https://justizonline.gv.at/jop/web/firmenbuchabfrage) | Das Handelsregister selbst: Firmen, Organe, gerichtliche Einreichungen, die Dokumente, die sie hinterlegen | SOAP, API-Key |
+| **OGD FN → ÖNACE-Extrakt** — [data.statistik.gv.at](https://data.statistik.gv.at/data/OGDEXT_HVD_FBNR_OENACE_1.csv) | Jede Firmenbuchnummer Österreichs mit ihrem Branchencode | Offenes CSV |
+| **GISA** — [Gewerbeinformationssystem Austria](https://www.gisa.gv.at/) | Das Gewerbeberechtigungsregister | REST, API-Key |
+| **EVI** — [evi.gv.at](https://www.evi.gv.at/) | Das elektronische Publikationsregister (*Ediktsdatei*) | Öffentliches Web |
+| **OeNB** — [Oesterreichische Nationalbank](https://www.oenb.at/) | Listen regulierter Finanzinstitute mit LEI-Codes | Open Data |
+
+Das Register hat **326.871** Firmen. Dieser OGD-Extrakt zählt mehr, als es
+aussieht: Die Firmenbuch-API hat keine Operation „alle Firmen auflisten“, nur
+Lookup-pro-Nummer und einen Veränderungsfeed. Ohne publizierte Aufzählung sieht
+man nur je, was sich kürzlich änderte — ein permanenter blinder Fleck, denn eine
+Firma, die seit 1992 nichts einreichte, taucht nie in einem Veränderungsfeed
+auf. Die Salzburger Firma in diesem Artikel ist genau dieser Fall, und wir
+hätten sie nie gefunden, ohne die volle Liste abzugehen.
+
+## Sechs Quellen, und warum nicht eine
+
+Der naheliegende Build ist ein Konnektor, der pro Firma alles holt. Wir
+teilten ihn in sechs. Jeder nimmt unabhängig auf, und sie verlinken danach.
+
+```text
+                    ┌──────────────────────────────────────────────┐
+                    │  SHARED IDENTITY                             │
+                    │  company://at/firmenbuchnummer/<fn>          │
+                    │  document://at/firmenbuch/<key>              │
+                    └──────────────────────────────────────────────┘
+                                       ▲
+        ┌──────────────┬───────────────┼───────────────┬──────────────┐
+        │              │               │               │              │
+   same_as()      same_as()      references()    references()   sets Asset.urn
+        │              │               │               │              │
+ ┌──────┴─────┐ ┌──────┴─────┐ ┌───────┴──────┐ ┌──────┴──────┐ ┌─────┴────────┐
+ │    EVI     │ │   OeNB     │ │    GISA      │ │ Bilanz-     │ │  FIRMENBUCH  │
+ │ publication│ │ regulated  │ │ trade        │ │ analyse     │ │  REGISTER    │
+ │ profiles   │ │ institutes │ │ register     │ │ (per year)  │ │  companies + │
+ └────────────┘ └────────────┘ └──────────────┘ └─────────────┘ │  officers    │
+                                                       ▲         └──────┬───────┘
+                                          flow(TRANSFORM)                │
+                                          + field mappings          contains()
+                                                       │                 │
+                                              ┌────────┴─────────────────▼──────┐
+                                              │  FIRMENBUCH FINANCIALS          │
+                                              │  filed PDF + XML documents      │
+                                              │  sets document://…              │
+                                              └─────────────────────────────────┘
+```
+
+Drei Gründe, warum sich die Teilung verdient:
+
+**Sie fallen unabhängig aus.** GISA verweigert Per-Firma-Lookups für unseren
+API-Key. In einem einzigen Konnektor hätte diese Weigerung den ganzen Scan mit
+runtergezogen. Geteilt degradiert GISA allein, und das Register läuft weiter.
+
+**Sie laufen verschieden schnell.** Das Register ist schnell. Die
+Dokumenten-Source konvertiert PDFs und ist langsam. Die Analyse-Source ruft ein
+Modell. Geteilt findet jede ihre eigene Kadenz, statt dass sich alles im Tempo
+der langsamsten bewegt.
+
+**Ordnung hört auf zu zählen.** Weil jede Source Firmen über dieselbe URN
+adressiert, muss keine auf eine andere gewartet haben. Ein GISA-Datensatz kann
+auf eine Firma zeigen, die das Register noch nicht erreichte; die Kante wird als
+*externer* Endpunkt gehalten und im Moment deren Eintreffens gestitcht.
+
+### Was jede Source beiträgt
+
+- **Firmenbuch Register** — der Anker. Firma, Rechtsform, Sitz, Registergericht,
+  Ersteintragung, Geschäftszweig, Organe mit Geburtsdaten und
+  Vertretungsbefugnissen und das volle gerichtliche Ereignislog (*VOLLZ*). Es
+  stempelt `Asset.urn`, woran alles andere joint.
+- **Firmenbuch Financials** — die hinterlegten Jahresabschlüsse als Dokumente.
+  Jede Einreichung existiert doppelt, als PDF und als getaggtes XML. Wir nehmen
+  beide und lesen das XML, denn die Zahlen liegen bereits strukturiert vor —
+  kein OCR.
+- **Bilanzanalyse** — ein Datensatz pro Firma pro Geschäftsjahr: die Bilanz,
+  die Kennzahlen und die gesetzlichen Krisentests.
+- **GISA** — Gewerbeberechtigungsdaten, wo verfügbar, und wo nicht, die
+  Weigerung selbst.
+- **EVI** — eine unabhängige Bestätigung des Registerstatus. Wenn zwei Quellen
+  übereinstimmen, ist das Korroboration; wo sie sich widersprechen, ist der
+  interessante Fall.
+- **OeNB** — welche Firmen regulierte Finanzinstitute sind, mit LEI-Codes.
+
+## Wie die Quellen wirklich verlinken
+
+Zwei Mechanismen, beide absichtlich langweilig.
+
+**Identität ist ein String, den beide Seiten rechnen können.** Jede Source
+leitet `company://at/firmenbuchnummer/<fn>` aus der Firmenbuchnummer ab, die sie
+ohnehin hat. Das Register *stempelt* sie auf seine Firmen-Assets; alle anderen
+*zeigen* darauf. Keine geteilte Tabelle, kein Lookup-Service, keine
+Ordnungsanforderung.
+
+**Fakten werden via TAG-Detektoren zu Befunden.** Das ist der erklärenswerte Teil.
+
+Ein [TAG-Detektor](https://docs.classifyre.com/detectors/custom-detectors/tag/)
+läuft gar nicht. Er ist die Deklaration, dass ein Faktum existiert und wie es
+heißt. Der Konnektor kennt Rechtsform, Registergericht und Shell-Score der Firma
+ohnehin — er las sie aus dem Register. Sie mit einem Klassifikator neu zu
+leiten wäre langsamer und schlechter.
+
+Also assertet der Konnektor sie direkt:
+
+```python
+Asset(
+    id=f"company-{fn}",
+    urn=company_urn(fn),
+    tags={
+        "fb_status": "aktiv",
+        "fb_legal_form": "Kommanditgesellschaft",
+        "fb_shell_risk": "hoch (6/12): keine Jahresabschlüsse trotz "
+                         "Offenlegungspflicht; ...",
+    },
+)
+```
+
+Jeder Tag wird ein Befund mit Label und Severity dieses Detektors. Wozu, wenn
+die Daten ohnehin in den Metadaten des Assets stehen? Weil ein Befund in
+Classifyre ein erstklassiges Objekt ist und Metadaten nicht. Ein Befund lässt
+sich filtern, als Beweis an einen Fall hängen, von einer stehenden Frage
+matchen, von der Korrelations-Engine gewichten und für semantische Suche
+embedden. Metadaten liegen nur herum.
+
+Die Wahl, konkret: **Ein Faktum in Metadaten gepusht ist abrufbar; als
+TAG-Befund ist es ermittelbar.**
+
+## Die Detektoren, und warum diese
+
+22 eigene Detektoren. Jeder existiert, weil eine konkrete Frage ihn brauchte.
+
+**Identität und Struktur** — `fb_status` (Registerstatus), `fb_legal_form`,
+`fb_jurisdiction` (Registergericht), `fb_company_age`, `fb_onace` (Branche),
+`fb_size_class`, `at_company_ids` (eine Regex über FN / UID / EUID / LEI).
+
+**Substanz** — `fb_shell_risk` scort zwölf Registerfakten: Löschung *von Amts
+wegen*, keine Abschlüsse trotz Einreichungspflicht, Auflösung binnen zwei Jahren
+nach Gründung, Adresse geteilt mit drei oder mehr Registrierungen,
+Alleinorgan mit Alleinvertretung, kein Geschäftszweig, keine zustellfähige
+Adresse. `fb_filing_gap` misst, wie überfällig die Abschlüsse sind.
+
+**Finanzielle Gesundheit** — `fb_distress` implementiert die gesetzlichen Tests:
+buchmäßige Überschuldung (negatives Eigenkapital) und den URG-§§-22–24-Reorganisationstest,
+der eine Eigenmittelquote unter 8 % **und** eine fiktive Schuldentilgungsdauer
+über 15 Jahre braucht — beide Äste, oder keiner. `fb_capital_thin` fängt
+teileingezahltes Stammkapital. `fb_solvency_outlook` ist der eine KI-Detektor
+und gibt einen vorausschauenden Read.
+
+**Kontrolle** — `fb_officer_role`, `fb_representation`, `fb_mandate_power` (wie
+viele Firmen eine Person zugleich führt).
+
+**Veränderung** — `fb_register_churn`, zählt Gerichtseinträge der letzten drei
+Jahre. Häufige Bewegung — Sitzwechsel, Geschäftsführer-Rotation, ein
+getauschter Name — ist ein anderes Signal als eine Lebenszeit-Ereigniszählung,
+die nichts sagt: Eine 40 Jahre alte Firma hat viele Events und eine saubere
+Historie.
+
+**Und der blinde Fleck** — `fb_trade_access` vermerkt GISAs Weigerung *als
+Befund*. Dieser verdient eine Note. Es wäre leicht gewesen, den Fehler zu loggen
+und weiterzugehen, und jeder Fall im Namespace ruhte dann still auf einer
+Annahme, die niemand sehen konnte. Stattdessen ist die Lücke ein Objekt mit
+4.563 Matches, angehängt an die Fälle, die es einschränkt — damit keine Analyse
+still „diese Firma hat keine Gewerbeberechtigung“ annehmen kann, wo die Wahrheit
+„wir durften nicht fragen“ lautet.
+
+## Lineage: wie eine Zahl ihre Provenienz behält
+
+Eine Zahl, die sich nicht zurückverfolgen lässt, ist kein Beweis. Jeder
+abgeleitete Wert trägt hier eine getypte Kante zu dem, woraus er kam.
+
+Nehmen wir die 2024er-Abschlüsse einer Firma:
+
+```
+company://at/firmenbuchnummer/008316f          (Firmenbuch Register)
+  │
+  ├── contains() ──▶ document://at/firmenbuch/<key>   Jahresabschluss 2024 (PDF)
+  ├── contains() ──▶ document://at/firmenbuch/<key>   Jahresabschluss 2024 (XML)
+  │                       │
+  │                       └── flow(TRANSFORM) ──▶ Bilanzanalyse record 2024
+  │                              + field mappings: Bilanzsumme, Eigenkapital, …
+  │
+  ├── ◀── same_as() ────── EVI profile
+  ├── ◀── references() ─── GISA lookup (refused)
+  └── ◀── uses() ───────── each officer, one edge per mandate
+```
+
+Die `flow(TRANSFORM)`-Kante trägt **Field Mappings** — welche Bilanzzeile
+welches Output-Feld produzierte. „Eigenmittelquote 96,8 %“ ist also keine Zahl
+in einer Datenbank. Es ist eine Zahl mit einem Pfad zurück zum XML-Element im
+hinterlegten Dokument, das sie produzierte, und von dort zur Firma.
+
+Über den Namespace löst sich das aktuell auf in:
+
+| Von | Relation | Nach | Kanten |
+|---|---|---|---|
+| EVI | `same_as` | Register | 17.881 |
+| GISA | `references` | Register | 2.479 |
+| Register | `contains` | Financials | 649 |
+| Financials | `flow(TRANSFORM)` | Bilanzanalyse | 622 |
+| Bilanzanalyse | `references` | Register | 367 |
+| OeNB | `same_as` | Register | 18 |
+
+## Das Glossar, das mehr tat als erwartet
+
+Österreichisches Firmenrecht hat Vokabular, das für Nicht-Spezialisten nichts
+und für Spezialisten eindeutig ist. Das Register schreibt `GES`, `E`, `K`, `W`.
+Ein Dokument sagt *Offenlegungspflicht*. Das XML sagt `HGB_224_3_A`.
+
+Wir luden 55 Begriffe mit ihren Aliasen — Deutsch, Englisch und die registereigenen
+Codes:
+
+| Begriff | Aliase | Warum er zählt |
+|---|---|---|
+| **Eigenmittelquote** | equity ratio, capital ratio | unter 8 % ist ein Ast des URG-Tests |
+| **Buchmäßige Überschuldung** | book overindebtedness, negative equity | ein Grund zu schauen, nie allein ein Insolvenzbefund |
+| **Einzelvertretung** | E, sole representation | ein Organ kann die Firma allein binden |
+| **EUID** | European Unique Identifier | so erscheint die Firma in der EU-Registervernetzung |
+
+Zweierlei änderte es. Die Suche hörte auf davon abzuhängen, in welcher Sprache
+der Analyst denkt — eine Query nach „equity ratio“ erreicht Datensätze, die nur
+je *Eigenmittelquote* sagen. Und einbuchstabige Registercodes lösen korrekt auf:
+`E` heißt *Einzelvertretung*, nicht „der Buchstabe E“ — was zählt, wenn ein so
+kurzer Code sonst den halben Korpus als Substring matchte.
+
+Bemerkenswert: Wir legten **keine Firmennamen** ins Glossar. Namen sind Daten,
+keine Terminologie, und ein Glossar, das Entitätsnamen lernt, macht die
+Korrelations-Engine über Dinge confident, die sie hinterfragen sollte.
+
+## Die Fälle
+
+Fälle sind Fragen mit angehängten Beweisen, keine Schlussfolgerungen. Jeder
+trägt seine eigenen Limits in seiner Beschreibung, damit niemand über sie
+hinwegliest.
+
+### Mantelgesellschaften ohne Substanz (*Scheinfirmen ohne Substanz*)
+
+Welche registrierten Firmen eher Registrierungen als Businesses aussehen.
+Beweise sind Registerfakten, nie Inferenz: Eine Löschung *von Amts wegen* ist
+das Gericht, das protokolliert, dass es kein Vermögen fand; eine Null-Einreichungshistorie
+in einer Form mit Offenlegungspflicht ist der Bruch einer Pflicht, die ab Jahr
+eins existiert.
+
+Eine Hypothese in diesem Fall steht als **WIDERLEGT** drin — eine geteilte
+eingetragene Adresse ist *für sich* kein Shell-Signal, und der Fall sagt das mit
+den Gegenbeispielen, die es zeigten. Ein Businesspark, ein Serviced Office und
+ein Gründungsagent sehen vom Register aus identisch aus. Es ist einen Punkt von
+zwölf wert und nicht mehr.
+
+### Frühwarnung: Insolvenz und Reorganisation (*Frühwarnung*)
+
+Zwei unabhängige Lesarten derselben Einreichungen, bewusst getrennt gehalten:
+die arithmetische Regel (negatives Eigenkapital; beide URG-Äste) und der
+Trajectory-Read des KI-Detektors. Übereinstimmung ist Korroboration. Dissens ist
+der Lead, den zu bearbeiten sich lohnt.
+
+### Einflussreiche Funktionsträger (*Einflussreiche Funktionsträger*)
+
+Wer viele Firmen zugleich kontrolliert, gemessen an den registereigenen
+Aufzeichnungen statt an Presselage. Jede Person ist ein echtes Asset mit stabiler
+Identität (Name plus Geburtsdatum) und einer Kante pro Mandat. Die interessante
+Überlappung ist mit dem Mantel-Fall: Eine Person, deren Mandate sich in Firmen
+clustern, die nie einreichen, ist eine andere Geschichte als eine, deren Mandate
+in einreichenden, kapitalisierten Firmen liegen.
+
+### Aufsteiger (*Aufsteiger*)
+
+Die andere Richtung — Bilanz und Eigenkapital wachsen beide bei intakter
+Eigenmittelquote. Als eigener Fall gehalten, weil der Fehlermodus ein anderer
+ist: Hier ist das Risiko, eine einmalige Kapitaleinlage für einen Trend zu
+halten — darum muss der KI-Detektor in jeder Prognose ein Gegenargument nennen.
+
+### Geschäftspartnerprüfung (*Geschäftspartnerprüfung*)
+
+Der Fall, für den der Namespace existiert, und der letzte, den wir schrieben —
+die früheren vier sind alle Fragen, die ein Analyst *an* den Korpus stellte.
+Keine war *„Ich stehe davor, mit dieser Firma zu handeln.“* Er deckt fünf
+Dimensionen ab: Existenz und Standing, Substanz, finanzielle Gesundheit,
+Stabilität und wer dahintersteht.
+
+## Zwei durchgearbeitete Beispiele
+
+Beide echt, beide leben im Namespace.
+
+### A. GARANT Austria GmbH & Co KG (FN 008316f) — beurteilbar
+
+Wien, gegründet 28. Jänner 1992. Großhandel (*Großhandel*, ÖNACE 46150).
+
+| Geschäftsjahr | 2022 | 2023 | 2024 |
+|---|---|---|---|
+| Bilanzsumme | 2.291.225 | 2.024.358 | 1.762.556 EUR |
+| Eigenmittelquote | 95,4 % | 95,7 % | 96,8 % |
+| Liquidität 3. Grades | 17,1× | 19,5× | 24,1× |
+
+Die Bilanz **schrumpft** grob 11 % pro Jahr. Allein gelesen sieht das nach
+Niedergang aus. Zusammen mit den anderen beiden Zeilen gelesen ist es das
+Gegenteil: Eigenmittelquote steigt und Liquidität gewinnt im selben Zeitraum
+41 % — was arithmetisch nur geht, wenn Verbindlichkeiten schneller fallen als
+Assets. Das ist Entschuldung, keine Verschlechterung.
+
+Der Fall vermerkt es als Hypothese mit testbarem Prädikat — *wenn das
+Entschuldung ist, müssen Eigenmittelquote und Liquidität hochgehen, während die
+Summe runtergeht* — und sagt, was sie widerlegte: eine Eigenmittelquote unter
+90 % in der nächsten Einreichung, oder kippende Liquidität.
+
+Daneben: 21 Jahresabschlüsse über 32 Jahre, aktuelle Einreichungslücke,
+Shell-Score 2/12, kein Insolvenzereignis. **Einreichungsdisziplin ist das
+stärkste Signal, das das Register bietet**, denn Einreichen kostet Geld und
+exponiert den Einreicher. Der Bilanzbuchhalter steht namentlich im Dokument. Die
+Vorjahresspalte ist gegen die vorige Einreichung prüfbar. Eine Firma ohne nichts
+dahinter tut das nicht 21-mal.
+
+### B. Videozentrale Verwaltungsgesellschaft m.b.H. & Co. KG. (FN 028409d) — nicht beurteilbar
+
+Salzburg, gegründet 21. August 1992. Unternehmensberatung (ÖNACE 70100).
+
+| | |
+|---|---|
+| Eingereichte Jahresabschlüsse | **0**, in 34 Jahren |
+| Letzter Registereintrag | **1. August 1995** — vor 31 Jahren |
+| Eingetragener Sitz | „5020 Salzburg“ — keine Straße, keine Nummer |
+| Adresse geteilt mit | **7** anderen Registrierungen |
+| Shell-Score | **6 von 12** — höchster im Korpus |
+| Registerstatus | **aktiv** |
+
+Die Schlussfolgerung ist bewusst eng, und sie ist keine Anschuldigung. Jedes
+Faktum hat eine unschuldige Erklärung verfügbar — ein ruhendes
+Holding-Vehikel, jahrzehntelang geparkt, ist völlig legal. Was die Fakten
+feststellen, ist etwas anderes:
+
+> Es gibt überhaupt keine publizierte Basis, diese Firma zu beurteilen.
+
+Keine Abschlüsse, also kein Eigenkapital, keine Liquidität, kein Trend. Keine
+Registeraktivität, die nahelegte, dass sie jemand administriert. Keine Adresse,
+unter der sie zu finden wäre. Für eine Geschäftspartnerentscheidung ist das ein
+**negatives** Ergebnis, kein neutrales.
+
+Und beachten Sie, was *nicht* behauptet wird: GISA verweigerte den
+Gewerbeberechtigungs-Lookup — „diese Firma hat keine Berechtigung“ steht also
+als Beweis nicht zur Verfügung, und keine Hypothese im Fall darf es annehmen.
+
+### Warum das Paar der Punkt ist
+
+Gleiche Rechtsform. Gleiches Gründungsjahr. Gleicher Registerstatus. Eine
+Prüfung, die bei „ist sie registriert?“ stoppt, gibt für beide JA zurück.
+
+Alles, was sie trennt, kam daher, bessere Fragen an Daten zu stellen, die die
+ganze Zeit öffentlich waren.
+
+## Was er nicht kann
+
+So schlicht gesagt wie der Rest, denn ein Due-Diligence-Tool, das mehr
+impliziert, als es hat, ist schlimmer als eines, das weniger zugibt.
+
+**Keine Profitabilität.** Die Einreichung, die wir erhalten, ist ein
+Bilanzauszug (*Auszug aus der Bilanz*). Kleine Firmen nach § 242 UGB müssen
+**überhaupt keine Gewinn-und-Verlust-Rechnung veröffentlichen**. Für den
+Großteil des Registers gibt es keinen Umsatz, keinen Gewinn, keine Marge — und
+kein Modell sollte benutzt werden, eines zu erfinden. Jede Kennzahl hier ist
+eine Bilanzkennzahl.
+
+**Keine Handelstätigkeit.** GISA verweigert Per-Firma-Lookups für diesen Key. Es
+ist eine Berechtigungsfrage, kein abgelaufenes Credential.
+
+**Beschäftigtenzahlen, fast nie.** Köpfe stehen nur als Freitext-Anmerkung in
+der älteren Einreichungstaxonomie — 5 Befunde über 645 analysierte Einreichungen.
+Pro-Kopf-Quoten sind hier also nicht sinnvoll.
+
+**Teilabdeckung.** Der Register-Walk läuft noch. Für jede einzelne Firma ist die
+ehrliche Antwort entweder die Daten oder *„noch nicht gescannt“* — nie
+*„nichts gefunden“*. Auf einem teilgesweepten Register sind das sehr
+verschiedene Behauptungen.
+
+## Wie er gebaut wurde
+
+Fast vollständig über Classifyres eigenen MCP-Server. Die Konnektoren sind
+Python-Notebooks, geschrieben und revidiert über dieselbe Tool-Oberfläche, die
+sie zurückliest — eine Source anlegen, eine Zelle pushen, laufen lassen, die
+Befunde lesen, justieren. Die Fälle, Anfragen, Detektoren und das Glossar in
+diesem Artikel entstanden alle gleich.
+
+Zweierlei kam dabei heraus:
+
+**Der Konnektor soll asserten, was er ohnehin weiß.** Jedes Faktum, das das
+Register überreicht — Rechtsform, Gericht, Organrollen — wird ein TAG-Befund,
+statt dass ein Klassifikator es aus Prosa neu leitet. Es ist schneller, und es
+ist exakt richtig statt approximativ richtig.
+
+**Ein blinder Fleck muss ein Objekt sein.** Die eine nützlichste
+Designentscheidung war, GISAs Weigerung zu einem Befund zu machen. Eine Lücke,
+die man an einen Fall hängen kann, schränkt die Analyse ein. Eine Lücke in
+einer Log-Datei nicht.
+
+## Sehen Sie selbst
+
+Der Namespace ist live, mit jedem Detektor, jeder Anfrage, jedem Fall, jeder
+Hypothese und jeder Lineage-Kante von oben:
+
+**[showcase.classifyre.com/firmenbuch-austria](https://showcase.classifyre.com/de/firmenbuch-austria)**
+
+Beginnen Sie mit den beiden durchgearbeiteten Fällen —
+*Geschäftspartner-Prüfung A* und *B* — und folgen Sie den Beweisen zurück durch
+die Lineage bis zum hinterlegten XML, aus dem sie kamen.
+
+Ein Detektor-Match ist kein Beweis für Fehlverhalten, und ein offener Fall ist
+eine Frage mit angehängten Beweisen, keine Schlussfolgerung mit nachträglich
+angehängtem Fragezeichen.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/de/blog/cases/austrian-firmenbuch-counterparty-due-diligence"
+  heading="Weitere Fallakten"
+  locale="de"
+/>

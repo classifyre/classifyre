@@ -1,0 +1,766 @@
+---
+title: "Wie eine KI 9.601 Hillary-Clinton-E-Mails untersuchte"
+description: Sehen Sie, wie Classifyre autonom 9.601 Hillary-Clinton-E-Mail-Dateien untersuchte, 20 Detektoren testete und acht beweisgestützte Fälle eröffnete.
+date: 2026-08-11T00:00:00.000Z
+tags:
+  - investigations
+  - detector-design
+  - public-data
+  - ai-agents
+categories:
+  - Field Notes
+author: Banandre
+image: /blog/assets/images/from-9601-clinton-email-files-to-eight-open-cases.jpg
+keywords:
+  - AI investigation
+  - agentic data analysis
+  - autonomous investigation
+  - public email dataset
+  - detector design
+  - Classifyre autopilot
+alternates:
+  canonical: /de/blog/cases/from-9601-clinton-email-files-to-eight-open-cases
+  languages:
+    en: /blog/cases/from-9601-clinton-email-files-to-eight-open-cases/
+    de: /de/blog/cases/from-9601-clinton-email-files-to-eight-open-cases/
+    x-default: /blog/cases/from-9601-clinton-email-files-to-eight-open-cases/
+openGraph:
+  type: article
+  title: "Wie eine KI 9.601 Hillary-Clinton-E-Mails untersuchte"
+  description: Sehen Sie, wie Classifyre autonom 9.601 Hillary-Clinton-E-Mail-Dateien untersuchte, 20 Detektoren testete und acht beweisgestützte Fälle eröffnete.
+  url: /de/blog/cases/from-9601-clinton-email-files-to-eight-open-cases
+  siteName: Classifyre
+  publishedTime: 2026-08-11T00:00:00.000Z
+  modifiedTime: 2026-08-11T00:00:00.000Z
+  authors:
+    - Banandre
+  section: Field Notes
+  tags:
+    - AI investigation
+    - agentic data analysis
+    - public email dataset
+    - detector design
+  images:
+    - /blog/assets/images/from-9601-clinton-email-files-to-eight-open-cases.jpg
+twitter:
+  card: summary
+  title: "Wie eine KI 9.601 Hillary-Clinton-E-Mails untersuchte"
+  description: Sehen Sie, wie Classifyre autonom 9.601 Hillary-Clinton-E-Mail-Dateien untersuchte, 20 Detektoren testete und acht beweisgestützte Fälle eröffnete.
+  images:
+    - /blog/assets/images/from-9601-clinton-email-files-to-eight-open-cases.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/from-9601-clinton-email-files-to-eight-open-cases.jpg"
+  eyebrow="Feldnotizen"
+  title="Wie eine KI 9.601 Hillary-Clinton-E-Mails untersuchte"
+  description="Sehen Sie, wie Classifyre autonom 9.601 Hillary-Clinton-E-Mail-Dateien untersuchte, 20 Detektoren testete und acht beweisgestützte Fälle eröffnete."
+/>
+
+<ArticleJsonLd
+  headline="Wie eine KI 9.601 Hillary-Clinton-E-Mails untersuchte"
+  description="Sehen Sie, wie Classifyre autonom 9.601 Hillary-Clinton-E-Mail-Dateien untersuchte, 20 Detektoren testete und acht beweisgestützte Fälle eröffnete."
+  path="/de/blog/cases/from-9601-clinton-email-files-to-eight-open-cases"
+  datePublished="2026-08-11T00:00:00.000Z"
+  dateModified="2026-08-11T00:00:00.000Z"
+  authorName="Banandre"
+  articleSection="Field Notes"
+  about={[
+    "Autonome KI-Ermittlung",
+    "Hillary-Clinton-E-Mail-Korpus",
+    "Datenklassifizierung",
+    "FOIA-Redaktionsanalyse",
+  ]}
+  mentions={[
+    {
+      "@type": "Dataset",
+      name: "Hillary Clinton Emails - WikiLeaks",
+      url: "https://huggingface.co/datasets/from-our-page/hillary-clinton-emails-wikileaks",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://showcase.classifyre.com/de/hillary-clinton-emails",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://showcase.classifyre.com/de/hillary-clinton-emails"
+  liveCaseName="Hillary-Clinton-E-Mails-Ermittlung"
+/>
+
+<LiveCaseLink
+  href="https://showcase.classifyre.com/de/hillary-clinton-emails"
+  caseName="Hillary-Clinton-E-Mails-Ermittlung"
+  locale="de"
+/>
+
+<ArticleSideRail
+  title="Wie eine KI 9.601 Hillary-Clinton-E-Mails untersuchte"
+  path="/de/blog/cases/from-9601-clinton-email-files-to-eight-open-cases/"
+  tags={["investigations", "detector-design", "public-data", "ai-agents"]}
+  backHref="/de/blog/cases"
+  backLabel="Alle Fallakten"
+  locale="de"
+/>
+
+Früh am ersten Tag eröffnete Classifyre seine erste Anfrage in den
+Clinton-E-Mail-Korpus. Es ging nicht um Klassifizierungsmarkierungen,
+diplomatische Depeschen oder Anwaltsprivileg. Es ging um E-Mail-Adressen.
+
+Das System hatte im ersten Teil des Scans ein simples Muster gefunden:
+offizielle `state.gov`-Adressen und persönliche `clintonemail.com`-Adressen,
+die in derselben Korrespondenz wiederkehrten. Acht Minuten später eröffnete es
+einen Fall, um zu fragen, was diese Überlappung bedeutete. Es hängte Beweise an,
+schlug zwei testbare Hypothesen vor und nahm die ersten Namen und Aliase in ein
+Arbeitsglossar auf.
+
+Das war der Beginn unserer ersten Ermittlung in echten öffentlichen Daten mit
+Classifyre. Über die nächsten drei Tage schrieb und testete dieselbe KI-Harness
+Detektoren, zog Ideen zurück, die nichts produzierten, trennte Release-Stempel
+von substanziellen Markierungen, eröffnete sieben stehende Anfragen und stellte
+acht Fälle zur Review zusammen.
+
+Sie können die resultierende
+[Clinton-E-Mails-Ermittlung in der Classifyre-Showcase](https://showcase.classifyre.com/de/hillary-clinton-emails)
+inspizieren. Der Namespace legt die Detektoren, Anfragen, Fälle, Hypothesen,
+Diskussionsthreads und Timelines offen, die unten beschrieben sind.
+
+> **Die kurze Antwort:** Classifyre scannte autonom 9.601 öffentliche
+> Hillary-Clinton-E-Mail-Dateien, testete 20 Detektor-Ideen, behielt 14, zog
+> sechs zurück, baute sieben überwachende Anfragen und eröffnete acht
+> beweisgestützte Fälle. Die KI leistete die Ermittlungsorganisation selbst;
+> Menschen prüfen weiter Terminologie und entscheiden, was die Beweise letztlich
+> bedeuten.
+
+Dies ist die Aufzeichnung, wie es geschah. Sie ist kein Urteil über die
+Menschen im Korpus, und ein Detektor-Match ist kein Beweis für Fehlverhalten.
+Die offenen Fälle sind Fragen mit angehängten Beweisen, keine Schlussfolgerungen
+mit nachträglich angehängtem Fragezeichen.
+
+![Classifyre-Namespace-Übersicht für die Hillary-Clinton-E-Mails-Ermittlung mit dem Fall hillary-clinton-emails mit 9.601 aufgenommenen E-Mail-Assets, sieben aktiven Anfragen und acht offenen Fällen](/blog/assets/images/hillary-clinton-emails-classifyre-case.webp)
+
+## Eine Source, absichtlich
+
+Wir banden eine Source an:
+[from-our-page/hillary-clinton-emails-wikileaks](https://huggingface.co/datasets/from-our-page/hillary-clinton-emails-wikileaks),
+ein öffentlicher Textdatensatz auf Hugging Face. Wir fügten keine
+Zeitungsberichterstattung hinzu, keine Kongressberichte, keine Biografien und
+keine zweite Kopie des Archivs. Zum Stand, der für diesen Artikel verwendet
+wurde, hatte Classifyre 9.601 Text-Assets aus dieser Source aufgenommen. Sie
+hatten 312.733 offene Befundzeilen produziert, ein Volumen, dominiert von
+breiter Entitätserkennung und wiederkehrenden Release-Metadaten statt von
+312.733 separaten Schlussfolgerungen.
+
+Der enge Scope war nützlich. Er zwang das System zu unterscheiden, was die
+Dokumente wirklich enthalten, von dem, was gemeinhin über sie gesagt wird. Er
+schuf auch ein wichtiges Limit: Diese Ermittlung kann feststellen, dass ein
+String, eine Markierung, eine Adresse oder ein Release-Code in diesem Korpus
+vorkommt. Sie kann, allein aus dieser Source, nicht klären, warum er vorkommt,
+ob das zugrunde liegende Dokument in jeder Hinsicht authentisch ist oder welche
+rechtliche Schlussfolgerung folgt.
+
+Sie können die Aufnahmehistorie selbst im
+[vollständigen Scan-Log](https://showcase.classifyre.com/de/hillary-clinton-emails/scans/) des
+Namespaces verfolgen. Der erste Scan nutzte den eingebauten PII-Detektor. Das
+gab der Harness Namen, Orte, Daten, Adressen, URLs und andere Entitäten, mit
+denen sie arbeiten konnte. Es gab ihr auch eine Menge Müll. Gewöhnliche Wörter
+wie „Thankfully“, „OBITUARY“, „IRELAND“ und „Breakthrough“ wurden manchmal als
+Personen oder Orte gelabelt. Relative Phrasen wie „last weekend“ tauchten als
+Daten auf. OCR-Schäden verdrehten Adressen zu Varianten wie
+`clintonennail.com` und `clintonemall.co`.
+
+Das zählte, weil viele dieser Fehler hoch rankten. Eine einzigartige schlechte
+Extraktion kann statistisch ungewöhnlich aussehen, und ungewöhnlich ist nicht
+dasselbe wie wichtig. Die Harness lernte diese Lektion früh und speicherte sie
+in Memory: In diesem Korpus verlangten generische PERSON-, LOCATION-,
+DATE_TIME- und NRP-Befunde Skepsis; E-Mail-Adressen waren das sauberere
+Startsignal.
+
+![Classifyre-Quellenkonfiguration für die Hillary-Clinton-E-Mails-Ermittlung mit dem Hugging-Face-Datensatz hillary-clinton-emails-wikileaks, angebunden als automatisch gesampelte Source mit Scan-Status](/blog/assets/images/classifyre_hillary-clinton-emails_investigation-wikileaks-hugging-face-source.webp)
+
+### Beweis-Ranking machte das Rauschen sichtbar
+
+Ein
+[LOCATION-Befund](https://showcase.classifyre.com/de/hillary-clinton-emails/findings/be9415ac-d93d-49ee-8064-33de0fb83b99/)
+zeigt, warum. Der PII-Detektor hatte das Wort `OBITUARY` mit 85 % Confidence
+geflaggt, und Classifyres Beweis-Ranking scorte es mit Wichtigkeit 97 und
+Beweisqualität 88 — auf dem Papier hoch, geboostet von lesbarem Kontext und
+einem Wert, der im Korpus einzigartig aussah. Der Ähnliche-Befunde-Graph an
+diesem Befund erzählt die wahre Geschichte: Seine nächsten Nachbarn sind eine
+`LOCATION`-Extraktion desselben `OBITUARY`-Strings auf einem anderen Asset, ein
+`URL`-Befund auf `tnr.com/article/79956/richard-holbrooke-wieseltier-obituary`
+und verstreute `PERSON`/`NRP`-Extraktionen wie `Historian`, `Emeritus` und
+`Deaths`. Ein separater `Memorial Day`-Wert kehrte oft genug wieder, um über
+sechs Assets zu einer expliziten Duplikatgruppe zu kollabieren. Nichts davon ist
+eine Person, ein Ort oder ein Datum in irgendeinem nützlichen Sinn — es ist eine
+Nachrufsektion des Archivs, neu geparst von einem generischen PII-Modell.
+
+Genau das ließ die Harness den Cluster diskontieren, statt ihm nachzujagen: Dieselbe
+Semantik-Ähnlichkeitssicht, die echte Duplikatbeweise über Dokumente hinweg
+hervorhebt, hebt auch dupliziertes Rauschen hervor, sodass ein Detektor danach
+beurteilt werden kann, ob seine Nachbarn korroborierendes Signal oder derselbe
+wiederholte Fehler sind.
+
+![Classifyre-Befunddetail für eine OBITUARY-LOCATION-Extraktion mit semantischem Ähnliche-Befunde-Graph, Beweis-Ranking-Score und benachbarten PERSON-, NRP- und duplikatgruppierten DATE_TIME-Befunden, die einen PII-Rauschcluster im Hillary-Clinton-E-Mail-Korpus offenbaren](/blog/assets/images/classifyre-simmilarity-detection-hillary-clinton-case.webp)
+
+## Was die Harness wirklich tat
+
+„Die KI hat es untersucht“ ist zu vage, um nützlich zu sein. Die Arbeit war
+aufgeteilt auf Agenten mit verschiedenen Jobs und verschiedenen
+Mutationsrechten:
+
+| Agent | Sein Job in dieser Ermittlung |
+| --- | --- |
+| Inquiry | Findet kohärente, beobachtbare Befundgruppen und legt gespeicherte Monitore an. |
+| Case | Macht aus beobachteten Befunden Fälle, hängt Beweise an und pflegt Hypothesen und Notizen. |
+| Config | Justiert Quellen- und Korrelationseinstellungen, wenn Rauschen oder fehlende Abdeckung sichtbar werden. |
+| Detector author | Schlägt jeweils eine fehlende Klasse vor, testet sie, legt sie an, bindet sie an die Source an und prüft das echte Scan-Ergebnis. |
+| Escalation | Benachrichtigt einen Operator erst, nachdem geprüft ist, dass ein Fall substanzielle Beweise jenseits von Boilerplate hat. |
+| Dream | Konsolidiert Memory und schreibt das kurze System-Briefing neu, nachdem die Ermittlung genug Historie angesammelt hat. |
+
+Ein separater Duplikatdurchlauf pflegte Fingerprints und Cluster, während der
+Korpus wuchs. Das war nicht kosmetisch. Zeitweise ließen der ubiquitäre
+`UNCLASSIFIED`-Release-Stempel und generische Datumswerte unzusammenhängende
+Dokumente nahezu identisch aussehen. Der Konfigurationsagent reduzierte ihr
+Korrelationsgewicht auf null, sodass geteilte Adressen, Namen und spezifische
+Detektorwerte mehr vom Vergleich tragen konnten.
+
+Bis Tag vier enthielt der Audit-Trail 743 Agentenläufe, jeder inspizierbar als
+Flight im
+[KI-Harness-Aktivitätslog](https://showcase.classifyre.com/de/hillary-clinton-emails/harness/?tab=activity):
+
+| Lauftyp | Läufe |
+| --- | ---: |
+| Duplikat- und Fingerprint-Pflege | 476 |
+| Anfragen-Review | 65 |
+| Quellen- und Korrelations-Konfiguration | 61 |
+| Fallarbeit | 51 |
+| Eskalations-Review | 45 |
+| Detektor-Erstellung | 44 |
+| Memory-Konsolidierung | 1 |
+
+Diese Läufe produzierten 1.270 protokollierte Fachaktionen und 115 langlebige
+Memory-Einträge. Der Memory-Store war kein Transkript-Dump. Er hielt
+Source-Profile, Detektor-Lektionen, Entitätskarten und
+Entscheidungspräzedenzen wie „keine pauschale Anfrage über rauschende
+PERSON-Befunde eröffnen“ und „diesen Fall nicht erneut alarmieren, außer seine
+Severity steigt“.
+
+Die Ermittlungsarbeit selbst ist in der API attribuierbar: Die sieben Anfragen
+und acht Fälle wurden von `ai-autopilot` erstellt, Detektor-Erstellung und
+Quellenänderungen erscheinen als Agentenentscheidungen, und Fallbeweise haben
+denselben Audit-Trail. Menschen wurden nicht aus der Verantwortung entfernt.
+Die Glossareinträge waren operator-verifiziert, und die Fälle bleiben offen für
+menschliche Review.
+
+### Was „autonom“ hier bedeutete
+
+Kein Operator überreichte der Harness eine vorbereitete Liste von acht Fällen.
+Die Agenten wiederholten eine zustandsbehaftete Schleife: inspizieren, was der
+Namespace weiß, eine unbehandelte Frage wählen, eine erlaubte Aktion ausführen,
+das Ergebnis testen, die Entscheidung protokollieren und später
+wiederkommen, wenn der Scan sich geändert hat. Die Arbeit überlebte zwischen
+Läufen im Namespace, statt am Ende einer Chat-Antwort zu verschwinden.
+
+Diese Unterscheidung ist sichtbar in der Ereignisfolge:
+
+| Wann | Was die KI tat |
+| --- | --- |
+| Tag eins, morgens | Legte die erste Anfrage an, nachdem E-Mail-Adressen als sauberste nützliche Signale im rauschenden PII-Output identifiziert waren. |
+| Tag eins, morgens | Eröffnete den Privates-gegen-offizielles-E-Mail-Fall, wählte Beweise und entwarf zwei Hypothesen. |
+| Tag eins, später Vormittag | Begann die erste Custom-Detektor-Sonde, erholte sich von zwei invaliden Tool-Inputs, bestand Positiv- und Gegenbeispiel-Tests und schickte den Detektor an die Source. |
+| Tag eins, nachmittags bis abends | Fügte Handling-, Netzwerk-, Depeschen- und Anwaltsprivileg-Anfragen hinzu, sobald ihre Detektorergebnisse reviewbar wurden. |
+| Tag zwei, kurz nach Mitternacht | Eröffnete den hochschweren Top-Secret-Fall, bemerkte dann, dass die zugehörige Anfrage `regex:top_secret` gar nicht enthielt. |
+| Tag zwei, frühe Stunden | Weitete die existierende Handling-Anfrage, statt einen duplikaten Monitor zu erstellen. |
+| Tag zwei, frühe Stunden | Besuchte den Top-Secret-Fall nach einem Re-Sweep erneut, erklärte zwei neue Befunde, hängte sie an und protokollierte, dass 427 andere hochgerankte Items PII-Rauschen waren. |
+| Tag zwei bis drei | Eröffnete die FOIA- und Foundation-Fälle, verlinkte neue Beweise und identifizierte FOIA-Release-Kontrollen als kohärente Gruppe, der noch eine Anfrage fehlte. |
+| Tag vier | Prüfte offene Themen bei Vollkorpus-Abdeckung erneut und behielt ungelöste Hypothesen, statt Schließung zu erzwingen. |
+
+Genau das brachte die Automatisierung in der Praxis: Persistenz. Ein
+Detektor-Autor konnte ein neues Signal erstellen; der Anfrage-Agent konnte es
+bemerken; der Fall-Agent konnte ausgewählte Beweise anhängen und eine Hypothese
+formulieren; und ein späterer Lauf konnte die frühere Arbeit challengen,
+erweitern oder verwerfen. Jeder Schritt hinterließ einen Timeline-Eintrag, den
+ein Ermittler inspizieren kann.
+
+Der ganze Lauf war billig. Jeder Agent — Detektor-Autor, Anfrage-Agent,
+Fall-Agent — lief auf DeepSeek V4 Flash, und die viertägige Ermittlung über
+9.601 Assets, 20 Detektoren, sieben Anfragen und acht Fälle kostete insgesamt
+**$4.91** an Modell-Spend. Die vollständige Lauf-für-Lauf-Aufschlüsselung ist
+sichtbar im
+[Harness-Nutzungsgraph](https://showcase.classifyre.com/de/hillary-clinton-emails/harness/?tab=usage).
+
+![DeepSeek-V4-Flash-Kostenaufschlüsselung für die Classifyre-KI-Harness in der Hillary-Clinton-E-Mails-Ermittlung](/blog/assets/images/deepseek-v4-ai-harness-classifyre-investigation.webp)
+
+## Die erste nützliche Frage war nicht die dramatische
+
+Der gespeicherte Monitor des Anfrage-Agenten beobachtete E-Mail-Adressen. Seine
+Begründung war schlicht: Das waren lesbare, hochconfidente Werte mit
+dokumentübergreifender Rekurrenz, und keine Anfrage deckte sie ab.
+
+Der Fall-Agent eröffnete darauf **Private E-Mail-Konten in offizieller
+State-Department-Korrespondenz**. Heute ist es der einzige als `IN_PROGRESS`
+markierte Fall; die anderen sieben bleiben `OPEN`. Er enthält 17 Beweis-Assets
+und 19 angehängte E-Mail-Adress-Befunde. Das angehängte Set enthält
+`state.gov`-Korrespondenten, persönliche `clintonemail.com`-Adressen, eine
+`att.blackberry.net`-Adresse und OCR-Varianten, die der Fall als beschädigte
+Formen behandelt statt als neue Identitäten.
+
+Zwei Hypothesen sind aktuell als gestützt markiert:
+
+- persönliche `clintonemail.com`-Konten trugen offizielle
+  State-Department-Korrespondenz — Confidence 0.75;
+- State-Department-Offizielle waren Korrespondenten in diesem Verkehr —
+  Confidence 0.70.
+
+Diese Confidence-Werte beschreiben den Stand des Falls, kein rechtliches Urteil.
+Der stärkste Beweis ist Ko-Okkurrenz im Korpus: offizielle und persönliche
+Adressen, die in denselben Nachrichten erscheinen, plus Rekurrenz über Dokumente.
+
+Dieser erste Fall setzte auch ein Muster für den Rest der Ermittlung. Die
+Harness eröffnete nicht für jedes hochgerankte Item einen Fall. Sie reviewte
+die rauschenden unbeobachteten Gruppen, dokumentierte, warum sie schwach waren,
+und kehrte zum Adressmuster zurück, weil es diese Review überstand.
+
+## Wie aus einer Detektor-Sonde ein echter Detektor wurde
+
+Später am selben Morgen nahm der Detektor-Autor-Agent seinen ersten Turn. Er
+sah einen State-Department-E-Mail-Korpus mit eingebauten PII-Befunden, aber
+ohne eigene Detektoren. Er hypothisierte, dass Klassifizierungs- und
+Handling-Markierungen eine fehlende Klasse waren: `SECRET`, `CONFIDENTIAL`,
+`SBU`, `NOFORN`, `FOUO`, `EYES ONLY` und verwandte Formen.
+
+Die Sonde war ein vierstufiger Prozess.
+
+1. **Positiv-Sample testen.** Der Agent lieferte repräsentativen Text, der die
+   vorgeschlagenen regulären Ausdrücke matchen sollte.
+2. **Gegenbeispiel testen.** Er lieferte gewöhnliche Prosa mit nahestehenden
+   Wörtern, gebaut, um überbreite Muster zu fangen.
+3. **Den gespeicherten Detektor testen.** Nach der Erstellung testete er per
+   Detektor-ID, um sicherzustellen, dass die gespeicherte Konfiguration sich
+   wie der Entwurf verhielt.
+4. **Auf dem Korpus laufen lassen.** Erst dann fügte er den Detektor der
+   Source hinzu, forderte einen Rescan an und hinterließ ein
+   Pending-Verification-Memory für den nächsten Zyklus.
+
+Der erste Versuch lief nicht glatt. Der Agent schickte eine invalide
+Extra-Property, dann wrappte er das Pipeline-Schema auf der falschen Ebene.
+Beide Calls schlugen fehl. Im dritten Versuch produzierte das Positiv-Sample
+neun erwartete Befunde. Das Gegenbeispiel produzierte keine. Der gespeicherte
+Detektor fand darauf sieben erwartete Items im Positiv-Sample und null im
+Gegenbeispiel.
+
+Diese Unterscheidung — eine bestehende synthetische Sonde, gefolgt von einem
+Echtkorpus-Check — wurde essenziell. Mehrere Ideen bestanden ihre Positiv- und
+Negativbeispiele, produzierten aber null Befunde im echten E-Mail-Set. Ein
+korrektes Muster für Text, der abwesend ist, ist trotzdem eine erfolglose
+Ermittlungssonde.
+
+## Was funktionierte, und was nicht
+
+Die Harness erstellte 20 Detektorkonzepte über den dreitägigen Review. Vierzehn
+sind jetzt aktiv. Dreizehn haben aktuell Befunde; der neueste
+Compartmented-Access-Detektor hat keine. Die Live-Konfiguration aller ist
+durchsuchbar in der
+[Custom-Detektoren-Liste](https://showcase.classifyre.com/de/hillary-clinton-emails/detectors/).
+
+Dies sind die aktiven Detektoren zum Artikel-Stand. „Befundzeilen“ ist die
+aktuelle Zählung der API, keine Zählung von Personen, Delikten oder
+einzigartigen Dokumenten. Release-Boilerplate und wiederkehrte Werte können
+diese Zahl groß machen.
+
+| Aktiver Detektor | Wonach er sucht | Befundzeilen |
+| --- | --- | ---: |
+| `classified_handling_marks` | SECRET, CONFIDENTIAL, SBU, NOFORN, FOUO, EYES ONLY, UNCLASSIFIED | 10,483 |
+| `classified_network_references` | SIPRNet, NIPRNet, JWICS, STU-III | 4 |
+| `diplomatic_cable_references` | STATE-, SECSTATE- und Botschaftsdepeschen-Referenzen | 4 |
+| `state_dissemination_controls` | LIMDIS, NODIS, SIPDIS, REL TO, E.O.-Referenzen | 19 |
+| `legal_privilege_markers` | Attorney-Client-, Work-Product- und Privilegiert/Vertraulich-Markierungen | 28 |
+| `clinton_foundation_references` | Clinton-Foundation- und Clinton-Global-Initiative-Namen | 24 |
+| `foia_release_control_numbers` | FOIA-Akten-, Dokumentnummern- und Release-Status-Stempel | 27,655 |
+| `top_secret_handling_marks` | TOP SECRET und TS-Compartment-Formen | 12 |
+| `foia_case_number` | State-Department-FOIA-Aktennummern | 9,641 |
+| `classification_authority_markings` | Klassifizierungs-Authority-Blöcke | 8 |
+| `foia_exemption_redaction_codes` | Parenthetische Exemptions und eigenständige B1–B7-Zeilen | 3,731 |
+| `state_dissemination_control_markings` | EXDIS, ORCON, PROPIN, REL TO und ähnliche Kontrollen | 1 |
+| `classification_reason_codes` | E.O.-13526-Grundcodes wie 1.4(B) | 602 |
+| `compartmented_access_handling_marks` | SCI, SAR, TALENT KEYHOLE, BYEMAN, Channel-Kontrollen | 0 |
+
+Die Nullen waren so informativ wie die Treffer. Sechs frühere Konzepte wurden
+aus dem aktiven Set zurückgezogen, nachdem der echte Korpus sie nicht stützte:
+
+| Zurückgezogene Sonde | Was geschah |
+| --- | --- |
+| `intelligence_community_markers` | Die Sample-Sonde funktionierte, aber der Scan fand kein SIGINT/HUMINT/COMINT-artiges Markerset. |
+| `cable_distribution_markings` | Es wurden keine echten Depeschen-Verteilerzeilen gefunden. |
+| `foia_exemption_codes` | Die erste Inline-/Parenthesen-Version fand nichts; das nützliche Format stellte sich als eigenständige State-Release-Block-Codes heraus. |
+| `declassification_instructions` | Das Muster matchte korrekt Testtext wie `DECLASSIFY ON`, aber der Korpus produzierte keine Befunde. |
+| `sipdis_distribution_control_marking` | Das dedizierte SIPDIS-Muster bestand seine Tests und fand dann keine SIPDIS-Markierung im Korpus. |
+| `state_cable_tags` | Eine `TAGS: PREL, KDEM`-artige Sonde bestand, aber es gab keinen echten Output, und sie wurde zurückgezogen. |
+
+Die Harness verweigerte auch manche schlechten Zugänge, bevor sie das aktive Set
+erreichten. Sie lehnte einen eigenen E-Mail-Adress-Detektor ab, weil das
+eingebaute EMAIL_ADDRESS-Muster diese Klasse bereits abdeckte. Sie lehnte
+Near-Duplikat-FOIA- und Klassifizierungs-Authority-Detektoren ab und sagte dem
+Agenten, stattdessen den existierenden Detektor zu schärfen. An einer anderen
+Stelle blockierte sie neues Authoring, bis drei Null-Befund-Detektoren geklärt
+waren. Diese Verweigerungen verhinderten, dass der Katalog zu einer Liste leicht
+verschiedener Namen für dieselbe Idee wurde.
+
+Der neueste Null-Ergebnis-Detektor,
+`compartmented_access_handling_marks`, bleibt aktiv. Er sucht nach den
+sensibelsten Special-Access-Begriffen. Zu diesem Stand hat er nichts gefunden.
+Das ehrliche Ergebnis ist nicht „der Korpus ist sauber“; es ist „dieser Detektor
+hat keine Matches und braucht noch eine abgeschlossene Review- oder
+Rückzugsentscheidung“.
+
+## Das Glossar wurde Teil der Methode
+
+Die Agenten schlugen ein Glossar vor, als sie Namen, Aliase, beschädigte
+Schreibweisen, Release-Codes und institutionelle Referenzen antrafen. Operatoren
+verifizierten alle 17 aktuellen Einträge, die Sie im
+[Live-Glossar](https://showcase.classifyre.com/de/hillary-clinton-emails/glossary/) durchsuchen
+können.
+
+Das Glossar ist klein genug zum Inspizieren:
+
+| Typ | Einträge |
+| --- | --- |
+| Personen (9) | Hillary Clinton; Huma Abedin; Cheryl Mills; Jacob „Jake“ Sullivan; Sidney Blumenthal; Abdullah bin Zayed Al Nahyan; Hamad bin Khalifa Al-Thani; Hamad bin Isa al-Khalifa; Rachel Kleinfeld |
+| Referenzen (7) | `clintonemail.com`; SIPRNet; FOIA-Akten F-2014-20439 und F-2016-07895; FOIA-Exemption-Codes; FOIA-Release-Kontrollnummer; Klassifizierungs-Grundcode |
+| Organisation (1) | Clinton Foundation, inklusive William J. Clinton Foundation, WJC Foundation, Clinton Global Initiative und CGI-Aliase |
+
+Das war mehr als eine Definitionsliste. Es hinderte das System daran, `HRC`,
+`HDR22` und „Hillary Rodham Clinton“ als unzusammenhängend zu behandeln;
+verband `SullivanJJ@state.gov` mit Jacob Sullivan; und hielt fest, dass
+`clintonennail.com` und `clintonemall.co` OCR- oder Schreibvarianten sind, die
+in den Daten gefunden wurden.
+
+Es trennte auch Begriffe, die ähnlich aussehen, aber verschiedene Fragen
+beantworten. Ein FOIA-Exemption-Code wie B1 oder B5 erklärt eine
+Release-Redaktion. Ein Klassifizierungs-Grundcode wie 1.4(B) nennt die
+Klassifizierungskategorie. Ein `Doc No. C057xxxxx`-Wert identifiziert ein
+freigegebenes Dokument. Alle drei als einen „Klassifizierungscode“ zu behandeln
+zerstörte die Struktur, die der FOIA-Fall braucht.
+
+## Sieben Anfragen: was das System weiter beobachtet
+
+Eine Anfrage ist ein gespeicherter Monitor, kein Fall. Sie beantwortet: „Welche
+neuen Befunde gehören zu dieser Frage?“ Die sieben aktiven Anfragen enthalten
+aktuell die folgenden Match-Zeilen und sind direkt im
+[Anfragen-Tab](https://showcase.classifyre.com/de/hillary-clinton-emails/investigations/?tab=inquiries)
+durchsuchbar:
+
+| Anfrage | Aktuelle Matches | Was sie beobachtet |
+| --- | ---: | --- |
+| State-Department-Korrespondenten-E-Mail-Adressen | 16,517 | Built-in-EMAIL_ADDRESS-Befunde in der Source |
+| Klassifizierte Handling-Markierungen | 1,540 | Handling-, Top-Secret- und Klassifizierungs-Grund-Detektoren, ohne den ubiquitären UNCLASSIFIED-Stempel |
+| Klassifizierte Netzwerk-Referenzen | 4 | Der Klassifiziert-Netzwerk-Detektor, aktuell SIPRNet-Matches |
+| State-Department-Diplomaten-Depeschen-Referenzen | 4 | Depeschen-Referenz-Formate |
+| Anwaltsprivileg-Markierungen | 28 | Der Anwaltsprivileg-Detektor |
+| Clinton-Foundation-Referenzen | 24 | Foundation- und CGI-Namen |
+| FOIA-Exemption-Redaktionscodes | 3,731 | Der Exemption-Code-Detektor |
+
+Die Monitorgrößen sollten nicht verglichen werden, als wären es Stimmtotale.
+Eine E-Mail kann mehrere Adressen enthalten. Ein Release-Code kann in
+wiederholtem Material rekurrieren. Eine Vier-Match-Anfrage kann wichtiger sein
+als eine mit Tausenden. Die Anfrage ist nützlich, weil sie eine enge Regel
+bewahrt und dem verlinkten Fall neues Material liefert.
+
+Der Anfrage-Agent änderte auch seine Meinung, wo nötig. Der Top-Secret-Fall
+legte anfangs eine Monitoring-Lücke offen: Seine `regex:top_secret`-Befunde
+waren nicht im Befundtyp-Filter der Handling-Anfrage. Ein späteres Update
+weitete die existierende Anfrage, statt einen weiteren Monitor für dasselbe
+Klassifizierungsthema zu erstellen. Die aktuelle Anfrage enthält auch
+Klassifizierungs-Grundcodes.
+
+Das ist ein nützlicher Unterschied zwischen Suche und Anfrage. Eine Suche gibt
+eine Antwort für einen Moment. Diese Anfragen bewahren die Source,
+Detektor-Keys, Befundtypen und Ausschlüsse, die jede Frage definieren. Als der
+Source-Scan voranschritt, musste der Agent die Frage nicht neu entdecken; er
+prüfte die neuen Matches gegen dieselbe Regel. Alle sieben wurden von
+`ai-autopilot` erstellt, und jede ist mit dem Fall oder den Fällen verlinkt,
+die erklären, warum der Monitor existiert.
+
+## Acht Fälle: die offengelassenen Fragen
+
+Fälle sind enger und anspruchsvoller als Anfragen. Sie halten ausgewählte
+Beweise, angehängte Befunde, Hypothesen, Notizen und Links zurück zu ihren
+Monitoren. Die Harness eröffnete alle acht aktuellen Fälle, die Sie in der
+[Live-Fallliste](https://showcase.classifyre.com/de/hillary-clinton-emails/investigations/) reviewen
+können.
+
+| Fall | Status | Schwere | Beweis-Assets / angehängte Befunde |
+| --- | --- | --- | ---: |
+| Private E-Mail-Konten in offizieller State-Department-Korrespondenz | In Bearbeitung | Hoch | 17 / 19 |
+| Klassifizierte Handling-Markierungen | Offen | Mittel | 8 / 9 |
+| Klassifizierte Netzwerk-Referenzen | Offen | Mittel | 4 / 4 |
+| Anwaltsprivileg-Markierungen | Offen | Mittel | 5 / 6 |
+| State-Department-Diplomaten-Depeschen-Referenzen | Offen | Mittel | 2 / 4 |
+| Top-Secret-Handling-Markierungen | Offen | Hoch | 5 / 5 |
+| FOIA-Exemption-Redaktionscodes | Offen | Mittel | 7 / 7 |
+| Clinton-Foundation-Referenzen | Offen | Mittel | 2 / 2 |
+
+### Der Fallindex: Hypothesen, Threads und Timelines
+
+Die Fallliste sind nicht nur acht aus Detektornamen generierte Titel. Zu diesem
+Stand enthalten die Fallakten 16 KI-erstellte Threads, 41 Thread-Einträge und
+158 Timeline-Events. Hypothesen-Threads bewahren die getestete Behauptung und
+ihren aktuellen Status. Diskussions-Threads halten Re-Sweep-Notizen,
+Monitoring-Lücken, Rauschentscheidungen und Folgearbeit. Timelines zeigen, wann
+Beweise, Anfrage-Links, Notizen und stützende Beziehungen sich änderten.
+
+| Fall | Hypothesen zu diesem Stand | Threads / Einträge | Timeline-Events |
+| --- | --- | ---: | ---: |
+| Private und offizielle E-Mail-Konten | Zwei gestützt: 0.75- und 0.70-Confidence | 3 / 7 | 50 |
+| Klassifizierte Handling-Markierungen | Gestützt bei 0.70; konkurrierende Rest-Stempel-Erklärung vorgeschlagen bei 0.40 | 3 / 11 | 26 |
+| Klassifizierte Netzwerk-Referenzen | SIPRNet-Präsenz gestützt bei 0.60; Inzidenz-Referenz-Erklärung vorgeschlagen bei 0.40 | 3 / 5 | 16 |
+| Anwaltsprivileg-Markierungen | Privileg-Markierungs-Sprache gestützt bei 0.60 | 1 / 1 | 9 |
+| Diplomaten-Depeschen-Referenzen | Multi-Asset-Präsenz gestützt bei 0.60 | 1 / 1 | 7 |
+| Top-Secret-Handling-Markierungen | Echte-Stempel-Interpretation vorgeschlagen bei 0.40 | 2 / 4 | 13 |
+| FOIA-Exemption-Codes | Release-Redaktions-Interpretation gestützt bei 0.80 | 2 / 11 | 32 |
+| Clinton-Foundation-Referenzen | Präsenz in offizieller Korrespondenz gestützt bei 0.70 | 1 / 1 | 5 |
+
+Die Confidence-Zahlen sind absichtlich exponiert, weil sie die Fälle reviewbar
+machen. Die KI durfte „gestützt“ sagen, wenn ausgewählte Beweise die
+Arbeitshypothese trafen, aber sie durfte auch eine konkurrierende Erklärung bei
+0.40 behalten. In den Handling- und SIPRNet-Fällen tat sie genau das. Das ist
+nützlicher als eine einzeilige KI-Zusammenfassung, weil ein Reviewer die
+Behauptung, die stützend verlinkten Beweise, die Gegenposition und die
+Chronologie inspizieren kann, die sie produzierten.
+
+### Klassifizierungsmarkierungen ohne voreilige Schlussfolgerung
+
+Der allgemeine Handling-Mark-Fall enthält angehängte Beispiele von `SECRET`,
+`NOFORN`, `EYES ONLY` und `Top Secret`. Seine gestützte Hypothese ist begrenzt:
+Der Korpus enthält echt aussehende Klassifizierungs- und Handling-Markierungen.
+Eine zweite Hypothese bleibt vorgeschlagen: Die Markierungen könnten
+Rest-Stempel auf weitergeleitetem oder zitiertem Material sein statt
+Klassifizierungen, die auf die E-Mail selbst angewendet wurden.
+
+Der separate Fall **Top-Secret-Handling-Markierungen** ist `HIGH`-Severity, weil
+seine angehängten Befunde `CRITICAL` sind. Ein `Top Secret`-Befund hatte einen
+Wichtigkeitsscore von 0.97 und lesbaren Kontext. Mehrere andere gehörten zu
+einer Duplikatgruppe, was bedeuten kann, dass derselbe Stempel über Assets
+wiederholt wurde. Die Haupthypothese des Falls bleibt `PROPOSED` bei 0.40
+Confidence. Das ist die korrekte Haltung: Der String ist präsent; sein
+Dokumentkontext und seine Signifikanz brauchen weiter Review.
+
+### Netzwerk- und Depeschen-Referenzen
+
+Der Netzwerk-Referenz-Detektor fand vier SIPRNet-Erwähnungen auf vier Assets.
+Der Fall stützt die enge Aussage, dass die Referenzen existieren. Er trägt auch
+die konkurrierende Möglichkeit, dass die Erwähnungen inzidentell, zitiert oder
+deskriptiv sind statt Beweise, dass Korrespondenten das klassifizierte Netzwerk
+nutzten.
+
+Der Diplomaten-Depeschen-Fall enthält aktuell vier angehängte Referenzen auf
+zwei Assets: `STATE 82581`, `STATE 86734`, `STATE 121442` und
+`11 STATE 121442`. Die Frage ist, wo Depeschenmaterial auftaucht und wie es in
+diese E-Mail-Sammlung einging oder zirkulierte. Wieder: Eine Depeschennummer
+ist ein Lead, kein Beweis, dass eine bestimmte Nachricht selbst eine Depesche
+war.
+
+### Privilegierte Sprache
+
+Der Anwaltsprivileg-Fall begann mit vier verifizierten Befunden auf drei
+Assets: „privileged and confidential“, „attorney-client privilege“ und „attorney
+work product“. Er ist seither auf fünf Beweis-Assets und sechs angehängte
+Befunde gewachsen. Keines der ursprünglich verifizierten Items gehörte zum
+Boilerplate-Cluster, den der Agent prüfte.
+
+Die gestützte 0.60-Confidence-Hypothese sagt, der Korpus enthalte echte
+Privileg-Markierungs-Sprache. Sie entscheidet nicht, ob Privileg rechtlich
+anhaftete, ob es gewaivt wurde oder ob das umgebende Material hätte
+zurückgehalten werden sollen. Das sind verschiedene Fragen.
+
+### FOIA-Codes: eine Karte, versteckt in den Margins
+
+Der FOIA-Fall könnte das nützlichste Ergebnis für einen künftigen Ermittler
+sein. Er enthält angehängte B1-, B5- und B6-Codes. Im
+[FOIA-Referenzguide des US-Justizministeriums](https://www.justice.gov/oip/department-justice-freedom-information-act-reference-guide)
+decken die entsprechenden Exemptions ab:
+
+- B1 ist assoziiert mit National-Security-Withholding;
+- B5 mit Deliberative-Process- oder Privileg-Gründen;
+- B6 mit persönlicher Privacy.
+
+Der Fall fragt, ob B1-codierte Dokumente die Klassifizierungsfälle
+überlappen und ob B5-codierte Dokumente den Anwaltsprivileg-Fall überlappen.
+Er beantwortet diese Asset-Level-Überlappungsfrage noch nicht.
+
+Die Harness fand auch eine größere, noch untergenutzte Struktur:
+Dokumentkontrollen wie `Doc No. C057xxxxx`, FOIA-Aktennummern und
+`RELEASE IN FULL`- oder `RELEASE IN PART`-Stempel. Der dedizierte
+Release-Kontroll-Detektor hat jetzt 27.655 Befundzeilen, aber keine der sieben
+aktiven Anfragen beobachtet diesen Detektor direkt. Der Memory-Store flaggt ihn
+als größte kohärente unbeobachtete Gruppe. Dokumentkontrollnummern mit
+B1/B5/B6-Codes zu paaren könnte aus einem losen Set von Redaktionsmarkierungen
+eine Dokument-für-Dokument-Release-Karte machen.
+
+Das ist zugleich ein überraschendes Ergebnis und eine ehrliche Lücke. Das
+System fand das Indexierungsmaterial, aber die aktuelle Ermittlung hat es noch
+nicht in eine stehende Anfrage und abgeschlossene Überlappungsanalyse
+konvertiert.
+
+![FOIA-Exemption-Redaktionscodes B1, B5 und B6, angehängt als Beweise im Clinton-E-Mail-Korpus, neben dem foia_release_control_numbers-Detektor und einem Doc-No.-Release-Kontroll-Befund](/blog/assets/images/foia-exemption-redaction-codes-b1b5b6-in-the-clinton-emails-corpus.webp)
+
+### Foundation-Referenzen
+
+Die Foundation-Anfrage enthält 24 aktuelle Matches. Der Fall hat zwei
+ausgewählte Beweis-Assets und zwei angehängte Befunde: `WJC FOUNDATION` und
+`Clinton Global initiative`. Seine gestützte Hypothese ist absichtlich
+bescheiden: Foundation- und CGI-Referenzen erscheinen über offizielle
+Korrespondenz im Korpus. Der Fall folgert aus diesen Erwähnungen keine
+Unregelmäßigkeit.
+
+## Was uns überraschte
+
+Die dramatischen Begriffe waren nicht immer die nützlichsten Befunde.
+
+Der häufigste klassifizierungsbezogene Wert, `UNCLASSIFIED`, war großteils ein
+FOIA-Release-Stempel. Unbehandelt ließ er unzusammenhängende Dokumente
+verbunden aussehen. Die nützliche Aktion war, ihn herunterzugewichten, nicht
+Tausende Matches zu feiern.
+
+Die höchstvolumige Befundkategorie, PII, enthielt sowohl das erste starke
+Signal der Ermittlung als auch ihr persistentestes Rauschen. EMAIL_ADDRESS
+verlinkte private und offizielle Korrespondenz. Dieselbe Detektorfamilie
+labelte auch gewöhnliche Wörter als Personen und Orte. Die Harness musste beide
+Fakten zugleich behalten.
+
+Ein Detektor kann jede Sonde bestehen und trotzdem in der Ermittlung scheitern.
+SIPDIS, Deklassifizierungsanweisungen, Intelligence-Community-Begriffe und
+Depeschen-TAGS verhielten sich korrekt auf Beispielen, fanden aber nichts im
+Live-Korpus.
+
+Und der unglamouröseste Detektor könnte das beste nächste Recherchetool
+schaffen. FOIA-Dokumentnummern und Release-Stempel sind administrative
+Metadaten, aber sie könnten den Join-Key liefern, der nötig ist, um
+Redaktionsgründe, Klassifizierungsmarkierungen und spezifische freigegebene
+Dokumente zu vergleichen.
+
+## Was die autonome KI wirklich beitrug
+
+Der Wert war nicht, dass das Modell E-Mail-Text durchsuchen konnte. Eine Person
+mit regulären Ausdrücken kann das. Der nützliche Beitrag war, Tausende Dateien
+und Hunderttausende rohe Befunde in gepflegten Ermittlungs-State zu
+verwandeln:
+
+- **Sie baute eine Review-Queue.** Sieben Anfragen halten die wichtigen Fragen
+  aktuell, während acht Fälle Beweise, die Urteil brauchen, vom viel größeren
+  Pool an Matches trennen.
+- **Sie hielt konkurrierende Erklärungen am Leben.** „Die Markierung existiert“
+  und „die Markierung könnte zu weitergeleitetem Material gehören“ können als
+  separate Hypothesen koexistieren, statt in eine confident klingende Antwort
+  kollabiert zu werden.
+- **Sie testete ihre eigene Instrumentierung.** Positiv-Sonden,
+  Gegenbeispiele, Gespeichert-Detektor-Tests, Korpus-Scans und spätere Re-Sweeps
+  exponierten den Unterschied zwischen einer guten Regex und einem nützlichen
+  Detektor.
+- **Sie erinnerte verworfene Arbeit.** Duplikat-Detektoren, leere Sonden,
+  PII-Fehler und Boilerplate-Ausschlüsse wurden protokolliert, sodass der
+  nächste Zyklus nicht wiederholt denselben Vorschlag machte.
+- **Sie fand operative Lücken.** Der Agent bemerkte, dass Top-Secret-Befunde in
+  einer scheinbar relevanten Anfrage fehlten, und reparierte den Filter. Er
+  identifizierte später FOIA-Dokumentkontrollen als große kohärente Gruppe, die
+  keine Anfrage beobachtete.
+- **Sie produzierte einen Audit-Trail.** Fall-Timelines zeigen
+  Beweis-Hinzufügungen, Hypothesen-Links, Anfrage-Änderungen und Agenten-Notizen.
+  Ein Reviewer kann den Pfad zu einer Behauptung rekonstruieren, statt einem
+  polierten Schlussabsatz zu vertrauen.
+
+Das ist der Marketing-Claim, den dieses Beispiel ehrlich stützen kann:
+Classifyre labelte nicht bloß einen öffentlichen Datensatz. Seine KI-Agenten
+organisierten die Arbeit unabhängig in Detektoren, Monitore, Fälle,
+Hypothesen, Beweis-Links, Diskussionsthreads, Timelines und erinnerte
+Entscheidungen. Was sie brachten, war Kontinuität und Struktur. Was sie nicht
+brachten, war die Autorität, aus einer offenen Hypothese ein Faktum zu machen.
+
+## Was diese Ermittlung nicht feststellt
+
+Der Artikel wäre ohne diese Liste irreführend.
+
+- Ein Match für `SECRET`, `Top Secret` oder `SIPRNet` stellt für sich nicht den
+  Status der E-Mail fest, die ihn enthält. Es kann ein Release-Stempel,
+  zitiertes Material, ein weitergeleitetes Dokument oder eine inzidentelle
+  Referenz sein.
+- Befundzählungen sind keine Einzig-Dokument-Zählungen. Ein Dokument kann
+  mehrere Matches enthalten, und rekurrierender Release-Text kann einen Detektor
+  dominieren.
+- Wichtigkeits- und Confidence-Scores reihen Beweise innerhalb dieses Systems.
+  Sie sind keine Wahrscheinlichkeiten, dass eine Behauptung wahr ist.
+- Die Source ist ein einzelner öffentlicher Datensatz. Es gibt keine
+  unabhängige Source in diesem Namespace, um Kontext oder Provenienz zu
+  korroborieren.
+- Keiner der acht Fälle ist geschlossen. Die aktuelle Haltung ist aktive
+  Post-Scan-Review, keine abgeschlossene Beurteilung.
+- Das Glossar wurde von Agenten vorgeschlagen, aber von einem Operator
+  verifiziert. Finale Fallschlussfolgerungen bleiben ebenfalls menschliche
+  Verantwortung.
+
+## Was als Nächstes geschehen sollte
+
+Die Ermittlung hat jetzt eine konkrete Queue statt eines vagen Versprechens,
+„die E-Mails zu analysieren“.
+
+Erstens, eine Anfrage für FOIA-Release-Kontrollnummern erstellen oder erweitern,
+dann Dokumentnummern mit dem Exemption-Code-Fall joinen. Zweitens, die bereits
+in den FOIA-Hypothesen benannten Asset-Level-Überlappungschecks durchführen: B1
+gegen Klassifizierungsmarkierungs-Fälle, B5 gegen den Privileg-Fall. Drittens,
+die wiederholte Top-Secret-Gruppe im Source-Kontext reviewen, um einen kopierten
+Stempel von unabhängigen Dokumenten zu trennen. Viertens, den
+Null-Ergebnis-Compartmented-Access-Detektor klären. Schließlich, eine
+unabhängige Source erst hinzufügen, wenn es eine spezifische
+Korroborationsfrage gibt; mehr Daten um ihrer selbst willen hinzuzufügen machte
+den Beweis-Trail schwerer lesbar.
+
+Das nützliche Ergebnis dieses ersten Echtdaten-Laufs ist nicht, dass eine KI ein
+berühmtes Archiv „löste“. Tat sie nicht. Das Ergebnis ist eine reviewbare
+Ermittlung: Fehlgeschlagene Sonden sind sichtbar, Rauschen hat protokollierte
+Gründe, Aliase haben Provenienz, Monitore haben explizite Regeln, und Fälle
+sagen, was unsicher bleibt.
+
+Das ist ein viel besserer Ort, ernsthafte Arbeit zu beginnen, als eine
+Suchbox und 9.601 Dateien.
+
+## Fragen zu dieser KI-Ermittlung
+
+### Hat die KI die Clinton-E-Mail-Anfragen und -Fälle selbst erstellt?
+
+Ja. Die Namespace-API attribuiert alle sieben Anfragen, alle acht Fälle und alle
+16 Fall-Threads an `ai-autopilot`. Die Agenten wählten unbehandelte Themen,
+erstellten oder verfeinerten Detektoren, hängten Beweise an, entwarfen
+Hypothesen und besuchten die Arbeit nach späteren Scans erneut. Operatoren
+verifizierten Glossareinträge und behalten Verantwortung für finale
+Schlussfolgerungen.
+
+### Was fand Classifyre im Hillary-Clinton-E-Mail-Datensatz?
+
+Es fand Klassifizierungs- und Handling-Markierungen, vier SIPRNet-Referenzen,
+vier Diplomaten-Depeschen-Referenzen, Anwaltsprivileg-Sprache,
+Foundation-Referenzen, FOIA-Exemption-Codes, E-Mail-Adress-Beziehungen und
+umfangreiche FOIA-Release-Metadaten. Das sind Detektorergebnisse und
+Ermittlungs-Leads, keine Feststellungen von Fehlverhalten.
+
+### Warum Anfragen und Fälle statt einer KI-Zusammenfassung?
+
+Eine Anfrage ist eine dauerhafte Regel, die auf neue matchende Beweise achtet.
+Ein Fall wählt relevante Beweise, formuliert testbare Hypothesen, hält
+Diskussionsthreads und protokolliert jede Änderung auf einer Timeline. Diese
+Struktur lässt sich prüfen, aktualisieren oder challengen, nachdem der
+Modelllauf endete.
+
+### Wo kann ich die Ermittlung inspizieren?
+
+Öffnen Sie den
+[Live-Classifyre-Showcase-Namespace](https://showcase.classifyre.com/de/hillary-clinton-emails),
+um die aktuellen Detektoren, Anfragen, Fälle, Hypothesen, Threads und Timelines
+zu inspizieren.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/de/blog/cases/from-9601-clinton-email-files-to-eight-open-cases"
+  heading="Weitere Fallakten"
+  locale="de"
+/>

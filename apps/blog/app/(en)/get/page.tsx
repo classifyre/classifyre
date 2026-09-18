@@ -26,7 +26,7 @@ import {
   softwareVersion,
 } from "@/lib/site";
 
-import "../landing.css";
+import "../../landing.css";
 
 export const metadata: Metadata = {
   title: "Get Classifyre",

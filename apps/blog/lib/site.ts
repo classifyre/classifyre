@@ -6,6 +6,8 @@ import {
   releasesLatestUrl,
 } from "@workspace/ui/lib/site-links";
 
+import type { Locale } from "@/lib/locale";
+
 /**
  * Marketing-site constants shared by the landing page and its sub-pages.
  * Anything that appears on more than one page lives here so a URL or a
@@ -17,6 +19,19 @@ export { releasesLatestUrl };
 export const repoUrl = "https://github.com/classifyre/classifyre";
 export const showcaseUrl = "https://showcase.classifyre.com/";
 export const enterpriseContactEmail = "contact@classifyre.com";
+
+/**
+ * Showcase link for a locale. The showcase is the web app, which serves
+ * German under the same `/de` prefix convention as this site — so German
+ * pages point readers at the German showcase (`/de/…`) while English pages
+ * keep the unprefixed URL. English output is byte-identical to `showcaseUrl`
+ * plus `path`, so existing links do not change.
+ */
+export function showcaseUrlFor(locale: Locale, path = "/"): string {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  const prefixed = locale === "de" ? `/de${normalized}` : normalized;
+  return `${showcaseUrl.replace(/\/$/, "")}${prefixed}`;
+}
 
 /**
  * Canonical origin of this site. Shared with the docs site and the app, which

@@ -2,24 +2,38 @@ import Link from "next/link";
 
 import { Badge, Card, CardContent, CardHeader } from "@workspace/ui/components";
 
+import { translate } from "@/i18n";
+import type { Locale } from "@/lib/locale";
 import type { BlogPostSummary } from "@/lib/posts";
 
-export function formatPostDate(date: string): string {
+export function formatPostDate(date: string, locale: Locale = "en"): string {
   const parsed = new Date(date);
   if (Number.isNaN(parsed.getTime())) {
     return date;
   }
 
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat(locale === "de" ? "de" : "en", {
     year: "numeric",
     month: "short",
     day: "numeric",
   }).format(parsed);
 }
 
-export function BlogPostCard({ post }: { post: BlogPostSummary }) {
-  const sectionLabel = post.section === "cases" ? "Case file" : "Business blog";
-  const ctaLabel = post.section === "cases" ? "Open case file" : "Read article";
+export function BlogPostCard({
+  post,
+  locale = "en",
+}: {
+  post: BlogPostSummary;
+  locale?: Locale;
+}) {
+  const sectionLabel =
+    post.section === "cases"
+      ? translate(locale, "blog.caseFile")
+      : translate(locale, "blog.article");
+  const ctaLabel =
+    post.section === "cases"
+      ? translate(locale, "blog.openCaseFile")
+      : translate(locale, "blog.readArticle");
 
   return (
     <Link href={post.route} className="group block h-full no-underline">
@@ -42,7 +56,7 @@ export function BlogPostCard({ post }: { post: BlogPostSummary }) {
 
           <CardHeader className="space-y-3 pt-5">
             <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-              {formatPostDate(post.date)}
+              {formatPostDate(post.date, locale)}
             </span>
             <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.02em] text-foreground sm:text-3xl">
               {post.title}

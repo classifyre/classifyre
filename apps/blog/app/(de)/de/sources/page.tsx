@@ -22,18 +22,26 @@ import {
   sourceCount,
 } from "@/components/source-showcase";
 import { docs, enterpriseContactEmail, routes } from "@/lib/site";
+import { withLocalePrefix } from "@/lib/locale";
 
-import "../landing.css";
+import "../../../landing.css";
 
 const total = sourceCount();
 
 export const metadata: Metadata = {
-  title: "Supported Sources",
-  description: `Every system Classifyre can scan — ${total} connectors across databases, warehouses and lakehouses, streaming, object storage, collaboration tools, analytics, and public content. Each connector links to its configuration reference.`,
-  alternates: { canonical: routes.sources },
+  title: "Unterstützte Quellen",
+  description: `Jedes System, das Classifyre scannen kann — ${total} Konnektoren über Datenbanken, Warehouses und Lakehouses, Streaming, Object Storage, Kollaborationstools, Analytics und öffentliche Inhalte. Jeder Konnektor verlinkt auf seine Konfigurationsreferenz.`,
+  alternates: {
+    canonical: "/de/sources/",
+    languages: {
+      en: "/sources/",
+      de: "/de/sources/",
+      "x-default": "/sources/",
+    },
+  },
   openGraph: {
-    title: "Classifyre — Supported Sources",
-    description: `${total} connectors across databases, lakehouses, storage, collaboration tools, analytics, and public content.`,
+    title: "Classifyre — Unterstützte Quellen",
+    description: `${total} Konnektoren über Datenbanken, Lakehouses, Storage, Kollaborationstools, Analytics und öffentliche Inhalte.`,
     type: "website",
   },
 };
@@ -66,57 +74,58 @@ function categoryBreakdown(): {
 const commonCapabilities = [
   {
     illustration: "docs" as const,
-    title: "Assets, not just rows",
-    body: "Each connector yields assets with source metadata attached — owner, path, timestamps — so a finding always carries where it came from.",
+    title: "Assets, nicht nur Zeilen",
+    body: "Jeder Konnektor liefert Assets mit dranhängenden Quell-Metadaten — Owner, Pfad, Zeitstempel — damit ein Befund immer mitführt, woher er kam.",
     href: docs.sources,
-    hrefLabel: "Assets & metadata",
+    hrefLabel: "Assets & Metadaten",
   },
   {
     illustration: "probe" as const,
-    title: "Test before you scan",
-    body: "Every source can be dry-run from the app: check the credentials, see what it would read, and only then commit to a full scan.",
+    title: "Vor dem Scan testen",
+    body: "Jede Quelle lässt sich aus der App dry-runnen: Credentials prüfen, sehen, was sie lesen würde, und erst dann einen vollen Scan committen.",
     href: docs.sourceTesting,
-    hrefLabel: "Testing sources",
+    hrefLabel: "Quellen testen",
   },
   {
     illustration: "dna" as const,
-    title: "Sampling that bounds cost",
-    body: "Large tables and files are read through sampling windows with a per-asset cursor, so a scan reads a bounded slice instead of everything.",
+    title: "Sampling, das Kosten deckelt",
+    body: "Große Tabellen und Dateien werden durch Sampling-Fenster mit Cursor pro Asset gelesen — ein Scan liest also einen begrenzten Ausschnitt statt allem.",
     href: docs.sampling,
     hrefLabel: "Sampling",
   },
   {
     illustration: "finger-print" as const,
-    title: "Cross-source fingerprints",
-    body: "The same value showing up in two different systems gets linked by identity, which is where most real investigations actually begin.",
+    title: "Quellenübergreifende Fingerprints",
+    body: "Derselbe Wert in zwei verschiedenen Systemen wird per Identität verlinkt — wo die meisten echten Ermittlungen tatsächlich beginnen.",
     href: docs.howItWorks,
-    hrefLabel: "How it works",
+    hrefLabel: "So funktioniert es",
   },
 ] as const;
 
-export default function SourcesPage() {
+export default function SourcesPageDe() {
   const breakdown = categoryBreakdown();
+  const getHref = `${withLocalePrefix("de", routes.get)}/`;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
       <PageHero
-        eyebrow="Sources"
+        eyebrow="Quellen"
         title={
           <>
-            Scan the systems
+            Scannen Sie die Systeme,
             <br />
-            you{" "}
+            die Sie{" "}
             <span className="inline-block bg-accent px-[0.12em] text-black">
-              already own.
+              bereits besitzen.
             </span>
           </>
         }
         lede={
           <>
-            <strong className="text-white">{total} connectors</strong> across
-            databases, warehouses and lakehouses, streaming, object storage,
-            collaboration tools, analytics, and public content — all feeding one
-            evidence stream.
+            <strong className="text-white">{total} Konnektoren</strong> über
+            Datenbanken, Warehouses und Lakehouses, Streaming, Object Storage,
+            Kollaborationstools, Analytics und öffentliche Inhalte — alle
+            speisen einen Beweisstrom.
           </>
         }
         actions={
@@ -126,7 +135,7 @@ export default function SourcesPage() {
               size="lg"
               className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
             >
-              <a href="#catalog">Browse the catalog</a>
+              <a href="#catalog">Katalog durchstöbern</a>
             </Button>
             <Button
               asChild
@@ -134,7 +143,7 @@ export default function SourcesPage() {
               variant="secondary"
               className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
             >
-              <a href={routes.get}>Run it and connect one</a>
+              <a href={getHref}>Betreiben und einen anbinden</a>
             </Button>
           </>
         }
@@ -148,9 +157,9 @@ export default function SourcesPage() {
 
             <SectionHead
               id="breakdown-title"
-              marker="By category"
-              title="Where the evidence comes from"
-              lede="Connectors are grouped by what they are, not by vendor. Counts come straight from the schema, so this page can never drift from what the product actually supports."
+              marker="Nach Kategorie"
+              title="Woher die Beweise kommen"
+              lede="Konnektoren sind gruppiert nach dem, was sie sind, nicht nach Hersteller. Zählungen kommen direkt aus dem Schema — diese Seite kann also nie von dem abweichen, was das Produkt wirklich unterstützt."
             />
 
             <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -182,19 +191,19 @@ export default function SourcesPage() {
           <div className="space-y-8">
             <SectionHead
               id="catalog-title"
-              marker="Full catalog"
+              marker="Voller Katalog"
               tone="signal"
               illustration="binders"
-              title={`All ${total} connectors`}
-              lede="Search by name, category, or capability. Every entry links to its configuration reference on the docs site — required fields, auth, and a worked example."
+              title={`Alle ${total} Konnektoren`}
+              lede="Suchen Sie nach Name, Kategorie oder Fähigkeit. Jeder Eintrag verlinkt auf seine Konfigurationsreferenz in der Doku-Site — Pflichtfelder, Auth und ein durchgearbeitetes Beispiel."
               action={
                 <DocsLink href={docs.sourceConfiguration} tone="signal">
-                  Configuration reference
+                  Konfigurationsreferenz
                 </DocsLink>
               }
             />
 
-            <SourceCatalogSection />
+            <SourceCatalogSection locale="de" />
           </div>
         </SectionShell>
       </section>
@@ -205,9 +214,9 @@ export default function SourcesPage() {
           <div className="space-y-8">
             <SectionHead
               id="capabilities-title"
-              marker="Every connector"
-              title="What they all have in common"
-              lede="The system on the other end changes. What Classifyre does with what it reads does not."
+              marker="Jeder Konnektor"
+              title="Was alle gemeinsam haben"
+              lede="Das System am anderen Ende wechselt. Was Classifyre mit dem Gelesenen tut, nicht."
             />
 
             <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -259,16 +268,16 @@ export default function SourcesPage() {
               id="missing-title"
               className="font-hero text-[clamp(2.5rem,7vw,5rem)] uppercase leading-[0.88] tracking-[0.01em]"
             >
-              Missing the one{" "}
+              Fehlt der eine,{" "}
               <span className="inline-block bg-accent px-[0.12em] text-black">
-                you need?
+                den Sie brauchen?
               </span>
             </h2>
             <p className="max-w-xl text-base leading-7 text-white/70">
-              Connectors are plugins, and the project is open source — so the
-              answer is either a pull request or a conversation. Enterprise
-              customers get sources built for their industry&apos;s systems by
-              our engineers.
+              Konnektoren sind Plugins, und das Projekt ist Open Source — die
+              Antwort ist also entweder ein Pull Request oder ein Gespräch.
+              Enterprise-Kunden bekommen Quellen für die Systeme ihrer Branche,
+              gebaut von unseren Engineers.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Button
@@ -281,7 +290,7 @@ export default function SourcesPage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Request a connector
+                  Konnektor anfragen
                 </a>
               </Button>
               <Button
@@ -291,7 +300,7 @@ export default function SourcesPage() {
                 className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
               >
                 <a href={`mailto:${enterpriseContactEmail}`}>
-                  Talk to us about enterprise
+                  Mit uns über Enterprise sprechen
                 </a>
               </Button>
             </div>
