@@ -39,7 +39,7 @@ const ENDPOINTS: Record<
   // pageview), browser history, window titles and screenshots.
   finding: {
     path: (id) => `/findings/${id}`,
-    name: (b) => b["findingType"] ?? b["category"],
+    name: (b) => findingSeoName(b),
   },
   case: { path: (id) => `/cases/${id}`, name: (b) => b["title"] },
   inquiry: { path: (id) => `/inquiries/${id}`, name: (b) => b["title"] },
@@ -53,6 +53,52 @@ type UnknownRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null;
+}
+
+/** Truncate one title segment; the signal must never squeeze out the asset. */
+function truncatePart(value: string, maxLength: number): string {
+  const trimmed = value.trim();
+  return trimmed.length > maxLength
+    ? `${trimmed.slice(0, maxLength - 1)}…`
+    : trimmed;
+}
+
+/**
+ * SEO name for a finding: the detection signal first, then the asset it was
+ * found on (e.g. `"AWS Secret Key · Q3 Invoices"`).
+ *
+ * The signal is the finding *type* (`findingType`, falling back to
+ * `category`) — never `matchedContent`/`redactedContent`, which are the
+ * detected secret or PII itself (see above). The asset name comes from the
+ * embedded asset the detail endpoint already returns, so no second lookup is
+ * needed. Either half may be long (a file path, a verbose detector label), so
+ * each is capped before joining; the caller (`usableName`) caps the whole.
+ */
+function findingSeoName(body: UnknownRecord): string | null {
+  const rawSignal = body["findingType"] ?? body["category"];
+  const signal =
+    typeof rawSignal === "string" && rawSignal.trim()
+      ? truncatePart(rawSignal, 70)
+      : null;
+
+  const asset = body["asset"];
+  const rawAsset = isRecord(asset)
+    ? (asset["name"] ?? asset["externalUrl"])
+    : null;
+  const location = body["location"];
+  const rawLocation =
+    isRecord(location) && typeof location["path"] === "string"
+      ? location["path"]
+      : null;
+  const rawAssetName =
+    (typeof rawAsset === "string" && rawAsset.trim() ? rawAsset : null) ??
+    (typeof rawLocation === "string" && rawLocation.trim()
+      ? rawLocation
+      : null);
+  const assetName = rawAssetName ? truncatePart(rawAssetName, 50) : null;
+
+  if (signal && assetName) return `${signal} · ${assetName}`;
+  return signal ?? assetName;
 }
 
 /** A name worth putting in a title: non-empty, and not just the id again. */
