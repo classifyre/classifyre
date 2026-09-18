@@ -12,6 +12,7 @@ import {
   upsertActiveNamespace,
   type ActiveNamespace,
 } from "@/lib/active-namespaces";
+import { stripLocalePrefix, withLocalePrefix } from "@/lib/locale-detection";
 
 /**
  * Route-backed workspace tabs. Inactive workspaces are deliberately represented
@@ -102,7 +103,13 @@ export function ActiveNamespaceTabs() {
       if (id !== current.id) return;
       deactivatingSlugRef.current = current.slug;
       const neighbor = next[closedIndex] ?? next[closedIndex - 1];
-      router.push(neighbor?.href ?? "/");
+      // Closing the last tab lands back in the directory — in the current
+      // language, not unprefixed English.
+      const directoryRoot = withLocalePrefix(
+        stripLocalePrefix(pathname).locale,
+        "/",
+      );
+      router.push(neighbor?.href ?? directoryRoot);
     },
     [current, pathname, replace, router, visibleItems],
   );

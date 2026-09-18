@@ -24,6 +24,7 @@ import {
 } from "@/components/namespace/workspace-card";
 import { useOpenWorkspace } from "@/hooks/use-open-workspace";
 import { useTranslation } from "@/hooks/use-translation";
+import { useLocalePath } from "@/lib/app-path";
 import { useStaticRouteParam } from "@/lib/use-route-id";
 
 /**
@@ -37,6 +38,7 @@ export default function CategoryDetailPage() {
   const categoryId = useStaticRouteParam("categoryId", "categories");
   const router = useRouter();
   const { t } = useTranslation();
+  const localePath = useLocalePath();
   const openWorkspace = useOpenWorkspace();
 
   const [category, setCategory] = React.useState<NamespaceCategory | null>(
@@ -102,7 +104,7 @@ export default function CategoryDetailPage() {
       <WorkspaceHeader />
       <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
         <Button variant="ghost" size="sm" asChild className="mb-7 -ml-3">
-          <Link href="/namespaces/categories">
+          <Link href={localePath("/namespaces/categories")}>
             <ArrowLeft className="size-4" />
             {t("categories.backToIndex")}
           </Link>
@@ -139,7 +141,8 @@ export default function CategoryDetailPage() {
               description={t("categories.notFoundDescription")}
               action={{
                 label: t("categories.backToIndex"),
-                onClick: () => router.push("/namespaces/categories"),
+                onClick: () =>
+                  router.push(localePath("/namespaces/categories")),
               }}
             />
           </Card>
@@ -204,7 +207,7 @@ export default function CategoryDetailPage() {
                   description={t("categories.emptyWorkspacesDescription")}
                   action={{
                     label: t("workspaces.all"),
-                    onClick: () => router.push("/"),
+                    onClick: () => router.push(localePath("/")),
                   }}
                 />
               </Card>
@@ -229,7 +232,9 @@ export default function CategoryDetailPage() {
             <CategoryDeleteDialog
               category={confirmingDelete ? category : null}
               onOpenChange={(next) => !next && setConfirmingDelete(false)}
-              onDeleted={() => router.push("/namespaces/categories")}
+              onDeleted={() =>
+                router.push(localePath("/namespaces/categories"))
+              }
             />
           </>
         )}

@@ -230,7 +230,7 @@ export function AppSidebar() {
               tooltip={t("workspaces.all")}
               className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
             >
-              <Link href="/">
+              <Link href={localePath("/")}>
                 <ArrowLeft className="size-5" />
                 <span>{t("workspaces.all")}</span>
               </Link>

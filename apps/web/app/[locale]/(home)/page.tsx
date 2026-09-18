@@ -26,6 +26,7 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { CreateNamespaceDialog } from "@/components/namespace/create-namespace-dialog";
 import { useTranslation } from "@/hooks/use-translation";
+import { useLocalePath } from "@/lib/app-path";
 import { WorkspaceHeader } from "@/components/namespace/workspace-header";
 import { useActiveNamespaces } from "@/components/active-namespaces-provider";
 import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
@@ -95,6 +96,7 @@ function groupByCategory(
 
 export default function LandingPage() {
   const { t } = useTranslation();
+  const localePath = useLocalePath();
   const { removeBySlug } = useActiveNamespaces();
   const open = useOpenWorkspace();
   // Categories drive the grouping below; a failure to load them degrades to a
@@ -200,7 +202,7 @@ export default function LandingPage() {
           {namespaces && hasWorkspaces && (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" asChild>
-                <Link href="/namespaces/categories">
+                <Link href={localePath("/namespaces/categories")}>
                   <Tags className="mr-2 h-4 w-4" />
                   {t("categories.manage")}
                 </Link>
