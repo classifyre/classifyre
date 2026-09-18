@@ -12,8 +12,8 @@ import {
 import { currentNamespaceHref } from "@/lib/active-namespaces";
 
 const INITIAL_ITEMS: NamespaceTabItem[] = [
-  { id: "alpha", label: "Alpha investigation" },
-  { id: "beta", label: "Beta review" },
+  { id: "alpha", label: "Alpha investigation", href: "/alpha" },
+  { id: "beta", label: "Beta review", href: "/beta" },
 ];
 
 export function NamespaceTabsHarness() {
@@ -65,6 +65,7 @@ export function NamespaceTabsHarness() {
         onCloseLeft={closeLeft}
         onCloseRight={closeRight}
         menuLabels={{
+          openInNewTab: "Open in new tab",
           close: () => "Close",
           closeOthers: "Close other tabs",
           closeLeft: "Close tabs to the left",

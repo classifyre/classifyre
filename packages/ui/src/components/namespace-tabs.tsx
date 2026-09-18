@@ -18,9 +18,16 @@ export interface NamespaceTabItem {
   id: string;
   /** Human-readable namespace name. */
   label: string;
+  /** Last URL of the tab. Enables the "open in new tab" menu entry. */
+  href?: string;
 }
 
 export interface NamespaceTabMenuLabels {
+  /**
+   * "Open this tab in a new browser tab" entry. Rendered only for items that
+   * carry an `href`; omit to hide the entry.
+   */
+  openInNewTab?: string;
   /** Per-tab "close this tab" entry. */
   close: (item: NamespaceTabItem) => string;
   /** "Close every tab except this one" entry. */
@@ -157,6 +164,17 @@ function NamespaceTabs({
                 <ContextMenu>
                   <ContextMenuTrigger asChild>{tab}</ContextMenuTrigger>
                   <ContextMenuContent>
+                    {menuLabels.openInNewTab && item.href && (
+                      <ContextMenuItem asChild>
+                        <a
+                          href={item.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {menuLabels.openInNewTab}
+                        </a>
+                      </ContextMenuItem>
+                    )}
                     <ContextMenuItem onSelect={() => onClose(item.id)}>
                       {menuLabels.close(item)}
                     </ContextMenuItem>

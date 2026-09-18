@@ -11,11 +11,11 @@ import { useActiveNamespaces } from "@/components/active-namespaces-provider";
 import {
   currentNamespaceHref,
   filterExistingNamespaces,
+  hrefInCurrentLocale,
   readActiveNamespaces,
   upsertActiveNamespace,
   type ActiveNamespace,
 } from "@/lib/active-namespaces";
-import { stripLocalePrefix, withLocalePrefix } from "@/lib/locale-detection";
 
 /**
  * Route-backed workspace tabs. Inactive workspaces are deliberately represented
@@ -107,14 +107,21 @@ export function ActiveNamespaceTabs() {
     });
   }, [current, pathname, remember]);
 
+  // The workspace directory in the current language — closing the last tab
+  // lands here instead of unprefixed English.
+  const directoryRoot = React.useMemo(
+    () => hrefInCurrentLocale(pathname, "/"),
+    [pathname],
+  );
+
   const activate = React.useCallback(
     (id: string) => {
       if (id === current.id) return;
       const next = persistCurrentLocation();
       const target = next.find((item) => item.id === id);
-      if (target) router.push(target.href);
+      if (target) router.push(hrefInCurrentLocale(pathname, target.href));
     },
-    [current.id, persistCurrentLocation, router],
+    [current.id, pathname, persistCurrentLocation, router],
   );
 
   const close = React.useCallback(
@@ -131,15 +138,11 @@ export function ActiveNamespaceTabs() {
       if (id !== current.id) return;
       deactivatingSlugRef.current = current.slug;
       const neighbor = next[closedIndex] ?? next[closedIndex - 1];
-      // Closing the last tab lands back in the directory — in the current
-      // language, not unprefixed English.
-      const directoryRoot = withLocalePrefix(
-        stripLocalePrefix(pathname).locale,
-        "/",
+      router.push(
+        neighbor ? hrefInCurrentLocale(pathname, neighbor.href) : directoryRoot,
       );
-      router.push(neighbor?.href ?? directoryRoot);
     },
-    [current, pathname, replace, router, visibleItems],
+    [current, directoryRoot, pathname, replace, router, visibleItems],
   );
 
   // After a bulk close, leave the strip on the anchor tab when the workspace
@@ -150,9 +153,11 @@ export function ActiveNamespaceTabs() {
       if (next.some((item) => item.id === current.id)) return;
       deactivatingSlugRef.current = current.slug;
       const anchor = next.find((item) => item.id === anchorId);
-      router.push(anchor?.href ?? "/");
+      router.push(
+        anchor ? hrefInCurrentLocale(pathname, anchor.href) : directoryRoot,
+      );
     },
-    [current.id, current.slug, replace, router],
+    [current.id, current.slug, directoryRoot, pathname, replace, router],
   );
 
   const closeOthers = React.useCallback(
@@ -199,7 +204,13 @@ export function ActiveNamespaceTabs() {
 
   return (
     <NamespaceTabs
-      items={visibleItems.map((item) => ({ id: item.id, label: item.name }))}
+      items={visibleItems.map((item) => ({
+        id: item.id,
+        label: item.name,
+        // Localized up front so "open in new tab" lands in the language the
+        // operator is currently using, just like switching tabs does.
+        href: hrefInCurrentLocale(pathname, item.href),
+      }))}
       activeId={current.id}
       ariaLabel={t("workspaces.activeTabsLabel")}
       closeLabel={(item) => t("workspaces.closeTabAria", { name: item.label })}
@@ -209,6 +220,7 @@ export function ActiveNamespaceTabs() {
       onCloseLeft={closeToLeft}
       onCloseRight={closeToRight}
       menuLabels={{
+        openInNewTab: t("workspaces.openInNewTab"),
         close: () => t("workspaces.closeTab"),
         closeOthers: t("workspaces.closeOtherTabs"),
         closeLeft: t("workspaces.closeTabsToLeft"),

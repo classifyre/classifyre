@@ -1,4 +1,4 @@
-import { stripLocalePrefix } from "@/lib/locale-detection";
+import { stripLocalePrefix, withLocalePrefix } from "@/lib/locale-detection";
 
 export const ACTIVE_NAMESPACES_STORAGE_KEY = "classifyre.active-namespaces.v1";
 
@@ -143,6 +143,20 @@ export function updateActiveNamespaceInItems(
       href: `${namespaceRoot(namespace.slug)}${suffix}`,
     };
   });
+}
+
+/**
+ * Re-prefix a stored tab URL with the locale of the current route. Tab hrefs
+ * remember the language that was active when they were last visited, so
+ * navigating to one verbatim would silently switch the UI language (e.g. from
+ * `/de/alpha` to a stored `/beta`). The current route locale always wins; an
+ * href that already carries it is returned unchanged.
+ */
+export function hrefInCurrentLocale(
+  currentPathname: string,
+  href: string,
+): string {
+  return withLocalePrefix(stripLocalePrefix(currentPathname).locale, href);
 }
 
 /**

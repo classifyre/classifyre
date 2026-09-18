@@ -109,6 +109,28 @@ test("closes tabs to the right from the tab context menu", async ({
   await expect(component.getByTestId("active-workspace")).toHaveText("alpha");
 });
 
+test("opens a namespace in a new browser tab from the context menu", async ({
+  mount,
+  page,
+}) => {
+  const component = await mount(<NamespaceTabsHarness />);
+
+  await component
+    .getByRole("tab", { name: "Beta review" })
+    .click({ button: "right" });
+  const menuItem = page.getByRole("menuitem", { name: "Open in new tab" });
+  await expect(menuItem).toHaveAttribute("href", "/beta");
+
+  const popupPromise = page.waitForEvent("popup");
+  await menuItem.click();
+  const popup = await popupPromise;
+  expect(new URL(popup.url()).pathname).toBe("/beta");
+  await popup.close();
+
+  // The strip itself is untouched: the current tab stays active.
+  await expect(component.getByTestId("active-workspace")).toHaveText("alpha");
+});
+
 test("disables bulk-close entries with no tabs in that direction", async ({
   mount,
   page,
