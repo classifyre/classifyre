@@ -86,32 +86,83 @@ function AustrianFlag() {
   );
 }
 
+export interface SiteFooterCopy {
+  tagline: string;
+  blurb: string;
+  navHeading: string;
+  navHome: string;
+  navGet: string;
+  navSources: string;
+  navEditions: string;
+  navBlog: string;
+  navDocumentation: string;
+  navShowcase: string;
+  navGithub: string;
+  legalHeading: string;
+  privacy: string;
+  cookieSettings: string;
+  contact: string;
+  madeIn: string;
+  baselineTagline: string;
+}
+
+const DEFAULT_COPY: SiteFooterCopy = {
+  tagline: "Investigation Platform",
+  blurb:
+    "The open-source investigation platform for your data. Classifyre scans the systems you already run, detects secrets, PII, and the signals you define, then works the findings like a detective — standing inquiries, ranked evidence, cases, and an AI autopilot between scans.",
+  navHeading: "Navigate",
+  navHome: "Home",
+  navGet: "Get Classifyre",
+  navSources: "Sources",
+  navEditions: "Open source vs Enterprise",
+  navBlog: "Blog",
+  navDocumentation: "Documentation",
+  navShowcase: "Live showcase",
+  navGithub: "GitHub",
+  legalHeading: "Legal & contact",
+  privacy: "Privacy & cookie policy",
+  cookieSettings: "Cookie settings",
+  contact: "Contact",
+  madeIn: "Made in Austria",
+  baselineTagline: "Every leak leaves a trail",
+};
+
 export function SiteFooter({
   origin = "",
   logoSrc = "/clasifyre_icon.png",
   className,
+  copy,
+  showcaseHref = `${showcaseSiteUrl}/`,
 }: {
   /** Prefix for marketing routes. Empty on the marketing site itself. */
   origin?: string;
   logoSrc?: string;
   className?: string;
+  /** Copy overrides, so a translated site can pass localized strings. */
+  copy?: Partial<SiteFooterCopy>;
+  /**
+   * Showcase link override, so a translated site can point at its locale
+   * (e.g. the `/de` showcase). Defaults to the unprefixed showcase.
+   */
+  showcaseHref?: string;
 }) {
   const marketing = (path: string) => `${origin}${path}`;
+  const text = { ...DEFAULT_COPY, ...copy };
 
   /* Mirrors the header: the Product menu, Blog, Documentation, and the two
      actions that live as buttons up there (Showcase, GitHub). */
   const navigation: readonly FooterLink[] = [
-    { label: "Home", href: marketing(marketingPaths.home) },
-    { label: "Get Classifyre", href: marketing(marketingPaths.get) },
-    { label: "Sources", href: marketing(marketingPaths.sources) },
+    { label: text.navHome, href: marketing(marketingPaths.home) },
+    { label: text.navGet, href: marketing(marketingPaths.get) },
+    { label: text.navSources, href: marketing(marketingPaths.sources) },
     {
-      label: "Open source vs Enterprise",
+      label: text.navEditions,
       href: marketing(marketingPaths.editions),
     },
-    { label: "Blog", href: marketing(marketingPaths.blog) },
-    { label: "Documentation", href: `${docsSiteUrl}/`, external: true },
-    { label: "Live showcase", href: `${showcaseSiteUrl}/`, external: true },
-    { label: "GitHub", href: repositoryUrl, external: true },
+    { label: text.navBlog, href: marketing(marketingPaths.blog) },
+    { label: text.navDocumentation, href: `${docsSiteUrl}/`, external: true },
+    { label: text.navShowcase, href: showcaseHref, external: true },
+    { label: text.navGithub, href: repositoryUrl, external: true },
   ];
 
   return (
@@ -142,17 +193,13 @@ export function SiteFooter({
                 Classifyre
               </span>
               <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">
-                Investigation Platform
+                {text.tagline}
               </span>
             </span>
           </a>
 
           <p className="mt-6 text-[15px] leading-7 text-white/70">
-            The open-source investigation platform for your data. Classifyre
-            scans the systems you already run, detects secrets, PII, and the
-            signals you define, then works the findings like a detective —
-            standing inquiries, ranked evidence, cases, and an AI autopilot
-            between scans.
+            {text.blurb}
           </p>
 
           <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
@@ -162,33 +209,36 @@ export function SiteFooter({
 
         {/* ── Navigation, mirroring the header ─────────────────────── */}
         <nav aria-label="Footer">
-          <ColumnHead>Navigate</ColumnHead>
+          <ColumnHead>{text.navHeading}</ColumnHead>
           <LinkList links={navigation} />
         </nav>
 
         {/* ── Legal & contact ──────────────────────────────────────── */}
         <div>
-          <ColumnHead>Legal &amp; contact</ColumnHead>
+          <ColumnHead>{text.legalHeading}</ColumnHead>
           <ul className="space-y-2.5">
             <li>
               <a
                 href={marketing(marketingPaths.privacy)}
                 className="text-[13px] leading-6 text-white/70 decoration-accent decoration-2 underline-offset-4 transition-colors hover:text-accent hover:underline"
               >
-                Privacy &amp; cookie policy
+                {text.privacy}
               </a>
             </li>
             <li>
               {/* Withdrawing consent has to be as easy as giving it —
                   GDPR Art. 7(3) is explicit about that. */}
-              <CookieSettingsButton className="text-left text-[13px] leading-6 text-white/70 decoration-accent decoration-2 underline-offset-4 transition-colors hover:text-accent hover:underline" />
+              <CookieSettingsButton
+                label={text.cookieSettings}
+                className="text-left text-[13px] leading-6 text-white/70 decoration-accent decoration-2 underline-offset-4 transition-colors hover:text-accent hover:underline"
+              />
             </li>
             <li>
               <a
                 href={`mailto:${contactEmail}`}
                 className="text-[13px] leading-6 text-white/70 decoration-accent decoration-2 underline-offset-4 transition-colors hover:text-accent hover:underline"
               >
-                Contact
+                {text.contact}
               </a>
             </li>
             <li className="pt-2">
@@ -197,7 +247,7 @@ export function SiteFooter({
                 className="group inline-flex items-center gap-2.5 border-2 border-white/20 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-white/70 transition-colors hover:border-accent hover:text-white"
               >
                 <AustrianFlag />
-                Made in Austria
+                {text.madeIn}
               </a>
             </li>
           </ul>
@@ -211,7 +261,7 @@ export function SiteFooter({
             © {new Date().getFullYear()} Classifyre · Apache-2.0 · v
             {softwareVersionLabel}
           </span>
-          <span className="text-white/35">Every leak leaves a trail</span>
+          <span className="text-white/35">{text.baselineTagline}</span>
         </div>
       </div>
     </div>

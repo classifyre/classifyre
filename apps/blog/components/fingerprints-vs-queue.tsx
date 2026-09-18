@@ -10,6 +10,9 @@
  * JS and no screenshot to go stale.
  */
 
+import { translate } from "@/i18n";
+import type { Locale } from "@/lib/locale";
+
 const HAIRBALL_NODES = [
   [22, 30], [44, 18], [66, 26], [88, 40], [104, 22], [126, 34],
   [16, 58], [38, 48], [58, 62], [80, 54], [100, 68], [122, 56],
@@ -98,20 +101,33 @@ function Panel({
   );
 }
 
-export function FingerprintsVsQueue() {
+/**
+ * Mock data carries English rule tags ("needs judgement", ...). They map to
+ * dictionary keys so the rendered words always come from i18n.
+ */
+const RULE_KEYS: Record<string, string> = {
+  "needs judgement": "queue.ruleNeedsJudgement",
+  "rule candidate": "queue.ruleCandidate",
+  "cutoff candidate": "queue.cutoffCandidate",
+  "no judgement needed": "queue.ruleNone",
+};
+
+export function FingerprintsVsQueue({ locale = "en" }: { locale?: Locale }) {
+  const rule = (text: string) =>
+    RULE_KEYS[text] ? translate(locale, RULE_KEYS[text]) : text;
   return (
     <figure className="my-10 not-prose">
       <div className="flex flex-col gap-4 md:flex-row">
         <Panel
-          eyebrow="Before · Fingerprints"
-          title="A similarity canvas"
-          verdict="412 pairs. No order, no counts, no end. Every session started from scratch."
+          eyebrow={translate(locale, "queue.beforeEyebrow")}
+          title={translate(locale, "queue.beforeTitle")}
+          verdict={translate(locale, "queue.beforeVerdict")}
         >
           <svg
             viewBox="0 0 152 128"
             className="h-[176px] w-full"
             role="img"
-            aria-label="A dense, unordered graph of similarity links between assets"
+            aria-label={translate(locale, "queue.beforeAria")}
           >
             {HAIRBALL_EDGES.map(([a, b], i) => {
               const from = HAIRBALL_NODES[a];
@@ -142,9 +158,9 @@ export function FingerprintsVsQueue() {
         </Panel>
 
         <Panel
-          eyebrow="After · Duplicate review"
-          title="A ranked queue"
-          verdict="Same 412 pairs. One rule clears 146 of them; 17 need no judgement at all."
+          eyebrow={translate(locale, "queue.afterEyebrow")}
+          title={translate(locale, "queue.afterTitle")}
+          verdict={translate(locale, "queue.afterVerdict")}
         >
           <div className="space-y-2.5">
             <div className="flex items-baseline gap-2 border-b-2 border-border pb-2">
@@ -152,7 +168,7 @@ export function FingerprintsVsQueue() {
                 412
               </span>
               <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                pairs remaining
+                {translate(locale, "queue.pairsRemaining")}
               </span>
             </div>
             {PATTERNS.map((p) => (
@@ -162,7 +178,7 @@ export function FingerprintsVsQueue() {
                     {p.labels}
                   </span>
                   <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
-                    {p.left} left · {p.lift}
+                    {p.left} {translate(locale, "queue.left")} · {p.lift}
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-[2px] bg-muted">
@@ -172,7 +188,7 @@ export function FingerprintsVsQueue() {
                   />
                 </div>
                 <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
-                  {p.rule}
+                  {rule(p.rule)}
                 </span>
               </div>
             ))}
@@ -180,7 +196,7 @@ export function FingerprintsVsQueue() {
         </Panel>
       </div>
       <figcaption className="mt-3 text-center font-mono text-[11px] text-muted-foreground">
-        The same corpus, drawn two ways. Only one of them can be finished.
+        {translate(locale, "queue.figcaption")}
       </figcaption>
     </figure>
   );

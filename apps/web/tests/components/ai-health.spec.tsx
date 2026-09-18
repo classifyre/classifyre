@@ -1,6 +1,6 @@
 import * as React from "react";
 import { expect, test } from "@playwright/experimental-ct-react";
-import { AiHealthProvider, AiHealthFixButton } from "@/components/ai-health";
+import { AiHealthProvider, AiHealthHarnessStatus } from "@/components/ai-health";
 import { ServerConfigContext } from "@/components/server-config-provider";
 import { AiHealthHarness } from "@/tests/components/fixtures/ai-health-harness";
 
@@ -26,18 +26,18 @@ async function trackProviderCalls(page: CtPage) {
   return { calls };
 }
 
-test("demo mode issues no provider probe and renders no fix banner", async ({
+test("demo mode issues no provider probe and renders no harness status", async ({
   mount,
   page,
 }) => {
   const { calls } = await trackProviderCalls(page);
 
-  const component = await mount(
+  await mount(
     <ServerConfigContext.Provider
       value={{ logsPersisted: false, demoMode: true }}
     >
       <AiHealthProvider>
-        <AiHealthFixButton />
+        <AiHealthHarnessStatus />
       </AiHealthProvider>
     </ServerConfigContext.Provider>,
   );
@@ -46,10 +46,10 @@ test("demo mode issues no provider probe and renders no fix banner", async ({
   await page.waitForTimeout(700);
 
   expect(calls).toEqual([]);
-  await expect(component.getByRole("link")).toHaveCount(0);
+  await expect(page.getByTestId("ai-health-harness-status")).toHaveCount(0);
 });
 
-test("outside demo mode missing role assignments link to Harness configuration", async ({
+test("outside demo mode a missing provider marks the Harness entry", async ({
   mount,
   page,
 }) => {
@@ -60,15 +60,15 @@ test("outside demo mode missing role assignments link to Harness configuration",
       value={{ logsPersisted: false, demoMode: false }}
     >
       <AiHealthProvider>
-        <AiHealthFixButton />
+        <AiHealthHarnessStatus />
       </AiHealthProvider>
     </ServerConfigContext.Provider>,
   );
 
   expect(calls).toEqual([]);
-  await expect(page.getByRole("link")).toHaveAttribute(
-    "href",
-    "/harness?tab=config",
+  await expect(page.getByTestId("ai-health-harness-status")).toHaveAttribute(
+    "data-status",
+    "not_configured",
   );
 });
 
@@ -133,5 +133,5 @@ test("global warning ignores Assistant state once Harness is healthy", async ({
     .getByRole("button", { name: "Configure Harness only" })
     .click();
   await expect.poll(() => harnessTests).toBe(1);
-  await expect(component.getByRole("link")).toHaveCount(0);
+  await expect(page.getByTestId("ai-health-harness-status")).toHaveCount(0);
 });

@@ -6,6 +6,9 @@ import { PrismaService } from './prisma.service';
 import { PrismaCoreModule } from './prisma/prisma-core.module';
 import { DemoModeService } from './demo-mode.service';
 import { DemoModeGuard } from './demo-mode.guard';
+import { NamespacePauseModule } from './namespace/namespace-pause.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
+import { NamespacePausedGuard } from './namespace/namespace-paused.guard';
 import { InternalApiKeyService } from './internal-api-key.service';
 import { InternalApiKeyGuard } from './internal-api-key.guard';
 import { SourceService } from './source.service';
@@ -104,6 +107,7 @@ import {
     // middleware would run before the namespace is resolved, so we don't use it.
     ClsModule.forRoot({ global: true }),
     PrismaCoreModule,
+    NamespacePauseModule,
     CliRunnerModule,
     NotebookModule,
     WebSocketModule,
@@ -116,6 +120,7 @@ import {
     EmbeddingModule,
     FindingStatsModule,
     SourceGraphModule,
+    MaintenanceModule,
   ],
   controllers: [
     HealthController,
@@ -152,6 +157,7 @@ import {
   providers: [
     { provide: APP_GUARD, useClass: InternalApiKeyGuard },
     { provide: APP_GUARD, useClass: DemoModeGuard },
+    { provide: APP_GUARD, useClass: NamespacePausedGuard },
     CliBackpressureGuard,
     DemoModeService,
     InternalApiKeyService,

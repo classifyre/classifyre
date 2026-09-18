@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Badge, Button } from "@workspace/ui/components";
 
 import { BlogPostCard } from "@/components/blog-post-card";
+import { translate } from "@/i18n";
+import type { Locale } from "@/lib/locale";
 import type { BlogPostSummary } from "@/lib/posts";
 
 export function BlogSectionPage({
@@ -10,11 +12,13 @@ export function BlogSectionPage({
   title,
   description,
   posts,
+  locale = "en",
 }: {
   eyebrow: string;
   title: string;
   description: string;
   posts: BlogPostSummary[];
+  locale?: Locale;
 }) {
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-10 sm:py-14">
@@ -27,13 +31,15 @@ export function BlogSectionPage({
           {description}
         </p>
         <Button asChild variant="link" className="mt-4 px-0">
-          <Link href="/blog">← Back to publication overview</Link>
+          <Link href={locale === "de" ? "/de/blog/" : "/blog/"}>
+            ← {translate(locale, "blog.backToOverview")}
+          </Link>
         </Button>
       </header>
 
       <div className="grid gap-5 md:grid-cols-2">
         {posts.map((post) => (
-          <BlogPostCard key={post.route} post={post} />
+          <BlogPostCard key={post.route} post={post} locale={locale} />
         ))}
       </div>
     </main>

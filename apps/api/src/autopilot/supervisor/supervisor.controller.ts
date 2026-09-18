@@ -22,6 +22,7 @@ import { UndoService } from './undo.service';
 import { CAPABILITY_GROUPS, groupForTool } from './capabilities';
 import { OPERATOR_ACTOR } from './supervisor.constants';
 import { ToolRegistry } from '../tools/tool-registry.service';
+import { BlockWhenPaused } from '../../namespace/block-when-paused.decorator';
 import {
   AgentUndoListDto,
   AnnotateJournalDto,
@@ -119,6 +120,7 @@ export class SupervisorController {
     return this.state();
   }
 
+  @BlockWhenPaused()
   @Post('wake')
   @HttpCode(202)
   @ApiOperation({ summary: 'Wake the supervisor now' })

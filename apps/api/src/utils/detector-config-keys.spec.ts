@@ -13,7 +13,11 @@ describe('configuredDetectorKeysFromConfig', () => {
       detectors: [
         { type: 'PII', enabled: true },
         { type: 'CUSTOM', enabled: true, custom_detector_key: ' Tasq ' },
-        { type: 'CUSTOM', enabled: true, config: { custom_detector_key: 'old-nested' } },
+        {
+          type: 'CUSTOM',
+          enabled: true,
+          config: { custom_detector_key: 'old-nested' },
+        },
         { type: 'YARA', enabled: false },
         { type: '', enabled: true },
         null,
@@ -23,7 +27,11 @@ describe('configuredDetectorKeysFromConfig', () => {
 
     expect(parsed?.customOnly).toBe(false);
     expect(parsed?.keys).toEqual(
-      new Set(['PII', `${CUSTOM_KEY_PREFIX}Tasq`, `${CUSTOM_KEY_PREFIX}old-nested`]),
+      new Set([
+        'PII',
+        `${CUSTOM_KEY_PREFIX}Tasq`,
+        `${CUSTOM_KEY_PREFIX}old-nested`,
+      ]),
     );
     expect(parsed?.legacyCustomIds).toEqual(['cd-1']);
   });
@@ -62,13 +70,19 @@ describe('findingDetectorConfigKey', () => {
 
   it('returns null for a CUSTOM finding without a key', () => {
     expect(
-      findingDetectorConfigKey({ detectorType: 'CUSTOM', customDetectorKey: null }),
+      findingDetectorConfigKey({
+        detectorType: 'CUSTOM',
+        customDetectorKey: null,
+      }),
     ).toBeNull();
   });
 
   it('keys built-in findings by detector type', () => {
     expect(
-      findingDetectorConfigKey({ detectorType: 'PII', customDetectorKey: null }),
+      findingDetectorConfigKey({
+        detectorType: 'PII',
+        customDetectorKey: null,
+      }),
     ).toBe('PII');
   });
 });

@@ -230,6 +230,7 @@ docs/LinkThreadSupportDto.md
 docs/ListRunnersResponseDto.md
 docs/LiveQueryResponseDto.md
 docs/LocationDto.md
+docs/MaintenanceApi.md
 docs/MarkAllReadDto.md
 docs/MatchOptionCustomDetectorDto.md
 docs/MatchOptionFindingTypeDto.md
@@ -273,6 +274,7 @@ docs/PreviewResponseDto.md
 docs/ProposeCaseLeadDto.md
 docs/PullFromInquiryDto.md
 docs/PullFromInquiryResponseDto.md
+docs/PurgeQueuedJobsResponseDto.md
 docs/PurgeSourceAssetsResponseDto.md
 docs/PutAssetChunksDto.md
 docs/RebuildEdgesResponseDto.md
@@ -481,6 +483,7 @@ src/apis/GraphApi.ts
 src/apis/HealthApi.ts
 src/apis/InquiriesApi.ts
 src/apis/InstanceSettingsApi.ts
+src/apis/MaintenanceApi.ts
 src/apis/NamespacesApi.ts
 src/apis/NotebooksApi.ts
 src/apis/NotificationsApi.ts
@@ -740,6 +743,7 @@ src/models/PreviewResponseDto.ts
 src/models/ProposeCaseLeadDto.ts
 src/models/PullFromInquiryDto.ts
 src/models/PullFromInquiryResponseDto.ts
+src/models/PurgeQueuedJobsResponseDto.ts
 src/models/PurgeSourceAssetsResponseDto.ts
 src/models/PutAssetChunksDto.ts
 src/models/RebuildEdgesResponseDto.ts

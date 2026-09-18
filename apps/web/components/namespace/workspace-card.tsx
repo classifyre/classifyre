@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   ExternalLink,
   Layers,
+  OctagonPause,
   Settings,
   TriangleAlert,
   Trash2,
@@ -96,9 +97,24 @@ export function WorkspaceCard({
       <CardContent className="flex min-h-40 flex-1 flex-col p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate font-semibold uppercase tracking-[0.06em]">
-              {ns.name}
-            </h3>
+            <div className="flex min-w-0 items-center gap-2">
+              <h3 className="truncate font-semibold uppercase tracking-[0.06em]">
+                {ns.name}
+              </h3>
+              {ns.paused && (
+                <span
+                  role="status"
+                  aria-label={t("workspaces.pausedBadgeAria", {
+                    name: ns.name,
+                  })}
+                  title={ns.pausedReason ?? undefined}
+                  className="flex shrink-0 items-center gap-1 rounded-sm border border-amber-600/40 bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-400"
+                >
+                  <OctagonPause className="size-3 shrink-0" />
+                  {t("workspaces.pausedBadge")}
+                </span>
+              )}
+            </div>
             <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
               /{ns.slug}
             </p>

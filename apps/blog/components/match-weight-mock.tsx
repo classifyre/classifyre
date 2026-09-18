@@ -10,6 +10,9 @@
  * stale against a UI change.
  */
 
+import { translate } from "@/i18n";
+import type { Locale } from "@/lib/locale";
+
 const ROWS = [
   { label: "iban", weight: 6, forPart: 0.42, against: 0, shared: "DE89 3704 …" },
   { label: "email", weight: 5, forPart: 0.24, against: 0, shared: "a.mendes@…" },
@@ -20,7 +23,7 @@ const ROWS = [
 
 const SCALE = 0.45; // widest bar in the set, for proportional widths
 
-export function MatchWeightMock() {
+export function MatchWeightMock({ locale = "en" }: { locale?: Locale }) {
   const total = ROWS.reduce((sum, r) => sum + r.forPart, 0);
 
   return (
@@ -28,7 +31,7 @@ export function MatchWeightMock() {
       <div className="flex items-baseline justify-between gap-3 border-b-2 border-border px-4 py-3">
         <div>
           <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Match weight
+            {translate(locale, "matchWeight.title")}
           </span>
           <p
             className="font-serif text-3xl font-black leading-none tabular-nums"
@@ -37,9 +40,10 @@ export function MatchWeightMock() {
           </p>
         </div>
         <span className="text-right font-mono text-[10px] leading-4 text-muted-foreground">
-          Perfect match = 1.00
+          {translate(locale, "matchWeight.perfect")}
           <br />
-          the bars below sum to {total.toFixed(2)}
+          {translate(locale, "matchWeight.barsPrefix")}
+          {total.toFixed(2)}
         </span>
       </div>
 
@@ -49,7 +53,9 @@ export function MatchWeightMock() {
             <div className="flex items-baseline justify-between gap-2 font-mono text-[11px]">
               <span className="text-foreground">
                 {r.label}{" "}
-                <span className="text-muted-foreground">weight {r.weight}</span>
+                <span className="text-muted-foreground">
+                  {translate(locale, "matchWeight.weight")} {r.weight}
+                </span>
               </span>
               <span className="tabular-nums text-muted-foreground">
                 {r.forPart > 0 ? `+${r.forPart.toFixed(2)}` : "0.00"}
@@ -85,9 +91,9 @@ export function MatchWeightMock() {
       </div>
 
       <p className="border-t-2 border-border px-4 py-2 font-mono text-[11px] leading-5 text-muted-foreground">
-        Left of the line is evidence <em>against</em>: an address and a phone
-        number on one asset that the other does not have. It is inside the sum,
-        not omitted from it.
+        {translate(locale, "matchWeight.footerA")}
+        <em>{translate(locale, "matchWeight.footerEm")}</em>
+        {translate(locale, "matchWeight.footerB")}
       </p>
     </figure>
   );

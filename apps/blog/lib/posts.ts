@@ -3,6 +3,8 @@ import { promises as fs } from "node:fs";
 
 import matter from "gray-matter";
 
+import { DEFAULT_LOCALE, type Locale } from "./locale";
+
 export type BlogPostSummary = {
   title: string;
   description: string;
@@ -28,7 +30,22 @@ type BlogFrontmatter = {
 };
 
 const APP_DIR = path.join(process.cwd(), "app");
-const BLOG_DIR = path.join(APP_DIR, "blog");
+
+/**
+ * Content roots per locale. English lives in the `(en)` route group,
+ * German in `(de)/de` — route groups are transparent to URLs but not to the
+ * filesystem, so each locale scans its own tree. The English index never
+ * lists German posts and vice versa.
+ */
+function blogDirForLocale(locale: Locale): string {
+  return locale === DEFAULT_LOCALE
+    ? path.join(APP_DIR, "(en)", "blog")
+    : path.join(APP_DIR, "(de)", "de", "blog");
+}
+
+function routePrefixForLocale(locale: Locale): string {
+  return locale === DEFAULT_LOCALE ? "" : "/de";
+}
 
 async function listMdxPageFiles(dir: string): Promise<string[]> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -54,14 +71,17 @@ async function listMdxPageFiles(dir: string): Promise<string[]> {
 function toPostSummary(
   filePath: string,
   frontmatter: BlogFrontmatter,
+  locale: Locale,
 ): BlogPostSummary {
+  const contentRoot = blogDirForLocale(locale);
   const routeDir = path
-    .dirname(path.relative(APP_DIR, filePath))
+    .dirname(path.relative(contentRoot, filePath))
     .replace(/\\/g, "/");
-  const route = `/${routeDir}`;
-  const section: BlogPostSection = route.startsWith("/blog/cases/")
-    ? "cases"
-    : "articles";
+  const route = `${routePrefixForLocale(locale)}/${routeDir}`;
+  const section: BlogPostSection =
+    route.startsWith("/blog/cases/") || route.startsWith("/de/blog/cases/")
+      ? "cases"
+      : "articles";
 
   return {
     title: frontmatter.title ?? "Untitled",
@@ -91,15 +111,17 @@ function sortNewestFirst(posts: BlogPostSummary[]): BlogPostSummary[] {
   });
 }
 
-export async function getAllPosts(): Promise<BlogPostSummary[]> {
-  const files = await listMdxPageFiles(BLOG_DIR);
+export async function getAllPosts(
+  locale: Locale = DEFAULT_LOCALE,
+): Promise<BlogPostSummary[]> {
+  const files = await listMdxPageFiles(blogDirForLocale(locale));
 
   const parsed = await Promise.all(
     files.map(async (filePath) => {
       const raw = await fs.readFile(filePath, "utf8");
       const { data } = matter(raw);
 
-      return toPostSummary(filePath, data as BlogFrontmatter);
+      return toPostSummary(filePath, data as BlogFrontmatter, locale);
     }),
   );
 
@@ -108,7 +130,8 @@ export async function getAllPosts(): Promise<BlogPostSummary[]> {
 
 export async function getPostsBySection(
   section: BlogPostSection,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<BlogPostSummary[]> {
-  const posts = await getAllPosts();
+  const posts = await getAllPosts(locale);
   return posts.filter((post) => post.section === section);
 }

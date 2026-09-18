@@ -62,6 +62,7 @@ import { SearchSourcesResponseDto } from '../dto/search-sources-response.dto';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { SourceFilesService } from '../source-files.service';
+import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 
 @Controller('sources')
 @ApiTags('Sources')
@@ -164,6 +165,7 @@ export class SourcesController {
     return { updatedCount: updatedIds.length, ids: updatedIds };
   }
 
+  @BlockWhenPaused()
   @Post('bulk-run')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -972,6 +974,7 @@ export class SourcesController {
     }
   }
 
+  @BlockWhenPaused()
   @Post(':id/test')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -1001,6 +1004,7 @@ export class SourcesController {
     return result as TestConnectionResponseDto;
   }
 
+  @BlockWhenPaused()
   @Post(':id/runs')
   @ApiOperation({
     summary: 'Start a new ingestion run',
@@ -1156,6 +1160,7 @@ export class SourcesController {
     return { ...schedule, auto };
   }
 
+  @BlockWhenPaused()
   @Post(':id/schedule/resume')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

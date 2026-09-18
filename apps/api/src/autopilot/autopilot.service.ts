@@ -14,6 +14,7 @@ import { ToolRegistry } from './tools/tool-registry.service';
 import { AgentConfigService } from './harness/agent-config.service';
 import { McpClientService } from './mcp-client/mcp-client.service';
 import { AUTOPILOT_QUEUE, PIPELINE_KINDS } from './autopilot.constants';
+import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import { CorrelationJobScheduler } from '../correlation/correlation-job-scheduler.service';
 import type { AutopilotJob } from './autopilot.types';
 
@@ -66,6 +67,7 @@ export class AutopilotService {
     private readonly agentConfig: AgentConfigService,
     private readonly mcp: McpClientService,
     @Optional() private readonly correlationJobs?: CorrelationJobScheduler,
+    @Optional() private readonly pause?: NamespacePauseService,
   ) {}
 
   /** The capability map: every registered tool + the missions that wield them. */
@@ -120,6 +122,7 @@ export class AutopilotService {
   async trigger(
     dto: TriggerAutopilotDto,
   ): Promise<TriggerAutopilotResponseDto> {
+    await this.pause?.assertNotPaused();
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: 1 },
       select: { harnessAiProviderConfigId: true },
@@ -232,6 +235,7 @@ export class AutopilotService {
    * every-other-day schedule.
    */
   async triggerDream(): Promise<TriggerAutopilotResponseDto> {
+    await this.pause?.assertNotPaused();
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: 1 },
       select: { harnessAiProviderConfigId: true },
@@ -280,6 +284,7 @@ export class AutopilotService {
    * ONLY its agent executes again under the original cycle identity.
    */
   async rerunRun(id: string): Promise<TriggerAutopilotResponseDto> {
+    await this.pause?.assertNotPaused();
     const run = await this.prisma.agentRun.findUnique({ where: { id } });
     if (!run) throw new NotFoundException(`Agent run ${id} not found`);
     if (run.status === AgentRunStatus.RUNNING) {

@@ -70,6 +70,18 @@ CREATE INDEX IF NOT EXISTS namespaces_status_deleted_at_idx
 -- always read, written and reordered as a whole, and never joined against.
 ALTER TABLE public.namespaces
   ADD COLUMN IF NOT EXISTS external_links jsonb NOT NULL DEFAULT '[]'::jsonb;
+-- Pausing a workspace freezes all background activity (scans, schedules,
+-- autopilot/harness cycles incl. dreams, duplicate checks) and rejects new
+-- mutating API calls with 409. Reads keep working so the workspace stays
+-- inspectable, and the schema/data are untouched — resume continues where it
+-- stopped. Separate from deleted_at: a paused workspace is still listed,
+-- resolved and billed as active.
+ALTER TABLE public.namespaces
+  ADD COLUMN IF NOT EXISTS paused boolean NOT NULL DEFAULT false;
+ALTER TABLE public.namespaces
+  ADD COLUMN IF NOT EXISTS paused_at timestamptz;
+ALTER TABLE public.namespaces
+  ADD COLUMN IF NOT EXISTS paused_reason text;
 
 -- Workspace categories. Flat (no nesting), shared across all workspaces, and
 -- therefore in the public schema next to the registry itself -- a per-tenant

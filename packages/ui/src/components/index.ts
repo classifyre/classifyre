@@ -71,6 +71,7 @@ export * from "./cookie-consent-banner";
 export * from "./site-footer";
 export * from "./brand-logos";
 export * from "./docker-run";
+export * from "./docker-run-data";
 export * from "./ai-prompt-popover";
 export * from "./assistant-workflow-panel";
 

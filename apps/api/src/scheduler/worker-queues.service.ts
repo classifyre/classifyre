@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import { CLS_NAMESPACE_ID } from '../namespace/namespace.constants';
 import { PgBossService, type QueueDepth } from './pg-boss.service';
@@ -142,6 +147,44 @@ export class WorkerQueuesService {
         instances: [],
       }
     );
+  }
+
+  /**
+   * Drop a queue's waiting backlog (`created` and scheduled-`retry` jobs).
+   * Side effects, and why each is accepted:
+   * - Dropped jobs are gone, not re-queued: periodic schedules recover on
+   *   their next fire, but one-off work (a manually scheduled recompute)
+   *   needs a manual re-trigger.
+   * - Jobs waiting to retry a failure go with the backlog: a failure that
+   *   would have recovered on retry stays failed (its error row remains).
+   * - Running jobs are untouched and finish normally; finished history and
+   *   the cron schedules themselves are never touched.
+   * Deliberately allowed while the workspace is paused (wind-down, like
+   * storage cleanup): nothing refills the queue until resume.
+   */
+  async purgeQueued(
+    queue: string,
+  ): Promise<{ queue: string; droppedQueued: number }> {
+    this.requireNamespaceId();
+    const name = queue.trim();
+    if (!name) throw new BadRequestException('queue is required');
+    if (name.startsWith('__')) {
+      throw new BadRequestException(
+        `Queue '${name}' is pg-boss housekeeping and cannot be purged.`,
+      );
+    }
+    const boss = await this.pgBoss.getBossAsync();
+    const known = (await boss.getQueues()).map((q) => q.name);
+    if (!known.includes(name)) {
+      throw new NotFoundException(`Unknown queue '${name}'.`);
+    }
+    const droppedQueued =
+      (await this.depths()).find((d) => d.queue === name)?.queuedCount ?? 0;
+    await boss.deleteQueuedJobs(name);
+    this.logger.log(
+      `Purged ${droppedQueued} queued job(s) from queue '${name}'.`,
+    );
+    return { queue: name, droppedQueued };
   }
 
   private aggregate(

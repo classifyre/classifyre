@@ -30,6 +30,7 @@ import { QueryFindingsAssetsDto } from './dto/query-findings-assets.dto';
 import { FindingResponseDto } from './dto/finding-response.dto';
 import { AssetFindingSummaryListResponseDto } from './dto/asset-finding-summary.dto';
 import { QueryFindingsDiscoveryDto } from './dto/query-findings-discovery.dto';
+import { BlockWhenPaused } from './namespace/block-when-paused.decorator';
 import {
   FindingsDiscoveryRefreshResponseDto,
   FindingsDiscoveryResponseDto,
@@ -150,6 +151,7 @@ export class FindingsController {
     return this.findingsService.getStatsFreshness();
   }
 
+  @BlockWhenPaused()
   @Post('discovery/refresh')
   @ApiOperation({
     summary: 'Queue a full rebuild of the pre-aggregated finding statistics',
