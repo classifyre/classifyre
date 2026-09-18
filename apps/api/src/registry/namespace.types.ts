@@ -46,6 +46,16 @@ export interface Namespace {
   schemaName: string;
   description: string | null;
   thumbnail: string | null;
+  /**
+   * True while the workspace is paused: background activity (scans,
+   * schedules, harness/dream cycles, duplicate checks) is stopped and new
+   * mutating API calls are rejected with 409. Reads keep working.
+   */
+  paused: boolean;
+  /** When the workspace was paused; null while running. */
+  pausedAt: string | null;
+  /** Operator note recorded at pause time; null when unset. */
+  pausedReason: string | null;
   settings: Record<string, unknown>;
   /** Ordered external links shown on the workspace card. */
   externalLinks: NamespaceExternalLink[];
@@ -79,6 +89,17 @@ export interface UpdateNamespaceInput {
    * to clear it. Omit to leave the existing thumbnail unchanged.
    */
   thumbnail?: string | null;
+  /**
+   * Pause (`true`) or resume (`false`) the workspace. Pausing stops its
+   * workers and in-flight scans; resuming starts the workers again. Omit to
+   * leave the pause state untouched.
+   */
+  paused?: boolean;
+  /**
+   * Operator note stored alongside the pause (shown in the directory and the
+   * paused banner). `null`/empty clears it. Omit to leave it untouched.
+   */
+  pausedReason?: string | null;
   settings?: Record<string, unknown>;
   lastOpenedAt?: string;
   /** Replaces the whole link array. Omit to leave links untouched. */

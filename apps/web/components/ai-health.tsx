@@ -1,14 +1,8 @@
 "use client";
 
-import { useNsPath } from "@/lib/ns-path";
 import * as React from "react";
-import Link from "next/link";
-import { AlertTriangle, Wrench } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { api } from "@workspace/api-client";
-import {
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@workspace/ui/components/sidebar";
 import {
   Tooltip,
   TooltipContent,
@@ -158,76 +152,38 @@ function useHealthCopy(status: AiHealthStatus, detail: string | null) {
 }
 
 /**
- * Prominent sidebar warning. Renders as a sidebar menu item (collapses to an
- * amber icon with a tooltip) linking to Harness configuration. Nothing when AI
- * is healthy.
+ * Inline status marker for the Harness AI sidebar entry. Renders nothing when
+ * AI is healthy — otherwise an amber (warning) or red (error) icon pinned to
+ * the right of the Harness label, with the problem as its tooltip. The entry
+ * itself already links to Harness, so no separate banner or link is needed.
  */
-export function AiHealthSidebarWarning() {
-  const nsPath = useNsPath();
+export function AiHealthHarnessStatus() {
   const { status, detail } = useAiHealth();
-  const { t } = useTranslation();
   const copy = useHealthCopy(status, detail);
   if (!copy) return null;
 
   const isError = status === "error";
-  const colorClasses = isError
-    ? "border-red-600/50 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-300"
-    : "border-amber-600/50 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300";
-
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        tooltip={`${copy.title} — ${copy.description}`}
-        className={`h-auto items-start gap-2 border-2 ${colorClasses}`}
-      >
-        <Link href={nsPath("/harness?tab=config")}>
-          <AlertTriangle className="size-5 shrink-0" />
-          <span className="flex min-w-0 flex-col">
-            <span className="truncate text-xs font-semibold">{copy.title}</span>
-            <span className="truncate text-[11px] opacity-90">
-              {t("aiHealth.fixInSettings")}
-            </span>
-          </span>
-        </Link>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  );
-}
-
-/**
- * Top-bar "fix" notification. A compact pill linking directly to Harness
- * configuration, shown only when the AI stack needs attention.
- */
-export function AiHealthFixButton() {
-  const nsPath = useNsPath();
-  const { status, detail } = useAiHealth();
-  const copy = useHealthCopy(status, detail);
-  const { t } = useTranslation();
-  if (!copy) return null;
-
-  const isError = status === "error";
-  const colorClasses = isError
-    ? "border-red-600/40 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-400"
-    : "border-amber-600/40 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-400";
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Link
-          href={nsPath("/harness?tab=config")}
-          className={`flex items-center gap-1.5 rounded-[4px] border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors ${colorClasses}`}
+        <span
+          data-testid="ai-health-harness-status"
+          data-status={status}
+          role="img"
+          aria-label={`${copy.title} — ${copy.description}`}
+          className={
+            isError
+              ? "flex shrink-0 items-center text-red-600 dark:text-red-400"
+              : "flex shrink-0 items-center text-amber-600 dark:text-amber-400"
+          }
         >
-          <AlertTriangle className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">{copy.title}</span>
-          <span className="flex items-center gap-0.5">
-            <Wrench className="h-3 w-3" />
-            {t("aiHealth.fix")}
-          </span>
-        </Link>
+          <AlertTriangle className="size-4" />
+        </span>
       </TooltipTrigger>
-      <TooltipContent side="bottom" sideOffset={6} className="max-w-xs">
-        {copy.description}
+      <TooltipContent side="right" sideOffset={8} className="max-w-xs">
+        <span className="block text-xs font-semibold">{copy.title}</span>
+        <span className="block text-xs opacity-90">{copy.description}</span>
       </TooltipContent>
     </Tooltip>
   );

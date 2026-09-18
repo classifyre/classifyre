@@ -14,6 +14,7 @@ import {
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CorrelationService } from './correlation.service';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
+import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import {
   AddExclusionDto,
   CaseActionRequestDto,
@@ -143,6 +144,7 @@ export class CorrelationController {
     });
   }
 
+  @BlockWhenPaused()
   @Post('assets/:id/recompute-correlation')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

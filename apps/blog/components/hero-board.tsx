@@ -3,6 +3,8 @@
 import * as React from "react";
 
 import { useCyclingTags } from "@/components/finding-tags";
+import { translateList } from "@/i18n";
+import type { Locale } from "@/lib/locale";
 
 /**
  * Hero backdrop: the same string-board language as the closing CTA, but with
@@ -82,10 +84,10 @@ const FLOWS: readonly { d: string; dur: string; begin: string }[] = [
   },
 ];
 
-export function HeroBoard() {
+export function HeroBoard({ locale = "en" }: { locale?: Locale }) {
   const ref = React.useRef<HTMLDivElement | null>(null);
   const svgRef = React.useRef<SVGSVGElement | null>(null);
-  const tags = useCyclingTags(TAGGED.length);
+  const tags = useCyclingTags(TAGGED.length, translateList(locale, "findingTags"));
 
   React.useEffect(() => {
     const board = ref.current;

@@ -1,7 +1,18 @@
-import { Body, Controller, Get, Param, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Put,
+} from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { WorkerQueuesService } from '../scheduler/worker-queues.service';
+import { AllowWhenPaused } from '../namespace/allow-when-paused.decorator';
 import {
+  PurgeQueuedJobsResponseDto,
   SetWorkerQueuePausedDto,
   WorkerOverviewDto,
   WorkerQueueDto,
@@ -48,5 +59,25 @@ export class WorkerQueuesController {
     // There is no global ValidationPipe, so the DTO decorators do not run at
     // request time; coerce here rather than trusting the declared type.
     return this.workerQueues.setPaused(queue, body?.paused === true);
+  }
+
+  @Post(':queue/purge')
+  @AllowWhenPaused()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Drop a queue’s waiting backlog',
+    description:
+      'Deletes waiting (`created`) and scheduled-retry jobs of one queue. Running jobs finish normally; finished history and the cron schedules themselves are untouched, so periodic work recovers on its next fire while one-off jobs need a manual re-trigger. Allowed while the workspace is paused — nothing refills the queue until resume.',
+  })
+  @ApiResponse({ status: 200, type: PurgeQueuedJobsResponseDto })
+  @ApiResponse({
+    status: 400,
+    description: 'Housekeeping queues cannot be purged',
+  })
+  @ApiResponse({ status: 404, description: 'Unknown queue' })
+  purgeQueued(
+    @Param('queue') queue: string,
+  ): Promise<PurgeQueuedJobsResponseDto> {
+    return this.workerQueues.purgeQueued(queue);
   }
 }

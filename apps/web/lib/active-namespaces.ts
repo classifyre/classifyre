@@ -1,4 +1,4 @@
-import { stripLocalePrefix } from "@/lib/locale-detection";
+import { stripLocalePrefix, withLocalePrefix } from "@/lib/locale-detection";
 
 export const ACTIVE_NAMESPACES_STORAGE_KEY = "classifyre.active-namespaces.v1";
 
@@ -110,6 +110,21 @@ export function removeActiveNamespaceFromItems(
   return items.filter((item) => item.slug !== slug);
 }
 
+/**
+ * Drop tabs whose workspace no longer exists in the registry. A tab matches
+ * when either its id or its slug is still known — the slug covers workspaces
+ * created before the tab record stored a registry id, the id covers renames
+ * that changed the slug after the tab was opened.
+ */
+export function filterExistingNamespaces(
+  items: ActiveNamespace[],
+  existing: Pick<ActiveNamespace, "id" | "slug">[],
+): ActiveNamespace[] {
+  const ids = new Set(existing.map((item) => item.id));
+  const slugs = new Set(existing.map((item) => item.slug));
+  return items.filter((item) => ids.has(item.id) || slugs.has(item.slug));
+}
+
 /** Keep an existing tab valid after workspace settings rename its slug/name. */
 export function updateActiveNamespaceInItems(
   items: ActiveNamespace[],
@@ -128,6 +143,20 @@ export function updateActiveNamespaceInItems(
       href: `${namespaceRoot(namespace.slug)}${suffix}`,
     };
   });
+}
+
+/**
+ * Re-prefix a stored tab URL with the locale of the current route. Tab hrefs
+ * remember the language that was active when they were last visited, so
+ * navigating to one verbatim would silently switch the UI language (e.g. from
+ * `/de/alpha` to a stored `/beta`). The current route locale always wins; an
+ * href that already carries it is returned unchanged.
+ */
+export function hrefInCurrentLocale(
+  currentPathname: string,
+  href: string,
+): string {
+  return withLocalePrefix(stripLocalePrefix(currentPathname).locale, href);
 }
 
 /**

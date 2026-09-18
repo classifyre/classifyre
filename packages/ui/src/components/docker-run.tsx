@@ -4,8 +4,11 @@ import * as React from "react";
 
 import { Button } from "./button";
 import { cn } from "../lib/utils";
-import { dockerImageRef } from "../lib/site-links";
-import { softwareVersion } from "../lib/software-version";
+import {
+  dockerImageTag,
+  dockerRunLines,
+  type RunLine,
+} from "./docker-run-data";
 
 /**
  * The `docker run` line that starts Classifyre, with a copy button.
@@ -31,40 +34,17 @@ import { softwareVersion } from "../lib/software-version";
  * parallel-query buffers in /dev/shm, and Docker's 64 MB default is small
  * enough that a large query fails mid-scan.
  */
-type RunLine = { code: string; note?: string };
-
-/**
- * The tag to quote: the version this site was built from, unless that is a
- * pre-release.
- *
- * `softwareVersion` is whatever the workspace package.json says, and on
- * `develop` that is a `-SNAPSHOT` for which no image was ever pushed. Quoting
- * it would hand a visitor a command that fails on `docker run` with a manifest
- * error — strictly worse than a moving tag. So a release pins, and anything
- * pre-release falls back to `latest`, which always resolves.
- */
-export const dockerImageTag = /-(SNAPSHOT|rc|alpha|beta)/i.test(softwareVersion)
-  ? "latest"
-  : softwareVersion;
-
-export function dockerRunLines(tag: string = dockerImageTag): RunLine[] {
-  return [
-    { code: "docker run -d --name classifyre \\" },
-    { code: "  -p 3000:3000 \\", note: "the only port it serves" },
-    { code: "  --shm-size=1g \\", note: "Postgres needs it; the default is too small" },
-    { code: "  -v classifyre-pgdata:/var/lib/postgresql/data \\", note: "your data" },
-    { code: "  -v classifyre-data:/var/lib/classifyre \\", note: "scan logs + credential key" },
-    { code: "  -v classifyre-uv-cache:/cache/uv \\", note: "survives upgrades" },
-    { code: `  ${dockerImageRef}:${tag}` },
-  ];
+export interface DockerRunCopy {
+  copy: string;
+  copied: string;
+  copyCommand: string;
 }
 
-/** The plain command, for a caller that just wants the text. */
-export function dockerRunCommand(tag: string = dockerImageTag): string {
-  return dockerRunLines(tag)
-    .map((line) => line.code)
-    .join("\n");
-}
+const DEFAULT_COPY: DockerRunCopy = {
+  copy: "Copy",
+  copied: "Copied",
+  copyCommand: "Copy command",
+};
 
 export function DockerRunBlock({
   tag = dockerImageTag,
@@ -72,6 +52,8 @@ export function DockerRunBlock({
   className,
   tone = "light",
   showNotes = true,
+  lines: linesOverride,
+  copy: copyOverride,
 }: {
   /** Image tag to quote. Defaults to the version this site was built from. */
   tag?: string;
@@ -81,10 +63,15 @@ export function DockerRunBlock({
   tone?: "light" | "dark";
   /** Notes need horizontal room; drop them in a narrow column. */
   showNotes?: boolean;
+  /** Translated command notes; defaults to the English `dockerRunLines`. */
+  lines?: RunLine[];
+  /** Copy-button labels; defaults to English. */
+  copy?: Partial<DockerRunCopy>;
 }) {
   const [copied, setCopied] = React.useState(false);
-  const lines = dockerRunLines(tag);
-  const command = dockerRunCommand(tag);
+  const lines = linesOverride ?? dockerRunLines(tag);
+  const command = lines.map((line) => line.code).join("\n");
+  const text = { ...DEFAULT_COPY, ...copyOverride };
   const dark = tone === "dark";
 
   const copy = async () => {
@@ -119,7 +106,7 @@ export function DockerRunBlock({
           variant="ghost"
           size="sm"
           onClick={() => void copy()}
-          aria-label={copied ? "Copied" : "Copy command"}
+          aria-label={copied ? text.copied : text.copyCommand}
           className={cn(
             "absolute right-1.5 top-1.5 z-10 h-7 px-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em]",
             dark
@@ -127,7 +114,7 @@ export function DockerRunBlock({
               : "text-muted-foreground hover:text-foreground",
           )}
         >
-          {copied ? "Copied" : "Copy"}
+          {copied ? text.copied : text.copy}
         </Button>
 
         {/* A <pre> wrapper keeps this selectable and copyable as one command

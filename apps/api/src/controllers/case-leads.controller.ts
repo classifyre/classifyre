@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CaseLeadsService } from '../case-leads.service';
+import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import {
   CaseLeadDto,
   GenerateCaseLeadsResponseDto,
@@ -32,6 +33,7 @@ export class CaseLeadsController {
     });
   }
 
+  @BlockWhenPaused()
   @Post('generate')
   @ApiOperation({
     summary:

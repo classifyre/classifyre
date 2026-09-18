@@ -59,3 +59,96 @@ test("does not render a duplicate workspace-directory action", async ({
   ).toHaveCount(0);
   await expect(component.getByTestId("active-workspace")).toHaveText("alpha");
 });
+
+test("closes other tabs from the tab context menu", async ({
+  mount,
+  page,
+}) => {
+  const component = await mount(<NamespaceTabsHarness />);
+
+  await component
+    .getByRole("tab", { name: "Beta review" })
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Close other tabs" }).click();
+
+  await expect(component.getByRole("tab", { name: "Alpha investigation" }))
+    .toHaveCount(0);
+  await expect(component.getByTestId("active-workspace")).toHaveText("beta");
+});
+
+test("closes tabs to the left from the tab context menu", async ({
+  mount,
+  page,
+}) => {
+  const component = await mount(<NamespaceTabsHarness />);
+
+  await component
+    .getByRole("tab", { name: "Beta review" })
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Close tabs to the left" }).click();
+
+  await expect(component.getByRole("tab", { name: "Alpha investigation" }))
+    .toHaveCount(0);
+  await expect(component.getByTestId("active-workspace")).toHaveText("beta");
+});
+
+test("closes tabs to the right from the tab context menu", async ({
+  mount,
+  page,
+}) => {
+  const component = await mount(<NamespaceTabsHarness />);
+
+  await component
+    .getByRole("tab", { name: "Alpha investigation" })
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Close tabs to the right" }).click();
+
+  await expect(component.getByRole("tab", { name: "Beta review" })).toHaveCount(
+    0,
+  );
+  await expect(component.getByTestId("active-workspace")).toHaveText("alpha");
+});
+
+test("opens a namespace in a new browser tab from the context menu", async ({
+  mount,
+  page,
+}) => {
+  const component = await mount(<NamespaceTabsHarness />);
+
+  await component
+    .getByRole("tab", { name: "Beta review" })
+    .click({ button: "right" });
+  const menuItem = page.getByRole("menuitem", { name: "Open in new tab" });
+  await expect(menuItem).toHaveAttribute("href", "/beta");
+
+  const popupPromise = page.waitForEvent("popup");
+  await menuItem.click();
+  const popup = await popupPromise;
+  expect(new URL(popup.url()).pathname).toBe("/beta");
+  await popup.close();
+
+  // The strip itself is untouched: the current tab stays active.
+  await expect(component.getByTestId("active-workspace")).toHaveText("alpha");
+});
+
+test("disables bulk-close entries with no tabs in that direction", async ({
+  mount,
+  page,
+}) => {
+  const component = await mount(<NamespaceTabsHarness />);
+
+  await component
+    .getByRole("tab", { name: "Alpha investigation" })
+    .click({ button: "right" });
+  await expect(
+    page.getByRole("menuitem", { name: "Close tabs to the left" }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+
+  await component
+    .getByRole("tab", { name: "Beta review" })
+    .click({ button: "right" });
+  await expect(
+    page.getByRole("menuitem", { name: "Close tabs to the right" }),
+  ).toBeDisabled();
+});

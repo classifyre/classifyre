@@ -6,6 +6,8 @@ import {
 } from "@workspace/ui/lib/source-catalog";
 import { getAllSourceDocs } from "@workspace/schemas/source-docs";
 
+import { translate, type TranslationKey } from "@/i18n";
+import type { Locale } from "@/lib/locale";
 import { docs } from "@/lib/site";
 
 /**
@@ -62,6 +64,21 @@ export function SourceMarquee() {
   );
 }
 
-export function SourceCatalogSection() {
-  return <SourceCatalog entries={sourceCatalogEntries()} />;
+export function SourceCatalogSection({ locale = "en" }: { locale?: Locale }) {
+  const t = (key: TranslationKey): string => translate(locale, key);
+  return (
+    <SourceCatalog
+      entries={sourceCatalogEntries()}
+      copy={{
+        heading: t("catalog.heading"),
+        subheading: t("catalog.subheading"),
+        matches: t("catalog.matches"),
+        sources: t("catalog.sources"),
+        searchPlaceholder: t("catalog.searchPlaceholder"),
+        clear: t("catalog.clear"),
+      }}
+      emptyTitle={t("catalog.emptyTitle")}
+      emptyDescription={t("catalog.emptyDescription")}
+    />
+  );
 }

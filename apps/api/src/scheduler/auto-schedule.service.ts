@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  Optional,
+} from '@nestjs/common';
+import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import type { Job } from 'pg-boss';
 import {
   AutoSchedulePhase,
@@ -113,6 +119,7 @@ export class AutoScheduleService {
     private readonly pgBoss: PgBossService,
     private readonly cliRunner: CliRunnerService,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly namespacePause?: NamespacePauseService,
   ) {}
 
   /**
@@ -429,6 +436,10 @@ export class AutoScheduleService {
    * with, so only one caller can start it.
    */
   async tick(): Promise<void> {
+    // No new scans while the workspace is paused. Outcome bookkeeping in
+    // handle() still runs so the phase machine is truthful on resume. (This
+    // is the workspace pause — `pause()` below is the per-source AUTO halt.)
+    if (await this.namespacePause?.isPaused()) return;
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },
       select: { autoScheduleEnabled: true },

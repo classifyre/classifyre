@@ -5,6 +5,7 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**workerQueuesControllerOverview**](WorkerQueuesApi.md#workerqueuescontrolleroverview) | **GET** /worker-queues | List background queues with live worker state and backlog |
+| [**workerQueuesControllerPurgeQueued**](WorkerQueuesApi.md#workerqueuescontrollerpurgequeued) | **POST** /worker-queues/{queue}/purge | Drop a queue’s waiting backlog |
 | [**workerQueuesControllerSetPaused**](WorkerQueuesApi.md#workerqueuescontrollersetpaused) | **PUT** /worker-queues/{queue}/paused | Pause or resume a background queue |
 
 
@@ -64,6 +65,75 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## workerQueuesControllerPurgeQueued
+
+> PurgeQueuedJobsResponseDto workerQueuesControllerPurgeQueued(queue)
+
+Drop a queue’s waiting backlog
+
+Deletes waiting (&#x60;created&#x60;) and scheduled-retry jobs of one queue. Running jobs finish normally; finished history and the cron schedules themselves are untouched, so periodic work recovers on its next fire while one-off jobs need a manual re-trigger. Allowed while the workspace is paused — nothing refills the queue until resume.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  WorkerQueuesApi,
+} from '@workspace/api-client';
+import type { WorkerQueuesControllerPurgeQueuedRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new WorkerQueuesApi();
+
+  const body = {
+    // string
+    queue: queue_example,
+  } satisfies WorkerQueuesControllerPurgeQueuedRequest;
+
+  try {
+    const data = await api.workerQueuesControllerPurgeQueued(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **queue** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**PurgeQueuedJobsResponseDto**](PurgeQueuedJobsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+| **400** | Housekeeping queues cannot be purged |  -  |
+| **404** | Unknown queue |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

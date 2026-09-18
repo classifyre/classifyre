@@ -63,5 +63,16 @@ CREATE TABLE IF NOT EXISTS public.worker_queue_pauses (
  */
 export const WORKER_HEARTBEAT_STALE_MS = 30_000;
 
+/**
+ * How long a heartbeat row may go quiet before it is deleted as orphaned.
+ * Clean shutdowns delete their own row; crashes and kills never get the
+ * chance, and without this their corpse rows would pin every queue at
+ * `stale` and pile dead instance ids into the UI forever. Live workers
+ * flush every WORKER_STATE_FLUSH_MS, so anything silent for five minutes is
+ * gone for sure. (A paused workspace's stopped workers age out the same
+ * way — its queues then correctly report no heartbeat until resume.)
+ */
+export const WORKER_HEARTBEAT_TTL_MS = 5 * 60_000;
+
 /** How often a worker process flushes its in-memory counters to Postgres. */
 export const WORKER_STATE_FLUSH_MS = 5_000;

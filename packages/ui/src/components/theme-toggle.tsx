@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "./button";
 
-export function ThemeToggle() {
+export function ThemeToggle({ label = "Toggle theme" }: { label?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -19,7 +19,7 @@ export function ThemeToggle() {
         variant="ghost"
         size="icon"
         className="rounded-[4px] border-2 border-transparent hover:border-border"
-        aria-label="Toggle theme"
+        aria-label={label}
       >
         <span className="size-4" />
       </Button>
@@ -32,7 +32,7 @@ export function ThemeToggle() {
       size="icon"
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
       className="rounded-[4px] border-2 border-transparent hover:border-border"
-      aria-label="Toggle theme"
+      aria-label={label}
     >
       {resolvedTheme === "dark" ? (
         <svg

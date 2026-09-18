@@ -24,9 +24,15 @@ export const FINDING_TAGS: readonly string[] = [
 /**
  * Rotates `slots` labels through the pool on an interval so the boards never
  * show the same set twice. Deterministic on first render (SSR-safe); frozen
- * when the reader asked for reduced motion.
+ * when the reader asked for reduced motion. The pool comes from the t18n
+ * dictionaries (`findingTags`, English fallback per key) — pass the page's
+ * locale list so German boards cycle German labels.
  */
-export function useCyclingTags(slots: number, periodMs = 4200): string[] {
+export function useCyclingTags(
+  slots: number,
+  tags: readonly string[] = FINDING_TAGS,
+  periodMs = 4200,
+): string[] {
   const [tick, setTick] = React.useState(0);
 
   React.useEffect(() => {
@@ -43,10 +49,8 @@ export function useCyclingTags(slots: number, periodMs = 4200): string[] {
       Array.from(
         { length: slots },
         (_, slot) =>
-          FINDING_TAGS[(slot * 5 + tick) % FINDING_TAGS.length] ??
-          FINDING_TAGS[0] ??
-          "",
+          tags[(slot * 5 + tick) % tags.length] ?? tags[0] ?? "",
       ),
-    [slots, tick],
+    [slots, tags, tick],
   );
 }

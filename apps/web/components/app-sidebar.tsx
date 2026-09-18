@@ -24,7 +24,7 @@ import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
 import { useLocalePath } from "@/lib/app-path";
 import type { TranslationKey } from "@/i18n";
 import { VersionSidebarNotifier } from "./version-update-notifier";
-import { AiHealthSidebarWarning } from "./ai-health";
+import { AiHealthHarnessStatus } from "./ai-health";
 import {
   LayoutDashboard,
   SearchCheck,
@@ -206,7 +206,6 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
-          <AiHealthSidebarWarning />
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
@@ -215,7 +214,12 @@ export function AppSidebar() {
             >
               <Link href={nsHref("/harness")}>
                 <Bot className="size-6 text-[#d97706]" />
-                <span>{t("nav.harness")}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {t("nav.harness")}
+                </span>
+                <span className="ml-auto flex shrink-0 items-center">
+                  <AiHealthHarnessStatus />
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

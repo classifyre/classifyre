@@ -4,12 +4,16 @@ import { useState } from "react";
 
 import { cn } from "@workspace/ui/lib/utils";
 
+import { translate } from "@/i18n";
+import type { Locale } from "@/lib/locale";
+
 type ArticleSideRailProps = {
   title: string;
   path: string;
   tags?: string[];
   backHref?: string;
   backLabel?: string;
+  locale?: Locale;
 };
 
 function XIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -130,11 +134,14 @@ function ShareRow({
   title,
   path,
   className,
+  locale = "en",
 }: {
   title: string;
   path: string;
   className?: string;
+  locale?: Locale;
 }) {
+  const t = (key: string): string => translate(locale ?? "en", key);
   const { copied, shareOnX, shareOnLinkedIn, shareViaEmail, copyLink } = useShareActions(
     title,
     path,
@@ -144,8 +151,8 @@ function ShareRow({
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       <button
         type="button"
-        aria-label="Share on X"
-        title="Share on X"
+        aria-label={t("share.x")}
+        title={t("share.x")}
         onClick={shareOnX}
         className={iconButtonClass}
       >
@@ -153,8 +160,8 @@ function ShareRow({
       </button>
       <button
         type="button"
-        aria-label="Share on LinkedIn"
-        title="Share on LinkedIn"
+        aria-label={t("share.linkedIn")}
+        title={t("share.linkedIn")}
         onClick={shareOnLinkedIn}
         className={iconButtonClass}
       >
@@ -162,8 +169,8 @@ function ShareRow({
       </button>
       <button
         type="button"
-        aria-label="Share via email"
-        title="Share via email"
+        aria-label={t("share.email")}
+        title={t("share.email")}
         onClick={shareViaEmail}
         className={iconButtonClass}
       >
@@ -171,8 +178,8 @@ function ShareRow({
       </button>
       <button
         type="button"
-        aria-label={copied ? "Link copied" : "Copy link"}
-        title={copied ? "Link copied" : "Copy link"}
+        aria-label={copied ? t("share.copied") : t("share.copy")}
+        title={copied ? t("share.copied") : t("share.copy")}
         onClick={copyLink}
         className={cn(iconButtonClass, copied && "bg-[#b7ff00]")}
       >
@@ -196,22 +203,24 @@ export function ArticleSideRail({
   tags,
   backHref = "/blog/cases",
   backLabel = "All case files",
+  locale = "en",
 }: ArticleSideRailProps) {
+  const t = (key: string): string => translate(locale, key);
   return (
     <>
       <div className="hidden md:fixed md:top-28 md:left-4 md:z-30 md:block md:w-48 lg:left-10 lg:w-52">
         <div className="space-y-5">
           <div>
             <span className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-              Share
+              {t("share.share")}
             </span>
-            <ShareRow title={title} path={path} className="gap-1.5" />
+            <ShareRow title={title} path={path} className="gap-1.5" locale={locale} />
           </div>
 
           {tags && tags.length > 0 ? (
             <div>
               <span className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                Filed under
+                {t("share.filedUnder")}
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {tags.map((tag) => (
@@ -238,7 +247,7 @@ export function ArticleSideRail({
       <div className="mb-8 flex flex-col gap-3 border-2 border-border bg-card px-4 py-3 md:hidden">
         <div className="flex items-center justify-between gap-3">
           <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-            Share this case file
+            {t("share.shareThis")}
           </span>
           <a
             href={backHref}
@@ -247,7 +256,7 @@ export function ArticleSideRail({
             &larr; {backLabel}
           </a>
         </div>
-        <ShareRow title={title} path={path} />
+        <ShareRow title={title} path={path} locale={locale} />
       </div>
     </>
   );
