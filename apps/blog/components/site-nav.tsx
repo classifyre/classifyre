@@ -1,6 +1,9 @@
 import { Button, SourceIcon, ThemeToggle } from "@workspace/ui/components";
 
-import { repoUrl, routes, showcaseUrl } from "@/lib/site";
+import { translate } from "@/i18n";
+import { withLocalePrefix, type Locale } from "@/lib/locale";
+import { repoUrl, routes, showcaseUrlFor } from "@/lib/site";
+import { LocaleSwitcher } from "./locale-switcher";
 
 /**
  * The action end of the navbar.
@@ -8,12 +11,15 @@ import { repoUrl, routes, showcaseUrl } from "@/lib/site";
  * Navigation itself is not here — Product, Blog, and Documentation come from
  * `app/_meta.js`, so Nextra renders them with its own menu and folds them into
  * its mobile drawer below `md`. This component only adds what the theme has no
- * concept of: the download CTA, the showcase link, and the repo.
+ * concept of: the download CTA, the showcase link, the repo, and the language
+ * switcher.
  *
  * The download button stays visible at every width because it is the page's
  * primary action; the rest collapse into the drawer with the nav links.
  */
-export function SiteNav() {
+export function SiteNav({ locale = "en" }: { locale?: Locale }) {
+  const getHref = `${withLocalePrefix(locale, routes.get)}/`;
+
   return (
     <div className="flex items-center gap-2">
       <Button
@@ -21,7 +27,7 @@ export function SiteNav() {
         size="sm"
         className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
       >
-        <a href={routes.get}>Get Classifyre</a>
+        <a href={getHref}>{translate(locale, "nav.getCta")}</a>
       </Button>
 
       <Button
@@ -30,8 +36,8 @@ export function SiteNav() {
         size="sm"
         className="hidden border-2 border-border hover:border-accent md:inline-flex"
       >
-        <a href={showcaseUrl} target="_blank" rel="noreferrer">
-          Showcase
+        <a href={showcaseUrlFor(locale)} target="_blank" rel="noreferrer">
+          {translate(locale, "nav.showcase")}
         </a>
       </Button>
 
@@ -45,7 +51,7 @@ export function SiteNav() {
           href={repoUrl}
           target="_blank"
           rel="noreferrer"
-          aria-label="Classifyre on GitHub"
+          aria-label={translate(locale, "nav.githubLabel")}
         >
           <SourceIcon
             source="github"
@@ -55,7 +61,9 @@ export function SiteNav() {
         </a>
       </Button>
 
-      <ThemeToggle />
+      <LocaleSwitcher locale={locale} />
+
+      <ThemeToggle label={translate(locale, "a11y.toggleTheme")} />
     </div>
   );
 }

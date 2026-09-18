@@ -1,12 +1,12 @@
 {
   "name": "@classifyre/blog",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "type": "module",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack --port 3003",
     "build": "next build --webpack",
-    "postbuild": "next-sitemap --config next-sitemap.config.js && pagefind --site out --output-subdir _pagefind",
+    "postbuild": "next-sitemap --config next-sitemap.config.js",
     "start": "next start",
     "lint": "eslint .",
     "check-types": "tsc --noEmit",
@@ -17,6 +17,7 @@
     "@workspace/schemas": "workspace:*",
     "@workspace/ui": "workspace:*",
     "gray-matter": "^4.0.3",
+    "lucide-react": "^1.7.0",
     "next": "16.1.7",
     "next-sitemap": "^4.2.3",
     "nextra": "^4.6.1",
@@ -35,7 +36,6 @@
     "@workspace/eslint-config": "workspace:^",
     "@workspace/typescript-config": "workspace:*",
     "eslint": "^9.39.4",
-    "pagefind": "^1.4.0",
     "typescript": "^5.9.3"
   }
 }

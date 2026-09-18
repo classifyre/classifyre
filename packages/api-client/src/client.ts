@@ -1395,6 +1395,15 @@ export interface Namespace {
   schemaName: string;
   description: string | null;
   thumbnail: string | null;
+  /**
+   * True while the workspace is paused: background activity is stopped and
+   * new mutating API calls are rejected with 409. Reads keep working.
+   */
+  paused: boolean;
+  /** When the workspace was paused; null while running. */
+  pausedAt: string | null;
+  /** Operator note recorded at pause time; null when unset. */
+  pausedReason: string | null;
   settings: Record<string, unknown>;
   /** Ordered external links shown on the workspace card. */
   externalLinks: NamespaceExternalLink[];
@@ -1422,6 +1431,16 @@ export interface UpdateNamespaceInput {
   description?: string;
   /** Base64 image data URI to set, or `null` to clear the thumbnail. */
   thumbnail?: string | null;
+  /**
+   * Pause (`true`) or resume (`false`) the workspace. Omit to leave the
+   * pause state untouched.
+   */
+  paused?: boolean;
+  /**
+   * Operator note stored alongside the pause. `null`/empty clears it.
+   * Omit to leave it untouched.
+   */
+  pausedReason?: string | null;
   /** Replaces the whole link array. Omit to leave links untouched. */
   externalLinks?: NamespaceExternalLinkInput[];
   /** Replaces the category set; empty falls back to the default category. */
@@ -1575,6 +1594,103 @@ class NamespacesApi {
   }
 }
 
+/**
+ * One storage dataset of a workspace: row estimate and byte size for a group
+ * of tables. `cleanupKey` is null for protected datasets (sources, findings,
+ * assets, cases, inquiries, glossary), which are measured but never wiped.
+ */
+export interface MaintenanceDatasetStat {
+  /** Stable dataset key for display (`sources`, `scans`, …). */
+  key: string;
+  cleanupKey: string | null;
+  tables: string[];
+  rowsEstimate: number;
+  sizeBytes: number;
+  cleanable: boolean;
+}
+
+/** Workspace storage overview for the Cleanup tab. */
+export interface MaintenanceOverview {
+  schemaSizeBytes: number;
+  bossSchemaSizeBytes: number;
+  datasets: MaintenanceDatasetStat[];
+  /** Schema tables no dataset lists (configuration, migrations, ...). */
+  unlistedTables: string[];
+  unlistedSizeBytes: number;
+  /** Pending/running scans right now; cleaning while non-zero races workers. */
+  activeJobs: number;
+}
+
+/** Result of wiping one cleanable dataset. */
+export interface MaintenanceCleanupResult {
+  key: string;
+  /** Rows removed per table (or job state). */
+  deleted: Record<string, number>;
+  /** Work deliberately left alone (running scans, live queue jobs, ...). */
+  skipped: Record<string, number>;
+  durationMs: number;
+}
+
+/** Immediate answer when a cleanup run starts (HTTP 202). */
+export interface MaintenanceCleanupStarted {
+  runId: string;
+  key: string;
+  status: 'running';
+}
+
+/** Pollable progress of a cleanup run. */
+export interface MaintenanceCleanupProgress {
+  runId: string;
+  key: string;
+  status: 'running' | 'done' | 'failed';
+  /** Planner guess at start (approximate); null when unknowable. */
+  totalEstimate: number | null;
+  /** Rows actually removed so far. */
+  processed: number;
+  currentTable: string | null;
+  tablesTotal: number;
+  tablesDone: number;
+  result?: MaintenanceCleanupResult;
+  error?: string;
+}
+
+class MaintenanceApi {
+  // Hand-written fetches bypass the generated client's slug middleware, so
+  // the namespace is appended here via getNamespacedApiBaseUrl (the same
+  // helper the hand-written search/* calls use).
+  private url(suffix = ""): string {
+    return `${getNamespacedApiBaseUrl()}/maintenance${suffix}`;
+  }
+
+  async overview(): Promise<MaintenanceOverview> {
+    const res = await resilientFetch(this.url("/overview"), {
+      cache: "no-store",
+    });
+    if (!res.ok)
+      throw new Error(await errorMessage(res, "load storage overview"));
+    return (await res.json()) as MaintenanceOverview;
+  }
+
+  async startCleanup(key: string): Promise<MaintenanceCleanupStarted> {
+    const res = await resilientFetch(
+      this.url(`/cleanup/${encodeURIComponent(key)}`),
+      { method: "POST" },
+    );
+    if (!res.ok) throw new Error(await errorMessage(res, "clean up storage"));
+    return (await res.json()) as MaintenanceCleanupStarted;
+  }
+
+  async cleanupProgress(runId: string): Promise<MaintenanceCleanupProgress> {
+    const res = await resilientFetch(
+      this.url(`/cleanup/runs/${encodeURIComponent(runId)}`),
+      { cache: "no-store" },
+    );
+    if (!res.ok)
+      throw new Error(await errorMessage(res, "poll cleanup progress"));
+    return (await res.json()) as MaintenanceCleanupProgress;
+  }
+}
+
 /** The API's own error message when it sent one, else a generic fallback. */
 async function errorMessage(res: Response, action: string): Promise<string> {
   try {
@@ -1613,6 +1729,7 @@ class ApiClient {
   public glossary: GlossaryApi;
   public workerQueues: WorkerQueuesApi;
   public namespaces: NamespacesApi;
+  public maintenance: MaintenanceApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -1640,6 +1757,7 @@ class ApiClient {
     this.embeddings = new EmbeddingsApi(this.config);
     this.glossary = new GlossaryApi(this.config);
     this.workerQueues = new WorkerQueuesApi(this.config);
+    this.maintenance = new MaintenanceApi();
   }
 
   /**

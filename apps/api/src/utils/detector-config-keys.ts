@@ -48,9 +48,11 @@ export function findingDetectorConfigKey(finding: {
  * a source was never in the configured set to be removed from: callers must
  * leave those findings alone rather than read them as orphaned.
  */
-export function configuredDetectorKeysFromConfig(
-  config: unknown,
-): { keys: Set<string>; legacyCustomIds: string[]; customOnly: boolean } | null {
+export function configuredDetectorKeysFromConfig(config: unknown): {
+  keys: Set<string>;
+  legacyCustomIds: string[];
+  customOnly: boolean;
+} | null {
   const recipe = (config ?? {}) as Record<string, any>;
   const legacyCustomIds = Array.isArray(recipe.custom_detectors)
     ? recipe.custom_detectors.filter(

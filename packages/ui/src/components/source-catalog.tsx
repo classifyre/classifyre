@@ -14,11 +14,31 @@ import {
   type SourceCatalogEntry,
 } from "@workspace/ui/lib/source-catalog";
 
+export interface SourceCatalogCopy {
+  heading: string;
+  subheading: string;
+  matches: string;
+  sources: string;
+  searchPlaceholder: string;
+  clear: string;
+}
+
+const DEFAULT_COPY: SourceCatalogCopy = {
+  heading: "Source Catalog",
+  subheading: "Pick connector by category",
+  matches: "Matches",
+  sources: "Sources",
+  searchPlaceholder: "Search sources, categories, or capabilities",
+  clear: "Clear",
+};
+
 type SourceCatalogProps = {
   entries: SourceCatalogEntry[];
   onSelect?: (type: string) => void;
   emptyTitle?: string;
   emptyDescription?: string;
+  /** Chrome copy overrides, so a translated site can localize the catalog. */
+  copy?: Partial<SourceCatalogCopy>;
 };
 
 function toGroupedEntries(entries: SourceCatalogEntry[]) {
@@ -35,7 +55,9 @@ export function SourceCatalog({
   onSelect,
   emptyTitle = "No sources found",
   emptyDescription = "Try a different keyword like SQL, BI, web, or chat.",
+  copy,
 }: SourceCatalogProps) {
+  const text = { ...DEFAULT_COPY, ...copy };
   const [searchQuery, setSearchQuery] = React.useState("");
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
@@ -70,14 +92,14 @@ export function SourceCatalog({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
-              Source Catalog
+              {text.heading}
             </div>
             <div className="text-sm font-semibold uppercase tracking-[0.06em]">
-              Pick connector by category
+              {text.subheading}
             </div>
           </div>
           <Badge className="rounded-[4px] border border-black bg-[#b7ff00] text-black">
-            {filteredEntries.length} Matches
+            {filteredEntries.length} {text.matches}
           </Badge>
         </div>
         <div className="relative mt-3">
@@ -85,7 +107,7 @@ export function SourceCatalog({
           <Input
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search sources, categories, or capabilities"
+            placeholder={text.searchPlaceholder}
             className="h-10 rounded-[4px] border-2 border-black pl-9 text-sm focus-visible:ring-0"
           />
           {searchQuery ? (
@@ -95,7 +117,7 @@ export function SourceCatalog({
               onClick={() => setSearchQuery("")}
               className="absolute right-1 top-1/2 h-7 -translate-y-1/2 rounded-[4px] px-2 text-xs"
             >
-              Clear
+              {text.clear}
             </Button>
           ) : null}
         </div>
@@ -128,7 +150,7 @@ export function SourceCatalog({
                       </p>
                     </div>
                     <Badge className="w-fit rounded-[4px] border-2 border-black bg-[#b7ff00] text-[10px] uppercase tracking-[0.16em] text-black">
-                      {categoryEntries.length} Sources
+                      {categoryEntries.length} {text.sources}
                     </Badge>
                   </div>
 

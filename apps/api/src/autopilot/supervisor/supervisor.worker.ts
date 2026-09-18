@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   AgentKind,
   AgentRunStatus,
   type InstanceSettings,
 } from '@prisma/client';
+import { NamespacePauseService } from '../../namespace/namespace-pause.service';
 import { randomUUID } from 'crypto';
 import type { Job } from 'pg-boss';
 import { PrismaService } from '../../prisma.service';
@@ -60,6 +61,7 @@ export class SupervisorWorker {
     private readonly harness: HarnessService,
     private readonly audit: AgentAuditService,
     private readonly log: AgentLoggerService,
+    @Optional() private readonly pause?: NamespacePauseService,
   ) {}
 
   async registerForNamespace(): Promise<void> {
@@ -126,10 +128,15 @@ export class SupervisorWorker {
    * silently. A tick that finds nothing due does one indexed read and returns.
    */
   async tick(): Promise<void> {
+    if (await this.pause?.isPaused()) return;
     if (await this.wakeIsDue()) await this.requestWake({ tick: true });
   }
 
   private async handle(jobs: Job[]): Promise<void> {
+    if (await this.pause?.isPaused()) {
+      this.logger.debug('Workspace paused — skipping supervisor job(s)');
+      return;
+    }
     for (const job of jobs) {
       const data = (job.data ?? {}) as SupervisorJob;
       // A tick asks whether a wake is due; it is not itself the wake. Without

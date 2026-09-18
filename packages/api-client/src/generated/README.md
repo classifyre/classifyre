@@ -263,6 +263,9 @@ All URIs are relative to *http://localhost*
 *InstanceSettingsApi* | [**mcpSettingsControllerGetTools**](docs/InstanceSettingsApi.md#mcpsettingscontrollergettools) | **GET** /instance-settings/mcp/tools | List MCP tools
 *InstanceSettingsApi* | [**mcpSettingsControllerListTokens**](docs/InstanceSettingsApi.md#mcpsettingscontrollerlisttokens) | **GET** /instance-settings/mcp/tokens | List MCP access tokens
 *InstanceSettingsApi* | [**mcpSettingsControllerUpdateToken**](docs/InstanceSettingsApi.md#mcpsettingscontrollerupdatetoken) | **PATCH** /instance-settings/mcp/tokens/{id} | Update MCP access token
+*MaintenanceApi* | [**maintenanceControllerCleanupRun**](docs/MaintenanceApi.md#maintenancecontrollercleanuprun) | **GET** /maintenance/cleanup/runs/{runId} | Poll one cleanup run: rows removed so far, current table, and the final result once done
+*MaintenanceApi* | [**maintenanceControllerOverview**](docs/MaintenanceApi.md#maintenancecontrolleroverview) | **GET** /maintenance/overview | Workspace storage overview: per-table row estimates and byte sizes, grouped into protected and cleanable datasets
+*MaintenanceApi* | [**maintenanceControllerStartCleanup**](docs/MaintenanceApi.md#maintenancecontrollerstartcleanup) | **POST** /maintenance/cleanup/{key} | Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph, finished transfers). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.
 *NamespacesApi* | [**namespacesControllerCreate**](docs/NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations)
 *NamespacesApi* | [**namespacesControllerCreateCategory**](docs/NamespacesApi.md#namespacescontrollercreatecategory) | **POST** /namespaces/categories | Create a workspace category
 *NamespacesApi* | [**namespacesControllerGet**](docs/NamespacesApi.md#namespacescontrollerget) | **GET** /namespaces/{id} | Get a namespace by id
@@ -340,6 +343,7 @@ All URIs are relative to *http://localhost*
 *ThreadsApi* | [**caseThreadsControllerUnlinkSupport**](docs/ThreadsApi.md#casethreadscontrollerunlinksupport) | **DELETE** /threads/{id}/support/{linkId} | Unlink evidence or finding from a thread
 *ThreadsApi* | [**caseThreadsControllerUpdate**](docs/ThreadsApi.md#casethreadscontrollerupdate) | **PATCH** /threads/{id} | Update thread title / status / confidence / color
 *WorkerQueuesApi* | [**workerQueuesControllerOverview**](docs/WorkerQueuesApi.md#workerqueuescontrolleroverview) | **GET** /worker-queues | List background queues with live worker state and backlog
+*WorkerQueuesApi* | [**workerQueuesControllerPurgeQueued**](docs/WorkerQueuesApi.md#workerqueuescontrollerpurgequeued) | **POST** /worker-queues/{queue}/purge | Drop a queue’s waiting backlog
 *WorkerQueuesApi* | [**workerQueuesControllerSetPaused**](docs/WorkerQueuesApi.md#workerqueuescontrollersetpaused) | **PUT** /worker-queues/{queue}/paused | Pause or resume a background queue
 
 
@@ -594,6 +598,7 @@ All URIs are relative to *http://localhost*
 - [ProposeCaseLeadDto](docs/ProposeCaseLeadDto.md)
 - [PullFromInquiryDto](docs/PullFromInquiryDto.md)
 - [PullFromInquiryResponseDto](docs/PullFromInquiryResponseDto.md)
+- [PurgeQueuedJobsResponseDto](docs/PurgeQueuedJobsResponseDto.md)
 - [PurgeSourceAssetsResponseDto](docs/PurgeSourceAssetsResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
 - [RebuildEdgesResponseDto](docs/RebuildEdgesResponseDto.md)

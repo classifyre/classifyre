@@ -113,6 +113,9 @@ export class NamespaceWorkerManager
     // Teardown is needed in every service role: API-only pods can own lazy
     // Prisma/pg-boss/export/MCP connections even though they run no workers.
     this.registry.onDeleting((e) => this.stop(e));
+    // Pause/resume flips workers on the process that handled the PATCH; every
+    // other process converges through the reconcile loop below.
+    this.registry.onPauseChanged((e) => this.applyPauseChanged(e));
 
     this.reconcileTimer = setInterval(() => {
       void this.reconcileNamespaces();
@@ -125,6 +128,15 @@ export class NamespaceWorkerManager
     }
 
     for (const ns of await this.registry.list()) {
+      // A restart must not briefly resurrect paused workspaces: their cron
+      // schedules would fire inside the window before the reconcile stops
+      // them again.
+      if (ns.paused) {
+        this.logger.log(
+          `Workspace '${ns.slug}' is paused — workers not started`,
+        );
+        continue;
+      }
       await this.start({
         namespaceId: ns.id,
         slug: ns.slug,
@@ -161,6 +173,41 @@ export class NamespaceWorkerManager
       void this.evaluateIdle();
     }, coldMode.checkMs);
     this.idleTimer.unref();
+  }
+
+  /**
+   * Apply a pause-state flip: stop everything for a paused workspace
+   * (including in-flight scans, via `stopForSchema`), start it all again on
+   * resume. Paused namespaces keep their data, schedules and queued jobs —
+   * resume continues where the pause stopped.
+   */
+  private async applyPauseChanged(
+    e: NamespaceLifecycleEvent & { paused: boolean },
+  ): Promise<void> {
+    if (e.paused) {
+      await this.stop(e).catch((error) =>
+        this.logger.error(
+          `Failed to stop workers for paused namespace '${e.slug}': ${String(error)}`,
+        ),
+      );
+      this.logger.log(
+        `Workspace '${e.slug}' paused — background workers stopped`,
+      );
+      return;
+    }
+    // `stop()` clears the cold-mode sleep record, so a namespace that was
+    // asleep when paused still wakes here rather than waiting on the idle
+    // evaluator.
+    this.sleeping.delete(e.schemaName);
+    if (!runsBackgroundWorkers()) return;
+    await this.start(e).catch((error) =>
+      this.logger.error(
+        `Failed to start workers for resumed namespace '${e.slug}': ${String(error)}`,
+      ),
+    );
+    this.logger.log(
+      `Workspace '${e.slug}' resumed — background workers started`,
+    );
   }
 
   /**
@@ -557,10 +604,17 @@ export class NamespaceWorkerManager
         }),
       ]),
     );
+    // Paused workspaces stay listed and resolvable, but run nothing: never
+    // auto-start them, and stop them here when the flip was handled by another
+    // process (its in-process event never reaches this one).
+    const pausedSchemas = new Set(
+      namespaces.filter((ns) => ns.paused).map((ns) => ns.schemaName),
+    );
 
     try {
       if (runsBackgroundWorkers()) {
         for (const ctx of local.values()) {
+          if (pausedSchemas.has(ctx.schemaName)) continue;
           // Sleeping namespaces wake only through the idle evaluator, which
           // has seen their activity snapshot — not through the blind reconcile.
           if (
@@ -573,6 +627,13 @@ export class NamespaceWorkerManager
               ),
             );
           }
+        }
+        for (const ctx of [...this.active.values()]) {
+          if (!pausedSchemas.has(ctx.schemaName)) continue;
+          await this.stop(ctx).catch(() => undefined);
+          this.logger.log(
+            `Workspace '${ctx.slug}' is paused — background workers stopped`,
+          );
         }
       }
 

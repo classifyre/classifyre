@@ -20,6 +20,7 @@ export { GraphApi } from './GraphApi';
 export { HealthApi } from './HealthApi';
 export { InquiriesApi } from './InquiriesApi';
 export { InstanceSettingsApi } from './InstanceSettingsApi';
+export { MaintenanceApi } from './MaintenanceApi';
 export { NamespacesApi } from './NamespacesApi';
 export { NotebooksApi } from './NotebooksApi';
 export { NotificationsApi } from './NotificationsApi';

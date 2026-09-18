@@ -136,3 +136,15 @@ export class SetWorkerQueuePausedDto {
   @IsBoolean()
   paused: boolean;
 }
+
+export class PurgeQueuedJobsResponseDto {
+  @ApiProperty({ example: 'auto-schedule.tick' })
+  queue: string;
+
+  @ApiProperty({
+    example: 3,
+    description:
+      'Waiting jobs dropped by the purge (depth sampled just before). Running jobs, finished history and schedules are untouched.',
+  })
+  droppedQueued: number;
+}

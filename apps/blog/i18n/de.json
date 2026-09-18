@@ -1,0 +1,199 @@
+{
+  "nav": {
+    "product": "Produkt",
+    "get": "Classifyre holen",
+    "sources": "Quellen",
+    "editions": "Open Source vs. Enterprise",
+    "blog": "Blog",
+    "overview": "Publikationsübersicht",
+    "articles": "Business-Blog",
+    "cases": "Fallakten",
+    "documentation": "Dokumentation",
+    "getCta": "Classifyre holen",
+    "showcase": "Showcase",
+    "githubLabel": "Classifyre auf GitHub"
+  },
+  "footer": {
+    "tagline": "Ermittlungsplattform",
+    "blurb": "Die Open-Source-Ermittlungsplattform für Ihre Daten. Classifyre scannt die Systeme, die Sie bereits betreiben, erkennt Secrets, PII und die von Ihnen definierten Signale und bearbeitet die Befunde wie ein Ermittler — stehende Anfragen, gereihte Beweise, Fälle und ein KI-Autopilot zwischen den Scans.",
+    "navHeading": "Navigation",
+    "navHome": "Start",
+    "navGet": "Classifyre holen",
+    "navSources": "Quellen",
+    "navEditions": "Open Source vs. Enterprise",
+    "navBlog": "Blog",
+    "navDocumentation": "Dokumentation",
+    "navShowcase": "Live-Showcase",
+    "navGithub": "GitHub",
+    "legalHeading": "Rechtliches & Kontakt",
+    "privacy": "Datenschutz- & Cookie-Richtlinie",
+    "cookieSettings": "Cookie-Einstellungen",
+    "contact": "Kontakt",
+    "madeIn": "Made in Austria",
+    "baselineTagline": "Jedes Leck hinterlässt eine Spur"
+  },
+  "cookie": {
+    "message": "Wir nutzen Analyse-Cookies nur, um zu sehen, welche Seiten gelesen werden — sonst nichts. Keine Werbung, kein Profiling, keine verkauften Daten. Lehnen Sie ab, funktioniert die Seite genau gleich.",
+    "policyLabel": "Datenschutz- & Cookie-Richtlinie",
+    "accept": "Akzeptieren",
+    "decline": "Ablehnen",
+    "regionLabel": "Cookies",
+    "ariaLabel": "Cookie-Einwilligung"
+  },
+  "blog": {
+    "caseFile": "Fallakte",
+    "article": "Business-Blog",
+    "openCaseFile": "Fallakte öffnen",
+    "readArticle": "Artikel lesen",
+    "backToOverview": "Zurück zur Publikationsübersicht"
+  },
+  "catalog": {
+    "heading": "Quellen-Katalog",
+    "subheading": "Konnektor nach Kategorie wählen",
+    "matches": "Treffer",
+    "sources": "Quellen",
+    "searchPlaceholder": "Quellen, Kategorien oder Fähigkeiten suchen",
+    "clear": "Zurücksetzen",
+    "emptyTitle": "Keine Quellen gefunden",
+    "emptyDescription": "Versuchen Sie ein anderes Stichwort, z. B. SQL, BI, Web oder Chat."
+  },
+  "docker": {
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "copyCommand": "Befehl kopieren",
+    "notes": [
+      "der einzige Port, den es bedient",
+      "Postgres braucht es; der Default ist zu klein",
+      "Ihre Daten",
+      "Scan-Logs + Credential-Key",
+      "überlebt Upgrades"
+    ]
+  },
+  "a11y": {
+    "toggleTheme": "Design wechseln"
+  },
+  "liveCase": {
+    "ariaLabel": "Die Live-Fallakte {{caseName}} in der Classifyre-Showcase öffnen (öffnet einen neuen Tab)",
+    "liveNamespace": "Live-Namespace · aktualisiert sich mit den Scans",
+    "inspect": "Live-Fallakte ansehen: {{caseName}}",
+    "open": "Fall öffnen",
+    "openLive": "Live-Fall öffnen"
+  },
+  "evidence": {
+    "ariaLabel": "Die Classifyre-Pipeline: Aus Quellen werden Assets, Detektoren melden Befunde, Befunde speisen Anfragen und Duplikate, und beide münden in Fälle — der Autopilot bearbeitet die Ermittlungshälfte",
+    "autopilotSide": "AUTOPILOT ARBEITET HIER",
+    "nodes": {
+      "sources": {
+        "label": "QUELLEN",
+        "sub": "Datenbanken · Dateien · SaaS"
+      },
+      "assets": {
+        "label": "ASSETS",
+        "sub": "Objekte + Metadaten"
+      },
+      "detectors": {
+        "label": "DETEKTOREN",
+        "sub": "eingebaut + eigene"
+      },
+      "findings": {
+        "label": "BEFUNDE",
+        "sub": "nach Wichtigkeit gereiht"
+      },
+      "inquiries": {
+        "label": "ANFRAGEN",
+        "sub": "stehende Fragen"
+      },
+      "duplicates": {
+        "label": "DUPLIKATE",
+        "sub": "Prüf-Queue, Paar für Paar"
+      },
+      "cases": {
+        "label": "FÄLLE",
+        "sub": "Beweise + Hypothesen"
+      }
+    }
+  },
+  "queue": {
+    "beforeEyebrow": "Vorher · Fingerprints",
+    "beforeTitle": "Ein Ähnlichkeits-Canvas",
+    "beforeVerdict": "412 Paare. Keine Ordnung, keine Zählungen, kein Ende. Jede Sitzung startete bei null.",
+    "beforeAria": "Ein dichter, ungeordneter Graph aus Ähnlichkeitslinks zwischen Assets",
+    "afterEyebrow": "Nachher · Duplikatprüfung",
+    "afterTitle": "Eine gereihte Queue",
+    "afterVerdict": "Dieselben 412 Paare. Eine Regel räumt 146 davon ab; 17 brauchen überhaupt kein Urteil.",
+    "pairsRemaining": "Paare übrig",
+    "left": "übrig",
+    "ruleNeedsJudgement": "braucht Urteil",
+    "ruleCandidate": "Regel-Kandidat",
+    "cutoffCandidate": "Cutoff-Kandidat",
+    "ruleNone": "kein Urteil nötig",
+    "figcaption": "Derselbe Korpus, zweimal gezeichnet. Nur eines davon lässt sich abschließen."
+  },
+  "matchWeight": {
+    "title": "Match-Gewicht",
+    "perfect": "Perfekter Match = 1.00",
+    "barsPrefix": "die Balken unten summieren sich auf ",
+    "weight": "Gewicht",
+    "footerA": "Links der Linie stehen Beweise ",
+    "footerEm": "dagegen",
+    "footerB": ": Adresse und Telefon auf einem Asset, die das andere nicht hat. Sie stecken in der Summe, nicht außerhalb."
+  },
+  "share": {
+    "share": "Teilen",
+    "shareThis": "Diese Fallakte teilen",
+    "filedUnder": "Abgelegt unter",
+    "x": "Auf X teilen",
+    "linkedIn": "Auf LinkedIn teilen",
+    "email": "Per E-Mail teilen",
+    "copy": "Link kopieren",
+    "copied": "Link kopiert"
+  },
+  "chrome": {
+    "tocTitle": "Auf dieser Seite",
+    "backToTop": "Nach oben scrollen",
+    "language": "Sprache",
+    "switchToGerman": "Auf Deutsch lesen",
+    "switchToEnglish": "Read in English",
+    "germanName": "Deutsch",
+    "englishName": "English"
+  },
+  "site": {
+    "title": "Classifyre",
+    "description": "Daten über Datenbanken, Lakehouses, Kollaborationstools, Analysesysteme und öffentliche Inhalte hinweg erkennen, klassifizieren und labeln.",
+    "websiteDescription": "Daten über Datenbanken, Lakehouses, Kollaborationstools, Analysesysteme und öffentliche Inhalte hinweg erkennen, klassifizieren und labeln.",
+    "blogDescription": "Produkt-Updates, Engineering-Notizen, Deployment-Anleitungen und Detektor-Designs von Classifyre.",
+    "orgDescription": "Open-Source-Plattform zur Datenerkennung, Klassifizierung und Labelung für moderne Quellsysteme, gebaut in Österreich."
+  },
+  "findingTags": [
+    "geleakte E-Mail",
+    "Kreditkarte",
+    "ungültiger Saldo",
+    "offengelegtes Geheimnis",
+    "falsche Adresse",
+    "geleakte Zugangsdaten",
+    "Insolvenz",
+    "unbezahlte Rechnung",
+    "abgelaufener Vertrag",
+    "sanktionierte Firma",
+    "veralteter Export",
+    "verwaistes Konto",
+    "fehlende Einwilligung",
+    "doppelter Lieferant"
+  ],
+  "closingBoard": {
+    "exhibitA": "Beweisstück A",
+    "confirmed": "Bestätigt"
+  },
+  "caseGraph": {
+    "ariaLabel": "Fall-Graph für Fall 42, ein Geheimleck per E-Mail: Absender- und Auswirkungs-Hypothesen, verknüpft mit E-Mail-, Identitäts-, Markierungs- und Duplikat-Befunden, mit Analysten-Link und Autopilot-Zuordnung",
+    "analystLink": "ANALYSTEN-LINK",
+    "duplicateMatch": "DUPLIKAT-TREFFER · VERSANDTE DATEI = INTERNE DATEI",
+    "caseOpen": "FALL #42 · OFFEN",
+    "caseTitle": "Geheimleck per E-Mail",
+    "hypothesis1": "HYPOTHESE 1",
+    "hypothesis1Text": "Absender: A. Novak",
+    "hypothesis2": "HYPOTHESE 2",
+    "hypothesis2Text": "214 Datensätze geleakt",
+    "autopilot": "PER AUTOPILOT"
+  }
+}

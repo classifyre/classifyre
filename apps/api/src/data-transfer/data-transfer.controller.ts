@@ -24,6 +24,7 @@ import type { DataTransferJob } from '@prisma/client';
 
 import { ArchiveStoreService } from './archive-store.service';
 import { DataTransferService } from './data-transfer.service';
+import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import {
   ArchivePreviewDto,
   DataTransferJobDto,
@@ -75,6 +76,7 @@ export class DataTransferController {
     return toDto(await this.transfers.get(id));
   }
 
+  @BlockWhenPaused()
   @Post('exports')
   @ApiOperation({ summary: 'Start an export of the selected scopes' })
   @ApiOkResponse({ type: DataTransferJobDto })
@@ -138,6 +140,7 @@ export class DataTransferController {
     );
   }
 
+  @BlockWhenPaused()
   @Post('imports')
   @ApiOperation({ summary: 'Import selected scopes from an uploaded archive' })
   @ApiOkResponse({ type: DataTransferJobDto })

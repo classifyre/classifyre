@@ -22,6 +22,7 @@ import {
   type NotebookScope,
 } from './notebook.service';
 import { NotebookExecutionService } from './notebook-execution.service';
+import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import {
   CreateNotebookExecutionDto,
   NotebookDto,
@@ -148,6 +149,7 @@ export class NotebookController {
     );
   }
 
+  @BlockWhenPaused()
   @Post('sources/:sourceId/notebook/executions')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({

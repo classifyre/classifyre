@@ -1,5 +1,8 @@
 import type { CSSProperties } from "react";
 
+import { translate } from "@/i18n";
+import type { Locale } from "@/lib/locale";
+
 /**
  * The evidence board: one static read of the whole pipeline, from the
  * systems you connect down to a case somebody can actually work.
@@ -13,8 +16,6 @@ import type { CSSProperties } from "react";
  */
 
 type BoardNode = {
-  label: string;
-  sub: string;
   x: number;
   y: number;
   width: number;
@@ -24,40 +25,23 @@ type BoardNode = {
 
 const NODE_HEIGHT = 52;
 
-const NODES: readonly BoardNode[] = [
-  {
-    label: "SOURCES",
-    sub: "databases · files · saas",
-    x: 80,
-    y: 16,
-    width: 200,
-  },
-  { label: "ASSETS", sub: "items + metadata", x: 80, y: 104, width: 200 },
-  { label: "DETECTORS", sub: "built-in + your own", x: 80, y: 192, width: 200 },
-  {
-    label: "FINDINGS",
-    sub: "ranked by importance",
-    x: 80,
-    y: 280,
-    width: 200,
-    primary: true,
-  },
-  { label: "INQUIRIES", sub: "standing questions", x: 14, y: 380, width: 156 },
-  {
-    label: "DUPLICATES",
-    sub: "review queue, pair by pair",
-    x: 190,
-    y: 380,
-    width: 156,
-  },
-  {
-    label: "CASES",
-    sub: "evidence + hypotheses",
-    x: 80,
-    y: 472,
-    width: 200,
-    primary: true,
-  },
+type EvidenceNodeKey =
+  | "sources"
+  | "assets"
+  | "detectors"
+  | "findings"
+  | "inquiries"
+  | "duplicates"
+  | "cases";
+
+const NODES: readonly (BoardNode & { key: EvidenceNodeKey })[] = [
+  { key: "sources", x: 80, y: 16, width: 200 },
+  { key: "assets", x: 80, y: 104, width: 200 },
+  { key: "detectors", x: 80, y: 192, width: 200 },
+  { key: "findings", x: 80, y: 280, width: 200, primary: true },
+  { key: "inquiries", x: 14, y: 380, width: 156 },
+  { key: "duplicates", x: 190, y: 380, width: 156 },
+  { key: "cases", x: 80, y: 472, width: 200, primary: true },
 ] as const;
 
 /** `d` plus the rough path length, so the draw-on animation lands evenly. */
@@ -71,12 +55,12 @@ const EDGES: readonly { d: string; len: number }[] = [
   { d: "M 268 432 C 260 456, 228 458, 198 472", len: 90 },
 ] as const;
 
-export function EvidenceBoard() {
+export function EvidenceBoard({ locale = "en" }: { locale?: Locale }) {
   return (
     <svg
       viewBox="0 0 360 566"
       role="img"
-      aria-label="The Classifyre pipeline: sources become assets, detectors raise findings, findings feed inquiries and duplicates, and both converge into cases — with the autopilot working the investigation half"
+      aria-label={translate(locale, "evidence.ariaLabel")}
       className="cl-board h-auto w-full text-foreground"
     >
       {EDGES.map((edge, index) => (
@@ -127,13 +111,13 @@ export function EvidenceBoard() {
           fill="currentColor"
           opacity="0.7"
         >
-          AUTOPILOT WORKS THIS SIDE
+          {translate(locale, "evidence.autopilotSide")}
         </text>
       </g>
 
       {NODES.map((node, index) => (
         <g
-          key={node.label}
+          key={node.key}
           className="cl-board-node"
           style={{ "--cl-delay": `${index * 90}ms` } as CSSProperties}
         >
@@ -156,7 +140,7 @@ export function EvidenceBoard() {
             letterSpacing="0.14em"
             fill={node.primary ? "#0a0a0a" : "currentColor"}
           >
-            {node.label}
+            {translate(locale, `evidence.nodes.${node.key}.label`)}
           </text>
           <text
             x={node.x + node.width / 2}
@@ -168,7 +152,7 @@ export function EvidenceBoard() {
             fill={node.primary ? "#0a0a0a" : "currentColor"}
             opacity={node.primary ? 0.72 : 0.6}
           >
-            {node.sub}
+            {translate(locale, `evidence.nodes.${node.key}.sub`)}
           </text>
         </g>
       ))}

@@ -10,6 +10,7 @@ import {
   setActiveNamespaceSlug,
   type Namespace,
 } from "@workspace/api-client";
+import { OctagonPause, Play } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
@@ -64,6 +65,11 @@ export default function NamespaceSettingsPage() {
   const [thumbnailChanged, setThumbnailChanged] = React.useState(false);
   const [links, setLinks] = React.useState<EditableLink[]>([]);
   const [categoryIds, setCategoryIds] = React.useState<string[]>([]);
+  const [paused, setPaused] = React.useState(false);
+  const [pausedAt, setPausedAt] = React.useState<string | null>(null);
+  const [pausedReason, setPausedReason] = React.useState<string | null>(null);
+  const [reasonDraft, setReasonDraft] = React.useState("");
+  const [pauseBusy, setPauseBusy] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -93,6 +99,10 @@ export default function NamespaceSettingsPage() {
         })),
       );
       setCategoryIds(result.categoryIds);
+      setPaused(result.paused);
+      setPausedAt(result.pausedAt);
+      setPausedReason(result.pausedReason);
+      setReasonDraft(result.pausedReason ?? "");
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -151,6 +161,10 @@ export default function NamespaceSettingsPage() {
         })),
       );
       setCategoryIds(updated.categoryIds);
+      setPaused(updated.paused);
+      setPausedAt(updated.pausedAt);
+      setPausedReason(updated.pausedReason);
+      setReasonDraft(updated.pausedReason ?? "");
       toast.success(t("workspaces.settingsSaved"));
       router.refresh();
     } catch (saveError) {
@@ -161,6 +175,46 @@ export default function NamespaceSettingsPage() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const applyPauseResult = (updated: Namespace, previousSlug: string) => {
+    updateActiveNamespace(updated, previousSlug);
+    setNamespace(updated);
+    setPaused(updated.paused);
+    setPausedAt(updated.pausedAt);
+    setPausedReason(updated.pausedReason);
+    setReasonDraft(updated.pausedReason ?? "");
+    router.refresh();
+  };
+
+  const setPauseState = async (nextPaused: boolean) => {
+    if (!namespace || pauseBusy) return;
+    setPauseBusy(true);
+    try {
+      const updated = await api.namespaces.update(namespace.id, {
+        paused: nextPaused,
+        // Record a fresh reason when pausing; leave the stored one alone when
+        // resuming so the settings still show why it had been paused.
+        ...(nextPaused
+          ? { pausedReason: reasonDraft.trim() ? reasonDraft.trim() : null }
+          : {}),
+      });
+      applyPauseResult(updated, namespace.slug);
+      toast.success(
+        t(
+          nextPaused ? "workspaces.pauseSuccess" : "workspaces.resumeSuccess",
+          { name: updated.name },
+        ),
+      );
+    } catch (pauseError) {
+      toast.error(
+        pauseError instanceof Error
+          ? pauseError.message
+          : t("workspaces.pauseFailed"),
+      );
+    } finally {
+      setPauseBusy(false);
     }
   };
 
@@ -306,6 +360,76 @@ export default function NamespaceSettingsPage() {
               </Button>
             </div>
           </form>
+        ) : null}
+
+        {namespace && !loading && !error ? (
+          <section
+            aria-label={t("workspaces.pauseSectionTitle")}
+            className="mt-8 space-y-4 border border-border p-5"
+          >
+            <div className="flex items-center gap-2">
+              <OctagonPause className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <h2 className="text-xs font-mono uppercase tracking-[0.14em]">
+                {t("workspaces.pauseSectionTitle")}
+              </h2>
+              {paused && (
+                <span className="rounded-sm border border-amber-600/40 bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-400">
+                  {t("workspaces.pausedBadge")}
+                </span>
+              )}
+            </div>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {t("workspaces.pauseSectionDescription")}
+            </p>
+            {paused && pausedAt ? (
+              <p className="text-xs text-muted-foreground">
+                {t("workspaces.pausedSince", {
+                  when: new Date(pausedAt).toLocaleString(),
+                })}
+                {pausedReason ? ` — ${pausedReason}` : ""}
+              </p>
+            ) : null}
+            {!paused ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="workspace-pause-reason">
+                    {t("workspaces.pauseReasonLabel")}
+                  </Label>
+                  <Input
+                    id="workspace-pause-reason"
+                    value={reasonDraft}
+                    onChange={(event) => setReasonDraft(event.target.value)}
+                    placeholder={t("workspaces.pauseReasonPlaceholder")}
+                    disabled={pauseBusy}
+                    maxLength={280}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={pauseBusy}
+                  onClick={() => void setPauseState(true)}
+                >
+                  <OctagonPause className="size-4" />
+                  {pauseBusy
+                    ? t("workspaces.pausingAction")
+                    : t("workspaces.pauseAction")}
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="default"
+                disabled={pauseBusy}
+                onClick={() => void setPauseState(false)}
+              >
+                <Play className="size-4" />
+                {pauseBusy
+                  ? t("workspaces.resumingAction")
+                  : t("workspaces.resumeAction")}
+              </Button>
+            )}
+          </section>
         ) : null}
       </main>
     </div>

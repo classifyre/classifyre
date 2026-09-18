@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { Job } from 'pg-boss';
+import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import {
   AgentKind,
   AgentRunStatus,
@@ -154,6 +155,7 @@ export class AutopilotWorker {
     private readonly embeddings: EmbeddingQueueService,
     private readonly agents: AgentConfigService,
     private readonly supervisor: SupervisorService,
+    @Optional() private readonly pause?: NamespacePauseService,
   ) {}
 
   /**
@@ -247,6 +249,14 @@ export class AutopilotWorker {
   }
 
   private async handle(jobs: Job[]): Promise<void> {
+    // Jobs enqueued before the pause landed — scan cycles, the dream cron,
+    // the heartbeat — complete without doing anything: no retry, no cycle,
+    // no dream. Resume re-enqueues nothing; the next scan starts the next
+    // cycle.
+    if (await this.pause?.isPaused()) {
+      this.logger.debug('Workspace paused — skipping autopilot job(s)');
+      return;
+    }
     for (const job of jobs) {
       const data = job.data as Partial<AutopilotJob>;
       const sourceId =
