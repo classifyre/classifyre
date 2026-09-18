@@ -4,6 +4,13 @@ import * as React from "react";
 import { X } from "lucide-react";
 
 import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@workspace/ui/components/context-menu";
 import { cn } from "@workspace/ui/lib/utils";
 
 export interface NamespaceTabItem {
@@ -11,6 +18,17 @@ export interface NamespaceTabItem {
   id: string;
   /** Human-readable namespace name. */
   label: string;
+}
+
+export interface NamespaceTabMenuLabels {
+  /** Per-tab "close this tab" entry. */
+  close: (item: NamespaceTabItem) => string;
+  /** "Close every tab except this one" entry. */
+  closeOthers: string;
+  /** "Close every tab left of this one" entry. */
+  closeLeft: string;
+  /** "Close every tab right of this one" entry. */
+  closeRight: string;
 }
 
 export interface NamespaceTabsProps extends Omit<
@@ -23,6 +41,11 @@ export interface NamespaceTabsProps extends Omit<
   closeLabel: (item: NamespaceTabItem) => string;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
+  /** Bulk-close handlers. The menu renders only when `menuLabels` is set. */
+  onCloseOthers?: (id: string) => void;
+  onCloseLeft?: (id: string) => void;
+  onCloseRight?: (id: string) => void;
+  menuLabels?: NamespaceTabMenuLabels;
 }
 
 /**
@@ -39,6 +62,10 @@ function NamespaceTabs({
   closeLabel,
   onActivate,
   onClose,
+  onCloseOthers,
+  onCloseLeft,
+  onCloseRight,
+  menuLabels,
   className,
   ...props
 }: NamespaceTabsProps) {
@@ -60,14 +87,8 @@ function NamespaceTabs({
           aria-label={ariaLabel}
           className="h-10 w-full justify-start overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {items.map((item, index) => (
-            <React.Fragment key={item.id}>
-              {index > 0 && (
-                <span
-                  aria-hidden="true"
-                  className="mx-1.5 h-4 w-px shrink-0 self-center bg-muted-foreground/20"
-                />
-              )}
+          {items.map((item, index) => {
+            const tab = (
               <div
                 role="presentation"
                 className="group relative h-10 min-w-36 max-w-56 shrink basis-48"
@@ -103,8 +124,66 @@ function NamespaceTabs({
                   <X className="size-3" />
                 </button>
               </div>
-            </React.Fragment>
-          ))}
+            );
+
+            // No menu labels: keep the strip a plain tab list (and keep
+            // consumers that only need activate/close untouched).
+            if (!menuLabels) {
+              return (
+                <React.Fragment key={item.id}>
+                  {index > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="mx-1.5 h-4 w-px shrink-0 self-center bg-muted-foreground/20"
+                    />
+                  )}
+                  {tab}
+                </React.Fragment>
+              );
+            }
+
+            const isFirst = index === 0;
+            const isLast = index === items.length - 1;
+            const isOnly = items.length < 2;
+
+            return (
+              <React.Fragment key={item.id}>
+                {index > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="mx-1.5 h-4 w-px shrink-0 self-center bg-muted-foreground/20"
+                  />
+                )}
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>{tab}</ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onSelect={() => onClose(item.id)}>
+                      {menuLabels.close(item)}
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      disabled={!onCloseOthers || isOnly}
+                      onSelect={() => onCloseOthers?.(item.id)}
+                    >
+                      {menuLabels.closeOthers}
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      disabled={!onCloseLeft || isFirst}
+                      onSelect={() => onCloseLeft?.(item.id)}
+                    >
+                      {menuLabels.closeLeft}
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      disabled={!onCloseRight || isLast}
+                      onSelect={() => onCloseRight?.(item.id)}
+                    >
+                      {menuLabels.closeRight}
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+              </React.Fragment>
+            );
+          })}
         </TabsList>
       </Tabs>
     </div>

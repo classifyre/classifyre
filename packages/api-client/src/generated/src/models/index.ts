@@ -249,6 +249,7 @@ export * from './PreviewResponseDto';
 export * from './ProposeCaseLeadDto';
 export * from './PullFromInquiryDto';
 export * from './PullFromInquiryResponseDto';
+export * from './PurgeQueuedJobsResponseDto';
 export * from './PurgeSourceAssetsResponseDto';
 export * from './PutAssetChunksDto';
 export * from './RebuildEdgesResponseDto';

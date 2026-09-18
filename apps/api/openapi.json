@@ -7664,6 +7664,44 @@
         ]
       }
     },
+    "/worker-queues/{queue}/purge": {
+      "post": {
+        "description": "Deletes waiting (`created`) and scheduled-retry jobs of one queue. Running jobs finish normally; finished history and the cron schedules themselves are untouched, so periodic work recovers on its next fire while one-off jobs need a manual re-trigger. Allowed while the workspace is paused — nothing refills the queue until resume.",
+        "operationId": "WorkerQueuesController_purgeQueued",
+        "parameters": [
+          {
+            "name": "queue",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgeQueuedJobsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Housekeeping queues cannot be purged"
+          },
+          "404": {
+            "description": "Unknown queue"
+          }
+        },
+        "summary": "Drop a queue’s waiting backlog",
+        "tags": [
+          "Worker Queues"
+        ]
+      }
+    },
     "/sources/{sourceId}/run": {
       "post": {
         "operationId": "CliRunnerController_startRunner",
@@ -11897,6 +11935,75 @@
         "summary": "Ask a running transfer to stop",
         "tags": [
           "data-transfer"
+        ]
+      }
+    },
+    "/maintenance/overview": {
+      "get": {
+        "operationId": "MaintenanceController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Workspace storage overview: per-table row estimates and byte sizes, grouped into protected and cleanable datasets",
+        "tags": [
+          "maintenance"
+        ]
+      }
+    },
+    "/maintenance/cleanup/{key}": {
+      "post": {
+        "operationId": "MaintenanceController_startCleanup",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cleanup run started"
+          },
+          "404": {
+            "description": "Unknown cleanup key (incl. protected datasets)"
+          }
+        },
+        "summary": "Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph, finished transfers). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.",
+        "tags": [
+          "maintenance"
+        ]
+      }
+    },
+    "/maintenance/cleanup/runs/{runId}": {
+      "get": {
+        "operationId": "MaintenanceController_cleanupRun",
+        "parameters": [
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Unknown or expired run id"
+          }
+        },
+        "summary": "Poll one cleanup run: rows removed so far, current table, and the final result once done",
+        "tags": [
+          "maintenance"
         ]
       }
     }
@@ -22064,6 +22171,24 @@
         },
         "required": [
           "paused"
+        ]
+      },
+      "PurgeQueuedJobsResponseDto": {
+        "type": "object",
+        "properties": {
+          "queue": {
+            "type": "string",
+            "example": "auto-schedule.tick"
+          },
+          "droppedQueued": {
+            "type": "number",
+            "example": 3,
+            "description": "Waiting jobs dropped by the purge (depth sampled just before). Running jobs, finished history and schedules are untouched."
+          }
+        },
+        "required": [
+          "queue",
+          "droppedQueued"
         ]
       },
       "StartRunnerDto": {

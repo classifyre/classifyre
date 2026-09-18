@@ -6,4 +6,7 @@ export default {
   "harness-agents": "Harness Agents",
   "harness-tools": "Harness Tools",
   "mcp-server": "MCP Server",
+  "pause-resume": "Pause & Resume",
+  cleanup: "Storage & Cleanup",
+  workers: "Workers & Queues",
 }

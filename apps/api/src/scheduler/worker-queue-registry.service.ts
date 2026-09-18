@@ -7,6 +7,7 @@ import {
 } from '../registry/namespace-registry.sql';
 import {
   WORKER_HEARTBEAT_STALE_MS,
+  WORKER_HEARTBEAT_TTL_MS,
   WORKER_STATE_FLUSH_MS,
 } from './worker-queue-state.sql';
 
@@ -287,6 +288,7 @@ export class WorkerQueueRegistryService implements OnApplicationShutdown {
         ]);
       }
       await this.refreshPauses(pool);
+      await this.reapOrphanedRows(pool);
       await this.notifyPauseObservers();
     } catch (error) {
       // Observability must never take the worker down with it.
@@ -329,6 +331,22 @@ export class WorkerQueueRegistryService implements OnApplicationShutdown {
         queue: row.queue,
       });
     }
+  }
+
+  /**
+   * Delete heartbeat rows silent past the TTL: crashed or killed workers
+   * never run their shutdown cleanup, and their corpse rows would otherwise
+   * pin queues at `stale` and pile dead instance ids into the UI forever.
+   * Runs inside flush(), so every live worker reaps for the whole table on
+   * its normal cadence — no extra timer, one cheap statement on a tiny
+   * table. Covered by the same try/catch as the flush itself.
+   */
+  private async reapOrphanedRows(pool: Pool): Promise<void> {
+    const cutoff = new Date(Date.now() - WORKER_HEARTBEAT_TTL_MS);
+    await pool.query(
+      `DELETE FROM public.worker_queue_state WHERE heartbeat_at < $1::timestamptz`,
+      [cutoff.toISOString()],
+    );
   }
 
   private async notifyPauseObservers(): Promise<void> {

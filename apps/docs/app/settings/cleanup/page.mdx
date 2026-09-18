@@ -1,0 +1,137 @@
+---
+sidebarTitle: Storage & Cleanup
+title: Storage & Cleanup
+description: See how much space a workspace uses and safely reclaim it by wiping ephemeral datasets — never the investigation itself.
+---
+
+# Storage & Cleanup
+
+**Settings → Cleanup** lists every storage dataset of the workspace with live
+row estimates (`~`, from the planner) and byte sizes (indexes included), plus
+a workspace total. Two groups, two rules:
+
+- **Measured, never deleted.** Sources, findings, assets, cases, inquiries
+  and glossary carry a Kept badge and have no action — the API has no cleanup
+  path for them at all, so a misclick cannot destroy the investigation.
+- **Cleanable.** Scan history, duplicate artefacts, embeddings, harness
+  history, finished queue jobs, derived stats/graphs and finished transfers.
+  Each row explains what goes, what stays, and what rebuilds itself.
+
+Every cleanup asks for confirmation first, then runs **in the background**:
+the request returns immediately (`202` + a run id) while the row shows live
+progress — rows removed so far, the table currently draining, and a bar
+against the starting estimate. Big wipes take minutes; you can leave the tab
+open and watch, or come back later — the table reloads with the final result
+(removed per table, live work left alone).
+
+> **Pause first when workers are active.** Cleanup never touches running
+> scans or queued jobs, but live workers keep *writing* while the wipe
+> drains — an embedding pipeline can re-insert thousands of rows into a table
+> you are emptying, and the tab will look “still full” afterwards. When the
+> overview reports pending/running scans, pause the workspace
+> (Settings → Pause), run the cleanup, then resume. Paused means frozen: no
+> writer can race the wipe.
+
+---
+
+## What each cleanup does
+
+| Dataset             | Removes                                                              | Keeps                                                                            | Rebuilds itself                         |
+| ------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------- |
+| Scan history        | Finished runs, per-run asset snapshots, log files                    | Pending/running scans; asset “last seen by” pointers are cleared, not the assets | No — history is history                 |
+| Duplicate artefacts | Match candidates, signatures, correlation values, clusters, profiles | Review decisions and batches (human triage), config                              | Yes, on the next duplicate check        |
+| Embeddings          | Vectors and chunk texts                                              | Spaces and settings                                                              | Yes, by re-running the embedding index  |
+| AI harness history  | Agent runs incl. dreams, logs, decisions, supervisor notes           | Learned memory, goals, briefs, configs, undo history                             | No — history is history                 |
+| Finished queue jobs | Completed/failed/cancelled jobs and archived history                 | Pending, scheduled and running jobs; the schedules themselves                    | N/A (history)                           |
+| Finding statistics  | Precomputed daily rollups and worker state                           | —                                                                                | Yes, automatically via the stats worker |
+| Source graph        | Precomputed nodes, links and worker state                            | —                                                                                | Yes, automatically via the graph worker |
+| Finished transfers  | Completed/failed/cancelled import/export jobs with chunks            | Staged and running transfers                                                     | N/A (history)                           |
+
+---
+
+## Side effects
+
+Case and inquiry rows are never touched by any cleanup: no case or inquiry
+table references cleanable storage, so triage work always survives whatever
+you wipe. What each wipe does change, besides freeing space:
+
+- **Scan history (destructive, no rebuild).** Finished runs vanish from the
+  scans list and their detail pages stop resolving; pending and running scans
+  are skipped, schedules and future scans are unaffected. Assets lose their
+  “last seen by” run link (the assets themselves stay); notifications keep
+  their text but lose the run link; findings keep the deleted run id as plain
+  filterable text.
+- **Duplicate artefacts (rebuilds on the next duplicate check).** The
+  duplicates view goes empty until the check runs again — automatically as
+  part of scanning, or via a manual full recompute. Human verdicts and review
+  batches are kept, so triage decisions survive.
+- **Embeddings (rebuilds by re-running the embedding index).** Semantic
+  search, similar-findings and semantic glossary matches return nothing until
+  the re-index finishes; spaces and settings stay. The pipeline keeps
+  embedding newly scanned content on its own schedule — only the existing
+  vectors are gone.
+- **AI harness history (destructive, no rebuild).** Agent runs, including
+  dreams, vanish with their logs and decisions, and the harness history views
+  go empty. Learned memory, goals, briefs, configs and undo history stay, and
+  nothing outside the history views reads past runs — future autopilot cycles
+  behave exactly as before.
+- **Finished queue jobs (history only).** The worker-queues history loses
+  finished entries; pending, scheduled and running jobs keep running and the
+  cron schedules themselves are never touched, so scheduling continues
+  unchanged.
+- **Finding statistics (rebuilds on refresh).** Dashboards and trends read
+  the rollups, so they show zeros until the next refresh (demand-driven, plus
+  a manual refresh). The first refresh after a wipe is a full recompute, not
+  an incremental one — expect a heavier worker pass.
+- **Source graph (rebuilds via the graph worker).** The source graph view
+  goes empty until the worker rebuilds it; same full-recompute caveat as the
+  stats above.
+- **Finished transfers (history only).** Completed import/export entries
+  disappear from the transfer history; staged and running transfers continue
+  untouched.
+
+---
+
+## How it stays safe on huge tables
+
+Workspaces in production hold tens of millions of rows (a busy one can keep
+8M+ embedding chunks at 16 GB). Cleanup is built for that scale:
+
+- **TRUNCATE first, chunked DELETE as fallback.** Whole-dataset wipes use a
+  single instant `TRUNCATE` whenever no outside table references the dataset
+  (checked live against the catalog, with a bounded 15 s lock wait so a busy
+  writer cannot wedge the request). If anything references it — or the lock
+  wait expires — the wipe drains 2,000 rows at a time via `ctid` positionals:
+  short statements, row locks only, no long transaction, no table lock.
+- **VACUUM (ANALYZE) closes every wipe.** `DELETE` leaves dead tuples behind:
+  the rows are gone but the disk stays full and the planner keeps reporting
+  the old counts. The closing pass reclaims the pages and refreshes the
+  estimates, so the overview shows the effect immediately. (Plain `VACUUM`,
+  never `FULL` — no blocking lock. The `TRUNCATE` path frees heap *and*
+  indexes instantly; on the `DELETE` fallback path, heap pages are reclaimed
+  while heavily bloated indexes — e.g. a large HNSW vector index — only
+  shrink on rebuild, so a residual index size may remain visible.)
+- **Progress you can poll.** `POST /maintenance/cleanup/:key` answers `202
+  { runId }`; `GET /maintenance/cleanup/runs/:runId` reports
+  `processed`, `currentTable` and the final `result`. Run records live in API
+  memory (last 50) — an API restart drops them, in which case the overview
+  itself shows the outcome.
+- **Live work is skipped, never deleted.** Running or pending scans, queued
+  or active jobs and unfinished transfers are counted under “left alone” in
+  the result instead of being touched.
+- **Foreign keys are honoured in dependency order.** Children before parents
+  (logs before runs, members before clusters, chunks before jobs); nullable
+  references are nulled first (assets pointing at a deleted run); database
+  cascades and `SET NULL` rules do the rest. Cleanup cannot strand dangling
+  references.
+- **Only allow-listed tables are ever named.** Identifiers are validated
+  before they reach SQL, and protected datasets have no cleanup key — an
+  unknown key is a `404`, not a wipe.
+- **Allowed while paused — that is the point.** Cleanup is the one mutation
+  a frozen workspace still accepts: pause stops every writer, so the wipe
+  drains without anything re-inserting behind it. The recommended flow is
+  pause → clean → resume. (Demo mode still blocks it entirely.)
+
+Row counts are planner estimates and may read `-1`/stale right after massive
+writes; sizes include indexes and TOAST. Both are measured live on each visit
+to the tab — there is no cache to go stale.

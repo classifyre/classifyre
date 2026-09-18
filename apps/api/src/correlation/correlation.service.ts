@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import {
   DetectorType,
   EdgeOrigin,
@@ -324,6 +325,7 @@ export class CorrelationService {
     private readonly correlationLock: CorrelationLockService,
     private readonly jobs: CorrelationJobScheduler,
     private readonly reviewIndex: CorrelationReviewIndexService,
+    @Optional() private readonly pause?: NamespacePauseService,
   ) {
     this.batches = computeCorrelationBatchSizes();
     this.logger.log(
@@ -361,10 +363,12 @@ export class CorrelationService {
 
   /** On-demand correlation for a single asset (and its neighbourhood). */
   async recomputeForAsset(assetId: string): Promise<CorrelationRunSummary> {
+    await this.pause?.assertNotPaused();
     return this.runRecompute(() => this.recompute([assetId]));
   }
 
   async recomputeForAssets(assetIds: string[]): Promise<CorrelationRunSummary> {
+    await this.pause?.assertNotPaused();
     const unique = [...new Set(assetIds)].filter(Boolean);
     return this.runRecompute(() => this.recompute(unique));
   }
@@ -375,6 +379,7 @@ export class CorrelationService {
    * once. Fingerprint rebuild is also paged with GC yields between pages.
    */
   async recomputeAll(onProgress?: ProgressFn): Promise<CorrelationRunSummary> {
+    await this.pause?.assertNotPaused();
     return this.runRecompute(() => this.recomputeAllUnlocked(onProgress));
   }
 
@@ -656,6 +661,9 @@ export class CorrelationService {
   async saveConfig(
     input: SaveCorrelationConfigInput,
   ): Promise<CorrelationConfigDto> {
+    // Deliberately NOT pause-guarded: tuning writes are plain config, and the
+    // recompute the caller schedules stays frozen on its own (workers stopped,
+    // recompute* guarded) until resume.
     const existing = await this.prisma.correlationConfig.findUnique({
       where: { id: 1 },
     });

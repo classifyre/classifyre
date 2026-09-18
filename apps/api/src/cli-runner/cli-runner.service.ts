@@ -22,6 +22,7 @@ import {
 import { AUTO_SCHEDULE_QUEUE } from '../scheduler/auto-schedule.constants';
 import { ClsService } from 'nestjs-cls';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
+import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import { CohortWeightsService } from '../cohort/cohort-weights.service';
 import {
   CLS_DATABASE_LANE,
@@ -212,6 +213,8 @@ export class CliRunnerService {
     private namespaceRegistry?: NamespaceRegistryService,
     @Optional()
     private cohortWeights?: CohortWeightsService,
+    @Optional()
+    private pause?: NamespacePauseService,
   ) {}
 
   /** Current namespace UUID from CLS, if running within a namespace context. */
@@ -1051,6 +1054,10 @@ export class CliRunnerService {
     triggeredBy?: string,
     forceFullRescan = false,
   ) {
+    // Non-HTTP triggers (schedulers, supervisor) bypass the pause guard, so
+    // the service refuses itself. Throws ConflictException, which the cron
+    // scheduler already treats as "skip quietly" (see handleIngestJob).
+    await this.pause?.assertNotPaused();
     // Before refusing with "already has a running scan", make sure the scan it
     // is talking about still exists. A runner whose Job has vanished keeps the
     // source pinned to RUNNING for good, and the operator sees a conflict on a
@@ -1515,6 +1522,7 @@ export class CliRunnerService {
   }
 
   async createExternalRunner(sourceId: string, triggeredBy?: string) {
+    await this.pause?.assertNotPaused();
     const { runner, previousSourceState } = await this.prisma.$transaction(
       async (tx) => {
         const { source, previousSourceState } =

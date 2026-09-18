@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { Job } from 'pg-boss';
+import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import { AgentKind, AgentRunStatus, RunnerStatus } from '@prisma/client';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { PrismaService } from '../prisma.service';
@@ -39,6 +40,7 @@ export class CorrelationWorker {
     private readonly matching: InquiryMatchingService,
     private readonly correlationService: CorrelationService,
     private readonly jobs: CorrelationJobScheduler,
+    @Optional() private readonly pause?: NamespacePauseService,
   ) {}
 
   /**
@@ -112,6 +114,12 @@ export class CorrelationWorker {
   }
 
   private async handle(jobs: Job[]): Promise<void> {
+    // No duplicate/fingerprint checks while paused — the job completes so it
+    // is not retried into the pause.
+    if (await this.pause?.isPaused()) {
+      this.logger.debug('Workspace paused — skipping correlation job(s)');
+      return;
+    }
     for (const job of jobs) {
       const data = job.data as CorrelationJobPayload;
       if (data?.recomputeAll) {
