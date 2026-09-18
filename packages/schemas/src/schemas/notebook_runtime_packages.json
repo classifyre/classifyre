@@ -13,7 +13,7 @@
     },
     {
       "name": "azure-storage-blob",
-      "version": "12.30.1",
+      "version": "12.30.2",
       "modules": [
         "azure.storage.blob"
       ],
@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.95",
+      "version": "1.43.97",
       "modules": [
         "boto3"
       ],
@@ -155,7 +155,7 @@
     },
     {
       "name": "huggingface-hub",
-      "version": "1.31.0",
+      "version": "1.32.0",
       "modules": [
         "huggingface_hub"
       ],
@@ -198,7 +198,7 @@
     },
     {
       "name": "msgraph-sdk",
-      "version": "1.62.0",
+      "version": "1.63.0",
       "modules": [
         "msgraph"
       ],
@@ -350,7 +350,7 @@
     },
     {
       "name": "pymysql",
-      "version": "1.2.0",
+      "version": "1.2.3",
       "modules": [
         "pymysql"
       ],

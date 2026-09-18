@@ -138,6 +138,36 @@ export function resolveLanguage(setting: LanguageSetting): ResolvedLanguage {
   return setting;
 }
 
+/**
+ * Where an automatic language redirect should go, if anywhere.
+ *
+ * Only the default locale is eligible: it is served unprefixed, so an
+ * unprefixed URL carries no explicit language choice and may follow the
+ * browser (AUTOMATIC) or the stored preference. A URL that already carries a
+ * non-default prefix (`/de/…`) is an explicit request for that language and
+ * must never switch — not for a cookie, not for the instance setting, not for
+ * the browser.
+ *
+ * Pure (no `navigator`, no router) so the rule is unit-testable; the client
+ * component in `components/locale-auto-redirect.tsx` supplies the resolved
+ * language and performs the navigation. The server never redirects: one URL
+ * always renders one language, which is what keeps the canonical/hreflang
+ * contract crawlers see deterministic.
+ */
+export function autoRedirectTarget(
+  pathname: string,
+  resolved: ResolvedLanguage,
+): string | null {
+  const { locale, rest } = stripLocalePrefix(pathname);
+  if (locale !== DEFAULT_LOCALE) return null;
+  if (resolved === localeToLanguage(DEFAULT_LOCALE)) return null;
+  // `next.config.mjs` sets `trailingSlash: true`, so the slash-terminated
+  // form is the one that does not redirect again — emit it directly instead
+  // of bouncing through a second 308.
+  const target = withLocalePrefix(languageToLocale(resolved), rest);
+  return target.endsWith("/") ? target : `${target}/`;
+}
+
 // ─── Time Format ─────────────────────────────────────────────────────
 
 export type ResolvedTimeFormat = "TWELVE_HOUR" | "TWENTY_FOUR_HOUR";

@@ -26,6 +26,7 @@ import {
 } from "@/components/namespace/external-links-editor";
 import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
 import { useTranslation } from "@/hooks/use-translation";
+import { useLocalePath } from "@/lib/app-path";
 import { useActiveNamespaces } from "@/components/active-namespaces-provider";
 import { useStaticRouteParam } from "@/lib/use-route-id";
 
@@ -48,6 +49,7 @@ export default function NamespaceSettingsPage() {
   const namespaceId = useStaticRouteParam("namespaceId", "namespaces");
   const router = useRouter();
   const { t } = useTranslation();
+  const localePath = useLocalePath();
   const { update: updateActiveNamespace } = useActiveNamespaces();
   const {
     categories,
@@ -167,7 +169,7 @@ export default function NamespaceSettingsPage() {
       <WorkspaceHeader />
       <main className="mx-auto max-w-3xl px-5 py-10 sm:px-8 sm:py-14">
         <Button variant="ghost" size="sm" asChild className="mb-7 -ml-3">
-          <Link href="/">
+          <Link href={localePath("/")}>
             <ArrowLeft className="size-4" />
             {t("workspaces.all")}
           </Link>

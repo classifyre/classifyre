@@ -222,14 +222,22 @@ export async function entityMetadata(
   const description = translateFor(locale, `${key}.descriptionWithEntity`, {
     name: entityName,
   });
+  const siteName = translateFor(locale, "app.name");
+  const suffixed = `${title} | ${siteName}`;
 
   return {
-    title,
+    // `absolute`, not a bare string: the section layout above every detail
+    // page already sets a string title, and Next resets its stashed
+    // `title.template` to that layer's (empty) template for everything deeper
+    // — a plain string here renders without the site suffix every section
+    // page gets. `absolute` never takes the template, so it renders the
+    // suffix exactly once and can never double-apply it.
+    title: { absolute: suffixed },
     description,
     alternates: alternates(baseUrl, locale, location),
     openGraph: {
       locale: localeOpenGraph(locale),
-      title,
+      title: suffixed,
       description,
     },
   };
