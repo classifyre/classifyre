@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { AgentKind, Severity } from '@prisma/client';
 import { AgentAuditService } from '../autopilot/audit/agent-audit.service';
 import { AgentLoggerService } from '../autopilot/audit/agent-logger.service';
 import { CasesService } from '../cases.service';
+import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import { CorrelationService } from './correlation.service';
 import { isTransientDbError } from '../db/transient-db-error';
 
@@ -52,6 +53,7 @@ export class DuplicatesFinderAgentService {
     private readonly cases: CasesService,
     private readonly audit: AgentAuditService,
     private readonly log: AgentLoggerService,
+    @Optional() private readonly pause?: NamespacePauseService,
   ) {}
 
   async runForScan(input: {
@@ -60,6 +62,9 @@ export class DuplicatesFinderAgentService {
     cycleKey: string;
     sourceName: string;
   }): Promise<void> {
+    // A scan that finished just as the pause landed still enqueues this; the
+    // worker checks first, this is the second gate for direct callers.
+    await this.pause?.assertNotPaused();
     const run = await this.audit.openRun(AgentKind.DUPLICATES, {
       sourceId: input.sourceId,
       runnerId: input.runnerId,
@@ -166,6 +171,7 @@ export class DuplicatesFinderAgentService {
    * clusters under the new weights/thresholds. Logged as a DUPLICATES run.
    */
   async runForConfigChange(): Promise<void> {
+    await this.pause?.assertNotPaused();
     const run = await this.audit.openRun(AgentKind.DUPLICATES, {
       sourceId: null,
       runnerId: null,
@@ -204,6 +210,8 @@ export class DuplicatesFinderAgentService {
    * log (CaseActivity also tracks the individual mutations).
    */
   async runCaseAction(input: CaseActionInput): Promise<CaseActionResult> {
+    // Deliberately NOT pause-guarded: user-initiated triage that only writes
+    // case rows (plus its own audit record) — it starts no background work.
     const assetIds = [...new Set(input.assetIds)].filter(Boolean);
     const run = await this.audit.openRun(AgentKind.DUPLICATES, {
       sourceId: null,

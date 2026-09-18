@@ -1,0 +1,199 @@
+{
+  "nav": {
+    "product": "Product",
+    "get": "Get Classifyre",
+    "sources": "Sources",
+    "editions": "Open source vs Enterprise",
+    "blog": "Blog",
+    "overview": "Publication overview",
+    "articles": "Business blog",
+    "cases": "Case files",
+    "documentation": "Documentation",
+    "getCta": "Get Classifyre",
+    "showcase": "Showcase",
+    "githubLabel": "Classifyre on GitHub"
+  },
+  "footer": {
+    "tagline": "Investigation Platform",
+    "blurb": "The open-source investigation platform for your data. Classifyre scans the systems you already run, detects secrets, PII, and the signals you define, then works the findings like a detective — standing inquiries, ranked evidence, cases, and an AI autopilot between scans.",
+    "navHeading": "Navigate",
+    "navHome": "Home",
+    "navGet": "Get Classifyre",
+    "navSources": "Sources",
+    "navEditions": "Open source vs Enterprise",
+    "navBlog": "Blog",
+    "navDocumentation": "Documentation",
+    "navShowcase": "Live showcase",
+    "navGithub": "GitHub",
+    "legalHeading": "Legal & contact",
+    "privacy": "Privacy & cookie policy",
+    "cookieSettings": "Cookie settings",
+    "contact": "Contact",
+    "madeIn": "Made in Austria",
+    "baselineTagline": "Every leak leaves a trail"
+  },
+  "cookie": {
+    "message": "We use analytics cookies to see which pages get read, nothing else. No ads, no profiling, no data sold. Decline and the site works exactly the same.",
+    "policyLabel": "Privacy & cookie policy",
+    "accept": "Accept",
+    "decline": "Decline",
+    "regionLabel": "Cookies",
+    "ariaLabel": "Cookie consent"
+  },
+  "blog": {
+    "caseFile": "Case file",
+    "article": "Business blog",
+    "openCaseFile": "Open case file",
+    "readArticle": "Read article",
+    "backToOverview": "Back to publication overview"
+  },
+  "catalog": {
+    "heading": "Source Catalog",
+    "subheading": "Pick connector by category",
+    "matches": "Matches",
+    "sources": "Sources",
+    "searchPlaceholder": "Search sources, categories, or capabilities",
+    "clear": "Clear",
+    "emptyTitle": "No sources found",
+    "emptyDescription": "Try a different keyword like SQL, BI, web, or chat."
+  },
+  "docker": {
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyCommand": "Copy command",
+    "notes": [
+      "the only port it serves",
+      "Postgres needs it; the default is too small",
+      "your data",
+      "scan logs + credential key",
+      "survives upgrades"
+    ]
+  },
+  "a11y": {
+    "toggleTheme": "Toggle theme"
+  },
+  "liveCase": {
+    "ariaLabel": "Open the live {{caseName}} case file in the Classifyre showcase (opens in a new tab)",
+    "liveNamespace": "Live namespace · updates as scans run",
+    "inspect": "Inspect the {{caseName}} case file",
+    "open": "Open Case",
+    "openLive": "Open live case"
+  },
+  "evidence": {
+    "ariaLabel": "The Classifyre pipeline: sources become assets, detectors raise findings, findings feed inquiries and duplicates, and both converge into cases — with the autopilot working the investigation half",
+    "autopilotSide": "AUTOPILOT WORKS THIS SIDE",
+    "nodes": {
+      "sources": {
+        "label": "SOURCES",
+        "sub": "databases · files · saas"
+      },
+      "assets": {
+        "label": "ASSETS",
+        "sub": "items + metadata"
+      },
+      "detectors": {
+        "label": "DETECTORS",
+        "sub": "built-in + your own"
+      },
+      "findings": {
+        "label": "FINDINGS",
+        "sub": "ranked by importance"
+      },
+      "inquiries": {
+        "label": "INQUIRIES",
+        "sub": "standing questions"
+      },
+      "duplicates": {
+        "label": "DUPLICATES",
+        "sub": "review queue, pair by pair"
+      },
+      "cases": {
+        "label": "CASES",
+        "sub": "evidence + hypotheses"
+      }
+    }
+  },
+  "queue": {
+    "beforeEyebrow": "Before · Fingerprints",
+    "beforeTitle": "A similarity canvas",
+    "beforeVerdict": "412 pairs. No order, no counts, no end. Every session started from scratch.",
+    "beforeAria": "A dense, unordered graph of similarity links between assets",
+    "afterEyebrow": "After · Duplicate review",
+    "afterTitle": "A ranked queue",
+    "afterVerdict": "Same 412 pairs. One rule clears 146 of them; 17 need no judgement at all.",
+    "pairsRemaining": "pairs remaining",
+    "left": "left",
+    "ruleNeedsJudgement": "needs judgement",
+    "ruleCandidate": "rule candidate",
+    "cutoffCandidate": "cutoff candidate",
+    "ruleNone": "no judgement needed",
+    "figcaption": "The same corpus, drawn two ways. Only one of them can be finished."
+  },
+  "matchWeight": {
+    "title": "Match weight",
+    "perfect": "Perfect match = 1.00",
+    "barsPrefix": "the bars below sum to ",
+    "weight": "weight",
+    "footerA": "Left of the line is evidence ",
+    "footerEm": "against",
+    "footerB": ": an address and a phone number on one asset that the other does not have. It is inside the sum, not omitted from it."
+  },
+  "share": {
+    "share": "Share",
+    "shareThis": "Share this case file",
+    "filedUnder": "Filed under",
+    "x": "Share on X",
+    "linkedIn": "Share on LinkedIn",
+    "email": "Share via email",
+    "copy": "Copy link",
+    "copied": "Link copied"
+  },
+  "chrome": {
+    "tocTitle": "On This Page",
+    "backToTop": "Scroll to top",
+    "language": "Language",
+    "switchToGerman": "Auf Deutsch lesen",
+    "switchToEnglish": "Read in English",
+    "germanName": "Deutsch",
+    "englishName": "English"
+  },
+  "site": {
+    "title": "Classifyre",
+    "description": "Detect, classify, and label data across databases, lakehouses, collaboration tools, analytics systems, and public content.",
+    "websiteDescription": "Detect, classify, and label data across databases, lakehouses, collaboration tools, analytics systems, and public content.",
+    "blogDescription": "Product updates, engineering notes, deployment guidance, and detector design write-ups from Classifyre.",
+    "orgDescription": "Open-source data detection, classification, and labeling platform for modern source systems, built in Austria."
+  },
+  "findingTags": [
+    "leaked email",
+    "credit card",
+    "invalid balance",
+    "exposed secret",
+    "wrong address",
+    "leaked credential",
+    "insolvency",
+    "unpaid invoice",
+    "expired contract",
+    "sanctioned entity",
+    "stale export",
+    "orphaned account",
+    "missing consent",
+    "duplicate vendor"
+  ],
+  "closingBoard": {
+    "exhibitA": "Exhibit A",
+    "confirmed": "Confirmed"
+  },
+  "caseGraph": {
+    "ariaLabel": "Case graph for case 42, a classified leak via email: sender-traced and impact hypotheses pinned to email, identity, classification-tag, and duplicate findings, with an analyst link and autopilot attribution",
+    "analystLink": "ANALYST LINK",
+    "duplicateMatch": "DUPLICATE MATCH · SENT FILE = INTERNAL FILE",
+    "caseOpen": "CASE #42 · OPEN",
+    "caseTitle": "Classified leak via email",
+    "hypothesis1": "HYPOTHESIS 1",
+    "hypothesis1Text": "Sender traced: A. Novak",
+    "hypothesis2": "HYPOTHESIS 2",
+    "hypothesis2Text": "214 records exposed",
+    "autopilot": "BY AUTOPILOT"
+  }
+}

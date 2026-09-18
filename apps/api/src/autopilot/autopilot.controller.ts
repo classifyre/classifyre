@@ -12,6 +12,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AllowWhenPaused } from '../namespace/allow-when-paused.decorator';
+import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import { AutopilotService } from './autopilot.service';
 import { AgentKind } from '@prisma/client';
 import {
@@ -46,6 +48,7 @@ import {
 export class AutopilotController {
   constructor(private readonly autopilot: AutopilotService) {}
 
+  @BlockWhenPaused()
   @Post('trigger')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -59,6 +62,7 @@ export class AutopilotController {
     return this.autopilot.trigger(dto);
   }
 
+  @BlockWhenPaused()
   @Post('dream')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -171,6 +175,7 @@ export class AutopilotController {
     return this.autopilot.getRun(id);
   }
 
+  @AllowWhenPaused()
   @Post('runs/:id/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -182,6 +187,7 @@ export class AutopilotController {
     return this.autopilot.cancelRun(id);
   }
 
+  @BlockWhenPaused()
   @Post('runs/:id/rerun')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({

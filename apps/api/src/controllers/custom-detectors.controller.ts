@@ -42,6 +42,7 @@ import { RetireOutOfScopeFindingsDto } from '../dto/retire-out-of-scope-findings
 import { FindingBulkOperationDto } from '../findings-bulk/finding-bulk-operation.dto';
 import { FindingBulkOperationService } from '../findings-bulk/finding-bulk-operation.service';
 import { RetireOutOfScopeService } from '../findings-bulk/retire-out-of-scope.service';
+import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 
 @ApiTags('Custom Detectors')
 @Controller('custom-detectors')
@@ -275,6 +276,7 @@ export class CustomDetectorsController {
 
   // ── Training ───────────────────────────────────────────────────────────────
 
+  @BlockWhenPaused()
   @Post(':id/train')
   @ApiOperation({ summary: 'Trigger custom detector training' })
   @ApiParam({ name: 'id', description: 'Custom detector UUID' })

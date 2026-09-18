@@ -31,9 +31,10 @@ import {
 } from "@workspace/ui/components/tooltip";
 import { AssistantFab } from "./assistant-workflow-provider";
 import { DemoModeBanner, DemoModeHeaderBadge } from "./demo-mode-badge";
+import { PausedWorkspaceBanner } from "./namespace/paused-workspace-banner";
 import { DocumentTitleUpdater } from "./document-title-updater";
 import { stripLocalePrefix } from "@/lib/locale-detection";
-import { AiHealthProvider, AiHealthFixButton } from "./ai-health";
+import { AiHealthProvider } from "./ai-health";
 import { LanguageSwitcher } from "./language-switcher";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
@@ -384,7 +385,6 @@ export function DashboardLayout({
                   </Breadcrumb>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <AiHealthFixButton />
                   {demoMode && <DemoModeHeaderBadge />}
                   <LanguageSwitcher />
                   <ThemeToggle />
@@ -420,6 +420,7 @@ export function DashboardLayout({
                 </div>
               </header>
               {demoMode && <DemoModeBanner />}
+              <PausedWorkspaceBanner />
               <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 pt-2">
                 {children}
               </div>

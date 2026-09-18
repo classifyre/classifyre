@@ -12,8 +12,8 @@ import {
 import { currentNamespaceHref } from "@/lib/active-namespaces";
 
 const INITIAL_ITEMS: NamespaceTabItem[] = [
-  { id: "alpha", label: "Alpha investigation" },
-  { id: "beta", label: "Beta review" },
+  { id: "alpha", label: "Alpha investigation", href: "/alpha" },
+  { id: "beta", label: "Beta review", href: "/beta" },
 ];
 
 export function NamespaceTabsHarness() {
@@ -29,6 +29,29 @@ export function NamespaceTabsHarness() {
     }
   };
 
+  const closeOthers = (id: string) => {
+    const anchor = items.find((item) => item.id === id);
+    if (!anchor || items.length < 2) return;
+    setItems([anchor]);
+    setActiveId(id);
+  };
+
+  const closeLeft = (id: string) => {
+    const index = items.findIndex((item) => item.id === id);
+    if (index <= 0) return;
+    const next = items.slice(index);
+    setItems(next);
+    if (!next.some((item) => item.id === activeId)) setActiveId(id);
+  };
+
+  const closeRight = (id: string) => {
+    const index = items.findIndex((item) => item.id === id);
+    if (index === -1 || index >= items.length - 1) return;
+    const next = items.slice(0, index + 1);
+    setItems(next);
+    if (!next.some((item) => item.id === activeId)) setActiveId(id);
+  };
+
   return (
     <>
       <NamespaceTabs
@@ -38,6 +61,16 @@ export function NamespaceTabsHarness() {
         closeLabel={(item) => `Deactivate ${item.label}`}
         onActivate={setActiveId}
         onClose={close}
+        onCloseOthers={closeOthers}
+        onCloseLeft={closeLeft}
+        onCloseRight={closeRight}
+        menuLabels={{
+          openInNewTab: "Open in new tab",
+          close: () => "Close",
+          closeOthers: "Close other tabs",
+          closeLeft: "Close tabs to the left",
+          closeRight: "Close tabs to the right",
+        }}
       />
       <output data-testid="active-workspace">{activeId || "none"}</output>
     </>

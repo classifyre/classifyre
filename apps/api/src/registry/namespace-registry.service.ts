@@ -48,6 +48,9 @@ interface NamespaceRow {
   schema_name: string;
   description: string | null;
   has_thumbnail: boolean;
+  paused: boolean;
+  paused_at: Date | null;
+  paused_reason: string | null;
   settings: Record<string, unknown>;
   external_links: NamespaceExternalLink[] | null;
   created_at: Date;
@@ -63,6 +66,7 @@ interface NamespaceRow {
 const NAMESPACE_COLUMNS = `
   id, name, slug, schema_name, description,
   (thumbnail_blob IS NOT NULL) AS has_thumbnail,
+  paused, paused_at, paused_reason,
   settings, external_links, created_at, updated_at, last_opened_at
 `;
 
@@ -74,6 +78,8 @@ const MAX_EXTERNAL_LINKS = 20;
 const MAX_LINK_TITLE_LENGTH = 80;
 const MAX_LINK_URL_LENGTH = 2048;
 const MAX_CATEGORY_TITLE_LENGTH = 60;
+/** Pause reason is a one-liner on a card and a banner, not an essay. */
+const MAX_PAUSED_REASON_LENGTH = 280;
 
 interface ResolveCacheEntry {
   context: NamespaceLifecycleEvent;
@@ -109,6 +115,22 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
   private readonly deletingListeners = new Set<
     (e: NamespaceLifecycleEvent) => void | Promise<void>
   >();
+  /**
+   * Fired whenever a workspace's pause state flips (pause or resume), with the
+   * new state. The worker manager stops/starts the namespace's workers from
+   * this; the polling reconcile covers every other process.
+   */
+  private readonly pauseChangedListeners = new Set<
+    (e: NamespaceLifecycleEvent & { paused: boolean }) => void | Promise<void>
+  >();
+  /**
+   * Last observed pause flag per namespace id, so the per-request pause guard
+   * is one indexed lookup every few seconds rather than on every mutation.
+   */
+  private readonly pauseCache = new Map<
+    string,
+    { paused: boolean; expiresAt: number }
+  >();
 
   async onModuleInit(): Promise<void> {
     // The pre-boot orchestrator normally created this already. The same
@@ -126,6 +148,37 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
 
   onDeleting(fn: (e: NamespaceLifecycleEvent) => void | Promise<void>): void {
     this.deletingListeners.add(fn);
+  }
+
+  onPauseChanged(
+    fn: (
+      e: NamespaceLifecycleEvent & { paused: boolean },
+    ) => void | Promise<void>,
+  ): void {
+    this.pauseChangedListeners.add(fn);
+  }
+
+  /**
+   * Whether the workspace is currently paused. Cached for
+   * {@link RESOLVE_CACHE_TTL_MS} — a pause takes effect on the guard within
+   * seconds, which is immediate enough for an operator toggle, while a resume
+   * is picked up just as fast.
+   */
+  async isPaused(namespaceId: string): Promise<boolean> {
+    const hit = this.pauseCache.get(namespaceId);
+    if (hit && hit.expiresAt > Date.now()) return hit.paused;
+    const { rows } = await this.pool.query<{ paused: boolean }>(
+      'SELECT paused FROM namespaces WHERE id = $1',
+      [namespaceId],
+    );
+    // A namespace that no longer resolves is not "paused": it is gone, and the
+    // request pipeline 404s it before any pause check matters.
+    const paused = rows[0]?.paused ?? false;
+    this.pauseCache.set(namespaceId, {
+      paused,
+      expiresAt: Date.now() + RESOLVE_CACHE_TTL_MS,
+    });
+    return paused;
   }
 
   /**
@@ -558,6 +611,21 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       push('settings', JSON.stringify(patch.settings));
     if (patch.lastOpenedAt !== undefined)
       push('last_opened_at', patch.lastOpenedAt);
+    // The pause flip is read before the write so the worker manager is only
+    // notified when the state actually changed (a reason-only edit resaves
+    // the same state and must not restart workers).
+    const pauseTouched =
+      patch.paused !== undefined || patch.pausedReason !== undefined;
+    const previouslyPaused = pauseTouched
+      ? (await this.get(id)).paused
+      : undefined;
+    if (patch.paused !== undefined) {
+      push('paused', patch.paused);
+      push('paused_at', patch.paused ? new Date() : null);
+    }
+    if (patch.pausedReason !== undefined) {
+      push('paused_reason', normalizePausedReason(patch.pausedReason));
+    }
 
     if (patch.categoryIds !== undefined) {
       // Validated against the registry (404s on an unknown id) before the row
@@ -592,6 +660,25 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     this.resolveCache.delete(previousSlug);
     this.resolveCache.delete(namespace.slug);
     this.resolveCache.delete(namespace.id);
+    this.pauseCache.set(namespace.id, {
+      paused: namespace.paused,
+      expiresAt: Date.now() + RESOLVE_CACHE_TTL_MS,
+    });
+    if (
+      previouslyPaused !== undefined &&
+      namespace.paused !== previouslyPaused
+    ) {
+      await this.notify(
+        this.pauseChangedListeners,
+        {
+          namespaceId: namespace.id,
+          slug: namespace.slug,
+          schemaName: namespace.schemaName,
+          paused: namespace.paused,
+        },
+        namespace.paused ? 'pause' : 'resume',
+      );
+    }
     return namespace;
   }
 
@@ -614,6 +701,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     // down (stop pg-boss polling + scheduling, unpin the Prisma client).
     this.resolveCache.delete(namespace.slug);
     this.resolveCache.delete(namespace.id);
+    this.pauseCache.delete(namespace.id);
     await this.pool.query(
       `UPDATE namespaces
          SET status = 'deleted', updated_at = now(), deleted_at = now()
@@ -830,9 +918,9 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private async notify(
-    listeners: Set<(e: NamespaceLifecycleEvent) => void | Promise<void>>,
-    ctx: NamespaceLifecycleEvent,
+  private async notify<E extends NamespaceLifecycleEvent>(
+    listeners: Set<(e: E) => void | Promise<void>>,
+    ctx: E,
     action: string,
   ): Promise<void> {
     const results = await Promise.allSettled(
@@ -856,6 +944,9 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       slug: row.slug,
       schemaName: row.schema_name,
       description: row.description,
+      paused: row.paused ?? false,
+      pausedAt: row.paused_at ? row.paused_at.toISOString() : null,
+      pausedReason: row.paused_reason ?? null,
       // A relative path to the streaming endpoint (cache-busted by updated_at);
       // the web api-client resolves it to an absolute URL. Null when unset.
       thumbnail: row.has_thumbnail
@@ -986,6 +1077,24 @@ function normalizeExternalLinks(
       url: url.toString(),
     };
   });
+}
+
+/**
+ * Normalise the operator's pause note: trimmed, length-capped, null when
+ * empty (clearing it). Stored as-is otherwise — it is rendered as plain text.
+ */
+function normalizePausedReason(
+  value: string | null | undefined,
+): string | null {
+  if (value === undefined || value === null) return null;
+  const reason = value.trim();
+  if (!reason) return null;
+  if (reason.length > MAX_PAUSED_REASON_LENGTH) {
+    throw new BadRequestException(
+      `Pause reason must be ${MAX_PAUSED_REASON_LENGTH} characters or fewer`,
+    );
+  }
+  return reason;
 }
 
 function isUniqueViolation(error: unknown): boolean {

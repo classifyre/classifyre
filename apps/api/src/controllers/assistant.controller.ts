@@ -17,12 +17,14 @@ import {
 import '@fastify/multipart';
 import type { FastifyRequest } from 'fastify';
 import { AssistantService } from '../assistant.service';
+import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 
 @ApiTags('Assistant')
 @Controller('assistant')
 export class AssistantController {
   constructor(private readonly assistantService: AssistantService) {}
 
+  @BlockWhenPaused()
   @Post('respond')
   @HttpCode(200)
   @ApiOperation({

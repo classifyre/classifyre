@@ -15,6 +15,11 @@
     "all": "All workspaces",
     "activeTabsLabel": "Active workspaces",
     "closeTabAria": "Deactivate {{name}}",
+    "closeTab": "Close",
+    "openInNewTab": "Open in new tab",
+    "closeOtherTabs": "Close other tabs",
+    "closeTabsToLeft": "Close tabs to the left",
+    "closeTabsToRight": "Close tabs to the right",
     "new": "New workspace",
     "loading": "Loading workspaces",
     "loadFailed": "Failed to load workspaces",
@@ -81,7 +86,25 @@
     "linkIncomplete": "Every link needs both a name and a URL.",
     "linkOpenAria": "Open {{name}} in a new tab",
     "groupCount": "{{count}} workspaces",
-    "groupCountOne": "1 workspace"
+    "groupCountOne": "1 workspace",
+    "pausedBadge": "Paused",
+    "pausedBadgeAria": "{{name}} is paused",
+    "pauseSectionTitle": "Pause workspace",
+    "pauseSectionDescription": "Pausing freezes everything in this workspace: no scans or runs, no scheduled or automatic activity, no AI harness cycles or dreams, and no duplicate checks. Reads keep working. Resume continues where the pause stopped.",
+    "pauseReasonLabel": "Reason (optional)",
+    "pauseReasonPlaceholder": "Why is this workspace paused?",
+    "pauseAction": "Pause workspace",
+    "pausingAction": "Pausing…",
+    "resumeAction": "Resume workspace",
+    "resumingAction": "Resuming…",
+    "pauseSuccess": "Workspace \"{{name}}\" paused",
+    "resumeSuccess": "Workspace \"{{name}}\" resumed",
+    "pauseFailed": "Failed to change the pause state",
+    "pausedSince": "Paused {{when}}",
+    "pausedBannerTitle": "This workspace is paused",
+    "pausedBannerDescription": "Scans, schedules, AI harness cycles and duplicate checks are stopped. Everything is read-only until you resume.",
+    "pausedBannerReason": "Reason: {{reason}}",
+    "pausedBannerAction": "Resume in settings"
   },
   "categories": {
     "label": "Categories",
@@ -345,7 +368,105 @@
       "mcp": "MCP Servers",
       "chat": "Chat Bots",
       "data": "Export & Import",
-      "workers": "Workers"
+      "workers": "Workers",
+      "cleanup": "Cleanup"
+    },
+    "cleanup": {
+      "title": "Storage & cleanup",
+      "description": "How much space this workspace uses, and a safe way to reclaim it. The investigation itself — sources, findings, assets, cases, inquiries, glossary — is measured but never deleted here.",
+      "totalData": "{{size}} of workspace data",
+      "totalQueues": "{{size}} of finished queue jobs",
+      "colDataset": "Dataset",
+      "colRows": "Rows",
+      "colSize": "Size",
+      "colAction": "Action",
+      "cleanableTitle": "Can be cleaned",
+      "cleanableSubtitle": "Ephemeral or derived data. Wiping rebuilds or drops history — the investigation itself is never touched.",
+      "protectedTitle": "Never deleted here",
+      "protectedSubtitle": "The investigation itself. Measured for size, with no cleanup action.",
+      "kept": "Kept",
+      "keptNote": "Never deleted",
+      "clean": "Clean",
+      "cleaning": "Cleaning…",
+      "confirmTitle": "Clean “{{name}}”?",
+      "confirmAction": "Clean now",
+      "cancel": "Cancel",
+      "success": "“{{name}}” cleaned: {{rows}} rows removed in {{seconds}}s",
+      "successSkipped": "{{count}} live item(s) left alone",
+      "failed": "Cleanup failed",
+      "progress": "{{processed}} of ~{{total}} rows · {{table}}",
+      "progressNoEstimate": "{{processed}} rows · {{table}}",
+      "progressFinishing": "Reclaiming space…",
+      "runFailed": "Cleanup failed: {{error}}",
+      "runGone": "Cleanup left this view; the overview below shows the result once reloaded.",
+      "activeJobsHint": "{{count}} scan(s) still running — pause the workspace first, or workers may write new rows while cleaning.",
+      "loading": "Measuring workspace storage…",
+      "loadFailed": "Could not load the storage overview",
+      "retry": "Retry",
+      "estimatesNote": "Row counts are planner estimates (~) and sizes include indexes; both are measured live on each visit.",
+      "unlisted": "{{count}} supporting tables ({{size}}) hold configuration and are never cleaned.",
+      "datasets": {
+        "sources": {
+          "name": "Sources",
+          "desc": "Connections and uploaded files — the inventory of what is watched."
+        },
+        "findings": {
+          "name": "Findings",
+          "desc": "Detected issues with evidence and detector feedback — the investigation record."
+        },
+        "assets": {
+          "name": "Assets",
+          "desc": "Discovered documents, people, companies and their relationship graph."
+        },
+        "cases": {
+          "name": "Cases",
+          "desc": "Case files with leads, threads, evidence links and hypotheses."
+        },
+        "inquiries": {
+          "name": "Inquiries",
+          "desc": "Saved investigation questions."
+        },
+        "glossary": {
+          "name": "Glossary",
+          "desc": "Agreed terms and references."
+        },
+        "scans": {
+          "name": "Scan history",
+          "desc": "Finished scan runs, per-run asset snapshots and log files. Pending and running scans are skipped.",
+          "destructive": "Finished run history is removed permanently and cannot be rebuilt. Assets lose their “last seen by” run link; findings keep the deleted run id as plain text."
+        },
+        "duplicates": {
+          "name": "Duplicate artefacts",
+          "desc": "Match candidates, signatures and correlation profiles. Human review decisions are kept; the next duplicate check rebuilds the rest.",
+          "impact": "Match candidates, signatures and clusters are removed; the duplicates queue stays empty until the next duplicate check. Your past review decisions are kept."
+        },
+        "embeddings": {
+          "name": "Embeddings",
+          "desc": "Vectors and chunk texts. Spaces and settings are kept; re-running the embedding index rebuilds the rest.",
+          "impact": "Vectors and chunk texts are removed. Semantic search, similar findings and semantic glossary matches return nothing until you re-run the embedding index."
+        },
+        "harness": {
+          "name": "AI harness history",
+          "desc": "Agent runs including dreams, with logs, decisions and supervisor notes. Learned memory, goals and undo history are kept.",
+          "destructive": "Agent runs, including dreams, are removed permanently with their logs and decisions and cannot be rebuilt. Learned memory, goals, briefs and configs are kept."
+        },
+        "scheduler": {
+          "name": "Finished queue jobs",
+          "desc": "Completed, failed and cancelled background jobs. Pending, scheduled and running jobs — and the schedules themselves — are kept."
+        },
+        "stats": {
+          "name": "Finding statistics",
+          "desc": "Precomputed daily rollups. Rebuilt automatically by the stats worker."
+        },
+        "graph": {
+          "name": "Source graph",
+          "desc": "Precomputed source relationship graph. Rebuilt automatically by the graph worker."
+        },
+        "transfers": {
+          "name": "Finished transfers",
+          "desc": "Completed, failed and cancelled export/import jobs with their chunks. Staged and running transfers are kept."
+        }
+      }
     },
     "version": {
       "heading": "Software Version",
@@ -453,6 +574,14 @@
       "loadFailed": "Could not load worker state",
       "pause": "Pause",
       "resume": "Resume",
+      "colAction": "Action",
+      "cancel": "Cancel",
+      "purge": "Purge",
+      "purgeConfirmTitle": "Drop {{count}} queued job(s) from “{{queue}}”?",
+      "purgeConfirmDesc": "Waiting jobs are deleted immediately and are not re-queued. Running jobs finish, schedules keep firing, and periodic work recovers on its next tick — one-off jobs do not come back on their own.",
+      "purgeConfirmAction": "Drop queued jobs",
+      "purgeSuccess": "Dropped {{count}} queued job(s) from “{{queue}}”",
+      "purgeFailed": "Could not purge the queue",
       "paused": "Paused",
       "pausedToast": "Queue paused. Jobs already running finish; new batches are retried until you resume.",
       "resumedToast": "Queue resumed",

@@ -4,9 +4,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@workspace/ui/lib/utils";
 
+import { translate } from "@/i18n";
+import type { Locale } from "@/lib/locale";
+
 type LiveCaseLinkProps = {
   href: string;
   caseName: string;
+  locale?: Locale;
 };
 
 function LiveDot({ className }: { className?: string }) {
@@ -42,7 +46,9 @@ function ArrowIcon({ className }: { className?: string }) {
  * once the slab scrolls out of view — so the link stays reachable for the
  * whole 20+ minute read without ever leaving the DOM (crawlable + no-JS-safe).
  */
-export function LiveCaseLink({ href, caseName }: LiveCaseLinkProps) {
+export function LiveCaseLink({ href, caseName, locale = "en" }: LiveCaseLinkProps) {
+  const t = (key: string): string =>
+    translate(locale, key, { caseName });
   const [slabVisible, setSlabVisible] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -61,7 +67,7 @@ export function LiveCaseLink({ href, caseName }: LiveCaseLinkProps) {
     return () => observer.disconnect();
   }, []);
 
-  const ariaLabel = `Open the live ${caseName} case file in the Classifyre showcase (opens in a new tab)`;
+  const ariaLabel = t("liveCase.ariaLabel");
 
   return (
     <>
@@ -78,16 +84,16 @@ export function LiveCaseLink({ href, caseName }: LiveCaseLinkProps) {
           <LiveDot />
           <span className="flex flex-col">
             <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-black/70">
-              Live namespace &middot; updates as scans run
+              {t("liveCase.liveNamespace")}
             </span>
             <span className="font-serif text-lg font-black uppercase tracking-[0.02em] sm:text-xl">
-              Inspect the {caseName} case file
+              {t("liveCase.inspect")}
             </span>
           </span>
         </span>
 
         <span className="inline-flex shrink-0 items-center gap-2 self-start border-2 border-black bg-black px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#b7ff00] sm:self-auto">
-          Open Case
+          {t("liveCase.open")}
           <ArrowIcon className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
         </span>
       </a>
@@ -107,7 +113,7 @@ export function LiveCaseLink({ href, caseName }: LiveCaseLinkProps) {
         )}
       >
         <LiveDot />
-        Open live case
+        {t("liveCase.openLive")}
         <ArrowIcon />
       </a>
     </>

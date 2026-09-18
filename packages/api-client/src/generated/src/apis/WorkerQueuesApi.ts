@@ -15,11 +15,14 @@
 
 import * as runtime from '../runtime';
 import type {
+  PurgeQueuedJobsResponseDto,
   SetWorkerQueuePausedDto,
   WorkerOverviewDto,
   WorkerQueueDto,
 } from '../models/index';
 import {
+    PurgeQueuedJobsResponseDtoFromJSON,
+    PurgeQueuedJobsResponseDtoToJSON,
     SetWorkerQueuePausedDtoFromJSON,
     SetWorkerQueuePausedDtoToJSON,
     WorkerOverviewDtoFromJSON,
@@ -27,6 +30,10 @@ import {
     WorkerQueueDtoFromJSON,
     WorkerQueueDtoToJSON,
 } from '../models/index';
+
+export interface WorkerQueuesControllerPurgeQueuedRequest {
+    queue: string;
+}
 
 export interface WorkerQueuesControllerSetPausedRequest {
     queue: string;
@@ -66,6 +73,45 @@ export class WorkerQueuesApi extends runtime.BaseAPI {
      */
     async workerQueuesControllerOverview(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<WorkerOverviewDto> {
         const response = await this.workerQueuesControllerOverviewRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Deletes waiting (`created`) and scheduled-retry jobs of one queue. Running jobs finish normally; finished history and the cron schedules themselves are untouched, so periodic work recovers on its next fire while one-off jobs need a manual re-trigger. Allowed while the workspace is paused — nothing refills the queue until resume.
+     * Drop a queue’s waiting backlog
+     */
+    async workerQueuesControllerPurgeQueuedRaw(requestParameters: WorkerQueuesControllerPurgeQueuedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PurgeQueuedJobsResponseDto>> {
+        if (requestParameters['queue'] == null) {
+            throw new runtime.RequiredError(
+                'queue',
+                'Required parameter "queue" was null or undefined when calling workerQueuesControllerPurgeQueued().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/worker-queues/{queue}/purge`;
+        urlPath = urlPath.replace(`{${"queue"}}`, encodeURIComponent(String(requestParameters['queue'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PurgeQueuedJobsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Deletes waiting (`created`) and scheduled-retry jobs of one queue. Running jobs finish normally; finished history and the cron schedules themselves are untouched, so periodic work recovers on its next fire while one-off jobs need a manual re-trigger. Allowed while the workspace is paused — nothing refills the queue until resume.
+     * Drop a queue’s waiting backlog
+     */
+    async workerQueuesControllerPurgeQueued(requestParameters: WorkerQueuesControllerPurgeQueuedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PurgeQueuedJobsResponseDto> {
+        const response = await this.workerQueuesControllerPurgeQueuedRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

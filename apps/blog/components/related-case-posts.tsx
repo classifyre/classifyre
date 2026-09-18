@@ -1,4 +1,5 @@
 import { BlogPostCard } from "@/components/blog-post-card";
+import type { Locale } from "@/lib/locale";
 import { getPostsBySection, type BlogPostSection } from "@/lib/posts";
 
 type RelatedCasePostsProps = {
@@ -6,6 +7,7 @@ type RelatedCasePostsProps = {
   currentPath: string;
   limit?: number;
   heading?: string;
+  locale?: Locale;
 };
 
 /**
@@ -19,8 +21,9 @@ export async function RelatedCasePosts({
   currentPath,
   limit = 3,
   heading = "More case files",
+  locale = "en",
 }: RelatedCasePostsProps) {
-  const posts = await getPostsBySection(section);
+  const posts = await getPostsBySection(section, locale);
   const related = posts.filter((post) => post.route !== currentPath).slice(0, limit);
 
   if (related.length === 0) return null;
@@ -32,7 +35,7 @@ export async function RelatedCasePosts({
       </h2>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {related.map((post) => (
-          <BlogPostCard key={post.route} post={post} />
+          <BlogPostCard key={post.route} post={post} locale={locale} />
         ))}
       </div>
     </section>
