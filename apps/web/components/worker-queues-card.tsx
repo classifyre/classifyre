@@ -2,10 +2,24 @@
 
 import * as React from "react";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   Badge,
   Button,
   Card,
   CardContent,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -70,6 +84,9 @@ export function WorkerQueuesCard() {
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [pending, setPending] = React.useState<string | null>(null);
+  const [purgeTarget, setPurgeTarget] =
+    React.useState<WorkerQueueDto | null>(null);
+  const [purging, setPurging] = React.useState(false);
 
   const load = React.useCallback(async () => {
     try {
@@ -115,6 +132,29 @@ export function WorkerQueuesCard() {
     },
     [load, t],
   );
+
+  const runPurge = async () => {
+    if (!purgeTarget || purging || demoMode) return;
+    const target = purgeTarget;
+    setPurging(true);
+    try {
+      const result = await api.workerQueues.workerQueuesControllerPurgeQueued(
+        { queue: target.queue },
+      );
+      toast.success(
+        t("settings.workers.purgeSuccess", {
+          count: result.droppedQueued,
+          queue: target.queue,
+        }),
+      );
+      setPurgeTarget(null);
+      await load();
+    } catch {
+      toast.error(t("settings.workers.purgeFailed"));
+    } finally {
+      setPurging(false);
+    }
+  };
 
   const concurrencyLabel = overview
     ? overview.concurrencyLimit === 0
@@ -181,29 +221,25 @@ export function WorkerQueuesCard() {
         ) : null}
 
         {overview && overview.queues.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                  <th className="py-2 pr-3 font-normal">
-                    {t("settings.workers.queue")}
-                  </th>
-                  <th className="py-2 pr-3 font-normal">
-                    {t("settings.workers.state")}
-                  </th>
-                  <th className="py-2 pr-3 font-normal">
+          <div className="overflow-x-auto rounded-[4px] border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("settings.workers.queue")}</TableHead>
+                  <TableHead>{t("settings.workers.state")}</TableHead>
+                  <TableHead className="text-right">
                     {t("settings.workers.backlog")}
-                  </th>
-                  <th className="py-2 pr-3 font-normal">
+                  </TableHead>
+                  <TableHead className="text-right">
                     {t("settings.workers.runs")}
-                  </th>
-                  <th className="py-2 pr-3 font-normal">
-                    {t("settings.workers.workers")}
-                  </th>
-                  <th className="py-2" />
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHead>
+                  <TableHead>{t("settings.workers.workers")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("settings.workers.colAction")}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {overview.queues.map((queue) => (
                   <QueueRow
                     key={queue.queue}
@@ -211,10 +247,11 @@ export function WorkerQueuesCard() {
                     demoMode={demoMode}
                     pending={pending === queue.queue}
                     onTogglePause={() => void togglePause(queue)}
+                    onPurge={() => setPurgeTarget(queue)}
                   />
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         ) : null}
 
@@ -223,6 +260,46 @@ export function WorkerQueuesCard() {
           {t("settings.workers.cancelNote")}
         </p>
       </CardContent>
+
+      <AlertDialog
+        open={purgeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !purging) setPurgeTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {purgeTarget
+                ? t("settings.workers.purgeConfirmTitle", {
+                    count: purgeTarget.queuedCount,
+                    queue: purgeTarget.queue,
+                  })
+                : ""}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("settings.workers.purgeConfirmDesc")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={purging}>
+              {t("settings.workers.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={purging}
+              onClick={(event) => {
+                event.preventDefault();
+                void runPurge();
+              }}
+            >
+              {purging ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : null}
+              {t("settings.workers.purgeConfirmAction")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
@@ -232,11 +309,13 @@ function QueueRow({
   demoMode,
   pending,
   onTogglePause,
+  onPurge,
 }: {
   queue: WorkerQueueDto;
   demoMode: boolean;
   pending: boolean;
   onTogglePause: () => void;
+  onPurge: () => void;
 }) {
   const { t } = useTranslation();
   const elapsed = queue.instances
@@ -246,10 +325,13 @@ function QueueRow({
   const lastDuration = queue.instances
     .map((instance) => instance.lastDurationMs)
     .filter((value): value is number => value != null)[0];
+  // pg-boss housekeeping queues can never be purged (the API refuses with
+  // 400), so offer the button only for real queues with a backlog.
+  const purgable = queue.queuedCount > 0 && !queue.queue.startsWith("__");
 
   return (
-    <tr className="border-b border-border/60 align-top last:border-b-0">
-      <td className="py-2.5 pr-3">
+    <TableRow key={queue.queue}>
+      <TableCell>
         <div className="font-mono text-xs">{queue.queue}</div>
         {queue.lastError ? (
           <div
@@ -259,8 +341,8 @@ function QueueRow({
             {t("settings.workers.lastError")}: {queue.lastError}
           </div>
         ) : null}
-      </td>
-      <td className="py-2.5 pr-3">
+      </TableCell>
+      <TableCell>
         <div className="flex flex-wrap items-center gap-1.5">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -299,52 +381,87 @@ function QueueRow({
             })}
           </div>
         ) : null}
-      </td>
-      <td className="py-2.5 pr-3 tabular-nums text-xs">
+      </TableCell>
+      <TableCell className="text-right tabular-nums text-xs">
         {t("settings.workers.queued", {
           count: queue.queuedCount.toLocaleString(),
         })}
-      </td>
-      <td className="py-2.5 pr-3 tabular-nums text-xs">
+      </TableCell>
+      <TableCell className="text-right tabular-nums text-xs">
         <div>{queue.runCount.toLocaleString()}</div>
         {queue.failureCount > 0 ? (
           <div className="text-[11px] text-destructive">
             {t("settings.workers.failures", { count: queue.failureCount })}
           </div>
         ) : null}
-      </td>
-      <td className="py-2.5 pr-3 text-[11px] text-muted-foreground">
-        {queue.instances.length === 0
-          ? "—"
-          : queue.instances.map((instance) => (
-              <div key={instance.instanceId} className="truncate font-mono">
-                {instance.instanceId}
+      </TableCell>
+      <TableCell className="text-[11px] text-muted-foreground">
+        {queue.instances.length === 0 ? (
+          "—"
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="max-w-[200px] cursor-default truncate font-mono">
+                {queue.instances.map((i) => i.instanceId).join(", ")}
               </div>
-            ))}
-      </td>
-      <td className="py-2.5 text-right">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 rounded-[4px] text-[11px]"
-          disabled={demoMode || pending}
-          onClick={onTogglePause}
-        >
-          {pending ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : queue.paused ? (
-            <>
-              <Play className="mr-1 h-3 w-3" />
-              {t("settings.workers.resume")}
-            </>
-          ) : (
-            <>
-              <Pause className="mr-1 h-3 w-3" />
-              {t("settings.workers.pause")}
-            </>
-          )}
-        </Button>
-      </td>
-    </tr>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[340px] text-xs">
+              <div className="space-y-1">
+                {queue.instances.map((instance) => (
+                  <div
+                    key={instance.instanceId}
+                    className="flex items-baseline justify-between gap-3"
+                  >
+                    <span className="break-all font-mono">
+                      {instance.instanceId}
+                    </span>
+                    <span className="shrink-0 text-muted-foreground">
+                      {instance.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1.5">
+          {purgable ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-[4px] text-[11px]"
+              disabled={demoMode}
+              onClick={onPurge}
+            >
+              {t("settings.workers.purge")}
+            </Button>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 rounded-[4px] text-[11px]"
+            disabled={demoMode || pending}
+            onClick={onTogglePause}
+          >
+            {pending ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : queue.paused ? (
+              <>
+                <Play className="mr-1 h-3 w-3" />
+                {t("settings.workers.resume")}
+              </>
+            ) : (
+              <>
+                <Pause className="mr-1 h-3 w-3" />
+                {t("settings.workers.pause")}
+              </>
+            )}
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
   );
 }

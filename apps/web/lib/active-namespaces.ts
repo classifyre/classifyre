@@ -110,6 +110,21 @@ export function removeActiveNamespaceFromItems(
   return items.filter((item) => item.slug !== slug);
 }
 
+/**
+ * Drop tabs whose workspace no longer exists in the registry. A tab matches
+ * when either its id or its slug is still known — the slug covers workspaces
+ * created before the tab record stored a registry id, the id covers renames
+ * that changed the slug after the tab was opened.
+ */
+export function filterExistingNamespaces(
+  items: ActiveNamespace[],
+  existing: Pick<ActiveNamespace, "id" | "slug">[],
+): ActiveNamespace[] {
+  const ids = new Set(existing.map((item) => item.id));
+  const slugs = new Set(existing.map((item) => item.slug));
+  return items.filter((item) => ids.has(item.id) || slugs.has(item.slug));
+}
+
 /** Keep an existing tab valid after workspace settings rename its slug/name. */
 export function updateActiveNamespaceInItems(
   items: ActiveNamespace[],

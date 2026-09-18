@@ -31,6 +31,8 @@ import {
 import { CliRunnerService } from './cli-runner.service';
 import { RunnerStatus } from '@prisma/client';
 import { AllowInDemoMode } from '../demo-mode.decorator';
+import { AllowWhenPaused } from '../namespace/allow-when-paused.decorator';
+import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { InternalOnly } from '../internal-only.decorator';
 import { CliBackpressureGuard } from '../guards/cli-backpressure.guard';
@@ -67,6 +69,7 @@ export class CliRunnerController {
     private readonly runnerAssetQuery: RunnerAssetQueryService,
   ) {}
 
+  @BlockWhenPaused()
   @Post('sources/:sourceId/run')
   @ApiOperation({ summary: 'Start CLI runner for source' })
   @ApiBody({ type: StartRunnerDto, required: false })
@@ -92,6 +95,7 @@ export class CliRunnerController {
 
   @UseGuards(CliBackpressureGuard)
   @InternalOnly()
+  @BlockWhenPaused()
   @Post('sources/:sourceId/runners/external')
   @ApiOperation({
     summary: 'Create runner record for external CLI REST ingestion',
@@ -112,6 +116,7 @@ export class CliRunnerController {
     );
   }
 
+  @AllowWhenPaused()
   @Patch('runners/:runnerId/stop')
   @ApiOperation({ summary: 'Stop running CLI process' })
   @ApiResponse({ status: 200, type: StopRunnerResponseDto })
@@ -119,6 +124,7 @@ export class CliRunnerController {
     return this.cliRunnerService.stopRunner(runnerId);
   }
 
+  @AllowWhenPaused()
   @Delete('runners/:runnerId')
   @ApiOperation({
     summary:

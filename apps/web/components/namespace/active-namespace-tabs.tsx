@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { api } from "@workspace/api-client";
 import { NamespaceTabs } from "@workspace/ui/components/namespace-tabs";
 
 import { useTranslation } from "@/hooks/use-translation";
@@ -9,6 +10,8 @@ import { useNamespace } from "@/components/namespace-provider";
 import { useActiveNamespaces } from "@/components/active-namespaces-provider";
 import {
   currentNamespaceHref,
+  filterExistingNamespaces,
+  readActiveNamespaces,
   upsertActiveNamespace,
   type ActiveNamespace,
 } from "@/lib/active-namespaces";
@@ -72,6 +75,31 @@ export function ActiveNamespaceTabs() {
     };
   }, [current, pathname, remember]);
 
+  // A workspace deleted elsewhere (another window, the API) leaves a tab that
+  // points at a registry entry that no longer exists. Reconcile the persisted
+  // strip once against the registry and drop whatever is gone. Failures keep
+  // the tabs untouched: a registry outage must not eat the strip.
+  const prunedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (prunedRef.current) return;
+    prunedRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const namespaces = await api.namespaces.list();
+        if (cancelled) return;
+        const stored = readActiveNamespaces();
+        const kept = filterExistingNamespaces(stored, namespaces);
+        if (kept.length !== stored.length) replace(kept);
+      } catch {
+        // Keep the tabs as they are when the registry cannot be reached.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [replace]);
+
   const persistCurrentLocation = React.useCallback(() => {
     return remember({
       ...current,
@@ -114,6 +142,58 @@ export function ActiveNamespaceTabs() {
     [current, pathname, replace, router, visibleItems],
   );
 
+  // After a bulk close, leave the strip on the anchor tab when the workspace
+  // being viewed was among the closed ones.
+  const afterBulkClose = React.useCallback(
+    (next: ActiveNamespace[], anchorId: string) => {
+      replace(next);
+      if (next.some((item) => item.id === current.id)) return;
+      deactivatingSlugRef.current = current.slug;
+      const anchor = next.find((item) => item.id === anchorId);
+      router.push(anchor?.href ?? "/");
+    },
+    [current.id, current.slug, replace, router],
+  );
+
+  const closeOthers = React.useCallback(
+    (id: string) => {
+      const latest = upsertActiveNamespace(visibleItems, {
+        ...current,
+        href: currentNamespaceHref(current.slug, pathname),
+      });
+      const anchor = latest.find((item) => item.id === id);
+      if (!anchor || latest.length < 2) return;
+      afterBulkClose([anchor], id);
+    },
+    [afterBulkClose, current, pathname, visibleItems],
+  );
+
+  const closeToLeft = React.useCallback(
+    (id: string) => {
+      const latest = upsertActiveNamespace(visibleItems, {
+        ...current,
+        href: currentNamespaceHref(current.slug, pathname),
+      });
+      const anchorIndex = latest.findIndex((item) => item.id === id);
+      if (anchorIndex <= 0) return;
+      afterBulkClose(latest.slice(anchorIndex), id);
+    },
+    [afterBulkClose, current, pathname, visibleItems],
+  );
+
+  const closeToRight = React.useCallback(
+    (id: string) => {
+      const latest = upsertActiveNamespace(visibleItems, {
+        ...current,
+        href: currentNamespaceHref(current.slug, pathname),
+      });
+      const anchorIndex = latest.findIndex((item) => item.id === id);
+      if (anchorIndex === -1 || anchorIndex >= latest.length - 1) return;
+      afterBulkClose(latest.slice(0, anchorIndex + 1), id);
+    },
+    [afterBulkClose, current, pathname, visibleItems],
+  );
+
   // A single open workspace needs no switcher; reclaim the strip's height.
   if (visibleItems.length < 2) return null;
 
@@ -125,6 +205,15 @@ export function ActiveNamespaceTabs() {
       closeLabel={(item) => t("workspaces.closeTabAria", { name: item.label })}
       onActivate={activate}
       onClose={close}
+      onCloseOthers={closeOthers}
+      onCloseLeft={closeToLeft}
+      onCloseRight={closeToRight}
+      menuLabels={{
+        close: () => t("workspaces.closeTab"),
+        closeOthers: t("workspaces.closeOtherTabs"),
+        closeLeft: t("workspaces.closeTabsToLeft"),
+        closeRight: t("workspaces.closeTabsToRight"),
+      }}
       data-testid="active-namespace-tabs"
     />
   );

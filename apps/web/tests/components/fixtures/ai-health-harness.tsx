@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AiHealthFixButton, AiHealthProvider } from "@/components/ai-health";
+import { AiHealthHarnessStatus, AiHealthProvider } from "@/components/ai-health";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { ServerConfigContext } from "@/components/server-config-provider";
 
@@ -21,7 +21,7 @@ export function AiHealthHarness() {
         >
           Configure Harness only
         </button>
-        <AiHealthFixButton />
+        <AiHealthHarnessStatus />
       </AiHealthProvider>
     </ServerConfigContext.Provider>
   );

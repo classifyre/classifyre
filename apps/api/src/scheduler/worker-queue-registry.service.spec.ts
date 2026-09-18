@@ -201,4 +201,23 @@ describe('WorkerQueueRegistryService', () => {
 
     await expect(service.flush()).resolves.toBeUndefined();
   });
+
+  it('reaps heartbeat rows silent past the TTL on every flush', async () => {
+    const deletes: unknown[][] = [];
+    const { service } = serviceWith((sql, params) => {
+      if (sql.includes('DELETE FROM public.worker_queue_state')) {
+        deletes.push(params as unknown[]);
+      }
+      return Promise.resolve({ rows: [] });
+    });
+    service.register({ namespaceId, queue: 'embedding' });
+    const before = Date.now();
+    await service.flush();
+
+    expect(deletes).toHaveLength(1);
+    const cutoff = new Date(deletes[0]?.[0] as string).getTime();
+    // Five-minute TTL with a small allowance for test execution time.
+    expect(before - cutoff).toBeGreaterThan(4 * 60_000);
+    expect(before - cutoff).toBeLessThan(6 * 60_000);
+  });
 });

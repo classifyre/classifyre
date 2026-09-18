@@ -18,6 +18,8 @@ interface NamespaceContextValue {
   displayName: string;
   /** Build a namespace-scoped href: nsHref("/settings") → "/acme-corp/settings". */
   nsHref: (path: string) => string;
+  /** Re-fetch registry metadata, e.g. after pausing from a settings card. */
+  refresh: () => Promise<void>;
 }
 
 const NamespaceContext = React.createContext<NamespaceContextValue | null>(
@@ -51,30 +53,28 @@ export function NamespaceProvider({
   const locale = useLocale();
 
   const [namespace, setNamespace] = React.useState<Namespace | null>(null);
+  // Latest slug, so a slow fetch for a previous workspace never overwrites
+  // the state of the one the route points at now.
+  const slugRef = React.useRef(effectiveSlug);
+  slugRef.current = effectiveSlug;
+
+  const refresh = React.useCallback(async () => {
+    const slug = effectiveSlug;
+    if (!slug) return;
+    try {
+      const items = await api.namespaces.list();
+      if (slugRef.current !== slug) return;
+      setNamespace(items.find((item) => item.slug === slug) ?? null);
+    } catch {
+      // The route slug remains a useful fallback when registry metadata is
+      // temporarily unavailable.
+    }
+  }, [effectiveSlug]);
 
   React.useEffect(() => {
-    if (!effectiveSlug) return;
-    let cancelled = false;
     setNamespace(null);
-
-    void api.namespaces
-      .list()
-      .then((items) => {
-        if (!cancelled) {
-          setNamespace(
-            items.find((item) => item.slug === effectiveSlug) ?? null,
-          );
-        }
-      })
-      .catch(() => {
-        // The route slug remains a useful fallback when registry metadata is
-        // temporarily unavailable.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveSlug]);
+    void refresh();
+  }, [refresh]);
 
   const value = React.useMemo<NamespaceContextValue>(
     () => ({
@@ -85,8 +85,9 @@ export function NamespaceProvider({
         const normalized = path.startsWith("/") ? path : `/${path}`;
         return withLocaleAndSlug(normalized, effectiveSlug, locale);
       },
+      refresh,
     }),
-    [effectiveSlug, namespace, locale],
+    [effectiveSlug, namespace, locale, refresh],
   );
 
   // A namespace route always carries a slug; the guard is here so a malformed

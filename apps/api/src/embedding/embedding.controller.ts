@@ -38,6 +38,7 @@ import {
 } from './embedding-settings.service';
 import { EmbeddingStatsService } from './embedding-stats.service';
 import { EmbeddingRebuildService } from './embedding-rebuild.service';
+import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import {
   EmbeddingRebuildResponseDto,
   EmbeddingSettingsResponseDto,
@@ -123,6 +124,7 @@ export class EmbeddingController {
     };
   }
 
+  @BlockWhenPaused()
   @Post('embeddings/rebuild')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -219,6 +221,7 @@ export class EmbeddingController {
     return { ...this.embeddings.status(), ...(await this.queue.status()) };
   }
 
+  @BlockWhenPaused()
   @Post('embeddings/reindex')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -271,6 +274,7 @@ export class EmbeddingController {
     });
   }
 
+  @BlockWhenPaused()
   @Post('embeddings/recalibrate')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({

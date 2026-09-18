@@ -1,0 +1,90 @@
+---
+sidebarTitle: Pause & Resume
+title: Pause & Resume
+description: Freeze a workspace completely — no scans, schedules, harness cycles or duplicate checks — and resume where it stopped.
+---
+
+# Pause & Resume
+
+Pausing a workspace freezes **all of its activity** without touching its
+data. It is the big red-freeze button for investigations you want to keep but
+not run: a finished case file, a seasonal source set, a workspace whose
+provider quota you need elsewhere.
+
+You pause in **Settings → Workers** (the Pause workspace card at the top) or
+in the workspace registry settings. An optional one-line reason is shown in
+the directory and in the banner.
+
+---
+
+## What stops
+
+Only calls that **start something** are rejected with a `409` naming the
+resume path — a manual start fails fast instead of queueing work nobody runs:
+
+- Scan and ingestion runs (single, bulk, external), schedule resumes,
+  connection tests (these can spawn jobs)
+- Notebook executions, export/import jobs, detector training
+- Embedding rebuilds, reindexes and recalibrations
+- Finding-statistics rebuilds, correlation recomputes
+- Autopilot triggers, dreams and reruns; the supervisor wake
+- Case-lead generation and assistant replies (agentic/AI activity)
+
+Everything behind those calls is frozen out-of-band as well, so automation
+cannot sneak around the API:
+
+| Layer                                                | While paused                                                            |
+| ---------------------------------------------------- | ----------------------------------------------------------------------- |
+| In-flight scans                                      | Stopped: local processes and Kubernetes jobs are terminated             |
+| Per-namespace background workers (pg-boss consumers) | Stopped (visible in Settings → Workers)                                 |
+| Cron and auto schedules                              | Skipped quietly — no new scans are admitted                             |
+| AI harness cycles and dreams                         | Skipped; jobs enqueued before the pause complete without doing anything |
+| Supervisor ticks                                     | Skipped                                                                 |
+| Queued correlation/duplicate jobs                    | Complete without doing anything                                         |
+
+Queued pg-boss jobs are **not deleted**: they wait and run after the resume.
+Schedules, crons and queue subscriptions are left configured, so resume
+continues where the pause stopped. Config saved while paused (tuning,
+schedules, goals) simply takes effect on resume — a recompute queued by a
+config change waits the same way.
+
+## What keeps working
+
+- **Reads, whatever the method.** The workspace stays fully inspectable:
+  search, findings and charts queries are POSTs and all pass, as do findings,
+  assets, cases, graphs and settings.
+- **Direct CRUD.** Sources, cases, evidence, findings triage, glossary,
+  notifications, detector and provider configs — create and edit freely. The
+  work they would normally trigger stays frozen until resume.
+- **Synchronous recomputation.** Inquiry rematch, review-rollup and edge
+  rebuilds run inside the request and complete normally.
+- **Winding down.** Stopping or deleting a run, cancelling an agent run or a
+  transfer, reverting an agent action, and storage cleanup stay available, so
+  in-flight work can be finished off deliberately.
+- **Diagnostics.** Provider and detector tests, capability checks, MCP
+  refreshes, dry-run previews.
+- **CLI result callbacks.** Runs that were in flight when the pause landed
+  can still report their terminal state instead of wedging as running.
+- **Resume.** `PATCH /namespaces/:id` with `{"paused": false}` — the registry
+  routes are outside any workspace, so the freeze can never lock you out.
+
+## How you see it
+
+- The workspace directory card carries an amber **Paused** badge (reason as
+  tooltip).
+- Every dashboard page shows an amber warning banner with the pause reason
+  and a link to the settings.
+- `GET /namespaces` and `GET /namespaces/:id` expose `paused`, `pausedAt`
+  and `pausedReason`.
+
+## Notes for operators
+
+- Pause and resume also converge across processes: the replica that handled
+  the toggle flips workers immediately, every other replica follows within
+  its reconcile pass (seconds). A worker restart never resurrects a paused
+  workspace.
+- Cleanup (Settings → Cleanup) is the intentional exception to the freeze:
+  it stays available while paused, because a frozen workspace is the ideal
+  quiet window — pause, clean, resume, and no worker can re-insert rows
+  while a wipe drains (see Storage & Cleanup).
+- Demo mode blocks pausing entirely, like any other mutation.

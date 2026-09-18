@@ -21,6 +21,7 @@ import {
 import {
   Clock3,
   Cpu,
+  Database,
   DatabaseBackup,
   Globe,
   Languages,
@@ -37,6 +38,8 @@ import { ChatBotsCard } from "@/components/chat-bots-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
 import { DataTransferCard } from "@/components/data-transfer/data-transfer-card";
+import { CleanupCard } from "@/components/maintenance/cleanup-card";
+import { PauseWorkspaceCard } from "@/components/namespace/pause-workspace-card";
 import { WorkerQueuesCard } from "@/components/worker-queues-card";
 
 import { useTranslation } from "@/hooks/use-translation";
@@ -225,6 +228,10 @@ export default function SettingsPage() {
             <Cpu className="h-3.5 w-3.5" />
             {t("settings.tabs.workers")}
           </TabsTrigger>
+          <TabsTrigger value="cleanup" className={TAB_TRIGGER_CLASS}>
+            <Database className="h-3.5 w-3.5" />
+            {t("settings.tabs.cleanup")}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent
@@ -397,9 +404,16 @@ export default function SettingsPage() {
 
         <TabsContent
           value="workers"
-          className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
+          className="space-y-6 duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
+          <PauseWorkspaceCard />
           <WorkerQueuesCard />
+        </TabsContent>
+        <TabsContent
+          value="cleanup"
+          className="space-y-6 duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
+        >
+          <CleanupCard />
         </TabsContent>
       </Tabs>
     </div>

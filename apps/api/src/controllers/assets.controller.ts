@@ -54,6 +54,7 @@ import { SearchFindingsResponseDto } from '../dto/search-findings-response.dto';
 import { SearchFindingsChartsRequestDto } from '../dto/search-findings-charts-request.dto';
 import { SearchFindingsChartsResponseDto } from '../dto/search-findings-charts-response.dto';
 import { SearchFindingsCustomDetectorOptionDto } from '../dto/search-findings-custom-detectors.dto';
+import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 
 @Controller('assets')
 @ApiTags('Assets')
@@ -339,6 +340,7 @@ export class SourceAssetsController {
 
   @UseGuards(CliBackpressureGuard)
   @InternalOnly()
+  @BlockWhenPaused()
   @Post('bulk')
   @ApiOperation({
     summary: 'Bulk ingest assets',
@@ -462,6 +464,7 @@ export class SourceAssetsController {
 
   @UseGuards(CliBackpressureGuard)
   @InternalOnly()
+  @BlockWhenPaused()
   @Post('finalize')
   @ApiOperation({
     summary: 'Finalize ingest run',

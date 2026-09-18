@@ -15,6 +15,10 @@
     "all": "Alle Arbeitsbereiche",
     "activeTabsLabel": "Aktive Arbeitsbereiche",
     "closeTabAria": "{{name}} deaktivieren",
+    "closeTab": "Schließen",
+    "closeOtherTabs": "Andere Tabs schließen",
+    "closeTabsToLeft": "Tabs links schließen",
+    "closeTabsToRight": "Tabs rechts schließen",
     "new": "Neuer Arbeitsbereich",
     "loading": "Arbeitsbereiche werden geladen",
     "loadFailed": "Arbeitsbereiche konnten nicht geladen werden",
@@ -81,7 +85,25 @@
     "linkIncomplete": "Jeder Link braucht sowohl einen Namen als auch eine URL.",
     "linkOpenAria": "{{name}} in einem neuen Tab öffnen",
     "groupCount": "{{count}} Arbeitsbereiche",
-    "groupCountOne": "1 Arbeitsbereich"
+    "groupCountOne": "1 Arbeitsbereich",
+    "pausedBadge": "Pausiert",
+    "pausedBadgeAria": "{{name}} ist pausiert",
+    "pauseSectionTitle": "Arbeitsbereich pausieren",
+    "pauseSectionDescription": "Pausieren friert alles in diesem Arbeitsbereich ein: keine Scans oder Läufe, keine geplanten oder automatischen Aktivitäten, keine KI-Harness-Zyklen oder Dreams und keine Duplikatprüfungen. Lesen bleibt möglich. Fortsetzen macht dort weiter, wo pausiert wurde.",
+    "pauseReasonLabel": "Grund (optional)",
+    "pauseReasonPlaceholder": "Warum ist dieser Arbeitsbereich pausiert?",
+    "pauseAction": "Arbeitsbereich pausieren",
+    "pausingAction": "Wird pausiert…",
+    "resumeAction": "Arbeitsbereich fortsetzen",
+    "resumingAction": "Wird fortgesetzt…",
+    "pauseSuccess": "Arbeitsbereich \"{{name}}\" pausiert",
+    "resumeSuccess": "Arbeitsbereich \"{{name}}\" fortgesetzt",
+    "pauseFailed": "Der Pausenstatus konnte nicht geändert werden",
+    "pausedSince": "Pausiert {{when}}",
+    "pausedBannerTitle": "Dieser Arbeitsbereich ist pausiert",
+    "pausedBannerDescription": "Scans, Pläne, KI-Harness-Zyklen und Duplikatprüfungen sind gestoppt. Bis zum Fortsetzen ist alles schreibgeschützt.",
+    "pausedBannerReason": "Grund: {{reason}}",
+    "pausedBannerAction": "In den Einstellungen fortsetzen"
   },
   "categories": {
     "label": "Kategorien",
@@ -345,7 +367,105 @@
       "mcp": "MCP-Server",
       "chat": "Chat-Bots",
       "data": "Export & Import",
-      "workers": "Worker"
+      "workers": "Worker",
+      "cleanup": "Bereinigung"
+    },
+    "cleanup": {
+      "title": "Speicher & Bereinigung",
+      "description": "Wie viel Speicher dieser Arbeitsbereich belegt, und ein sicherer Weg, ihn zurückzugewinnen. Die Untersuchung selbst — Quellen, Befunde, Assets, Fälle, Anfragen, Glossar — wird gemessen, aber hier nie gelöscht.",
+      "totalData": "{{size}} Arbeitsbereichsdaten",
+      "totalQueues": "{{size}} abgeschlossene Queue-Jobs",
+      "colDataset": "Datensatz",
+      "colRows": "Zeilen",
+      "colSize": "Größe",
+      "colAction": "Aktion",
+      "cleanableTitle": "Kann bereinigt werden",
+      "cleanableSubtitle": "Flüchtige oder abgeleitete Daten. Die Untersuchung selbst wird nie berührt.",
+      "protectedTitle": "Wird hier nie gelöscht",
+      "protectedSubtitle": "Die Untersuchung selbst. Nur zur Größenanzeige, ohne Bereinigungsaktion.",
+      "kept": "Bleibt",
+      "keptNote": "Wird nie gelöscht",
+      "clean": "Bereinigen",
+      "cleaning": "Wird bereinigt…",
+      "confirmTitle": "„{{name}}“ bereinigen?",
+      "confirmAction": "Jetzt bereinigen",
+      "cancel": "Abbrechen",
+      "success": "„{{name}}“ bereinigt: {{rows}} Zeilen in {{seconds}}s entfernt",
+      "successSkipped": "{{count}} laufende Element(e) belassen",
+      "failed": "Bereinigung fehlgeschlagen",
+      "progress": "{{processed}} von ~{{total}} Zeilen · {{table}}",
+      "progressNoEstimate": "{{processed}} Zeilen · {{table}}",
+      "progressFinishing": "Speicher wird freigegeben…",
+      "runFailed": "Bereinigung fehlgeschlagen: {{error}}",
+      "runGone": "Bereinigung hat diese Ansicht verlassen; die Übersicht zeigt das Ergebnis nach dem Neuladen.",
+      "activeJobsHint": "{{count}} Scan(s) laufen noch — Arbeitsbereich zuerst pausieren, sonst schreiben Worker während der Bereinigung neue Zeilen.",
+      "loading": "Speicherverbrauch wird gemessen…",
+      "loadFailed": "Die Speicherübersicht konnte nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "estimatesNote": "Zeilenangaben sind Planer-Schätzungen (~) und Größen enthalten Indizes; beides wird bei jedem Besuch live gemessen.",
+      "unlisted": "{{count}} Hilfstabellen ({{size}}) enthalten Konfiguration und werden nie bereinigt.",
+      "datasets": {
+        "sources": {
+          "name": "Quellen",
+          "desc": "Verbindungen und hochgeladene Dateien — das Inventar des Überwachten."
+        },
+        "findings": {
+          "name": "Befunde",
+          "desc": "Erkannte Probleme mit Nachweisen und Detektor-Feedback — das Untersuchungsprotokoll."
+        },
+        "assets": {
+          "name": "Assets",
+          "desc": "Gefundene Dokumente, Personen, Firmen und ihr Beziehungsgraph."
+        },
+        "cases": {
+          "name": "Fälle",
+          "desc": "Fallakten mit Spuren, Threads, Nachweislinks und Hypothesen."
+        },
+        "inquiries": {
+          "name": "Anfragen",
+          "desc": "Gespeicherte Untersuchungsfragen."
+        },
+        "glossary": {
+          "name": "Glossar",
+          "desc": "Vereinbarte Begriffe und Referenzen."
+        },
+        "scans": {
+          "name": "Scan-Verlauf",
+          "desc": "Abgeschlossene Scan-Läufe, Asset-Snapshots pro Lauf und Logdateien. Ausstehende und laufende Scans werden übersprungen.",
+          "destructive": "Abgeschlossene Läufe werden endgültig entfernt und können nicht wiederhergestellt werden. Assets verlieren ihre „Zuletzt-gesehen-von“-Verknüpfung; Fundstellen behalten die Lauf-ID als reinen Text."
+        },
+        "duplicates": {
+          "name": "Duplikat-Artefakte",
+          "desc": "Trefferkandidaten, Signaturen und Korrelationsprofile. Menschliche Review-Entscheidungen bleiben; die nächste Duplikatprüfung baut den Rest neu.",
+          "impact": "Match-Kandidaten, Signaturen und Cluster werden entfernt; die Duplikat-Warteschlange bleibt bis zur nächsten Duplikatprüfung leer. Bereits getroffene Prüfentscheidungen bleiben erhalten."
+        },
+        "embeddings": {
+          "name": "Embeddings",
+          "desc": "Vektoren und Chunk-Texte. Spaces und Einstellungen bleiben; ein erneuter Embedding-Index baut den Rest neu.",
+          "impact": "Vektoren und Chunk-Texte werden entfernt. Semantische Suche, ähnliche Fundstellen und semantische Glossartreffer liefern nichts, bis der Embedding-Index neu erstellt wird."
+        },
+        "harness": {
+          "name": "KI-Harness-Verlauf",
+          "desc": "Agentenläufe inklusive Dreams, mit Logs, Entscheidungen und Supervisor-Notizen. Gelerntes Wissen, Ziele und Undo-Verlauf bleiben.",
+          "destructive": "Agentenläufe einschließlich Dreams werden mit Logs und Entscheidungen endgültig entfernt. Gelerntes Wissen, Ziele, Briefs und Konfigurationen bleiben erhalten."
+        },
+        "scheduler": {
+          "name": "Abgeschlossene Queue-Jobs",
+          "desc": "Erledigte, fehlgeschlagene und abgebrochene Hintergrundjobs. Wartende, geplante und laufende Jobs — und die Pläne selbst — bleiben."
+        },
+        "stats": {
+          "name": "Befund-Statistiken",
+          "desc": "Vorberechnete Tages-Rollups. Werden vom Statistik-Worker automatisch neu aufgebaut."
+        },
+        "graph": {
+          "name": "Quellen-Graph",
+          "desc": "Vorberechneter Beziehungs-Graph der Quellen. Wird vom Graph-Worker automatisch neu aufgebaut."
+        },
+        "transfers": {
+          "name": "Abgeschlossene Transfers",
+          "desc": "Erledigte, fehlgeschlagene und abgebrochene Export/Import-Jobs mit ihren Chunks. Bereitgestellte und laufende Transfers bleiben."
+        }
+      }
     },
     "version": {
       "heading": "Softwareversion",
@@ -453,6 +573,14 @@
       "loadFailed": "Worker-Status konnte nicht geladen werden",
       "pause": "Pausieren",
       "resume": "Fortsetzen",
+      "colAction": "Aktion",
+      "cancel": "Abbrechen",
+      "purge": "Leeren",
+      "purgeConfirmTitle": "„{{queue}}“: {{count}} wartende Job(s) verwerfen?",
+      "purgeConfirmDesc": "Wartende Jobs werden sofort gelöscht und nicht erneut eingereiht. Laufende Jobs werden fertig, Pläne laufen weiter, und periodische Arbeit erholt sich beim nächsten Tick — einmalige Jobs kommen nicht von allein zurück.",
+      "purgeConfirmAction": "Warteschlange leeren",
+      "purgeSuccess": "„{{queue}}“: {{count}} wartende Job(s) verworfen",
+      "purgeFailed": "Warteschlange konnte nicht geleert werden",
       "paused": "Pausiert",
       "pausedToast": "Queue pausiert. Laufende Jobs werden beendet; neue Batches werden bis zum Fortsetzen wiederholt.",
       "resumedToast": "Queue fortgesetzt",

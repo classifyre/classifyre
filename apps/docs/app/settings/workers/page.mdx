@@ -1,0 +1,72 @@
+---
+sidebarTitle: Workers & Queues
+title: Workers & Queues
+description: See what the background queues are doing, pause a queue, or drop a stuck backlog — and what each of those does.
+---
+
+# Workers & Queues
+
+**Settings → Workers** shows every background queue serving the workspace:
+its state, its waiting backlog, how many batches it ran, which worker
+processes report on it, and a per-queue pause switch. Above the table sits
+the Pause workspace card — pausing the whole workspace stops all of its
+workers at once (see Pause & Resume).
+
+## Reading the table
+
+- **State.** `running` (a batch is executing), `waiting_slot` (queued for a
+  concurrency slot), `failed` (the last batch errored — details under the
+  queue name), `idle`, or `stale`, shown as **No heartbeat**.
+- **Backlog.** Jobs waiting to be fetched, read from the queue itself — an
+  idle-looking queue with a backlog still has work nobody picked up.
+- **Runs.** Completed batches, with failures called out separately.
+- **Workers.** The processes currently reporting on the queue, truncated with
+  the full list in the tooltip. `hostname:pid` identifies the pod and process.
+
+### No heartbeat
+
+Every worker process reports every 5 seconds; a row silent for more than 30
+seconds is downgraded to stale rather than believed, so an OOM-killed pod
+cannot leave a queue looking busy forever. Rows silent for more than 5
+minutes are deleted outright (clean shutdowns already remove their own row),
+so corpse entries cannot pin a queue at stale or pile dead ids into the
+Workers column.
+
+Two cases where stale is *correct*, not a bug: a queue with a backlog but no
+live worker (nothing beats for it — start or resume the workers), and a
+paused workspace (its workers are stopped, so there is no heartbeat until
+resume).
+
+## Pausing a queue
+
+The per-queue switch stops fetching: queued jobs wait safely and run after
+resume instead of burning retries, and a batch fetched just as the pause
+landed waits for resume rather than failing. Jobs already running cannot be
+cancelled — pause and let them drain, or restart the worker. Pausing is
+database-backed, so it applies to every worker replica.
+
+## Purging a backlog
+
+A queue with waiting jobs offers **Purge**, behind a confirmation that names
+the count. Purging deletes the waiting (`created`) and scheduled-retry jobs
+of that one queue:
+
+- Dropped jobs are gone, not re-queued. Periodic schedules recover on their
+  next fire; one-off work (a manually scheduled recompute) needs a manual
+  re-trigger.
+- Jobs waiting to retry a failure go with the backlog: a failure that would
+  have recovered on retry stays failed (its error row remains visible).
+- Running jobs finish normally. Finished history and the cron schedules
+  themselves are never touched — for finished-job history see Storage &
+  Cleanup instead.
+- Housekeeping queues (`__pgboss__*`) refuse with a 400; purging is allowed
+  while the workspace is paused (nothing refills the queue until resume) and
+  blocked in demo mode like any other mutation.
+
+## Why there is no "run now" button
+
+Queue jobs carry queue-specific payloads (which assets, which inquiry, which
+source), so a generic trigger would fire handlers with empty input. Manual
+starts live where the work is defined instead: scan now on a source,
+autopilot trigger, embedding reindex, correlation recompute. The queues tab
+stays a visibility and wind-down surface: watch, pause, purge.
