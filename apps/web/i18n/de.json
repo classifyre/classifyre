@@ -16,6 +16,7 @@
     "activeTabsLabel": "Aktive Arbeitsbereiche",
     "closeTabAria": "{{name}} deaktivieren",
     "closeTab": "Schließen",
+    "openInNewTab": "In neuem Tab öffnen",
     "closeOtherTabs": "Andere Tabs schließen",
     "closeTabsToLeft": "Tabs links schließen",
     "closeTabsToRight": "Tabs rechts schließen",

@@ -32,7 +32,7 @@ test("demo mode issues no provider probe and renders no harness status", async (
 }) => {
   const { calls } = await trackProviderCalls(page);
 
-  const component = await mount(
+  await mount(
     <ServerConfigContext.Provider
       value={{ logsPersisted: false, demoMode: true }}
     >
@@ -46,9 +46,7 @@ test("demo mode issues no provider probe and renders no harness status", async (
   await page.waitForTimeout(700);
 
   expect(calls).toEqual([]);
-  await expect(
-    component.getByTestId("ai-health-harness-status"),
-  ).toHaveCount(0);
+  await expect(page.getByTestId("ai-health-harness-status")).toHaveCount(0);
 });
 
 test("outside demo mode a missing provider marks the Harness entry", async ({
@@ -57,7 +55,7 @@ test("outside demo mode a missing provider marks the Harness entry", async ({
 }) => {
   const { calls } = await trackProviderCalls(page);
 
-  const component = await mount(
+  await mount(
     <ServerConfigContext.Provider
       value={{ logsPersisted: false, demoMode: false }}
     >
@@ -68,9 +66,10 @@ test("outside demo mode a missing provider marks the Harness entry", async ({
   );
 
   expect(calls).toEqual([]);
-  await expect(
-    component.getByTestId("ai-health-harness-status"),
-  ).toHaveAttribute("data-status", "not_configured");
+  await expect(page.getByTestId("ai-health-harness-status")).toHaveAttribute(
+    "data-status",
+    "not_configured",
+  );
 });
 
 test("global warning ignores Assistant state once Harness is healthy", async ({
@@ -134,7 +133,5 @@ test("global warning ignores Assistant state once Harness is healthy", async ({
     .getByRole("button", { name: "Configure Harness only" })
     .click();
   await expect.poll(() => harnessTests).toBe(1);
-  await expect(
-    component.getByTestId("ai-health-harness-status"),
-  ).toHaveCount(0);
+  await expect(page.getByTestId("ai-health-harness-status")).toHaveCount(0);
 });

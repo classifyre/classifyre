@@ -16,6 +16,7 @@
     "activeTabsLabel": "Active workspaces",
     "closeTabAria": "Deactivate {{name}}",
     "closeTab": "Close",
+    "openInNewTab": "Open in new tab",
     "closeOtherTabs": "Close other tabs",
     "closeTabsToLeft": "Close tabs to the left",
     "closeTabsToRight": "Close tabs to the right",
