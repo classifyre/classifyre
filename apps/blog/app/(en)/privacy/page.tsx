@@ -12,7 +12,7 @@ import {
   showcaseUrl,
 } from "@/lib/site";
 
-import "../landing.css";
+import "../../landing.css";
 
 /**
  * Privacy and cookie policy for the public Classifyre websites.

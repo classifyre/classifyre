@@ -16,20 +16,28 @@ import {
   enterpriseContactEmail,
   repoUrl,
   routes,
-  showcaseUrl,
+  showcaseUrlFor,
 } from "@/lib/site";
+import { withLocalePrefix } from "@/lib/locale";
 
-import "../landing.css";
+import "../../../landing.css";
 
 export const metadata: Metadata = {
-  title: "Open Source vs Enterprise",
+  title: "Open Source vs. Enterprise",
   description:
-    "A plain comparison of Classifyre's open-source core and the enterprise layer. Every detection, investigation, and deployment feature is open source; enterprise adds SSO, roles, per-workspace authorization, tuned models, and SLA-backed support.",
-  alternates: { canonical: routes.editions },
+    "Ein schlichter Vergleich von Classifyres Open-Source-Kern und dem Enterprise-Layer. Jede Detektions-, Ermittlungs- und Deployment-Funktion ist Open Source; Enterprise legt SSO, Rollen, Autorisierung pro Workspace, abgestimmte Modelle und Support mit SLA drauf.",
+  alternates: {
+    canonical: "/de/open-source-vs-enterprise/",
+    languages: {
+      en: "/open-source-vs-enterprise/",
+      de: "/de/open-source-vs-enterprise/",
+      "x-default": "/open-source-vs-enterprise/",
+    },
+  },
   openGraph: {
-    title: "Classifyre — Open Source vs Enterprise",
+    title: "Classifyre — Open Source vs. Enterprise",
     description:
-      "Detection, investigations, autopilot, and both runtimes are open source. Enterprise adds the governance layer and our engineers.",
+      "Detektion, Ermittlungen, Autopilot und beide Runtimes sind Open Source. Enterprise legt die Governance-Schicht und unsere Engineers drauf.",
     type: "website",
   },
 };
@@ -55,100 +63,100 @@ type RowGroup = {
 
 const COMPARISON: readonly RowGroup[] = [
   {
-    group: "Detection",
-    summary: "Identical. The engine is the open-source project.",
+    group: "Detektion",
+    summary: "Identisch. Die Engine ist das Open-Source-Projekt.",
     rows: [
       {
-        capability: "Every source connector",
-        detail: "Databases, lakehouses, collaboration tools, storage, streams",
+        capability: "Jeder Quellen-Konnektor",
+        detail: "Datenbanken, Lakehouses, Kollaborationstools, Storage, Streams",
         oss: true,
         ent: true,
       },
       {
-        capability: "Built-in detector packs",
-        detail: "PII, secrets, code security, threats, content quality",
+        capability: "Eingebaute Detektor-Packs",
+        detail: "PII, Secrets, Code-Security, Threats, Content-Qualität",
         oss: true,
         ent: true,
       },
       {
-        capability: "Custom detectors",
-        detail: "Regex, entity classification, Hugging Face models, any LLM",
+        capability: "Eigene Detektoren",
+        detail: "Regex, Entitäts-Klassifizierung, Hugging-Face-Modelle, jedes LLM",
         oss: true,
-        ent: "Built with you",
+        ent: "Mit Ihnen gebaut",
       },
       {
-        capability: "Semantic ranking",
-        detail: "Importance 0–1 with written reasons, not just severity",
+        capability: "Semantisches Ranking",
+        detail: "Wichtigkeit 0–1 mit aufgeschriebenen Gründen, nicht nur Severity",
         oss: true,
-        ent: "Calibrated to your corpus",
+        ent: "Auf Ihren Korpus kalibriert",
       },
       {
-        capability: "Detection tuned to your terminology",
-        detail: "Models trained so a term means what it means at your company",
+        capability: "Detektion abgestimmt auf Ihre Terminologie",
+        detail: "Modelle, trainiert, damit ein Begriff bedeutet, was er in Ihrer Firma bedeutet",
         oss: false,
         ent: true,
       },
       {
-        capability: "Multilanguage detection tuning",
+        capability: "Mehrsprachiges Detektions-Tuning",
         oss: false,
         ent: true,
       },
     ],
   },
   {
-    group: "Investigation",
-    summary: "Identical. Cases are the product, in both editions.",
+    group: "Ermittlung",
+    summary: "Identisch. Fälle sind das Produkt, in beiden Editionen.",
     rows: [
       {
-        capability: "Findings, inquiries, and fingerprints",
+        capability: "Befunde, Anfragen und Fingerprints",
         oss: true,
         ent: true,
       },
       {
-        capability: "Cases, hypotheses, and evidence trails",
+        capability: "Fälle, Hypothesen und Beweisspuren",
         oss: true,
         ent: true,
       },
       {
-        capability: "Harness AI autopilot",
-        detail: "Five agents working the investigation between scans",
+        capability: "Harness-AI-Autopilot",
+        detail: "Fünf Agenten bearbeiten die Ermittlung zwischen den Scans",
         oss: true,
-        ent: "Tuned to your workflows",
+        ent: "Auf Ihre Workflows abgestimmt",
       },
       {
-        capability: "In-app assistant and MCP server",
-        detail: "Drive the whole product from your own AI client",
+        capability: "In-App-Assistent und MCP-Server",
+        detail: "Das ganze Produkt aus Ihrem eigenen KI-Client steuern",
         oss: true,
         ent: true,
       },
-      { capability: "Notifications and data export", oss: true, ent: true },
+      { capability: "Benachrichtigungen und Datenexport", oss: true, ent: true },
     ],
   },
   {
     group: "Deployment",
-    summary: "Identical. No runtime is held back.",
+    summary: "Identisch. Keine Runtime wird zurückgehalten.",
     rows: [
       {
-        capability: "All-in-one Docker image",
-        detail: "macOS, Windows, Linux — PostgreSQL inside",
+        capability: "All-in-one-Docker-Image",
+        detail: "macOS, Windows, Linux — PostgreSQL drinnen",
         oss: true,
         ent: true,
       },
       {
-        capability: "Helm chart on Kubernetes",
-        detail: "Scales as far as the estate demands",
+        capability: "Helm-Chart auf Kubernetes",
+        detail: "Skaliert so weit, wie der Bestand verlangt",
         oss: true,
         ent: true,
       },
       {
-        capability: "Workspace isolation",
-        detail: "Own schema, evidence, AI memory, and endpoint per workspace",
+        capability: "Workspace-Isolierung",
+        detail: "Eigenes Schema, eigene Beweise, eigenes KI-Memory und eigener Endpunkt pro Workspace",
         oss: true,
         ent: true,
       },
       {
         capability: "OpenShift",
-        detail: "With upgrade assistance from our engineers",
+        detail: "Mit Upgrade-Hilfe unserer Engineers",
         oss: false,
         ent: true,
       },
@@ -156,38 +164,38 @@ const COMPARISON: readonly RowGroup[] = [
   },
   {
     group: "Governance",
-    summary: "The real difference — the lock on the cabinet.",
+    summary: "Der echte Unterschied — das Schloss am Schrank.",
     rows: [
-      { capability: "Single sign-on (SSO)", oss: false, ent: true },
-      { capability: "Roles and permissions", oss: false, ent: true },
+      { capability: "Single Sign-on (SSO)", oss: false, ent: true },
+      { capability: "Rollen und Berechtigungen", oss: false, ent: true },
       {
-        capability: "Per-workspace authorization",
-        detail: "An auditor opens the audit workspace and nothing else",
+        capability: "Autorisierung pro Workspace",
+        detail: "Ein Auditor öffnet den Audit-Workspace und sonst nichts",
         oss: false,
         ent: true,
       },
     ],
   },
   {
-    group: "People",
-    summary: "What you get besides software.",
+    group: "Menschen",
+    summary: "Was Sie außer Software bekommen.",
     rows: [
       {
         capability: "Support",
-        oss: "GitHub issues",
-        ent: "SLA-backed, named engineers",
+        oss: "GitHub-Issues",
+        ent: "Mit SLA, benannte Engineers",
       },
       {
         capability: "Onboarding",
-        oss: "Docs and the showcase",
-        ent: "Guided pilot, architecture review",
+        oss: "Doku und die Showcase",
+        ent: "Begleiteter Pilot, Architektur-Review",
       },
       {
-        capability: "Roadmap influence",
-        oss: "Open issues and PRs",
-        ent: "Direct, on your industry's data",
+        capability: "Einfluss auf die Roadmap",
+        oss: "Offene Issues und PRs",
+        ent: "Direkt, an den Daten Ihrer Branche",
       },
-      { capability: "Price", oss: "Free, forever", ent: "Talk to us" },
+      { capability: "Preis", oss: "Kostenlos, für immer", ent: "Sprechen Sie mit uns" },
     ],
   },
 ];
@@ -219,7 +227,7 @@ function Cell({
       <span
         className="inline-flex h-6 w-6 items-center justify-center border-2 border-accent bg-accent font-mono text-[13px] font-black text-black"
         role="img"
-        aria-label="Included"
+        aria-label="Enthalten"
       >
         ✓
       </span>
@@ -230,7 +238,7 @@ function Cell({
     <span
       className="inline-flex h-6 w-6 items-center justify-center border-2 border-border font-mono text-[13px] text-muted-foreground"
       role="img"
-      aria-label="Not included"
+      aria-label="Nicht enthalten"
     >
       –
     </span>
@@ -252,7 +260,7 @@ function RowCard({ row }: { row: Row }) {
       <dl className="mt-3 grid grid-cols-2 gap-px bg-border">
         <div className="flex flex-col gap-1.5 bg-background p-3">
           <dt className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-            Open source
+            Open Source
           </dt>
           <dd>
             <Cell value={row.oss} emphasis={false} />
@@ -321,7 +329,9 @@ function EditionCard({
   );
 }
 
-export default function EditionsPage() {
+export default function EditionsPageDe() {
+  const getHref = `${withLocalePrefix("de", routes.get)}/`;
+
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
 
@@ -331,21 +341,21 @@ export default function EditionsPage() {
           <div className="space-y-8">
             <SectionHead
               id="editions-title"
-              marker="At a glance"
-              title="Same engine. Different room."
-              lede="The open-source core is the whole product, not a funnel into a paid one. What enterprise sells is governance, tuning, and people — the things a large organisation actually cannot self-serve."
+              marker="Auf einen Blick"
+              title="Gleiche Engine. Anderer Raum."
+              lede="Der Open-Source-Kern ist das ganze Produkt, kein Trichter in ein Bezahlprodukt. Was Enterprise verkauft, sind Governance, Tuning und Menschen — die Dinge, die eine große Organisation wirklich nicht selbst bedienen kann."
             />
 
             <div className="grid gap-4 lg:grid-cols-2">
               <EditionCard
-                eyebrow="Open source · free forever"
-                title="Core"
-                body="Everything that detects, investigates, and deploys. Run it on a laptop or across a cluster, for as long as you like, with no seat count and no expiry."
+                eyebrow="Open Source · für immer kostenlos"
+                title="Kern"
+                body="Alles, was detektiert, ermittelt und deployt. Auf einem Laptop oder clusterweit betreiben, so lange Sie wollen, ohne Seat-Count und ohne Ablauf."
                 points={[
-                  "Every connector, detector pack, and custom detector tier",
-                  "Inquiries, fingerprints, cases, and the Harness AI autopilot",
-                  "The Docker image and the Helm chart, both fully featured",
-                  "Workspace isolation is in the core and always on",
+                  "Jeder Konnektor, jedes Detektor-Pack und jede Custom-Detektor-Stufe",
+                  "Anfragen, Fingerprints, Fälle und der Harness-AI-Autopilot",
+                  "Docker-Image und Helm-Chart, beide voll ausgestattet",
+                  "Workspace-Isolierung steckt im Kern und ist immer an",
                 ]}
                 action={
                   <div className="flex flex-wrap gap-3">
@@ -353,7 +363,7 @@ export default function EditionsPage() {
                       asChild
                       className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
                     >
-                      <a href={routes.get}>Get it</a>
+                      <a href={getHref}>Holen</a>
                     </Button>
                     <Button
                       asChild
@@ -369,14 +379,14 @@ export default function EditionsPage() {
               />
               <EditionCard
                 featured
-                eyebrow="Enterprise · a partnership"
-                title="Governed"
-                body="The core plus the lock on the cabinet, and engineers who learn your domain. Our people work with your team from the first pilot rather than handing over a license key."
+                eyebrow="Enterprise · eine Partnerschaft"
+                title="Gesteuert"
+                body="Der Kern plus das Schloss am Schrank, und Engineers, die Ihre Domäne lernen. Unsere Leute arbeiten mit Ihrem Team ab dem ersten Piloten, statt einen Lizenzschlüssel zu überreichen."
                 points={[
-                  "SSO, roles, and per-workspace authorization",
-                  "Models tuned on your terminology and languages",
-                  "Detectors and sources built for your industry's data",
-                  "Architecture reviews, OpenShift, SLA-backed support",
+                  "SSO, Rollen und Autorisierung pro Workspace",
+                  "Modelle, abgestimmt auf Ihre Terminologie und Sprachen",
+                  "Detektoren und Quellen, gebaut für die Daten Ihrer Branche",
+                  "Architektur-Reviews, OpenShift, Support mit SLA",
                 ]}
                 action={
                   <div className="flex flex-wrap items-center gap-3">
@@ -385,7 +395,7 @@ export default function EditionsPage() {
                       className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
                     >
                       <a href={`mailto:${enterpriseContactEmail}`}>
-                        Start the conversation
+                        Gespräch beginnen
                       </a>
                     </Button>
                     <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
@@ -405,9 +415,9 @@ export default function EditionsPage() {
           <div className="space-y-8">
             <SectionHead
               id="comparison-title"
-              marker="Line by line"
-              title="The whole comparison"
-              lede="Four of the five groups below are identical between editions."
+              marker="Zeile für Zeile"
+              title="Der gesamte Vergleich"
+              lede="Vier der fünf Gruppen unten sind zwischen den Editionen identisch."
             />
 
             {/* Desktop: one continuous table. Below lg the same data renders
@@ -416,8 +426,8 @@ export default function EditionsPage() {
             <div className="hidden overflow-hidden border-2 border-border lg:block">
               <table className="w-full border-collapse text-left">
                 <caption className="sr-only">
-                  Feature comparison between the Classifyre open-source core and
-                  the enterprise edition
+                  Feature-Vergleich zwischen dem Classifyre-Open-Source-Kern
+                  und der Enterprise-Edition
                 </caption>
                 <thead>
                   <tr className="bg-foreground text-primary-foreground">
@@ -425,13 +435,13 @@ export default function EditionsPage() {
                       scope="col"
                       className="w-1/2 px-5 py-4 font-mono text-[11px] font-bold uppercase tracking-[0.18em]"
                     >
-                      Capability
+                      Funktion
                     </th>
                     <th
                       scope="col"
                       className="w-1/4 px-5 py-4 font-mono text-[11px] font-bold uppercase tracking-[0.18em]"
                     >
-                      Open source
+                      Open Source
                     </th>
                     {/* A lime block rather than lime text: the header bar is
                         painted with bg-foreground, which flips with the theme,
@@ -514,11 +524,12 @@ export default function EditionsPage() {
 
             <div className="flex flex-wrap items-center gap-3 border-2 border-border bg-background p-5">
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                Workspace isolation lives in the open-source core and is always
-                on — a workspace has its own database schema, evidence, AI
-                memory, and endpoint. Enterprise does not add the wall; it adds
-                the <em>authorization</em> that decides who may open which
-                drawer.
+                Workspace-Isolierung lebt im Open-Source-Kern und ist immer
+                an — ein Workspace hat eigenes Datenbank-Schema, eigene
+                Beweise, eigenes KI-Memory und eigenen Endpunkt. Enterprise
+                legt nicht die Mauer dazu; es legt die{" "}
+                <em>Autorisierung</em> dazu, die entscheidet, wer welche
+                Schublade öffnen darf.
               </p>
               <Button
                 asChild
@@ -526,7 +537,7 @@ export default function EditionsPage() {
                 className="border-2 border-border"
               >
                 <a href={docs.workspaces} target="_blank" rel="noreferrer">
-                  How workspaces work
+                  So funktionieren Workspaces
                 </a>
               </Button>
             </div>
@@ -542,15 +553,15 @@ export default function EditionsPage() {
               id="editions-cta-title"
               className="font-hero text-[clamp(2.5rem,7vw,5rem)] uppercase leading-[0.88] tracking-[0.01em]"
             >
-              Start free.{" "}
+              Gratis starten.{" "}
               <span className="inline-block bg-accent px-[0.12em] text-black">
-                Call us later.
+                Später anrufen.
               </span>
             </h2>
             <p className="max-w-xl text-base leading-7 text-white/70">
-              Almost everyone starts on the open-source core and stays there.
-              The conversation is worth having when SSO, roles, and a tuned
-              model start mattering more than the scan itself.
+              Fast alle starten mit dem Open-Source-Kern und bleiben dort.
+              Das Gespräch lohnt, wenn SSO, Rollen und ein abgestimmtes Modell
+              wichtiger werden als der Scan selbst.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Button
@@ -558,8 +569,8 @@ export default function EditionsPage() {
                 size="lg"
                 className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
               >
-                <a href={routes.get}>
-                  Get the free core
+                <a href={getHref}>
+                  Den kostenlosen Kern holen
                 </a>
               </Button>
               <Button
@@ -569,17 +580,17 @@ export default function EditionsPage() {
                 className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
               >
                 <a href={`mailto:${enterpriseContactEmail}`}>
-                  Talk about enterprise
+                  Über Enterprise sprechen
                 </a>
               </Button>
             </div>
             <a
-              href={showcaseUrl}
+              href={showcaseUrlFor("de")}
               target="_blank"
               rel="noreferrer"
               className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50 underline-offset-4 hover:text-accent hover:underline"
             >
-              Or poke at the live showcase first
+              Oder erst in der Live-Showcase stöbern
             </a>
           </div>
         </SectionShell>

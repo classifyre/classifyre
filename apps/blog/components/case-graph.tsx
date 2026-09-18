@@ -2,6 +2,9 @@
 
 import * as React from "react";
 
+import { translate } from "@/i18n";
+import type { Locale } from "@/lib/locale";
+
 /**
  * Animated case graph for case #42 — a classified file emailed to an
  * external address. When the figure enters the viewport, the graph assembles
@@ -76,9 +79,10 @@ function delayStyle(delayMs: number, length?: number) {
   } as React.CSSProperties;
 }
 
-export function CaseGraph() {
+export function CaseGraph({ locale = "en" }: { locale?: Locale }) {
   const ref = React.useRef<SVGSVGElement | null>(null);
   const [inView, setInView] = React.useState(false);
+  const t = (key: string): string => translate(locale, `caseGraph.${key}`);
 
   React.useEffect(() => {
     const node = ref.current;
@@ -105,7 +109,7 @@ export function CaseGraph() {
       ref={ref}
       viewBox="0 0 720 460"
       role="img"
-      aria-label="Case graph for case 42, a classified leak via email: sender-traced and impact hypotheses pinned to email, identity, classification-tag, and duplicate findings, with an analyst link and autopilot attribution"
+      aria-label={t("ariaLabel")}
       className="cl-cg h-auto w-full"
       data-inview={inView ? "true" : "false"}
     >
@@ -220,7 +224,7 @@ export function CaseGraph() {
         fill="#d97706"
         letterSpacing="0.12em"
       >
-        ANALYST LINK
+        {t("analystLink")}
       </text>
 
       {/* duplicate match: the same thing seen in two systems */}
@@ -244,7 +248,7 @@ export function CaseGraph() {
         fill="#a855f7"
         letterSpacing="0.12em"
       >
-        DUPLICATE MATCH · SENT FILE = INTERNAL FILE
+        {t("duplicateMatch")}
       </text>
 
       {/* case node */}
@@ -278,7 +282,7 @@ export function CaseGraph() {
           letterSpacing="0.2em"
           fontWeight="700"
         >
-          CASE #42 · OPEN
+          {t("caseOpen")}
         </text>
         <text
           x="360"
@@ -289,7 +293,7 @@ export function CaseGraph() {
           fill="#0a0a0a"
           fontWeight="700"
         >
-          Classified leak via email
+          {t("caseTitle")}
         </text>
       </g>
 
@@ -315,7 +319,7 @@ export function CaseGraph() {
           opacity="0.6"
           letterSpacing="0.18em"
         >
-          HYPOTHESIS 1
+          {t("hypothesis1")}
         </text>
         <text
           x="190"
@@ -326,7 +330,7 @@ export function CaseGraph() {
           fill="currentColor"
           fontWeight="700"
         >
-          Sender traced: A. Novak
+          {t("hypothesis1Text")}
         </text>
       </g>
 
@@ -352,7 +356,7 @@ export function CaseGraph() {
           opacity="0.6"
           letterSpacing="0.18em"
         >
-          HYPOTHESIS 2
+          {t("hypothesis2")}
         </text>
         <text
           x="530"
@@ -363,7 +367,7 @@ export function CaseGraph() {
           fill="currentColor"
           fontWeight="700"
         >
-          214 records exposed
+          {t("hypothesis2Text")}
         </text>
       </g>
 
@@ -427,7 +431,7 @@ export function CaseGraph() {
           letterSpacing="0.14em"
           fontWeight="700"
         >
-          BY AUTOPILOT
+          {t("autopilot")}
         </text>
         <line
           x1="600"

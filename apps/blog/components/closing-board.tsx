@@ -3,6 +3,8 @@
 import * as React from "react";
 
 import { useCyclingTags } from "@/components/finding-tags";
+import { translate, translateList } from "@/i18n";
+import type { Locale } from "@/lib/locale";
 
 /**
  * Interactive backdrop for the closing CTA: a detective's string board —
@@ -51,9 +53,9 @@ const THREADS: readonly (readonly [number, number])[] = [
   [9, 11],
 ];
 
-export function ClosingBoard() {
+export function ClosingBoard({ locale = "en" }: { locale?: Locale }) {
   const ref = React.useRef<HTMLDivElement | null>(null);
-  const tags = useCyclingTags(TAGGED.length);
+  const tags = useCyclingTags(TAGGED.length, translateList(locale, "findingTags"));
 
   // Track the pointer across the whole CTA section, not just the board
   // itself — the board is click-transparent so it never sees the events.
@@ -145,10 +147,10 @@ export function ClosingBoard() {
       </svg>
       {/* Exhibit stamps, pinned to the corners of the file. */}
       <span className="cl-exhibit left-6 top-6 hidden -rotate-6 md:block">
-        Exhibit A
+        {translate(locale, "closingBoard.exhibitA")}
       </span>
       <span className="cl-exhibit bottom-6 right-6 hidden rotate-3 md:block">
-        Confirmed
+        {translate(locale, "closingBoard.confirmed")}
       </span>
       {/* The pointer spotlight — fades in on first move, out on leave. */}
       <div className="cl-net-spot absolute inset-0" />
