@@ -27,6 +27,7 @@ import { CategoryEditDialog } from "@/components/namespace/category-edit-dialog"
 import { CategoryDeleteDialog } from "@/components/namespace/category-delete-dialog";
 import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
 import { useTranslation } from "@/hooks/use-translation";
+import { useLocalePath } from "@/lib/app-path";
 
 /** Two-digit shelf number, in the manner of a printed index. */
 function indexLabel(position: number): string {
@@ -45,6 +46,7 @@ function indexLabel(position: number): string {
  */
 export default function CategoriesPage() {
   const { t } = useTranslation();
+  const localePath = useLocalePath();
   const { categories, loading, error, reload } = useNamespaceCategories();
   const [namespaces, setNamespaces] = React.useState<Namespace[] | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
@@ -92,7 +94,7 @@ export default function CategoriesPage() {
       <WorkspaceHeader />
       <main className="mx-auto max-w-4xl px-5 py-10 sm:px-8 sm:py-14">
         <Button variant="ghost" size="sm" asChild className="mb-7 -ml-3">
-          <Link href="/">
+          <Link href={localePath("/")}>
             <ArrowLeft className="size-4" />
             {t("workspaces.all")}
           </Link>
@@ -158,7 +160,9 @@ export default function CategoriesPage() {
           <ol className="border-t">
             {categories.map((category, position) => {
               const filed = workspacesByCategory.get(category.id) ?? [];
-              const href = `/namespaces/categories/${category.id}`;
+              const href = localePath(
+                `/namespaces/categories/${category.id}`,
+              );
               return (
                 <li
                   key={category.id}
@@ -209,7 +213,7 @@ export default function CategoriesPage() {
                           {filed.map((ns) => (
                             <li key={ns.id}>
                               <Link
-                                href={`/${ns.slug}`}
+                                href={localePath(`/${ns.slug}`)}
                                 className="flex items-baseline gap-1.5 text-sm underline-offset-4 hover:underline"
                               >
                                 {ns.name}

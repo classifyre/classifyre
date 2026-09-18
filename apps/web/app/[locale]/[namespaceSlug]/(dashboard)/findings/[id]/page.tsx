@@ -60,6 +60,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-severity";
 import { DetailBackButton } from "@/components/detail-back-button";
+import { useEntityDocumentTitle } from "@/components/document-title-updater";
 import { MatchedContentBlock } from "@/components/matched-content-block";
 import { WhereElseFound } from "@/components/where-else-found";
 import { SimilarFindingsCard } from "@/components/similar-findings-card";
@@ -248,6 +249,22 @@ export default function FindingDetailPage() {
       ),
     };
   }, [finding]);
+
+  // Tab title mirrors the server-rendered <title> (signal first, then asset).
+  // Never the matched content: it is the detected secret or PII, and the
+  // title reaches analytics, history and screenshots.
+  const entityTitle = useMemo(() => {
+    if (!finding) return null;
+    const signal = finding.findingType || finding.category || null;
+    const assetName =
+      finding.asset?.name ||
+      finding.asset?.externalUrl ||
+      finding.location?.path ||
+      null;
+    if (signal && assetName) return `${signal} · ${assetName}`;
+    return signal ?? assetName;
+  }, [finding]);
+  useEntityDocumentTitle(entityTitle);
 
   if (loading) {
     return (

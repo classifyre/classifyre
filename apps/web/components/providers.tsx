@@ -9,6 +9,7 @@ import { DemoModeBlockedDialog } from "@/components/demo-mode-blocked-dialog";
 import { InstanceSettingsProvider } from "@/components/instance-settings-provider";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { ActiveNamespacesProvider } from "@/components/active-namespaces-provider";
+import { LocaleAutoRedirect } from "@/components/locale-auto-redirect";
 import type { Locale } from "@/lib/locale-detection";
 
 export function Providers({
@@ -33,6 +34,9 @@ export function Providers({
             <AssistantWorkflowProvider>
               {children}
               <DemoModeBlockedDialog />
+              {/* Inside InstanceSettingsProvider so the redirect reads the
+                  same effective language setting the UI renders with. */}
+              <LocaleAutoRedirect />
               {/* Inside InstanceSettingsProvider so the bar speaks the same
                   language as the rest of the app. */}
               <CookieConsent />
