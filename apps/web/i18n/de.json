@@ -400,6 +400,8 @@
       "runFailed": "Bereinigung fehlgeschlagen: {{error}}",
       "runGone": "Bereinigung hat diese Ansicht verlassen; die Übersicht zeigt das Ergebnis nach dem Neuladen.",
       "activeJobsHint": "{{count}} Scan(s) laufen noch — Arbeitsbereich zuerst pausieren, sonst schreiben Worker während der Bereinigung neue Zeilen.",
+      "featureOnNote": "{{feature}} ist eingeschaltet; diese Daten wachsen mit dem nächsten Scan oder der nächsten Neuberechnung wieder an. Damit sie leer bleiben, schalten Sie {{feature}} stattdessen oben unter Funktionen aus.",
+      "featureOffNote": "{{feature}} ist ausgeschaltet; diese Daten bleiben gelöscht, bis Sie die Funktion wieder einschalten.",
       "loading": "Speicherverbrauch wird gemessen…",
       "loadFailed": "Die Speicherübersicht konnte nicht geladen werden",
       "retry": "Erneut versuchen",
@@ -437,13 +439,13 @@
         },
         "duplicates": {
           "name": "Duplikat-Artefakte",
-          "desc": "Trefferkandidaten, Signaturen und Korrelationsprofile. Menschliche Review-Entscheidungen bleiben; die nächste Duplikatprüfung baut den Rest neu.",
-          "impact": "Match-Kandidaten, Signaturen und Cluster werden entfernt; die Duplikat-Warteschlange bleibt bis zur nächsten Duplikatprüfung leer. Bereits getroffene Prüfentscheidungen bleiben erhalten."
+          "desc": "Trefferkandidaten, Signaturen, Korrelationswerte, Cluster und die bewerteten Duplikat-Verbindungen im Asset-Graphen. Prüfentscheidungen und Lineage bleiben erhalten; die nächste Duplikatprüfung baut den Rest neu auf.",
+          "impact": "Alles, was die Duplikaterkennung erzeugt hat, wird entfernt — einschließlich ihrer bewerteten Verbindungen im Asset-Graphen; die Duplikatprüfung bleibt bis zur nächsten Duplikatprüfung leer. Lineage und Ihre Prüfentscheidungen bleiben erhalten."
         },
         "embeddings": {
           "name": "Embeddings",
-          "desc": "Vektoren und Chunk-Texte. Spaces und Einstellungen bleiben; ein erneuter Embedding-Index baut den Rest neu.",
-          "impact": "Vektoren und Chunk-Texte werden entfernt. Semantische Suche, ähnliche Fundstellen und semantische Glossartreffer liefern nichts, bis der Embedding-Index neu erstellt wird."
+          "desc": "Vektoren, die daraus abgeleiteten Wichtigkeits-Rankings, Text-Chunks der Dokumente und die Vektorräume. Die Embedding-Einstellungen bleiben erhalten.",
+          "impact": "Vektoren, Rankings (Wichtigkeitswerte werden auf 0 gesetzt) und Text-Chunks der Dokumente werden entfernt. Befunde werden automatisch neu eingebettet, solange Embeddings eingeschaltet sind; Dokumenttext kommt nur durch einen vollständigen erneuten Scan der Quellen zurück."
         },
         "harness": {
           "name": "KI-Harness-Verlauf",
@@ -607,6 +609,109 @@
         "failed": "Der letzte Batch ist fehlgeschlagen. pg-boss wiederholt ihn nach eigenem Zeitplan.",
         "stale": "Kein Worker hat sich kürzlich gemeldet. Der Prozess wurde möglicherweise mitten im Job beendet."
       }
+    }
+  },
+  "features": {
+    "title": "Funktionen",
+    "subtitle": "Die beiden Hintergrund-Engines, die den Großteil der abgeleiteten Daten dieses Arbeitsbereichs erzeugen. Wird eine ausgeschaltet, stoppt ihre Arbeit und ihre Worker pausieren; die Untersuchung selbst — Quellen, Befunde, Assets, Fälle, Anfragen, Glossar — bleibt immer unberührt.",
+    "loading": "Funktionsschalter werden gelesen…",
+    "loadFailed": "Die Funktionsschalter konnten nicht geladen werden",
+    "retry": "Erneut versuchen",
+    "stateOn": "An",
+    "stateOffKept": "Aus · Daten behalten",
+    "stateOffDeleted": "Aus · Daten gelöscht",
+    "stateDefaultOff": "Standardmäßig aus",
+    "defaultOffHint": "Diese Installation liefert die Funktion ausgeschaltet aus. Das Einschalten gilt nur für diesen Arbeitsbereich.",
+    "since": "seit {{when}}",
+    "dataSize": "{{size}} Daten · ~{{rows}} Zeilen",
+    "noData": "Keine Daten gespeichert",
+    "workersPaused": "Pausierte Worker: {{queues}}",
+    "viewWorkers": "Worker anzeigen",
+    "deleteData": "Behaltene Daten löschen",
+    "deleting": "Daten werden gelöscht… {{rows}} Zeilen entfernt",
+    "switchLabel": "{{name}} ein- oder ausschalten",
+    "items": {
+      "embeddings": {
+        "name": "Embeddings",
+        "desc": "Die semantische Ebene: Wichtigkeits-Ranking, Gruppen nahezu identischer Texte, semantische Suche, ähnliche Befunde, Fall-Hinweise und die Evidenzsuche des KI-Harness.",
+        "configure": "Modell & Leistung"
+      },
+      "duplicates": {
+        "name": "Duplikaterkennung",
+        "desc": "Ordnet nach jedem Scan Assets einander zu, die identifizierende Werte teilen. Speist die Duplikatprüfung, „Wo sonst gefunden“, Ähnlichkeitsverbindungen im Graphen und die Duplikat-Werkzeuge des Harness.",
+        "configure": "Feinabstimmung"
+      }
+    },
+    "off": {
+      "title": "{{name}} ausschalten?",
+      "stops": "Solange ausgeschaltet",
+      "keepLabel": "Ausschalten, Daten behalten",
+      "keepDesc": "Eine Pause. Alles bleibt, wie es ist, und nach dem Wiedereinschalten geht es dort weiter, wo es aufgehört hat.",
+      "deleteLabel": "Ausschalten und Daten löschen ({{size}})",
+      "deleteDesc": "Gibt den Speicher sofort frei. Nach dem Wiedereinschalten wird alles neu aufgebaut.",
+      "cancel": "Abbrechen",
+      "confirmKeep": "Ausschalten",
+      "confirmDelete": "Ausschalten und löschen",
+      "embeddings": {
+        "stop1": "Keine neuen Vektoren: neu gescannte Befunde bleiben ohne Ranking, bestehende Wichtigkeitswerte werden eingefroren.",
+        "stop2": "Die semantische Suche fällt auf exakten Text zurück; ähnliche Befunde, Gruppen nahezu identischer Texte und semantische Fall-Hinweise entfallen.",
+        "stop3": "Das KI-Harness verliert seine semantische Evidenzsuche.",
+        "stop4": "Die Embedding- und Rekalibrierungs-Worker werden pausiert (Einstellungen → Worker) und lassen sich dort nicht fortsetzen.",
+        "keep": "Behalten werden Vektoren, Rankings und Text-Chunks der Dokumente. Scans speichern weiterhin Text-Chunks, sodass nach dem Wiedereinschalten ohne erneuten Scan aufgeholt wird.",
+        "delete": "Löscht Vektoren, Wichtigkeits-Rankings (Werte werden auf 0 gesetzt), Text-Chunks der Dokumente und Vektorindizes; neue Scans speichern keine Text-Chunks mehr. Nach dem Wiedereinschalten wird jeder Befund neu eingebettet (bei großen Korpora Stunden Worker-CPU); Dokumenttext kommt nur durch einen vollständigen erneuten Scan der Quellen zurück."
+      },
+      "duplicates": {
+        "stop1": "Keine Duplikatprüfung nach Scans; Neuberechnungen und Änderungen der Feinabstimmung warten bis zum Wiedereinschalten.",
+        "stop2": "Duplikatprüfung, „Wo sonst gefunden“, Ähnlichkeitsverbindungen im Graphen und die Duplikat-Werkzeuge des Harness werden nicht mehr aktualisiert.",
+        "stop3": "Scans werden weiterhin an das KI-Harness übergeben — nur die Duplikatprüfung entfällt.",
+        "stop4": "Der Worker correlation.scan wird pausiert (Einstellungen → Worker) und lässt sich dort nicht fortsetzen.",
+        "keep": "Behalten werden alle Treffer und Muster im aktuellen Stand sowie alle Prüfentscheidungen.",
+        "delete": "Löscht Trefferkandidaten, Signaturen, Korrelationswerte, Cluster, Muster und die bewerteten Duplikat-Verbindungen im Asset-Graphen. Herkunftsverbindungen (Lineage) und Ihre Prüfentscheidungen bleiben erhalten. Die Duplikatprüfung bleibt leer, bis die Funktion wieder eingeschaltet ist und die Neuberechnung abgeschlossen ist."
+      }
+    },
+    "enable": {
+      "title": "{{name}} einschalten?",
+      "confirm": "Einschalten",
+      "cancel": "Abbrechen",
+      "embeddingsKept": "Das Einbetten wird dort fortgesetzt, wo es aufgehört hat: Inhalte, die während der Pause gescannt wurden, werden im Hintergrund eingebettet, und die Rankings werden beim Aufholen aktualisiert.",
+      "embeddingsDeleted": "Das Einbetten beginnt von vorn: Jeder Befund wird im Hintergrund neu eingebettet — bei großen Korpora Stunden Worker-CPU. Zuvor gelöschter Dokumenttext kommt nur durch einen vollständigen erneuten Scan der Quellen zurück.",
+      "duplicates": "Führt eine vollständige Neuberechnung über alle Assets aus, um alles aufzuholen, was während der Pause gescannt wurde — bei großen Korpora etwa eine Stunde Worker-Zeit. Die Duplikatprüfung füllt sich, sobald sie abgeschlossen ist."
+    },
+    "deleteKept": {
+      "title": "Von {{name}} behaltene Daten löschen?",
+      "desc": "{{name}} bleibt ausgeschaltet. Dadurch werden jetzt {{size}} frei; nach dem Wiedereinschalten wird alles neu aufgebaut.",
+      "confirm": "Daten löschen",
+      "cancel": "Abbrechen"
+    },
+    "toast": {
+      "turnedOn": "{{name}} ist eingeschaltet",
+      "turnedOff": "{{name}} ist ausgeschaltet",
+      "recompute": "{{name}} ist eingeschaltet — eine vollständige Neuberechnung wurde zum Aufholen eingeplant",
+      "deleted": "Daten von {{name}} gelöscht: {{rows}} Zeilen in {{seconds}} s",
+      "deleteFailed": "Löschen der Daten von {{name}} fehlgeschlagen: {{error}}",
+      "failed": "{{name}} konnte nicht geändert werden"
+    },
+    "notice": {
+      "action": "In Einstellungen → Bereinigung einschalten",
+      "embeddings": {
+        "title": "Embeddings sind ausgeschaltet",
+        "search": "Semantisches Ranking ist nicht verfügbar — Ergebnisse treffen nur exakten Text.",
+        "similar": "Ähnliche Befunde stammen aus Embeddings, die für diesen Arbeitsbereich ausgeschaltet sind.",
+        "leads": "Solange Embeddings ausgeschaltet sind, werden keine semantischen Nachbarn vorgeschlagen; Hinweise stammen nur aus verknüpften Anfragen.",
+        "duplicates": "Gruppen nahezu identischer Texte werden nicht aktualisiert, solange Embeddings ausgeschaltet sind.",
+        "index": "Der semantische Index ist pausiert; es wird nichts neu indiziert oder rekalibriert."
+      },
+      "duplicates": {
+        "title": "Duplikaterkennung ist ausgeschaltet",
+        "review": "Neue Scans werden nicht auf Duplikate geprüft; diese Liste zeigt den Stand vor dem Ausschalten.",
+        "reviewDeleted": "Ihre Ergebnisse wurden gelöscht; bis zum Wiedereinschalten gibt es nichts zu prüfen.",
+        "occurrences": "Abfragen gemeinsamer Werte stammen aus der Duplikaterkennung, die für diesen Arbeitsbereich ausgeschaltet ist."
+      }
+    },
+    "workers": {
+      "heldBy": "Angehalten · {{feature}} aus",
+      "heldHint": "Pausiert, weil {{feature}} für diesen Arbeitsbereich ausgeschaltet ist. Wird fortgesetzt, sobald Sie die Funktion unter Einstellungen → Bereinigung wieder einschalten.",
+      "turnOn": "In Bereinigung einschalten"
     }
   },
   "dataTransfer": {
@@ -806,6 +911,7 @@
     "statusCompleted": "Abgeschlossen",
     "statusWarning": "Warnung",
     "statusError": "Fehler",
+    "statusStopped": "Gestoppt",
     "scheduleEnabled": "Zeitplan aktiv",
     "findingsLatestRun": "Befunde aus letztem Lauf",
     "noChanges": "Keine Änderungen",
@@ -2154,7 +2260,8 @@
       "warning": "Warnung",
       "running": "Läuft",
       "pending": "Ausstehend",
-      "error": "Fehler"
+      "error": "Fehler",
+      "stopped": "Gestoppt"
     },
     "logs": {
       "title": "Protokolle",
@@ -3642,8 +3749,11 @@
       "desc": "Embeddings wandeln Beweistexte in Vektoren um, damit Classifyre Near-Duplicates findet, Wichtigkeit bewertet und semantische Suche beantwortet. Alles hier gilt nur für diesen Workspace.",
       "on": "An",
       "off": "Aus",
-      "enableLabel": "Semantische Embeddings",
-      "enableDesc": "Wird dies deaktiviert, stoppt jede Inferenz und alle gespeicherten Vektoren dieses Workspace werden gelöscht. Near-Duplicate-Gruppierung, Bewertung und semantische Suche funktionieren erst wieder nach dem Einschalten.",
+      "switchLabel": "Embeddings für diesen Arbeitsbereich",
+      "switchOnDesc": "An. Embeddings werden unter Einstellungen → Bereinigung ein- oder ausgeschaltet, neben der Duplikaterkennung — beim Ausschalten wird dort angeboten, den Korpus zu behalten oder zu löschen.",
+      "switchOffKeptDesc": "Aus — der Korpus bleibt erhalten (eine Pause). Schalten Sie Embeddings unter Einstellungen → Bereinigung wieder ein, um aufzuholen.",
+      "switchOffDeletedDesc": "Aus — der Korpus wurde gelöscht. Schalten Sie Embeddings unter Einstellungen → Bereinigung wieder ein, um ihn neu aufzubauen.",
+      "switchManage": "Einstellungen → Bereinigung",
       "providerHeading": "Modell",
       "providerDesc": "Welches Modell Text in Vektoren umwandelt. Eine Änderung erzeugt den gesamten Korpus neu.",
       "providerLocal": "Lokale Inferenz",
@@ -3670,9 +3780,6 @@
       "aiProviderNotEmbedding": "Dieser Anbieter ist nicht als Embedding-Modell markiert.",
       "inheritedHeading": "Vom Anbieter",
       "inheritedHint": "Modell, Dimensionen und Pooling stammen vom gewählten KI-Anbieter. Ändern Sie sie dort.",
-      "confirmDisableTitle": "Alle Embeddings löschen?",
-      "confirmDisableBody": "Beim Deaktivieren werden alle gespeicherten Vektoren dieses Workspace gelöscht. Es wird nichts neu eingebettet — beim späteren Einschalten beginnt ein neuer Aufbau.",
-      "confirmDisableProceed": "Embeddings löschen",
       "offlineWarning": "Diese Installation läuft offline und liefert ein fest hinterlegtes Modell mit; ein anderes lokales Modell kann nicht geladen werden. Verwenden Sie stattdessen einen externen Anbieter oder erlauben Sie Modell-Downloads in der Installation.",
       "performanceHeading": "Durchsatz",
       "performanceDesc": "Wie schnell Vektoren erzeugt werden. Dies beeinflusst nie die Bedeutung eines Vektors, ein Neuaufbau entfällt — Batchgröße, Worker-Parallelität und Startabgleich werden jedoch bei der Registrierung des Workers gebunden und gelten daher erst nach einem Neustart des Dienstes.",
@@ -3735,7 +3842,7 @@
       "confirmChanges": "Wird geändert: {{fields}}",
       "confirmProceed": "Löschen und neu einbetten",
       "confirmCancel": "Abbrechen",
-      "disabledNotice": "Embedding ist für diesen Workspace deaktiviert. Near-Duplicate-Gruppierung, Bewertung und semantische Suche sind nicht verfügbar."
+      "disabledNotice": "Das Einbetten ist für diesen Arbeitsbereich ausgeschaltet; Wichtigkeits-Ranking, Gruppen nahezu identischer Texte und semantische Suche sind nicht verfügbar. Schalten Sie es unter Einstellungen → Bereinigung wieder ein."
     },
     "kinds": {
       "INQUIRY": "Inquiry",

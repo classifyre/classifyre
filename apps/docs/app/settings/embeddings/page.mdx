@@ -9,7 +9,9 @@ import { Callout } from "nextra/components"
 # Embeddings
 
 Open **Harness AI → Embedding** to see and change how this workspace turns
-evidence into meaning.
+evidence into meaning. Whether embeddings run at all is a switch in
+[Settings → Cleanup › Features](/settings/cleanup/#feature-switches), next to
+duplicate detection; this page shows its state and links there.
 
 Embeddings live beside the Harness rather than in general settings because
 they are the retrieval half of the same AI stack: the model chosen here is what
@@ -156,14 +158,12 @@ embeds the corpus again from scratch:
 - Pooling
 - Normalization
 - Provider (local ↔ remote)
-- Turning embeddings **off** (or back on)
 
 The page tells you what that costs before you confirm — how many vectors and
 how much disk will be deleted.
 
-Turning embeddings **off** is the one case that only deletes. The corpus is
-purged and nothing is re-embedded; the confirmation says so, and turning them
-back on later starts a fresh build.
+Turning embeddings off or back on is **not** on this list any more: it no
+longer implies a rebuild. See [Turning embeddings off](#turning-embeddings-off).
 
 ### What is deleted, and what is not
 
@@ -188,6 +188,39 @@ reconciliation or recalibration pass is currently running.
 
 You can also start one at any time with **Rebuild now**, which is the right
 move if you suspect the index is incomplete or inconsistent.
+
+---
+
+## Turning embeddings off
+
+The switch lives in [Settings → Cleanup › Features](/settings/cleanup/#feature-switches),
+and turning it off asks how:
+
+- **Keep data** is a pause. Vectors, importance rankings and document text
+  chunks stay, and scans keep saving text chunks, so turning embeddings back
+  on catches up without rescanning anything — the vectors are still in the
+  same coordinate system.
+- **Delete data** removes vectors, rankings (importance scores read 0), text
+  chunks and the vector indexes, and new scans stop saving chunks. Turning
+  back on re-embeds every finding from scratch; document text comes back only
+  when sources are rescanned with **Full rescan**.
+
+Either way the embedding and recalibration workers are held paused (they show
+as held in [Settings → Workers](/settings/workers/)) and semantic search,
+similar findings and near-duplicate text groups are unavailable until
+embeddings are back on. Detectors, scans, findings, assets and cases keep
+working normally.
+
+While embeddings are off, the model sections of this page are hidden — there
+is nothing for them to act on — and the **Corpus** panel still shows what is
+stored, so the cost of a kept corpus stays visible. (The API still accepts a
+model change while embeddings are off; one that redefines the vector space
+purges the kept vectors, because they would be meaningless under the new
+model.)
+
+Before this switch existed, turning embeddings off always deleted the corpus.
+A workspace turned off that way reads as *off, data kept*: its vectors are
+already gone, and turning back on embeds everything again.
 
 ---
 

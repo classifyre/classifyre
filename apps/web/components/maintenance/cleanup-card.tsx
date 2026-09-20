@@ -26,13 +26,19 @@ import type {
   MaintenanceCleanupProgress,
   MaintenanceDatasetStat,
   MaintenanceOverview,
+  WorkspaceFeatureKey,
 } from "@workspace/api-client";
 import { AlertTriangle, Database, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import type { TranslationKey } from "@/i18n";
 import { useTranslation } from "@/hooks/use-translation";
+import {
+  refreshWorkspaceFeatures,
+  useWorkspaceFeatures,
+} from "@/hooks/use-workspace-features";
 import { useServerConfig } from "@/components/server-config-provider";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
+import { emitStorageChanged, onStorageChanged } from "@/lib/storage-events";
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "–";
@@ -70,6 +76,17 @@ const DIALOG_NOTES: Partial<
 };
 
 /**
+ * Datasets produced by a feature switch (Features card above). Cleaning one
+ * while its feature is on is a one-off wipe that grows back; while it is off,
+ * the wipe goes through the switch instead, so the feature records its data
+ * as deleted (embeddings then also stop collecting text chunks).
+ */
+const FEATURE_OF_DATASET: Partial<Record<string, WorkspaceFeatureKey>> = {
+  duplicates: "duplicates",
+  embeddings: "embeddings",
+};
+
+/**
  * Storage & cleanup for the Settings → Cleanup tab.
  *
  * Two tables share one row renderer: cleanable datasets first (live row
@@ -83,6 +100,9 @@ export function CleanupCard() {
   const serverConfig = useServerConfig();
   const { settings } = useInstanceSettings();
   const demoMode = serverConfig.demoMode || settings.demoMode;
+  const { feature: featureState } = useWorkspaceFeatures();
+  const featureName = (key: WorkspaceFeatureKey) =>
+    t(`features.items.${key}.name` as TranslationKey);
 
   // Dataset keys come from the API overview; the translation dictionary
   // covers every key the API can send, with the key itself as fallback.
@@ -125,6 +145,9 @@ export function CleanupCard() {
     void load();
   }, [load]);
 
+  // A feature switched off with its data deleted changes these sizes too.
+  React.useEffect(() => onStorageChanged(() => void load()), [load]);
+
   const confirmDataset = confirmKey
     ? overview?.datasets.find((d) => d.cleanupKey === confirmKey) ?? null
     : null;
@@ -134,6 +157,12 @@ export function CleanupCard() {
   const protectedDatasets =
     overview?.datasets.filter((d) => !d.cleanable) ?? [];
   const dialogNote = confirmKey ? DIALOG_NOTES[confirmKey] : undefined;
+  const confirmFeatureKey = confirmKey
+    ? FEATURE_OF_DATASET[confirmKey]
+    : undefined;
+  const confirmFeature = confirmFeatureKey
+    ? featureState(confirmFeatureKey)
+    : undefined;
 
   const renderDatasetTable = (list: MaintenanceDatasetStat[]) => (
     <div className="overflow-x-auto rounded-[4px] border border-border">
@@ -157,7 +186,14 @@ export function CleanupCard() {
             const key = dataset.key;
             const name = datasetName(key);
             const desc = datasetDesc(key);
-            const busy = cleaningKey === dataset.cleanupKey;
+            const ownerKey = dataset.cleanupKey
+              ? FEATURE_OF_DATASET[dataset.cleanupKey]
+              : undefined;
+            // Being wiped from the Features card: that card shows progress.
+            const featureWipe = Boolean(
+              ownerKey && featureState(ownerKey)?.cleanupRunId,
+            );
+            const busy = cleaningKey === dataset.cleanupKey || featureWipe;
             const progress =
               busy && runState && runState.status === "running"
                 ? runState
@@ -176,7 +212,9 @@ export function CleanupCard() {
                     <div className="mt-2 w-52 max-w-full">
                       <Progress value={percent} className="h-1.5" />
                       <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
-                        {progress.currentTable
+                        {progress.note
+                          ? progress.note
+                          : progress.currentTable
                           ? total && total > 0
                             ? t("settings.cleanup.progress", {
                                 processed:
@@ -210,7 +248,9 @@ export function CleanupCard() {
                       size="sm"
                       variant="outline"
                       className="h-8 rounded-[4px]"
-                      disabled={busy || demoMode || cleaningKey !== null}
+                      disabled={
+                        busy || demoMode || cleaningKey !== null || featureWipe
+                      }
                       onClick={() => setConfirmKey(dataset.cleanupKey)}
                     >
                       {busy ? (
@@ -261,6 +301,27 @@ export function CleanupCard() {
     if (!confirmKey || runState || demoMode) return;
     const key = confirmKey;
     setConfirmKey(null);
+    const owner = FEATURE_OF_DATASET[key];
+    const ownerOff = owner ? featureState(owner)?.enabled === false : false;
+    if (owner && ownerOff) {
+      // Through the switch, so the feature records its data as deleted. The
+      // Features card follows that run (progress, toast, re-measure); this
+      // row shows it as busy until then.
+      try {
+        await api.maintenance.setFeature(owner, {
+          enabled: false,
+          deleteData: true,
+        });
+      } catch (cleanupError) {
+        toast.error(
+          cleanupError instanceof Error
+            ? cleanupError.message
+            : t("settings.cleanup.failed"),
+        );
+      }
+      await refreshWorkspaceFeatures();
+      return;
+    }
     let runId: string;
     try {
       const started = await api.maintenance.startCleanup(key);
@@ -283,6 +344,7 @@ export function CleanupCard() {
         currentTable: null,
         tablesTotal: 0,
         tablesDone: 0,
+        note: null,
       });
     }
     const final = await pollRun(runId);
@@ -310,6 +372,9 @@ export function CleanupCard() {
       );
     }
     if (mountedRef.current) await load();
+    // Feature sizes and "data deleted" states read from the same tables.
+    void refreshWorkspaceFeatures();
+    emitStorageChanged();
   };
 
   return (
@@ -415,6 +480,27 @@ export function CleanupCard() {
                   ? datasetDesc(confirmDataset.cleanupKey as string)
                   : ""}
               </span>
+              {confirmFeatureKey && confirmFeature ? (
+                <span
+                  className={
+                    confirmFeature.enabled
+                      ? "flex items-start gap-2 rounded-[4px] border border-amber-600/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200"
+                      : "block text-muted-foreground"
+                  }
+                >
+                  {confirmFeature.enabled ? (
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  ) : null}
+                  <span>
+                    {t(
+                      confirmFeature.enabled
+                        ? "settings.cleanup.featureOnNote"
+                        : "settings.cleanup.featureOffNote",
+                      { feature: featureName(confirmFeatureKey) },
+                    )}
+                  </span>
+                </span>
+              ) : null}
               {dialogNote?.warn ? (
                 <span className="flex items-start gap-2 rounded-[4px] border border-amber-600/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />

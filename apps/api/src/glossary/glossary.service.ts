@@ -62,7 +62,10 @@ function lexicalRank(
   if (candidate === needle) return { matchType: 'exact', order: 0 };
   if (hasExactAlias) return { matchType: 'alias', order: 1 };
   if (candidate.startsWith(needle)) return { matchType: 'partial', order: 2 };
-  return { matchType: 'partial', order: 3 };
+  if (candidate.includes(needle)) return { matchType: 'partial', order: 3 };
+  // Reached only through an alias that contains the query ('725000' in the
+  // alias 'PKS 725000'): a weaker match than any on the term itself.
+  return { matchType: 'alias', order: 4 };
 }
 
 /**
@@ -465,14 +468,24 @@ export class GlossaryService {
     if (!trimmed) return [];
     const needle = trimmed.toLowerCase();
 
-    const aliasRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT DISTINCT gt.id
+    // Aliases are matched as substrings too, not only by equality. Codes and
+    // statute names usually live in aliases ('PKS 725000', 'Straftaten gegen
+    // das Aufenthaltsgesetz'), and without embeddings nothing else reached
+    // them: '725000' found no term at all (GENESIS field report P10).
+    const aliasRows = await this.prisma.$queryRaw<
+      Array<{ id: string; exact: boolean }>
+    >`
+      SELECT gt.id, bool_or(lower(alias) = lower(${trimmed})) AS exact
       FROM glossary_terms gt
       CROSS JOIN LATERAL unnest(gt.aliases) AS alias
-      WHERE lower(alias) = lower(${trimmed})
-      LIMIT ${limit}
+      WHERE strpos(lower(alias), lower(${trimmed})) > 0
+      GROUP BY gt.id
+      LIMIT ${LEXICAL_FETCH_CAP}
     `;
-    const exactAliasIds = new Set(aliasRows.map((row) => row.id));
+    const exactAliasIds = new Set(
+      aliasRows.filter((row) => row.exact).map((row) => row.id),
+    );
+    const aliasIds = aliasRows.map((row) => row.id);
 
     // Fetch more than `limit` so ranking has something to rank. Ordering by
     // term alphabetically and cutting at `limit` in SQL is what buried the
@@ -484,7 +497,7 @@ export class GlossaryService {
       where: {
         OR: [
           { term: { contains: trimmed, mode: 'insensitive' } },
-          { id: { in: [...exactAliasIds] } },
+          { id: { in: aliasIds } },
         ],
       },
       take: Math.min(limit * LEXICAL_OVERFETCH, LEXICAL_FETCH_CAP),

@@ -37,6 +37,14 @@ It runs after every scan, before the autopilot cycle, so agents never reason
 about stale duplicates. It also runs on demand after a
 [tuning](/duplicates/tuning/) change, and when you promote a cluster into a case.
 
+With [duplicate detection turned off](/settings/cleanup/#feature-switches) it
+does not run at all, and records nothing — the switch is a deliberate choice,
+and a skipped run after every scan would only bury the runs that matter. The
+scan goes straight to the autopilot cycle instead, so the agents still hear
+about it; they work from the duplicates as they stood when it was turned off.
+A full recompute that is running when the switch goes off stops at its next
+page and is logged as skipped.
+
 ---
 
 ## Which agents touch duplicates, and when

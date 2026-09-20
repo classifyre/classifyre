@@ -8,6 +8,7 @@ All URIs are relative to *http://localhost*
 | [**cliRunnerControllerDeleteRunner**](RunnersApi.md#clirunnercontrollerdeleterunner) | **DELETE** /runners/{runnerId} | Delete runner metadata and cleanup filesystem logs for this runner |
 | [**cliRunnerControllerGetRunner**](RunnersApi.md#clirunnercontrollergetrunner) | **GET** /runners/{runnerId} | Get runner status and details |
 | [**cliRunnerControllerGetRunnerAssetProgress**](RunnersApi.md#clirunnercontrollergetrunnerassetprogress) | **GET** /runners/{runnerId}/assets/progress | Get runner asset processing progress |
+| [**cliRunnerControllerGetRunnerQueuePosition**](RunnersApi.md#clirunnercontrollergetrunnerqueueposition) | **GET** /runners/{runnerId}/queue-position | Why a queued run has not started yet |
 | [**cliRunnerControllerListRunners**](RunnersApi.md#clirunnercontrollerlistrunners) | **GET** /runners | List all runners |
 | [**cliRunnerControllerListSourceRunners**](RunnersApi.md#clirunnercontrollerlistsourcerunners) | **GET** /sources/{sourceId}/runners | List runners for source |
 | [**cliRunnerControllerQueryAssets**](RunnersApi.md#clirunnercontrollerqueryassets) | **POST** /runners/{runnerId}/assets/query | Read assets of a source in this namespace, for a running connector |
@@ -288,6 +289,73 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## cliRunnerControllerGetRunnerQueuePosition
+
+> RunnerQueuePositionDto cliRunnerControllerGetRunnerQueuePosition(runnerId)
+
+Why a queued run has not started yet
+
+Place in this workspace\&#39;s queue, whether the run is in the priority lane, how many scans are running across the deployment, and the concurrency limit. All nulls once the run has left the queue.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerGetRunnerQueuePositionRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+  } satisfies CliRunnerControllerGetRunnerQueuePositionRequest;
+
+  try {
+    const data = await api.cliRunnerControllerGetRunnerQueuePosition(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**RunnerQueuePositionDto**](RunnerQueuePositionDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## cliRunnerControllerListRunners
 
 > ListRunnersResponseDto cliRunnerControllerListRunners(sourceId, status, skip, take)
@@ -310,7 +378,7 @@ async function example() {
   const body = {
     // string (optional)
     sourceId: sourceId_example,
-    // 'PENDING' | 'RUNNING' | 'COMPLETED' | 'WARNING' | 'ERROR' (optional)
+    // 'PENDING' | 'RUNNING' | 'COMPLETED' | 'WARNING' | 'ERROR' | 'STOPPED' (optional)
     status: status_example,
     // number (optional)
     skip: 8.14,
@@ -336,7 +404,7 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **sourceId** | `string` |  | [Optional] [Defaults to `undefined`] |
-| **status** | `PENDING`, `RUNNING`, `COMPLETED`, `WARNING`, `ERROR` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, WARNING, ERROR] |
+| **status** | `PENDING`, `RUNNING`, `COMPLETED`, `WARNING`, `ERROR`, `STOPPED` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, WARNING, ERROR, STOPPED] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **take** | `number` |  | [Optional] [Defaults to `20`] |
 
@@ -386,7 +454,7 @@ async function example() {
     sourceId: sourceId_example,
     // string (optional)
     sourceId2: sourceId_example,
-    // 'PENDING' | 'RUNNING' | 'COMPLETED' | 'WARNING' | 'ERROR' (optional)
+    // 'PENDING' | 'RUNNING' | 'COMPLETED' | 'WARNING' | 'ERROR' | 'STOPPED' (optional)
     status: status_example,
     // number (optional)
     skip: 8.14,
@@ -413,7 +481,7 @@ example().catch(console.error);
 |------------- | ------------- | ------------- | -------------|
 | **sourceId** | `string` |  | [Defaults to `undefined`] |
 | **sourceId2** | `string` |  | [Optional] [Defaults to `undefined`] |
-| **status** | `PENDING`, `RUNNING`, `COMPLETED`, `WARNING`, `ERROR` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, WARNING, ERROR] |
+| **status** | `PENDING`, `RUNNING`, `COMPLETED`, `WARNING`, `ERROR`, `STOPPED` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, WARNING, ERROR, STOPPED] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **take** | `number` |  | [Optional] [Defaults to `20`] |
 

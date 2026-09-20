@@ -81,6 +81,9 @@ import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operat
  */
 const BULK_STATUS_PAGE_SIZE = 5000;
 
+/** Assets one `assetSeverityCounts` call will answer for — a graph page, not an export. */
+const ASSET_SEVERITY_COUNT_CAP = 500;
+
 @Injectable()
 export class FindingsService {
   constructor(
@@ -1866,13 +1869,66 @@ export class FindingsService {
    * same contract {@link discoveryOverviewFromRollup} uses: a slow dashboard is
    * a better failure mode than one that claims a workspace has no findings.
    */
+  /**
+   * Finding counts per asset, for a set of assets already in hand.
+   *
+   * Exists for graph views, which have a page of asset nodes and need to say
+   * how many findings each carries. The lineage view had no way to ask: its
+   * hotspot panel summed finding *nodes*, and a lineage graph contains none,
+   * so every hotspot read "0 findings" while every asset in it carried one
+   * (field report P13).
+   *
+   * Unresolved only, matching what the graph draws. Bounded by the caller's
+   * page, not by a filter, so a node list is a node list.
+   */
+  async assetSeverityCounts(assetIds: string[]): Promise<
+    Array<{
+      assetId: string;
+      total: number;
+      severityCounts: Record<string, number>;
+    }>
+  > {
+    const ids = Array.from(
+      new Set(
+        (assetIds ?? []).filter(
+          (id): id is string => typeof id === 'string' && id.length > 0,
+        ),
+      ),
+    ).slice(0, ASSET_SEVERITY_COUNT_CAP);
+    if (ids.length === 0) return [];
+
+    const rows = await this.prisma.finding.groupBy({
+      by: ['assetId', 'severity'],
+      where: { assetId: { in: ids }, status: { not: FindingStatus.RESOLVED } },
+      _count: { _all: true },
+    });
+
+    const byAsset = new Map<
+      string,
+      { assetId: string; total: number; severityCounts: Record<string, number> }
+    >();
+    for (const row of rows) {
+      const entry = byAsset.get(row.assetId) ?? {
+        assetId: row.assetId,
+        total: 0,
+        severityCounts: {},
+      };
+      const count = row._count._all;
+      entry.total += count;
+      entry.severityCounts[row.severity] =
+        (entry.severityCounts[row.severity] ?? 0) + count;
+      byAsset.set(row.assetId, entry);
+    }
+    return [...byAsset.values()];
+  }
+
   async getStats(sourceId?: string) {
     const fromRollup = await this.statsFromRollup(sourceId);
     if (fromRollup) return fromRollup;
 
     const where = sourceId ? { sourceId } : {};
 
-    const [total, critical, high, medium, low, open] = await Promise.all([
+    const [total, critical, high, medium, low, info, open] = await Promise.all([
       this.prisma.finding.count({ where }),
       this.prisma.finding.count({
         where: { ...where, severity: 'CRITICAL' },
@@ -1887,6 +1943,9 @@ export class FindingsService {
         where: { ...where, severity: 'LOW' },
       }),
       this.prisma.finding.count({
+        where: { ...where, severity: 'INFO' },
+      }),
+      this.prisma.finding.count({
         where: { ...where, status: FindingStatus.OPEN },
       }),
     ]);
@@ -1898,6 +1957,7 @@ export class FindingsService {
         high,
         medium,
         low,
+        info,
       },
       byStatus: {
         open,
@@ -1908,9 +1968,10 @@ export class FindingsService {
   /**
    * {@link getStats} against the rollup, or null when it cannot answer.
    *
-   * The severity keys are fixed to the four the live path returns, so a
-   * severity outside that set (INFO) still counts toward `total` — matching the
-   * unfiltered `count()` above — without inventing a key the UI does not read.
+   * The severity keys mirror the five the live path counts. INFO used to be
+   * omitted here and from the live path, so the four tiles summed to less than
+   * `total` with no way to tell where the difference went — 21% of one GENESIS
+   * namespace was invisible (field report P7).
    */
   private async statsFromRollup(sourceId?: string) {
     if (!this.stats || !(await this.stats.isUsable())) return null;
@@ -1920,12 +1981,13 @@ export class FindingsService {
       sourceId ? { sourceId: [sourceId] } : undefined,
     );
 
-    const bySeverity = { critical: 0, high: 0, medium: 0, low: 0 };
+    const bySeverity = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
     const severityKeys: Record<string, keyof typeof bySeverity> = {
       CRITICAL: 'critical',
       HIGH: 'high',
       MEDIUM: 'medium',
       LOW: 'low',
+      INFO: 'info',
     };
     let total = 0;
     let open = 0;

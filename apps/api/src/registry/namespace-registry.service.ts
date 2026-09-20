@@ -92,6 +92,40 @@ const RESOLVE_CACHE_TTL_MS = 5_000;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** One namespace's claim on the next runner slot. */
+export interface QueuedRunnerHead {
+  runnerId: string;
+  triggeredAt: Date;
+  /** 0 = someone is waiting at a screen (MANUAL/API, or a source's first run). */
+  lane: number;
+  /** When this namespace last had a slot. Null means never. */
+  lastServedAt: Date | null;
+}
+
+/**
+ * Whether `candidate` should take the next slot ahead of `incumbent`.
+ *
+ * Lane first, then the namespace served longest ago, then the older ticket.
+ * Exported so the ordering can be tested without a database: it is the whole
+ * of the fairness policy, and getting it wrong is invisible until a tenant is
+ * starved for hours (field report P1).
+ */
+export function preferQueued(
+  candidate: QueuedRunnerHead,
+  incumbent: QueuedRunnerHead,
+): boolean {
+  if (candidate.lane !== incumbent.lane) return candidate.lane < incumbent.lane;
+
+  const a = candidate.lastServedAt?.getTime() ?? null;
+  const b = incumbent.lastServedAt?.getTime() ?? null;
+  // A namespace that has never run is the one that has waited longest.
+  if (a === null && b !== null) return true;
+  if (b === null && a !== null) return false;
+  if (a !== null && b !== null && a !== b) return a < b;
+
+  return candidate.triggeredAt.getTime() < incumbent.triggeredAt.getTime();
+}
+
 /**
  * Source of truth for the list of namespaces (tenants).
  *
@@ -404,7 +438,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * The runner that has waited longest, across every namespace.
+   * The next runner to promote, across every namespace.
    *
    * The concurrency cap spans namespaces (see countRowsAcrossNamespaces), so
    * the queue has to as well. Promoting only within the namespace whose run
@@ -413,27 +447,75 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
    * scheduler counts a PENDING run as in flight and yields to it. Observed on
    * 2026-09-14: two queued runs in two namespaces, an idle runner slot, and
    * nothing started for as long as anyone waited.
+   *
+   * Global FIFO fixed that and introduced a second unfairness: it is fair per
+   * *run*, not per tenant. A namespace whose adaptive scheduler is in CATCH_UP
+   * re-enqueues every 15 minutes, so it almost always holds the oldest ticket,
+   * and a single sweep has no time budget. One tenant's register sweep — two
+   * previous runs of 26 minutes and 13.9 hours — meant nothing in three other
+   * namespaces could run at all, not a scan and not a connection test, until
+   * the owner switched that tenant's schedules off (field report P1).
+   *
+   * So the choice is made in two steps:
+   *
+   * 1. **Lane.** A MANUAL run and a source's first run go ahead of scheduled
+   *    sweeps. Both are someone waiting at a screen; a sweep is not.
+   * 2. **Round robin.** Within the highest lane that has anyone queued, the
+   *    namespace served longest ago goes first — never served at all counts as
+   *    longest. A namespace that just had a slot goes to the back however
+   *    quickly it re-enqueues, which is the property global FIFO lacked.
+   *
+   * Ties inside a namespace are still oldest-first, so no run can be starved
+   * by a newer one from its own workspace.
    */
-  async findOldestPendingRunner(): Promise<{
+  async findNextPendingRunner(): Promise<{
     namespace: Namespace;
     runnerId: string;
     triggeredAt: Date;
+    lane: number;
+    lastServedAt: Date | null;
   } | null> {
     const namespaces = await this.list();
     const heads = await Promise.all(
       namespaces.map(async (namespace) => {
         try {
+          const schema = namespace.schemaName;
           const { rows } = await this.pool.query<{
             id: string;
             triggered_at: Date;
+            lane: number;
+            last_served_at: Date | null;
           }>(
-            `SELECT id, triggered_at FROM "${namespace.schemaName}"."runners"
-               WHERE status = 'PENDING' AND started_at IS NULL
-               ORDER BY triggered_at ASC LIMIT 1`,
+            // One round trip per namespace: the head of its queue, and when it
+            // last had a slot. `last_served_at` is a MAX over an indexed
+            // column, so it costs an index probe rather than a scan.
+            `SELECT r.id,
+                    r.triggered_at,
+                    CASE
+                      WHEN r.trigger_type IN ('MANUAL', 'API') THEN 0
+                      WHEN NOT EXISTS (
+                        SELECT 1 FROM "${schema}"."runners" c
+                         WHERE c.source_id = r.source_id
+                           AND c.status = 'COMPLETED'
+                      ) THEN 0
+                      ELSE 1
+                    END AS lane,
+                    (SELECT MAX(started_at) FROM "${schema}"."runners")
+                      AS last_served_at
+               FROM "${schema}"."runners" r
+              WHERE r.status = 'PENDING' AND r.started_at IS NULL
+              ORDER BY lane ASC, r.triggered_at ASC
+              LIMIT 1`,
           );
           const row = rows[0];
           return row
-            ? { namespace, runnerId: row.id, triggeredAt: row.triggered_at }
+            ? {
+                namespace,
+                runnerId: row.id,
+                triggeredAt: row.triggered_at,
+                lane: Number(row.lane),
+                lastServedAt: row.last_served_at,
+              }
             : null;
         } catch (error) {
           this.logger.warn(
@@ -444,10 +526,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       }),
     );
     return heads.reduce<(typeof heads)[number]>(
-      (oldest, head) =>
-        head && (!oldest || head.triggeredAt < oldest.triggeredAt)
-          ? head
-          : oldest,
+      (best, head) =>
+        head && (!best || preferQueued(head, best)) ? head : best,
       null,
     );
   }

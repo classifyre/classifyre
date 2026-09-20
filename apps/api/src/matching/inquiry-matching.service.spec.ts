@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { InquiryMatchingService } from './inquiry-matching.service';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
+import { NotificationsService } from '../notifications.service';
 
 describe('InquiryMatchingService', () => {
   let service: InquiryMatchingService;
@@ -9,8 +10,10 @@ describe('InquiryMatchingService', () => {
   const mockPrisma = {
     inquiry: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     finding: { findMany: jest.fn(), count: jest.fn() },
+    runner: { findUnique: jest.fn() },
   };
   const mockPgBoss = {};
+  const mockNotifications = { create: jest.fn().mockResolvedValue({}) };
 
   const inquiry = (over: Record<string, unknown> = {}) => ({
     id: 'q1',
@@ -34,11 +37,13 @@ describe('InquiryMatchingService', () => {
         InquiryMatchingService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: PgBossService, useValue: mockPgBoss },
+        { provide: NotificationsService, useValue: mockNotifications },
       ],
     }).compile();
     service = module.get(InquiryMatchingService);
     jest.clearAllMocks();
     mockPrisma.inquiry.update.mockResolvedValue({});
+    mockPrisma.runner.findUnique.mockResolvedValue(null);
   });
 
   it('does nothing when no active inquiry matches the source', async () => {
@@ -78,6 +83,58 @@ describe('InquiryMatchingService', () => {
         data: expect.objectContaining({ matchCount: 1 }),
       }),
     );
+  });
+
+  // GENESIS journal §13: a standing question warned no one until an operator
+  // opened it. New unseen matches now raise one notification per run.
+  describe('new-match notifications', () => {
+    const started = new Date('2026-07-15T12:00:00Z');
+    const fresh = () =>
+      finding({ createdAt: new Date('2026-07-15T13:00:00Z') });
+
+    it('notifies when the run created a matching finding, even for an inquiry never opened', async () => {
+      // matchesSeenAt null: newMatchCount stays 0 for such an inquiry, which is
+      // why notifications cannot be derived from it.
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({ findingTypes: ['email'], matchesSeenAt: null }),
+      ]);
+      mockPrisma.runner.findUnique.mockResolvedValue({ startedAt: started });
+      mockPrisma.finding.findMany.mockResolvedValue([fresh()]);
+
+      await service.processSourceCompletion('s1', 'run-1');
+
+      expect(mockNotifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'inquiry.new_matches',
+          actionUrl: '/investigations/inquiries/q1',
+          metadata: expect.objectContaining({ added: 1 }),
+        }),
+      );
+    });
+
+    it('stays quiet when the run created nothing that matches', async () => {
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({ findingTypes: ['ssn'] }),
+      ]);
+      mockPrisma.runner.findUnique.mockResolvedValue({ startedAt: started });
+      mockPrisma.finding.findMany.mockResolvedValue([fresh()]);
+
+      await service.processSourceCompletion('s1', 'run-1');
+
+      expect(mockNotifications.create).not.toHaveBeenCalled();
+    });
+
+    it("does not notify for the autopilot's own inquiries", async () => {
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({ findingTypes: ['email'], createdBy: 'ai-autopilot' }),
+      ]);
+      mockPrisma.runner.findUnique.mockResolvedValue({ startedAt: started });
+      mockPrisma.finding.findMany.mockResolvedValue([fresh()]);
+
+      await service.processSourceCompletion('s1', 'run-1');
+
+      expect(mockNotifications.create).not.toHaveBeenCalled();
+    });
   });
 
   // G-033. newMatchCount used to increment by every finding the run touched,

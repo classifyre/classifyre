@@ -106,11 +106,92 @@ describe('EmbeddingSettingsService', () => {
     expect(result.requiresRebuild).toBe(false);
   });
 
-  it('rebuilds when embeddings are switched off, so no orphan corpus is left', async () => {
+  // The switch moved to Settings → Cleanup › Features, which also holds the
+  // queues and offers keeping or deleting the corpus. A stale client sending
+  // it through the model settings must learn that, not have it half-applied.
+  it('refuses the on/off switch in a settings patch', async () => {
     const service = build();
-    const result = await service.update({ enabled: false });
 
-    expect(result.requiresRebuild).toBe(true);
+    await expect(service.update({ enabled: false })).rejects.toThrow(
+      /Settings → Cleanup/,
+    );
+    expect(prisma.embeddingSettings.upsert).not.toHaveBeenCalled();
+  });
+
+  describe('the on/off switch', () => {
+    it('turns off as a pause by default, without asking for a rebuild', async () => {
+      const service = build();
+
+      const state = await service.setEnabled(false, null);
+
+      expect(state.enabled).toBe(false);
+      expect(state.disabledMode).toBe('kept');
+      expect(stored).toEqual(
+        expect.objectContaining({ enabled: false, disabledMode: 'kept' }),
+      );
+      expect(await service.enabledNow()).toBe(false);
+    });
+
+    it('records a deleted corpus', async () => {
+      const service = build();
+
+      const state = await service.setEnabled(false, 'deleted');
+
+      expect(state.disabledMode).toBe('deleted');
+    });
+
+    it('clears the mode when turned back on', async () => {
+      stored = { id: 1, enabled: false, disabledMode: 'deleted' };
+      const service = build();
+
+      const state = await service.setEnabled(true, null);
+
+      expect(state.enabled).toBe(true);
+      expect(state.disabledMode).toBeNull();
+      expect(stored).toEqual(
+        expect.objectContaining({ enabled: true, disabledMode: null }),
+      );
+    });
+
+    it('only moves the change time when the switch itself moves', async () => {
+      const at = new Date('2026-09-01T00:00:00Z');
+      stored = {
+        id: 1,
+        enabled: false,
+        disabledMode: 'kept',
+        enabledChangedAt: at,
+      };
+      const service = build();
+
+      // Already off: deleting its data is not "turned off again".
+      const state = await service.setEnabled(false, 'deleted');
+
+      expect(state.changedAt).toEqual(at);
+    });
+
+    it('reads an off switch with no recorded mode as a pause', async () => {
+      stored = { id: 1, enabled: false };
+      const service = build();
+
+      expect((await service.switchState()).disabledMode).toBe('kept');
+    });
+  });
+
+  // Another process (the API pod that served the change) flipped the switch;
+  // this one must notice without a restart.
+  it('re-reads the switch after a few seconds', async () => {
+    const service = build();
+    expect(await service.enabledNow()).toBe(
+      service.deploymentDefaults().enabled,
+    );
+
+    stored = { id: 1, enabled: false };
+    jest.useFakeTimers({ now: Date.now() + 6_000 });
+    try {
+      expect(await service.enabledNow()).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('clears an override back to the deployment default when sent null', async () => {

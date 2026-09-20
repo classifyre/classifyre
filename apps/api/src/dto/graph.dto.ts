@@ -136,6 +136,12 @@ export class GraphNodeDto {
     description: 'True when the underlying row no longer exists',
   })
   missing?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Total edges on this node, present only when it exceeded the lineage hub threshold. The node is drawn but the walk did not continue through it — open it on its own page to see what it connects.',
+  })
+  fanOut?: number;
 }
 
 export class FieldMappingDto {
@@ -521,6 +527,17 @@ export class LineageGraphDto {
   @Min(1)
   @Max(3)
   depth?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Edges above which a node is drawn but not walked through. A hub table feeding hundreds of assets otherwise makes depth 2 return the whole namespace. 0 turns the guard off. Defaults to 40.',
+    minimum: 0,
+    default: 40,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  hubFanOut?: number;
 
   @ApiPropertyOptional({
     description:

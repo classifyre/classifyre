@@ -385,7 +385,13 @@ def flow(
     )
 
 
-def contains(parent: Ref, child: Ref, *, type: ContainmentType = ContainmentType.CONTAINS) -> Edge:
+def contains(
+    parent: Ref,
+    child: Ref,
+    *,
+    type: ContainmentType = ContainmentType.CONTAINS,
+    evidence: dict[str, Any] | None = None,
+) -> Edge:
     """``child`` is a part of ``parent`` -- structural, not temporal."""
     return Edge(
         frm=parent,
@@ -394,18 +400,32 @@ def contains(parent: Ref, child: Ref, *, type: ContainmentType = ContainmentType
         relation_type=str(type),
         method=Method.SYSTEM_CATALOG,
         confidence=1.0,
+        evidence=dict(evidence or {}),
     )
 
 
-def same_as(a: Ref, b: Ref, *, method: Method = Method.SYSTEM_CATALOG) -> Edge:
-    """The same real-world object, seen from two systems."""
+def same_as(
+    a: Ref,
+    b: Ref,
+    *,
+    method: Method = Method.SYSTEM_CATALOG,
+    confidence: float | None = None,
+    evidence: dict[str, Any] | None = None,
+) -> Edge:
+    """The same real-world object, seen from two systems.
+
+    ``evidence`` says why the match holds -- e.g. ``{"match": "alias", "checked_by": "hand"}``
+    for a crosswalk entry a person verified -- so a reader can weigh a MANUAL match
+    differently from a name heuristic.
+    """
     return Edge(
         frm=a,
         to=b,
         edge_class=EdgeClass.IDENTITY,
         relation_type="SAME_AS",
         method=method,
-        confidence=_confidence(method, None),
+        confidence=_confidence(method, confidence),
+        evidence=dict(evidence or {}),
     )
 
 
@@ -415,6 +435,8 @@ def references(
     *,
     type: ReferenceType = ReferenceType.REFERENCES,
     method: Method = Method.SYSTEM_CATALOG,
+    confidence: float | None = None,
+    evidence: dict[str, Any] | None = None,
 ) -> Edge:
     """``frm`` points at ``to``. No data moves -- a foreign key is not lineage."""
     return Edge(
@@ -423,7 +445,8 @@ def references(
         edge_class=EdgeClass.REFERENCE,
         relation_type=str(type),
         method=method,
-        confidence=_confidence(method, None),
+        confidence=_confidence(method, confidence),
+        evidence=dict(evidence or {}),
     )
 
 

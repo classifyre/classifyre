@@ -79,6 +79,7 @@ import {
 } from "./finding-summary-badges";
 import { useTranslation } from "../hooks/use-translation";
 import type { TranslationKey } from "../i18n";
+import { FeatureOffNotice } from "@/components/feature-off-notice";
 
 type AssetsTableScope = {
   sourceId?: string;
@@ -920,6 +921,10 @@ export function AssetsTable({
           />
         </div>
       </div>
+
+      {searchMode === "hybrid" && draft.search.trim() ? (
+        <FeatureOffNotice feature="embeddings" context="search" variant="inline" />
+      ) : null}
 
       {error && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">

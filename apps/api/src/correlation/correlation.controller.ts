@@ -94,6 +94,10 @@ export class CorrelationController {
     @Body() dto: UpdateCorrelationConfigDto,
   ): Promise<CorrelationConfigResponseDto> {
     const config = await this.correlation.saveConfig(dto);
+    // saveConfig deliberately leaves scheduling to its caller, and this caller
+    // never did: new weights waited for the next scan's incremental recompute,
+    // which re-scores only the assets that scan touched (GENESIS field report P6).
+    await this.correlation.scheduleFullRecompute('correlation config updated');
     return config;
   }
 
@@ -111,6 +115,7 @@ export class CorrelationController {
       label: dto.label ?? null,
       value: dto.value ?? null,
     });
+    await this.correlation.scheduleFullRecompute('correlation exclusion added');
     return config;
   }
 
@@ -121,6 +126,9 @@ export class CorrelationController {
     @Param('id') id: string,
   ): Promise<CorrelationConfigResponseDto> {
     const config = await this.correlation.removeExclusion(id);
+    await this.correlation.scheduleFullRecompute(
+      'correlation exclusion removed',
+    );
     return config;
   }
 
@@ -151,6 +159,10 @@ export class CorrelationController {
     summary: 'Recompute correlation for a single asset (on demand)',
   })
   @ApiResponse({ status: 200, type: RecomputeCorrelationResponseDto })
+  @ApiResponse({
+    status: 409,
+    description: 'Duplicate detection is turned off for this workspace',
+  })
   async recompute(
     @Param('id') id: string,
   ): Promise<RecomputeCorrelationResponseDto> {

@@ -99,6 +99,10 @@ export class CaseThreadsController {
   @Post('threads/:id/entries')
   @ApiOperation({
     summary: 'Add a note, statement revision, or status entry to a thread',
+    // A client that addresses hypotheses by title renamed five of them by
+    // posting dated revisions as STATEMENT (GENESIS field report P14).
+    description:
+      'A STATEMENT entry revises the claim itself: the thread title becomes the first 200 characters of its body. Use NOTE for commentary, evidence or dated review remarks that must leave the title unchanged.',
   })
   @ApiResponse({ status: 200, type: ThreadResponseDto })
   async addEntry(

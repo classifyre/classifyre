@@ -103,3 +103,13 @@ def test_it_keeps_a_reason_the_notebook_already_gave() -> None:
     ctx.set_partial_coverage("weekly change feed")
     ctx.query_assets("Firmenbuch Register")
     assert ctx.partial_coverage_reason == "weekly change feed"
+
+
+def test_an_input_only_query_keeps_coverage_complete() -> None:
+    # GENESIS field report P5: Land aggregates read every district profile and
+    # yield their whole universe; the query is input, not a cohort.
+    ctx = Context(query_assets=lambda _payload: {"items": [], "nextCursor": None})
+    ctx.query_assets("GENESIS Kreisprofile", cohort=False)
+    assert ctx.partial_coverage is False
+    ctx.query_assets("GENESIS Kreisprofile")
+    assert ctx.partial_coverage is True

@@ -1,6 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { Job } from 'pg-boss';
-import { DetectorType, Prisma } from '@prisma/client';
+import { DetectorType, Prisma, Severity } from '@prisma/client';
+import { NotificationsService } from '../notifications.service';
+import {
+  NotificationEvent,
+  NotificationType,
+} from '../types/notification.types';
 import { PrismaService } from '../prisma.service';
 import { renderReasons } from '../embedding/reason-labels';
 import { PgBossService } from '../scheduler/pg-boss.service';
@@ -11,7 +16,7 @@ import {
   InquiryMatchers,
 } from './inquiry-matcher';
 import { INQUIRY_MATCH_QUEUE } from './matching.constants';
-import { OPERATOR_CREATED } from '../autopilot/autopilot.constants';
+import { AI_ACTOR, OPERATOR_CREATED } from '../autopilot/autopilot.constants';
 import {
   PreviewDiagnosticDto,
   PreviewResponseDto,
@@ -106,6 +111,7 @@ export class InquiryMatchingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pgBoss: PgBossService,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   /**
@@ -177,7 +183,7 @@ export class InquiryMatchingService {
    */
   async processSourceCompletion(
     sourceId: string,
-    _runnerId: string | null,
+    runnerId: string | null,
   ): Promise<{ landed: number }> {
     const inquiries = await this.prisma.inquiry.findMany({
       where: {
@@ -186,12 +192,20 @@ export class InquiryMatchingService {
       },
       select: {
         ...this.matcherSelect,
+        title: true,
+        createdBy: true,
         matchCount: true,
         newMatchCount: true,
         matchesSeenAt: true,
       },
     });
     if (inquiries.length === 0) return { landed: 0 };
+
+    // Findings this run created. "New for this inquiry" cannot come from
+    // newMatchCount: it counts only after matchesSeenAt, which stays null until
+    // someone opens the inquiry — so a question nobody had opened yet could
+    // never announce an answer.
+    const created = await this.findingsCreatedByRun(sourceId, runnerId);
 
     let landed = 0;
     for (const q of inquiries) {
@@ -208,6 +222,15 @@ export class InquiryMatchingService {
           data: { matchCount: total, newMatchCount: newCount },
         });
       }
+      // Only questions a person asked: the autopilot's own inquiries are its
+      // working set and would turn every run into a notification.
+      if (created.length > 0 && q.createdBy !== AI_ACTOR) {
+        const matcher = new CompiledMatcher(q);
+        const added = created.filter((f) => matcher.matches(f)).length;
+        if (added > 0) {
+          await this.notifyNewMatches(q, added, { newCount, total, sourceId });
+        }
+      }
       landed += newCount;
     }
 
@@ -216,6 +239,64 @@ export class InquiryMatchingService {
         `Recorded ${landed} new match(es) for source ${sourceId}`,
       );
     return { landed };
+  }
+
+  /** OPEN findings first created by this run (re-detections keep their createdAt). */
+  private async findingsCreatedByRun(
+    sourceId: string,
+    runnerId: string | null,
+  ) {
+    if (!runnerId) return [];
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { startedAt: true, triggeredAt: true },
+    });
+    const since = runner?.startedAt ?? runner?.triggeredAt;
+    if (!since) return [];
+    return this.prisma.finding.findMany({
+      where: { sourceId, runnerId, status: 'OPEN', createdAt: { gte: since } },
+      select: FINDING_SELECT,
+    });
+  }
+
+  /**
+   * Tell someone a standing question has new answers. Matching used to update
+   * the counters silently, so an early-warning inquiry ("insolvencies +30 %
+   * year on year") warned no one until an operator happened to open it
+   * (GENESIS journal §13). Raised only for findings the run created, so a
+   * run that merely re-detects stays quiet.
+   */
+  private async notifyNewMatches(
+    inquiry: { id: string; title: string },
+    added: number,
+    counts: { newCount: number; total: number; sourceId: string },
+  ): Promise<void> {
+    if (!this.notifications) return;
+    try {
+      await this.notifications.create({
+        type: NotificationType.FINDING,
+        event: NotificationEvent.INQUIRY_NEW_MATCHES,
+        severity: Severity.MEDIUM,
+        title: `New matches: ${inquiry.title}`,
+        message:
+          `${added} new finding(s) answer "${inquiry.title}" ` +
+          `(${counts.newCount} unseen, ${counts.total} in total).`,
+        sourceId: counts.sourceId,
+        actionUrl: `/investigations/inquiries/${inquiry.id}`,
+        isImportant: true,
+        metadata: {
+          inquiryId: inquiry.id,
+          added,
+          newCount: counts.newCount,
+          total: counts.total,
+        },
+      });
+    } catch (error) {
+      // Counters are already stored; a failed notification must not fail matching.
+      this.logger.warn(
+        `Failed to notify new matches for inquiry ${inquiry.id}: ${String(error)}`,
+      );
+    }
   }
 
   /**

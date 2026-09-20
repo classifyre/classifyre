@@ -182,7 +182,7 @@ export class CasesService {
     return (await this.findOne(caseId))!;
   }
 
-  /** Close the case with a conclusion and archive its linked inquiries. */
+  /** Close the case with a conclusion and archive its linked inquiries (unless `keepInquiries`). */
   async close(id: string, dto: CloseCaseDto): Promise<CloseCaseResponseDto> {
     await this.ensureExists(id);
     const conclusion = (dto.conclusion ?? '').trim();
@@ -195,14 +195,24 @@ export class CasesService {
       where: { id },
       data: { status: 'CLOSED', conclusion },
     });
-    // Archive linked inquiries — but only those not driving another open case.
-    const linked = await this.prisma.inquiry.findMany({
-      where: { status: 'ACTIVE', caseLinks: { some: { caseId: id } } },
-      select: {
-        id: true,
-        caseLinks: { select: { case: { select: { id: true, status: true } } } },
-      },
-    });
+    // Archive linked inquiries — but only those not driving another open case,
+    // and not at all when the caller keeps them: an answered case can have
+    // standing checks behind it (GENESIS field report P14).
+    // No global ValidationPipe: a query-string or form "true" arrives as text.
+    const keepInquiries =
+      (dto.keepInquiries as unknown) === true ||
+      (dto.keepInquiries as unknown) === 'true';
+    const linked = keepInquiries
+      ? []
+      : await this.prisma.inquiry.findMany({
+          where: { status: 'ACTIVE', caseLinks: { some: { caseId: id } } },
+          select: {
+            id: true,
+            caseLinks: {
+              select: { case: { select: { id: true, status: true } } },
+            },
+          },
+        });
     const archivable = linked
       .filter((q) =>
         q.caseLinks.every(
@@ -541,7 +551,12 @@ export class CasesService {
       if (!evidenceByAsset.has(f.assetId)) {
         evidenceByAsset.set(
           f.assetId,
-          await this.ensureAssetEvidence(caseId, f.assetId, f.asset),
+          await this.ensureAssetEvidence(
+            caseId,
+            f.assetId,
+            f.asset,
+            dto.addedBy,
+          ),
         );
       }
     }
@@ -762,6 +777,7 @@ export class CasesService {
       assetType: string;
       sourceType: { toString(): string };
     } | null,
+    addedBy?: string,
   ): Promise<string> {
     const ev = await this.prisma.caseEvidence.upsert({
       where: {
@@ -778,6 +794,9 @@ export class CasesService {
         label: asset?.name ?? null,
         assetType: asset?.assetType ?? null,
         sourceType: asset ? String(asset.sourceType) : null,
+        // Recorded on the evidence the attach creates; it used to be dropped,
+        // leaving addedBy null on every evidence row (field report P14).
+        addedBy: addedBy ?? null,
       },
       update: {},
       select: { id: true },

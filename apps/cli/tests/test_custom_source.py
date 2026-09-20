@@ -373,6 +373,52 @@ def test_automatic_cursor_wraps_when_the_source_is_exhausted() -> None:
         instance.cleanup()
 
 
+def test_an_automatic_window_keeps_the_notebooks_stored_cursor(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # GENESIS field report P15: a window stopped the notebook before it reached
+    # ctx.set_cursor(), and the positional offset replaced its whole state.
+    import base64
+    import json
+
+    stored = {"no_data": {"51000-0013": "2026-09-13"}, "seed_applied": True}
+    monkeypatch.setenv(
+        CustomSource.SAMPLING_CURSOR_ENV,
+        base64.b64encode(json.dumps(stored).encode()).decode(),
+    )
+    recipe = build_recipe(counting_notebook(25))
+    recipe["sampling"] = {"strategy": "AUTOMATIC", "rows_per_page": 10}
+    instance = get_source(dict(recipe), source_id="s", runner_id="r")
+    try:
+        with caplog.at_level("WARNING"):
+            assert len(collect(instance)) == 10
+        cursor = instance.current_sampling_cursor()
+    finally:
+        instance.cleanup()
+    assert cursor == {**stored, "assets": 10}
+    assert any("window of 10 asset(s)" in r.getMessage() for r in caplog.records)
+
+
+def test_no_window_warning_when_the_notebook_fits() -> None:
+    recipe = build_recipe()  # 5 assets, window of 10
+    recipe["sampling"] = {"strategy": "AUTOMATIC", "rows_per_page": 10}
+    instance = get_source(dict(recipe), source_id="s", runner_id="r")
+    try:
+        collect(instance)
+    finally:
+        instance.cleanup()
+    assert instance.current_sampling_cursor() == {"assets": 0}
+
+
+def test_a_notebook_asserts_the_complete_tag_set_of_what_it_yielded(source) -> None:
+    # An absent tag key on a yielded asset is a withdrawn fact (field report P4);
+    # an asset this run never yielded is not the notebook's to answer for.
+    instance = source(build_recipe())
+    assets = collect(instance)
+    assert all(instance.asserts_complete_tags(str(a.hash)) for a in assets)
+    assert not instance.asserts_complete_tags("never-yielded")
+
+
 # -- isolation ---------------------------------------------------------------
 
 

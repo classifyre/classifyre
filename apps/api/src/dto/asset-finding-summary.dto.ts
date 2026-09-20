@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DetectorType, FindingStatus, Severity } from '@prisma/client';
+import { ArrayMaxSize, IsArray, IsString } from 'class-validator';
 import { AssetResponseDto, SourceResponseDto } from './finding-response.dto';
 
 export class AssetFindingDetectorCountDto {
@@ -81,4 +82,42 @@ export class AssetFindingSummaryListResponseDto {
 
   @ApiProperty()
   limit: number;
+}
+
+/** Unresolved finding counts for one asset, for a graph view that has its nodes. */
+export class AssetSeverityCountsItemDto {
+  @ApiProperty()
+  assetId!: string;
+
+  @ApiProperty()
+  total!: number;
+
+  @ApiProperty({
+    type: Object,
+    description:
+      'Severity (uppercase) to count, omitting severities with none.',
+  })
+  severityCounts!: Record<string, number>;
+}
+
+/**
+ * Asset ids to count findings for.
+ *
+ * A lineage graph carries no finding nodes, so every hotspot it drew reported
+ * "0 findings" while each of its assets carried one (GENESIS field report P13).
+ */
+export class AssetSeverityCountsRequestDto {
+  @ApiProperty({
+    type: [String],
+    description: 'Up to 500 asset ids. Anything beyond that is ignored.',
+  })
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsString({ each: true })
+  assetIds!: string[];
+}
+
+export class AssetSeverityCountsResponseDto {
+  @ApiProperty({ type: [AssetSeverityCountsItemDto] })
+  items!: AssetSeverityCountsItemDto[];
 }

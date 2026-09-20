@@ -13,6 +13,7 @@ import {
   SourceScheduleMode,
   TriggerType,
 } from '@prisma/client';
+import { MANUAL_STOP_MESSAGE } from '../cli-runner/manual-stop';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from './pg-boss.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
@@ -78,6 +79,7 @@ interface ResolvedRun {
   /** Opaque AUTOMATIC sampling position this run finished at, if any. */
   samplingCursor: unknown;
   completedAt: Date | null;
+  errorMessage?: string | null;
 }
 
 /**
@@ -341,6 +343,7 @@ export class AutoScheduleService {
       assetsDeleted: true,
       findingsCreated: true,
       samplingCursor: true,
+      errorMessage: true,
       completedAt: true,
     };
     return runnerId
@@ -409,6 +412,17 @@ export class AutoScheduleService {
     // A kick naming a runner that belongs to another source is a bug
     // elsewhere; treat it as no signal rather than acting on it.
     if (runner.sourceId !== sourceId) return 'NO_PROGRESS';
+    // An operator stop is a decision, not a failure: counting it backed a
+    // source off and moved it towards the failure circuit breaker (GENESIS
+    // field report P8). The ERROR arm covers runs stopped before STOPPED
+    // existed, which carry the message and nothing else.
+    if (runner.status === RunnerStatus.STOPPED) return 'NO_PROGRESS';
+    if (
+      runner.status === RunnerStatus.ERROR &&
+      runner.errorMessage === MANUAL_STOP_MESSAGE
+    ) {
+      return 'NO_PROGRESS';
+    }
     if (runner.status === RunnerStatus.ERROR) return 'FAILED';
 
     if (cursorAdvanced(previousCursor, runner.samplingCursor)) {

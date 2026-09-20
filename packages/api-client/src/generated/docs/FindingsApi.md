@@ -4,6 +4,7 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**findingsControllerAssetSeverityCounts**](FindingsApi.md#findingscontrollerassetseveritycounts) | **POST** /findings/assets/severity-counts | Unresolved finding counts per asset, for a set of assets |
 | [**findingsControllerBulkUpdate**](FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings |
 | [**findingsControllerCancelBulkOperation**](FindingsApi.md#findingscontrollercancelbulkoperation) | **POST** /findings/bulk-operations/{operationId}/cancel | Cancel a background bulk finding operation |
 | [**findingsControllerCreate**](FindingsApi.md#findingscontrollercreate) | **POST** /findings/create | Create a new finding |
@@ -17,6 +18,73 @@ All URIs are relative to *http://localhost*
 | [**findingsControllerRefreshDiscoveryStats**](FindingsApi.md#findingscontrollerrefreshdiscoverystats) | **POST** /findings/discovery/refresh | Queue a full rebuild of the pre-aggregated finding statistics |
 | [**findingsControllerUpdate**](FindingsApi.md#findingscontrollerupdate) | **PATCH** /findings/{id} | Update a finding |
 
+
+
+## findingsControllerAssetSeverityCounts
+
+> AssetSeverityCountsResponseDto findingsControllerAssetSeverityCounts(assetSeverityCountsRequestDto)
+
+Unresolved finding counts per asset, for a set of assets
+
+For a graph view that already has its nodes: how many unresolved findings each carries, by severity. POST because the id list does not belong in a query string. Ids beyond the first 500 are ignored.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  FindingsApi,
+} from '@workspace/api-client';
+import type { FindingsControllerAssetSeverityCountsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new FindingsApi();
+
+  const body = {
+    // AssetSeverityCountsRequestDto
+    assetSeverityCountsRequestDto: ...,
+  } satisfies FindingsControllerAssetSeverityCountsRequest;
+
+  try {
+    const data = await api.findingsControllerAssetSeverityCounts(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **assetSeverityCountsRequestDto** | [AssetSeverityCountsRequestDto](AssetSeverityCountsRequestDto.md) |  | |
+
+### Return type
+
+[**AssetSeverityCountsResponseDto**](AssetSeverityCountsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## findingsControllerBulkUpdate

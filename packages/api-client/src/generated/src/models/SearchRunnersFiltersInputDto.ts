@@ -130,7 +130,8 @@ export const SearchRunnersFiltersInputDtoStatusEnum = {
     Running: 'RUNNING',
     Completed: 'COMPLETED',
     Warning: 'WARNING',
-    Error: 'ERROR'
+    Error: 'ERROR',
+    Stopped: 'STOPPED'
 } as const;
 export type SearchRunnersFiltersInputDtoStatusEnum = typeof SearchRunnersFiltersInputDtoStatusEnum[keyof typeof SearchRunnersFiltersInputDtoStatusEnum];
 

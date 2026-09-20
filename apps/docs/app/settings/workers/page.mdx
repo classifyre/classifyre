@@ -45,6 +45,30 @@ landed waits for resume rather than failing. Jobs already running cannot be
 cancelled — pause and let them drain, or restart the worker. Pausing is
 database-backed, so it applies to every worker replica.
 
+## Queues held by a feature
+
+Turning [embeddings or duplicate detection](/settings/cleanup/#feature-switches)
+off in Settings → Cleanup holds that feature's queues paused:
+
+| Feature | Queues |
+| --- | --- |
+| Duplicate detection | `correlation.scan` |
+| Embeddings | `semantic-embeddings-<space>`, `semantic-recalibrate-<space>` |
+
+A held queue shows **Held · &lt;feature&gt; off** instead of *Paused*, and offers
+a link to the switch instead of **Resume** — resuming it here would run work
+the workspace turned off, so the API refuses with `409`. Turning the feature
+back on releases the hold. A queue you had also paused by hand before stays
+paused after that; one you tried to resume while it was held resumes with the
+feature.
+
+`autopilot.handoff` carries a finished scan to the AI harness while duplicate
+detection is off (normally that hand-off rides on `correlation.scan`, after the
+duplicate check). It is never held.
+
+Purging a held queue's backlog is allowed, and rarely useful: while a feature
+is off nothing new is queued for it.
+
 ## Purging a backlog
 
 A queue with waiting jobs offers **Purge**, behind a confirmation that names

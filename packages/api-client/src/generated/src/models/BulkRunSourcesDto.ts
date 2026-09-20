@@ -45,6 +45,12 @@ export interface BulkRunSourcesDto {
      * @memberof BulkRunSourcesDto
      */
     forceFullRescan?: boolean;
+    /**
+     * Who started these runs, recorded as each run's triggeredBy. Defaults to 'bulk-run' so a run started this way is never anonymous.
+     * @type {string}
+     * @memberof BulkRunSourcesDto
+     */
+    triggeredBy?: string;
 }
 
 /**
@@ -67,6 +73,7 @@ export function BulkRunSourcesDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'ids': json['ids'] == null ? undefined : json['ids'],
         'filters': json['filters'] == null ? undefined : SearchSourcesFiltersDtoFromJSON(json['filters']),
         'forceFullRescan': json['forceFullRescan'] == null ? undefined : json['forceFullRescan'],
+        'triggeredBy': json['triggeredBy'] == null ? undefined : json['triggeredBy'],
     };
 }
 
@@ -84,6 +91,7 @@ export function BulkRunSourcesDtoToJSONTyped(value?: BulkRunSourcesDto | null, i
         'ids': value['ids'],
         'filters': SearchSourcesFiltersDtoToJSON(value['filters']),
         'forceFullRescan': value['forceFullRescan'],
+        'triggeredBy': value['triggeredBy'],
     };
 }
 

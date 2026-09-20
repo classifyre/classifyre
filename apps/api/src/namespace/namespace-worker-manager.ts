@@ -50,6 +50,9 @@ import {
 } from './namespace-idle-policy';
 import type { NamespaceLifecycleEvent } from '../registry/namespace.types';
 
+/** How often a worker process checks the embeddings switch per namespace. */
+const EMBEDDING_SWITCH_RECONCILE_MS = 10_000;
+
 /**
  * Runs one set of background workers per namespace inside the single shared
  * worker process (SERVICE_ROLE=worker|all). On boot it enumerates namespaces
@@ -77,8 +80,16 @@ export class NamespaceWorkerManager
   private configWatchTimer?: NodeJS.Timeout;
   private reconcileTimer?: NodeJS.Timeout;
   private idleTimer?: NodeJS.Timeout;
+  private embeddingSwitchTimer?: NodeJS.Timeout;
   private reconciling = false;
   private evaluatingIdle = false;
+  private reconcilingEmbeddings = false;
+  /**
+   * Namespaces whose worker start has FINISHED. `active` is set at the top of
+   * `start()`, so anything that re-registers workers on a timer must look here
+   * instead, or it races the start and subscribes a handler twice.
+   */
+  private readonly started = new Set<string>();
 
   constructor(
     private readonly registry: NamespaceRegistryService,
@@ -173,6 +184,35 @@ export class NamespaceWorkerManager
       void this.evaluateIdle();
     }, coldMode.checkMs);
     this.idleTimer.unref();
+
+    // The embeddings switch is flipped in whichever API pod served the
+    // request. Turning it off reaches this process through the queue hold;
+    // turning it back on can need a fresh registration here (see
+    // EmbeddingQueueService.reconcileWorker), which only this process can do.
+    this.embeddingSwitchTimer = setInterval(() => {
+      void this.reconcileEmbeddingWorkers();
+    }, EMBEDDING_SWITCH_RECONCILE_MS);
+    this.embeddingSwitchTimer.unref();
+  }
+
+  private async reconcileEmbeddingWorkers(): Promise<void> {
+    if (this.reconcilingEmbeddings) return;
+    this.reconcilingEmbeddings = true;
+    try {
+      for (const schema of [...this.started]) {
+        const ctx = this.active.get(schema);
+        if (!ctx) continue;
+        await this.runInNamespace(ctx, () =>
+          this.embedding.reconcileWorker(),
+        ).catch((error) =>
+          this.logger.warn(
+            `Embedding reconcile failed for '${ctx.slug}': ${String(error)}`,
+          ),
+        );
+      }
+    } finally {
+      this.reconcilingEmbeddings = false;
+    }
   }
 
   /**
@@ -234,6 +274,7 @@ export class NamespaceWorkerManager
     if (this.configWatchTimer) clearInterval(this.configWatchTimer);
     if (this.reconcileTimer) clearInterval(this.reconcileTimer);
     if (this.idleTimer) clearInterval(this.idleTimer);
+    if (this.embeddingSwitchTimer) clearInterval(this.embeddingSwitchTimer);
     for (const ctx of [...this.active.values()]) {
       await this.stop(ctx).catch(() => undefined);
     }
@@ -317,6 +358,7 @@ export class NamespaceWorkerManager
       await this.stop(e);
       throw error;
     }
+    this.started.add(e.schemaName);
     this.logger.log(`Started workers for namespace '${e.slug}'`);
   }
 
@@ -333,6 +375,7 @@ export class NamespaceWorkerManager
    * real cause. The trailing sync calls had no protection at all.
    */
   private async stop(e: NamespaceLifecycleEvent): Promise<void> {
+    this.started.delete(e.schemaName);
     const wasActive = this.active.delete(e.schemaName);
     // A deleted namespace must never be woken back up by the idle evaluator.
     this.sleeping.delete(e.schemaName);

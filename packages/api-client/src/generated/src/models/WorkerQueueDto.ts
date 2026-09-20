@@ -46,6 +46,12 @@ export interface WorkerQueueDto {
      */
     paused: boolean;
     /**
+     * Workspace feature holding this queue paused because it is turned off (Settings → Cleanup › Features), or null. A held queue cannot be resumed here — resuming answers 409 — and turning the feature back on releases it.
+     * @type {string}
+     * @memberof WorkerQueueDto
+     */
+    heldBy: WorkerQueueDtoHeldByEnum | null;
+    /**
      * 
      * @type {number}
      * @memberof WorkerQueueDto
@@ -114,6 +120,15 @@ export const WorkerQueueDtoStatusEnum = {
 } as const;
 export type WorkerQueueDtoStatusEnum = typeof WorkerQueueDtoStatusEnum[keyof typeof WorkerQueueDtoStatusEnum];
 
+/**
+ * @export
+ */
+export const WorkerQueueDtoHeldByEnum = {
+    Embeddings: 'embeddings',
+    Duplicates: 'duplicates'
+} as const;
+export type WorkerQueueDtoHeldByEnum = typeof WorkerQueueDtoHeldByEnum[keyof typeof WorkerQueueDtoHeldByEnum];
+
 
 /**
  * Check if a given object implements the WorkerQueueDto interface.
@@ -122,6 +137,7 @@ export function instanceOfWorkerQueueDto(value: object): value is WorkerQueueDto
     if (!('queue' in value) || value['queue'] === undefined) return false;
     if (!('status' in value) || value['status'] === undefined) return false;
     if (!('paused' in value) || value['paused'] === undefined) return false;
+    if (!('heldBy' in value) || value['heldBy'] === undefined) return false;
     if (!('activeJobs' in value) || value['activeJobs'] === undefined) return false;
     if (!('queuedCount' in value) || value['queuedCount'] === undefined) return false;
     if (!('deferredCount' in value) || value['deferredCount'] === undefined) return false;
@@ -147,6 +163,7 @@ export function WorkerQueueDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'queue': json['queue'],
         'status': json['status'],
         'paused': json['paused'],
+        'heldBy': json['heldBy'],
         'activeJobs': json['activeJobs'],
         'queuedCount': json['queuedCount'],
         'deferredCount': json['deferredCount'],
@@ -173,6 +190,7 @@ export function WorkerQueueDtoToJSONTyped(value?: WorkerQueueDto | null, ignoreD
         'queue': value['queue'],
         'status': value['status'],
         'paused': value['paused'],
+        'heldBy': value['heldBy'],
         'activeJobs': value['activeJobs'],
         'queuedCount': value['queuedCount'],
         'deferredCount': value['deferredCount'],

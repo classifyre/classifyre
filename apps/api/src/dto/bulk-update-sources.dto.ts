@@ -103,6 +103,14 @@ export class BulkUpdateSourcesDto {
   @ValidateNested()
   @Type(() => BulkUpdateSourcesSamplingDto)
   sampling?: BulkUpdateSourcesSamplingDto;
+
+  @ApiPropertyOptional({
+    description:
+      'Who made the change. Recorded on the SOURCE_CONFIG_CHANGED notification a sampling change raises.',
+  })
+  @IsOptional()
+  @IsString()
+  updatedBy?: string;
 }
 
 export class BulkUpdateSourcesResponseDto {

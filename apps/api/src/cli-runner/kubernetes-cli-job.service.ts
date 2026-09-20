@@ -694,6 +694,23 @@ export class KubernetesCliJobService {
       this.attachNotebookFilesVolume(jobAny, container, envMap);
     }
 
+    // A connection test answers in seconds and holds no corpus, but it was built
+    // from the extract template: a 3-second test waited 6.5 minutes Pending for
+    // a 7 GiB slot behind a running scan (GENESIS field report P2). It gets its
+    // own small profile, request == limit so the scheduler can place it next to
+    // an extract. Recipe `resources` below can still raise it for one source.
+    if (params.mode === 'test') {
+      const memory = process.env.K8S_CLI_TEST_JOB_MEMORY || '2Gi';
+      const cpu = process.env.K8S_CLI_TEST_JOB_CPU || '1';
+      container.resources = {
+        requests: {
+          memory,
+          cpu: process.env.K8S_CLI_TEST_JOB_CPU_REQUEST || '250m',
+        },
+        limits: { memory, cpu },
+      };
+    }
+
     // Apply per-source resource overrides from recipe
     const recipeResources = (params.recipe as any)?.resources;
     if (recipeResources && typeof recipeResources === 'object') {

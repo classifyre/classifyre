@@ -63,6 +63,8 @@ import { CsvExportButton, filtersToSearchParams } from "./csv-export-button";
 import { useUrlParams } from "../lib/url-filters";
 import { toFindingStatusBadgeValue } from "../lib/finding-status-badge";
 import { useTranslation } from "@/hooks/use-translation";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
+import { FeatureOffNotice } from "@/components/feature-off-notice";
 import type { TranslationKey } from "@/i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -286,6 +288,9 @@ export function FindingsTable({
   excludedFindingIds,
 }: FindingsTableProps = {}) {
   const { t } = useTranslation();
+  // Hybrid search quietly degrades to exact text while embeddings are off;
+  // say so where the ranking claim would otherwise be made.
+  const embeddingsOff = useWorkspaceFeatures().isOff("embeddings");
   const router = useRouter();
   const { searchParams, setParams } = useUrlParams();
 
@@ -924,10 +929,13 @@ export function FindingsTable({
             +{groupedCount.toLocaleString()} identical findings grouped
           </span>
         )}
-        {searchMode === "hybrid" && draft.search && (
+        {searchMode === "hybrid" && draft.search && !embeddingsOff && (
           <span>Hybrid semantic ranking active</span>
         )}
       </div>
+      {searchMode === "hybrid" && draft.search ? (
+        <FeatureOffNotice feature="embeddings" context="search" variant="inline" />
+      ) : null}
 
       {/* ── Selection banner ── */}
       {selectionCount > 0 && (

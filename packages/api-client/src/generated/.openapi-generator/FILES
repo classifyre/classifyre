@@ -43,6 +43,9 @@ docs/AssetFindingTypeCountDto.md
 docs/AssetListItemDto.md
 docs/AssetListResponseDto.md
 docs/AssetResponseDto.md
+docs/AssetSeverityCountsItemDto.md
+docs/AssetSeverityCountsRequestDto.md
+docs/AssetSeverityCountsResponseDto.md
 docs/AssetSimilarityDto.md
 docs/AssetsApi.md
 docs/AssistantApi.md
@@ -110,6 +113,7 @@ docs/CohortWeightsPreviewDto.md
 docs/ColumnLineageDto.md
 docs/ColumnLineageResponseDto.md
 docs/ColumnLineageStepDto.md
+docs/ConnectionTestStatusDto.md
 docs/ConstellationBoundaryAssetDto.md
 docs/ConstellationBoundaryEdgeDto.md
 docs/ConstellationBundleDto.md
@@ -282,6 +286,8 @@ docs/RebuildIndexResponseDto.md
 docs/RecomputeCorrelationResponseDto.md
 docs/RecordVerdictDto.md
 docs/RecordVerdictResponseDto.md
+docs/ReferencingFindingDto.md
+docs/ReferencingFindingsResponseDto.md
 docs/RegisterDiscoveredAssetsDto.md
 docs/RegisterDiscoveredAssetsResponseDto.md
 docs/RejectCauseDto.md
@@ -325,6 +331,7 @@ docs/RunnerAssetStatusUpdateItem.md
 docs/RunnerDto.md
 docs/RunnerLogEntryDto.md
 docs/RunnerLogsResponseDto.md
+docs/RunnerQueuePositionDto.md
 docs/RunnersApi.md
 docs/RunnersChartsTimelineBucketDto.md
 docs/RunnersChartsTopSourceDto.md
@@ -534,6 +541,9 @@ src/models/AssetFindingTypeCountDto.ts
 src/models/AssetListItemDto.ts
 src/models/AssetListResponseDto.ts
 src/models/AssetResponseDto.ts
+src/models/AssetSeverityCountsItemDto.ts
+src/models/AssetSeverityCountsRequestDto.ts
+src/models/AssetSeverityCountsResponseDto.ts
 src/models/AssetSimilarityDto.ts
 src/models/AssistantCapabilityReportDto.ts
 src/models/AssistantControllerRespond200Response.ts
@@ -596,6 +606,7 @@ src/models/CohortWeightsPreviewDto.ts
 src/models/ColumnLineageDto.ts
 src/models/ColumnLineageResponseDto.ts
 src/models/ColumnLineageStepDto.ts
+src/models/ConnectionTestStatusDto.ts
 src/models/ConstellationBoundaryAssetDto.ts
 src/models/ConstellationBoundaryEdgeDto.ts
 src/models/ConstellationBundleDto.ts
@@ -751,6 +762,8 @@ src/models/RebuildIndexResponseDto.ts
 src/models/RecomputeCorrelationResponseDto.ts
 src/models/RecordVerdictDto.ts
 src/models/RecordVerdictResponseDto.ts
+src/models/ReferencingFindingDto.ts
+src/models/ReferencingFindingsResponseDto.ts
 src/models/RegisterDiscoveredAssetsDto.ts
 src/models/RegisterDiscoveredAssetsResponseDto.ts
 src/models/RejectCauseDto.ts
@@ -794,6 +807,7 @@ src/models/RunnerAssetStatusUpdateItem.ts
 src/models/RunnerDto.ts
 src/models/RunnerLogEntryDto.ts
 src/models/RunnerLogsResponseDto.ts
+src/models/RunnerQueuePositionDto.ts
 src/models/RunnersChartsTimelineBucketDto.ts
 src/models/RunnersChartsTopSourceDto.ts
 src/models/RunnersChartsTotalsDto.ts
