@@ -181,3 +181,87 @@ describe('orphan reconciliation', () => {
     });
   });
 });
+
+/**
+ * A scan outlives an API restart: the Job keeps running, the CLI reports its
+ * own result over REST, and the process that was streaming the Job's output is
+ * gone. Observed on 2026-09-20: a 29-minute catalogue walk that spanned a
+ * reload finished COMPLETED with **no log file at all**, while its Job had
+ * printed 16,996 lines.
+ */
+describe('log re-attachment after a restart', () => {
+  let service: CliRunnerService;
+  let followExistingJob: jest.Mock;
+  let storage: {
+    initializeRunner: jest.Mock;
+    finalizeRunner: jest.Mock;
+    flushLateChunks: jest.Mock;
+    appendChunk: jest.Mock;
+  };
+
+  const runner = (over: Record<string, unknown> = {}) => ({
+    id: 'r1',
+    sourceId: 's1',
+    status: RunnerStatus.RUNNING,
+    executionMode: RunnerExecutionMode.KUBERNETES,
+    jobName: 'classifyre-extract-abc',
+    jobNamespace: 'classifyre-dev',
+    ...over,
+  });
+
+  beforeEach(() => {
+    followExistingJob = jest.fn().mockResolvedValue({ succeeded: true });
+    storage = {
+      initializeRunner: jest.fn().mockResolvedValue(undefined),
+      finalizeRunner: jest.fn().mockResolvedValue(undefined),
+      flushLateChunks: jest.fn().mockResolvedValue(0),
+      appendChunk: jest.fn().mockReturnValue([]),
+    };
+    service = Object.create(CliRunnerService.prototype) as CliRunnerService;
+    Object.assign(service, {
+      kubernetesCliJobService: { isEnabled: () => true, followExistingJob },
+      runnerLogStorage: storage,
+      resumedLogStreams: new Set<string>(),
+      logger: { warn: jest.fn(), log: jest.fn(), error: jest.fn() },
+    });
+  });
+
+  const resume = (row: ReturnType<typeof runner>) =>
+    (
+      service as unknown as { resumeLogStreaming: (r: unknown) => void }
+    ).resumeLogStreaming(row);
+
+  it('follows the surviving Job and stores what it prints', async () => {
+    resume(runner());
+    await new Promise((r) => setImmediate(r));
+
+    expect(storage.initializeRunner).toHaveBeenCalledWith('s1', 'r1');
+    expect(followExistingJob).toHaveBeenCalledWith(
+      'classifyre-extract-abc',
+      expect.any(Function),
+      'classifyre-dev',
+    );
+    expect(storage.finalizeRunner).toHaveBeenCalledWith('s1', 'r1');
+  });
+
+  it('follows a Job only once, however often reconciliation runs', async () => {
+    resume(runner());
+    resume(runner());
+    await new Promise((r) => setImmediate(r));
+    expect(followExistingJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a local run and a runner with no Job', async () => {
+    resume(runner({ executionMode: RunnerExecutionMode.LOCAL }));
+    resume(runner({ id: 'r2', jobName: null }));
+    await new Promise((r) => setImmediate(r));
+    expect(followExistingJob).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when the Job cannot be followed', async () => {
+    followExistingJob.mockRejectedValue(new Error('job gone'));
+    resume(runner());
+    await new Promise((r) => setImmediate(r));
+    expect(storage.finalizeRunner).not.toHaveBeenCalled();
+  });
+});

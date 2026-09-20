@@ -97,6 +97,8 @@ describe('CliRunnerService', () => {
       initializeRunner: jest.fn().mockResolvedValue(undefined),
       appendChunk: jest.fn(),
       finalizeRunner: jest.fn().mockResolvedValue(undefined),
+      // Output that reaches the API after the CLI reported its own completion.
+      flushLateChunks: jest.fn().mockResolvedValue(0),
       deleteRunnerLogs: jest.fn().mockResolvedValue(undefined),
       listLogs: jest.fn().mockResolvedValue({
         runnerId: 'runner-1',

@@ -1052,6 +1052,29 @@ export class KubernetesCliJobService {
     return `set -eu; python3 - <<'PYEOF'\n${py}\nPYEOF`;
   }
 
+  /**
+   * Follow the logs of a Job this process did not start.
+   *
+   * A scan outlives an API restart: the Job keeps running and the CLI reports
+   * its own result over REST, but the process that was streaming the Job's
+   * output is gone, so the run finished with no stored log at all. Re-attaching
+   * on boot restores it — without the live tail for the part that was missed,
+   * which nothing kept.
+   */
+  async followExistingJob(
+    jobName: string,
+    onLogChunk: CliJobLogHandler,
+    namespace = this.namespace,
+  ): Promise<{ succeeded: boolean; exitCode?: number }> {
+    await this.ensureKubernetesClients();
+    const result = await this.waitForJobCompletion(
+      namespace,
+      jobName,
+      onLogChunk,
+    );
+    return { succeeded: result.succeeded, exitCode: result.exitCode };
+  }
+
   private async waitForJobCompletion(
     namespace: string,
     jobName: string,
