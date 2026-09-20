@@ -160,6 +160,15 @@ interface EmbeddingRuntime {
 export class EmbeddingQueueService {
   private readonly logger = new Logger(EmbeddingQueueService.name);
   private readonly runtimes = new Map<string, EmbeddingRuntime>();
+  /**
+   * Per schema: the switch's `enabledChangedAt` as this process last saw it
+   * (0 when never changed). Lets {@link reconcileWorker} tell "turned back on
+   * since I last looked" from "has been on all along" without depending on
+   * having observed the off state in between.
+   */
+  private readonly switchSeen = new Map<string, number>();
+  /** Last reconcile failure per schema, so a persistent one is logged once. */
+  private readonly reconcileErrors = new Map<string, string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -176,6 +185,20 @@ export class EmbeddingQueueService {
   /** Effective configuration for the current namespace. */
   private get cfg(): ResolvedEmbeddingConfig {
     return this.settings?.cached() ?? resolvedFromEnv(this.config);
+  }
+
+  /**
+   * The on/off switch, at most a few seconds stale. Every path that produces
+   * or performs embedding work reads this rather than {@link cfg}: in a
+   * process that did not serve the change, `cfg` can lag by half a minute.
+   */
+  private async enabledNow(): Promise<boolean> {
+    return this.settings ? this.settings.enabledNow() : this.cfg.enabled;
+  }
+
+  /** Whether a running walk should stop: namespace gone, or switched off. */
+  private async halted(rt: EmbeddingRuntime): Promise<boolean> {
+    return rt.disposed || !(await this.enabledNow());
   }
 
   /** Resolve (or create) the runtime object for the current namespace schema. */
@@ -318,12 +341,158 @@ export class EmbeddingQueueService {
 
   /** Cancel detached recovery work and wait for an active backfill on delete. */
   async stopForSchema(schema: string): Promise<void> {
+    this.switchSeen.delete(schema);
+    this.reconcileErrors.delete(schema);
     const rt = this.runtimes.get(schema);
     if (!rt) return;
     rt.disposed = true;
     if (rt.recoveryTimer) clearTimeout(rt.recoveryTimer);
     await rt.backfillPromise?.catch(() => undefined);
     this.runtimes.delete(schema);
+  }
+
+  /**
+   * Every embedding queue of the current namespace — the ones a switched-off
+   * workspace holds paused. Both per-space prefixes, for every space pg-boss
+   * still knows (a retired space's backlog must not drain either) plus the
+   * active space's names even before its queues exist, so a worker that
+   * registers later starts paused.
+   */
+  async queueNamesForHold(): Promise<string[]> {
+    const names = new Set<string>();
+    const isEmbeddingQueue = (name: string) =>
+      name.startsWith(`${EMBEDDING_QUEUE_PREFIX}-`) ||
+      name.startsWith(`${RECALIBRATE_QUEUE_PREFIX}-`);
+    try {
+      const boss = await this.pgBoss.getBossAsync();
+      for (const queue of await boss.getQueues()) {
+        if (isEmbeddingQueue(queue.name)) names.add(queue.name);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Could not list embedding queues to hold: ${String(error)}`,
+      );
+    }
+    const active = await this.prisma.embeddingSpace
+      .findFirst({ where: { isActive: true }, select: { id: true } })
+      .catch(() => null);
+    if (active) {
+      names.add(`${EMBEDDING_QUEUE_PREFIX}-${active.id}`);
+      names.add(`${RECALIBRATE_QUEUE_PREFIX}-${active.id}`);
+    }
+    return [...names];
+  }
+
+  /**
+   * Whether evidence analysis is still catching up — the autopilot's reason
+   * to hold evidence-gated agents back. Never while embeddings are off: a
+   * paused backlog will not drain, and waiting on it would park those agents
+   * until their staleness backstop.
+   */
+  async analysisPending(): Promise<boolean> {
+    if (!(await this.enabledNow())) return false;
+    const status = await this.status();
+    return (status.pendingEmbedJobs ?? 0) > 0;
+  }
+
+  /**
+   * Converge THIS worker process on the workspace's embedding switch.
+   *
+   * Turning embeddings off needs nothing here: the switch holds the embedding
+   * queues paused (every replica stops fetching) and the backfill halts at its
+   * next page. Turning them back on is where a worker can be left behind:
+   *
+   * - it booted while embeddings were off, so it never registered at all;
+   * - "turn off and delete" dropped the space its queues are named after, and
+   *   turning back on binds a new one;
+   * - another process rebuilt the corpus under a new model (same thing).
+   *
+   * In each case the released hold resumes nothing, because this process is
+   * not subscribed to the queue that now matters. So it re-binds: drop the
+   * old subscription and the memoised space, register again. And after any
+   * turn-back-on it runs the catch-up backfill — content scanned while off
+   * was never queued.
+   *
+   * Called on a timer by the namespace worker manager (worker role only) and
+   * directly by the process that served the switch change, which passes
+   * `catchUp` because it knows the switch just came on.
+   */
+  async reconcileWorker(options: { catchUp?: boolean } = {}): Promise<void> {
+    if (!runsBackgroundWorkers() || !this.settings) return;
+    const schema = this.cls.get<string>(CLS_SCHEMA);
+    if (!schema) return;
+    try {
+      const sw = await this.settings.switchState();
+      const changedAt = sw.changedAt?.getTime() ?? 0;
+      const seen = this.switchSeen.get(schema);
+      this.switchSeen.set(schema, changedAt);
+      if (!sw.enabled) return;
+
+      // The first look after boot is not a transition: boot registration
+      // already did whatever autoBackfill asks for.
+      const turnedBackOn = seen !== undefined && changedAt > seen;
+      const rt = this.runtimes.get(schema);
+      const active = await this.prisma.embeddingSpace.findFirst({
+        where: { isActive: true },
+        select: { id: true },
+      });
+      const serving = Boolean(
+        rt?.workerRegistered &&
+        rt.queueName &&
+        active &&
+        rt.spaceId === active.id &&
+        this.pgBoss.hasSubscription(rt.queueName),
+      );
+      if (!serving) await this.rebind(schema, rt);
+      if (turnedBackOn || options.catchUp) this.requestCatchUp();
+      this.reconcileErrors.delete(schema);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Retried on the next tick; say so once, not every ten seconds.
+      if (this.reconcileErrors.get(schema) !== message) {
+        this.reconcileErrors.set(schema, message);
+        this.logger.warn(
+          `Embedding worker reconcile for ${schema}: ${message}`,
+        );
+      }
+    }
+  }
+
+  private async rebind(
+    schema: string,
+    rt: EmbeddingRuntime | undefined,
+  ): Promise<void> {
+    if (rt?.queueName) await this.pgBoss.unsubscribe(rt.queueName);
+    if (rt?.recalibrateQueueName) {
+      await this.pgBoss.unsubscribe(rt.recalibrateQueueName);
+    }
+    if (rt) {
+      rt.workerRegistered = false;
+      rt.queueName = undefined;
+      rt.recalibrateQueueName = undefined;
+      rt.spaceId = undefined;
+    }
+    // Both caches may describe a space that no longer exists.
+    this.settings?.clearForSchema(schema);
+    this.embeddings.clearForSchema(schema);
+    await this.registerForNamespace();
+    this.logger.log(
+      `Embedding worker for ${schema} bound to space ${this.runtimes.get(schema)?.spaceId ?? '(none)'}`,
+    );
+  }
+
+  /** Start the catch-up backfill, if this runtime has a space to fill. */
+  private requestCatchUp(): void {
+    try {
+      const started = this.requestBackfill();
+      if (started.started) {
+        this.logger.log(
+          `Embeddings turned back on: catching up space ${started.spaceId}`,
+        );
+      }
+    } catch {
+      // No space bound yet; the registration's own backfill covers it.
+    }
   }
 
   enqueue(contents: QueuedContent[]): void {
@@ -415,7 +584,7 @@ export class EmbeddingQueueService {
   }
 
   async scheduleRecalibration(): Promise<boolean> {
-    if (!this.cfg.enabled) return false;
+    if (!(await this.enabledNow())) return false;
     try {
       return await this.persistRecalibration();
     } catch (error) {
@@ -451,6 +620,9 @@ export class EmbeddingQueueService {
   private async handleRecalibration(): Promise<void> {
     const rt = this.runtime();
     if (!rt.queueName || !rt.spaceId) return;
+    // The queue is held paused while embeddings are off; this covers a pass
+    // fetched in the instant before the hold landed.
+    if (!(await this.enabledNow())) return;
     const boss = await this.pgBoss.getBossAsync();
     const stats = await boss.getQueueStats(rt.queueName);
     const pending = stats.queuedCount + stats.activeCount + stats.deferredCount;
@@ -570,6 +742,9 @@ export class EmbeddingQueueService {
   }
 
   private async persist(contents: QueuedContent[]): Promise<void> {
+    // Turned off: nothing is queued. Whatever this drops is found again by the
+    // catch-up backfill that runs when the switch comes back on.
+    if (!(await this.enabledNow())) return;
     const rt = await this.ensureRuntime();
     if (rt.disposed) return;
     if (!rt.queueName || !rt.spaceId) {
@@ -718,6 +893,9 @@ export class EmbeddingQueueService {
 
   private async handle(jobs: Job<EmbeddingJob>[]): Promise<void> {
     const rt = this.runtime();
+    // Same race as recalibration: a batch fetched just before the hold. It is
+    // dropped rather than embedded; the catch-up backfill finds it again.
+    if (!(await this.enabledNow())) return;
     const seen = new Set<string>();
     const requested: string[] = [];
     const inline = new Map<string, string>();
@@ -795,13 +973,13 @@ export class EmbeddingQueueService {
 
   private async backfillStoredContent(rt: EmbeddingRuntime): Promise<void> {
     try {
-      if (rt.disposed) return;
+      if (await this.halted(rt)) return;
       await this.backfillFindings(rt);
-      if (rt.disposed) return;
+      if (await this.halted(rt)) return;
       await this.backfillAssetChunks(rt);
-      if (rt.disposed) return;
+      if (await this.halted(rt)) return;
       await this.backfillGlossaryTerms(rt);
-      if (rt.disposed) return;
+      if (await this.halted(rt)) return;
       rt.backfillCompletedAt = new Date().toISOString();
       void this.scheduleRecalibration();
       this.logger.log(
@@ -878,7 +1056,7 @@ export class EmbeddingQueueService {
   private async backfillFindings(rt: EmbeddingRuntime): Promise<void> {
     let cursor: string | undefined;
     do {
-      if (rt.disposed) return;
+      if (await this.halted(rt)) return;
       const findings = await this.prisma.finding.findMany({
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         orderBy: { id: 'asc' },
@@ -925,7 +1103,7 @@ export class EmbeddingQueueService {
   private async backfillAssetChunks(rt: EmbeddingRuntime): Promise<void> {
     let cursor: string | undefined;
     do {
-      if (rt.disposed) return;
+      if (await this.halted(rt)) return;
       const chunks = await this.prisma.assetChunk.findMany({
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         orderBy: { id: 'asc' },
@@ -948,7 +1126,7 @@ export class EmbeddingQueueService {
   private async backfillGlossaryTerms(rt: EmbeddingRuntime): Promise<void> {
     let cursor: string | undefined;
     do {
-      if (rt.disposed) return;
+      if (await this.halted(rt)) return;
       const terms = await this.prisma.glossaryTerm.findMany({
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         orderBy: { id: 'asc' },

@@ -25,6 +25,7 @@ Name | Type
 `hypothesisIds` | Array&lt;string&gt;
 `caseFindingId` | string
 `missing` | boolean
+`fanOut` | number
 
 ## Example
 
@@ -52,6 +53,7 @@ const example = {
   "hypothesisIds": null,
   "caseFindingId": null,
   "missing": null,
+  "fanOut": null,
 } satisfies GraphNodeDto
 
 console.log(example)

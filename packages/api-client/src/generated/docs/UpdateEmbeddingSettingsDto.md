@@ -6,7 +6,6 @@
 
 Name | Type
 ------------ | -------------
-`enabled` | boolean
 `provider` | string
 `model` | string
 `revision` | string
@@ -32,7 +31,6 @@ import type { UpdateEmbeddingSettingsDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "enabled": null,
   "provider": null,
   "model": null,
   "revision": null,

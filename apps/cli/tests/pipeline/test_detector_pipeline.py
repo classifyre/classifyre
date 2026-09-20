@@ -788,6 +788,67 @@ async def test_sources_without_tags_are_unaffected() -> None:
     assert detector.seen == ["hello world"]
 
 
+class CompleteTaggingSource(TaggingSource):
+    """A CUSTOM-connector-like source whose tag set is the whole truth per asset."""
+
+    def asserts_complete_tags(self, asset_hash: str) -> bool:
+        return True
+
+
+def _outcome_keys(asset) -> set[str | None]:
+    outcomes = asset.scan_stats.detector_outcomes or []
+    return {
+        o.custom_detector_key
+        for o in outcomes
+        if o.status == "OK" or getattr(o.status, "value", None) == "OK"
+    }
+
+
+@pytest.mark.asyncio
+async def test_a_withdrawn_tag_reports_an_ok_outcome_so_its_finding_can_resolve() -> None:
+    # GENESIS field report P4: run 1 tagged the asset, run 2 no longer does.
+    # Without an OK outcome for the tag detector the API keeps the old finding
+    # open forever; with it, resolution retires it.
+    hidden = make_tag_detector("hidden_total", "Hidden total", "Hidden total")
+    missing = make_tag_detector("no_total_row", "No total row", "No total row")
+
+    first = CompleteTaggingSource({"type": "DUMMY"}, {"1": {"hidden_total": "ZUGINS"}})
+    [run1] = await DetectorPipeline(
+        detectors=[hidden, missing], source=first, runner_id="run-1"
+    ).process([make_asset()])
+    assert [f.custom_detector_key for f in run1.findings or []] == ["hidden_total"]
+
+    second = CompleteTaggingSource({"type": "DUMMY"}, {"1": {"no_total_row": "KFZAT2"}})
+    [run2] = await DetectorPipeline(
+        detectors=[hidden, missing], source=second, runner_id="run-2"
+    ).process([make_asset()])
+    assert [f.custom_detector_key for f in run2.findings or []] == ["no_total_row"]
+    assert {"hidden_total", "no_total_row"} <= _outcome_keys(run2)
+
+
+@pytest.mark.asyncio
+async def test_an_asset_with_no_tags_left_still_reports_its_tag_detectors() -> None:
+    detector = make_tag_detector("legal_hold", "Legal Hold", "Legal hold")
+    source = CompleteTaggingSource({"type": "DUMMY"}, {})
+    [asset] = await DetectorPipeline(
+        detectors=[detector], source=source, runner_id="run-empty"
+    ).process([make_asset()])
+    assert not (asset.findings or [])
+    assert "legal_hold" in _outcome_keys(asset)
+
+
+@pytest.mark.asyncio
+async def test_a_source_that_may_tag_a_subset_reports_nothing_for_absent_keys() -> None:
+    # An augmentation notebook, or any source that does not promise a complete
+    # tag set: silence must stay silence, or unrelated findings would resolve.
+    detector = make_tag_detector("legal_hold", "Legal Hold", "Legal hold")
+    source = TaggingSource({"type": "DUMMY"}, {"1": {"other": "x"}})
+    [asset] = await DetectorPipeline(
+        detectors=[detector], source=source, runner_id="run-partial"
+    ).process([make_asset()])
+    assert "legal_hold" not in _outcome_keys(asset)
+
+
 # ── Reference assets: recorded on purpose without content ───────────────────
 
 

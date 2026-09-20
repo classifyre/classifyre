@@ -15,9 +15,15 @@ import {
 } from '../namespace/namespace.constants';
 import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import { RunnerLogStorageService } from '../cli-runner/runner-log-storage.service';
+import { CorrelationLockService } from '../correlation/correlation-lock.service';
+import { EmbeddingService } from '../embedding/embedding.service';
+import { EmbeddingSettingsService } from '../embedding/embedding-settings.service';
+import { EmbeddingQueueService } from '../embedding/embedding-queue.service';
+import { PgBossService } from '../scheduler/pg-boss.service';
 import {
   CLEANABLE_DATASETS,
   PROTECTED_DATASETS,
+  SCORED_EDGE_RELATION_TYPES,
   isCleanupKey,
   type CleanableDataset,
   type CleanupKey,
@@ -88,6 +94,14 @@ export interface CleanupProgress {
   currentTable: string | null;
   tablesTotal: number;
   tablesDone: number;
+  /** Workspace schema the run belongs to (runs are kept process-wide). */
+  schema?: string;
+  /**
+   * What the run is doing when that is not "removing rows from a table" —
+   * waiting for a duplicate check to finish, dropping vector indexes. Null
+   * otherwise.
+   */
+  note: string | null;
   result?: CleanupResult;
   error?: string;
 }
@@ -107,6 +121,30 @@ const FINISHED_JOB_STATES = ['completed', 'failed', 'cancelled'];
 
 /** TRUNCATE waits at most this long for writers, then falls back to DELETE. */
 const TRUNCATE_LOCK_TIMEOUT = '15s';
+
+/**
+ * Heap blocks per statement when walking a table by physical position
+ * (`ctid` ranges, a Tid Range Scan): 64 MB of sequential reads per step. Used
+ * where the rows to touch cannot be found by index — `edges` has no index on
+ * `relation_type` — and where a `LIMIT` chunk would rescan everything already
+ * deleted on every step.
+ */
+const TID_RANGE_BLOCKS = 8192;
+
+/**
+ * The scored edges are removed by rewriting `edges` — copy the lineage out,
+ * TRUNCATE, copy it back — when they are at least this share of the table.
+ * That is what frees the disk at once (a DELETE only marks space reusable),
+ * and on the incident that motivated it the rewrite took 18 s where a DELETE
+ * of 23.5M rows would have written tens of GB of WAL.
+ */
+const REWRITE_MIN_SHARE = 0.5;
+/** ...and only while the lineage kept is small enough to copy under a lock. */
+const REWRITE_MAX_KEPT_ROWS = 2_000_000;
+/** Ceiling for the rewrite transaction (it holds an exclusive lock on edges). */
+const REWRITE_TIMEOUT_MS = 30 * 60_000;
+/** Bounded sample for the scored share when `edges` was never analyzed. */
+const EDGE_SAMPLE_ROWS = 50_000;
 /** Recent runs kept for progress polling (in-memory; single API replica). */
 const MAX_KEPT_RUNS = 50;
 
@@ -150,6 +188,15 @@ export class MaintenanceService {
     private readonly cls: ClsService,
     @Optional() private readonly pause?: NamespacePauseService,
     @Optional() private readonly runnerLogs?: RunnerLogStorageService,
+    // The rest are optional for the same reason: the specs construct this
+    // service positionally. Each only makes a wipe more thorough (serialised
+    // against recomputes, per-space indexes and queues dropped, caches of
+    // purged spaces forgotten); none is needed for the SQL to be correct.
+    @Optional() private readonly correlationLock?: CorrelationLockService,
+    @Optional() private readonly embeddings?: EmbeddingService,
+    @Optional() private readonly embeddingSettings?: EmbeddingSettingsService,
+    @Optional() private readonly embeddingQueue?: EmbeddingQueueService,
+    @Optional() private readonly pgBoss?: PgBossService,
   ) {}
 
   private schema(): string {
@@ -226,6 +273,25 @@ export class MaintenanceService {
       );
       scheduler.sizeBytes = boss.total;
       scheduler.tables = boss.tables.map((t) => t.table);
+    }
+
+    // `edges` is lineage and scored pairs in one table: attribute its size by
+    // the scored share, so the duplicates row shows what its cleanup frees
+    // and the protected assets row stops claiming 17 GB of duplicate output.
+    const edges = byTable.get('edges');
+    if (edges && edges.rowsEstimate > 0) {
+      const share = await this.scoredEdgeShare().catch(() => 0);
+      const assets = datasets.find((d) => d.key === 'assets');
+      const duplicates = datasets.find((d) => d.cleanupKey === 'duplicates');
+      if (share > 0 && assets && duplicates) {
+        const rows = Math.round(edges.rowsEstimate * share);
+        const bytes = Math.round(edges.sizeBytes * share);
+        assets.rowsEstimate -= rows;
+        assets.sizeBytes -= bytes;
+        duplicates.rowsEstimate += rows;
+        duplicates.sizeBytes += bytes;
+        duplicates.tables = [...duplicates.tables, 'edges'];
+      }
     }
 
     const listed = new Set<string>();
@@ -330,12 +396,17 @@ export class MaintenanceService {
     const run: CleanupProgress = {
       runId: randomUUID(),
       key,
+      schema: this.schema(),
       status: 'running',
       totalEstimate: null,
       processed: 0,
       currentTable: null,
-      tablesTotal: dataset.tables.length + (dataset.bossTables?.length ?? 0),
+      tablesTotal:
+        dataset.tables.length +
+        (dataset.bossTables?.length ?? 0) +
+        (dataset.sharedRows ? 1 : 0),
       tablesDone: 0,
+      note: null,
       result: undefined,
       error: undefined,
     };
@@ -346,6 +417,7 @@ export class MaintenanceService {
       run.status = 'failed';
       run.error = error instanceof Error ? error.message : String(error);
       run.currentTable = null;
+      run.note = null;
       this.logger.error(
         `Storage cleanup '${key}' (run ${run.runId}) failed: ${run.error}`,
       );
@@ -353,11 +425,26 @@ export class MaintenanceService {
     return { runId: run.runId, key, status: 'running' };
   }
 
+  /** The run currently wiping `key` in this workspace, if any. */
+  runningCleanup(key: CleanupKey): CleanupProgress | null {
+    const schema = this.cls.get<string>(CLS_SCHEMA);
+    for (const run of this.runs.values()) {
+      if (
+        run.key === key &&
+        run.status === 'running' &&
+        run.schema === schema
+      ) {
+        return snapshot(run);
+      }
+    }
+    return null;
+  }
+
   /** Pollable snapshot of a run; 404 once the run aged out of memory. */
   cleanupProgress(runId: string): CleanupProgress {
     const run = this.runs.get(runId);
     if (!run) throw new NotFoundException(`Unknown cleanup run '${runId}'`);
-    return { ...run };
+    return snapshot(run);
   }
 
   private rememberRun(run: CleanupProgress): void {
@@ -396,29 +483,30 @@ export class MaintenanceService {
 
     let result: Omit<CleanupResult, 'key' | 'durationMs'>;
     // touched tracks app-schema tables for the closing VACUUM (boss tables
-    // are handled with the scheduler key explicitly).
+    // are handled with the scheduler key explicitly); alsoVacuum is for
+    // tables outside the dataset that a wipe had to rewrite.
     let touched: string[] = [];
+    const alsoVacuum: string[] = [];
     switch (key) {
       case 'scans':
         result = await this.cleanupScans(this.tick(run, 'runners'));
         touched = ['runners', 'runner_assets'];
         break;
       case 'duplicates':
-        result = await this.wipeTables(
-          dataset,
-          ['asset_cluster_members', 'asset_clusters'],
-          this.tick(run, dataset.tables[0] ?? 'duplicates'),
-        );
-        touched = [...dataset.tables];
+        result = await this.cleanupDuplicates(run, dataset);
+        touched = [
+          ...dataset.tables,
+          ...(dataset.sharedRows ? [dataset.sharedRows.table] : []),
+        ];
         break;
-      case 'embeddings':
-        result = await this.wipeTables(
-          dataset,
-          [],
-          this.tick(run, dataset.tables[0] ?? 'embeddings'),
-        );
+      case 'embeddings': {
+        const purged = await this.purgeEmbeddings(run, dataset);
+        result = purged;
         touched = [...dataset.tables];
+        // The importance reset rewrote rows in `findings`; reclaim them too.
+        if (purged.importanceReset > 0) alsoVacuum.push('findings');
         break;
+      }
       case 'harness':
         result = await this.wipeTables(
           dataset,
@@ -464,6 +552,7 @@ export class MaintenanceService {
 
     if (touched.length > 0) await this.vacuumTables(touched);
     for (const t of touched) this.tableDone(run, t);
+    if (alsoVacuum.length > 0) await this.vacuumTables(alsoVacuum);
 
     const full: CleanupResult = {
       key,
@@ -473,6 +562,7 @@ export class MaintenanceService {
     run.status = 'done';
     run.result = full;
     run.currentTable = null;
+    run.note = null;
     this.logger.log(
       `Storage cleanup '${key}' (run ${run.runId}) finished in ` +
         `${full.durationMs}ms: ${JSON.stringify(full.deleted)} ` +
@@ -484,9 +574,16 @@ export class MaintenanceService {
   private async estimateDataset(
     dataset: CleanableDataset,
   ): Promise<number | null> {
-    const counts = await this.countEstimates(dataset.tables);
+    const shared = dataset.sharedRows?.table;
+    const counts = await this.countEstimates(
+      shared ? [...dataset.tables, shared] : dataset.tables,
+    );
     let total = 0;
     for (const t of dataset.tables) total += Math.max(0, counts.get(t) ?? 0);
+    if (shared) {
+      const share = await this.scoredEdgeShare().catch(() => 0);
+      total += Math.round(Math.max(0, counts.get(shared) ?? 0) * share);
+    }
     if (dataset.bossTables?.length) {
       const boss = await this.bossStats().catch(() => null);
       if (boss) total += boss.tables.reduce((a, t) => a + t.rowsEstimate, 0);
@@ -507,13 +604,26 @@ export class MaintenanceService {
     dataset: CleanableDataset,
     childFirst: string[],
     onProgress: ProgressTick = NO_PROGRESS,
-  ): Promise<Omit<CleanupResult, 'key' | 'durationMs'>> {
+  ): Promise<
+    Omit<CleanupResult, 'key' | 'durationMs'> & { truncated: boolean }
+  > {
     const ordered = [
       ...childFirst,
       ...dataset.tables.filter((t) => !childFirst.includes(t)),
     ];
     const counts = await this.countEstimates(ordered);
-    const deletedOf = (t: string) => Math.max(0, counts.get(t) ?? 0);
+    // A table Postgres has never analyzed estimates as 0 (or -1), and TRUNCATE
+    // gives no row count of its own — so a wipe that emptied a fresh table
+    // would report "0 rows removed". Count those exactly; the estimate is only
+    // missing where it is cheap to replace, since anything large enough for the
+    // count to hurt has been analyzed by autovacuum long before.
+    const exact = new Map<string, number>();
+    for (const table of ordered) {
+      if ((counts.get(table) ?? 0) > 0) continue;
+      exact.set(table, await this.countWhere(table, '').catch(() => 0));
+    }
+    const deletedOf = (t: string) =>
+      Math.max(0, exact.get(t) ?? counts.get(t) ?? 0);
 
     if (!(await this.hasExternalReferences(ordered))) {
       const quoted = ordered.map((t) => `"${this.assertIdent(t)}"`).join(', ');
@@ -529,7 +639,7 @@ export class MaintenanceService {
           deleted[t] = deletedOf(t);
           onProgress(deleted[t], t);
         }
-        return { deleted, skipped: {} };
+        return { deleted, skipped: {}, truncated: true };
       } catch (error) {
         // Locked by a writer, or a reference appeared mid-flight: drain by
         // DELETE instead of failing the run.
@@ -546,7 +656,7 @@ export class MaintenanceService {
       const n = await this.deleteChunks(table, '', false, 'ctid', onProgress);
       deleted[table] = n;
     }
-    return { deleted, skipped: {} };
+    return { deleted, skipped: {}, truncated: false };
   }
 
   /**
@@ -598,6 +708,328 @@ export class MaintenanceService {
         `VACUUM (ANALYZE) "${schema}"."${table}"`,
       );
     }
+  }
+
+  // ── duplicates ──────────────────────────────────────────────────────────
+
+  /**
+   * Wipe the duplicate engine's output: its own tables, and its scored rows in
+   * the shared `edges` table (lineage stays — it only comes back by rescanning).
+   *
+   * Serialised against recomputes through the correlation lock: a recompute
+   * that is mid-flight would otherwise re-insert pairs behind the wipe. A full
+   * recompute can hold that lock for an hour, so the run says it is waiting
+   * rather than looking stuck — and turning duplicate detection off first
+   * makes a running recompute stop at its next page.
+   */
+  private async cleanupDuplicates(
+    run: CleanupProgress,
+    dataset: CleanableDataset,
+  ): Promise<Omit<CleanupResult, 'key' | 'durationMs'>> {
+    const work = async () => {
+      run.note = null;
+      const wiped = await this.wipeTables(
+        dataset,
+        ['asset_cluster_members', 'asset_clusters'],
+        this.tick(run, dataset.tables[0] ?? 'duplicates'),
+      );
+      const deleted = { ...wiped.deleted };
+      if (dataset.sharedRows) {
+        const shared = dataset.sharedRows;
+        const edges = await this.deleteSharedRows(
+          shared,
+          this.tick(run, shared.table),
+          run,
+        );
+        deleted[`${shared.table} (${shared.values.join(', ')})`] =
+          edges.deleted;
+      }
+      return { deleted, skipped: wiped.skipped };
+    };
+    if (!this.correlationLock) return work();
+    run.note = 'Waiting for a running duplicate check to finish';
+    return this.correlationLock.runExclusive(work);
+  }
+
+  /**
+   * Remove one dataset's rows from a table it shares (the scored `edges`).
+   *
+   * Two strategies, both bounded:
+   * - **Rewrite** when those rows dominate the table and what stays is small:
+   *   copy the kept rows to a temp table, TRUNCATE, copy them back — inside
+   *   one transaction holding an exclusive lock, so no concurrent write is
+   *   lost. The only path that returns the disk immediately.
+   * - **Block walk** otherwise: DELETE by `ctid` range, 64 MB of heap per
+   *   statement. Sequential reads, no index needed (there is none on
+   *   `relation_type`), short statements, no table lock.
+   */
+  private async deleteSharedRows(
+    shared: NonNullable<CleanableDataset['sharedRows']>,
+    onProgress: ProgressTick,
+    run?: CleanupProgress,
+  ): Promise<{ deleted: number; strategy: 'rewrite' | 'walk' }> {
+    const table = this.assertIdent(shared.table);
+    const column = this.assertIdent(shared.column);
+    const values = shared.values.map(quoteLiteral).join(', ');
+
+    const total = Math.max(
+      0,
+      (await this.countEstimates([table])).get(table) ?? 0,
+    );
+    const share = await this.scoredEdgeShare(true).catch(() => 0);
+    const keptEstimate = Math.round(total * (1 - share));
+    if (
+      total > 0 &&
+      share >= REWRITE_MIN_SHARE &&
+      keptEstimate <= REWRITE_MAX_KEPT_ROWS &&
+      !(await this.hasExternalReferences([table]))
+    ) {
+      try {
+        if (run) run.note = `Rewriting ${table} without the scored rows`;
+        const kept = await this.rewriteKeeping(table, column, values);
+        const deleted = Math.max(0, total - kept);
+        onProgress(deleted, table);
+        this.logger.log(
+          `Rewrote ${table}: kept ${kept} row(s), dropped ~${deleted} ` +
+            `(${shared.values.join(', ')})`,
+        );
+        return { deleted, strategy: 'rewrite' };
+      } catch (error) {
+        this.logger.warn(
+          `Rewrite of ${table} refused, deleting by block range instead: ` +
+            `${error instanceof Error ? error.message : String(error)}`,
+        );
+      } finally {
+        if (run) run.note = null;
+      }
+    }
+    const deleted = await this.walkBlocks(
+      table,
+      (from, to) =>
+        `DELETE FROM "${table}" WHERE ctid >= '(${from},0)'::tid ` +
+        `AND ctid < '(${to},0)'::tid AND "${column}" IN (${values})`,
+      onProgress,
+    );
+    return { deleted, strategy: 'walk' };
+  }
+
+  /** Keep only the rows NOT in `values`, by copy-out/TRUNCATE/copy-back. */
+  private async rewriteKeeping(
+    table: string,
+    column: string,
+    values: string,
+  ): Promise<number> {
+    const temp = `maintenance_kept_${table}`;
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRawUnsafe(
+          `SET LOCAL lock_timeout = '${TRUNCATE_LOCK_TIMEOUT}'`,
+        );
+        await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = 0`);
+        await tx.$executeRawUnsafe(
+          `LOCK TABLE "${table}" IN ACCESS EXCLUSIVE MODE`,
+        );
+        await tx.$executeRawUnsafe(
+          `CREATE TEMP TABLE "${temp}" ON COMMIT DROP AS ` +
+            `SELECT * FROM "${table}" WHERE "${column}" NOT IN (${values})`,
+        );
+        await tx.$executeRawUnsafe(`TRUNCATE "${table}"`);
+        return Number(
+          await tx.$executeRawUnsafe(
+            `INSERT INTO "${table}" SELECT * FROM "${temp}"`,
+          ),
+        );
+      },
+      { timeout: REWRITE_TIMEOUT_MS, maxWait: 30_000 },
+    );
+  }
+
+  /**
+   * Fraction of `edges` rows the duplicate engine wrote.
+   *
+   * Read from the planner's statistics (`pg_stats`, instant, as fresh as the
+   * last ANALYZE — every cleanup ends with one), falling back to a bounded
+   * sample for a table that was never analyzed.
+   */
+  private async scoredEdgeShare(allowSample = false): Promise<number> {
+    const schema = this.schema();
+    const scored = new Set<string>(SCORED_EDGE_RELATION_TYPES);
+    const stats = await this.prisma.$queryRaw<
+      Array<{ vals: string[] | null; freqs: number[] | null }>
+    >`
+      SELECT most_common_vals::text::text[] AS vals,
+             most_common_freqs AS freqs
+        FROM pg_stats
+       WHERE schemaname = ${schema}
+         AND tablename = 'edges'
+         AND attname = 'relation_type'`;
+    const row = stats[0];
+    if (row?.vals && row.freqs) {
+      let share = 0;
+      row.vals.forEach((value, i) => {
+        if (scored.has(value)) share += Number(row.freqs?.[i] ?? 0);
+      });
+      return Math.min(1, Math.max(0, share));
+    }
+    // Never on a read path: a 1% sample of a 17 GB table is hundreds of MB of
+    // reads, and the overview is fetched by every page that shows a feature
+    // switch. Without statistics the scored rows simply stay unattributed
+    // until the next ANALYZE (every cleanup ends with one).
+    if (!allowSample) return 0;
+    const sample = await this.prisma.$queryRaw<
+      Array<{ scored: bigint | null; total: bigint | null }>
+    >`
+      SELECT COUNT(*) FILTER (
+               WHERE relation_type IN (${Prisma.join([...scored])})
+             )::bigint AS scored,
+             COUNT(*)::bigint AS total
+        FROM (SELECT relation_type FROM edges TABLESAMPLE SYSTEM (1)
+              LIMIT ${EDGE_SAMPLE_ROWS}) s`;
+    const total = Number(sample[0]?.total ?? 0);
+    return total > 0 ? Number(sample[0]?.scored ?? 0) / total : 0;
+  }
+
+  // ── embeddings ──────────────────────────────────────────────────────────
+
+  /**
+   * Purge the semantic layer: vectors, evidence rankings, chunk texts and the
+   * spaces tying them together — plus what exists outside the tables: each
+   * space's partial HNSW index and its two pg-boss queues, both named after
+   * the space id so nothing else knows to drop them.
+   *
+   * Rankings are denormalised onto `findings.importance_score` by a row
+   * trigger. TRUNCATE fires no row triggers, so after the fast path the scores
+   * are reset explicitly (block walk, only rows that are non-zero) — otherwise
+   * findings would keep sorting by rankings that no longer exist.
+   */
+  private async purgeEmbeddings(
+    run: CleanupProgress,
+    dataset: CleanableDataset,
+  ): Promise<
+    Omit<CleanupResult, 'key' | 'durationMs'> & { importanceReset: number }
+  > {
+    const schema = this.schema();
+    // This process's backfill/recovery for the namespace; every other process
+    // stops through the switch (queues held) or re-binds on its next check.
+    await this.embeddingQueue?.stopForSchema(schema).catch(() => undefined);
+
+    let spaces: Array<{ id: string }> = [];
+    try {
+      spaces = await this.prisma.$queryRawUnsafe<Array<{ id: string }>>(
+        `SELECT id FROM "embedding_spaces"`,
+      );
+    } catch {
+      // Not migrated yet: no spaces, nothing named after one.
+    }
+    run.note =
+      spaces.length > 0
+        ? `Dropping ${spaces.length} vector index(es) and queue(s)`
+        : null;
+    for (const space of spaces) {
+      if (!/^[0-9a-f-]{36}$/i.test(space.id)) continue;
+      const index = `content_embeddings_${space.id.replaceAll('-', '')}_hnsw`;
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(
+            `SET LOCAL lock_timeout = '${TRUNCATE_LOCK_TIMEOUT}'`,
+          );
+          await tx.$executeRawUnsafe(`DROP INDEX IF EXISTS "${index}"`);
+        });
+      } catch (error) {
+        // TRUNCATE below empties it anyway; a leftover definition is inert.
+        this.logger.warn(`Could not drop ${index}: ${String(error)}`);
+      }
+      await this.dropEmbeddingQueues(space.id);
+    }
+    run.note = null;
+
+    const wiped = await this.wipeTables(
+      dataset,
+      [
+        'content_embeddings',
+        'finding_evidence_analyses',
+        'asset_chunks',
+        'embedding_spaces',
+      ],
+      this.tick(run, dataset.tables[0] ?? 'embeddings'),
+    );
+    let importanceReset = 0;
+    if (wiped.truncated) {
+      importanceReset = await this.walkBlocks(
+        'findings',
+        (from, to) =>
+          `UPDATE "findings" SET "importance_score" = 0 ` +
+          `WHERE ctid >= '(${from},0)'::tid AND ctid < '(${to},0)'::tid ` +
+          `AND "importance_score" <> 0`,
+        NO_PROGRESS,
+      );
+    }
+    // Cached spaces in this process now point at rows that are gone.
+    this.embeddings?.clearForSchema(schema);
+    this.embeddingSettings?.clearForSchema(schema);
+
+    const deleted = { ...wiped.deleted };
+    if (importanceReset > 0) {
+      deleted['findings.importance_score (reset to 0)'] = importanceReset;
+    }
+    return { deleted, skipped: wiped.skipped, importanceReset };
+  }
+
+  private async dropEmbeddingQueues(spaceId: string): Promise<void> {
+    if (!this.pgBoss) return;
+    try {
+      const boss = await this.pgBoss.getBossAsync();
+      for (const name of [
+        `semantic-embeddings-${spaceId}`,
+        `semantic-recalibrate-${spaceId}`,
+      ]) {
+        await boss.deleteQueue(name).catch(() => undefined);
+      }
+    } catch (error) {
+      // An orphaned queue is inert once its space is gone.
+      this.logger.warn(
+        `Could not delete embedding queues for space ${spaceId}: ${String(error)}`,
+      );
+    }
+  }
+
+  // ── block walks ─────────────────────────────────────────────────────────
+
+  /**
+   * Run `sqlForRange` over a table in physical block ranges, re-reading its
+   * size each step because writers keep appending while the walk runs.
+   * Returns the rows the statements affected.
+   */
+  private async walkBlocks(
+    table: string,
+    sqlForRange: (from: number, to: number) => string,
+    onProgress: ProgressTick,
+  ): Promise<number> {
+    let total = 0;
+    for (let from = 0; ; from += TID_RANGE_BLOCKS) {
+      const blocks = await this.relationBlocks(table);
+      if (!(blocks > from)) break;
+      const n = Number(
+        await this.prisma.$executeRawUnsafe(
+          sqlForRange(from, from + TID_RANGE_BLOCKS),
+        ),
+      );
+      total += n;
+      if (n > 0) onProgress(n, table);
+    }
+    return total;
+  }
+
+  private async relationBlocks(table: string): Promise<number> {
+    const qualified = `"${this.schema()}"."${this.assertIdent(table)}"`;
+    const rows = await this.prisma.$queryRawUnsafe<
+      Array<{ blocks: bigint | number | null }>
+    >(
+      `SELECT (pg_relation_size('${qualified}'::regclass) / ` +
+        `current_setting('block_size')::bigint)::bigint AS blocks`,
+    );
+    const blocks = Number(rows[0]?.blocks ?? 0);
+    return Number.isFinite(blocks) ? blocks : 0;
   }
 
   // ── scans ───────────────────────────────────────────────────────────────
@@ -835,6 +1267,13 @@ export class MaintenanceService {
     }
     return `"${parts[0]}"."${parts[1]}"`;
   }
+}
+
+/** A copy for callers, without the internal schema tag. */
+function snapshot(run: CleanupProgress): CleanupProgress {
+  const copy = { ...run };
+  delete copy.schema;
+  return copy;
 }
 
 function assertNever(value: never): never {

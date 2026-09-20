@@ -238,6 +238,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     COMPLETED: t("sources.statusCompleted"),
     WARNING: t("sources.statusWarning"),
     ERROR: t("sources.statusError"),
+    STOPPED: t("sources.statusStopped"),
   };
 
   const [searchInput, setSearchInput] = useState(

@@ -1379,7 +1379,7 @@ describe('CliRunnerService', () => {
       .mockResolvedValueOnce({
         id: 'runner-1',
         sourceId: 'source-1',
-        status: 'ERROR',
+        status: 'STOPPED',
       });
 
     const tx = {
@@ -1403,16 +1403,19 @@ describe('CliRunnerService', () => {
       'source-1',
       'runner-1',
     );
+    // STOPPED, not ERROR: an operator's decision is not a failed scan, and as
+    // ERROR it counted against the source's failure streak and backed off its
+    // adaptive schedule (field report P8).
     expect(tx.runner.update).toHaveBeenCalledWith({
       where: { id: 'runner-1' },
       data: expect.objectContaining({
-        status: 'ERROR',
+        status: 'STOPPED',
         errorMessage: 'Manually stopped',
       }),
     });
     expect(tx.source.updateMany).toHaveBeenCalledWith({
       where: { id: 'source-1', currentRunnerId: 'runner-1' },
-      data: { runnerStatus: 'ERROR', currentRunnerId: null },
+      data: { runnerStatus: 'STOPPED', currentRunnerId: null },
     });
   });
 
@@ -1925,7 +1928,7 @@ describe('CliRunnerService', () => {
       };
       const registry = {
         countRowsAcrossNamespaces: jest.fn().mockResolvedValue(running),
-        findOldestPendingRunner: jest.fn().mockResolvedValue(oldest),
+        findNextPendingRunner: jest.fn().mockResolvedValue(oldest),
       };
       const service = new CliRunnerService(
         {} as any,
@@ -2001,7 +2004,7 @@ describe('CliRunnerService', () => {
 
       await service.promotePendingRunners();
 
-      expect(registry.findOldestPendingRunner).not.toHaveBeenCalled();
+      expect(registry.findNextPendingRunner).not.toHaveBeenCalled();
       expect(seen).toEqual([]);
     });
 
@@ -2103,7 +2106,7 @@ describe('CliRunnerService', () => {
         countRowsAcrossNamespaces: query(
           () => rows.filter((r) => r.status === RunnerStatus.RUNNING).length,
         ),
-        findOldestPendingRunner: query(() => {
+        findNextPendingRunner: query(() => {
           const [head] = rows
             .filter((r) => r.status === RunnerStatus.PENDING && !r.startedAt)
             .sort(oldestFirst);

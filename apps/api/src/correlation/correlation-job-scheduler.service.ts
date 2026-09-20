@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { CORRELATION_QUEUE } from './correlation.constants';
+import { CorrelationSwitchService } from './correlation-switch.service';
 
 export interface CorrelationJobPayload {
   sourceId?: string;
@@ -17,10 +18,34 @@ const COALESCE_SECONDS = 5;
 export class CorrelationJobScheduler {
   private readonly logger = new Logger(CorrelationJobScheduler.name);
 
-  constructor(private readonly pgBoss: PgBossService) {}
+  constructor(
+    private readonly pgBoss: PgBossService,
+    // Optional and last so the specs' positional construction keeps working;
+    // absent reads as "on".
+    @Optional() private readonly featureSwitch?: CorrelationSwitchService,
+  ) {}
+
+  /**
+   * Whether duplicate detection wants work at all.
+   *
+   * Refusing here rather than letting the job sit in the held queue matters:
+   * every edit, exclusion and bulk update schedules a recompute, and a backlog
+   * of them released at once when the switch comes back on would be pure
+   * waste — turning it on schedules one full recompute that covers them all.
+   */
+  private async accepting(reason: string): Promise<boolean> {
+    if (!this.featureSwitch || (await this.featureSwitch.isEnabled())) {
+      return true;
+    }
+    this.logger.debug(
+      `Duplicate detection is off — not scheduling correlation work (${reason})`,
+    );
+    return false;
+  }
 
   /** Queue a full recompute. Returns false when the queue could not take it. */
   async scheduleFull(reason: string, manual = false): Promise<boolean> {
+    if (!(await this.accepting(reason))) return false;
     return this.sendBestEffort(
       { recomputeAll: true, manual },
       {
@@ -39,6 +64,7 @@ export class CorrelationJobScheduler {
   async scheduleAssets(assetIds: string[], reason: string): Promise<boolean> {
     const unique = [...new Set(assetIds)].filter(Boolean);
     if (unique.length === 0) return false;
+    if (!(await this.accepting(reason))) return false;
     return this.sendBestEffort(
       { assetIds: unique },
       {

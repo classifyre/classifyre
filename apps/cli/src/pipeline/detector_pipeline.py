@@ -1162,11 +1162,15 @@ class DetectorPipeline:
 
         A tag is the one finding that does not come from reading anything. The
         connector already knew the answer; the Tag detector named by the key
-        supplies the label and severity, and the value the connector supplied
-        becomes the matched content.
+        supplies the label and the severity ceiling, and the value the
+        connector supplied becomes the matched content. A ``Tag(value,
+        severity=)`` may lower the severity of its own finding within that
+        ceiling (field report P9).
         """
         tags = self.content_provider.asset_tags(str(asset.hash))
-        if not tags:
+        severities = self._asset_tag_severities(str(asset.hash))
+        complete = self._asserts_complete_tags(str(asset.hash))
+        if not tags and not complete:
             return [], [], []
 
         runners = self._tag_runners(detectors)
@@ -1181,19 +1185,65 @@ class DetectorPipeline:
                 # deleted. Silence would look like the tag simply not working,
                 # so name the key and what was available instead.
                 available = ", ".join(sorted(runners)) or "none configured"
-                warnings.append(
+                msg = (
                     f"Tag '{key}' on asset '{asset.name}' matches no Tag detector "
                     f"and was skipped (available: {available})"
                 )
+                logger.warning(msg)
+                warnings.append(msg)
                 continue
             detector, runner = entry
-            finding = runner.tag_finding(value)
+            requested = severities.get(key)
+            applied, lowered = runner.bound_severity(requested)
+            if lowered:
+                # The detector's severity is the ceiling. Saying so is the
+                # point: a connector that thinks it raised a finding to
+                # CRITICAL and silently did not would act on the wrong
+                # severity for as long as nobody checked. Logged as well as
+                # collected, because scan warnings live on the asset and the
+                # runner log is where an operator actually looks.
+                msg = (
+                    f"Tag '{key}' on asset '{asset.name}' asked for severity "
+                    f"{requested!r}, which its detector does not allow; "
+                    f"recorded as {str(applied).upper()}"
+                )
+                logger.warning(msg)
+                warnings.append(msg)
+            # The raw request, not `applied`: tag_finding bounds it again and
+            # records what was refused on the finding itself.
+            finding = runner.tag_finding(value, requested)
             self.content_provider.enrich_finding_location(finding, asset, "")
             findings.append(finding)
             self._record_outcome(outcome_sink, detector, None)
             types_run = self._merge_detector_types(types_run, [DetectorType.CUSTOM])
 
+        if complete:
+            # The source's tag set is complete, so an absent key is an answer:
+            # this detector found nothing on this asset. Recording OK lets the
+            # API resolve what it found in an earlier run. Without it a fact
+            # the connector withdrew stayed an open finding for as long as the
+            # asset lived (GENESIS field report P4).
+            for key, (detector, _runner) in runners.items():
+                if key not in tags:
+                    self._record_outcome(outcome_sink, detector, None)
+                    types_run = self._merge_detector_types(types_run, [DetectorType.CUSTOM])
+
         return findings, warnings, types_run
+
+    def _asset_tag_severities(self, asset_hash: str) -> dict[str, str]:
+        """Per-tag severities this source asked for, or nothing.
+
+        Probed rather than called outright: a provider written before Tag
+        severities existed still satisfies the pipeline's contract.
+        """
+        probe = getattr(self.content_provider, "asset_tag_severities", None)
+        if not callable(probe):
+            return {}
+        return dict(probe(asset_hash) or {})
+
+    def _asserts_complete_tags(self, asset_hash: str) -> bool:
+        probe = getattr(self.content_provider, "asserts_complete_tags", None)
+        return bool(probe(asset_hash)) if callable(probe) else False
 
     @staticmethod
     def _tag_runners(detectors: list[BaseDetector]) -> dict[str, tuple[BaseDetector, Any]]:

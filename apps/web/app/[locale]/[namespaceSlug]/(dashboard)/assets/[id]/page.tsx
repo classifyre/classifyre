@@ -30,6 +30,7 @@ import { LineageView } from "@/components/lineage-view";
 import { ColumnLineagePanel } from "@/components/column-lineage-panel";
 import { AssetMetadataCard } from "@/components/asset-metadata-card";
 import { AssetKindBadge } from "@/components/asset-kind-badge";
+import { ReferencingFindingsPanel } from "@/components/referencing-findings-panel";
 import { formatAssetKind } from "@/lib/asset-kind";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { useTranslation } from "@/hooks/use-translation";
@@ -309,10 +310,17 @@ export default function AssetDetailPage() {
               {t("lineage.tab")}
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="findings">
+          <TabsContent value="findings" className="space-y-4">
             <Suspense>
               <FindingsTable lockedFilters={lockedFilters} />
             </Suspense>
+            {/*
+              An integrity check or a derived profile is its own asset that
+              references the thing it is about, so this tab could read "No
+              findings found" while a finding pointed straight at the asset
+              (field report P12). Renders nothing when nothing points here.
+            */}
+            <ReferencingFindingsPanel assetId={assetDetails.id} />
           </TabsContent>
           <TabsContent value="related">
             <div className="h-[60vh]">

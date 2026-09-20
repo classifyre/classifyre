@@ -7,6 +7,7 @@ import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { AutoScheduleService } from '../scheduler/auto-schedule.service';
 import { SourceFilesService } from '../source-files.service';
+import { NotificationsService } from '../notifications.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RunnerStatus, SourceScheduleMode } from '@prisma/client';
 
@@ -84,6 +85,10 @@ describe('SourcesController', () => {
     assertHasFiles: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockNotificationsService = {
+    create: jest.fn().mockResolvedValue({}),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SourcesController],
@@ -98,6 +103,7 @@ describe('SourcesController', () => {
         { provide: SchedulerService, useValue: mockSchedulerService },
         { provide: AutoScheduleService, useValue: mockAutoScheduleService },
         { provide: SourceFilesService, useValue: mockSourceFilesService },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
 
@@ -322,6 +328,61 @@ describe('SourcesController', () => {
       expect(result).toEqual({ updatedCount: 1, ids: [mockSource.id] });
     });
 
+    it('records a sampling change with its before, after and actor', async () => {
+      // GENESIS field report P15: a bulk switch to AUTOMATIC cut every scan
+      // to 100 assets and left no trace of who did it or what it replaced.
+      mockSourceService.sources.mockResolvedValue([mockSource]);
+      mockSourceService.decryptSourceConfig.mockReturnValue({
+        type: 'CUSTOM',
+        sampling: { strategy: 'ALL' },
+      });
+      mockValidationService.validate.mockImplementation(
+        (_type: string, config: Record<string, unknown>) => config,
+      );
+      mockSourceService.updateFromConfig.mockResolvedValue(mockSource);
+
+      await controller.bulkUpdateSources({
+        ids: [mockSource.id],
+        sampling: { strategy: 'AUTOMATIC' },
+        updatedBy: 'ops@example.com',
+      });
+
+      expect(mockNotificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'source.config_changed',
+          triggeredBy: 'ops@example.com',
+          metadata: expect.objectContaining({
+            changes: [
+              expect.objectContaining({
+                sourceId: mockSource.id,
+                before: 'ALL',
+                after: 'AUTOMATIC',
+              }),
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('raises nothing when the sampling did not actually change', async () => {
+      mockSourceService.sources.mockResolvedValue([mockSource]);
+      mockSourceService.decryptSourceConfig.mockReturnValue({
+        type: 'CUSTOM',
+        sampling: { strategy: 'ALL' },
+      });
+      mockValidationService.validate.mockImplementation(
+        (_type: string, config: Record<string, unknown>) => config,
+      );
+      mockSourceService.updateFromConfig.mockResolvedValue(mockSource);
+
+      await controller.bulkUpdateSources({
+        ids: [mockSource.id],
+        sampling: { strategy: 'ALL' },
+      });
+
+      expect(mockNotificationsService.create).not.toHaveBeenCalled();
+    });
+
     it('uses the filter snapshot and leaves config untouched for schedule-only updates', async () => {
       mockSourceService.sources.mockResolvedValue([mockSource]);
       mockSchedulerService.removeSchedule.mockResolvedValue(undefined);
@@ -392,7 +453,7 @@ describe('SourcesController', () => {
       expect(mockCliRunnerService.startRun).toHaveBeenCalledWith(
         mockSource.id,
         'MANUAL',
-        undefined,
+        'bulk-run',
         false,
       );
       expect(result).toEqual({

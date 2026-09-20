@@ -10,6 +10,7 @@ import {
   Gauge,
   Loader2,
   Plus,
+  Power,
   RotateCcw,
   Search,
   Sparkles,
@@ -51,6 +52,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useNsPath } from "@/lib/ns-path";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import { formatDate } from "@/lib/date";
+import { FEATURE_SWITCHES_PATH } from "@/components/feature-off-notice";
 
 const PREFIX = "harness.embedding" as const;
 function key(suffix: string): TranslationKey {
@@ -269,13 +271,6 @@ export function EmbeddingSettingsCard() {
     [dirtyFields, settings],
   );
 
-  // Turning embeddings off purges the corpus and stops. Offering "delete and
-  // re-embed" there described the opposite of what the server does.
-  const purgeOnly = React.useMemo(
-    () => dirtyFields.includes("enabled") && draft.enabled === false,
-    [dirtyFields, draft.enabled],
-  );
-
   const save = React.useCallback(async () => {
     if (!settings) return;
     setSaving(true);
@@ -340,7 +335,11 @@ export function EmbeddingSettingsCard() {
     );
   }
 
-  const enabled = Boolean(value("enabled"));
+  // Read-only here: the switch lives in Settings → Cleanup › Features, next
+  // to duplicate detection, where turning off asks whether to keep or delete
+  // the corpus. One switch, one place.
+  const enabled = settings.enabled;
+  const disabledMode = settings.disabledMode ?? "kept";
   const provider = String(value("provider"));
   const isRemote = provider === "openai-compatible";
   const model = String(value("model") ?? "");
@@ -412,19 +411,33 @@ export function EmbeddingSettingsCard() {
             {t(key("desc"))}
           </p>
 
-          <div className="flex items-start justify-between gap-4 rounded-[4px] border-2 border-border bg-muted/20 p-3">
+          <div
+            data-testid="embedding-switch-status"
+            className="flex flex-wrap items-start justify-between gap-3 rounded-[4px] border-2 border-border bg-muted/20 p-3"
+          >
             <div className="space-y-1">
               <p className="text-[11px] font-mono uppercase tracking-[0.12em]">
-                {t(key("enableLabel"))}
+                {t(key("switchLabel"))}
               </p>
               <p className="max-w-prose text-[11px] text-muted-foreground">
-                {t(key("enableDesc"))}
+                {enabled
+                  ? t(key("switchOnDesc"))
+                  : disabledMode === "deleted"
+                    ? t(key("switchOffDeletedDesc"))
+                    : t(key("switchOffKeptDesc"))}
               </p>
             </div>
-            <Switch
-              checked={enabled}
-              onCheckedChange={(checked) => set({ enabled: checked })}
-            />
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 rounded-[4px] text-[11px]"
+            >
+              <Link href={nsPath(FEATURE_SWITCHES_PATH)}>
+                <Power className="h-3 w-3" />
+                {t(key("switchManage"))}
+              </Link>
+            </Button>
           </div>
 
           {!enabled ? (
@@ -999,7 +1012,7 @@ export function EmbeddingSettingsCard() {
               className="gap-1 border-amber-600/50 text-[10px] uppercase text-amber-700 dark:text-amber-500"
             >
               <Trash2 className="h-3 w-3" />
-              {t(key(purgeOnly ? "confirmDisableTitle" : "confirmTitle"))}
+              {t(key("confirmTitle"))}
             </Badge>
           ) : null}
           <div className="ml-auto flex items-center gap-2">
@@ -1031,12 +1044,10 @@ export function EmbeddingSettingsCard() {
         <AlertDialogContent className="rounded-[6px]">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-serif text-lg font-black uppercase tracking-[0.06em]">
-              {t(key(purgeOnly ? "confirmDisableTitle" : "confirmTitle"))}
+              {t(key("confirmTitle"))}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2 text-xs">
-              <span className="block">
-                {t(key(purgeOnly ? "confirmDisableBody" : "confirmBody"))}
-              </span>
+              <span className="block">{t(key("confirmBody"))}</span>
               <span className="block font-mono text-[11px] text-amber-700 dark:text-amber-500">
                 {t(key("confirmDeletes"), {
                   vectors: formatCount(stats.vectorsAllSpaces),
@@ -1044,13 +1055,11 @@ export function EmbeddingSettingsCard() {
                 })}
               </span>
               <span className="block">{t(key("confirmKeeps"))}</span>
-              {purgeOnly ? null : (
-                <span className="block font-mono text-[11px] text-muted-foreground">
-                  {t(key("confirmChanges"), {
-                    fields: rebuildFields.join(", "),
-                  })}
-                </span>
-              )}
+              <span className="block font-mono text-[11px] text-muted-foreground">
+                {t(key("confirmChanges"), {
+                  fields: rebuildFields.join(", "),
+                })}
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1061,7 +1070,7 @@ export function EmbeddingSettingsCard() {
               onClick={() => void save()}
               className="rounded-[4px] text-xs"
             >
-              {t(key(purgeOnly ? "confirmDisableProceed" : "confirmProceed"))}
+              {t(key("confirmProceed"))}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

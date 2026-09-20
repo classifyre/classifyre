@@ -28,6 +28,15 @@ from ._base import BaseRunner
 #: from, so an unreadable one falls back here rather than being guessed at.
 _DEFAULT_SEVERITY = Severity.medium
 
+#: Most severe first, so a lower index is a higher severity.
+_SEVERITY_ORDER: tuple[Severity, ...] = (
+    Severity.critical,
+    Severity.high,
+    Severity.medium,
+    Severity.low,
+    Severity.info,
+)
+
 
 class TagRunner(BaseRunner):
     """Placeholder pipeline: produces findings only from notebook-supplied tags."""
@@ -56,13 +65,39 @@ class TagRunner(BaseRunner):
         """No content type is supported, so the pipeline never schedules this."""
         return []
 
-    def tag_finding(self, value: str) -> DetectionResult:
-        """One finding for one value the notebook asserted under this key."""
+    def bound_severity(self, requested: str | Severity | None) -> tuple[Severity, bool]:
+        """The severity to use for one tag, and whether it had to be lowered.
+
+        The detector's own severity is a ceiling, not a default. A connector
+        that knows this instance is milder than usual may say so; one that
+        wants its findings to outrank what the operator configured may not,
+        because the detector is where that decision belongs. An unreadable or
+        over-severe request lands on the ceiling and the caller reports it,
+        rather than being applied or dropped in silence.
+        """
+        if requested is None:
+            return self.severity, False
+        asked = _parse_severity(requested)
+        if asked is None:
+            return self.severity, True
+        if _SEVERITY_ORDER.index(asked) < _SEVERITY_ORDER.index(self.severity):
+            return self.severity, True
+        return asked, False
+
+    def tag_finding(self, value: str, severity: str | Severity | None = None) -> DetectionResult:
+        """One finding for one value the notebook asserted under this key.
+
+        ``severity`` is what the connector *asked for*, not an already-bounded
+        value: the finding records both what was applied and what was refused,
+        so a capped tag can be explained from the finding itself rather than
+        from a log line nobody kept.
+        """
         text = str(value).strip()
+        applied, lowered = self.bound_severity(severity)
         return self._make_result(
             finding_type=f"tag:{self.label}",
             category="CLASSIFICATION",
-            severity=self.severity,
+            severity=applied,
             # Asserted by the connector, not inferred from content: there is
             # nothing here for a confidence score to express.
             confidence=1.0,
@@ -73,13 +108,33 @@ class TagRunner(BaseRunner):
                 "label": self.label,
                 "tag_key": self._detector_key,
                 "tag_value": text,
+                # Recorded so a finding whose severity differs from its
+                # detector's can be explained without re-reading the notebook.
+                **({"tag_severity": str(applied)} if applied != self.severity else {}),
+                # And when the connector asked for more than the detector
+                # allows, what it asked for. Without this the most interesting
+                # case -- a refused promotion -- left no trace on the finding
+                # at all, only a warning in a log.
+                **(
+                    {"tag_severity_requested": str(severity).strip().upper()}
+                    if lowered and severity is not None
+                    else {}
+                ),
             },
         )
 
 
-def _coerce_severity(value: object) -> Severity:
+def _parse_severity(value: object) -> Severity | None:
+    """The severity this value names, or None when it names none."""
     if isinstance(value, Severity):
         return value
-    if isinstance(value, str) and value in Severity.__members__:
-        return Severity(value)
-    return _DEFAULT_SEVERITY
+    if isinstance(value, str):
+        # The schema spells them lowercase; a notebook writes "HIGH".
+        name = value.strip().lower()
+        if name in Severity.__members__:
+            return Severity(name)
+    return None
+
+
+def _coerce_severity(value: object) -> Severity:
+    return _parse_severity(value) or _DEFAULT_SEVERITY

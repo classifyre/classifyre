@@ -796,6 +796,76 @@
         "tags": [
           "Sources"
         ]
+      },
+      "get": {
+        "description": "RUNNING while a test started by POST /sources/{id}/test/async is still going. Null when the source has never been tested.",
+        "operationId": "SourcesController_getConnectionTest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Source unique identifier",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The last connection test, or null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTestStatusDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source not found"
+          }
+        },
+        "summary": "The result of the last connection test",
+        "tags": [
+          "Sources"
+        ]
+      }
+    },
+    "/sources/{id}/test/async": {
+      "post": {
+        "description": "Returns immediately with status RUNNING; poll GET /sources/{id}/test for the answer. Use this rather than POST /sources/{id}/test wherever the test may be slow to start: on Kubernetes the test pod queues behind running scans, and one measured test returned after 422.5 s of which 3 s was the test itself. A second call while a test is already running joins that test instead of starting another.",
+        "operationId": "SourcesController_startConnectionTest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Source unique identifier",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Connection test started (or already running)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTestStatusDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source not found"
+          }
+        },
+        "summary": "Start a source connection test without waiting for it",
+        "tags": [
+          "Sources"
+        ]
       }
     },
     "/sources/{id}/runs": {
@@ -1321,6 +1391,51 @@
           }
         },
         "summary": "Get asset by ID",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/assets/{id}/referencing-findings": {
+      "get": {
+        "description": "An integrity check or a derived profile is its own asset that references the thing it is about, so the subject's own Findings tab can be empty while a finding points straight at it. Incoming asset-to-asset edges only, worst severity first, unresolved only.",
+        "operationId": "AssetsController_getReferencingFindings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Asset unique identifier",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Findings to return, 1–200. Defaults to 50.",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferencingFindingsResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Asset not found"
+          }
+        },
+        "summary": "Findings recorded on assets that point at this one",
         "tags": [
           "Assets"
         ]
@@ -3442,6 +3557,39 @@
           }
         },
         "summary": "Get finding statistics",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/findings/assets/severity-counts": {
+      "post": {
+        "description": "For a graph view that already has its nodes: how many unresolved findings each carries, by severity. POST because the id list does not belong in a query string. Ids beyond the first 500 are ignored.",
+        "operationId": "FindingsController_assetSeverityCounts",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetSeverityCountsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetSeverityCountsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unresolved finding counts per asset, for a set of assets",
         "tags": [
           "findings"
         ]
@@ -6035,6 +6183,7 @@
     },
     "/threads/{id}/entries": {
       "post": {
+        "description": "A STATEMENT entry revises the claim itself: the thread title becomes the first 200 characters of its body. Use NOTE for commentary, evidence or dated review remarks that must leave the title unchanged.",
         "operationId": "CaseThreadsController_addEntry",
         "parameters": [
           {
@@ -8067,6 +8216,38 @@
         ]
       }
     },
+    "/runners/{runnerId}/queue-position": {
+      "get": {
+        "description": "Place in this workspace's queue, whether the run is in the priority lane, how many scans are running across the deployment, and the concurrency limit. All nulls once the run has left the queue.",
+        "operationId": "CliRunnerController_getRunnerQueuePosition",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerQueuePositionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Why a queued run has not started yet",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
     "/runners/{runnerId}/logs": {
       "post": {
         "operationId": "CliRunnerController_searchRunnerLogs",
@@ -8138,7 +8319,8 @@
                 "RUNNING",
                 "COMPLETED",
                 "WARNING",
-                "ERROR"
+                "ERROR",
+                "STOPPED"
               ],
               "type": "string"
             }
@@ -8202,7 +8384,8 @@
                 "RUNNING",
                 "COMPLETED",
                 "WARNING",
-                "ERROR"
+                "ERROR",
+                "STOPPED"
               ],
               "type": "string"
             }
@@ -10556,6 +10739,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Duplicate detection is turned off for this workspace"
           }
         },
         "summary": "Recompute correlation for a single asset (on demand)",
@@ -10659,6 +10845,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Duplicate detection is turned off for this workspace"
           }
         },
         "summary": "Rebuild the review rollups from existing correlation data",
@@ -11376,6 +11565,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Embeddings are turned off"
           }
         },
         "summary": "Purge every stored vector for this workspace and re-embed the corpus from scratch",
@@ -11420,6 +11612,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Embeddings are turned off"
           }
         },
         "summary": "Reconcile stored findings and asset chunks into the configured embedding space",
@@ -11591,6 +11786,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Embeddings are turned off"
           }
         },
         "summary": "Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)",
@@ -11938,6 +12136,54 @@
         ]
       }
     },
+    "/maintenance/features": {
+      "get": {
+        "operationId": "MaintenanceController_listFeatures",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Workspace feature switches (embeddings, duplicate detection): state, how each was turned off, the data each owns and the queues held while off",
+        "tags": [
+          "maintenance"
+        ]
+      }
+    },
+    "/maintenance/features/{key}": {
+      "put": {
+        "operationId": "MaintenanceController_setFeature",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "description": "Malformed body"
+          },
+          "404": {
+            "description": "Unknown feature"
+          },
+          "409": {
+            "description": "The feature's data is being deleted right now"
+          }
+        },
+        "summary": "Turn a workspace feature on or off. Off holds its worker queues paused (every replica stops; the Workers tab cannot resume them) and either keeps its data (a pause — turning back on catches up) or, with deleteData, wipes it in the background (poll GET cleanup/runs/:runId). On resumes the queues and catches up: one full duplicate recompute, or an embedding backfill. Body: { enabled: boolean, deleteData?: boolean }. Allowed while the workspace is paused.",
+        "tags": [
+          "maintenance"
+        ]
+      }
+    },
     "/maintenance/overview": {
       "get": {
         "operationId": "MaintenanceController_overview",
@@ -12122,7 +12368,8 @@
                 "RUNNING",
                 "COMPLETED",
                 "WARNING",
-                "ERROR"
+                "ERROR",
+                "STOPPED"
               ]
             }
           }
@@ -12216,6 +12463,10 @@
                 "$ref": "#/components/schemas/BulkUpdateSourcesSamplingDto"
               }
             ]
+          },
+          "updatedBy": {
+            "type": "string",
+            "description": "Who made the change. Recorded on the SOURCE_CONFIG_CHANGED notification a sampling change raises."
           }
         }
       },
@@ -12261,6 +12512,10 @@
             "type": "boolean",
             "description": "Ignore the scan cache for every run started by this call.",
             "default": false
+          },
+          "triggeredBy": {
+            "type": "string",
+            "description": "Who started these runs, recorded as each run's triggeredBy. Defaults to 'bulk-run' so a run started this way is never anonymous."
           }
         }
       },
@@ -12687,6 +12942,45 @@
             "type": "string",
             "example": "SLACK",
             "description": "Source type reported by the CLI test result."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "ConnectionTestStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "SUCCESS",
+              "FAILURE"
+            ],
+            "description": "RUNNING until the test answers. A test with no result after 15 minutes is reported FAILURE rather than left spinning."
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true,
+            "description": "The connector's own message, once it has one."
+          },
+          "result": {
+            "type": "object",
+            "nullable": true,
+            "description": "The full CLI test result, in the shape the synchronous endpoint returns."
+          },
+          "triggeredBy": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -13143,6 +13437,94 @@
           "status",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "ReferencingFindingDto": {
+        "type": "object",
+        "properties": {
+          "findingId": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "FALSE_POSITIVE",
+              "RESOLVED",
+              "IGNORED"
+            ]
+          },
+          "findingType": {
+            "type": "string"
+          },
+          "matchedContent": {
+            "type": "string",
+            "nullable": true
+          },
+          "detectedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "viaAssetId": {
+            "type": "string",
+            "description": "The asset the finding is actually recorded on."
+          },
+          "viaAssetName": {
+            "type": "string"
+          },
+          "relationType": {
+            "type": "string",
+            "description": "The edge that connects that asset to this one."
+          }
+        },
+        "required": [
+          "findingId",
+          "severity",
+          "status",
+          "findingType",
+          "matchedContent",
+          "detectedAt",
+          "viaAssetId",
+          "viaAssetName",
+          "relationType"
+        ]
+      },
+      "ReferencingFindingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "referencingAssets": {
+            "type": "number",
+            "description": "How many assets point at this one."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when there were more incoming edges or findings than this response carries."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReferencingFindingDto"
+            }
+          }
+        },
+        "required": [
+          "assetId",
+          "referencingAssets",
+          "truncated",
+          "items"
         ]
       },
       "LiveQueryResponseDto": {
@@ -15661,6 +16043,55 @@
           "ids"
         ]
       },
+      "AssetSeverityCountsRequestDto": {
+        "type": "object",
+        "properties": {
+          "assetIds": {
+            "description": "Up to 500 asset ids. Anything beyond that is ignored.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "assetIds"
+        ]
+      },
+      "AssetSeverityCountsItemDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "total": {
+            "type": "number"
+          },
+          "severityCounts": {
+            "type": "object",
+            "description": "Severity (uppercase) to count, omitting severities with none."
+          }
+        },
+        "required": [
+          "assetId",
+          "total",
+          "severityCounts"
+        ]
+      },
+      "AssetSeverityCountsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetSeverityCountsItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
       "AssetFindingDetectorCountDto": {
         "type": "object",
         "properties": {
@@ -16095,7 +16526,8 @@
               "RUNNING",
               "COMPLETED",
               "WARNING",
-              "ERROR"
+              "ERROR",
+              "STOPPED"
             ]
           },
           "triggerType": {
@@ -18352,6 +18784,11 @@
           },
           "closedBy": {
             "type": "string"
+          },
+          "keepInquiries": {
+            "type": "boolean",
+            "description": "Keep the linked inquiries active. By default closing archives them; an answered case whose inquiries are standing checks (they catch next year's occurrence) should keep them.",
+            "default": false
           }
         },
         "required": [
@@ -18479,6 +18916,10 @@
           "missing": {
             "type": "boolean",
             "description": "True when the underlying row no longer exists"
+          },
+          "fanOut": {
+            "type": "number",
+            "description": "Total edges on this node, present only when it exceeded the lineage hub threshold. The node is drawn but the walk did not continue through it — open it on its own page to see what it connects."
           }
         },
         "required": [
@@ -19815,7 +20256,8 @@
               "STATEMENT",
               "STATUS_CHANGE",
               "CONFIDENCE_CHANGE"
-            ]
+            ],
+            "description": "STATEMENT replaces the thread title with the first 200 characters of `body`; NOTE leaves it unchanged."
           },
           "body": {
             "type": "string"
@@ -20277,6 +20719,12 @@
             "minimum": 1,
             "maximum": 3,
             "default": 2
+          },
+          "hubFanOut": {
+            "type": "number",
+            "description": "Edges above which a node is drawn but not walked through. A hub table feeding hundreds of assets otherwise makes depth 2 return the whole namespace. 0 turns the guard off. Defaults to 40.",
+            "minimum": 0,
+            "default": 40
           },
           "collapseContainers": {
             "type": "boolean",
@@ -22079,6 +22527,16 @@
             "type": "boolean",
             "example": false
           },
+          "heldBy": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "embeddings",
+              "duplicates"
+            ],
+            "example": null,
+            "description": "Workspace feature holding this queue paused because it is turned off (Settings → Cleanup › Features), or null. A held queue cannot be resumed here — resuming answers 409 — and turning the feature back on releases it."
+          },
           "activeJobs": {
             "type": "number",
             "example": 0
@@ -22123,6 +22581,7 @@
           "queue",
           "status",
           "paused",
+          "heldBy",
           "activeJobs",
           "queuedCount",
           "deferredCount",
@@ -22313,7 +22772,8 @@
               "RUNNING",
               "COMPLETED",
               "WARNING",
-              "ERROR"
+              "ERROR",
+              "STOPPED"
             ]
           },
           "executionMode": {
@@ -22853,6 +23313,56 @@
           "total"
         ]
       },
+      "RunnerQueuePositionDto": {
+        "type": "object",
+        "properties": {
+          "runnerId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETED",
+              "WARNING",
+              "ERROR",
+              "STOPPED"
+            ]
+          },
+          "positionInNamespace": {
+            "type": "number",
+            "nullable": true,
+            "description": "1-based place in this workspace's own queue. Null when the run is not queued."
+          },
+          "priority": {
+            "type": "boolean",
+            "description": "True when this run is in the lane that goes ahead of scheduled sweeps: an operator-triggered run, or a source that has never completed one."
+          },
+          "runningNow": {
+            "type": "number",
+            "description": "Scans running across the whole deployment. -1 when that count could not be read, which is not the same as zero."
+          },
+          "concurrencyLimit": {
+            "type": "number",
+            "description": "Concurrent scans this deployment allows. 0 means unlimited."
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human-readable explanation, or null when the run is not queued."
+          }
+        },
+        "required": [
+          "runnerId",
+          "status",
+          "positionInNamespace",
+          "priority",
+          "runningNow",
+          "concurrencyLimit",
+          "reason"
+        ]
+      },
       "SearchRunnerLogsBodyDto": {
         "type": "object",
         "properties": {
@@ -23103,7 +23613,8 @@
                 "RUNNING",
                 "COMPLETED",
                 "WARNING",
-                "ERROR"
+                "ERROR",
+                "STOPPED"
               ]
             }
           },
@@ -23213,7 +23724,8 @@
               "RUNNING",
               "COMPLETED",
               "WARNING",
-              "ERROR"
+              "ERROR",
+              "STOPPED"
             ]
           },
           "executionMode": {
@@ -26434,6 +26946,10 @@
       "CorrelationConfigResponseDto": {
         "type": "object",
         "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether duplicate detection runs in this workspace (Settings → Cleanup › Features). Tuning can be saved while it is off; it takes effect in the full recompute that runs when it is turned back on."
+          },
           "defaultWeight": {
             "type": "number",
             "description": "Fallback weight for any unlisted label"
@@ -26468,6 +26984,7 @@
           }
         },
         "required": [
+          "enabled",
           "defaultWeight",
           "relatedMin",
           "duplicateMin",
@@ -28307,7 +28824,16 @@
         "properties": {
           "enabled": {
             "type": "boolean",
-            "description": "Semantic embedding is on for this workspace"
+            "description": "Semantic embedding is on for this workspace. Read-only here: it is turned on or off in Settings → Cleanup › Features (PUT /maintenance/features/embeddings)."
+          },
+          "disabledMode": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "kept",
+              "deleted"
+            ],
+            "description": "How embeddings were turned off: \"kept\" is a pause (vectors, rankings and text chunks stay, and scans keep saving chunks), \"deleted\" purged all of it. Null while on."
           },
           "provider": {
             "type": "string",
@@ -28441,10 +28967,6 @@
       "UpdateEmbeddingSettingsDto": {
         "type": "object",
         "properties": {
-          "enabled": {
-            "type": "boolean",
-            "nullable": true
-          },
           "provider": {
             "type": "string",
             "nullable": true,

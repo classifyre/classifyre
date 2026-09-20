@@ -98,8 +98,19 @@ export class EmbeddingAiProviderOptionDto {
 
 @ApiExtraModels(EmbeddingSettingValueDto)
 export class EmbeddingSettingsResponseDto {
-  @ApiProperty({ description: 'Semantic embedding is on for this workspace' })
+  @ApiProperty({
+    description:
+      'Semantic embedding is on for this workspace. Read-only here: it is turned on or off in Settings → Cleanup › Features (PUT /maintenance/features/embeddings).',
+  })
   enabled!: boolean;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    enum: ['kept', 'deleted'],
+    description:
+      'How embeddings were turned off: "kept" is a pause (vectors, rankings and text chunks stay, and scans keep saving chunks), "deleted" purged all of it. Null while on.',
+  })
+  disabledMode?: 'kept' | 'deleted' | null;
 
   @ApiProperty({
     description: 'transformers-js (local inference) or openai-compatible',
@@ -173,7 +184,10 @@ export class EmbeddingSettingsResponseDto {
  * "use default" control sends.
  */
 export class UpdateEmbeddingSettingsDto {
-  @ApiPropertyOptional({ nullable: true }) enabled?: boolean | null;
+  // No `enabled` here: the on/off switch lives with the other feature switches
+  // (PUT /maintenance/features/embeddings), which is also what holds the
+  // embedding queues paused and offers keeping or deleting the corpus. A patch
+  // carrying it is refused rather than half-applied.
   @ApiPropertyOptional({
     nullable: true,
     enum: ['transformers-js', 'openai-compatible'],

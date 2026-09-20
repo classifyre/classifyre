@@ -18,6 +18,8 @@ import {
 import {
   CORRELATION_QUEUE,
   CORRELATION_SCAN_COALESCE_SECONDS,
+  SCAN_HANDOFF_QUEUE,
+  scanHandoffJobOptions,
 } from '../correlation/correlation.constants';
 import { AUTO_SCHEDULE_QUEUE } from '../scheduler/auto-schedule.constants';
 import { ClsService } from 'nestjs-cls';
@@ -86,6 +88,8 @@ import {
   BoundedOutput,
   type BoundedOutputOptions,
 } from '../utils/bounded-output';
+import { parseCliTestOutput } from '../utils/cli-test-output';
+import { MANUAL_STOP_MESSAGE } from './manual-stop';
 import {
   describeDegradation,
   summarizeOutcomeFailures,
@@ -134,6 +138,7 @@ const TERMINAL_RUNNER_STATUSES = new Set<RunnerStatus>([
   RunnerStatus.COMPLETED,
   RunnerStatus.WARNING,
   RunnerStatus.ERROR,
+  RunnerStatus.STOPPED,
 ]);
 
 /**
@@ -144,6 +149,31 @@ const TERMINAL_RUNNER_STATUSES = new Set<RunnerStatus>([
  * it — and it halves the time a multi-source workspace needs for a full sweep.
  */
 const DEFAULT_MAX_CONCURRENT_RUNNERS = 2;
+
+/**
+ * After this long with no answer, a RUNNING connection test is reported as
+ * lost rather than left spinning. Generous because the wait it covers is a
+ * Kubernetes pod queueing behind a scan, not the test itself.
+ */
+const CONNECTION_TEST_STALE_MS = 15 * 60 * 1000;
+
+/**
+ * How long after a stop the "an operator did this" marker is kept.
+ *
+ * Long enough to outlast a watch loop that was mid-poll when the execution was
+ * torn down, short enough that a re-run of the same id could never inherit it.
+ */
+const STOP_GRACE_MS = 60_000;
+
+/** The stored outcome of a connection test, as `Source.connectionTest` holds it. */
+export interface ConnectionTestRecord {
+  status: 'RUNNING' | 'SUCCESS' | 'FAILURE';
+  startedAt: string | null;
+  finishedAt: string | null;
+  message: string | null;
+  result: Record<string, unknown> | null;
+  triggeredBy: string | null;
+}
 
 /**
  * How long a RUNNING runner may have no execution before it counts as orphaned.
@@ -190,6 +220,18 @@ export class CliRunnerService {
     { schema?: string; done: Promise<void> }
   >();
   private readonly stoppingSchemas = new Set<string>();
+
+  /**
+   * Runners an operator has asked to stop, from the moment the request is
+   * accepted until the stop is recorded.
+   *
+   * The DB status alone is not enough: `stopRunner` tears the execution down
+   * before it can write STOPPED, and the teardown's own "the Job is gone"
+   * lands on `failRunner` in between. This marker closes that window. It is
+   * in-memory because the execution it guards lives in this process too — the
+   * same replica that launched the run watches it.
+   */
+  private readonly stoppingRunners = new Set<string>();
 
   constructor(
     private prisma: PrismaService,
@@ -353,24 +395,52 @@ export class CliRunnerService {
       // Correlation (DUPLICATES FINDER AGENT) for the same scan — runs the
       // deterministic duplicate detection and then hands off to the autopilot
       // cycle, so inquiry/case agents can consider the duplicate/cluster
-      // results.
-      await boss.send(
-        CORRELATION_QUEUE,
-        { sourceId, runnerId },
-        {
-          singletonKey: `correlation:${sourceId}`,
-          singletonSeconds: CORRELATION_SCAN_COALESCE_SECONDS,
-          singletonNextSlot: true,
-          retryLimit: 2,
-          retryDelay: 60,
-          retryBackoff: true,
-          expireInSeconds: 3 * 3600,
-        },
-      );
+      // results. With duplicate detection turned off its queue is held
+      // paused, so the scan goes straight to the hand-off instead — the agents
+      // must not stop hearing about scans because duplicates did.
+      if (await this.duplicateDetectionEnabled()) {
+        await boss.send(
+          CORRELATION_QUEUE,
+          { sourceId, runnerId },
+          {
+            singletonKey: `correlation:${sourceId}`,
+            singletonSeconds: CORRELATION_SCAN_COALESCE_SECONDS,
+            singletonNextSlot: true,
+            retryLimit: 2,
+            retryDelay: 60,
+            retryBackoff: true,
+            expireInSeconds: 3 * 3600,
+          },
+        );
+      } else {
+        await boss.send(
+          SCAN_HANDOFF_QUEUE,
+          { sourceId, runnerId },
+          scanHandoffJobOptions(sourceId),
+        );
+      }
     } catch (error) {
       this.logger.warn(
         `Failed to enqueue question matching for source ${sourceId}: ${error instanceof Error ? error.message : String(error)}`,
       );
+    }
+  }
+
+  /**
+   * Read straight from the config row, once per finished scan: this service
+   * sits below the correlation module, and a scan completion is rare enough
+   * that a cached switch would buy nothing. Unreadable means on — the
+   * behaviour every workspace had before the switch existed.
+   */
+  private async duplicateDetectionEnabled(): Promise<boolean> {
+    try {
+      const row = await this.prisma.correlationConfig.findUnique({
+        where: { id: 1 },
+        select: { enabled: true },
+      });
+      return row?.enabled ?? true;
+    } catch {
+      return true;
     }
   }
 
@@ -2215,6 +2285,138 @@ export class CliRunnerService {
     return filepath;
   }
 
+  /**
+   * Start a connection test in the background and answer immediately.
+   *
+   * The synchronous endpoint holds the HTTP request open for the whole test.
+   * That is fine for a connector that answers in three seconds and useless on
+   * Kubernetes, where the test pod first has to be scheduled: one measured run
+   * returned after 422.5 s, of which the test itself was 3 s and the rest was
+   * `Pending` behind a running scan. Any ingress with a 60 s timeout turns that
+   * into a failed request while the job is still running (field report P2).
+   *
+   * The answer is written to `Source.connectionTest`, not held in memory, so a
+   * poll landing on another API replica — or after a restart — still finds it.
+   * One record per source: a second test of the same source while one is in
+   * flight is the same question, so it joins the one already running.
+   */
+  async startConnectionTest(
+    sourceId: string,
+    triggeredBy?: string,
+  ): Promise<ConnectionTestRecord> {
+    const source = await this.prisma.source.findUnique({
+      where: { id: sourceId },
+      select: { id: true, connectionTest: true },
+    });
+    if (!source) throw new NotFoundException(`Source ${sourceId} not found`);
+
+    const existing = this.readConnectionTest(source.connectionTest);
+    if (existing?.status === 'RUNNING' && !this.testHasGoneStale(existing)) {
+      return existing;
+    }
+
+    const record: ConnectionTestRecord = {
+      status: 'RUNNING',
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+      message: null,
+      result: null,
+      triggeredBy: triggeredBy ?? null,
+    };
+    await this.writeConnectionTest(sourceId, record);
+
+    // Deliberately not awaited: the point of this endpoint is to return now.
+    // Every failure path below ends in a stored FAILURE, so a poll always
+    // reaches a terminal state rather than hanging on RUNNING forever.
+    void (async () => {
+      try {
+        const result = await this.testConnection(sourceId);
+        await this.writeConnectionTest(sourceId, {
+          ...record,
+          status: result?.status === 'SUCCESS' ? 'SUCCESS' : 'FAILURE',
+          finishedAt: new Date().toISOString(),
+          message: typeof result?.message === 'string' ? result.message : null,
+          result,
+        });
+      } catch (error) {
+        await this.writeConnectionTest(sourceId, {
+          ...record,
+          status: 'FAILURE',
+          finishedAt: new Date().toISOString(),
+          message: String((error as Error)?.message ?? error),
+          result: null,
+        }).catch(() => undefined);
+      }
+    })();
+
+    return record;
+  }
+
+  /** The stored result of the last connection test, or null when never tested. */
+  async getConnectionTest(
+    sourceId: string,
+  ): Promise<ConnectionTestRecord | null> {
+    const source = await this.prisma.source.findUnique({
+      where: { id: sourceId },
+      select: { id: true, connectionTest: true },
+    });
+    if (!source) throw new NotFoundException(`Source ${sourceId} not found`);
+
+    const record = this.readConnectionTest(source.connectionTest);
+    if (!record) return null;
+    if (record.status === 'RUNNING' && this.testHasGoneStale(record)) {
+      // The replica that started it is gone. Saying so beats a spinner that
+      // never resolves, which is the failure mode this endpoint replaced.
+      return {
+        ...record,
+        status: 'FAILURE',
+        finishedAt: new Date().toISOString(),
+        message: `No result after ${Math.round(CONNECTION_TEST_STALE_MS / 60_000)} minutes; the test was lost (an API restart, or a job that never started).`,
+      };
+    }
+    return record;
+  }
+
+  private readConnectionTest(value: unknown): ConnectionTestRecord | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+    const raw = value as Record<string, unknown>;
+    const status = raw.status;
+    if (status !== 'RUNNING' && status !== 'SUCCESS' && status !== 'FAILURE') {
+      return null;
+    }
+    return {
+      status,
+      startedAt: typeof raw.startedAt === 'string' ? raw.startedAt : null,
+      finishedAt: typeof raw.finishedAt === 'string' ? raw.finishedAt : null,
+      message: typeof raw.message === 'string' ? raw.message : null,
+      result:
+        raw.result &&
+        typeof raw.result === 'object' &&
+        !Array.isArray(raw.result)
+          ? (raw.result as Record<string, unknown>)
+          : null,
+      triggeredBy: typeof raw.triggeredBy === 'string' ? raw.triggeredBy : null,
+    };
+  }
+
+  private testHasGoneStale(record: ConnectionTestRecord): boolean {
+    const started = record.startedAt ? Date.parse(record.startedAt) : NaN;
+    if (!Number.isFinite(started)) return true;
+    return Date.now() - started > CONNECTION_TEST_STALE_MS;
+  }
+
+  private async writeConnectionTest(
+    sourceId: string,
+    record: ConnectionTestRecord,
+  ): Promise<void> {
+    await this.prisma.source.update({
+      where: { id: sourceId },
+      data: { connectionTest: record as unknown as Prisma.InputJsonValue },
+    });
+  }
+
   async testConnection(sourceId: string): Promise<Record<string, any>> {
     const source = await this.prisma.source.findUnique({
       where: { id: sourceId },
@@ -2324,32 +2526,18 @@ export class CliRunnerService {
       config,
       this.resolveOutputRestUrl('kubernetes'),
     );
-    const output = result.output || '';
-    const lines = output.split(/\r?\n/);
-
-    let payload: Record<string, any> = {
+    // The result is a multi-line JSON document among log lines; see
+    // parseCliTestOutput for why line-by-line parsing never found it.
+    const { result: parsed, otherLines: nonJsonLines } = parseCliTestOutput(
+      result.output || '',
+    );
+    const payload: Record<string, any> = parsed ?? {
       status: result.exitCode === 0 ? 'SUCCESS' : 'FAILURE',
       message:
         result.exitCode === 0
           ? 'Connection test completed.'
           : 'Connection test failed.',
     };
-
-    const nonJsonLines: string[] = [];
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        continue;
-      }
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          payload = parsed as Record<string, any>;
-        }
-      } catch {
-        nonJsonLines.push(trimmed);
-      }
-    }
 
     if (result.exitCode !== 0) {
       if (payload.status !== 'FAILURE') {
@@ -3147,10 +3335,24 @@ export class CliRunnerService {
   ) {
     const runnerRef = await this.prisma.runner.findUnique({
       where: { id: runnerId },
-      select: { sourceId: true },
+      select: { sourceId: true, status: true },
     });
     if (!runnerRef) {
       this.logger.warn(`Runner ${runnerId} disappeared before it could fail`);
+      return;
+    }
+    // A stop tears the execution down, and the teardown then reports what it
+    // always reports: the process is gone, the Kubernetes Job is not found.
+    // That is the stop's own consequence, not a second, independent failure,
+    // and acting on it overwrote STOPPED with ERROR and charged the source a
+    // consecutive failure for a decision its operator made (field report P8).
+    if (
+      runnerRef.status === RunnerStatus.STOPPED ||
+      this.stoppingRunners.has(runnerId)
+    ) {
+      this.logger.log(
+        `Runner ${runnerId} was stopped by an operator; not recording "${errorMessage}" as a failure`,
+      );
       return;
     }
 
@@ -3818,6 +4020,33 @@ export class CliRunnerService {
       );
     }
 
+    // Claimed before anything is torn down: from here on, the teardown's own
+    // "the process is gone" must not be read as a failure (see failRunner).
+    this.stoppingRunners.add(runnerId);
+    try {
+      return await this.performStop(runnerId, runner);
+    } finally {
+      // Held a little past the transition: a watch loop mid-poll when the Job
+      // vanished still resolves after the row says STOPPED, and would
+      // otherwise arrive just too late to be recognised.
+      const timer = setTimeout(
+        () => this.stoppingRunners.delete(runnerId),
+        STOP_GRACE_MS,
+      );
+      timer.unref?.();
+    }
+  }
+
+  private async performStop(
+    runnerId: string,
+    runner: {
+      sourceId: string;
+      status: RunnerStatus;
+      executionMode: RunnerExecutionMode | null;
+      jobName: string | null;
+      jobNamespace: string | null;
+    },
+  ) {
     // A PENDING runner is still waiting in the queue: there is no process or
     // Kubernetes Job to tear down, so cancelling it is only the terminal
     // transition below.
@@ -3851,14 +4080,19 @@ export class CliRunnerService {
           `Failed to finalize logs for runner ${runnerId}: ${String(err)}`,
         );
       });
+    // STOPPED, not ERROR: an operator's decision is not a failed scan. As
+    // ERROR it backed the source off, counted against its failure streak and
+    // showed up on every dashboard that counts errors — one namespace had a
+    // source paused "after 11 consecutive failed scans" partly this way
+    // (GENESIS field report P8).
     await this.transitionRunnerToTerminalState({
       runnerId,
       sourceId: runner.sourceId,
-      sourceStatus: RunnerStatus.ERROR,
+      sourceStatus: RunnerStatus.STOPPED,
       runnerData: {
-        status: RunnerStatus.ERROR,
+        status: RunnerStatus.STOPPED,
         completedAt: new Date(),
-        errorMessage: 'Manually stopped',
+        errorMessage: MANUAL_STOP_MESSAGE,
       },
     });
 
@@ -3927,6 +4161,109 @@ export class CliRunnerService {
     });
 
     return { message: 'Runner deleted' };
+  }
+
+  /**
+   * Why a queued run has not started, in the terms the queue actually uses.
+   *
+   * The UI showed a PENDING run with no position and no reason, which is how a
+   * run waiting behind another tenant's 13.9-hour sweep looked identical to one
+   * about to start (field report P1). Deliberately a separate call rather than
+   * a field on `getRunnerStatus`: that one is re-read on every websocket
+   * update, and this counts rows in every namespace.
+   */
+  async getRunnerQueuePosition(runnerId: string): Promise<{
+    runnerId: string;
+    status: RunnerStatus;
+    /** 1-based place in this workspace's own queue; null when not queued. */
+    positionInNamespace: number | null;
+    /** True when this run is in the lane that goes ahead of scheduled sweeps. */
+    priority: boolean;
+    runningNow: number;
+    /** Concurrent scans this deployment allows. 0 means unlimited. */
+    concurrencyLimit: number;
+    reason: string | null;
+  }> {
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: {
+        id: true,
+        status: true,
+        sourceId: true,
+        triggeredAt: true,
+        triggerType: true,
+      },
+    });
+    if (!runner) {
+      throw new NotFoundException(`Runner with ID ${runnerId} not found`);
+    }
+
+    const concurrencyLimit = this.resolveMaxConcurrentRunners();
+    if (runner.status !== RunnerStatus.PENDING) {
+      return {
+        runnerId,
+        status: runner.status,
+        positionInNamespace: null,
+        priority: false,
+        runningNow: 0,
+        concurrencyLimit,
+        reason: null,
+      };
+    }
+
+    // Lane 0 is "someone is waiting at a screen": an operator-triggered run,
+    // or a source that has never completed one. Same rule the queue applies.
+    const hasCompleted = await this.prisma.runner.findFirst({
+      where: { sourceId: runner.sourceId, status: RunnerStatus.COMPLETED },
+      select: { id: true },
+    });
+    const priority =
+      runner.triggerType === TriggerType.MANUAL ||
+      runner.triggerType === TriggerType.API ||
+      !hasCompleted;
+
+    const [ahead, runningNow] = await Promise.all([
+      this.prisma.runner.count({
+        where: {
+          status: RunnerStatus.PENDING,
+          startedAt: null,
+          triggeredAt: { lt: runner.triggeredAt },
+        },
+      }),
+      this.countRunningRunners(),
+    ]);
+
+    // countRunningRunners answers MAX_SAFE_INTEGER when the cross-namespace
+    // count fails, which is its way of saying "hold everything". Reporting
+    // that number to a user would be worse than admitting it is unknown.
+    const countKnown = runningNow < Number.MAX_SAFE_INTEGER;
+
+    const parts: string[] = [];
+    if (!countKnown) {
+      parts.push('the instance-wide scan count is temporarily unreadable');
+    } else if (concurrencyLimit > 0 && runningNow >= concurrencyLimit) {
+      parts.push(
+        `${runningNow} scan(s) running across the instance (limit ${concurrencyLimit})`,
+      );
+    }
+    if (ahead > 0) {
+      parts.push(`${ahead} run(s) queued ahead of it in this workspace`);
+    }
+    parts.push(
+      priority
+        ? 'it is in the priority lane, ahead of scheduled sweeps'
+        : 'scheduled sweeps wait behind manual and first runs',
+    );
+
+    return {
+      runnerId,
+      status: runner.status,
+      positionInNamespace: ahead + 1,
+      priority,
+      runningNow: countKnown ? runningNow : -1,
+      concurrencyLimit,
+      reason: parts.join('; '),
+    };
   }
 
   getRunnerStatus(runnerId: string) {
@@ -4641,11 +4978,16 @@ export class CliRunnerService {
   }
 
   /**
-   * Promote the runner that has waited longest in ANY namespace. Resolves
-   * whether a runner was claimed.
+   * Promote the next runner from ANY namespace. Resolves whether one was
+   * claimed.
    *
    * The cap is instance-wide, so the queue must be too: promoting only from the
    * namespace whose run just finished stranded every other namespace's queue.
+   * Which run comes next is the registry's fairness policy — lane first, then
+   * the namespace served longest ago (see `preferQueued`) — not whichever
+   * ticket happens to be oldest, which let one tenant's re-enqueuing sweep
+   * hold every slot (field report P1).
+   *
    * The claim and launch then run inside the queued runner's own namespace
    * context, exactly as a same-namespace dequeue always did.
    */
@@ -4655,20 +4997,20 @@ export class CliRunnerService {
     }
     if (!(await this.canStartNewRunner())) return false;
 
-    let oldest: Awaited<
-      ReturnType<NamespaceRegistryService['findOldestPendingRunner']>
+    let next: Awaited<
+      ReturnType<NamespaceRegistryService['findNextPendingRunner']>
     >;
     try {
-      oldest = await this.namespaceRegistry.findOldestPendingRunner();
+      next = await this.namespaceRegistry.findNextPendingRunner();
     } catch (error) {
       this.logger.warn(
         `Cross-namespace pending lookup failed, dequeuing locally: ${String(error)}`,
       );
       return this.dequeuePendingRunnerInCurrentNamespace();
     }
-    if (!oldest) return false;
+    if (!next) return false;
 
-    const target = oldest;
+    const target = next;
     if (this.cls.get<string>(CLS_SCHEMA) === target.namespace.schemaName) {
       return this.dequeuePendingRunnerInCurrentNamespace(target.runnerId);
     }

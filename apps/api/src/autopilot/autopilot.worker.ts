@@ -1062,8 +1062,9 @@ export class AutopilotWorker {
    */
   private async evidenceAnalysisBusy(): Promise<boolean> {
     try {
-      const status = await this.embeddings.status();
-      return (status.pendingEmbedJobs ?? 0) > 0;
+      // False while embeddings are turned off: their paused backlog will not
+      // drain, and waiting on it would park every evidence-gated agent.
+      return await this.embeddings.analysisPending();
     } catch {
       // Embeddings unconfigured or not ready is not a reason to hold the
       // cycle: an instance with no semantic stack still needs its agents.

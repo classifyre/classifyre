@@ -21,12 +21,6 @@ import { mapValues } from '../runtime';
 export interface UpdateEmbeddingSettingsDto {
     /**
      * 
-     * @type {boolean}
-     * @memberof UpdateEmbeddingSettingsDto
-     */
-    enabled?: boolean | null;
-    /**
-     * 
      * @type {string}
      * @memberof UpdateEmbeddingSettingsDto
      */
@@ -167,7 +161,6 @@ export function UpdateEmbeddingSettingsDtoFromJSONTyped(json: any, ignoreDiscrim
     }
     return {
         
-        'enabled': json['enabled'] == null ? undefined : json['enabled'],
         'provider': json['provider'] == null ? undefined : json['provider'],
         'model': json['model'] == null ? undefined : json['model'],
         'revision': json['revision'] == null ? undefined : json['revision'],
@@ -199,7 +192,6 @@ export function UpdateEmbeddingSettingsDtoToJSONTyped(value?: UpdateEmbeddingSet
 
     return {
         
-        'enabled': value['enabled'],
         'provider': value['provider'],
         'model': value['model'],
         'revision': value['revision'],

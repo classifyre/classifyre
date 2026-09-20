@@ -36,10 +36,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import Link from "next/link";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import { useServerConfig } from "@/components/server-config-provider";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
+import { FEATURE_SWITCHES_PATH } from "@/components/feature-off-notice";
+import { useNsPath } from "@/lib/ns-path";
 
 const REFRESH_MS = 5_000;
 
@@ -124,8 +127,14 @@ export function WorkerQueuesCard() {
             : t("settings.workers.pausedToast"),
         );
         await load();
-      } catch {
-        toast.error(t("settings.workers.pauseFailedToast"));
+      } catch (error) {
+        // A held queue answers 409 with a message naming the feature; show
+        // it rather than a generic failure.
+        toast.error(
+          error instanceof Error && error.message
+            ? error.message
+            : t("settings.workers.pauseFailedToast"),
+        );
       } finally {
         setPending(null);
       }
@@ -318,6 +327,12 @@ function QueueRow({
   onPurge: () => void;
 }) {
   const { t } = useTranslation();
+  const nsPath = useNsPath();
+  // Paused by a feature switch (Settings → Cleanup), not by an operator: it
+  // cannot be resumed here, only by turning the feature back on.
+  const heldBy = queue.heldBy
+    ? t(`features.items.${queue.heldBy}.name` as TranslationKey)
+    : null;
   const elapsed = queue.instances
     .map((instance) => instance.elapsedMs)
     .filter((value): value is number => value != null)
@@ -359,7 +374,22 @@ function QueueRow({
               )}
             </TooltipContent>
           </Tooltip>
-          {queue.paused ? (
+          {heldBy ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  data-testid={`queue-held-${queue.queue}`}
+                  className="rounded-[3px] border-amber-500/40 bg-transparent px-1.5 text-[10px] font-mono uppercase tracking-[0.12em] text-amber-600 dark:text-amber-400"
+                >
+                  {t("features.workers.heldBy", { feature: heldBy })}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[260px] text-xs">
+                {t("features.workers.heldHint", { feature: heldBy })}
+              </TooltipContent>
+            </Tooltip>
+          ) : queue.paused ? (
             <Badge
               variant="outline"
               className="rounded-[3px] border-amber-500/40 bg-transparent px-1.5 text-[10px] font-mono uppercase tracking-[0.12em] text-amber-600 dark:text-amber-400"
@@ -439,6 +469,19 @@ function QueueRow({
               {t("settings.workers.purge")}
             </Button>
           ) : null}
+          {heldBy ? (
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-[4px] text-[11px]"
+            >
+              <Link href={nsPath(FEATURE_SWITCHES_PATH)}>
+                <Play className="mr-1 h-3 w-3" />
+                {t("features.workers.turnOn")}
+              </Link>
+            </Button>
+          ) : (
           <Button
             variant="outline"
             size="sm"
@@ -460,6 +503,7 @@ function QueueRow({
               </>
             )}
           </Button>
+          )}
         </div>
       </TableCell>
     </TableRow>

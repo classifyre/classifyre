@@ -52,6 +52,11 @@ describe('AutopilotWorker readiness and batch consumption', () => {
         pendingEmbedJobs: over.pendingEmbedJobs ?? 0,
         recalibrationScheduled: over.recalibrationScheduled ?? false,
       }),
+      // What the real service answers with embeddings on; switched-off
+      // workspaces are covered by EmbeddingQueueService.analysisPending.
+      analysisPending: jest
+        .fn()
+        .mockResolvedValue((over.pendingEmbedJobs ?? 0) > 0),
     };
     worker = new AutopilotWorker(
       prisma,
