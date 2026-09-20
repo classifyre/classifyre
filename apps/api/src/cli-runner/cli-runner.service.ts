@@ -214,6 +214,8 @@ const PROCESS_STARTED_AT = new Date(Date.now() - process.uptime() * 1000);
 @Injectable()
 export class CliRunnerService {
   private readonly logger = new Logger(CliRunnerService.name);
+  /** Runners whose Kubernetes log stream this process re-attached to after a restart. */
+  private readonly resumedLogStreams = new Set<string>();
   private runningProcessesByRunnerId = new Map<string, ChildProcess>();
   private readonly activeExecutions = new Map<
     string,
@@ -620,6 +622,11 @@ export class CliRunnerService {
 
       if (await this.isRunnerExecutionActive(runner)) {
         preservedActiveRunners += 1;
+        // The Job survived the restart, but the process that was streaming its
+        // output did not: without this the run finishes with no stored log at
+        // all (observed on 2026-09-20 — a 29-minute catalogue walk that spanned
+        // a reload has no log file, while its Job printed 16,996 lines).
+        this.resumeLogStreaming(runner);
         continue;
       }
 
@@ -672,6 +679,57 @@ export class CliRunnerService {
         `Pending runner promotion after startup failed: ${String(error)}`,
       ),
     );
+  }
+
+  /**
+   * Re-attach to a Kubernetes Job this process did not start, so the rest of
+   * its output is stored. The follow re-reads the Job's log from the start, so
+   * what the dead process had already written is restored too, not just the
+   * tail. Fire-and-forget: a run whose logs cannot be followed still completes.
+   */
+  private resumeLogStreaming(runner: {
+    id: string;
+    sourceId: string;
+    executionMode: RunnerExecutionMode | null;
+    jobName: string | null;
+    jobNamespace: string | null;
+  }): void {
+    if (
+      !this.kubernetesCliJobService ||
+      runner.executionMode !== RunnerExecutionMode.KUBERNETES ||
+      !runner.jobName ||
+      this.resumedLogStreams.has(runner.id)
+    ) {
+      return;
+    }
+    this.resumedLogStreams.add(runner.id);
+    const jobName = runner.jobName;
+    void (async () => {
+      try {
+        await this.runnerLogStorage.initializeRunner(
+          runner.sourceId,
+          runner.id,
+        );
+        await this.kubernetesCliJobService!.followExistingJob(
+          jobName,
+          (chunk) => this.appendLog(runner.id, chunk, 'combined'),
+          runner.jobNamespace ?? undefined,
+        );
+        await this.runnerLogStorage.flushLateChunks(runner.sourceId, runner.id);
+        await this.runnerLogStorage.finalizeRunner(runner.sourceId, runner.id);
+        this.logger.log(
+          `Re-attached to Job ${jobName} after a restart; its log is stored.`,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Could not follow Job ${jobName} after a restart: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      } finally {
+        this.resumedLogStreams.delete(runner.id);
+      }
+    })();
   }
 
   private isTerminalRunnerStatus(status: RunnerStatus): boolean {
@@ -1791,6 +1849,11 @@ export class CliRunnerService {
       this.encodeSamplingCursor(source),
     );
     const output = result.output || '';
+    // The CLI reports its own completion over REST while this loop is still
+    // reading the Job's output, so the run is often finalised before the last
+    // log read. Whatever arrived after that is held, not stored — fold it in
+    // now, or the tail of every Kubernetes run is silently missing.
+    await this.runnerLogStorage.flushLateChunks(source.id, runnerId);
     if (await this.shouldSkipRunnerFinalTransition(runnerId, result.exitCode)) {
       return;
     }
