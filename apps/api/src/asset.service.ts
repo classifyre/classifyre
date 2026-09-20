@@ -23,6 +23,7 @@ import {
 import { generateDetectionIdentity } from './utils/detection-identity';
 import { heapOverThreshold } from './utils/heap-guard';
 import { computeScopeFingerprint } from './utils/scope-fingerprint';
+import { assertKnownAssetSearchKeys } from './utils/asset-search-keys';
 import {
   CUSTOM_KEY_PREFIX,
   configuredDetectorKeysFromConfig,
@@ -1268,6 +1269,10 @@ export class AssetService {
     limit: number;
     ranking?: { mode: string; query: string; explained: boolean };
   }> {
+    // Fails closed like the findings search: an unrecognised key would widen
+    // the result instead of narrowing it, and the caller would read the whole
+    // corpus as the filtered answer.
+    assertKnownAssetSearchKeys(params);
     const assetFilters = params.assets ?? {};
     const findingFilters = params.findings ?? {};
     const page = params.page ?? {};
