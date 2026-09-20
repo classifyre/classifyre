@@ -1,13 +1,19 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'pg-boss';
-import { SourceScheduleMode, TriggerType } from '@prisma/client';
+import { RunnerStatus, SourceScheduleMode, TriggerType } from '@prisma/client';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from './pg-boss.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { CLS_SCHEMA } from '../namespace/namespace.constants';
+import { previousCronOccurrence } from './cron-window';
 
 const JOB_NAME_PREFIX = 'ingest-source-';
+/** Queue and cadence of the missed-window sweep (see catchUpMissedCronRuns). */
+const CATCH_UP_QUEUE = 'cron-catchup';
+const CATCH_UP_CRON = '*/10 * * * *';
+/** Runs one pass may start, so a long outage cannot enqueue a whole namespace. */
+const MAX_CATCH_UP_RUNS_PER_PASS = 5;
 
 function jobName(sourceId: string): string {
   return `${JOB_NAME_PREFIX}${sourceId}`;
@@ -36,6 +42,112 @@ export class SchedulerService {
    */
   async registerForNamespace(): Promise<void> {
     await this.syncSchedulesFromDatabase();
+    await this.registerCatchUpSchedule();
+    // A window missed while this process was down is gone from pg-boss, so the
+    // first thing a booting scheduler owes its sources is a look backwards.
+    await this.catchUpMissedCronRuns();
+  }
+
+  /**
+   * Re-check for missed windows on a timer as well as at boot: a window can
+   * also pass while the source is already running, while the namespace is
+   * paused, or while the single scan slot is held by another namespace.
+   */
+  private async registerCatchUpSchedule(): Promise<void> {
+    const boss = await this.getBoss();
+    const key = this.queueKey(CATCH_UP_QUEUE);
+    if (!this.registeredQueues.has(key)) {
+      await boss.createQueue(CATCH_UP_QUEUE);
+      await this.pgBossService.work(
+        CATCH_UP_QUEUE,
+        { localConcurrency: 1 },
+        () => this.catchUpMissedCronRuns(),
+      );
+      this.registeredQueues.add(key);
+    }
+    await boss.schedule(CATCH_UP_QUEUE, CATCH_UP_CRON, {}, { tz: 'UTC' });
+  }
+
+  /**
+   * Start one run for each CRON source whose last window passed unserved.
+   *
+   * pg-boss only fires a cron while a scheduler is listening at that exact
+   * minute; nothing replays a window missed while the instance was down. On an
+   * instance that is not up around the clock that turns "daily at 06:15" into
+   * "never": the GENESIS namespaces sat 25 hours stale with every schedule
+   * enabled, because the pods were down at 04:15 UTC and came up at 07:49.
+   *
+   * One run per source per pass, oldest miss first, capped — a source that has
+   * missed thirty windows needs one run, not thirty, and a namespace that has
+   * been down for a week must not enqueue its whole catalogue at once.
+   */
+  async catchUpMissedCronRuns(): Promise<{ started: number }> {
+    const sources = await this.prisma.source.findMany({
+      where: {
+        scheduleEnabled: true,
+        scheduleMode: SourceScheduleMode.CRON,
+        scheduleCron: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        scheduleCron: true,
+        scheduleTimezone: true,
+        lastRunAt: true,
+        runnerStatus: true,
+      },
+    });
+
+    const due: Array<{ id: string; name: string; missedAt: Date }> = [];
+    for (const source of sources) {
+      // In flight already: the window is being served, or is queued behind the
+      // scan slot. Either way this pass has nothing to add.
+      if (
+        source.runnerStatus === RunnerStatus.RUNNING ||
+        source.runnerStatus === RunnerStatus.PENDING
+      ) {
+        continue;
+      }
+      const missedAt = previousCronOccurrence(
+        source.scheduleCron as string,
+        source.scheduleTimezone ?? 'UTC',
+      );
+      if (!missedAt) continue;
+      if (source.lastRunAt && source.lastRunAt >= missedAt) continue;
+      due.push({ id: source.id, name: source.name, missedAt });
+    }
+
+    due.sort((a, b) => a.missedAt.getTime() - b.missedAt.getTime());
+
+    let started = 0;
+    for (const source of due.slice(0, MAX_CATCH_UP_RUNS_PER_PASS)) {
+      try {
+        await this.cliRunnerService.startRun(
+          source.id,
+          TriggerType.SCHEDULED,
+          'Scheduler (catch-up)',
+        );
+        started += 1;
+        this.logger.log(
+          `Catch-up run for "${source.name}": its ${source.missedAt.toISOString()} ` +
+            `window passed while nothing was scheduling.`,
+        );
+      } catch (error) {
+        // Paused namespace, source already claimed, or a cap reached: all
+        // reasons to leave it for the next pass rather than fail the sweep.
+        this.logger.warn(
+          `Catch-up run for source ${source.id} not started: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+    if (due.length > 0) {
+      this.logger.log(
+        `Cron catch-up: ${started} run(s) started of ${due.length} source(s) with a missed window.`,
+      );
+    }
+    return { started };
   }
 
   clearForSchema(schema: string): void {
