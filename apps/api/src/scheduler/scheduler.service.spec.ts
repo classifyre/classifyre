@@ -460,13 +460,17 @@ describe('SchedulerService cron catch-up', () => {
     // therefore found a difference every time and cleared the backoff on every
     // failure -- the live counter sat at "attempt 1/5" indefinitely.
     let updatedAt = new Date('2026-09-01T00:00:00Z');
-    mockPrisma.source.findMany.mockImplementation(async () => [
-      source({ updatedAt }),
-    ]);
-    mockPrisma.source.findUnique.mockImplementation(async () => ({ updatedAt }));
-    mockCliRunnerService.startRun.mockImplementation(async () => {
+    mockPrisma.source.findMany.mockImplementation(() =>
+      Promise.resolve([source({ updatedAt })]),
+    );
+    mockPrisma.source.findUnique.mockImplementation(() =>
+      Promise.resolve({ updatedAt }),
+    );
+    mockCliRunnerService.startRun.mockImplementation(() => {
       updatedAt = new Date(Date.now());
-      throw new Error('Unsupported state or unable to authenticate data');
+      return Promise.reject(
+        new Error('Unsupported state or unable to authenticate data'),
+      );
     });
 
     for (const at of [
@@ -515,7 +519,11 @@ describe('SchedulerService cron catch-up', () => {
     // The held-back source is filtered before the cap, so five healthy
     // sources still start.
     const sources = Array.from({ length: 6 }, (_, i) =>
-      source({ id: `s${i}`, scheduleTimezone: 'UTC', scheduleCron: '0 4 * * *' }),
+      source({
+        id: `s${i}`,
+        scheduleTimezone: 'UTC',
+        scheduleCron: '0 4 * * *',
+      }),
     );
     mockPrisma.source.findMany.mockResolvedValue(sources);
     mockCliRunnerService.startRun.mockImplementation((id: string) =>
@@ -531,9 +539,9 @@ describe('SchedulerService cron catch-up', () => {
     const { started } = await service.catchUpMissedCronRuns();
 
     expect(started).toBe(5);
-    expect(mockCliRunnerService.startRun.mock.calls.map((c) => c[0])).not.toContain(
-      's0',
-    );
+    expect(
+      mockCliRunnerService.startRun.mock.calls.map((c) => c[0]),
+    ).not.toContain('s0');
   });
 
   it('caps one pass and takes the oldest miss first', async () => {
