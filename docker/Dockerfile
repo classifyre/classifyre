@@ -44,7 +44,7 @@ ARG S6_OVERLAY_VERSION=3.2.3.2
 ARG PG_MAJOR=18
 
 # ── Sources of binaries (Dependabot keeps these current) ──────────────────────
-FROM ghcr.io/astral-sh/uv:0.12.13 AS uv-bin
+FROM ghcr.io/astral-sh/uv:0.12.17 AS uv-bin
 FROM caddy:2.11.4 AS caddy-bin
 FROM node:24.21.0-bookworm-slim AS node-bin
 
@@ -62,7 +62,7 @@ FROM models AS models-source
 # ── runtime ───────────────────────────────────────────────────────────────────
 # Based on the same image the CLI is, so the virtualenv's interpreter, its
 # symlinks and every native wheel it carries are the ones they were built for.
-FROM python:3.12.14-slim-bookworm AS runtime
+FROM python:3.14.6-slim-bookworm AS runtime
 
 ARG TARGETARCH
 ARG PG_MAJOR
