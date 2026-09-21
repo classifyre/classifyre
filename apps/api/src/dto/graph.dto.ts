@@ -112,6 +112,17 @@ export class GraphNodeDto {
   matchedContent?: string;
 
   @ApiPropertyOptional({
+    enum: ['NEW', 'GONE'],
+    description:
+      "For finding nodes on a CASE graph: how the latest run of the finding's " +
+      "source changed it, relative to the case's driving inquiries. NEW means " +
+      'that run created it; GONE means that run retired it, so the case still ' +
+      'cites evidence the scan no longer finds. Absent when neither applies, ' +
+      'and absent entirely outside a case graph.',
+  })
+  matchState?: string;
+
+  @ApiPropertyOptional({
     description: 'For finding nodes: name of the parent asset',
   })
   assetName?: string;

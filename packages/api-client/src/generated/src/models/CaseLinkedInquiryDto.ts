@@ -44,11 +44,23 @@ export interface CaseLinkedInquiryDto {
      */
     matchCount: number;
     /**
-     * Matches that appeared since the inquiry was last viewed
+     * Matches the latest completed run of their source created. Clears when that source runs again, not when the inquiry is read.
      * @type {number}
      * @memberof CaseLinkedInquiryDto
      */
     newMatchCount: number;
+    /**
+     * Matches the latest run retired — they no longer exist
+     * @type {number}
+     * @memberof CaseLinkedInquiryDto
+     */
+    goneMatchCount: number;
+    /**
+     * New matches land in this case by themselves
+     * @type {boolean}
+     * @memberof CaseLinkedInquiryDto
+     */
+    autoPull: boolean;
 }
 
 
@@ -71,6 +83,8 @@ export function instanceOfCaseLinkedInquiryDto(value: object): value is CaseLink
     if (!('status' in value) || value['status'] === undefined) return false;
     if (!('matchCount' in value) || value['matchCount'] === undefined) return false;
     if (!('newMatchCount' in value) || value['newMatchCount'] === undefined) return false;
+    if (!('goneMatchCount' in value) || value['goneMatchCount'] === undefined) return false;
+    if (!('autoPull' in value) || value['autoPull'] === undefined) return false;
     return true;
 }
 
@@ -89,6 +103,8 @@ export function CaseLinkedInquiryDtoFromJSONTyped(json: any, ignoreDiscriminator
         'status': json['status'],
         'matchCount': json['matchCount'],
         'newMatchCount': json['newMatchCount'],
+        'goneMatchCount': json['goneMatchCount'],
+        'autoPull': json['autoPull'],
     };
 }
 
@@ -108,6 +124,8 @@ export function CaseLinkedInquiryDtoToJSONTyped(value?: CaseLinkedInquiryDto | n
         'status': value['status'],
         'matchCount': value['matchCount'],
         'newMatchCount': value['newMatchCount'],
+        'goneMatchCount': value['goneMatchCount'],
+        'autoPull': value['autoPull'],
     };
 }
 

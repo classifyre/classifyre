@@ -137,6 +137,7 @@ All URIs are relative to *http://localhost*
 *CasesApi* | [**casesControllerRemove**](docs/CasesApi.md#casescontrollerremove) | **DELETE** /cases/{id} | Delete a case (its questions become standalone)
 *CasesApi* | [**casesControllerRemoveEvidence**](docs/CasesApi.md#casescontrollerremoveevidence) | **DELETE** /cases/{id}/evidence/{evidenceId} | Remove evidence from the case
 *CasesApi* | [**casesControllerRemoveFinding**](docs/CasesApi.md#casescontrollerremovefinding) | **DELETE** /cases/{id}/findings/{caseFindingId} | Remove a finding from the case
+*CasesApi* | [**casesControllerSetInquiryAutoPull**](docs/CasesApi.md#casescontrollersetinquiryautopull) | **PATCH** /cases/{id}/inquiries/{inquiryId} | Turn automatic pulling of an inquiry\&#39;s new matches on or off
 *CasesApi* | [**casesControllerUnlinkInquiry**](docs/CasesApi.md#casescontrollerunlinkinquiry) | **DELETE** /cases/{id}/inquiries/{inquiryId} | Unlink an inquiry from a case (the inquiry is untouched)
 *CasesApi* | [**casesControllerUpdate**](docs/CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case
 *CasesApi* | [**caseworkControllerSummary**](docs/CasesApi.md#caseworkcontrollersummary) | **GET** /casework/summary | Counts and recent activity across cases, inquiries and leads
@@ -251,11 +252,12 @@ All URIs are relative to *http://localhost*
 *InquiriesApi* | [**inquiriesControllerFindOne**](docs/InquiriesApi.md#inquiriescontrollerfindone) | **GET** /inquiries/{id} | Get an inquiry
 *InquiriesApi* | [**inquiriesControllerList**](docs/InquiriesApi.md#inquiriescontrollerlist) | **GET** /inquiries | List inquiries (with match counts)
 *InquiriesApi* | [**inquiriesControllerListMatches**](docs/InquiriesApi.md#inquiriescontrollerlistmatches) | **GET** /inquiries/{id}/matches | List the findings currently matching this inquiry (paginated)
-*InquiriesApi* | [**inquiriesControllerMarkSeen**](docs/InquiriesApi.md#inquiriescontrollermarkseen) | **POST** /inquiries/{id}/seen | Mark the current matches as seen (clears the \&quot;new\&quot; badge)
+*InquiriesApi* | [**inquiriesControllerMarkSeen**](docs/InquiriesApi.md#inquiriescontrollermarkseen) | **POST** /inquiries/{id}/seen | Acknowledge the current matches. Does NOT clear the \&quot;new\&quot; count — that is measured against the source\&#39;s latest run and clears when the source runs again.
 *InquiriesApi* | [**inquiriesControllerMatchOptions**](docs/InquiriesApi.md#inquiriescontrollermatchoptions) | **GET** /inquiries/match-options | Sources, custom detectors and distinct finding types for the matcher form
 *InquiriesApi* | [**inquiriesControllerPreview**](docs/InquiriesApi.md#inquiriescontrollerpreview) | **POST** /inquiries/preview | Preview findings a matcher config currently selects (no save)
 *InquiriesApi* | [**inquiriesControllerRematch**](docs/InquiriesApi.md#inquiriescontrollerrematch) | **POST** /inquiries/{id}/rematch | Recompute matches against all current findings
 *InquiriesApi* | [**inquiriesControllerRemove**](docs/InquiriesApi.md#inquiriescontrollerremove) | **DELETE** /inquiries/{id} | Delete an inquiry
+*InquiriesApi* | [**inquiriesControllerTimeline**](docs/InquiriesApi.md#inquiriescontrollertimeline) | **GET** /inquiries/{id}/timeline | The inquiry\&#39;s own history: config changes and each run\&#39;s deltas
 *InquiriesApi* | [**inquiriesControllerUpdate**](docs/InquiriesApi.md#inquiriescontrollerupdate) | **PATCH** /inquiries/{id} | Update an inquiry (matchers change → matches recomputed)
 *InstanceSettingsApi* | [**instanceSettingsControllerGetSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollergetsettings) | **GET** /instance-settings | Get instance settings
 *InstanceSettingsApi* | [**instanceSettingsControllerUpdateSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollerupdatesettings) | **PUT** /instance-settings | Update instance settings
@@ -556,11 +558,13 @@ All URIs are relative to *http://localhost*
 - [HarnessToolsResponseDto](docs/HarnessToolsResponseDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
+- [InquiryActivityDto](docs/InquiryActivityDto.md)
 - [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
 - [InquiryListResponseDto](docs/InquiryListResponseDto.md)
 - [InquiryMatchDto](docs/InquiryMatchDto.md)
 - [InquiryMatchListResponseDto](docs/InquiryMatchListResponseDto.md)
 - [InquiryResponseDto](docs/InquiryResponseDto.md)
+- [InquiryTimelineResponseDto](docs/InquiryTimelineResponseDto.md)
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)
 - [LineageGraphDto](docs/LineageGraphDto.md)
@@ -711,6 +715,7 @@ All URIs are relative to *http://localhost*
 - [SearchSourcesResponseDto](docs/SearchSourcesResponseDto.md)
 - [SearchSourcesTotalsDto](docs/SearchSourcesTotalsDto.md)
 - [SemanticFindingsSearchDto](docs/SemanticFindingsSearchDto.md)
+- [SetInquiryAutoPullDto](docs/SetInquiryAutoPullDto.md)
 - [SetWorkerQueuePausedDto](docs/SetWorkerQueuePausedDto.md)
 - [SimilarFindingAssetDto](docs/SimilarFindingAssetDto.md)
 - [SimilarFindingDto](docs/SimilarFindingDto.md)

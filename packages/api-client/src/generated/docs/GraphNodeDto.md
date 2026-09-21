@@ -20,6 +20,7 @@ Name | Type
 `customDetectorName` | string
 `status` | string
 `matchedContent` | string
+`matchState` | string
 `assetName` | string
 `assetId` | string
 `hypothesisIds` | Array&lt;string&gt;
@@ -48,6 +49,7 @@ const example = {
   "customDetectorName": null,
   "status": null,
   "matchedContent": null,
+  "matchState": null,
   "assetName": null,
   "assetId": null,
   "hypothesisIds": null,

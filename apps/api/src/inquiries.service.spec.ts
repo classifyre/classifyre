@@ -4,6 +4,7 @@ import { InquiriesService } from './inquiries.service';
 import { PrismaService } from './prisma.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
+import { InquiryActivityService } from './inquiry-activity.service';
 
 describe('InquiriesService', () => {
   let service: InquiriesService;
@@ -21,16 +22,19 @@ describe('InquiriesService', () => {
     source: { findMany: jest.fn() },
     customDetector: { findMany: jest.fn() },
     finding: { groupBy: jest.fn() },
+    asset: { groupBy: jest.fn() },
   };
   const mockMatching = {
     rematchInquiry: jest.fn(),
     getLiveMatches: jest.fn(),
     preview: jest.fn(),
+    latestRunAt: jest.fn().mockResolvedValue(null),
   };
   const mockAgentMemory = {
     recordEntityDeletion: jest.fn(),
     syncEntityMap: jest.fn(),
   };
+  const mockInquiryActivity = { record: jest.fn(), tryRecord: jest.fn() };
 
   const row = (over: Record<string, unknown> = {}) => ({
     id: 'q1',
@@ -61,6 +65,7 @@ describe('InquiriesService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: InquiryMatchingService, useValue: mockMatching },
         { provide: AgentMemoryService, useValue: mockAgentMemory },
+        { provide: InquiryActivityService, useValue: mockInquiryActivity },
       ],
     }).compile();
     service = module.get(InquiriesService);
@@ -143,6 +148,7 @@ describe('InquiriesService', () => {
     const arrange = (detectors: Array<Record<string, unknown>>) => {
       mockPrisma.source.findMany.mockResolvedValue([]);
       mockPrisma.customDetector.findMany.mockResolvedValue(detectors);
+      mockPrisma.asset.groupBy.mockResolvedValue([]);
       mockPrisma.finding.groupBy
         // Corpus-wide finding types.
         .mockResolvedValueOnce([])
@@ -163,7 +169,9 @@ describe('InquiriesService', () => {
             findingType: 'stabil',
             _count: { _all: 83 },
           },
-        ]);
+        ])
+        // Per-source open-finding counts.
+        .mockResolvedValueOnce([]);
     };
 
     it('points a TAG detector at findingValueRegex and an LLM at findingTypes', async () => {
@@ -220,6 +228,44 @@ describe('InquiriesService', () => {
       const options = await service.matchOptions();
       expect(options.customDetectors[0].answerDimension).toBe('matchedContent');
       expect(options.customDetectors[0].pipelineType).toBe('FUTURE');
+    });
+  });
+
+  // The source picker shows per-source sizes from the same call, so a source
+  // with no assets or no open findings must read as 0 rather than undefined.
+  describe('matchOptions source counts', () => {
+    it('maps per-source asset and open-finding totals, defaulting to 0', async () => {
+      mockPrisma.source.findMany.mockResolvedValue([
+        { id: 's1', name: 'Wiki', type: 'CONFLUENCE' },
+        { id: 's2', name: 'Empty', type: 'JIRA' },
+      ]);
+      mockPrisma.customDetector.findMany.mockResolvedValue([]);
+      mockPrisma.finding.groupBy
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ sourceId: 's1', _count: { _all: 7 } }]);
+      mockPrisma.asset.groupBy.mockResolvedValue([
+        { sourceId: 's1', _count: { _all: 12 } },
+      ]);
+
+      const options = await service.matchOptions();
+
+      expect(options.sources).toEqual([
+        {
+          id: 's1',
+          name: 'Wiki',
+          type: 'CONFLUENCE',
+          assetCount: 12,
+          openFindingCount: 7,
+        },
+        {
+          id: 's2',
+          name: 'Empty',
+          type: 'JIRA',
+          assetCount: 0,
+          openFindingCount: 0,
+        },
+      ]);
     });
   });
 });

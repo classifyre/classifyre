@@ -82,11 +82,24 @@ export interface InquiryMatchDto {
      */
     matchedAt: Date;
     /**
-     * Appeared since the question was last viewed
-     * @type {boolean}
+     * Where this match sits relative to the latest completed run of its source. NEW: the run created it. ONGOING: it was already there. GONE: the run retired it, so it matches the question but no longer exists.
+     * @type {string}
      * @memberof InquiryMatchDto
      */
+    state: InquiryMatchDtoStateEnum;
+    /**
+     * Equivalent to state === NEW. Kept for clients generated before state existed. Note the meaning changed: this used to mean "appeared since you last looked", which cleared when you read it rather than when the corpus moved on.
+     * @type {boolean}
+     * @memberof InquiryMatchDto
+     * @deprecated
+     */
     isNew: boolean;
+    /**
+     * Why a GONE match left — absent from the scan, asset deleted, or the detector removed. Absent for NEW and ONGOING.
+     * @type {string}
+     * @memberof InquiryMatchDto
+     */
+    goneReason?: string;
     /**
      * Evidence ranking (importance, quality, reasons) when the finding has been analyzed
      * @type {FindingSearchRankingDto}
@@ -94,6 +107,18 @@ export interface InquiryMatchDto {
      */
     ranking?: FindingSearchRankingDto;
 }
+
+
+/**
+ * @export
+ */
+export const InquiryMatchDtoStateEnum = {
+    New: 'NEW',
+    Ongoing: 'ONGOING',
+    Gone: 'GONE'
+} as const;
+export type InquiryMatchDtoStateEnum = typeof InquiryMatchDtoStateEnum[keyof typeof InquiryMatchDtoStateEnum];
+
 
 /**
  * Check if a given object implements the InquiryMatchDto interface.
@@ -103,6 +128,7 @@ export function instanceOfInquiryMatchDto(value: object): value is InquiryMatchD
     if (!('label' in value) || value['label'] === undefined) return false;
     if (!('assetId' in value) || value['assetId'] === undefined) return false;
     if (!('matchedAt' in value) || value['matchedAt'] === undefined) return false;
+    if (!('state' in value) || value['state'] === undefined) return false;
     if (!('isNew' in value) || value['isNew'] === undefined) return false;
     return true;
 }
@@ -126,7 +152,9 @@ export function InquiryMatchDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'assetName': json['assetName'] == null ? undefined : json['assetName'],
         'sourceType': json['sourceType'] == null ? undefined : json['sourceType'],
         'matchedAt': (new Date(json['matchedAt'])),
+        'state': json['state'],
         'isNew': json['isNew'],
+        'goneReason': json['goneReason'] == null ? undefined : json['goneReason'],
         'ranking': json['ranking'] == null ? undefined : FindingSearchRankingDtoFromJSON(json['ranking']),
     };
 }
@@ -151,7 +179,9 @@ export function InquiryMatchDtoToJSONTyped(value?: InquiryMatchDto | null, ignor
         'assetName': value['assetName'],
         'sourceType': value['sourceType'],
         'matchedAt': value['matchedAt'].toISOString(),
+        'state': value['state'],
         'isNew': value['isNew'],
+        'goneReason': value['goneReason'],
         'ranking': FindingSearchRankingDtoToJSON(value['ranking']),
     };
 }

@@ -3286,13 +3286,18 @@ export class McpServerFactoryService {
       {
         title: 'List Inquiry Matches',
         description:
-          'Findings currently matching a saved question (live query, never persisted).',
+          'Findings currently matching a saved question (live query, never ' +
+          "persisted). NEW means the latest completed run of the finding's " +
+          'source created it; GONE means that run retired it, so it answers ' +
+          'the question but no longer exists. Defaults to NEW and ONGOING — ' +
+          'ask for GONE by name.',
         inputSchema: {
           id: z.string().uuid(),
           search: z.string().optional(),
           severity: z
             .array(z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']))
             .optional(),
+          state: z.array(z.enum(['NEW', 'ONGOING', 'GONE'])).optional(),
           onlyNew: z.boolean().optional(),
           skip: z.number().int().min(0).optional(),
           limit: z.number().int().min(1).max(200).optional(),
@@ -3591,22 +3596,51 @@ export class McpServerFactoryService {
       {
         title: 'Link Case Inquiries',
         description:
-          'Link additional questions to a case. Already-linked ones are ignored.',
+          'Link additional questions to a case. Already-linked ones are ' +
+          'ignored. Ids also named in autoPullInquiryIds will pull their new ' +
+          'matches into the case by themselves as later scans land them.',
         inputSchema: {
           id: z.string().uuid(),
           inquiryIds: z.array(z.string()),
+          autoPullInquiryIds: z.array(z.string()).optional(),
         },
         annotations: {
           readOnlyHint: false,
           destructiveHint: false,
         },
       },
-      async ({ id, inquiryIds }) => {
+      async ({ id, inquiryIds, autoPullInquiryIds }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.casesService.linkInquiries(id, { inquiryIds }),
+          await this.casesService.linkInquiries(id, {
+            inquiryIds,
+            autoPullInquiryIds,
+          }),
         );
       },
+    );
+
+    server.registerTool(
+      'get_inquiry_timeline',
+      {
+        title: 'Get Inquiry Timeline',
+        description:
+          "A saved question's own history: matcher changes, and what each run " +
+          "landed or retired. The durable record — a match's NEW state is " +
+          'live and expires the next time its source runs, but the run that ' +
+          'produced it stays here.',
+        inputSchema: {
+          id: z.string().uuid(),
+          cursor: z.string().optional(),
+          limit: z.number().int().min(1).max(100).optional(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ id, cursor, limit }) =>
+        jsonResult(await this.inquiriesService.timeline(id, cursor, limit)),
     );
 
     server.registerTool(

@@ -31,6 +31,22 @@ export interface FindingCandidate {
  * either a built-in detectorType or a customDetectorKey -- except that naming
  * custom keys narrows CUSTOM findings rather than widening them: see matches().
  */
+/**
+ * The in-memory half of the matcher.
+ *
+ * It has no status and no newness dimension, and must not grow one. Two
+ * reasons, both load-bearing:
+ *
+ *  - Newness is a property of (finding, run anchor), not of (finding, matcher).
+ *    This class has no anchor, and `probeMatches`, `unmonitoredFindings` and
+ *    `watchedBy` have no meaningful one to give it.
+ *  - `watchersForFindings` is fed row shapes that carry no status column at all
+ *    (the orphan check in asset.service, retire-out-of-scope's CandidateRow). A
+ *    status dimension would let `undefined` decide watch coverage — and that
+ *    coverage is the guard stopping a scan auto-resolving cited evidence.
+ *
+ * Every path that consults this has already been narrowed by `candidateWhere`.
+ */
 export class CompiledMatcher {
   private readonly matchAllSources: boolean;
   private readonly sourceIds: Set<string>;
@@ -110,10 +126,22 @@ export class CompiledMatcher {
  * it and never consults the matcher — so a divergence returns a wrong *number*,
  * not merely a wide candidate set.
  */
-export function candidateWhere(m: InquiryMatchers): Prisma.FindingWhereInput {
+export type CandidateStatusScope = 'OPEN' | 'OPEN_AND_RESOLVED';
+
+export function candidateWhere(
+  m: InquiryMatchers,
+  scope: CandidateStatusScope = 'OPEN',
+): Prisma.FindingWhereInput {
   const hasDetectorFilter =
     m.detectorTypes.length > 0 || m.customDetectorKeys.length > 0;
-  const where: Prisma.FindingWhereInput = { status: 'OPEN' };
+  // Status is the ONLY dimension the two halves do not share, and it stays out
+  // of CompiledMatcher on purpose (see its docblock). The widened scope is for
+  // reading retired matches — "what did the latest run take away" — so it names
+  // RESOLVED explicitly rather than negating OPEN: FALSE_POSITIVE and IGNORED
+  // are an operator's verdict, not a disappearance, and must never be admitted.
+  const where: Prisma.FindingWhereInput = {
+    status: scope === 'OPEN' ? 'OPEN' : { in: ['OPEN', 'RESOLVED'] },
+  };
   if (!m.matchAllSources) where.sourceId = { in: m.sourceIds };
   if (hasDetectorFilter) {
     // Naming custom keys RESTRICTS custom findings rather than widening them:

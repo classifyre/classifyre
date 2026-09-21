@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -219,11 +220,32 @@ export class InquiryResponseDto {
   @ApiProperty({ type: [String] })
   findingValueRegex!: string[];
 
-  @ApiProperty({ description: 'Findings currently matching this query' })
+  @ApiProperty({
+    description: 'Open findings currently matching this query',
+  })
   matchCount!: number;
 
-  @ApiProperty({ description: 'Matches that appeared since you last viewed' })
+  @ApiProperty({
+    description:
+      'Matches the latest completed run of their source created. Clears when ' +
+      'that source runs again, not when you read it.',
+  })
   newMatchCount!: number;
+
+  @ApiProperty({
+    description:
+      'Matches the latest run retired — they still answer the question, but ' +
+      'the scan no longer finds them. Not counted in matchCount.',
+  })
+  goneMatchCount!: number;
+
+  @ApiPropertyOptional({
+    description:
+      'When the run that NEW and GONE are measured against started. Null ' +
+      'until some source in scope has completed a run.',
+    nullable: true,
+  })
+  lastRunAt?: Date | null;
 
   @ApiProperty()
   createdAt!: Date;
@@ -247,6 +269,17 @@ export class InquiryListResponseDto {
 }
 
 /** A finding currently matching a question (joined live; not persisted as evidence). */
+/**
+ * Where a match sits relative to the latest completed run of its source.
+ *
+ * Mirrors InquiryMatchState in matching/match-state.ts. Declared here as a
+ * literal union rather than imported, because this file is the contract the
+ * OpenAPI client is generated from and must not drag the matching internals
+ * into it.
+ */
+export const INQUIRY_MATCH_STATES = ['NEW', 'ONGOING', 'GONE'] as const;
+export type InquiryMatchStateDto = (typeof INQUIRY_MATCH_STATES)[number];
+
 export class InquiryMatchDto {
   @ApiProperty()
   findingId!: string;
@@ -275,8 +308,31 @@ export class InquiryMatchDto {
   @ApiProperty()
   matchedAt!: Date;
 
-  @ApiProperty({ description: 'Appeared since the question was last viewed' })
+  @ApiProperty({
+    enum: INQUIRY_MATCH_STATES,
+    description:
+      'Where this match sits relative to the latest completed run of its ' +
+      'source. NEW: the run created it. ONGOING: it was already there. GONE: ' +
+      'the run retired it, so it matches the question but no longer exists.',
+  })
+  state!: InquiryMatchStateDto;
+
+  @ApiProperty({
+    deprecated: true,
+    description:
+      'Equivalent to state === NEW. Kept for clients generated before state ' +
+      'existed. Note the meaning changed: this used to mean "appeared since ' +
+      'you last looked", which cleared when you read it rather than when the ' +
+      'corpus moved on.',
+  })
   isNew!: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Why a GONE match left — absent from the scan, asset deleted, or the ' +
+      'detector removed. Absent for NEW and ONGOING.',
+  })
+  goneReason?: string;
 
   @ApiPropertyOptional({
     type: () => FindingSearchRankingDto,
@@ -303,7 +359,20 @@ export class QueryInquiryMatchesDto {
   severity?: Severity[];
 
   @ApiPropertyOptional({
-    description: 'Only matches that appeared since last seen',
+    enum: INQUIRY_MATCH_STATES,
+    isArray: true,
+    description:
+      'Restrict to these states. Defaults to NEW and ONGOING — GONE matches ' +
+      'are RESOLVED findings and are only returned when asked for by name.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(INQUIRY_MATCH_STATES, { each: true })
+  state?: InquiryMatchStateDto[];
+
+  @ApiPropertyOptional({
+    deprecated: true,
+    description: 'Equivalent to state: [NEW].',
   })
   @IsOptional()
   @IsBoolean()
@@ -332,9 +401,17 @@ export class InquiryMatchListResponseDto {
   total!: number;
 
   @ApiProperty({
-    description: 'New matches after filters (appeared since last seen)',
+    description:
+      'Matches the latest run of their source created, after filters',
   })
   newCount!: number;
+
+  @ApiProperty({
+    description:
+      'Matches the latest run retired. Exact when GONE was requested; ' +
+      'otherwise the count the last matching pass stored.',
+  })
+  goneCount!: number;
 
   @ApiProperty()
   skip!: number;
@@ -399,6 +476,20 @@ class MatchOptionSourceDto {
   @ApiProperty() id!: string;
   @ApiProperty() name!: string;
   @ApiProperty() type!: string;
+
+  @ApiProperty({
+    description:
+      'Total assets ingested under this source. Lets the matcher form show ' +
+      'a per-source size without a second round-trip.',
+  })
+  assetCount!: number;
+
+  @ApiProperty({
+    description:
+      'Open findings currently under this source. Lets the matcher form ' +
+      'show a per-source signal size without a second round-trip.',
+  })
+  openFindingCount!: number;
 }
 
 class MatchOptionCustomDetectorDto {

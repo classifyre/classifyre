@@ -22,6 +22,8 @@ Name | Type
 `findingValueRegex` | Array&lt;string&gt;
 `matchCount` | number
 `newMatchCount` | number
+`goneMatchCount` | number
+`lastRunAt` | Date
 `createdAt` | Date
 `updatedAt` | Date
 
@@ -48,6 +50,8 @@ const example = {
   "findingValueRegex": null,
   "matchCount": null,
   "newMatchCount": null,
+  "goneMatchCount": null,
+  "lastRunAt": null,
   "createdAt": null,
   "updatedAt": null,
 } satisfies InquiryResponseDto
