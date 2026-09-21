@@ -48,7 +48,7 @@ unfixed, and added two defects found while answering "why are the namespaces sta
 | P19 | **fixed** | `POST /search/assets` ignored unknown keys and returned the whole corpus with a 200. Its shape (`{assets, findings, page, options, semantic}`) differs from the findings search (`{filters, page}`), so sending the sibling shape silently "matched" every asset in the namespace. Now fails closed like findings, naming the section or filter and suggesting the intended key | spec (4) |
 | P20 | **fixed (dev config)** | `helm/develop/values-dev.yaml` set `RUNNER_LOG_DIR` to each pod's own `/tmp` — the production chart deliberately leaves it unset for exactly this reason. Either process drives runs (the API when it promotes a queued runner, the worker when its scheduler starts one), while `POST /runners/{id}/logs` is served by the API alone, so each served a partial log and neither said so. Now a hostPath shared by both pods, created and chowned in `create-cluster.sh` (a kubelet-created hostPath is root-owned; the containers run as 10001) | live: full log served after the change; before it, `EACCES ... mkdir` was the only symptom, in a warning nobody reads |
 | P21 | **fixed** | `syncJobLogs` adopted an empty `readJobLogs` result as its delta cursor. An empty read is not an empty log — `findJobPod` finds no pod between Job attempts, and a response with no Content-Type yields `''` — so the next good read looked like a whole new log and re-emitted every line already stored. It **duplicates** rather than drops, which is why the P18 work did not catch it: the missing tail hid the doubling. A read that is a prefix of what is already held now leaves the cursor alone | spec (2), each failing without the fix |
-| P22 | **fixed** | The cron catch-up never gave up. `lastRunAt` only advances when a run starts, so a source that *cannot* start stays due forever: one HIVE source in `onedata` whose credentials would not decrypt was retried and warned about 8 times in 70 minutes. Failures now back off (10/20/40/80 min) and stop after five with one line naming the source and the reason; held-back sources are filtered before the per-pass cap, and editing the source clears the state so a fix is picked up at once | spec (4), three failing without the fix |
+| P22 | **fixed** | The cron catch-up never gave up. `lastRunAt` only advances when a run starts, so a source that *cannot* start stays due forever: one HIVE source in `onedata` whose credentials would not decrypt was retried and warned about 8 times in 70 minutes. Failures now back off (10/20/40/80 min) and stop after five with one line naming the source and the reason; held-back sources are filtered before the per-pass cap, and editing the source clears the state so a fix is picked up at once | spec (6), four failing without the fix; live: `attempt 1/5` → `1 held back` → `attempt 2/5` across 11:33–11:51 with no restart |
 | new | **added** | `inquiry.new_matches` notification when a run creates findings that match an operator's inquiry (autopilot inquiries excluded). Derived from the run's new findings, not from `newMatchCount`, which stays 0 until someone opens the inquiry | spec (3); live: "New matches: Verify: withdrawn tag" for a never-opened inquiry |
 
 **What held up, so it is not re-litigated:** retirement itself (datasets GovData dropped were DELETED and their
@@ -730,6 +730,19 @@ instead of serving out a wait it no longer deserves. But `updatedAt` is not "som
 value captured before the attempt therefore never matched the row after it, the sweep concluded the source had
 been edited, and it cleared its own backoff every single time. The value is now re-read *after* the attempt
 (`e5ac06f8`), so a later pass compares against what the failure left behind and only a genuine edit differs.
+
+**Confirmed live, once the process stopped restarting long enough to watch.** The first clean window — no
+reload between 11:33 and 11:51 — shows the behaviour the fix was written for:
+
+```
+11:33:19  attempt 1/5                                  (fresh process, first failure)
+11:40:54  Cron catch-up: 0 run(s) started of 0 source(s)
+          with a missed window, 1 held back after failing to start
+11:50:48  attempt 2/5                                  (backoff elapsed at 11:43:19)
+```
+
+The 11:40 pass is the point: the source was due, and the sweep skipped it and said so instead of retrying and
+warning. The counter advancing to 2 is the other half — it had never left 1 before.
 
 Both bugs shared a shape worth naming: **the test doubles were too clean.** A `startRun` that is a bare
 rejection writes nothing, and a service that is never torn down keeps its state. Each fix looked right, passed
