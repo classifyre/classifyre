@@ -9,6 +9,7 @@ import { CorrelationModule } from '../correlation/correlation.module';
 import { CasesService } from '../cases.service';
 import { CaseThreadsService } from '../case-threads.service';
 import { CaseActivityService } from '../case-activity.service';
+import { InquiryActivityService } from '../inquiry-activity.service';
 import { GraphService } from '../graph.service';
 import { AgentMemoryService } from './memory/agent-memory.service';
 import { AgentSearchService } from './search/agent-search.service';
@@ -92,6 +93,7 @@ import { SourceGraphModule } from '../stats/source-graph.module';
     AiProviderConfigService,
     AiClientService,
     CaseActivityService,
+    InquiryActivityService,
     GraphService,
     CaseThreadsService,
     InquiriesService,

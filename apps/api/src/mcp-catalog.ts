@@ -129,6 +129,7 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'update_inquiry',
       'delete_inquiry',
       'list_inquiry_matches',
+      'get_inquiry_timeline',
       'rematch_inquiry',
       'preview_inquiry_matchers',
       'get_inquiry_match_options',
@@ -136,6 +137,7 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     operations: [
       'Preview matcher configs before saving a question',
       'List findings currently matching a saved question',
+      'See what the latest scan landed or retired for a question',
       'Recompute matches on demand',
     ],
   },

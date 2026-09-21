@@ -9,6 +9,8 @@ Name | Type
 `id` | string
 `name` | string
 `type` | string
+`assetCount` | number
+`openFindingCount` | number
 
 ## Example
 
@@ -20,6 +22,8 @@ const example = {
   "id": null,
   "name": null,
   "type": null,
+  "assetCount": null,
+  "openFindingCount": null,
 } satisfies MatchOptionSourceDto
 
 console.log(example)
