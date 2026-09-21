@@ -202,7 +202,7 @@ export class SchedulerService {
         // But a source that can NEVER start -- credentials that will not
         // decrypt -- would otherwise be retried and warned about forever, so
         // each failure buys the next attempt a longer wait and there is an end.
-        this.noteCatchUpFailure(source, error);
+        await this.noteCatchUpFailure(source, error);
       }
     }
     if (due.length > 0 || heldBack > 0) {
@@ -225,10 +225,10 @@ export class SchedulerService {
    * source will not be retried -- the line an operator needs, and the one the
    * old code never reached because it warned identically forever.
    */
-  private noteCatchUpFailure(
+  private async noteCatchUpFailure(
     source: { id: string; name: string; updatedAt: Date },
     error: unknown,
-  ): void {
+  ): Promise<void> {
     const key = this.sourceKey(source.id);
     const previous = this.catchUpFailures.get(key);
     const attempts = (previous?.attempts ?? 0) + 1;
@@ -238,7 +238,13 @@ export class SchedulerService {
       attempts,
       nextAttemptAt:
         Date.now() + CATCH_UP_BACKOFF_BASE_MS * Math.pow(2, attempts - 1),
-      sourceUpdatedAt: source.updatedAt.getTime(),
+      // Re-read, because `startRun` writes to the source row on its way to
+      // failing -- it claims the source with a `currentRunnerId` and then puts
+      // it back -- so the value this pass read before the attempt is already
+      // stale, and comparing against it would find a difference every time and
+      // clear this record on every failure. That is not a hypothetical: it kept
+      // the live counter pinned at "attempt 1/5" until it was found.
+      sourceUpdatedAt: await this.currentSourceUpdatedAt(source),
       gaveUp,
     });
 
@@ -257,6 +263,25 @@ export class SchedulerService {
       this.logger.warn(message);
     } else {
       this.logger.debug(message);
+    }
+  }
+
+  /**
+   * The source's `updatedAt` as it stands now, falling back to what the sweep
+   * read if the row cannot be re-read (it may have just been deleted).
+   */
+  private async currentSourceUpdatedAt(source: {
+    id: string;
+    updatedAt: Date;
+  }): Promise<number> {
+    try {
+      const fresh = await this.prisma.source.findUnique({
+        where: { id: source.id },
+        select: { updatedAt: true },
+      });
+      return (fresh?.updatedAt ?? source.updatedAt).getTime();
+    } catch {
+      return source.updatedAt.getTime();
     }
   }
 

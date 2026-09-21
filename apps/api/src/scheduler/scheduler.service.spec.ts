@@ -316,6 +316,7 @@ describe('SchedulerService cron catch-up', () => {
     // clearAllMocks clears calls but keeps implementations, so a test that
     // makes startRun reject would otherwise leak into the next one.
     mockCliRunnerService.startRun.mockReset().mockResolvedValue(undefined);
+    mockPrisma.source.findUnique.mockReset().mockResolvedValue(null);
     jest.useFakeTimers().setSystemTime(new Date('2026-09-20T09:00:00Z'));
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -447,6 +448,46 @@ describe('SchedulerService cron catch-up', () => {
     ]);
     jest.setSystemTime(new Date('2026-09-20T11:51:00Z'));
 
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 1,
+    });
+  });
+
+  it('advances the attempt count although failing to start writes to the source row', async () => {
+    // `startRun` claims the source with a `currentRunnerId` and then puts it
+    // back on its way to failing, so Source.updatedAt is bumped by the failed
+    // attempt itself. Comparing against the value read BEFORE the attempt
+    // therefore found a difference every time and cleared the backoff on every
+    // failure -- the live counter sat at "attempt 1/5" indefinitely.
+    let updatedAt = new Date('2026-09-01T00:00:00Z');
+    mockPrisma.source.findMany.mockImplementation(async () => [
+      source({ updatedAt }),
+    ]);
+    mockPrisma.source.findUnique.mockImplementation(async () => ({ updatedAt }));
+    mockCliRunnerService.startRun.mockImplementation(async () => {
+      updatedAt = new Date(Date.now());
+      throw new Error('Unsupported state or unable to authenticate data');
+    });
+
+    for (const at of [
+      '2026-09-20T09:00:00Z',
+      '2026-09-20T09:11:00Z',
+      '2026-09-20T09:35:00Z',
+      '2026-09-20T10:20:00Z',
+      '2026-09-20T11:45:00Z',
+      '2026-09-20T23:00:00Z',
+    ]) {
+      jest.setSystemTime(new Date(at));
+      await service.catchUpMissedCronRuns();
+    }
+
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledTimes(5);
+
+    // And an edit by someone else still clears it: a different updatedAt that
+    // no failed attempt produced.
+    mockCliRunnerService.startRun.mockReset().mockResolvedValue(undefined);
+    updatedAt = new Date('2026-09-20T23:30:00Z');
+    jest.setSystemTime(new Date('2026-09-20T23:31:00Z'));
     await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
       started: 1,
     });
