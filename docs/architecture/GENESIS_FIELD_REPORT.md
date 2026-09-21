@@ -712,13 +712,28 @@ Held-back sources are filtered out *before* the five-runs-per-pass cap, so a bro
 healthy ones. The record is keyed on the source's `updatedAt`, so correcting the credentials clears it and the
 next pass tries immediately rather than waiting out a backoff.
 
-**The first version of this fix did not work, and only the live check said so.** `clearForSchema` runs every
+**Two versions of this fix did not work, and only the live check said so — each time.**
+
+*First*,  `clearForSchema` runs every
 time a namespace's workers are torn down — a routine event, not a shutdown — and it cleared the failure
 records along with the queue registrations. Every pass therefore started from an empty map, and the dev
 cluster showed the same source at `attempt 1/5` at 08:43, 08:47, 08:50, 08:53 and 09:02: a counter that never
 advanced and a warning that never stopped, which is precisely the behaviour the fix was meant to end. The
 records describe the source, not the worker registration, so they now outlive the teardown (`1f2a5a5f`). The
 unit tests passed throughout because none of them tore a namespace down; one that does has been added.
+
+*Second*, the counter still would not advance — 09:02, 09:07, 09:09, 09:13, 09:20, all `attempt 1/5`, with no
+restart between them. The record is keyed on `Source.updatedAt` so that editing a source retries it at once
+instead of serving out a wait it no longer deserves. But `updatedAt` is not "someone edited the config"; it is
+*any write to the row*, and **the failing path writes to the row itself**: `startRun` claims the source with a
+`currentRunnerId`, fails to decrypt, and restores the previous value — two writes per failed attempt. The
+value captured before the attempt therefore never matched the row after it, the sweep concluded the source had
+been edited, and it cleared its own backoff every single time. The value is now re-read *after* the attempt
+(`e5ac06f8`), so a later pass compares against what the failure left behind and only a genuine edit differs.
+
+Both bugs shared a shape worth naming: **the test doubles were too clean.** A `startRun` that is a bare
+rejection writes nothing, and a service that is never torn down keeps its state. Each fix looked right, passed
+its tests, and did nothing in production. The regression tests now model the write and the teardown.
 
 **Not durable, and that has a sharper edge in dev than in production.** The state is per-process: a restart
 retries every given-up source once. That is deliberate — a restart is exactly the event after which a source
