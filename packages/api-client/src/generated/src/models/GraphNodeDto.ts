@@ -133,6 +133,12 @@ export interface GraphNodeDto {
      * @memberof GraphNodeDto
      */
     missing?: boolean;
+    /**
+     * Total edges on this node, present only when it exceeded the lineage hub threshold. The node is drawn but the walk did not continue through it — open it on its own page to see what it connects.
+     * @type {number}
+     * @memberof GraphNodeDto
+     */
+    fanOut?: number;
 }
 
 /**
@@ -175,6 +181,7 @@ export function GraphNodeDtoFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'hypothesisIds': json['hypothesisIds'] == null ? undefined : json['hypothesisIds'],
         'caseFindingId': json['caseFindingId'] == null ? undefined : json['caseFindingId'],
         'missing': json['missing'] == null ? undefined : json['missing'],
+        'fanOut': json['fanOut'] == null ? undefined : json['fanOut'],
     };
 }
 
@@ -208,6 +215,7 @@ export function GraphNodeDtoToJSONTyped(value?: GraphNodeDto | null, ignoreDiscr
         'hypothesisIds': value['hypothesisIds'],
         'caseFindingId': value['caseFindingId'],
         'missing': value['missing'],
+        'fanOut': value['fanOut'],
     };
 }
 

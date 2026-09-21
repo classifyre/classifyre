@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface AddThreadEntryDto {
     /**
-     * 
+     * STATEMENT replaces the thread title with the first 200 characters of `body`; NOTE leaves it unchanged.
      * @type {string}
      * @memberof AddThreadEntryDto
      */

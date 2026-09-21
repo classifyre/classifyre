@@ -5,6 +5,10 @@ import { AgentLoggerService } from '../autopilot/audit/agent-logger.service';
 import { CasesService } from '../cases.service';
 import { NamespacePauseService } from '../namespace/namespace-pause.service';
 import { CorrelationService } from './correlation.service';
+import {
+  CorrelationSwitchService,
+  DuplicateDetectionOffException,
+} from './correlation-switch.service';
 import { isTransientDbError } from '../db/transient-db-error';
 
 /**
@@ -42,7 +46,8 @@ export interface CaseActionResult {
  * and records the work as a first-class AgentRun so it shows up in the
  * autopilot log alongside the AI agents — and so the inquiry/case agents can
  * take the duplicate/cluster results into account. Runs regardless of whether
- * AI is enabled: duplicate detection is always on.
+ * AI is enabled; the one thing that stops it is the workspace's duplicate
+ * detection switch (Settings → Cleanup › Features).
  */
 @Injectable()
 export class DuplicatesFinderAgentService {
@@ -54,7 +59,21 @@ export class DuplicatesFinderAgentService {
     private readonly audit: AgentAuditService,
     private readonly log: AgentLoggerService,
     @Optional() private readonly pause?: NamespacePauseService,
+    @Optional() private readonly featureSwitch?: CorrelationSwitchService,
   ) {}
+
+  /**
+   * Whether duplicate detection is on. When it is off the finder does nothing
+   * and records nothing: the switch is a deliberate operator choice, and a
+   * SKIPPED row after every scan would only bury the runs that matter.
+   */
+  private async switchedOff(context: string): Promise<boolean> {
+    if (!this.featureSwitch || (await this.featureSwitch.isEnabled())) {
+      return false;
+    }
+    this.logger.debug(`Duplicate detection is off — ${context} skipped.`);
+    return true;
+  }
 
   async runForScan(input: {
     sourceId: string;
@@ -65,6 +84,7 @@ export class DuplicatesFinderAgentService {
     // A scan that finished just as the pause landed still enqueues this; the
     // worker checks first, this is the second gate for direct callers.
     await this.pause?.assertNotPaused();
+    if (await this.switchedOff(`scan ${input.runnerId}`)) return;
     const run = await this.audit.openRun(AgentKind.DUPLICATES, {
       sourceId: input.sourceId,
       runnerId: input.runnerId,
@@ -119,6 +139,13 @@ export class DuplicatesFinderAgentService {
       await this.log.business(run.id, `Duplicates finder finished: ${text}`);
       this.logger.log(`Duplicates run ${run.id} completed: ${text}`);
     } catch (error) {
+      if (error instanceof DuplicateDetectionOffException) {
+        await this.audit.skip(
+          run.id,
+          'Duplicate detection was turned off for this workspace; stopped.',
+        );
+        return;
+      }
       await this.log.error(run.id, 'TECHNICAL', 'Duplicates finder failed.', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -172,6 +199,7 @@ export class DuplicatesFinderAgentService {
    */
   async runForConfigChange(): Promise<void> {
     await this.pause?.assertNotPaused();
+    if (await this.switchedOff('full recompute')) return;
     const run = await this.audit.openRun(AgentKind.DUPLICATES, {
       sourceId: null,
       runnerId: null,
@@ -195,6 +223,15 @@ export class DuplicatesFinderAgentService {
       await this.log.business(run.id, `Recompute finished: ${text}`);
       this.logger.log(`Config recompute run ${run.id} completed: ${text}`);
     } catch (error) {
+      if (error instanceof DuplicateDetectionOffException) {
+        // Turned off mid-recompute: the pages already written stay, the rest
+        // is covered by the recompute that runs when it is turned back on.
+        await this.audit.skip(
+          run.id,
+          'Duplicate detection was turned off for this workspace; the recompute stopped.',
+        );
+        return;
+      }
       await this.log.error(run.id, 'TECHNICAL', 'Config recompute failed.', {
         error: error instanceof Error ? error.message : String(error),
       });

@@ -329,6 +329,60 @@ describe('KubernetesCliJobService', () => {
     ).toBe('http://api.svc/prefix/namespace-id');
   });
 
+  // GENESIS field report P2: a 3-second connection test waited 6.5 minutes
+  // Pending for the 7 GiB an extract requests.
+  it('gives connection tests a small resource profile, and extracts the template', async () => {
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
+    const template = () => ({
+      apiVersion: 'batch/v1',
+      kind: 'Job',
+      spec: {
+        template: {
+          spec: {
+            containers: [
+              {
+                name: 'cli',
+                image: 'cli:latest',
+                resources: {
+                  requests: { memory: '7Gi', cpu: '500m' },
+                  limits: { memory: '7Gi', cpu: '4' },
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+    const build = (mode: string, recipe: Record<string, unknown> = {}) =>
+      (service as any).buildJobFromTemplate(template(), {
+        sourceId: 'source-1',
+        runnerId: 'runner-1',
+        mode,
+        recipe: { type: 'CUSTOM', ...recipe },
+        outputRestUrl: 'http://api.svc/ns',
+      });
+
+    const test = await build('test');
+    expect(test.spec.template.spec.containers[0].resources).toEqual({
+      requests: { memory: '2Gi', cpu: '250m' },
+      limits: { memory: '2Gi', cpu: '1' },
+    });
+    const extract = await build('extract');
+    expect(
+      extract.spec.template.spec.containers[0].resources.limits.memory,
+    ).toBe('7Gi');
+    // A source that needs more for its test can still say so.
+    const raised = await build('test', {
+      resources: { requests: { memory: '4Gi' }, limits: { memory: '4Gi' } },
+    });
+    expect(
+      raised.spec.template.spec.containers[0].resources.limits.memory,
+    ).toBe('4Gi');
+  });
+
   it('builds file-evaluation command reading input from the mounted volume', () => {
     const service = new KubernetesCliJobService(
       mockInstanceSettings(),

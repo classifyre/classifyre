@@ -16,6 +16,7 @@ import {
   Spinner,
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
+import { FeatureOffNotice } from "@/components/feature-off-notice";
 
 /**
  * "Where else found" — lists every other asset that carries the same normalized
@@ -72,7 +73,14 @@ export function WhereElseFound({
         </CardTitle>
         <CardDescription>{t("correlation.occurrences.desc")}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
+        {/* The reverse index is duplicate detection's output: while it is off
+            it stops growing (and is empty once its data was deleted). */}
+        <FeatureOffNotice
+          feature="duplicates"
+          context="occurrences"
+          variant="inline"
+        />
         {error ? (
           <EmptyState
             icon={Radar}

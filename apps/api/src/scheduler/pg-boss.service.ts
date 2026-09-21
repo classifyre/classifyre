@@ -370,6 +370,47 @@ export class PgBossService implements OnApplicationShutdown {
     }
   }
 
+  /**
+   * Whether this process serves `queue` in the current namespace.
+   *
+   * Workers bound to a queue whose name can change (the embedding queues are
+   * named after their space) use it to tell "already serving this queue — a
+   * released pause resumes it" from "must register": registering twice would
+   * subscribe two handlers to one queue and process every batch twice.
+   */
+  hasSubscription(queue: string): boolean {
+    const schema = this.requireSchema();
+    return this.subscriptions.get(schema)?.has(queue) ?? false;
+  }
+
+  /**
+   * Stop serving `queue` in the current namespace and forget it, so neither a
+   * pause refresh nor the worker view brings it back. The counterpart of
+   * {@link work} for a worker that re-binds to a different queue; a batch
+   * already running finishes normally.
+   */
+  async unsubscribe(queue: string): Promise<void> {
+    const schema = this.requireSchema();
+    const subscription = this.subscriptions.get(schema)?.get(queue);
+    this.subscriptions.get(schema)?.delete(queue);
+    if (subscription) {
+      this.queueRegistry.unregister({
+        namespaceId: subscription.namespaceId,
+        queue,
+      });
+    }
+    const boss = this.bosses.get(schema);
+    if (!boss) return;
+    try {
+      await boss.offWork(queue);
+    } catch (error) {
+      // Nothing to stop (never subscribed here, or the queue is gone).
+      this.logger.debug(
+        `offWork('${queue}') in '${schema}' failed: ${String(error)}`,
+      );
+    }
+  }
+
   /** Stop and forget the pg-boss instance for a namespace schema. */
   async stopForNamespace(schema: string): Promise<void> {
     const boss = this.bosses.get(schema);

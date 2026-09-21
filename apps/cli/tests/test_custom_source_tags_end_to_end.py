@@ -135,3 +135,68 @@ def test_an_unknown_key_warns_instead_of_failing(scan) -> None:
     assert not (tagged.findings or [])
     warnings = tagged.scan_stats.warnings or []
     assert any("cardholderdata" in w for w in warnings)
+
+
+# ── Per-tag severity (field report P9) ────────────────────────────────────────
+
+BANDED_NOTEBOOK = """from classifyre import Asset, Tag
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS", "message": "Ready."}
+
+
+def extract():
+    yield Asset(
+        id="prod.payments.transactions",
+        name="transactions",
+        content="card_last4,amount\\n4242,240.00\\n",
+        kind="table",
+        tags={"cardholder_data": Tag("primary-account-numbers", severity="LOW")},
+    )
+"""
+
+
+def test_a_tag_can_carry_its_own_severity(scan) -> None:
+    # One detector for a banded rule: the finding, not the detector, says which
+    # band this asset landed in.
+    tagged = next(r for r in scan(build_recipe(BANDED_NOTEBOOK)) if r.name == "transactions")
+
+    finding = (tagged.findings or [])[0]
+    assert finding.severity == Severity.low
+    assert finding.matched_content == "primary-account-numbers"
+    assert not (tagged.scan_stats.warnings or [])
+
+
+def test_a_tag_cannot_outrank_its_detector(scan) -> None:
+    # The detector is HIGH; asking for CRITICAL lands on HIGH and says so,
+    # rather than letting a connector promote past what the operator allowed.
+    over = BANDED_NOTEBOOK.replace('severity="LOW"', 'severity="CRITICAL"')
+    tagged = next(r for r in scan(build_recipe(over)) if r.name == "transactions")
+
+    finding = (tagged.findings or [])[0]
+    assert finding.severity == Severity.high
+    warnings = tagged.scan_stats.warnings or []
+    assert any("CRITICAL" in w and "cardholder_data" in w for w in warnings)
+
+
+def test_changing_only_the_severity_changes_the_asset(scan) -> None:
+    # A band that moves while the value stays put is a changed finding. If the
+    # checksum missed it the scan cache would skip the asset and keep serving
+    # the old severity.
+    before = next(r for r in scan(build_recipe(BANDED_NOTEBOOK)) if r.name == "transactions")
+    revised = BANDED_NOTEBOOK.replace('severity="LOW"', 'severity="MEDIUM"')
+    after = next(r for r in scan(build_recipe(revised)) if r.name == "transactions")
+
+    assert before.hash == after.hash
+    assert before.checksum != after.checksum
+    assert (after.findings or [])[0].severity == Severity.medium
+
+
+def test_a_plain_tag_keeps_the_checksum_it_always_had(scan) -> None:
+    # The severity key is added to the checksum basis only when a Tag set one,
+    # so an existing corpus is not re-checksummed for a feature it never used.
+    plain = next(r for r in scan() if r.name == "transactions")
+    assert plain.checksum
+    again = next(r for r in scan() if r.name == "transactions")
+    assert plain.checksum == again.checksum

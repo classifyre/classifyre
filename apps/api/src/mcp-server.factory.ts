@@ -2429,7 +2429,14 @@ export class McpServerFactoryService {
         inputSchema: {
           sourceId: z.string().uuid(),
           status: z
-            .enum(['PENDING', 'RUNNING', 'COMPLETED', 'WARNING', 'ERROR'])
+            .enum([
+              'PENDING',
+              'RUNNING',
+              'COMPLETED',
+              'WARNING',
+              'ERROR',
+              'STOPPED',
+            ])
             .optional()
             .describe('Filter to runs in this status.'),
           skip: z
@@ -3469,11 +3476,12 @@ export class McpServerFactoryService {
       {
         title: 'Close Case',
         description:
-          'Close a case with a conclusion. Linked questions are archived unless they drive another open case.',
+          'Close a case with a conclusion. Linked questions are archived unless they drive another open case, or keepInquiries is true (use it when the questions are standing checks that should keep running after the case is answered).',
         inputSchema: {
           id: z.string().uuid(),
           conclusion: z.string(),
           closedBy: z.string().optional(),
+          keepInquiries: z.boolean().optional(),
         },
         annotations: {
           readOnlyHint: false,
@@ -3807,10 +3815,19 @@ export class McpServerFactoryService {
       },
       async (dto) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        const config = await this.correlationService.saveConfig(dto);
+        const saved = await this.correlationService.saveConfig(dto);
+        // The status below promised this; nothing scheduled it (field report P6).
+        await this.correlationService.scheduleFullRecompute(
+          'correlation config updated (MCP)',
+        );
+        // Re-read so `recompute` describes what actually happens — including
+        // "nothing, duplicate detection is off".
+        const config = await this.correlationService.getConfig(saved.recompute);
         return jsonResult({
           config,
-          status: 'Config saved; a background recompute has been scheduled.',
+          status: config.enabled
+            ? 'Config saved; a background recompute has been scheduled.'
+            : `Config saved. ${config.recompute.note}`,
         });
       },
     );
@@ -3838,9 +3855,14 @@ export class McpServerFactoryService {
           label: label ?? null,
           value: value ?? null,
         });
+        await this.correlationService.scheduleFullRecompute(
+          'correlation exclusion added (MCP)',
+        );
         return jsonResult({
           config,
-          status: 'Exclusion added; a background recompute has been scheduled.',
+          status: config.enabled
+            ? 'Exclusion added; a background recompute has been scheduled.'
+            : `Exclusion added. ${config.recompute.note}`,
         });
       },
     );
@@ -3862,10 +3884,14 @@ export class McpServerFactoryService {
       async ({ id }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         const config = await this.correlationService.removeExclusion(id);
+        await this.correlationService.scheduleFullRecompute(
+          'correlation exclusion removed (MCP)',
+        );
         return jsonResult({
           config,
-          status:
-            'Exclusion removed; a background recompute has been scheduled.',
+          status: config.enabled
+            ? 'Exclusion removed; a background recompute has been scheduled.'
+            : `Exclusion removed. ${config.recompute.note}`,
         });
       },
     );
@@ -3890,6 +3916,9 @@ export class McpServerFactoryService {
       },
       async ({ assetId }) => {
         this.mcpToolExecutor.assertNotDemoMode();
+        // Explicit request: say why nothing happens rather than report a
+        // recompute that the switched-off scheduler silently refused.
+        await this.correlationService.assertEnabled();
         if (assetId) {
           const summary =
             await this.correlationService.recomputeForAsset(assetId);

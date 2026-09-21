@@ -6,6 +6,37 @@
 export const CORRELATION_QUEUE = 'correlation.scan';
 
 /**
+ * pg-boss queue carrying "a source finished ingesting, enrol it in the
+ * autopilot" jobs — the hand-off WITHOUT the duplicate check.
+ *
+ * The hand-off normally rides on CORRELATION_QUEUE, after the duplicates
+ * finder, so the agents see fresh duplicate results. When duplicate detection
+ * is turned off that queue is held paused, and the hand-off must not wait with
+ * it: the agents are independently valuable, and a paused hand-off would
+ * silently stop every autopilot cycle a scan should start. Scan completions go
+ * here instead while the switch is off (and queued scan jobs are moved here
+ * when it is turned off). Never held by a feature switch.
+ */
+export const SCAN_HANDOFF_QUEUE = 'autopilot.handoff';
+
+/**
+ * Job options for one scan's hand-off, shared by every producer so a job moved
+ * over from CORRELATION_QUEUE coalesces exactly like one sent directly. Same
+ * per-source window as the correlation job it stands in for.
+ */
+export function scanHandoffJobOptions(sourceId: string) {
+  return {
+    singletonKey: `handoff:${sourceId}`,
+    singletonSeconds: CORRELATION_SCAN_COALESCE_SECONDS,
+    singletonNextSlot: true,
+    retryLimit: 2,
+    retryDelay: 60,
+    retryBackoff: true,
+    expireInSeconds: 3600,
+  };
+}
+
+/**
  * Coalescing window for the per-scan correlation job.
  *
  * Must be passed as `singletonSeconds` alongside the source's `singletonKey`:

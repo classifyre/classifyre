@@ -592,6 +592,25 @@ class BaseSource(ABC):
         with self._augmentation_tags_lock:
             return dict(self._augmentation_tags.get(asset_hash, {}))
 
+    def asset_tag_severities(self, asset_hash: str) -> Mapping[str, str]:
+        """Per-tag severity overrides, for the keys a connector set one on.
+
+        Only the CUSTOM notebook can express one today (``Tag(value,
+        severity=)``); every other source leaves the Tag detector's own
+        severity in force, which is what an empty mapping means here.
+        """
+        return {}
+
+    def asserts_complete_tags(self, asset_hash: str) -> bool:
+        """Whether ``asset_tags`` is the *whole* truth about this asset.
+
+        When it is, a Tag detector whose key is absent has positively found
+        nothing, and a finding it produced earlier must resolve. Only a
+        connector that re-derives every tag on every run can promise that; an
+        augmentation notebook may tag a subset, so the default is False.
+        """
+        return False
+
     def enrich_finding_location(
         self,
         finding: DetectionResult,

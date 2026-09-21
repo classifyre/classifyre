@@ -163,6 +163,25 @@ export class WorkerQueueRegistryService implements OnApplicationShutdown {
   }
 
   /**
+   * Stop reporting a queue this process no longer serves (its worker re-bound
+   * to another queue). The row is deleted rather than left to age into
+   * `stale`: nothing crashed, the queue simply is not served here any more.
+   */
+  unregister(key: WorkerQueueKey): void {
+    if (!key.namespaceId) return;
+    this.counters.delete(cacheKey(key.namespaceId, key.queue));
+    const pool = this.pool;
+    if (!pool) return;
+    void pool
+      .query(
+        `DELETE FROM public.worker_queue_state
+          WHERE instance_id = $1 AND namespace_id = $2::uuid AND queue = $3`,
+        [this.instanceId, key.namespaceId, key.queue],
+      )
+      .catch(() => undefined);
+  }
+
+  /**
    * Whether this queue is paused, from the cache refreshed on each flush tick.
    *
    * Deliberately synchronous and slightly stale: it is consulted on the hot
@@ -184,36 +203,133 @@ export class WorkerQueueRegistryService implements OnApplicationShutdown {
     this.pauseObservers.add(observer);
   }
 
-  /** Pause or resume a queue across every worker replica. */
-  async setPaused(key: WorkerQueueKey, paused: boolean): Promise<void> {
+  /**
+   * Pause or resume a queue by hand (the Workers tab), across every worker
+   * replica.
+   *
+   * A queue held paused by a workspace feature switch cannot be resumed here:
+   * the operator's pause is cleared, the hold is not, and the result names the
+   * feature so the caller can say where the switch is. Resuming it anyway would
+   * run work the workspace has turned off — a duplicate check nobody wants,
+   * inference into a corpus that was just deleted.
+   */
+  async setPaused(
+    key: WorkerQueueKey,
+    paused: boolean,
+  ): Promise<{ heldBy: string | null }> {
     const pool = this.requirePool();
     if (paused) {
       await pool.query(
-        `INSERT INTO public.worker_queue_pauses (namespace_id, queue)
-         VALUES ($1::uuid, $2)
-         ON CONFLICT (namespace_id, queue) DO NOTHING`,
+        `INSERT INTO public.worker_queue_pauses (namespace_id, queue, manual)
+         VALUES ($1::uuid, $2, true)
+         ON CONFLICT (namespace_id, queue) DO UPDATE SET manual = true`,
         [key.namespaceId, key.queue],
       );
       this.pausedQueues.set(cacheKey(key.namespaceId, key.queue), {
         namespaceId: key.namespaceId,
         queue: key.queue,
       });
-      return;
+      return { heldBy: null };
+    }
+    const { rows } = await pool.query<{ feature: string | null }>(
+      `SELECT feature FROM public.worker_queue_pauses
+        WHERE namespace_id = $1::uuid AND queue = $2`,
+      [key.namespaceId, key.queue],
+    );
+    const heldBy = rows[0]?.feature ?? null;
+    if (heldBy) {
+      await pool.query(
+        `UPDATE public.worker_queue_pauses SET manual = false
+          WHERE namespace_id = $1::uuid AND queue = $2`,
+        [key.namespaceId, key.queue],
+      );
+      return { heldBy };
     }
     await pool.query(
       'DELETE FROM public.worker_queue_pauses WHERE namespace_id = $1::uuid AND queue = $2',
       [key.namespaceId, key.queue],
     );
     this.pausedQueues.delete(cacheKey(key.namespaceId, key.queue));
+    return { heldBy: null };
+  }
+
+  /**
+   * Hold queues paused on behalf of a workspace feature that was turned off.
+   *
+   * Goes through the same table as a manual pause, so every replica stops
+   * fetching within one flush interval with no extra machinery — the feature
+   * switch is just a second reason for the pause that already exists. An
+   * existing manual pause is preserved underneath the hold.
+   */
+  async holdForFeature(
+    namespaceId: string,
+    feature: string,
+    queues: string[],
+  ): Promise<void> {
+    const names = [...new Set(queues.filter(Boolean))];
+    if (names.length === 0) return;
+    await this.requirePool().query(
+      `INSERT INTO public.worker_queue_pauses (namespace_id, queue, manual, feature)
+       SELECT $1::uuid, q, false, $2 FROM unnest($3::text[]) AS q
+       ON CONFLICT (namespace_id, queue) DO UPDATE SET feature = EXCLUDED.feature`,
+      [namespaceId, feature, names],
+    );
+    for (const queue of names) {
+      this.pausedQueues.set(cacheKey(namespaceId, queue), {
+        namespaceId,
+        queue,
+      });
+    }
+  }
+
+  /**
+   * Lift a feature's hold. Queues the operator had also paused by hand stay
+   * paused; everything else resumes on the next flush. Returns the queues that
+   * are running again.
+   */
+  async releaseFeature(
+    namespaceId: string,
+    feature: string,
+  ): Promise<string[]> {
+    const pool = this.requirePool();
+    const { rows } = await pool.query<{ queue: string }>(
+      `DELETE FROM public.worker_queue_pauses
+        WHERE namespace_id = $1::uuid AND feature = $2 AND manual = false
+        RETURNING queue`,
+      [namespaceId, feature],
+    );
+    await pool.query(
+      `UPDATE public.worker_queue_pauses SET feature = NULL
+        WHERE namespace_id = $1::uuid AND feature = $2`,
+      [namespaceId, feature],
+    );
+    const released = rows.map((row) => row.queue);
+    for (const queue of released) {
+      this.pausedQueues.delete(cacheKey(namespaceId, queue));
+    }
+    return released;
   }
 
   /** Queues paused for a namespace, read straight from the database. */
   async listPaused(namespaceId: string): Promise<Set<string>> {
-    const { rows } = await this.requirePool().query<{ queue: string }>(
-      'SELECT queue FROM public.worker_queue_pauses WHERE namespace_id = $1::uuid',
+    return new Set((await this.listPauseHolds(namespaceId)).keys());
+  }
+
+  /**
+   * Every paused queue of a namespace, mapped to the feature holding it (null
+   * for a plain manual pause).
+   */
+  async listPauseHolds(
+    namespaceId: string,
+  ): Promise<Map<string, string | null>> {
+    const { rows } = await this.requirePool().query<{
+      queue: string;
+      feature: string | null;
+    }>(
+      'SELECT queue, feature FROM public.worker_queue_pauses WHERE namespace_id = $1::uuid',
       [namespaceId],
     );
-    return new Set(rows.map((row) => row.queue));
+    return new Map(rows.map((row) => [row.queue, row.feature ?? null]));
   }
 
   /**

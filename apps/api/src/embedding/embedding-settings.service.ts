@@ -8,6 +8,37 @@ import {
   type EmbeddingProviderKind,
 } from './embedding-config.service';
 import { MAX_VECTOR_DIMENSIONS } from './embedding-vector';
+import {
+  WORKSPACE_FEATURES_LOCATION,
+  type FeatureDisabledMode,
+} from '../maintenance/workspace-features.constants';
+
+/**
+ * How long a process trusts a resolved configuration before re-reading it.
+ *
+ * The API and the embedding worker are separate processes on Kubernetes and
+ * only the one that served a settings change drops its cache. Everything else
+ * used to keep the old configuration until it restarted, which for the on/off
+ * switch meant "turned off" kept embedding in the worker. Re-reading every
+ * half minute costs one singleton lookup per namespace.
+ */
+const SETTINGS_CACHE_MS = 30_000;
+
+/**
+ * Staleness the on/off gates accept. Tighter than the general cache because a
+ * gate that still says "on" enqueues work the operator just switched off.
+ */
+const SWITCH_CACHE_MS = 5_000;
+
+/** The embeddings switch as the feature page shows it. */
+export interface EmbeddingSwitchState {
+  enabled: boolean;
+  /** How it was turned off: corpus kept (a pause) or deleted. Null while on. */
+  disabledMode: FeatureDisabledMode | null;
+  changedAt: Date | null;
+  /** What the deployment says when the workspace never chose. */
+  deploymentDefault: boolean;
+}
 
 /**
  * The fields that define a vector coordinate system.
@@ -32,6 +63,12 @@ export type SpaceDefiningField = (typeof SPACE_DEFINING_FIELDS)[number];
 /** Everything the embedding subsystem needs, after overrides are applied. */
 export interface ResolvedEmbeddingConfig {
   enabled: boolean;
+  /**
+   * How embeddings were turned off (null while on, and for a deployment that
+   * is off by environment). Decides whether scans keep saving text chunks:
+   * "kept" is a pause and keeps collecting, "deleted" stopped collecting.
+   */
+  disabledMode: FeatureDisabledMode | null;
   provider: EmbeddingProviderKind;
   model: string;
   revision: string;
@@ -83,6 +120,7 @@ export function resolvedFromEnv(
 ): ResolvedEmbeddingConfig {
   return {
     enabled: d.enabled,
+    disabledMode: null,
     provider: d.provider,
     model: d.model,
     revision: d.revision,
@@ -126,14 +164,17 @@ export function resolvedFromEnv(
  *
  * The result is cached per schema because it is read on hot paths (every
  * similarity query interpolates `dimensions` and `hnswEfSearch` into SQL) and
- * a database round trip per query would be absurd. The cache is dropped
- * whenever the settings change, and settings changes are rare by nature — the
- * expensive ones force a corpus rebuild.
+ * a database round trip per query would be absurd. The process that makes a
+ * change drops its cache at once; every other process re-reads within
+ * SETTINGS_CACHE_MS (the on/off gates within SWITCH_CACHE_MS).
  */
 @Injectable()
 export class EmbeddingSettingsService {
   private readonly logger = new Logger(EmbeddingSettingsService.name);
-  private readonly cache = new Map<string, ResolvedEmbeddingConfig>();
+  private readonly cache = new Map<
+    string,
+    { cfg: ResolvedEmbeddingConfig; at: number }
+  >();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -164,10 +205,12 @@ export class EmbeddingSettingsService {
    * settings page), so an unusable field falls back to the deployment default
    * with a warning rather than taking the subsystem down.
    */
-  async resolve(): Promise<ResolvedEmbeddingConfig> {
+  async resolve(
+    maxAgeMs = SETTINGS_CACHE_MS,
+  ): Promise<ResolvedEmbeddingConfig> {
     const key = this.schemaKey();
     const cached = this.cache.get(key);
-    if (cached) return cached;
+    if (cached && Date.now() - cached.at <= maxAgeMs) return cached.cfg;
 
     const base = this.deploymentDefaults();
     let row: Awaited<ReturnType<typeof this.overrides>> = null;
@@ -192,6 +235,10 @@ export class EmbeddingSettingsService {
         if (value !== null && value !== undefined) resolved[field] = value;
       };
       pick('enabled', row.enabled);
+      if (!resolved.enabled) {
+        resolved.disabledMode =
+          row.disabledMode === 'deleted' ? 'deleted' : 'kept';
+      }
       pick('provider', row.provider as EmbeddingProviderKind | null);
       pick('model', row.model);
       pick('revision', row.revision);
@@ -245,8 +292,85 @@ export class EmbeddingSettingsService {
       }
     }
 
-    this.cache.set(key, resolved);
+    this.cache.set(key, { cfg: resolved, at: Date.now() });
     return resolved;
+  }
+
+  /**
+   * Whether embeddings are on right now, re-read if the last read is more than
+   * a few seconds old. The gates that must stop work when the switch goes off
+   * (enqueue, backfill, recalibration, inference) read this rather than
+   * {@link cached}, which can be up to half a minute behind in a process that
+   * did not serve the change.
+   */
+  async enabledNow(): Promise<boolean> {
+    return (await this.resolve(SWITCH_CACHE_MS)).enabled;
+  }
+
+  /**
+   * Whether scans should keep saving text chunks. True while on, and while
+   * off as a pause — chunks are the text the corpus is rebuilt from, and a
+   * scan that skipped them would never send them again (the scan cache marks
+   * the asset done). False only after "turn off and delete".
+   */
+  async collectsChunks(): Promise<boolean> {
+    const cfg = await this.resolve(SWITCH_CACHE_MS);
+    return cfg.enabled || cfg.disabledMode !== 'deleted';
+  }
+
+  /** The on/off switch with its bookkeeping, read fresh. */
+  async switchState(): Promise<EmbeddingSwitchState> {
+    const cfg = await this.resolve(0);
+    let row: {
+      disabledMode: string | null;
+      enabledChangedAt: Date | null;
+    } | null = null;
+    try {
+      row = await this.prisma.embeddingSettings.findUnique({
+        where: { id: 1 },
+        select: { disabledMode: true, enabledChangedAt: true },
+      });
+    } catch {
+      // Not migrated yet: no bookkeeping to report.
+    }
+    return {
+      enabled: cfg.enabled,
+      disabledMode: cfg.enabled
+        ? null
+        : row?.disabledMode === 'deleted'
+          ? 'deleted'
+          : 'kept',
+      changedAt: row?.enabledChangedAt ?? null,
+      deploymentDefault: this.defaults.enabled,
+    };
+  }
+
+  /**
+   * Flip the switch. Only the workspace feature service calls this: turning
+   * embeddings off or on also holds or releases the embedding queues, and
+   * "off and delete" purges the corpus — none of which belongs to settings.
+   *
+   * Deliberately NOT a rebuild. Off is a pause unless the operator chose to
+   * delete, and on resumes into the same space: the stored vectors are still
+   * in the coordinate system the configuration describes.
+   */
+  async setEnabled(
+    enabled: boolean,
+    mode: FeatureDisabledMode | null,
+  ): Promise<EmbeddingSwitchState> {
+    const before = await this.switchState();
+    const disabledMode = enabled ? null : (mode ?? 'kept');
+    // The change time moves only when the switch itself moves: deleting the
+    // corpus of a feature that is already off is not "turned off again".
+    const enabledChangedAt =
+      before.enabled !== enabled ? new Date() : before.changedAt;
+    await this.prisma.embeddingSettings.upsert({
+      where: { id: 1 },
+      create: { id: 1, enabled, disabledMode, enabledChangedAt },
+      update: { enabled, disabledMode, enabledChangedAt },
+    });
+    this.invalidate();
+    return this.switchState();
   }
 
   /**
@@ -259,7 +383,7 @@ export class EmbeddingSettingsService {
    * fallback to deployment defaults is a safety net, not the normal path.
    */
   cached(): ResolvedEmbeddingConfig {
-    return this.cache.get(this.schemaKey()) ?? this.deploymentDefaults();
+    return this.cache.get(this.schemaKey())?.cfg ?? this.deploymentDefaults();
   }
 
   /** Drop the cached resolution so the next read reloads from the database. */
@@ -285,7 +409,15 @@ export class EmbeddingSettingsService {
     requiresRebuild: boolean;
     changedFields: string[];
   }> {
-    const before = await this.resolve();
+    if ('enabled' in patch && patch.enabled !== undefined) {
+      // The page that sent this is out of date. Refused rather than silently
+      // dropped, so a stale client learns where the switch went.
+      throw new BadRequestException(
+        `Embeddings are turned on or off in ${WORKSPACE_FEATURES_LOCATION} ` +
+          '(PUT /maintenance/features/embeddings), not in the model settings.',
+      );
+    }
+    const before = await this.resolve(0);
     this.validate(patch);
 
     // Checked against the state the patch produces, not the patch alone: the
@@ -337,13 +469,14 @@ export class EmbeddingSettingsService {
       Object.keys(after) as (keyof ResolvedEmbeddingConfig)[]
     ).filter((field) => field !== 'apiKey' && before[field] !== after[field]);
 
-    // Turning embeddings off is a rebuild too: the vectors have to go, and
-    // turning them back on has to start from an empty corpus rather than a
-    // corpus frozen halfway through whatever was running when it stopped.
-    const requiresRebuild =
-      changedFields.some((field) =>
-        (SPACE_DEFINING_FIELDS as readonly string[]).includes(field),
-      ) || before.enabled !== after.enabled;
+    // On/off is not a patch field any more (see above), so only a change to
+    // the coordinate system itself forces a rebuild. A space-defining change
+    // made while embeddings are off is stored and applied by the rebuild the
+    // caller starts — which purges the old corpus, still the right thing,
+    // since those vectors would be meaningless under the new model.
+    const requiresRebuild = changedFields.some((field) =>
+      (SPACE_DEFINING_FIELDS as readonly string[]).includes(field),
+    );
 
     return { requiresRebuild, changedFields: changedFields.map(String) };
   }
@@ -417,7 +550,11 @@ export class EmbeddingSettingsService {
   }
 }
 
-/** Null clears an override; undefined leaves it untouched. */
+/**
+ * Null clears an override; undefined leaves it untouched. `enabled` is listed
+ * only so a stale client's patch can be recognised and refused — the switch is
+ * {@link EmbeddingSettingsService.setEnabled}.
+ */
 export interface EmbeddingSettingsPatch {
   enabled?: boolean | null;
   provider?: string | null;

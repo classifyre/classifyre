@@ -3,7 +3,7 @@ import { FindingsService } from './findings.service';
 /**
  * The overview counters must come from the rollup, not from `findings`.
  *
- * `getStats` was six `count(*)` statements over the whole table. On a
+ * `getStats` was a row of `count(*)` statements over the whole table. On a
  * 6.7M-finding workspace they measured 11.4 s wall-clock with a Postgres
  * backend at ~95% CPU, and the dashboard header issues them on every load —
  * which is what made the app feel unusable while a scan was running. The same
@@ -51,6 +51,7 @@ describe('FindingsService.getStats', () => {
         high: 1041263,
         medium: 5652948,
         low: 12,
+        info: 0,
       },
       // RESOLVED is in `total` but not in `open`, exactly as the live
       // `count({ status: OPEN })` behaved.
@@ -82,10 +83,9 @@ describe('FindingsService.getStats', () => {
     });
   });
 
-  it('counts a severity outside the four keys toward the total only', async () => {
-    // The live path's unfiltered `count()` includes INFO findings while its
-    // `bySeverity` has no key for them. Dropping them from `total` here would
-    // make the header disagree with the findings list.
+  it('gives INFO its own key instead of hiding it in the total', async () => {
+    // The tiles used to sum to less than `total` because INFO had no key, so a
+    // fifth of a workspace was unreachable from the header (field report P7).
     const h = harness({
       rows: [
         { severity: 'INFO', status: 'OPEN', count: 7 },
@@ -102,7 +102,12 @@ describe('FindingsService.getStats', () => {
       high: 3,
       medium: 0,
       low: 0,
+      info: 7,
     });
+    // The keys still sum to the total: that is the invariant P7 broke.
+    expect(
+      Object.values(result.bySeverity).reduce((a, b) => a + b, 0),
+    ).toBe(result.total);
   });
 
   it('falls back to live counts when the rollup is not built', async () => {
@@ -113,13 +118,14 @@ describe('FindingsService.getStats', () => {
       .mockResolvedValueOnce(2) // high
       .mockResolvedValueOnce(3) // medium
       .mockResolvedValueOnce(4) // low
+      .mockResolvedValueOnce(5) // info
       .mockResolvedValueOnce(90); // open
 
     const result = await h.service.getStats();
 
     expect(result).toEqual({
       total: 100,
-      bySeverity: { critical: 1, high: 2, medium: 3, low: 4 },
+      bySeverity: { critical: 1, high: 2, medium: 3, low: 4, info: 5 },
       byStatus: { open: 90 },
     });
     expect(h.stats.severityStatusTotals).not.toHaveBeenCalled();
@@ -134,7 +140,7 @@ describe('FindingsService.getStats', () => {
 
     await expect(h.service.getStats()).resolves.toEqual({
       total: 0,
-      bySeverity: { critical: 0, high: 0, medium: 0, low: 0 },
+      bySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
       byStatus: { open: 0 },
     });
   });

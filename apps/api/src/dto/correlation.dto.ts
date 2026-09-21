@@ -89,6 +89,11 @@ export class CorrelationRecomputeNoteDto {
 }
 
 export class CorrelationConfigResponseDto {
+  @ApiProperty({
+    description:
+      'Whether duplicate detection runs in this workspace (Settings → Cleanup › Features). Tuning can be saved while it is off; it takes effect in the full recompute that runs when it is turned back on.',
+  })
+  enabled!: boolean;
   @ApiProperty({ description: 'Fallback weight for any unlisted label' })
   defaultWeight!: number;
   @ApiProperty({

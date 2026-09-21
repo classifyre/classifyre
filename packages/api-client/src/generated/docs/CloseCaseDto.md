@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `conclusion` | string
 `closedBy` | string
+`keepInquiries` | boolean
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { CloseCaseDto } from '@workspace/api-client'
 const example = {
   "conclusion": null,
   "closedBy": null,
+  "keepInquiries": null,
 } satisfies CloseCaseDto
 
 console.log(example)

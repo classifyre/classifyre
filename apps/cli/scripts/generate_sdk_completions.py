@@ -40,6 +40,7 @@ from src.notebook.sdk import (  # noqa: E402
     NotebookFile,
     ParsedContent,
     Ref,
+    Tag,
     contains,
     flow,
     pages,
@@ -252,6 +253,13 @@ def build() -> dict[str, Any]:
                 "insertText": "Asset",
             },
             {
+                "label": "Tag",
+                "kind": "class",
+                "detail": 'Tag(value, severity="HIGH")',
+                "documentation": _summary(Tag),
+                "insertText": "Tag",
+            },
+            {
                 "label": "Ref",
                 "kind": "class",
                 "detail": "Ref.asset(id) | Ref.urn(urn)",
@@ -291,6 +299,10 @@ def build() -> dict[str, Any]:
             "Asset": {
                 "documentation": _summary(Asset),
                 "fields": _fields(Asset),
+            },
+            "Tag": {
+                "documentation": _summary(Tag),
+                "fields": _fields(Tag),
             },
             "AugmentedAsset": {
                 "documentation": _summary(augmentation_sdk.AugmentedAsset),

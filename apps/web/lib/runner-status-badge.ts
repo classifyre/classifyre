@@ -7,6 +7,9 @@ const RUNNER_STATUS_BADGE_LABELS = {
   RUNNING: "runners.status.running",
   PENDING: "runners.status.pending",
   ERROR: "runners.status.error",
+  // An operator's decision, not a failure — a separate label and the
+  // "set aside" tone rather than the red one (field report P8).
+  STOPPED: "runners.status.stopped",
 } as const;
 
 const RUNNER_STATUS_BADGE_TONE = {
@@ -15,6 +18,7 @@ const RUNNER_STATUS_BADGE_TONE = {
   RUNNING: STATUS_TONE.active,
   PENDING: STATUS_TONE.idle,
   ERROR: STATUS_TONE.error,
+  STOPPED: STATUS_TONE.archived,
 } as const;
 
 type RunnerStatusBadgeKey = keyof typeof RUNNER_STATUS_BADGE_LABELS;
@@ -32,7 +36,8 @@ export function getRunnerStatusBadgeLabel(status?: string | null): TranslationKe
 
 export function getRunnerStatusBadgeTone(status?: string | null) {
   if (!status) return RUNNER_STATUS_BADGE_TONE.PENDING;
-  if (isRunnerStatusBadgeKey(status)) return RUNNER_STATUS_BADGE_TONE[status];
+  const upper = status.toUpperCase();
+  if (isRunnerStatusBadgeKey(upper)) return RUNNER_STATUS_BADGE_TONE[upper];
   return RUNNER_STATUS_BADGE_TONE.PENDING;
 }
 

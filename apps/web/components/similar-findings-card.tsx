@@ -16,7 +16,9 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { SimilarFindingsGraph } from "@/components/similar-findings-graph";
+import { FeatureOffNotice } from "@/components/feature-off-notice";
 import { useTranslation } from "@/hooks/use-translation";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 
 const LIMIT = 8;
 
@@ -50,8 +52,12 @@ export function SimilarFindingsCard({
   const [items, setItems] = useState<SimilarFindingDto[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [view, setView] = useState<"graph" | "list">("graph");
+  // Off is not "no neighbours": say why the card is empty and where the
+  // switch is, instead of hiding it like an ordinary miss.
+  const embeddingsOff = useWorkspaceFeatures().isOff("embeddings");
 
   useEffect(() => {
+    if (embeddingsOff) return;
     let active = true;
     setItems(null);
     setFailed(false);
@@ -66,7 +72,27 @@ export function SimilarFindingsCard({
     return () => {
       active = false;
     };
-  }, [findingId]);
+  }, [findingId, embeddingsOff]);
+
+  if (embeddingsOff) {
+    return (
+      <Card className="rounded-[6px] border-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Layers className="h-4 w-4" />
+            {t("findings.detail.similarFindings.title")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <FeatureOffNotice
+            feature="embeddings"
+            context="similar"
+            variant="inline"
+          />
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (failed || items?.length === 0) return null;
 

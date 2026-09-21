@@ -1,14 +1,177 @@
 ---
 sidebarTitle: Storage & Cleanup
 title: Storage & Cleanup
-description: See how much space a workspace uses and safely reclaim it by wiping ephemeral datasets — never the investigation itself.
+description: Decide which storage-heavy engines run in a workspace, see how much space each dataset takes, and reclaim it safely — never the investigation itself.
 ---
 
 # Storage & Cleanup
 
-**Settings → Cleanup** lists every storage dataset of the workspace with live
-row estimates (`~`, from the planner) and byte sizes (indexes included), plus
-a workspace total. Two groups, two rules:
+**Settings → Cleanup** has two parts:
+
+- **Features** — on/off switches for the two background engines that build
+  most of a workspace's derived data: **embeddings** and **duplicate
+  detection**. Turning one off stops its work everywhere, pauses its workers,
+  and asks whether to keep or delete what it built.
+- **Datasets** — every storage dataset of the workspace with live row
+  estimates (`~`, from the planner) and byte sizes (indexes included), plus a
+  workspace total, and a safe way to wipe the ones that can be rebuilt or are
+  only history.
+
+Neither part ever touches the investigation itself: sources, findings,
+assets, cases, inquiries and the glossary.
+
+---
+
+## Feature switches
+
+| Feature | What it builds | What reads it |
+| --- | --- | --- |
+| **Embeddings** | Vectors of finding evidence and document text, the importance rankings derived from them, and the document text chunks they are embedded from | Importance ranking, near-duplicate text groups, semantic search, similar findings, semantic case leads, the AI harness's evidence lookups |
+| **Duplicate detection** | Correlation values, signatures, clusters, patterns and the scored duplicate links in the asset graph | [Duplicate review](/duplicates/), "where else found", similar-asset links in the graph, the harness duplicates tools |
+
+Both are on in a new workspace. (Embeddings follow the deployment's default
+until a workspace chooses; a deployment that ships them off shows **Off by
+default**.) Each row shows the feature's state, when it last changed, how much
+data it owns right now, and — while off — which workers it holds paused.
+
+**How** each feature works is configured elsewhere: the embedding model,
+provider and throughput live in [Harness AI → Embedding](/settings/embeddings/),
+duplicate matching in [Duplicates → Tuning](/duplicates/tuning/). Both link
+back here for the switch, so there is exactly one place to turn either on or
+off.
+
+### Turning a feature off
+
+The switch opens a dialog that lists what stops while the feature is off, then
+asks how to turn it off:
+
+- **Turn off, keep data** — a pause. Everything the feature built stays as it
+  is, frozen, and turning it back on picks up where it stopped.
+- **Turn off and delete data** — frees the storage now, in the background, with
+  live progress. Turning it back on rebuilds from scratch.
+
+Either way:
+
+- **Work stops in every process within seconds** — API pods and worker pods
+  alike, on every replica.
+- **Its workers are held.** The feature's queues are paused and show as
+  *Held · &lt;feature&gt; off* in [Settings → Workers](/settings/workers/). They
+  cannot be resumed there — the API answers `409` — because resuming them
+  would run work the workspace switched off. Turning the feature back on
+  releases them.
+- **The investigation is never touched**, and neither is anything a person
+  decided: review decisions, cases, inquiries.
+
+#### Embeddings
+
+| | Keep data (pause) | Delete data |
+| --- | --- | --- |
+| New vectors | None | None |
+| Stored vectors and importance rankings | Kept, frozen | Deleted; importance scores reset to 0 |
+| Document text chunks | Kept — and scans keep saving them | Deleted — and scans stop saving them |
+| Semantic search, similar findings, near-duplicate text groups, semantic case leads | Unavailable (search falls back to exact text) | Unavailable |
+| Workers held | `semantic-embeddings-…`, `semantic-recalibrate-…` | The same |
+| Turning back on | A catch-up pass embeds whatever arrived while off | Every finding is re-embedded (hours of worker CPU on a large corpus); document text comes back only by rescanning sources with **Full rescan** (in the scan wizard) |
+
+Why a pause keeps saving text chunks: chunks are the document text the vectors
+are built from, and a scan never sends them twice — the scan cache marks an
+unchanged file as done. Skipping them while paused would leave those files
+permanently without semantic coverage. Deleting the data is the explicit choice
+to stop collecting them.
+
+Agents that wait for evidence ranking are not held back while embeddings are
+off: a paused backlog would never drain, so the harness stops waiting on it and
+works from the evidence as it stands.
+
+#### Duplicate detection
+
+| | Keep data (pause) | Delete data |
+| --- | --- | --- |
+| Duplicate check after scans | Skipped | Skipped |
+| Recomputes and tuning changes | Wait (tuning is still saved) | Wait |
+| Duplicate review, "where else found", graph similarity links | Frozen as of turning off | Empty |
+| Review decisions and asset lineage | Kept | Kept |
+| Workers held | `correlation.scan` | The same |
+| Turning back on | One full recompute | One full recompute |
+
+Scans still reach the AI harness while duplicate detection is off. A finished
+scan normally hands its source to the autopilot *after* the duplicate check, on
+the same queue; with that queue held, the hand-off travels on its own queue
+(`autopilot.handoff`) instead, and scans that were already waiting are moved
+there when the switch goes off.
+
+A recompute that is running when the switch goes off stops at its next page of
+assets — it does not finish writing another few million pairs first — and is
+recorded in the harness log as skipped, not failed.
+
+### Turning a feature back on
+
+The switch opens a dialog that says what catching up costs before it starts:
+
+- **Embeddings** resume into the same vector space: a catch-up pass embeds
+  everything scanned while they were off, and rankings update as it goes. After
+  **delete**, everything is embedded from scratch instead.
+- **Duplicate detection** runs **one full recompute** over every asset. On a
+  large corpus that is about an hour of worker time; Duplicate review fills in
+  as it finishes. It is one recompute, not a backlog — the scans, edits and
+  tuning changes made while it was off were deliberately not queued one by one.
+
+### Deleting what a paused feature kept
+
+A feature that is off with its data kept offers **Delete kept data**. It stays
+off; the data is deleted in the background, exactly as if it had been turned
+off with **delete** in the first place (for embeddings, scans then also stop
+saving text chunks).
+
+**Clean** in the dataset table below does the same for a feature that is off.
+For a feature that is **on**, Clean is a one-off wipe and the data starts
+growing back with the next scan or recompute — the confirmation says so, and
+suggests turning the feature off instead if the goal is to keep it empty.
+
+### Where the switches show up
+
+| Where | While off |
+| --- | --- |
+| Duplicate review (every tab) | Banner: *Duplicate detection is turned off* — results as of turning off, or none after delete. A note when embeddings are off: near-duplicate text groups are not updated. |
+| Finding detail → Similar findings | Says embeddings are off instead of silently hiding the card |
+| Findings and Assets search | *Semantic* ranking notes that results match exact text only |
+| Case → Leads | Semantic neighbours are not suggested; leads come from linked inquiries |
+| Finding detail → Where else found | Notes that shared-value lookups come from duplicate detection |
+| Duplicates → Tuning → Semantic index | Reindex and recalibrate are disabled |
+| Harness AI → Embedding | Shows the state (on, off with the corpus kept, off with it deleted) and links here |
+| Settings → Workers | Held queues, with a link here instead of a Resume button |
+
+Every notice links back to this tab.
+
+### From the API or MCP
+
+```
+GET /<workspace>/maintenance/features
+PUT /<workspace>/maintenance/features/duplicates   {"enabled": false}
+PUT /<workspace>/maintenance/features/embeddings   {"enabled": false, "deleteData": true}
+PUT /<workspace>/maintenance/features/embeddings   {"enabled": true}
+```
+
+The `PUT` answers with the new state, the id of the cleanup run when data is
+being deleted (poll `GET /maintenance/cleanup/runs/:runId`), and whether a
+catch-up recompute was queued. It is allowed while the workspace is paused and
+blocked in demo mode. Turning a feature on or off while its data is being
+deleted answers `409`.
+
+Work refused because a feature is off answers with a message naming the switch:
+a manual duplicate recompute or review rebuild (`409`), an embedding reindex,
+recalibration or rebuild (`409`), a similar-findings or semantic query (`503` —
+search callers fall back to exact text). The embedding settings endpoint no
+longer accepts `enabled`; the MCP `get_correlation_config` tool reports
+`enabled`, and saving tuning while duplicate detection is off says that nothing
+recomputes until it is turned back on.
+
+---
+
+## Datasets
+
+The dataset tables list every storage dataset of the workspace. Two groups, two
+rules:
 
 - **Measured, never deleted.** Sources, findings, assets, cases, inquiries
   and glossary carry a Kept badge and have no action — the API has no cleanup
@@ -30,26 +193,34 @@ open and watch, or come back later — the table reloads with the final result
 > you are emptying, and the tab will look “still full” afterwards. When the
 > overview reports pending/running scans, pause the workspace
 > (Settings → Pause), run the cleanup, then resume. Paused means frozen: no
-> writer can race the wipe.
+> writer can race the wipe. For embeddings and duplicates, turning the
+> feature off does the same for that one engine.
 
----
+### One table, two datasets
 
-## What each cleanup does
+The asset graph (`edges`) holds two very different things: **lineage** — how
+assets derive from each other, which only a source rescan can rebuild — and the
+**scored duplicate links** duplicate detection writes, which the next duplicate
+check rebuilds. The overview splits the table's size between the **Assets** row
+(lineage) and the **Duplicate artefacts** row (scored links) by the planner's
+statistics, and the duplicates cleanup removes only the scored links. On the
+incident that motivated this, the scored links were 17 GB of a 42 GB database,
+all of it previously counted as protected assets.
+
+### What each cleanup does
 
 | Dataset             | Removes                                                              | Keeps                                                                            | Rebuilds itself                         |
 | ------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------- |
 | Scan history        | Finished runs, per-run asset snapshots, log files                    | Pending/running scans; asset “last seen by” pointers are cleared, not the assets | No — history is history                 |
-| Duplicate artefacts | Match candidates, signatures, correlation values, clusters, profiles | Review decisions and batches (human triage), config                              | Yes, on the next duplicate check        |
-| Embeddings          | Vectors and chunk texts                                              | Spaces and settings                                                              | Yes, by re-running the embedding index  |
+| Duplicate artefacts | Match candidates, signatures, correlation values, clusters, patterns, profiles, scored duplicate links in the asset graph | Review decisions and batches (human triage), lineage, config | Yes, on the next duplicate check (while duplicate detection is on) |
+| Embeddings          | Vectors, importance rankings (scores reset to 0), document text chunks, vector spaces and their indexes | Embedding settings | Findings: yes, while embeddings are on. Document text: only by a full rescan |
 | AI harness history  | Agent runs incl. dreams, logs, decisions, supervisor notes           | Learned memory, goals, briefs, configs, undo history                             | No — history is history                 |
 | Finished queue jobs | Completed/failed/cancelled jobs and archived history                 | Pending, scheduled and running jobs; the schedules themselves                    | N/A (history)                           |
 | Finding statistics  | Precomputed daily rollups and worker state                           | —                                                                                | Yes, automatically via the stats worker |
 | Source graph        | Precomputed nodes, links and worker state                            | —                                                                                | Yes, automatically via the graph worker |
 | Finished transfers  | Completed/failed/cancelled import/export jobs with chunks            | Staged and running transfers                                                     | N/A (history)                           |
 
----
-
-## Side effects
+### Side effects
 
 Case and inquiry rows are never touched by any cleanup: no case or inquiry
 table references cleanable storage, so triage work always survives whatever
@@ -61,15 +232,19 @@ you wipe. What each wipe does change, besides freeing space:
   “last seen by” run link (the assets themselves stay); notifications keep
   their text but lose the run link; findings keep the deleted run id as plain
   filterable text.
-- **Duplicate artefacts (rebuilds on the next duplicate check).** The
-  duplicates view goes empty until the check runs again — automatically as
-  part of scanning, or via a manual full recompute. Human verdicts and review
-  batches are kept, so triage decisions survive.
-- **Embeddings (rebuilds by re-running the embedding index).** Semantic
-  search, similar-findings and semantic glossary matches return nothing until
-  the re-index finishes; spaces and settings stay. The pipeline keeps
-  embedding newly scanned content on its own schedule — only the existing
-  vectors are gone.
+- **Duplicate artefacts (rebuilds on the next duplicate check).** Duplicate
+  review, “where else found” and the graph's similarity links go empty until
+  the check runs again — automatically as part of scanning, or via a manual
+  full recompute. Human verdicts and review batches are kept, so triage
+  decisions survive; lineage links are kept, so the lineage view is unchanged.
+  The wipe waits for a duplicate check that is already running rather than
+  racing it.
+- **Embeddings.** Importance scores read 0 and semantic search, similar
+  findings and near-duplicate text groups return nothing until re-embedding
+  finishes. While embeddings are on, findings are re-embedded automatically;
+  document text chunks only come back when sources are rescanned with
+  **Full rescan** (in the scan wizard), because the scan cache skips files that did not
+  change. Embedding settings stay.
 - **AI harness history (destructive, no rebuild).** Agent runs, including
   dreams, vanish with their logs and decisions, and the harness history views
   go empty. Learned memory, goals, briefs, configs and undo history stay, and
@@ -103,19 +278,31 @@ Workspaces in production hold tens of millions of rows (a busy one can keep
   writer cannot wedge the request). If anything references it — or the lock
   wait expires — the wipe drains 2,000 rows at a time via `ctid` positionals:
   short statements, row locks only, no long transaction, no table lock.
+- **Shared tables are filtered, never truncated.** The scored links in the
+  asset graph are removed one of two ways. When they are most of the table
+  and the lineage kept is small, the table is rewritten: lineage is copied
+  aside, the table truncated and the lineage copied back, in one transaction
+  that holds the table so no concurrent write is lost — the only way to give
+  the disk back at once. Otherwise the rows are deleted by physical block
+  range, 64 MB of the table per statement: sequential reads, no index needed.
+- **Embeddings go completely.** Each vector space's search index and its two
+  worker queues are dropped with it (both are named after the space, so
+  nothing else would ever clean them), and because a truncate bypasses the
+  trigger that copies importance scores onto findings, those scores are reset
+  to 0 explicitly, again block range by block range.
 - **VACUUM (ANALYZE) closes every wipe.** `DELETE` leaves dead tuples behind:
   the rows are gone but the disk stays full and the planner keeps reporting
   the old counts. The closing pass reclaims the pages and refreshes the
   estimates, so the overview shows the effect immediately. (Plain `VACUUM`,
-  never `FULL` — no blocking lock. The `TRUNCATE` path frees heap *and*
-  indexes instantly; on the `DELETE` fallback path, heap pages are reclaimed
-  while heavily bloated indexes — e.g. a large HNSW vector index — only
-  shrink on rebuild, so a residual index size may remain visible.)
+  never `FULL` — no blocking lock. The `TRUNCATE` and rewrite paths free heap
+  *and* indexes instantly; on the `DELETE` paths, heap pages are reclaimed
+  for reuse while heavily bloated indexes only shrink on rebuild, so a
+  residual size may remain visible.)
 - **Progress you can poll.** `POST /maintenance/cleanup/:key` answers `202
   { runId }`; `GET /maintenance/cleanup/runs/:runId` reports
-  `processed`, `currentTable` and the final `result`. Run records live in API
-  memory (last 50) — an API restart drops them, in which case the overview
-  itself shows the outcome.
+  `processed`, `currentTable`, a `note` while the run waits or drops indexes,
+  and the final `result`. Run records live in API memory (last 50) — an API
+  restart drops them, in which case the overview itself shows the outcome.
 - **Live work is skipped, never deleted.** Running or pending scans, queued
   or active jobs and unfinished transfers are counted under “left alone” in
   the result instead of being touched.

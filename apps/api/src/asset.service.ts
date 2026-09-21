@@ -16,12 +16,14 @@ import {
   DetectorType,
   FindingStatus,
   RunnerAssetChangeType,
+  RunnerAssetStatus,
   Severity,
   TextExtractionStatus,
 } from '@prisma/client';
 import { generateDetectionIdentity } from './utils/detection-identity';
 import { heapOverThreshold } from './utils/heap-guard';
 import { computeScopeFingerprint } from './utils/scope-fingerprint';
+import { assertKnownAssetSearchKeys } from './utils/asset-search-keys';
 import {
   CUSTOM_KEY_PREFIX,
   configuredDetectorKeysFromConfig,
@@ -102,6 +104,17 @@ const DUPLICATE_REPORT_CAP = 5;
 
 /** Orphaned findings per page in the removed-detector cleanup (see call site). */
 const REMOVED_DETECTOR_PAGE_SIZE = 1000;
+
+/** Findings returned by default for "what points at this asset" (field report P12). */
+const DEFAULT_REFERENCING_FINDINGS_LIMIT = 50;
+
+/**
+ * Incoming edges read before the panel gives up and says it is truncated.
+ *
+ * A hub asset can be referenced by thousands of others — one GENESIS table fed
+ * ~900 assets (P13) — and this is a side panel, not an export.
+ */
+const REFERENCING_ASSET_SCAN_LIMIT = 500;
 
 const findingForAssetSelect = {
   id: true,
@@ -987,6 +1000,114 @@ export class AssetService {
     });
   }
 
+  /**
+   * Findings recorded on OTHER assets that point at this one.
+   *
+   * An integrity check, a profile or a derived record is its own asset that
+   * `references()` the thing it is about. On the Köln region page the Findings
+   * tab therefore read "No findings found" while *Zensus-Rebasing: Köln*
+   * (−74,346, −6.9%) pointed straight at it: an analyst looking at a district
+   * could not see what was known about it without leaving the page (field
+   * report P12).
+   *
+   * Only incoming asset→asset edges count. Following outgoing ones as well
+   * would pull in everything a hub table feeds, which is the whole namespace
+   * (P13); the asset's own findings are already on the Findings tab.
+   */
+  async listFindingsOnReferencingAssets(
+    assetId: string,
+    options?: { limit?: number },
+  ): Promise<{
+    assetId: string;
+    referencingAssets: number;
+    truncated: boolean;
+    items: Array<{
+      findingId: string;
+      severity: Severity;
+      status: FindingStatus;
+      findingType: string;
+      matchedContent: string | null;
+      detectedAt: Date;
+      viaAssetId: string;
+      viaAssetName: string;
+      relationType: string;
+    }>;
+  }> {
+    const asset = await this.prisma.asset.findUnique({
+      where: { id: assetId },
+      select: { id: true },
+    });
+    if (!asset) throw new NotFoundException(`Asset ${assetId} not found`);
+
+    const limit = Math.min(
+      200,
+      Math.max(1, Number(options?.limit ?? DEFAULT_REFERENCING_FINDINGS_LIMIT)),
+    );
+
+    // Bounded on purpose: a hub asset can be referenced by thousands of others
+    // and this is a panel, not an export. `truncated` says when that happened.
+    const edges = await this.prisma.edge.findMany({
+      where: { toType: 'asset', toId: assetId, fromType: 'asset' },
+      select: { fromId: true, relationType: true },
+      take: REFERENCING_ASSET_SCAN_LIMIT + 1,
+      orderBy: { createdAt: 'desc' },
+    });
+    const truncatedEdges = edges.length > REFERENCING_ASSET_SCAN_LIMIT;
+    const relationByAsset = new Map<string, string>();
+    for (const edge of edges.slice(0, REFERENCING_ASSET_SCAN_LIMIT)) {
+      if (edge.fromId === assetId) continue;
+      if (!relationByAsset.has(edge.fromId)) {
+        relationByAsset.set(edge.fromId, edge.relationType);
+      }
+    }
+    const referencingIds = [...relationByAsset.keys()];
+    if (referencingIds.length === 0) {
+      return {
+        assetId,
+        referencingAssets: 0,
+        truncated: truncatedEdges,
+        items: [],
+      };
+    }
+
+    const findings = await this.prisma.finding.findMany({
+      where: {
+        assetId: { in: referencingIds },
+        status: { not: FindingStatus.RESOLVED },
+      },
+      select: {
+        id: true,
+        assetId: true,
+        severity: true,
+        status: true,
+        findingType: true,
+        matchedContent: true,
+        detectedAt: true,
+        asset: { select: { name: true } },
+      },
+      // Worst first: the reason to look at this panel is to notice something.
+      orderBy: [{ severity: 'asc' }, { detectedAt: 'desc' }],
+      take: limit + 1,
+    });
+
+    return {
+      assetId,
+      referencingAssets: referencingIds.length,
+      truncated: truncatedEdges || findings.length > limit,
+      items: findings.slice(0, limit).map((finding) => ({
+        findingId: finding.id,
+        severity: finding.severity,
+        status: finding.status,
+        findingType: finding.findingType,
+        matchedContent: finding.matchedContent,
+        detectedAt: finding.detectedAt,
+        viaAssetId: finding.assetId,
+        viaAssetName: finding.asset?.name ?? finding.assetId,
+        relationType: relationByAsset.get(finding.assetId) ?? 'REFERENCES',
+      })),
+    };
+  }
+
   async getAssetById(assetId: string): Promise<NormalizedAsset | null> {
     const asset = await this.prisma.asset.findUnique({
       where: { id: assetId },
@@ -1148,6 +1269,10 @@ export class AssetService {
     limit: number;
     ranking?: { mode: string; query: string; explained: boolean };
   }> {
+    // Fails closed like the findings search: an unrecognised key would widen
+    // the result instead of narrowing it, and the caller would read the whole
+    // corpus as the filtered answer.
+    assertKnownAssetSearchKeys(params);
     const assetFilters = params.assets ?? {};
     const findingFilters = params.findings ?? {};
     const page = params.page ?? {};
@@ -2166,19 +2291,38 @@ export class AssetService {
     // — it just means we stopped looking there — so the asset and its findings
     // are retained and reported instead. Assets predating scope fingerprinting
     // carry null and are retained on the same reasoning.
+    //
+    // `absentUnderScope` is what makes that recoverable. A retained asset is
+    // stamped with the scope this run covered, so the NEXT full scan under the
+    // same scope has two independent passes saying the object is not there and
+    // can retire it. Without it, an asset that vanished in the same run as a
+    // notebook variable change was exempt for good: it kept the old
+    // fingerprint, every later run carried the new one, and they never matched
+    // again (field report §14 operational note).
     const deletableAssets = missingAssets.filter(
-      (a) => a.scopeFingerprint === scopeFingerprint,
+      (a) =>
+        a.scopeFingerprint === scopeFingerprint ||
+        a.absentUnderScope === scopeFingerprint,
     );
     const outOfScopeAssets = missingAssets.filter(
-      (a) => a.scopeFingerprint !== scopeFingerprint,
+      (a) =>
+        a.scopeFingerprint !== scopeFingerprint &&
+        a.absentUnderScope !== scopeFingerprint,
     );
 
     if (outOfScopeAssets.length > 0) {
       console.warn(
         `[finalizeIngestRun] Source ${sourceId}: retaining ${outOfScopeAssets.length} ` +
           `asset(s) absent from this run but ingested under a different scope. ` +
-          `Their findings stay OPEN. Retire them explicitly if intended.`,
+          `Their findings stay OPEN. A second full scan under this same scope ` +
+          `will retire them; retire them explicitly to do it now.`,
       );
+      // Recorded before the deletions below so a run that dies part-way still
+      // leaves the "we looked here" evidence behind rather than starting over.
+      await this.prisma.asset.updateMany({
+        where: { id: { in: outOfScopeAssets.map((a) => a.id) } },
+        data: { absentUnderScope: scopeFingerprint },
+      });
     }
 
     const missingAssetIds = deletableAssets.map((a) => a.id);
@@ -2203,6 +2347,22 @@ export class AssetService {
           await tx.asset.updateMany({
             where: { id: { in: missingAssetIds } },
             data: { status: AssetStatus.DELETED, runnerId },
+          });
+
+          // A retired asset was, by definition, not discovered by this run, so
+          // it normally has no runner_assets row. Updating alone matched nothing
+          // and every run reported assetsDeleted = 0 (GENESIS field report P16).
+          // Create the row; the update below covers the rare asset that has one.
+          const retiredAt = new Date();
+          await tx.runnerAsset.createMany({
+            data: deletableAssets.map((a) => ({
+              runnerId,
+              assetHash: a.hash,
+              status: RunnerAssetStatus.PROCESSED,
+              changeType: RunnerAssetChangeType.DELETED,
+              completedAt: retiredAt,
+            })),
+            skipDuplicates: true,
           });
 
           // Retirement is the strongest thing a run can do to an asset, so it
@@ -2859,6 +3019,10 @@ export class AssetService {
             // Records the scope this asset was seen under, so a later run can
             // tell "the object is gone" from "we stopped looking there".
             ...(scopeFingerprint ? { scopeFingerprint } : {}),
+            // It is here, so no earlier run's "looked and did not find it"
+            // still stands. Left set, a reappearing asset would be retired by
+            // the next scan that happened to miss it.
+            absentUnderScope: null,
           };
 
           if (!existingAsset) {
@@ -2954,6 +3118,7 @@ export class AssetService {
               status: AssetStatus.UNCHANGED,
               lastScannedAt: scannedAt,
               ...(scopeFingerprint ? { scopeFingerprint } : {}),
+              absentUnderScope: null,
             },
           });
         }

@@ -100,7 +100,8 @@ export const SearchSourcesFiltersDtoStatusEnum = {
     Running: 'RUNNING',
     Completed: 'COMPLETED',
     Warning: 'WARNING',
-    Error: 'ERROR'
+    Error: 'ERROR',
+    Stopped: 'STOPPED'
 } as const;
 export type SearchSourcesFiltersDtoStatusEnum = typeof SearchSourcesFiltersDtoStatusEnum[keyof typeof SearchSourcesFiltersDtoStatusEnum];
 

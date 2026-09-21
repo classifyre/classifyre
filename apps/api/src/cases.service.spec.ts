@@ -258,8 +258,19 @@ describe('CasesService', () => {
     mockPrisma.caseEvidence.upsert.mockResolvedValue({ id: 'ev1' });
     mockPrisma.caseFinding.createMany.mockResolvedValue({ count: 1 });
 
-    const result = await service.attachFindings('c1', { findingIds: ['f1'] });
+    const result = await service.attachFindings('c1', {
+      findingIds: ['f1'],
+      addedBy: 'genesis-productionisation',
+    });
     expect(result.attached).toBe(1);
+    // The actor reaches the evidence row the attach creates (field report P14).
+    expect(mockPrisma.caseEvidence.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          addedBy: 'genesis-productionisation',
+        }),
+      }),
+    );
     expect(mockGraph.inferEdgesForAsset).toHaveBeenCalledWith('a1');
   });
 
@@ -299,6 +310,28 @@ describe('CasesService', () => {
     expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('case', 'c1');
     expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q1');
     expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q2');
+  });
+
+  // An answered case can have standing checks behind it: the non-additivity
+  // check catches next year's mismatch only while its inquiry stays active
+  // (GENESIS field report P14).
+  it('keeps the linked inquiries active when asked to', async () => {
+    mockPrisma.case.findUnique.mockResolvedValue({
+      ...caseRow({ status: 'CLOSED', conclusion: 'Answered.' }),
+      evidence: [],
+      inquiryLinks: [],
+    });
+    mockPrisma.case.update.mockResolvedValue(caseRow({ status: 'CLOSED' }));
+    mockPrisma.caseInquiry.findMany.mockResolvedValue([{ inquiryId: 'q1' }]);
+
+    const result = await service.close('c1', {
+      conclusion: 'Answered; the checks keep running.',
+      keepInquiries: true,
+    });
+
+    expect(result.archivedInquiries).toBe(0);
+    expect(mockPrisma.inquiry.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.inquiry.updateMany).not.toHaveBeenCalled();
   });
 
   it('refuses to close a case without a conclusion', async () => {

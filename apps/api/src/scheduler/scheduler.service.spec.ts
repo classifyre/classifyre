@@ -80,9 +80,12 @@ describe('SchedulerService', () => {
       );
     });
 
-    it('does not register any worker when no sources are enabled', async () => {
+    it('registers no source worker when no sources are enabled', async () => {
       await service.registerForNamespace();
-      expect(mockBoss.work).not.toHaveBeenCalled();
+      // Only the missed-window sweep, which is per namespace and not per source.
+      expect(mockBoss.work.mock.calls.map((c) => c[0])).toEqual([
+        'cron-catchup',
+      ]);
     });
 
     it('registers missing DB schedules on startup sync', async () => {
@@ -113,7 +116,11 @@ describe('SchedulerService', () => {
 
       await service.registerForNamespace();
 
-      expect(mockBoss.schedule).not.toHaveBeenCalled();
+      expect(
+        mockBoss.schedule.mock.calls.filter((c) =>
+          String(c[0]).startsWith('ingest-source-'),
+        ),
+      ).toEqual([]);
     });
 
     it('removes stale pg-boss schedules for disabled/deleted sources', async () => {
@@ -140,7 +147,11 @@ describe('SchedulerService', () => {
       await service.registerForNamespace();
 
       // worker should only be registered once despite two bootstrap calls
-      expect(mockBoss.work).toHaveBeenCalledTimes(1);
+      expect(
+        mockBoss.work.mock.calls.filter((c) =>
+          String(c[0]).startsWith('ingest-source-'),
+        ),
+      ).toHaveLength(1);
     });
   });
 
@@ -276,5 +287,140 @@ describe('SchedulerService', () => {
         capturedHandler([{ id: 'job-4', data: { sourceId } }]),
       ).resolves.toBeUndefined();
     });
+  });
+});
+
+/**
+ * A cron window that passes while nothing is scheduling is lost: pg-boss only
+ * fires while a listener is up, and no replay exists. On an instance that is
+ * not up around the clock that silently turns a daily schedule into no runs at
+ * all — the GENESIS namespaces went 25 hours stale with every schedule enabled.
+ */
+describe('SchedulerService cron catch-up', () => {
+  let service: SchedulerService;
+
+  const source = (over: Record<string, unknown> = {}) => ({
+    id: 's1',
+    name: 'Destatis Pressemitteilungen',
+    scheduleCron: '15 6 * * *',
+    scheduleTimezone: 'Europe/Berlin',
+    // The window at 04:15 UTC on the 20th passed unserved.
+    lastRunAt: new Date('2026-09-19T07:40:00Z'),
+    runnerStatus: 'COMPLETED',
+    ...over,
+  });
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-20T09:00:00Z'));
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        SchedulerService,
+        { provide: PgBossService, useValue: mockPgBossService },
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: CliRunnerService, useValue: mockCliRunnerService },
+        { provide: ClsService, useValue: mockCls },
+      ],
+    }).compile();
+    service = module.get<SchedulerService>(SchedulerService);
+  });
+
+  afterEach(() => jest.useRealTimers());
+
+  it('starts one run for a source whose window passed while nothing ran', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([source()]);
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 1,
+    });
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledWith(
+      's1',
+      TriggerType.SCHEDULED,
+      'Scheduler (catch-up)',
+    );
+  });
+
+  it('starts nothing when the last run is newer than the window', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([
+      source({ lastRunAt: new Date('2026-09-20T05:00:00Z') }),
+    ]);
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 0,
+    });
+    expect(mockCliRunnerService.startRun).not.toHaveBeenCalled();
+  });
+
+  it('leaves a source that is already running or queued alone', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([
+      source({ runnerStatus: 'RUNNING' }),
+      source({ id: 's2', runnerStatus: 'PENDING' }),
+    ]);
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 0,
+    });
+  });
+
+  it('never starts a run for a window that has not come round yet', async () => {
+    // Weekly on Tuesday; 2026-09-20 is a Sunday and the source ran on Saturday.
+    mockPrisma.source.findMany.mockResolvedValue([
+      source({ scheduleCron: '0 4 * * 2' }),
+    ]);
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 0,
+    });
+  });
+
+  it('caps one pass and takes the oldest miss first', async () => {
+    // Daily windows at 07:00–13:00 UTC, with "now" at 09:00 on the 20th: for
+    // s3..s6 today's window has not arrived, so their last one is yesterday's
+    // — which makes them the oldest misses, ahead of this morning's 07:00.
+    const missed = Array.from({ length: 7 }, (_, i) =>
+      source({
+        id: `s${i}`,
+        scheduleCron: `0 ${7 + i} * * *`,
+        scheduleTimezone: 'UTC',
+        lastRunAt: new Date('2026-09-19T00:00:00Z'),
+      }),
+    );
+    mockPrisma.source.findMany.mockResolvedValue(missed);
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 5,
+    });
+    expect(mockCliRunnerService.startRun.mock.calls.map((c) => c[0])).toEqual([
+      's3',
+      's4',
+      's5',
+      's6',
+      's0',
+    ]);
+  });
+
+  it('keeps sweeping when one source refuses to start', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([
+      source({ id: 'paused' }),
+      source({ id: 'fine', scheduleCron: '0 7 * * *' }),
+    ]);
+    mockCliRunnerService.startRun
+      .mockRejectedValueOnce(new ConflictException('workspace is paused'))
+      .mockResolvedValueOnce({});
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 1,
+    });
+  });
+
+  it('registers the recurring sweep alongside the source schedules', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([]);
+    await service.registerForNamespace();
+    expect(mockBoss.schedule).toHaveBeenCalledWith(
+      'cron-catchup',
+      '*/10 * * * *',
+      {},
+      { tz: 'UTC' },
+    );
   });
 });

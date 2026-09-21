@@ -170,6 +170,59 @@ describe('RunnerLogStorageService (local filesystem backend)', () => {
     return service;
   }
 
+  // On Kubernetes the CLI reports completion over REST while the API is still
+  // reading the Job's output, so the run is finalised before the last log read.
+  // Those lines used to vanish: 2 to 19 missing from the tail of every run.
+  it('keeps output that arrives after the run was finalised', async () => {
+    const service = await createService();
+    const runnerId = 'runner-late-tail';
+
+    await service.initializeRunner(SOURCE_ID, runnerId);
+    service.appendChunk(runnerId, 'phase 1 done\n', 'combined');
+    await service.finalizeRunner(SOURCE_ID, runnerId);
+
+    // The Job's final log read lands here, after finalisation.
+    service.appendChunk(
+      runnerId,
+      'Phase 2 starting\nScan complete\n',
+      'combined',
+    );
+    await expect(service.flushLateChunks(SOURCE_ID, runnerId)).resolves.toBe(2);
+
+    const logs = await service.listLogs({
+      sourceId: SOURCE_ID,
+      runnerId,
+      take: 20,
+    });
+    expect(logs.entries.map((e) => e.message)).toEqual([
+      'phase 1 done',
+      'Phase 2 starting',
+      'Scan complete',
+    ]);
+
+    // Nothing left to flush, and a second call is harmless.
+    await expect(service.flushLateChunks(SOURCE_ID, runnerId)).resolves.toBe(0);
+    await service.onModuleDestroy();
+  });
+
+  it('flushing is a no-op for a run whose tail arrived in time', async () => {
+    const service = await createService();
+    const runnerId = 'runner-no-late-tail';
+
+    await service.initializeRunner(SOURCE_ID, runnerId);
+    service.appendChunk(runnerId, 'alpha\nbeta\n', 'combined');
+    await service.finalizeRunner(SOURCE_ID, runnerId);
+
+    await expect(service.flushLateChunks(SOURCE_ID, runnerId)).resolves.toBe(0);
+    const logs = await service.listLogs({
+      sourceId: SOURCE_ID,
+      runnerId,
+      take: 20,
+    });
+    expect(logs.entries.map((e) => e.message)).toEqual(['alpha', 'beta']);
+    await service.onModuleDestroy();
+  });
+
   it('persists logs to disk and serves them after finalizeRunner', async () => {
     const service = await createService();
     const runnerId = 'runner-local-persist';

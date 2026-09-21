@@ -150,13 +150,13 @@ test("rebuildable datasets explain the impact instead of warning", async ({
   const firstTable = component.getByRole("table").nth(0);
   const cancel = () => page.getByRole("button", { name: "Cancel", exact: true }).click();
 
-  // Embeddings: features stay broken until re-index — amber warning.
+  // Embeddings: document text only comes back by rescanning — amber warning.
   await firstTable
     .getByRole("row", { name: /Embeddings/ })
     .getByRole("button", { name: "Clean", exact: true })
     .click();
   await expect(
-    page.getByText("return nothing until you re-run the embedding index", {
+    page.getByText("document text only comes back by rescanning", {
       exact: false,
     }),
   ).toBeVisible();
@@ -168,7 +168,9 @@ test("rebuildable datasets explain the impact instead of warning", async ({
     .getByRole("button", { name: "Clean", exact: true })
     .click();
   await expect(
-    page.getByText("Your past review decisions are kept", { exact: false }),
+    page.getByText("Lineage and your review decisions are kept", {
+      exact: false,
+    }),
   ).toBeVisible();
   await cancel();
 });

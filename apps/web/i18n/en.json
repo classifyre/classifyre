@@ -400,6 +400,8 @@
       "runFailed": "Cleanup failed: {{error}}",
       "runGone": "Cleanup left this view; the overview below shows the result once reloaded.",
       "activeJobsHint": "{{count}} scan(s) still running — pause the workspace first, or workers may write new rows while cleaning.",
+      "featureOnNote": "{{feature}} is on, so this data starts growing back with the next scan or recompute. To keep it empty, turn {{feature}} off in Features above instead.",
+      "featureOffNote": "{{feature}} is off, so this data stays deleted until you turn it back on.",
       "loading": "Measuring workspace storage…",
       "loadFailed": "Could not load the storage overview",
       "retry": "Retry",
@@ -437,13 +439,13 @@
         },
         "duplicates": {
           "name": "Duplicate artefacts",
-          "desc": "Match candidates, signatures and correlation profiles. Human review decisions are kept; the next duplicate check rebuilds the rest.",
-          "impact": "Match candidates, signatures and clusters are removed; the duplicates queue stays empty until the next duplicate check. Your past review decisions are kept."
+          "desc": "Match candidates, signatures, correlation values, clusters and the scored duplicate links in the asset graph. Review decisions and lineage are kept; the next duplicate check rebuilds the rest.",
+          "impact": "Everything duplicate detection produced is removed, including its scored links in the asset graph; Duplicate review stays empty until the next duplicate check. Lineage and your review decisions are kept."
         },
         "embeddings": {
           "name": "Embeddings",
-          "desc": "Vectors and chunk texts. Spaces and settings are kept; re-running the embedding index rebuilds the rest.",
-          "impact": "Vectors and chunk texts are removed. Semantic search, similar findings and semantic glossary matches return nothing until you re-run the embedding index."
+          "desc": "Vectors, the importance rankings derived from them, document text chunks and the vector spaces. Embedding settings are kept.",
+          "impact": "Vectors, rankings (importance scores reset to 0) and document text chunks are removed. Findings are re-embedded automatically while embeddings are on; document text only comes back by rescanning sources with a full rescan."
         },
         "harness": {
           "name": "AI harness history",
@@ -607,6 +609,109 @@
         "failed": "The last batch threw. pg-boss retries on its own schedule.",
         "stale": "No worker has reported recently. The process may have been killed mid-job."
       }
+    }
+  },
+  "features": {
+    "title": "Features",
+    "subtitle": "The two background engines that build most of this workspace's derived data. Turning one off stops its work and pauses its workers; the investigation itself — sources, findings, assets, cases, inquiries, glossary — is never touched.",
+    "loading": "Reading feature switches…",
+    "loadFailed": "Could not load the feature switches",
+    "retry": "Retry",
+    "stateOn": "On",
+    "stateOffKept": "Off · data kept",
+    "stateOffDeleted": "Off · data deleted",
+    "stateDefaultOff": "Off by default",
+    "defaultOffHint": "This deployment ships with it off. Turning it on applies to this workspace only.",
+    "since": "since {{when}}",
+    "dataSize": "{{size}} of data · ~{{rows}} rows",
+    "noData": "No data stored",
+    "workersPaused": "Workers paused: {{queues}}",
+    "viewWorkers": "View workers",
+    "deleteData": "Delete kept data",
+    "deleting": "Deleting data… {{rows}} rows removed",
+    "switchLabel": "Turn {{name}} on or off",
+    "items": {
+      "embeddings": {
+        "name": "Embeddings",
+        "desc": "The semantic layer: importance ranking, near-duplicate text groups, semantic search, similar findings, case leads and the AI harness's evidence lookups.",
+        "configure": "Model & performance"
+      },
+      "duplicates": {
+        "name": "Duplicate detection",
+        "desc": "Matches assets that share identifying values after every scan. Feeds Duplicate review, “where else found”, similar-asset links in the graph and the harness duplicates tools.",
+        "configure": "Tuning"
+      }
+    },
+    "off": {
+      "title": "Turn off {{name}}?",
+      "stops": "While it is off",
+      "keepLabel": "Turn off, keep data",
+      "keepDesc": "A pause. Everything stays as it is now, and turning it back on picks up where it stopped.",
+      "deleteLabel": "Turn off and delete data ({{size}})",
+      "deleteDesc": "Frees the storage now. Turning it back on rebuilds from scratch.",
+      "cancel": "Cancel",
+      "confirmKeep": "Turn off",
+      "confirmDelete": "Turn off and delete",
+      "embeddings": {
+        "stop1": "No new vectors: newly scanned findings stay unranked and existing importance scores freeze.",
+        "stop2": "Semantic search falls back to exact text; similar findings, near-duplicate text groups and semantic case leads stop.",
+        "stop3": "The AI harness loses its semantic evidence lookups.",
+        "stop4": "The embedding and recalibration workers are paused (Settings → Workers) and cannot be resumed there.",
+        "keep": "Kept: vectors, rankings and document text chunks. Scans keep saving text chunks, so turning back on catches up without rescanning.",
+        "delete": "Deletes vectors, importance rankings (scores reset to 0), document text chunks and vector indexes, and new scans stop saving text chunks. Turning back on re-embeds every finding (hours of worker CPU on a large corpus); document text only comes back by rescanning sources with a full rescan."
+      },
+      "duplicates": {
+        "stop1": "No duplicate check after scans; recomputes and tuning changes wait until it is turned back on.",
+        "stop2": "Duplicate review, “where else found”, similar-asset links in the graph and the harness duplicates tools stop updating.",
+        "stop3": "Scans still hand off to the AI harness — only the duplicate check is skipped.",
+        "stop4": "The correlation.scan worker is paused (Settings → Workers) and cannot be resumed there.",
+        "keep": "Kept: every match and pattern as it stands now, and all review decisions.",
+        "delete": "Deletes match candidates, signatures, correlation values, clusters, patterns and the scored duplicate links in the asset graph. Lineage links and your review decisions are kept. Duplicate review stays empty until it is turned back on and the recompute finishes."
+      }
+    },
+    "enable": {
+      "title": "Turn on {{name}}?",
+      "confirm": "Turn on",
+      "cancel": "Cancel",
+      "embeddingsKept": "Embedding resumes where it stopped: content scanned while it was off is embedded in the background, and rankings update as it catches up.",
+      "embeddingsDeleted": "Embedding starts from scratch: every finding is re-embedded in the background — hours of worker CPU on a large corpus. Document text deleted earlier only comes back by rescanning sources with a full rescan.",
+      "duplicates": "Runs one full recompute over every asset to catch up with everything scanned while it was off — on a large corpus about an hour of worker time. Duplicate review fills in as it finishes."
+    },
+    "deleteKept": {
+      "title": "Delete the data {{name}} kept?",
+      "desc": "{{name}} stays off. This frees {{size}} now; turning it back on then rebuilds from scratch.",
+      "confirm": "Delete data",
+      "cancel": "Cancel"
+    },
+    "toast": {
+      "turnedOn": "{{name}} is on",
+      "turnedOff": "{{name}} is off",
+      "recompute": "{{name}} is on — a full recompute was queued to catch up",
+      "deleted": "{{name}} data deleted: {{rows}} rows in {{seconds}}s",
+      "deleteFailed": "Deleting {{name}} data failed: {{error}}",
+      "failed": "Could not change {{name}}"
+    },
+    "notice": {
+      "action": "Turn on in Settings → Cleanup",
+      "embeddings": {
+        "title": "Embeddings are turned off",
+        "search": "Semantic ranking is unavailable — results match exact text only.",
+        "similar": "Similar findings come from embeddings, which are turned off for this workspace.",
+        "leads": "Semantic neighbours are not suggested while embeddings are off; leads come from linked inquiries only.",
+        "duplicates": "Near-duplicate text groups are not updated while embeddings are off.",
+        "index": "The semantic index is paused, so nothing is re-indexed or recalibrated."
+      },
+      "duplicates": {
+        "title": "Duplicate detection is turned off",
+        "review": "New scans are not checked for duplicates, so this queue shows the results from before it was turned off.",
+        "reviewDeleted": "Its results were deleted, so there is nothing to review until it is turned back on.",
+        "occurrences": "Shared-value lookups come from duplicate detection, which is turned off for this workspace."
+      }
+    },
+    "workers": {
+      "heldBy": "Held · {{feature}} off",
+      "heldHint": "Paused because {{feature}} is turned off for this workspace. It resumes when you turn it back on in Settings → Cleanup.",
+      "turnOn": "Turn on in Cleanup"
     }
   },
   "dataTransfer": {
@@ -806,6 +911,7 @@
     "statusCompleted": "Completed",
     "statusWarning": "Warning",
     "statusError": "Error",
+    "statusStopped": "Stopped",
     "scheduleEnabled": "Schedule enabled",
     "findingsLatestRun": "Findings from latest run",
     "noChanges": "No changes",
@@ -2154,7 +2260,8 @@
       "warning": "Warning",
       "running": "Running",
       "pending": "Pending",
-      "error": "Error"
+      "error": "Error",
+      "stopped": "Stopped"
     },
     "logs": {
       "title": "Logs",
@@ -3642,8 +3749,11 @@
       "desc": "Embeddings turn evidence text into vectors so Classifyre can find near-duplicates, rank importance and answer semantic search. Everything here applies to this workspace only.",
       "on": "On",
       "off": "Off",
-      "enableLabel": "Semantic embedding",
-      "enableDesc": "Turning this off stops all inference and deletes every stored vector for this workspace. Near-duplicate grouping, evidence ranking and semantic search stop working until it is turned back on.",
+      "switchLabel": "Embeddings for this workspace",
+      "switchOnDesc": "On. Embeddings are turned on or off in Settings → Cleanup, next to duplicate detection — turning them off there offers keeping or deleting the corpus.",
+      "switchOffKeptDesc": "Off — the corpus is kept (a pause). Turn embeddings back on in Settings → Cleanup to catch up.",
+      "switchOffDeletedDesc": "Off — the corpus was deleted. Turn embeddings back on in Settings → Cleanup to rebuild it.",
+      "switchManage": "Settings → Cleanup",
       "providerHeading": "Model",
       "providerDesc": "Which model turns text into vectors. Changing it re-embeds the corpus from scratch.",
       "providerLocal": "Local inference",
@@ -3670,9 +3780,6 @@
       "aiProviderNotEmbedding": "This provider is not marked as an embedding model.",
       "inheritedHeading": "From the provider",
       "inheritedHint": "Model, dimensions and pooling come from the selected AI provider. Edit them there.",
-      "confirmDisableTitle": "Delete all embeddings?",
-      "confirmDisableBody": "Turning embeddings off deletes every stored vector for this workspace. Nothing is re-embedded — turning them back on later starts a fresh build.",
-      "confirmDisableProceed": "Delete embeddings",
       "offlineWarning": "This deployment runs offline and ships one pinned model, so a different local model cannot be downloaded. Use a remote provider instead, or enable model downloads in the deployment.",
       "performanceHeading": "Throughput",
       "performanceDesc": "How fast vectors are produced. These never affect what a vector means, so no rebuild is needed — but batch size, worker concurrency and startup reconciliation bind when the embedding worker registers, so they apply after the service restarts.",
@@ -3735,7 +3842,7 @@
       "confirmChanges": "Changing: {{fields}}",
       "confirmProceed": "Delete and re-embed",
       "confirmCancel": "Cancel",
-      "disabledNotice": "Embedding is off for this workspace. Near-duplicate grouping, evidence ranking and semantic search are unavailable."
+      "disabledNotice": "Embedding is off for this workspace, so importance ranking, near-duplicate text groups and semantic search are unavailable. Turn it back on in Settings → Cleanup."
     },
     "kinds": {
       "INQUIRY": "Inquiry",
