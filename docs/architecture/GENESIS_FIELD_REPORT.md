@@ -1,6 +1,6 @@
 # Field report: three GENESIS namespaces built on the dev instance
 
-**Status:** 20 of 20 addressed on branch `feat/cleanup_storage` (P17–P20 uncommitted, 2026-09-20; P1 and P14 partly), 0 open · **Observed:** 2026-09-17, re-checked 2026-09-19 and 2026-09-20 on v0.5.9 · **Instance:** local k3d/skaffold
+**Status:** 22 of 22 addressed and merged (P17–P20 in `119eb354`, `35d7e292`, `ff7e35f5`; P21–P22 in `98534f5d`, `4b60785b`; P1 and P14 partly), 0 open · **Reviewed:** 2026-09-21, journal §17 — the corpus exercises ingestion and casework but not the detection engine · **Observed:** 2026-09-17, re-checked 2026-09-19 and 2026-09-20 on v0.5.9 · **Instance:** local k3d/skaffold
 (`classifyre-dev`, API via port-forward `:8811`) · **Namespaces:** `de-statistik-integritaet`,
 `de-regionen`, `de-fruehwarnung` · **Companion:** `genesis/PRODUCTIONISATION_JOURNAL.md`
 
@@ -35,7 +35,7 @@ unfixed, and added two defects found while answering "why are the namespaces sta
 | P6 | **fixed (platform + config)** | `tag_*` labels are no longer phonetic-eligible; the GENESIS namespaces set every Tag and REGEX label's correlation weight to 0 (`deploy.py --only correlation`). Applying that exposed three more defects, all fixed: (1) `PUT /correlation/config`, `POST`/`DELETE /correlation/exclusions` and the MCP `save_correlation_config` / `add_`/`remove_correlation_exclusion` tools promised a recompute and never scheduled one (`saveConfig` leaves scheduling to its caller, and no caller did); (2) an *exact* value-set match forced DUPLICATE even when every shared value was weighted 0 — 1,928 pairs at 0 % confidence; (3) a full recompute never rebuilt the review queue, so it kept serving 20,506 pairs the new weights had removed. The umlaut-stripping label key is left alone: changing it would re-key existing correlation data | specs (value-normalizer, scoring, controller, recompute); live: 0 scored duplicate/related pairs; review queue 7,771 / 20,506 / 2,078 → 2,444 / 4,365 / 0 (the rest is near-duplicate template text, an operator decision) |
 | P7 | **fixed** | `findings/stats` carries an `info` key on both the rollup and live paths, and the Findings page has a sixth tile. The invariant the four tiles broke — the severity keys summing to `total` — is now a test | spec; live: `de-statistik-integritaet` 1,176 total = 0+18+252+299+**607**, and the UI shows *Routine 607* |
 | P8 | **fixed** | `RunnerStatus.STOPPED` exists (migration `20260920120000`, applied to all 12 tenant schemas), with its own label and a set-aside tone in the UI. The scheduler still reads a pre-STOPPED stop by its message. Fixing the status exposed a race the old ERROR-over-ERROR hid: tearing the execution down makes the watcher report "the Job is not found", and `failRunner` wrote that over the stop and charged a consecutive failure — so the stop is now claimed before any teardown begins | specs; live: `status=STOPPED`, `errorMessage=Manually stopped`, `consecutiveFailures=0` |
-| P9 | **fixed** | `Tag(value, severity=)` in the notebook SDK. The detector's severity is a *ceiling*, not a default: a connector may lower a single assertion within it and may not promote past it. A refused promotion is recorded on the finding (`tag_severity_requested`) as well as warned about, so one detector covers *HIGH at +30%, MEDIUM at +20%* instead of two with duplicated descriptions | pytest (11); live: `+22%` → LOW under a HIGH detector, `+80%` asking CRITICAL → HIGH with `tag_severity_requested: CRITICAL` |
+| P9 | **fixed** | `Tag(value, severity=)` in the notebook SDK. The detector's severity is a *ceiling*, not a default: a connector may lower a single assertion within it and may not promote past it. A refused promotion is recorded on the finding (`tag_severity_requested`) as well as warned about, so one detector covers *HIGH at +30%, MEDIUM at +20%* instead of two with duplicated descriptions | pytest (11); live: `+22%` → LOW under a HIGH detector, `+80%` asking CRITICAL → HIGH with `tag_severity_requested: CRITICAL`. **Applied 2026-09-21:** the platform fix shipped in the third pass but nothing used it — `de_land_alert_insolvencies_3m_yoy_high` and `…_yoy` were still two detectors and *Insolvenzsprünge* still named both. The Monatsindikatoren notebook now writes `Tag(value, severity="HIGH"|"MEDIUM")` under one key with a HIGH ceiling |
 | P10 | **fixed** | glossary lookup matches alias substrings (ranked below term matches) | spec; live: `725000` and `Aufenthaltsgesetz` find *Ausländerrechtliche Verstöße* |
 | P11 | **fixed** | notebook log lines carry a level (`INFO:notebook:`, `ctx.log(..., level=)`); SDK exports `Method`, `ReferenceType`, `ContainmentType`, `FieldTransform`, `UsageType`; `same_as`/`references`/`contains` take `evidence` (and `confidence`) | pytest; live: runner log shows `INFO` |
 | P12 | **fixed** | `GET /assets/{id}/referencing-findings` and an *About this asset, recorded elsewhere* section under the Findings tab: unresolved findings on assets whose edges point at this one, worst first, naming the asset each came via | live: the Köln-style case — Oldenburg's own Findings tab reads 0 while the section shows 10 findings on 45 assets that point at it |
@@ -47,6 +47,8 @@ unfixed, and added two defects found while answering "why are the namespaces sta
 | P18 | **fixed** | *The truncated Kubernetes log the third pass could not explain.* Three causes, all fixed: (1) the CLI reports its own completion over REST while the API is still polling the Job, so `finalizeRunner` clears the buffer before the final log read and `appendChunk` dropped what followed — late output is now held (1 MiB, tail kept) and folded in by `flushLateChunks`; (2) a run that outlives an API restart kept running with nobody streaming its output — the reconciler now re-attaches (`followExistingJob`) and stores the Job's whole log; (3) `RUNNER_LOG_DIR` was a per-pod directory while both the api and worker pods drive runs, so the API served only the half it wrote itself (P20) | specs (2 + 4); live: 180 of 180 pod lines stored, last line included (was 45 of 66, and 64 of 2,367 across a restart) |
 | P19 | **fixed** | `POST /search/assets` ignored unknown keys and returned the whole corpus with a 200. Its shape (`{assets, findings, page, options, semantic}`) differs from the findings search (`{filters, page}`), so sending the sibling shape silently "matched" every asset in the namespace. Now fails closed like findings, naming the section or filter and suggesting the intended key | spec (4) |
 | P20 | **fixed (dev config)** | `helm/develop/values-dev.yaml` set `RUNNER_LOG_DIR` to each pod's own `/tmp` — the production chart deliberately leaves it unset for exactly this reason. Either process drives runs (the API when it promotes a queued runner, the worker when its scheduler starts one), while `POST /runners/{id}/logs` is served by the API alone, so each served a partial log and neither said so. Now a hostPath shared by both pods, created and chowned in `create-cluster.sh` (a kubelet-created hostPath is root-owned; the containers run as 10001) | live: full log served after the change; before it, `EACCES ... mkdir` was the only symptom, in a warning nobody reads |
+| P21 | **fixed** | `syncJobLogs` adopted an empty `readJobLogs` result as its delta cursor. An empty read is not an empty log — `findJobPod` finds no pod between Job attempts, and a response with no Content-Type yields `''` — so the next good read looked like a whole new log and re-emitted every line already stored. It **duplicates** rather than drops, which is why the P18 work did not catch it: the missing tail hid the doubling. A read that is a prefix of what is already held now leaves the cursor alone | spec (2), each failing without the fix |
+| P22 | **fixed** | The cron catch-up never gave up. `lastRunAt` only advances when a run starts, so a source that *cannot* start stays due forever: one HIVE source in `onedata` whose credentials would not decrypt was retried and warned about 8 times in 70 minutes. Failures now back off (10/20/40/80 min) and stop after five with one line naming the source and the reason; held-back sources are filtered before the per-pass cap, and editing the source clears the state so a fix is picked up at once | spec (6), four failing without the fix; live: `attempt 1/5` → `1 held back` → `attempt 2/5` across 11:33–11:51 with no restart |
 | new | **added** | `inquiry.new_matches` notification when a run creates findings that match an operator's inquiry (autopilot inquiries excluded). Derived from the run's new findings, not from `newMatchCount`, which stays 0 until someone opens the inquiry | spec (3); live: "New matches: Verify: withdrawn tag" for a never-opened inquiry |
 
 **What held up, so it is not re-litigated:** retirement itself (datasets GovData dropped were DELETED and their
@@ -649,6 +651,111 @@ filters are rejected with the known list and a suggestion (`sourceIds` → `sour
 - Observation, not a defect: a scan registers stubs during `extract()` and runs detectors only after it
   returns (`main.py`, Phase 1/Phase 2), holding every asset in memory in between. A 25-minute catalogue
   walk showed 3,370 assets and 0 findings for 25 minutes.
+
+---
+
+## P21 — The log reader re-sent the whole log after an empty read
+
+`syncJobLogs` tracks what it has already streamed and appends only the delta:
+
+```ts
+latestOutput = await this.readJobLogs(namespace, jobName);
+// ...
+const nextChunk = latestOutput.startsWith(previousOutput)
+  ? latestOutput.slice(previousOutput.length)
+  : latestOutput;
+```
+
+`readJobLogs` returns `''` in two ordinary situations — `findJobPod` finds no pod while the Job is between
+attempts, and a pod-log response that arrives with no `Content-Type` is deliberately turned into `''`. Neither
+means the log is empty. The pass itself emitted nothing (`''.startsWith(previousOutput)` is false, so the chunk
+was `''`), but `''` became the new cursor, and on the next successful read `latestOutput.startsWith('')` is
+true — so the entire log so far was handed to `appendChunk` a second time.
+
+The effect is the opposite of P18: lines are **duplicated**, not lost. That is exactly why the P18
+investigation did not find it. A stored log that was missing its tail and doubling its head reads as one
+corruption, and the missing tail is the half that gets noticed.
+
+The guard is the symmetric one: a read that is a *prefix* of what is already held — empty, or merely short —
+is an unavailable read and leaves the cursor alone. A read that **diverges** still replaces it, because that is
+a retried pod whose output is genuinely new.
+
+---
+
+## P22 — A source that could never start was retried forever
+
+The catch-up sweep (P17) starts a run for every CRON source whose last window passed unserved. It decides by
+comparing `previousCronOccurrence` with `lastRunAt` — and `lastRunAt` only advances when a run actually
+*starts*. A source that cannot start therefore stays due for every pass, for as long as the instance lives.
+
+For a transient reason that is the intended behaviour, and the code said so: a paused namespace, a source
+already claimed, the single scan slot held elsewhere. For a permanent one it is a loop. A HIVE source in
+`onedata` whose credentials would not decrypt produced:
+
+```
+8 × "Catch-up run for source <id> not started: Failed to decrypt source credentials"
+   in 70 minutes, identical every time
+```
+
+No backoff, no end, and — because every line was identical and at WARN — nothing to distinguish "this just
+happened" from "this has been happening all morning".
+
+Now each consecutive failure doubles the wait before the next attempt (10, 20, 40, 80 minutes), the first
+failure warns and the ones between are DEBUG, and the fifth stops the retries with a single line that says so:
+
+```
+Catch-up for "<name>" (<id>) gave up after 5 failed starts: <reason>.
+It will not be retried until the source is changed or this instance restarts.
+```
+
+Held-back sources are filtered out *before* the five-runs-per-pass cap, so a broken source cannot crowd out
+healthy ones. The record is keyed on the source's `updatedAt`, so correcting the credentials clears it and the
+next pass tries immediately rather than waiting out a backoff.
+
+**Two versions of this fix did not work, and only the live check said so — each time.**
+
+*First*,  `clearForSchema` runs every
+time a namespace's workers are torn down — a routine event, not a shutdown — and it cleared the failure
+records along with the queue registrations. Every pass therefore started from an empty map, and the dev
+cluster showed the same source at `attempt 1/5` at 08:43, 08:47, 08:50, 08:53 and 09:02: a counter that never
+advanced and a warning that never stopped, which is precisely the behaviour the fix was meant to end. The
+records describe the source, not the worker registration, so they now outlive the teardown (`1f2a5a5f`). The
+unit tests passed throughout because none of them tore a namespace down; one that does has been added.
+
+*Second*, the counter still would not advance — 09:02, 09:07, 09:09, 09:13, 09:20, all `attempt 1/5`, with no
+restart between them. The record is keyed on `Source.updatedAt` so that editing a source retries it at once
+instead of serving out a wait it no longer deserves. But `updatedAt` is not "someone edited the config"; it is
+*any write to the row*, and **the failing path writes to the row itself**: `startRun` claims the source with a
+`currentRunnerId`, fails to decrypt, and restores the previous value — two writes per failed attempt. The
+value captured before the attempt therefore never matched the row after it, the sweep concluded the source had
+been edited, and it cleared its own backoff every single time. The value is now re-read *after* the attempt
+(`e5ac06f8`), so a later pass compares against what the failure left behind and only a genuine edit differs.
+
+**Confirmed live, once the process stopped restarting long enough to watch.** The first clean window — no
+reload between 11:33 and 11:51 — shows the behaviour the fix was written for:
+
+```
+11:33:19  attempt 1/5                                  (fresh process, first failure)
+11:40:54  Cron catch-up: 0 run(s) started of 0 source(s)
+          with a missed window, 1 held back after failing to start
+11:50:48  attempt 2/5                                  (backoff elapsed at 11:43:19)
+```
+
+The 11:40 pass is the point: the source was due, and the sweep skipped it and said so instead of retrying and
+warning. The counter advancing to 2 is the other half — it had never left 1 before.
+
+Both bugs shared a shape worth naming: **the test doubles were too clean.** A `startRun` that is a bare
+rejection writes nothing, and a service that is never torn down keeps its state. Each fix looked right, passed
+its tests, and did nothing in production. The regression tests now model the write and the teardown.
+
+**Not durable, and that has a sharper edge in dev than in production.** The state is per-process: a restart
+retries every given-up source once. That is deliberate — a restart is exactly the event after which a source
+deserves a fresh try — but it assumes the process is long-lived. Under `bun --watch` the dev worker restarted
+six times in three hours (every edit to an API file reloads it), and a backoff cannot accumulate across
+restarts that frequent. On a stable deployment it holds; on a laptop cluster being actively edited, the
+warning loop comes back. Making "cannot start" survive a restart — and making it visible in the API or UI
+rather than only in a pod log — needs a source-level status column, which is a schema change and is not in
+this fix.
 
 ---
 

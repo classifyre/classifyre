@@ -3,7 +3,7 @@
 import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, Database, Fingerprint, Loader2 } from "lucide-react";
+import { ArrowLeft, Database, Fingerprint, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -18,6 +18,20 @@ import { Textarea } from "@workspace/ui/components/textarea";
 import { Label } from "@workspace/ui/components/label";
 import { SeverityBadge } from "@workspace/ui/components/severity-badge";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@workspace/ui/components/accordion";
+import {
+  MultiSelect,
+  MultiSelectContent,
+  MultiSelectGroup,
+  MultiSelectItem,
+  MultiSelectTrigger,
+  MultiSelectValue,
+} from "@workspace/ui/components/multi-select";
 import { StickyActionToolbar } from "@/components/sticky-action-toolbar";
 import {
   HorizontalStepperNav,
@@ -25,14 +39,27 @@ import {
   type StepperNavItem,
 } from "@/components/stepper-nav";
 import { useTranslation } from "@/hooks/use-translation";
+import {
+  ALL_SOURCES_VALUE,
+  customDetectorValue,
+  detectorOptionCount,
+  matchersFromDetectorValues,
+  matchersFromSourceValues,
+  normaliseSourceValues,
+  pruneFindingTypes,
+  visibleFindingTypes,
+} from "@/lib/inquiry-matcher-form";
 
-const DETECTORS = [
+/** Built-in detector types offered in the merged detector picker. CUSTOM is
+ * deliberately absent: it is the supertype of every custom detector, so
+ * offering it would silently widen a question meant for one detector to all
+ * of them. Custom detectors appear as their own entries instead. */
+const BUILT_IN_DETECTORS = [
   "SECRETS",
   "PII",
   "YARA",
   "BROKEN_LINKS",
   "CODE_SECURITY",
-  "CUSTOM",
 ] as const;
 const parseList = (s: string) =>
   s
@@ -43,47 +70,6 @@ const joinList = (items: string[]) => items.join(", ");
 
 const STEP_IDS = ["define", "filters", "preview"] as const;
 type StepId = (typeof STEP_IDS)[number];
-
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-1 rounded-[4px] border-2 px-2.5 py-1 text-xs font-medium transition-all ${
-        active
-          ? "border-border bg-foreground text-background "
-          : "border-border text-muted-foreground hover:bg-accent"
-      }`}
-    >
-      {active && <Check className="h-3 w-3" />}
-      {children}
-    </button>
-  );
-}
-
-function applyInitialFindingTypes(
-  findingTypes: string[],
-  options: MatchOptionsResponseDto | null,
-): { selectedTypes: Set<string>; customTypeText: string } {
-  if (!options) {
-    return { selectedTypes: new Set(findingTypes), customTypeText: "" };
-  }
-  const known = new Set(options.findingTypes.map((t) => t.value));
-  const selected = findingTypes.filter((t) => known.has(t));
-  const custom = findingTypes.filter((t) => !known.has(t));
-  return {
-    selectedTypes: new Set(selected),
-    customTypeText: joinList(custom),
-  };
-}
 
 export type InquiryFormProps = {
   mode: "create" | "edit";
@@ -127,22 +113,26 @@ export const InquiryForm = React.forwardRef<
     () => new Set(initial?.sourceIds ?? []),
   );
   const [selectedDetectors, setSelectedDetectors] = React.useState<Set<string>>(
-    () => new Set(initial?.detectorTypes ?? []),
+    // The raw CUSTOM supertype is never a selectable option (see
+    // BUILT_IN_DETECTORS); a legacy bare CUSTOM expands to concrete keys once
+    // match-options arrive (detectorExpandRef effect below).
+    () => new Set((initial?.detectorTypes ?? []).filter((d) => d !== "CUSTOM")),
   );
   const [selectedCustomKeys, setSelectedCustomKeys] = React.useState<
     Set<string>
   >(() => new Set(initial?.customDetectorKeys ?? []));
+  // The full stored list, including types match-options cannot see (a detector
+  // removed since, or types outside the current source scope). Pruning only
+  // ever drops types that are known AND uncovered, so edits never lose those.
   const [selectedTypes, setSelectedTypes] = React.useState<Set<string>>(
     () => new Set(initial?.findingTypes ?? []),
   );
-  const [customTypeText, setCustomTypeText] = React.useState("");
   const [regexText, setRegexText] = React.useState(
     joinList(initial?.findingTypeRegex ?? []),
   );
   const [valueRegexText, setValueRegexText] = React.useState(
     joinList(initial?.findingValueRegex ?? []),
   );
-  const [typeSearch, setTypeSearch] = React.useState("");
 
   const [options, setOptions] = React.useState<MatchOptionsResponseDto | null>(
     null,
@@ -151,7 +141,8 @@ export const InquiryForm = React.forwardRef<
   const [previewing, setPreviewing] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [activeStep, setActiveStep] = React.useState<StepId>("define");
-  const findingTypesSplitRef = React.useRef(false);
+  const detectorExpandRef = React.useRef(false);
+  const detectorsTouchedRef = React.useRef(false);
 
   const sectionRefs = {
     define: React.useRef<HTMLElement>(null),
@@ -177,16 +168,6 @@ export const InquiryForm = React.forwardRef<
     },
   ];
 
-  const toggle = (
-    set: Set<string>,
-    setter: (s: Set<string>) => void,
-    id: string,
-  ) => {
-    const n = new Set(set);
-    n.has(id) ? n.delete(id) : n.add(id);
-    setter(n);
-  };
-
   const loadOptions = React.useCallback(async (sourceIds?: string[]) => {
     try {
       setOptions(
@@ -206,14 +187,44 @@ export const InquiryForm = React.forwardRef<
       void loadOptions(Array.from(selectedSources));
   }, [matchAllSources, selectedSources, loadOptions]);
 
+  // Legacy bare-CUSTOM expansion: `detectorTypes: ["CUSTOM"]` with no keys
+  // meant "any custom detector". Expand once to the concrete keys so the
+  // merged picker shows what that actually matches. Skipped when the operator
+  // already touched the detector selection.
   React.useEffect(() => {
-    if (!isEdit || !initial || !options || findingTypesSplitRef.current) return;
-    const { selectedTypes: splitSelected, customTypeText: splitCustom } =
-      applyInitialFindingTypes(initial.findingTypes, options);
-    setSelectedTypes(splitSelected);
-    setCustomTypeText(splitCustom);
-    findingTypesSplitRef.current = true;
+    if (!isEdit || !initial || !options || detectorExpandRef.current) return;
+    detectorExpandRef.current = true;
+    if (
+      initial.detectorTypes.includes("CUSTOM" as never) &&
+      initial.customDetectorKeys.length === 0 &&
+      !detectorsTouchedRef.current
+    ) {
+      setSelectedCustomKeys(
+        new Set(options.customDetectors.map((c) => c.key)),
+      );
+    }
   }, [isEdit, initial, options]);
+
+  // Keep the finding-type selection consistent with the detector selection: a
+  // type whose detector is no longer selected is deselected. Pruning only
+  // drops types match-options knows and shows as uncovered; anything else
+  // (removed detectors, other source scopes) survives. Idempotent, so repeat
+  // runs are a no-op guarded by the equality check.
+  React.useEffect(() => {
+    if (!options) return;
+    setSelectedTypes((prev) => {
+      const next = pruneFindingTypes(
+        [...prev],
+        options.findingTypes,
+        [...selectedDetectors],
+        [...selectedCustomKeys],
+        options.customDetectors,
+      );
+      return next.length === prev.size && next.every((v) => prev.has(v))
+        ? prev
+        : new Set(next);
+    });
+  }, [options, selectedDetectors, selectedCustomKeys]);
 
   const matchers = React.useMemo(
     () => ({
@@ -221,7 +232,7 @@ export const InquiryForm = React.forwardRef<
       sourceIds: matchAllSources ? [] : Array.from(selectedSources),
       detectorTypes: Array.from(selectedDetectors) as never,
       customDetectorKeys: Array.from(selectedCustomKeys),
-      findingTypes: [...selectedTypes, ...parseList(customTypeText)],
+      findingTypes: [...selectedTypes],
       findingTypeRegex: parseList(regexText),
       findingValueRegex: parseList(valueRegexText),
     }),
@@ -231,7 +242,6 @@ export const InquiryForm = React.forwardRef<
       selectedDetectors,
       selectedCustomKeys,
       selectedTypes,
-      customTypeText,
       regexText,
       valueRegexText,
     ],
@@ -256,12 +266,19 @@ export const InquiryForm = React.forwardRef<
               ),
             );
           } else if (patch.path === "matchers.detectorTypes") {
+            // The picker never offers CUSTOM; strip it so an assistant patch
+            // cannot sneak the supertype back in (bare CUSTOM expands to
+            // concrete keys only through the edit-load path above).
+            detectorsTouchedRef.current = true;
             setSelectedDetectors(
               new Set(
-                Array.isArray(patch.value) ? patch.value.map(String) : [],
+                Array.isArray(patch.value)
+                  ? patch.value.map(String).filter((d) => d !== "CUSTOM")
+                  : [],
               ),
             );
           } else if (patch.path === "matchers.customDetectorKeys") {
+            detectorsTouchedRef.current = true;
             setSelectedCustomKeys(
               new Set(
                 Array.isArray(patch.value) ? patch.value.map(String) : [],
@@ -291,6 +308,84 @@ export const InquiryForm = React.forwardRef<
     }),
     [title, description, matchers],
   );
+
+  // ─── Multi-select derivations ──────────────────────────────────────────
+  const loadingOptions = options === null;
+
+  const sourceValues = matchAllSources
+    ? [ALL_SOURCES_VALUE]
+    : [...selectedSources];
+  const handleSourceValuesChange = (values: string[]) => {
+    const next = normaliseSourceValues(values, sourceValues);
+    const asMatchers = matchersFromSourceValues(next);
+    setMatchAllSources(asMatchers.matchAllSources);
+    setSelectedSources(new Set(asMatchers.sourceIds));
+  };
+
+  const detectorValues = React.useMemo(
+    () => [
+      ...selectedDetectors,
+      ...[...selectedCustomKeys].map(customDetectorValue),
+    ],
+    [selectedDetectors, selectedCustomKeys],
+  );
+  const handleDetectorValuesChange = (values: string[]) => {
+    detectorsTouchedRef.current = true;
+    const asMatchers = matchersFromDetectorValues(values);
+    setSelectedDetectors(new Set(asMatchers.detectorTypes));
+    setSelectedCustomKeys(new Set(asMatchers.customDetectorKeys));
+  };
+
+  // Finding-type rows for the current detector selection, deduped by value
+  // (one type string can be emitted by several detectors) with counts summed.
+  // Selected-but-invisible values (removed detectors, other source scopes) get
+  // fallback entries below so they stay visible and removable.
+  const availableTypeRows = React.useMemo(() => {
+    const rows = visibleFindingTypes(
+      options?.findingTypes ?? [],
+      [...selectedDetectors],
+      [...selectedCustomKeys],
+      "",
+      options?.customDetectors ?? [],
+    );
+    const byValue = new Map<string, { value: string; count: number }>();
+    for (const row of rows) {
+      const existing = byValue.get(row.value);
+      byValue.set(
+        row.value,
+        existing
+          ? { value: row.value, count: existing.count + row.count }
+          : { value: row.value, count: row.count },
+      );
+    }
+    return [...byValue.values()].sort(
+      (a, b) => b.count - a.count || a.value.localeCompare(b.value),
+    );
+  }, [options, selectedDetectors, selectedCustomKeys]);
+  const knownTypeValues = React.useMemo(
+    () => new Set((options?.findingTypes ?? []).map((t) => t.value)),
+    [options],
+  );
+  // Selected types match-options has never heard of (a detector removed
+  // since, or types from another source scope): kept by pruning, so they need
+  // fallback entries to stay visible and removable.
+  const orphanTypeValues = [...selectedTypes].filter(
+    (v) => !knownTypeValues.has(v),
+  );
+  const knownCustomKeys = React.useMemo(
+    () => new Set((options?.customDetectors ?? []).map((c) => c.key)),
+    [options],
+  );
+  const orphanCustomKeys = [...selectedCustomKeys].filter(
+    (k) => !knownCustomKeys.has(k),
+  );
+  // Sources selected before they were deleted: kept in state so saving does
+  // not silently narrow the question, with fallback entries to remove them.
+  const orphanSourceIds = matchAllSources
+    ? []
+    : [...selectedSources].filter(
+        (id) => !(options?.sources ?? []).some((s) => s.id === id),
+      );
 
   const matchersKey = JSON.stringify(matchers);
   React.useEffect(() => {
@@ -397,11 +492,6 @@ export const InquiryForm = React.forwardRef<
     else router.push(nsPath("/investigations"));
   };
 
-  const filteredTypes = (options?.findingTypes ?? []).filter(
-    (type) =>
-      !typeSearch.trim() ||
-      type.value.toLowerCase().includes(typeSearch.trim().toLowerCase()),
-  );
   const noSourcesChosen = !matchAllSources && selectedSources.size === 0;
 
   return (
@@ -495,40 +585,89 @@ export const InquiryForm = React.forwardRef<
                     <Database className="h-3.5 w-3.5" />{" "}
                     {t("investigations.inquiryForm.sourcesLabel")}
                   </Label>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Chip
-                      active={matchAllSources}
-                      onClick={() => setMatchAllSources(true)}
+                  <MultiSelect
+                    values={sourceValues}
+                    onValuesChange={handleSourceValuesChange}
+                  >
+                    <MultiSelectTrigger
+                      className="w-full rounded-[4px] border-2 border-border"
+                      disabled={loadingOptions}
                     >
-                      {t("investigations.inquiryForm.allSources")}
-                    </Chip>
-                    <Chip
-                      active={!matchAllSources}
-                      onClick={() => setMatchAllSources(false)}
-                    >
-                      {t("investigations.inquiryForm.specificSources")}
-                    </Chip>
-                  </div>
-                  {!matchAllSources && (
-                    <div className="flex max-h-40 flex-wrap gap-1.5 overflow-auto rounded-[4px] border border-border p-2">
-                      {(options?.sources ?? []).length === 0 && (
-                        <span className="text-muted-foreground text-xs">
-                          {t("investigations.inquiryForm.noSources")}
+                      {loadingOptions ? (
+                        <span className="text-muted-foreground flex items-center gap-2 font-normal">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          {t("investigations.inquiryForm.optionsLoading")}
                         </span>
+                      ) : (
+                        <MultiSelectValue
+                          placeholder={t(
+                            "investigations.inquiryForm.sourcesMultiselectPlaceholder",
+                          )}
+                          overflowBehavior="wrap-when-open"
+                        />
                       )}
-                      {(options?.sources ?? []).map((s) => (
-                        <Chip
-                          key={s.id}
-                          active={selectedSources.has(s.id)}
-                          onClick={() =>
-                            toggle(selectedSources, setSelectedSources, s.id)
-                          }
+                    </MultiSelectTrigger>
+                    <MultiSelectContent
+                      search={{
+                        placeholder: t(
+                          "investigations.inquiryForm.sourcesSearchPlaceholder",
+                        ),
+                        emptyMessage: t(
+                          "investigations.inquiryForm.searchEmpty",
+                        ),
+                      }}
+                    >
+                      <MultiSelectGroup>
+                        <MultiSelectItem
+                          value={ALL_SOURCES_VALUE}
+                          badgeLabel={t(
+                            "investigations.inquiryForm.allSources",
+                          )}
                         >
-                          {s.name}
-                        </Chip>
-                      ))}
-                    </div>
-                  )}
+                          {t("investigations.inquiryForm.allSources")}
+                        </MultiSelectItem>
+                        {(options?.sources ?? []).map((s) => (
+                          <MultiSelectItem
+                            key={s.id}
+                            value={s.id}
+                            badgeLabel={s.name}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="truncate font-medium">
+                                {s.name}
+                              </span>
+                              <span className="text-muted-foreground shrink-0 text-xs">
+                                {s.type} ·{" "}
+                                {t(
+                                  "investigations.inquiryForm.sourcesCounts",
+                                  {
+                                    assets: s.assetCount,
+                                    findings: s.openFindingCount,
+                                  },
+                                )}
+                              </span>
+                            </span>
+                          </MultiSelectItem>
+                        ))}
+                        {orphanSourceIds.map((id) => (
+                          <MultiSelectItem
+                            key={id}
+                            value={id}
+                            badgeLabel={id}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="truncate font-mono text-xs">
+                                {id}
+                              </span>
+                              <span className="text-muted-foreground shrink-0 text-xs">
+                                {t("investigations.inquiryForm.unobservedType")}
+                              </span>
+                            </span>
+                          </MultiSelectItem>
+                        ))}
+                      </MultiSelectGroup>
+                    </MultiSelectContent>
+                  </MultiSelect>
                 </div>
 
                 <div className="space-y-2">
@@ -538,45 +677,100 @@ export const InquiryForm = React.forwardRef<
                       {t("investigations.inquiryForm.emptyMeansAny")}
                     </span>
                   </Label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DETECTORS.map((d) => (
-                      <Chip
-                        key={d}
-                        active={selectedDetectors.has(d)}
-                        onClick={() =>
-                          toggle(selectedDetectors, setSelectedDetectors, d)
-                        }
+                  <MultiSelect
+                    values={detectorValues}
+                    onValuesChange={handleDetectorValuesChange}
+                  >
+                    <MultiSelectTrigger
+                      className="w-full rounded-[4px] border-2 border-border"
+                      disabled={loadingOptions}
+                    >
+                      {loadingOptions ? (
+                        <span className="text-muted-foreground flex items-center gap-2 font-normal">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          {t("investigations.inquiryForm.optionsLoading")}
+                        </span>
+                      ) : (
+                        <MultiSelectValue
+                          placeholder={t(
+                            "investigations.inquiryForm.detectorsPlaceholder",
+                          )}
+                          overflowBehavior="wrap-when-open"
+                        />
+                      )}
+                    </MultiSelectTrigger>
+                    <MultiSelectContent
+                      search={{
+                        placeholder: t(
+                          "investigations.inquiryForm.detectorsSearchPlaceholder",
+                        ),
+                        emptyMessage: t(
+                          "investigations.inquiryForm.searchEmpty",
+                        ),
+                      }}
+                    >
+                      <MultiSelectGroup
+                        heading={t(
+                          "investigations.inquiryForm.detectorsGroupBuiltIn",
+                        )}
                       >
-                        {d}
-                      </Chip>
-                    ))}
-                  </div>
+                        {BUILT_IN_DETECTORS.map((d) => (
+                          <MultiSelectItem key={d} value={d} badgeLabel={d}>
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="truncate font-medium">{d}</span>
+                              <span className="text-muted-foreground shrink-0 text-xs">
+                                ·{" "}
+                                {detectorOptionCount(
+                                  d,
+                                  options?.findingTypes ?? [],
+                                  options?.customDetectors ?? [],
+                                )}
+                              </span>
+                            </span>
+                          </MultiSelectItem>
+                        ))}
+                      </MultiSelectGroup>
+                      <MultiSelectGroup
+                        heading={t(
+                          "investigations.inquiryForm.detectorsGroupCustom",
+                        )}
+                      >
+                        {(options?.customDetectors ?? []).map((c) => (
+                          <MultiSelectItem
+                            key={c.key}
+                            value={customDetectorValue(c.key)}
+                            badgeLabel={c.name}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="truncate font-medium">
+                                {c.name}
+                              </span>
+                              <span className="text-muted-foreground shrink-0 text-xs">
+                                · {c.openFindings}
+                              </span>
+                            </span>
+                          </MultiSelectItem>
+                        ))}
+                        {orphanCustomKeys.map((key) => (
+                          <MultiSelectItem
+                            key={key}
+                            value={customDetectorValue(key)}
+                            badgeLabel={key}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="truncate font-mono text-xs">
+                                {key}
+                              </span>
+                              <span className="text-muted-foreground shrink-0 text-xs">
+                                {t("investigations.inquiryForm.unobservedType")}
+                              </span>
+                            </span>
+                          </MultiSelectItem>
+                        ))}
+                      </MultiSelectGroup>
+                    </MultiSelectContent>
+                  </MultiSelect>
                 </div>
-
-                {(options?.customDetectors ?? []).length > 0 && (
-                  <div className="space-y-2">
-                    <Label>
-                      {t("investigations.inquiryForm.customDetectorsLabel")}
-                    </Label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {options!.customDetectors.map((c) => (
-                        <Chip
-                          key={c.key}
-                          active={selectedCustomKeys.has(c.key)}
-                          onClick={() =>
-                            toggle(
-                              selectedCustomKeys,
-                              setSelectedCustomKeys,
-                              c.key,
-                            )
-                          }
-                        >
-                          {c.name}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 <div className="space-y-2">
                   <Label>
@@ -585,75 +779,129 @@ export const InquiryForm = React.forwardRef<
                       {t("investigations.inquiryForm.emptyMeansAny")}
                     </span>
                   </Label>
-                  <Input
-                    value={typeSearch}
-                    onChange={(e) => setTypeSearch(e.target.value)}
-                    placeholder={t(
-                      "investigations.inquiryForm.filterTypesPlaceholder",
-                    )}
-                    className="h-8 max-w-xs"
-                  />
-                  {filteredTypes.length > 0 ? (
-                    <div className="flex max-h-44 flex-wrap gap-1.5 overflow-auto rounded-[4px] border border-border p-2">
-                      {filteredTypes.map((type) => (
-                        <Chip
-                          key={`${type.detectorType}:${type.value}`}
-                          active={selectedTypes.has(type.value)}
-                          onClick={() =>
-                            toggle(selectedTypes, setSelectedTypes, type.value)
-                          }
-                        >
-                          {type.value}{" "}
-                          <span className="opacity-50">· {type.count}</span>
-                        </Chip>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground text-xs">
-                      {noSourcesChosen
-                        ? t(
-                            "investigations.inquiryForm.noDetectedTypesPickSources",
-                          )
-                        : t("investigations.inquiryForm.noDetectedTypes")}
+                  {detectorValues.length > 0 && (
+                    <p className="text-muted-foreground text-[11px]">
+                      {t("investigations.inquiryForm.findingTypesFilteredHint")}
                     </p>
                   )}
-                  <Input
-                    value={customTypeText}
-                    onChange={(e) => setCustomTypeText(e.target.value)}
-                    placeholder={t(
-                      "investigations.inquiryForm.customTypesPlaceholder",
-                    )}
-                    className="h-8"
-                  />
-                  <Input
-                    value={regexText}
-                    onChange={(e) => setRegexText(e.target.value)}
-                    placeholder={t(
-                      "investigations.inquiryForm.typeRegexPlaceholder",
-                    )}
-                    className="h-8 font-mono text-xs"
-                  />
+                  <MultiSelect
+                    values={[...selectedTypes]}
+                    onValuesChange={(values) =>
+                      setSelectedTypes(new Set(values))
+                    }
+                  >
+                    <MultiSelectTrigger
+                      className="w-full rounded-[4px] border-2 border-border"
+                      disabled={loadingOptions}
+                    >
+                      {loadingOptions ? (
+                        <span className="text-muted-foreground flex items-center gap-2 font-normal">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          {t("investigations.inquiryForm.optionsLoading")}
+                        </span>
+                      ) : (
+                        <MultiSelectValue
+                          placeholder={t(
+                            "investigations.inquiryForm.findingTypesPlaceholder",
+                          )}
+                          overflowBehavior="wrap-when-open"
+                        />
+                      )}
+                    </MultiSelectTrigger>
+                    <MultiSelectContent
+                      search={{
+                        placeholder: t(
+                          "investigations.inquiryForm.filterTypesPlaceholder",
+                        ),
+                        emptyMessage: t(
+                          "investigations.inquiryForm.searchEmpty",
+                        ),
+                      }}
+                    >
+                      <MultiSelectGroup>
+                        {availableTypeRows.map((row) => (
+                          <MultiSelectItem
+                            key={row.value}
+                            value={row.value}
+                            badgeLabel={row.value}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="truncate font-medium">
+                                {row.value}
+                              </span>
+                              <span className="text-muted-foreground shrink-0 text-xs">
+                                · {row.count}
+                              </span>
+                            </span>
+                          </MultiSelectItem>
+                        ))}
+                        {orphanTypeValues.map((value) => (
+                          <MultiSelectItem
+                            key={value}
+                            value={value}
+                            badgeLabel={value}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="truncate font-mono text-xs">
+                                {value}
+                              </span>
+                              <span className="text-muted-foreground shrink-0 text-xs">
+                                {t("investigations.inquiryForm.unobservedType")}
+                              </span>
+                            </span>
+                          </MultiSelectItem>
+                        ))}
+                      </MultiSelectGroup>
+                    </MultiSelectContent>
+                  </MultiSelect>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>
-                    {t("investigations.inquiryForm.valueFilterLabel")}{" "}
-                    <span className="text-muted-foreground font-normal">
-                      {t("investigations.inquiryForm.valueFilterHint")}
-                    </span>
-                  </Label>
-                  <p className="text-muted-foreground text-[11px]">
-                    {t("investigations.inquiryForm.valueFilterDesc")}
-                  </p>
-                  <Input
-                    value={valueRegexText}
-                    onChange={(e) => setValueRegexText(e.target.value)}
-                    placeholder={t(
-                      "investigations.inquiryForm.valueRegexPlaceholder",
-                    )}
-                    className="h-8 font-mono text-xs"
-                  />
-                </div>
+                <Accordion type="single" collapsible>
+                  <AccordionItem value="advanced">
+                    <AccordionTrigger
+                      caption={t("investigations.inquiryForm.advancedDesc")}
+                    >
+                      {t("investigations.inquiryForm.advancedTitle")}
+                    </AccordionTrigger>
+                    <AccordionContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>
+                          {t("investigations.inquiryForm.findingTypesLabel")}{" "}
+                          <span className="text-muted-foreground font-normal">
+                            regex
+                          </span>
+                        </Label>
+                        <Input
+                          value={regexText}
+                          onChange={(e) => setRegexText(e.target.value)}
+                          placeholder={t(
+                            "investigations.inquiryForm.typeRegexPlaceholder",
+                          )}
+                          className="h-8 font-mono text-xs"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>
+                          {t("investigations.inquiryForm.valueFilterLabel")}{" "}
+                          <span className="text-muted-foreground font-normal">
+                            {t("investigations.inquiryForm.valueFilterHint")}
+                          </span>
+                        </Label>
+                        <p className="text-muted-foreground text-[11px]">
+                          {t("investigations.inquiryForm.valueFilterDesc")}
+                        </p>
+                        <Input
+                          value={valueRegexText}
+                          onChange={(e) => setValueRegexText(e.target.value)}
+                          placeholder={t(
+                            "investigations.inquiryForm.valueRegexPlaceholder",
+                          )}
+                          className="h-8 font-mono text-xs"
+                        />
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </div>
             </AiAssistedCard>
           </section>

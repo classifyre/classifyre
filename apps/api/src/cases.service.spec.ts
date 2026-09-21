@@ -5,6 +5,7 @@ import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { CaseActivityService } from './case-activity.service';
+import { InquiryActivityService } from './inquiry-activity.service';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 
 describe('CasesService', () => {
@@ -44,6 +45,7 @@ describe('CasesService', () => {
   const mockGraph = { inferEdgesForAsset: jest.fn(), caseGraph: jest.fn() };
   const mockMatching = { getMatchingFindingIds: jest.fn() };
   const mockActivity = { record: jest.fn() };
+  const mockInquiryActivity = { record: jest.fn(), tryRecord: jest.fn() };
   const mockAgentMemory = {
     recordEntityDeletion: jest.fn(),
     syncEntityMap: jest.fn(),
@@ -72,6 +74,7 @@ describe('CasesService', () => {
         { provide: GraphService, useValue: mockGraph },
         { provide: InquiryMatchingService, useValue: mockMatching },
         { provide: CaseActivityService, useValue: mockActivity },
+        { provide: InquiryActivityService, useValue: mockInquiryActivity },
         { provide: AgentMemoryService, useValue: mockAgentMemory },
       ],
     }).compile();
@@ -104,8 +107,8 @@ describe('CasesService', () => {
     await service.create({ title: 'Case', inquiryIds: ['q1', 'q2'] });
     expect(mockPrisma.caseInquiry.createMany).toHaveBeenCalledWith({
       data: [
-        { caseId: 'c1', inquiryId: 'q1' },
-        { caseId: 'c1', inquiryId: 'q2' },
+        { caseId: 'c1', inquiryId: 'q1', autoPull: false },
+        { caseId: 'c1', inquiryId: 'q2', autoPull: false },
       ],
       skipDuplicates: true,
     });
@@ -126,7 +129,7 @@ describe('CasesService', () => {
     mockPrisma.caseInquiry.findMany.mockResolvedValue([]);
     await service.linkInquiries('c1', { inquiryIds: ['q9'] });
     expect(mockPrisma.caseInquiry.createMany).toHaveBeenCalledWith({
-      data: [{ caseId: 'c1', inquiryId: 'q9' }],
+      data: [{ caseId: 'c1', inquiryId: 'q9', autoPull: false }],
       skipDuplicates: true,
     });
   });

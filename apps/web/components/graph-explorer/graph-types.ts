@@ -150,6 +150,12 @@ export function edgeClassOf(edge: GraphEdgeDto): string {
 
 export const MANUAL_EDGE_COLOR = "#d97706";
 export const CROSS_HYP_COLOR = "#a855f7";
+/**
+ * A finding the latest scan of its source retired — it still answers the
+ * watch driving the case, but the evidence is no longer there. Red because a
+ * case citing something that has gone is a problem, not a notification.
+ */
+export const GONE_RING_COLOR = "#dc2626";
 export const ACCENT = "#b7ff00";
 
 /**

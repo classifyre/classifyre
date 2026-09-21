@@ -14,9 +14,37 @@ const CATCH_UP_QUEUE = 'cron-catchup';
 const CATCH_UP_CRON = '*/10 * * * *';
 /** Runs one pass may start, so a long outage cannot enqueue a whole namespace. */
 const MAX_CATCH_UP_RUNS_PER_PASS = 5;
+/**
+ * Consecutive failed starts before the sweep stops retrying a source.
+ *
+ * A source that cannot start for a permanent reason -- credentials that will
+ * not decrypt is the one seen in the field -- stays due forever, because
+ * `lastRunAt` only advances when a run actually starts. Without a ceiling the
+ * sweep retried it every 10 minutes and warned every time: 8 warnings in 70
+ * minutes for a single HIVE source, which is how a real failure gets buried.
+ */
+const MAX_CATCH_UP_ATTEMPTS = 5;
+/** First backoff step; it doubles per failure (10, 20, 40, 80 minutes). */
+const CATCH_UP_BACKOFF_BASE_MS = 10 * 60 * 1000;
 
 function jobName(sourceId: string): string {
   return `${JOB_NAME_PREFIX}${sourceId}`;
+}
+
+/** One source's run of failed catch-up starts. */
+interface CatchUpFailure {
+  /** Consecutive failed attempts. */
+  attempts: number;
+  /** Epoch ms before which this source is not retried. */
+  nextAttemptAt: number;
+  /**
+   * `updatedAt` of the source row these attempts describe. Any edit to the
+   * source -- new credentials, a corrected config -- makes the record stale,
+   * which is the signal to try again at once instead of waiting out a backoff.
+   */
+  sourceUpdatedAt: number;
+  /** Set once the sweep has stopped retrying and has said so exactly once. */
+  gaveUp: boolean;
 }
 
 @Injectable()
@@ -28,6 +56,13 @@ export class SchedulerService {
    * (and the per-namespace bosses) are tracked independently.
    */
   private readonly registeredQueues = new Set<string>();
+  /**
+   * Why a source's catch-up is being held back, keyed `<schema>:<sourceId>`.
+   *
+   * In memory on purpose: the record describes this process's attempts, and a
+   * restart is exactly the event after which a source deserves a fresh try.
+   */
+  private readonly catchUpFailures = new Map<string, CatchUpFailure>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -95,10 +130,18 @@ export class SchedulerService {
         scheduleTimezone: true,
         lastRunAt: true,
         runnerStatus: true,
+        updatedAt: true,
       },
     });
 
-    const due: Array<{ id: string; name: string; missedAt: Date }> = [];
+    const due: Array<{
+      id: string;
+      name: string;
+      missedAt: Date;
+      updatedAt: Date;
+    }> = [];
+    const now = Date.now();
+    let heldBack = 0;
     for (const source of sources) {
       // In flight already: the window is being served, or is queued behind the
       // scan slot. Either way this pass has nothing to add.
@@ -114,7 +157,27 @@ export class SchedulerService {
       );
       if (!missedAt) continue;
       if (source.lastRunAt && source.lastRunAt >= missedAt) continue;
-      due.push({ id: source.id, name: source.name, missedAt });
+
+      // A source that keeps failing to start must not occupy a slot this pass,
+      // so this filter runs before the cap below rather than after it.
+      const key = this.sourceKey(source.id);
+      const failure = this.catchUpFailures.get(key);
+      if (failure) {
+        if (failure.sourceUpdatedAt !== source.updatedAt.getTime()) {
+          // The source was edited since it last failed. Whatever was wrong may
+          // now be fixed, and waiting out a backoff would hide that.
+          this.catchUpFailures.delete(key);
+        } else if (failure.gaveUp || now < failure.nextAttemptAt) {
+          heldBack += 1;
+          continue;
+        }
+      }
+      due.push({
+        id: source.id,
+        name: source.name,
+        missedAt,
+        updatedAt: source.updatedAt,
+      });
     }
 
     due.sort((a, b) => a.missedAt.getTime() - b.missedAt.getTime());
@@ -128,6 +191,7 @@ export class SchedulerService {
           'Scheduler (catch-up)',
         );
         started += 1;
+        this.catchUpFailures.delete(this.sourceKey(source.id));
         this.logger.log(
           `Catch-up run for "${source.name}": its ${source.missedAt.toISOString()} ` +
             `window passed while nothing was scheduling.`,
@@ -135,19 +199,95 @@ export class SchedulerService {
       } catch (error) {
         // Paused namespace, source already claimed, or a cap reached: all
         // reasons to leave it for the next pass rather than fail the sweep.
-        this.logger.warn(
-          `Catch-up run for source ${source.id} not started: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
+        // But a source that can NEVER start -- credentials that will not
+        // decrypt -- would otherwise be retried and warned about forever, so
+        // each failure buys the next attempt a longer wait and there is an end.
+        await this.noteCatchUpFailure(source, error);
       }
     }
-    if (due.length > 0) {
+    if (due.length > 0 || heldBack > 0) {
       this.logger.log(
-        `Cron catch-up: ${started} run(s) started of ${due.length} source(s) with a missed window.`,
+        `Cron catch-up: ${started} run(s) started of ${due.length} source(s) with a missed window` +
+          (heldBack > 0
+            ? `, ${heldBack} held back after failing to start.`
+            : '.'),
       );
     }
     return { started };
+  }
+
+  /**
+   * Record one failed catch-up start, and stop retrying once there have been
+   * enough of them.
+   *
+   * The first failure warns, because it may be the only notice anyone gets.
+   * The ones after it are debug until the last, which says plainly that this
+   * source will not be retried -- the line an operator needs, and the one the
+   * old code never reached because it warned identically forever.
+   */
+  private async noteCatchUpFailure(
+    source: { id: string; name: string; updatedAt: Date },
+    error: unknown,
+  ): Promise<void> {
+    const key = this.sourceKey(source.id);
+    const previous = this.catchUpFailures.get(key);
+    const attempts = (previous?.attempts ?? 0) + 1;
+    const reason = error instanceof Error ? error.message : String(error);
+    const gaveUp = attempts >= MAX_CATCH_UP_ATTEMPTS;
+    this.catchUpFailures.set(key, {
+      attempts,
+      nextAttemptAt:
+        Date.now() + CATCH_UP_BACKOFF_BASE_MS * Math.pow(2, attempts - 1),
+      // Re-read, because `startRun` writes to the source row on its way to
+      // failing -- it claims the source with a `currentRunnerId` and then puts
+      // it back -- so the value this pass read before the attempt is already
+      // stale, and comparing against it would find a difference every time and
+      // clear this record on every failure. That is not a hypothetical: it kept
+      // the live counter pinned at "attempt 1/5" until it was found.
+      sourceUpdatedAt: await this.currentSourceUpdatedAt(source),
+      gaveUp,
+    });
+
+    if (gaveUp) {
+      this.logger.warn(
+        `Catch-up for "${source.name}" (${source.id}) gave up after ` +
+          `${attempts} failed starts: ${reason}. It will not be retried until ` +
+          `the source is changed or this instance restarts.`,
+      );
+      return;
+    }
+    const message =
+      `Catch-up run for source ${source.id} not started (attempt ` +
+      `${attempts}/${MAX_CATCH_UP_ATTEMPTS}): ${reason}`;
+    if (attempts === 1) {
+      this.logger.warn(message);
+    } else {
+      this.logger.debug(message);
+    }
+  }
+
+  /**
+   * The source's `updatedAt` as it stands now, falling back to what the sweep
+   * read if the row cannot be re-read (it may have just been deleted).
+   */
+  private async currentSourceUpdatedAt(source: {
+    id: string;
+    updatedAt: Date;
+  }): Promise<number> {
+    try {
+      const fresh = await this.prisma.source.findUnique({
+        where: { id: source.id },
+        select: { updatedAt: true },
+      });
+      return (fresh?.updatedAt ?? source.updatedAt).getTime();
+    } catch {
+      return source.updatedAt.getTime();
+    }
+  }
+
+  /** Namespace-qualified key, so one source id cannot collide across tenants. */
+  private sourceKey(sourceId: string): string {
+    return `${this.cls.get<string>(CLS_SCHEMA) ?? ''}:${sourceId}`;
   }
 
   clearForSchema(schema: string): void {
@@ -155,6 +295,13 @@ export class SchedulerService {
     for (const key of this.registeredQueues) {
       if (key.startsWith(prefix)) this.registeredQueues.delete(key);
     }
+    // Deliberately NOT cleared here. A namespace's workers are torn down and
+    // re-registered routinely, and clearing the backoff on each cycle made it
+    // meaningless: observed live on 2026-09-21, the same broken source warned
+    // at "attempt 1/5" five times in twenty minutes because every pass started
+    // from an empty map. These records describe the source, not the worker
+    // registration, so they outlive it. What they cost is one small entry per
+    // source that has ever failed to start, until the process exits.
   }
 
   private getBoss() {

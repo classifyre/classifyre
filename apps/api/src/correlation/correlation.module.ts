@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma.service';
 import { MatchingModule } from '../matching/matching.module';
 import { GraphService } from '../graph.service';
 import { CaseActivityService } from '../case-activity.service';
+import { InquiryActivityService } from '../inquiry-activity.service';
 import { CasesService } from '../cases.service';
 import { InquiriesService } from '../inquiries.service';
 import { AgentMemoryService } from '../autopilot/memory/agent-memory.service';
@@ -34,6 +35,7 @@ import { SourceGraphModule } from '../stats/source-graph.module';
     PrismaService,
     GraphService,
     CaseActivityService,
+    InquiryActivityService,
     AgentMemoryService,
     CasesService,
     InquiriesService,

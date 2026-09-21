@@ -37,6 +37,18 @@ export interface MatchOptionSourceDto {
      * @memberof MatchOptionSourceDto
      */
     type: string;
+    /**
+     * Total assets ingested under this source. Lets the matcher form show a per-source size without a second round-trip.
+     * @type {number}
+     * @memberof MatchOptionSourceDto
+     */
+    assetCount: number;
+    /**
+     * Open findings currently under this source. Lets the matcher form show a per-source signal size without a second round-trip.
+     * @type {number}
+     * @memberof MatchOptionSourceDto
+     */
+    openFindingCount: number;
 }
 
 /**
@@ -46,6 +58,8 @@ export function instanceOfMatchOptionSourceDto(value: object): value is MatchOpt
     if (!('id' in value) || value['id'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('type' in value) || value['type'] === undefined) return false;
+    if (!('assetCount' in value) || value['assetCount'] === undefined) return false;
+    if (!('openFindingCount' in value) || value['openFindingCount'] === undefined) return false;
     return true;
 }
 
@@ -62,6 +76,8 @@ export function MatchOptionSourceDtoFromJSONTyped(json: any, ignoreDiscriminator
         'id': json['id'],
         'name': json['name'],
         'type': json['type'],
+        'assetCount': json['assetCount'],
+        'openFindingCount': json['openFindingCount'],
     };
 }
 
@@ -79,6 +95,8 @@ export function MatchOptionSourceDtoToJSONTyped(value?: MatchOptionSourceDto | n
         'id': value['id'],
         'name': value['name'],
         'type': value['type'],
+        'assetCount': value['assetCount'],
+        'openFindingCount': value['openFindingCount'],
     };
 }
 

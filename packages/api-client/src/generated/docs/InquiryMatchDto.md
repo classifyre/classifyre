@@ -15,7 +15,9 @@ Name | Type
 `assetName` | string
 `sourceType` | string
 `matchedAt` | Date
+`state` | string
 `isNew` | boolean
+`goneReason` | string
 `ranking` | [FindingSearchRankingDto](FindingSearchRankingDto.md)
 
 ## Example
@@ -34,7 +36,9 @@ const example = {
   "assetName": null,
   "sourceType": null,
   "matchedAt": null,
+  "state": null,
   "isNew": null,
+  "goneReason": null,
   "ranking": null,
 } satisfies InquiryMatchDto
 

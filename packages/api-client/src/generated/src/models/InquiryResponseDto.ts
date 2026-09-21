@@ -112,17 +112,29 @@ export interface InquiryResponseDto {
      */
     findingValueRegex: Array<string>;
     /**
-     * Findings currently matching this query
+     * Open findings currently matching this query
      * @type {number}
      * @memberof InquiryResponseDto
      */
     matchCount: number;
     /**
-     * Matches that appeared since you last viewed
+     * Matches the latest completed run of their source created. Clears when that source runs again, not when you read it.
      * @type {number}
      * @memberof InquiryResponseDto
      */
     newMatchCount: number;
+    /**
+     * Matches the latest run retired — they still answer the question, but the scan no longer finds them. Not counted in matchCount.
+     * @type {number}
+     * @memberof InquiryResponseDto
+     */
+    goneMatchCount: number;
+    /**
+     * When the run that NEW and GONE are measured against started. Null until some source in scope has completed a run.
+     * @type {Date}
+     * @memberof InquiryResponseDto
+     */
+    lastRunAt?: Date | null;
     /**
      * 
      * @type {Date}
@@ -189,6 +201,7 @@ export function instanceOfInquiryResponseDto(value: object): value is InquiryRes
     if (!('findingValueRegex' in value) || value['findingValueRegex'] === undefined) return false;
     if (!('matchCount' in value) || value['matchCount'] === undefined) return false;
     if (!('newMatchCount' in value) || value['newMatchCount'] === undefined) return false;
+    if (!('goneMatchCount' in value) || value['goneMatchCount'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
@@ -220,6 +233,8 @@ export function InquiryResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'findingValueRegex': json['findingValueRegex'],
         'matchCount': json['matchCount'],
         'newMatchCount': json['newMatchCount'],
+        'goneMatchCount': json['goneMatchCount'],
+        'lastRunAt': json['lastRunAt'] == null ? undefined : (new Date(json['lastRunAt'])),
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
     };
@@ -252,6 +267,8 @@ export function InquiryResponseDtoToJSONTyped(value?: InquiryResponseDto | null,
         'findingValueRegex': value['findingValueRegex'],
         'matchCount': value['matchCount'],
         'newMatchCount': value['newMatchCount'],
+        'goneMatchCount': value['goneMatchCount'],
+        'lastRunAt': value['lastRunAt'] == null ? value['lastRunAt'] : value['lastRunAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
     };

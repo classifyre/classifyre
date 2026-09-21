@@ -7,10 +7,22 @@ import { NotificationsService } from '../notifications.service';
 describe('InquiryMatchingService', () => {
   let service: InquiryMatchingService;
 
+  /**
+   * The run anchor these tests are measured against: source `s1` completed a
+   * run at ANCHOR_AT, so a finding created at or after that is NEW and one
+   * created before it is ONGOING.
+   */
+  const ANCHOR_AT = new Date('2026-09-20T10:00:00Z');
+  const BEFORE_ANCHOR = new Date('2026-09-19T10:00:00Z');
+  const AFTER_ANCHOR = new Date('2026-09-20T11:00:00Z');
+
   const mockPrisma = {
     inquiry: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     finding: { findMany: jest.fn(), count: jest.fn() },
     runner: { findUnique: jest.fn() },
+    source: { findMany: jest.fn() },
+    caseInquiry: { findMany: jest.fn() },
+    $queryRaw: jest.fn(),
   };
   const mockPgBoss = {};
   const mockNotifications = { create: jest.fn().mockResolvedValue({}) };
@@ -27,6 +39,7 @@ describe('InquiryMatchingService', () => {
     findingValueRegex: [],
     matchCount: 0,
     newMatchCount: 0,
+    goneMatchCount: 0,
     matchesSeenAt: null,
     ...over,
   });
@@ -44,6 +57,13 @@ describe('InquiryMatchingService', () => {
     jest.clearAllMocks();
     mockPrisma.inquiry.update.mockResolvedValue({});
     mockPrisma.runner.findUnique.mockResolvedValue(null);
+    mockPrisma.source.findMany.mockResolvedValue([{ id: 's1' }]);
+    mockPrisma.caseInquiry.findMany.mockResolvedValue([]);
+    // One completed run for s1 — the anchor every NEW/GONE answer is measured
+    // against. Returned by the DISTINCT ON in runAnchors().
+    mockPrisma.$queryRaw.mockResolvedValue([
+      { sourceId: 's1', runnerId: 'run-anchor', startedAt: ANCHOR_AT },
+    ]);
   });
 
   it('does nothing when no active inquiry matches the source', async () => {
@@ -140,20 +160,18 @@ describe('InquiryMatchingService', () => {
   // G-033. newMatchCount used to increment by every finding the run touched,
   // including ones merely re-detected, while /matches derived "new" from
   // createdAt > matchesSeenAt. The counters contradicted the endpoint.
+  //
+  // Both halves now read the same run anchor instead, so the older question
+  // ("has the operator looked") cannot come back as a second definition.
   describe('newMatchCount agrees with the /matches definition (G-033)', () => {
-    it('does not count re-detected findings created before matchesSeenAt', async () => {
-      const seenAt = new Date('2026-07-15T12:00:00Z');
+    it('does not count re-detected findings created before the latest run', async () => {
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({
-          findingTypes: ['email'],
-          matchCount: 1,
-          matchesSeenAt: seenAt,
-        }),
+        inquiry({ findingTypes: ['email'], matchCount: 1 }),
       ]);
-      // Re-detected by this run, but created long before the operator last
-      // looked — /matches calls this 0 new, so the counter must too.
+      // Re-detected by this run, but first seen by an earlier one. Its
+      // createdAt predates the anchor, so it is not new.
       mockPrisma.finding.findMany.mockResolvedValue([
-        finding({ createdAt: new Date('2026-07-15T09:00:00Z') }),
+        finding({ createdAt: BEFORE_ANCHOR }),
       ]);
 
       const result = await service.processSourceCompletion('s1', 'run-1');
@@ -162,18 +180,13 @@ describe('InquiryMatchingService', () => {
       expect(mockPrisma.inquiry.update).not.toHaveBeenCalled();
     });
 
-    it('counts findings created after matchesSeenAt', async () => {
-      const seenAt = new Date('2026-07-15T12:00:00Z');
+    it('counts findings the latest run created', async () => {
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({
-          findingTypes: ['email'],
-          matchCount: 1,
-          matchesSeenAt: seenAt,
-        }),
+        inquiry({ findingTypes: ['email'], matchCount: 1 }),
       ]);
       mockPrisma.finding.findMany.mockResolvedValue([
-        finding({ id: 'f1', createdAt: new Date('2026-07-15T09:00:00Z') }),
-        finding({ id: 'f2', createdAt: new Date('2026-07-15T13:00:00Z') }),
+        finding({ id: 'f1', createdAt: BEFORE_ANCHOR }),
+        finding({ id: 'f2', createdAt: AFTER_ANCHOR }),
       ]);
 
       const result = await service.processSourceCompletion('s1', 'run-1');
@@ -189,16 +202,11 @@ describe('InquiryMatchingService', () => {
     it('assigns newMatchCount rather than incrementing it', async () => {
       // An accumulator drifts permanently once any run miscounts; assignment
       // lets every run reconcile against the live set.
-      const seenAt = new Date('2026-07-15T12:00:00Z');
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({
-          findingTypes: ['email'],
-          newMatchCount: 99,
-          matchesSeenAt: seenAt,
-        }),
+        inquiry({ findingTypes: ['email'], newMatchCount: 99 }),
       ]);
       mockPrisma.finding.findMany.mockResolvedValue([
-        finding({ createdAt: new Date('2026-07-15T13:00:00Z') }),
+        finding({ createdAt: AFTER_ANCHOR }),
       ]);
 
       await service.processSourceCompletion('s1', 'run-1');
@@ -208,31 +216,62 @@ describe('InquiryMatchingService', () => {
       expect(data).not.toHaveProperty('newMatchCount.increment');
     });
 
-    it('reports zero new when the inquiry has never been seen', async () => {
+    it('reports new matches on an inquiry nobody has opened', async () => {
+      // The old definition could not: it measured against matchesSeenAt, which
+      // stays null until someone opens the inquiry, so a standing question
+      // could never announce its first answer.
       mockPrisma.inquiry.findMany.mockResolvedValue([
         inquiry({ findingTypes: ['email'], matchesSeenAt: null }),
       ]);
-      mockPrisma.finding.findMany.mockResolvedValue([finding()]);
+      mockPrisma.finding.findMany.mockResolvedValue([
+        finding({ createdAt: AFTER_ANCHOR }),
+      ]);
 
       const result = await service.processSourceCompletion('s1', 'run-1');
 
-      // Matches the endpoint: isNew is false when matchesSeenAt is null.
+      expect(result.landed).toBe(1);
+    });
+
+    it('reports zero new when no source in scope has completed a run', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({ findingTypes: ['email'], matchCount: 1 }),
+      ]);
+      mockPrisma.finding.findMany.mockResolvedValue([
+        finding({ createdAt: AFTER_ANCHOR }),
+      ]);
+
+      const result = await service.processSourceCompletion('s1', 'run-1');
+
       expect(result.landed).toBe(0);
     });
 
     it('leaves an already-correct inquiry untouched', async () => {
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({
-          findingTypes: ['email'],
-          matchCount: 1,
-          matchesSeenAt: null,
-        }),
+        inquiry({ findingTypes: ['email'], matchCount: 1 }),
       ]);
-      mockPrisma.finding.findMany.mockResolvedValue([finding()]);
+      mockPrisma.finding.findMany.mockResolvedValue([
+        finding({ createdAt: BEFORE_ANCHOR }),
+      ]);
 
       await service.processSourceCompletion('s1', 'run-1');
 
       expect(mockPrisma.inquiry.update).not.toHaveBeenCalled();
+    });
+
+    it('builds the run anchor once per pass, not once per inquiry', async () => {
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({ id: 'q1', findingTypes: ['email'] }),
+        inquiry({ id: 'q2', findingTypes: ['email'] }),
+        inquiry({ id: 'q3', findingTypes: ['email'] }),
+      ]);
+      mockPrisma.finding.findMany.mockResolvedValue([
+        finding({ createdAt: AFTER_ANCHOR }),
+      ]);
+
+      await service.processSourceCompletion('s1', 'run-1');
+
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
     });
 
     it('corrects a stale matchCount even with no new findings', async () => {
@@ -257,19 +296,16 @@ describe('InquiryMatchingService', () => {
   });
 
   describe('runner-scoped express inquiry matching', () => {
-    const seenAt = new Date('2026-07-15T12:00:00Z');
-
     it('returns an inquiry only when this runner produced a matching new finding', async () => {
       mockPrisma.inquiry.findMany.mockResolvedValue([
         inquiry({
           title: 'Board travel',
           findingTypes: ['email'],
-          matchesSeenAt: seenAt,
           newMatchCount: 50,
         }),
       ]);
       mockPrisma.finding.findMany.mockResolvedValue([
-        finding({ createdAt: new Date('2026-07-15T13:00:00Z') }),
+        finding({ createdAt: AFTER_ANCHOR }),
       ]);
 
       await expect(
@@ -308,16 +344,14 @@ describe('InquiryMatchingService', () => {
       );
     });
 
-    it('ignores a globally unread inquiry when this runner has no new match', async () => {
+    it('ignores a globally fresh inquiry when this runner has no new match', async () => {
+      // Stored newMatchCount is corpus-wide, so it cannot decide whether THIS
+      // run is worth an express slot.
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({
-          findingTypes: ['email'],
-          matchesSeenAt: seenAt,
-          newMatchCount: 50,
-        }),
+        inquiry({ findingTypes: ['email'], newMatchCount: 50 }),
       ]);
       mockPrisma.finding.findMany.mockResolvedValue([
-        finding({ createdAt: new Date('2026-07-15T09:00:00Z') }),
+        finding({ createdAt: BEFORE_ANCHOR }),
       ]);
 
       await expect(
@@ -331,17 +365,10 @@ describe('InquiryMatchingService', () => {
 
     it('uses the canonical matcher rather than treating every runner finding as a hit', async () => {
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({
-          findingTypes: ['ssn'],
-          matchesSeenAt: seenAt,
-          newMatchCount: 1,
-        }),
+        inquiry({ findingTypes: ['ssn'], newMatchCount: 1 }),
       ]);
       mockPrisma.finding.findMany.mockResolvedValue([
-        finding({
-          findingType: 'email',
-          createdAt: new Date('2026-07-15T13:00:00Z'),
-        }),
+        finding({ findingType: 'email', createdAt: AFTER_ANCHOR }),
       ]);
 
       await expect(
@@ -354,26 +381,23 @@ describe('InquiryMatchingService', () => {
     });
   });
 
-  it('resets newMatchCount to 0 on rematch', async () => {
+  // A rematch used to write newMatchCount: 0 as "the fresh baseline". Under the
+  // run anchor there is no baseline to reset — NEW is a pure function of the
+  // corpus and the latest run — and create() plus every matcher edit come
+  // through here, so zeroing made an inquiry report no new matches at exactly
+  // the moment its answers were freshest.
+  it('recomputes all three counters on rematch instead of zeroing new', async () => {
     mockPrisma.inquiry.findUnique.mockResolvedValue(inquiry());
     mockPrisma.finding.findMany.mockResolvedValue([
-      {
-        id: 'f1',
-        assetId: 'a1',
-        sourceId: 's1',
-        detectorType: 'PII',
-        customDetectorKey: null,
-        findingType: 'email',
-        severity: 'HIGH',
-        matchedContent: 'x',
-      },
+      finding({ id: 'f1', createdAt: AFTER_ANCHOR }),
+      finding({ id: 'f2', createdAt: BEFORE_ANCHOR }),
     ]);
 
     await service.rematchInquiry('q1');
 
     expect(mockPrisma.inquiry.update).toHaveBeenCalledWith({
       where: { id: 'q1' },
-      data: { matchCount: 1, newMatchCount: 0 },
+      data: { matchCount: 2, newMatchCount: 1, goneMatchCount: 0 },
     });
   });
 

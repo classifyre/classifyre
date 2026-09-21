@@ -3,10 +3,13 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { SourceGraphScheduler } from './stats/source-graph-scheduler.service';
+// Value import, not `import type` — see the constructor.
+import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { resolveEdgeClass } from './graph/edge-class';
 import { tryNormalizeUrn } from './graph/urn';
 import {
@@ -261,6 +264,9 @@ export class GraphService {
     // Value import, not `import type` — a type-only import of an injected class
     // leaves Nest with no metadata to resolve and injects undefined silently.
     private readonly sourceGraphScheduler: SourceGraphScheduler,
+    // Optional so the graph specs can construct this service without the whole
+    // matching stack; a case graph simply goes unbadged without it.
+    @Optional() private readonly matching?: InquiryMatchingService,
   ) {}
 
   // ─── Edge inference ──────────────────────────────────────────────
@@ -1231,7 +1237,57 @@ export class GraphService {
           )
         : { nodes: [], edges: [], truncated: false };
 
-    return this.mergeCaseGraph(caseId, evidence, base);
+    const merged = await this.mergeCaseGraph(caseId, evidence, base);
+    return this.badgeInquiryStates(caseId, merged);
+  }
+
+  /**
+   * Mark which of a case's finding nodes the latest scan brought in or took
+   * away, according to the inquiries driving that case.
+   *
+   * Scoped to the nodes already on the graph rather than to every match of
+   * every linked inquiry: this is a question about one screenful, and answering
+   * it by walking the corpus would cost the same as the inquiry page itself.
+   *
+   * A failure here badges nothing. The graph is the case's main entrance, and
+   * it must still open when the matching stack cannot answer.
+   */
+  private async badgeInquiryStates(
+    caseId: string,
+    graph: GraphResponseDto,
+  ): Promise<GraphResponseDto> {
+    if (!this.matching) return graph;
+    const findingIds = graph.nodes
+      .filter((n) => n.type === 'finding')
+      .map((n) => n.id);
+    if (findingIds.length === 0) return graph;
+
+    try {
+      const links = await this.prisma.caseInquiry.findMany({
+        where: { caseId },
+        select: { inquiryId: true },
+      });
+      if (links.length === 0) return graph;
+
+      const states = await this.matching.matchStatesForFindings(
+        links.map((l) => l.inquiryId),
+        findingIds,
+      );
+      if (states.size === 0) return graph;
+
+      for (const node of graph.nodes) {
+        if (node.type !== 'finding') continue;
+        const state = states.get(node.id);
+        // ONGOING is the unremarkable case and is left off the wire entirely,
+        // so the canvas decorator only sees what it should draw.
+        if (state === 'NEW' || state === 'GONE') node.matchState = state;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Inquiry states not applied to case ${caseId} graph: ${String(error)}`,
+      );
+    }
+    return graph;
   }
 
   /**

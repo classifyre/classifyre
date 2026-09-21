@@ -8,11 +8,12 @@ All URIs are relative to *http://localhost*
 | [**inquiriesControllerFindOne**](InquiriesApi.md#inquiriescontrollerfindone) | **GET** /inquiries/{id} | Get an inquiry |
 | [**inquiriesControllerList**](InquiriesApi.md#inquiriescontrollerlist) | **GET** /inquiries | List inquiries (with match counts) |
 | [**inquiriesControllerListMatches**](InquiriesApi.md#inquiriescontrollerlistmatches) | **GET** /inquiries/{id}/matches | List the findings currently matching this inquiry (paginated) |
-| [**inquiriesControllerMarkSeen**](InquiriesApi.md#inquiriescontrollermarkseen) | **POST** /inquiries/{id}/seen | Mark the current matches as seen (clears the \&quot;new\&quot; badge) |
+| [**inquiriesControllerMarkSeen**](InquiriesApi.md#inquiriescontrollermarkseen) | **POST** /inquiries/{id}/seen | Acknowledge the current matches. Does NOT clear the \&quot;new\&quot; count — that is measured against the source\&#39;s latest run and clears when the source runs again. |
 | [**inquiriesControllerMatchOptions**](InquiriesApi.md#inquiriescontrollermatchoptions) | **GET** /inquiries/match-options | Sources, custom detectors and distinct finding types for the matcher form |
 | [**inquiriesControllerPreview**](InquiriesApi.md#inquiriescontrollerpreview) | **POST** /inquiries/preview | Preview findings a matcher config currently selects (no save) |
 | [**inquiriesControllerRematch**](InquiriesApi.md#inquiriescontrollerrematch) | **POST** /inquiries/{id}/rematch | Recompute matches against all current findings |
 | [**inquiriesControllerRemove**](InquiriesApi.md#inquiriescontrollerremove) | **DELETE** /inquiries/{id} | Delete an inquiry |
+| [**inquiriesControllerTimeline**](InquiriesApi.md#inquiriescontrollertimeline) | **GET** /inquiries/{id}/timeline | The inquiry\&#39;s own history: config changes and each run\&#39;s deltas |
 | [**inquiriesControllerUpdate**](InquiriesApi.md#inquiriescontrollerupdate) | **PATCH** /inquiries/{id} | Update an inquiry (matchers change → matches recomputed) |
 
 
@@ -226,7 +227,7 @@ No authorization required
 
 ## inquiriesControllerListMatches
 
-> InquiryMatchListResponseDto inquiriesControllerListMatches(id, search, severity, onlyNew, skip, limit)
+> InquiryMatchListResponseDto inquiriesControllerListMatches(id, search, severity, state, onlyNew, skip, limit)
 
 List the findings currently matching this inquiry (paginated)
 
@@ -250,7 +251,9 @@ async function example() {
     search: search_example,
     // Array<'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'> (optional)
     severity: ...,
-    // boolean | Only matches that appeared since last seen (optional)
+    // Array<'NEW' | 'ONGOING' | 'GONE'> | Restrict to these states. Defaults to NEW and ONGOING — GONE matches are RESOLVED findings and are only returned when asked for by name. (optional)
+    state: ...,
+    // boolean | Equivalent to state: [NEW]. (optional)
     onlyNew: true,
     // number (optional)
     skip: 8.14,
@@ -278,7 +281,8 @@ example().catch(console.error);
 | **id** | `string` |  | [Defaults to `undefined`] |
 | **search** | `string` | Substring match on finding type, asset name or matched content | [Optional] [Defaults to `undefined`] |
 | **severity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
-| **onlyNew** | `boolean` | Only matches that appeared since last seen | [Optional] [Defaults to `undefined`] |
+| **state** | `NEW`, `ONGOING`, `GONE` | Restrict to these states. Defaults to NEW and ONGOING — GONE matches are RESOLVED findings and are only returned when asked for by name. | [Optional] [Enum: NEW, ONGOING, GONE] |
+| **onlyNew** | `boolean` | Equivalent to state: [NEW]. | [Optional] [Defaults to `undefined`] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **limit** | `number` |  | [Optional] [Defaults to `50`] |
 
@@ -308,7 +312,7 @@ No authorization required
 
 > inquiriesControllerMarkSeen(id)
 
-Mark the current matches as seen (clears the \&quot;new\&quot; badge)
+Acknowledge the current matches. Does NOT clear the \&quot;new\&quot; count — that is measured against the source\&#39;s latest run and clears when the source runs again.
 
 ### Example
 
@@ -625,6 +629,77 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## inquiriesControllerTimeline
+
+> InquiryTimelineResponseDto inquiriesControllerTimeline(id, cursor, limit)
+
+The inquiry\&#39;s own history: config changes and each run\&#39;s deltas
+
+### Example
+
+```ts
+import {
+  Configuration,
+  InquiriesApi,
+} from '@workspace/api-client';
+import type { InquiriesControllerTimelineRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new InquiriesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string (optional)
+    cursor: cursor_example,
+    // string (optional)
+    limit: limit_example,
+  } satisfies InquiriesControllerTimelineRequest;
+
+  try {
+    const data = await api.inquiriesControllerTimeline(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **cursor** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **limit** | `string` |  | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**InquiryTimelineResponseDto**](InquiryTimelineResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

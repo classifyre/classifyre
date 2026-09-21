@@ -851,6 +851,10 @@ model Runner {
   // given a slot" — a MAX(started_at) per namespace on every dequeue, which
   // without this is a sequential scan of the whole run history.
   @@index([startedAt])
+  // The inquiry run anchor: "latest COMPLETED|WARNING run per source", as a
+  // DISTINCT ON. None of the three single-column indexes above can seek that —
+  // [sourceId] alone still has to sort every run a source ever had.
+  @@index([sourceId, status, startedAt(sort: Desc)])
   @@map("runners")
 }
 
@@ -1969,9 +1973,17 @@ model CaseEvent {
   @@map("case_events")
 }
 
-// A saved query / monitor. It does NOT persist evidence — it only defines matchers
-// and tracks which findings currently match (QuestionMatch) so we can surface new
-// matches. An inquiry is standalone or linked to any number of cases (CaseInquiry).
+// A saved query / monitor ("Inquiry Watch" in the UI). It persists no match rows
+// at all: it defines matchers, and its counters are recomputed from the live
+// finding set. An inquiry is standalone or linked to any number of cases
+// (CaseInquiry).
+//
+// Newness is a property of (finding, run), not of (finding, reader). A match is
+// NEW when it was created by the latest completed run of its source, and stops
+// being new the moment that source runs again — whether or not anyone looked.
+// Its mirror is GONE: a match the latest run retired. Both are derived at read
+// time from the run anchor; matchesSeenAt is only an acknowledgement stamp and
+// no longer defines either.
 //
 // Matchers: a finding matches iff source matches AND (detector OR customDetector
 // matches) AND type matches, where an empty list for a dimension means "any".
@@ -1992,16 +2004,58 @@ model Inquiry {
   findingTypeRegex   String[]       @map("finding_type_regex")
   findingValueRegex  String[]       @map("finding_value_regex")
 
-  matchCount    Int       @default(0) @map("match_count")
-  newMatchCount Int       @default(0) @map("new_match_count")
-  matchesSeenAt DateTime? @map("matches_seen_at")
+  // Counters, all recomputed from the live set — never incremented. An
+  // accumulator drifts permanently once any run miscounts and cannot be
+  // reconciled. matchCount counts OPEN matches only; goneMatchCount counts the
+  // ones the latest run retired, which are RESOLVED and so outside matchCount.
+  matchCount     Int       @default(0) @map("match_count")
+  newMatchCount  Int       @default(0) @map("new_match_count")
+  goneMatchCount Int       @default(0) @map("gone_match_count")
+  // Acknowledgement only: "an operator has looked since this stamp". Does not
+  // decide newness — see the run-anchor note above.
+  matchesSeenAt  DateTime? @map("matches_seen_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  caseLinks CaseInquiry[]
+  caseLinks  CaseInquiry[]
+  activities InquiryActivity[]
 
   @@index([status])
   @@map("inquiries")
+}
+
+// Append-only log of everything that happened to an inquiry: its own config
+// changes, and each run's landed/retired deltas.
+//
+// This is what makes derived newness safe. The NEW/GONE state of a match is
+// live and therefore ephemeral — it is gone the next time the source runs. The
+// timeline is the durable record of what arrived when, so "what was new last
+// Tuesday" survives even though no match rows do.
+enum InquiryActivityType {
+  INQUIRY_CREATED
+  MATCHERS_UPDATED
+  STATUS_CHANGED
+  REMATCHED
+  MATCHES_LANDED
+  MATCHES_RETIRED
+  CASE_LINKED
+  CASE_UNLINKED
+  PULLED_TO_CASE
+  AUTO_PULLED
+}
+
+model InquiryActivity {
+  id           String              @id @default(uuid())
+  inquiryId    String              @map("inquiry_id")
+  activityType InquiryActivityType @map("activity_type")
+  actor        String?
+  payload      Json?               @db.JsonB
+  createdAt    DateTime            @default(now()) @map("created_at")
+
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId, createdAt(sort: Desc)])
+  @@map("inquiry_activities")
 }
 
 // Many-to-many link: an inquiry can guide several cases and a case can be
@@ -2010,6 +2064,11 @@ model CaseInquiry {
   id        String   @id @default(uuid())
   caseId    String   @map("case_id")
   inquiryId String   @map("inquiry_id")
+  // When set, findings the inquiry newly matches are pulled into this case as
+  // they land, without anyone re-opening the inquiry. Off by default: a case
+  // that silently grows its own evidence base is a surprise, not a feature,
+  // unless the investigator asked for it.
+  autoPull  Boolean  @default(false) @map("auto_pull")
   createdAt DateTime @default(now()) @map("created_at")
 
   case    Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
