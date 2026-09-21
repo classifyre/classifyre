@@ -672,6 +672,54 @@ export class RunnerAssetProgressDto {
   total: number;
 }
 
+/**
+ * Why a queued run has not started yet.
+ *
+ * A PENDING run used to show as PENDING and nothing else, so a run about to
+ * start and one waiting behind another tenant's 13.9-hour sweep looked the
+ * same (GENESIS field report P1).
+ */
+export class RunnerQueuePositionDto {
+  @ApiProperty()
+  runnerId!: string;
+
+  @ApiProperty({ enum: RunnerStatus })
+  status!: RunnerStatus;
+
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description:
+      "1-based place in this workspace's own queue. Null when the run is not queued.",
+  })
+  positionInNamespace!: number | null;
+
+  @ApiProperty({
+    description:
+      'True when this run is in the lane that goes ahead of scheduled sweeps: an operator-triggered run, or a source that has never completed one.',
+  })
+  priority!: boolean;
+
+  @ApiProperty({
+    description:
+      'Scans running across the whole deployment. -1 when that count could not be read, which is not the same as zero.',
+  })
+  runningNow!: number;
+
+  @ApiProperty({
+    description: 'Concurrent scans this deployment allows. 0 means unlimited.',
+  })
+  concurrencyLimit!: number;
+
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description:
+      'Human-readable explanation, or null when the run is not queued.',
+  })
+  reason!: string | null;
+}
+
 /** `ctx.query_assets()` from a CUSTOM notebook, relayed by the CLI. */
 export class RunnerAssetQueryDto {
   @ApiProperty({

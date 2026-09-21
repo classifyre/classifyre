@@ -17,12 +17,14 @@ All URIs are relative to *http://localhost*
 | [**sourcesControllerBulkUpdateSources**](SourcesApi.md#sourcescontrollerbulkupdatesources) | **POST** /sources/bulk-update | Bulk update data sources |
 | [**sourcesControllerCreateSource**](SourcesApi.md#sourcescontrollercreatesource) | **POST** /sources | Create a new data source |
 | [**sourcesControllerDeleteSource**](SourcesApi.md#sourcescontrollerdeletesource) | **DELETE** /sources/{id} | Delete a data source |
+| [**sourcesControllerGetConnectionTest**](SourcesApi.md#sourcescontrollergetconnectiontest) | **GET** /sources/{id}/test | The result of the last connection test |
 | [**sourcesControllerGetSchedule**](SourcesApi.md#sourcescontrollergetschedule) | **GET** /sources/{id}/schedule | Get source schedule |
 | [**sourcesControllerGetSource**](SourcesApi.md#sourcescontrollergetsource) | **GET** /sources/{id} | Get source by ID |
 | [**sourcesControllerListSources**](SourcesApi.md#sourcescontrollerlistsources) | **GET** /sources | List all data sources |
 | [**sourcesControllerPurgeAssets**](SourcesApi.md#sourcescontrollerpurgeassets) | **DELETE** /sources/{id}/assets | Retire a source\&#39;s assets — all of them, or a named subset |
 | [**sourcesControllerPurgeFindings**](SourcesApi.md#sourcescontrollerpurgefindings) | **DELETE** /sources/{id}/findings | Purge all findings of a data source |
 | [**sourcesControllerResumeSchedule**](SourcesApi.md#sourcescontrollerresumeschedule) | **POST** /sources/{id}/schedule/resume | Resume automatic scanning |
+| [**sourcesControllerStartConnectionTest**](SourcesApi.md#sourcescontrollerstartconnectiontest) | **POST** /sources/{id}/test/async | Start a source connection test without waiting for it |
 | [**sourcesControllerStartRun**](SourcesApi.md#sourcescontrollerstartrun) | **POST** /sources/{id}/runs | Start a new ingestion run |
 | [**sourcesControllerTestConnection**](SourcesApi.md#sourcescontrollertestconnection) | **POST** /sources/{id}/test | Test source connection |
 | [**sourcesControllerUpdateSource**](SourcesApi.md#sourcescontrollerupdatesource) | **PUT** /sources/{id} | Update a data source |
@@ -931,6 +933,74 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## sourcesControllerGetConnectionTest
+
+> ConnectionTestStatusDto sourcesControllerGetConnectionTest(id)
+
+The result of the last connection test
+
+RUNNING while a test started by POST /sources/{id}/test/async is still going. Null when the source has never been tested.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SourcesApi,
+} from '@workspace/api-client';
+import type { SourcesControllerGetConnectionTestRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SourcesApi();
+
+  const body = {
+    // string | Source unique identifier
+    id: id_example,
+  } satisfies SourcesControllerGetConnectionTestRequest;
+
+  try {
+    const data = await api.sourcesControllerGetConnectionTest(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` | Source unique identifier | [Defaults to `undefined`] |
+
+### Return type
+
+[**ConnectionTestStatusDto**](ConnectionTestStatusDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | The last connection test, or null |  -  |
+| **404** | Source not found |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## sourcesControllerGetSchedule
 
 > SourcesControllerGetSchedule200Response sourcesControllerGetSchedule(id)
@@ -1347,6 +1417,74 @@ No authorization required
 |-------------|-------------|------------------|
 | **200** | Automatic scanning resumed |  -  |
 | **400** | Source is not using automatic scheduling |  -  |
+| **404** | Source not found |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## sourcesControllerStartConnectionTest
+
+> ConnectionTestStatusDto sourcesControllerStartConnectionTest(id)
+
+Start a source connection test without waiting for it
+
+Returns immediately with status RUNNING; poll GET /sources/{id}/test for the answer. Use this rather than POST /sources/{id}/test wherever the test may be slow to start: on Kubernetes the test pod queues behind running scans, and one measured test returned after 422.5 s of which 3 s was the test itself. A second call while a test is already running joins that test instead of starting another.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SourcesApi,
+} from '@workspace/api-client';
+import type { SourcesControllerStartConnectionTestRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SourcesApi();
+
+  const body = {
+    // string | Source unique identifier
+    id: id_example,
+  } satisfies SourcesControllerStartConnectionTestRequest;
+
+  try {
+    const data = await api.sourcesControllerStartConnectionTest(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` | Source unique identifier | [Defaults to `undefined`] |
+
+### Return type
+
+[**ConnectionTestStatusDto**](ConnectionTestStatusDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **202** | Connection test started (or already running) |  -  |
 | **404** | Source not found |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)

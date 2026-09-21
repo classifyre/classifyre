@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -396,6 +397,15 @@ export class CloseCaseDto {
   @IsOptional()
   @IsString()
   closedBy?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Keep the linked inquiries active. By default closing archives them; an answered case whose inquiries are standing checks (they catch next year's occurrence) should keep them.",
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  keepInquiries?: boolean;
 }
 
 export class CloseCaseResponseDto {

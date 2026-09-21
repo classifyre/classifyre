@@ -1,0 +1,11 @@
+-- Make a scope change recoverable for retirement (GENESIS field report §14).
+--
+-- An asset that disappeared in the same run that moved the source's scope kept
+-- its old scope_fingerprint forever, while every later run carried the new one,
+-- so it was never comparable again and had to be retired by hand.
+--
+-- absent_under_scope records the scope a full scan has already looked for the
+-- asset under without finding it. The first full scan after a scope change
+-- stamps it; the second retires. Absence is still never acted on in the same
+-- run that moved the scope.
+ALTER TABLE "assets" ADD COLUMN IF NOT EXISTS "absent_under_scope" VARCHAR(64);

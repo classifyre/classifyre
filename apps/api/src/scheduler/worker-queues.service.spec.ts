@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { WorkerQueuesService } from './worker-queues.service';
 
 describe('WorkerQueuesService.purgeQueued', () => {
@@ -70,5 +74,71 @@ describe('WorkerQueuesService.purgeQueued', () => {
       BadRequestException,
     );
     expect(deleteQueuedJobs).not.toHaveBeenCalled();
+  });
+});
+
+describe('WorkerQueuesService — feature holds', () => {
+  const namespaceId = '00000000-0000-0000-0000-000000000001';
+
+  const build = (holds: Map<string, string | null>, heldBy: string | null) => {
+    const registry = {
+      listRows: jest.fn().mockResolvedValue([]),
+      listPauseHolds: jest.fn().mockResolvedValue(holds),
+      setPaused: jest.fn().mockResolvedValue({ heldBy }),
+    };
+    const pgBoss = {
+      queueDepths: jest.fn().mockResolvedValue([
+        {
+          queue: 'correlation.scan',
+          queuedCount: 4,
+          activeCount: 0,
+          deferredCount: 0,
+          totalCount: 4,
+        },
+      ]),
+    };
+    const concurrency = {
+      getLimit: () => 4,
+      getWaitTimeoutMs: () => 900_000,
+    };
+    const cls = { get: jest.fn(() => namespaceId) };
+    return new WorkerQueuesService(
+      cls as never,
+      registry as never,
+      pgBoss as never,
+      concurrency as never,
+    );
+  };
+
+  it('reports which feature holds a queue, even one no worker registered', async () => {
+    const service = build(
+      new Map([
+        ['correlation.scan', 'duplicates'],
+        ['semantic-embeddings-s1', 'embeddings'],
+      ]),
+      null,
+    );
+
+    const { queues } = await service.overview();
+    const byName = new Map(queues.map((q) => [q.queue, q]));
+
+    expect(byName.get('correlation.scan')).toEqual(
+      expect.objectContaining({ paused: true, heldBy: 'duplicates' }),
+    );
+    // No depth row and no worker row: listed because of the hold alone.
+    expect(byName.get('semantic-embeddings-s1')).toEqual(
+      expect.objectContaining({ paused: true, heldBy: 'embeddings' }),
+    );
+  });
+
+  it('answers 409 when a held queue is resumed by hand', async () => {
+    const service = build(new Map(), 'duplicates');
+
+    await expect(service.setPaused('correlation.scan', false)).rejects.toThrow(
+      ConflictException,
+    );
+    await expect(service.setPaused('correlation.scan', false)).rejects.toThrow(
+      /Duplicate detection is turned off/,
+    );
   });
 });

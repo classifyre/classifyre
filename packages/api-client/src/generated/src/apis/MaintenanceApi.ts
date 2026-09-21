@@ -19,6 +19,10 @@ export interface MaintenanceControllerCleanupRunRequest {
     runId: string;
 }
 
+export interface MaintenanceControllerSetFeatureRequest {
+    key: string;
+}
+
 export interface MaintenanceControllerStartCleanupRequest {
     key: string;
 }
@@ -65,6 +69,34 @@ export class MaintenanceApi extends runtime.BaseAPI {
     }
 
     /**
+     * Workspace feature switches (embeddings, duplicate detection): state, how each was turned off, the data each owns and the queues held while off
+     */
+    async maintenanceControllerListFeaturesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/maintenance/features`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Workspace feature switches (embeddings, duplicate detection): state, how each was turned off, the data each owns and the queues held while off
+     */
+    async maintenanceControllerListFeatures(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.maintenanceControllerListFeaturesRaw(initOverrides);
+    }
+
+    /**
      * Workspace storage overview: per-table row estimates and byte sizes, grouped into protected and cleanable datasets
      */
     async maintenanceControllerOverviewRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -90,6 +122,42 @@ export class MaintenanceApi extends runtime.BaseAPI {
      */
     async maintenanceControllerOverview(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.maintenanceControllerOverviewRaw(initOverrides);
+    }
+
+    /**
+     * Turn a workspace feature on or off. Off holds its worker queues paused (every replica stops; the Workers tab cannot resume them) and either keeps its data (a pause — turning back on catches up) or, with deleteData, wipes it in the background (poll GET cleanup/runs/:runId). On resumes the queues and catches up: one full duplicate recompute, or an embedding backfill. Body: { enabled: boolean, deleteData?: boolean }. Allowed while the workspace is paused.
+     */
+    async maintenanceControllerSetFeatureRaw(requestParameters: MaintenanceControllerSetFeatureRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['key'] == null) {
+            throw new runtime.RequiredError(
+                'key',
+                'Required parameter "key" was null or undefined when calling maintenanceControllerSetFeature().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/maintenance/features/{key}`;
+        urlPath = urlPath.replace(`{${"key"}}`, encodeURIComponent(String(requestParameters['key'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Turn a workspace feature on or off. Off holds its worker queues paused (every replica stops; the Workers tab cannot resume them) and either keeps its data (a pause — turning back on catches up) or, with deleteData, wipes it in the background (poll GET cleanup/runs/:runId). On resumes the queues and catches up: one full duplicate recompute, or an embedding backfill. Body: { enabled: boolean, deleteData?: boolean }. Allowed while the workspace is paused.
+     */
+    async maintenanceControllerSetFeature(requestParameters: MaintenanceControllerSetFeatureRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.maintenanceControllerSetFeatureRaw(requestParameters, initOverrides);
     }
 
     /**

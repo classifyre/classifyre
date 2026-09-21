@@ -69,7 +69,7 @@ describe('embedding queue batching', () => {
       handle: (jobs: unknown[]) => Promise<void>;
     };
     Object.assign(service, {
-      config: { queueBatchSize, retrySeconds: 30 },
+      config: { enabled: true, queueBatchSize, retrySeconds: 30 },
       pgBoss: { getBossAsync: () => Promise.resolve(boss) },
       embeddings,
       provider,

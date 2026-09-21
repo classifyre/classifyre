@@ -50,6 +50,7 @@ import {
   RegisterDiscoveredAssetsResponseDto,
   UpdateRunnerAssetStatusDto,
   RunnerAssetProgressDto,
+  RunnerQueuePositionDto,
   RunnerAssetQueryDto,
   RunnerAssetQueryResponseDto,
 } from './dto';
@@ -228,6 +229,18 @@ export class CliRunnerController {
   @ApiResponse({ status: 200, type: RunnerDto })
   getRunner(@Param('runnerId') runnerId: string) {
     return this.cliRunnerService.getRunnerStatus(runnerId);
+  }
+
+  @AllowInDemoMode()
+  @Get('runners/:runnerId/queue-position')
+  @ApiOperation({
+    summary: 'Why a queued run has not started yet',
+    description:
+      "Place in this workspace's queue, whether the run is in the priority lane, how many scans are running across the deployment, and the concurrency limit. All nulls once the run has left the queue.",
+  })
+  @ApiResponse({ status: 200, type: RunnerQueuePositionDto })
+  getRunnerQueuePosition(@Param('runnerId') runnerId: string) {
+    return this.cliRunnerService.getRunnerQueuePosition(runnerId);
   }
 
   // POST only because the filter set does not fit a query string — this reads

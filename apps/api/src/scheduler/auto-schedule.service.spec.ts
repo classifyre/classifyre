@@ -312,6 +312,39 @@ describe('AutoScheduleService', () => {
       expect(delayOf(data, now)).toBe(BACKOFF_BASE_SECONDS * 4);
     });
 
+    // GENESIS field report P8: an operator stop is not a failed scan.
+    it('does not count a stopped run as a failure', async () => {
+      prisma.source.findUnique.mockResolvedValue(
+        autoSource({ consecutiveFailures: CIRCUIT_BREAK_FAILURES }),
+      );
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({ status: 'STOPPED', errorMessage: 'Manually stopped' }),
+      );
+
+      await service.recordRunOutcome('s1', 'r1');
+
+      const data = written();
+      expect(data.autoPhase).not.toBe('BACKOFF');
+      expect(data.autoPhase).not.toBe('PAUSED');
+      expect(notifications.create).not.toHaveBeenCalled();
+    });
+
+    it('still reads a pre-STOPPED stop by its message', async () => {
+      // Runs stopped before the status existed are ERROR rows carrying only
+      // the message. They must not start counting as failures now.
+      prisma.source.findUnique.mockResolvedValue(
+        autoSource({ consecutiveFailures: CIRCUIT_BREAK_FAILURES }),
+      );
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({ status: 'ERROR', errorMessage: 'Manually stopped' }),
+      );
+
+      await service.recordRunOutcome('s1', 'r1');
+
+      expect(written().autoPhase).not.toBe('PAUSED');
+      expect(notifications.create).not.toHaveBeenCalled();
+    });
+
     it('pauses and notifies once the failures stop looking transient', async () => {
       prisma.source.findUnique.mockResolvedValue(
         autoSource({ consecutiveFailures: CIRCUIT_BREAK_FAILURES }),

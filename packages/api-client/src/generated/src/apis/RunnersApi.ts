@@ -27,6 +27,7 @@ import type {
   RunnerAssetQueryResponseDto,
   RunnerDto,
   RunnerLogsResponseDto,
+  RunnerQueuePositionDto,
   SearchRunnerLogsBodyDto,
   SearchRunnersAssetsRequestDto,
   SearchRunnersAssetsResponseDto,
@@ -63,6 +64,8 @@ import {
     RunnerDtoToJSON,
     RunnerLogsResponseDtoFromJSON,
     RunnerLogsResponseDtoToJSON,
+    RunnerQueuePositionDtoFromJSON,
+    RunnerQueuePositionDtoToJSON,
     SearchRunnerLogsBodyDtoFromJSON,
     SearchRunnerLogsBodyDtoToJSON,
     SearchRunnersAssetsRequestDtoFromJSON,
@@ -99,6 +102,10 @@ export interface CliRunnerControllerGetRunnerRequest {
 }
 
 export interface CliRunnerControllerGetRunnerAssetProgressRequest {
+    runnerId: string;
+}
+
+export interface CliRunnerControllerGetRunnerQueuePositionRequest {
     runnerId: string;
 }
 
@@ -330,6 +337,45 @@ export class RunnersApi extends runtime.BaseAPI {
      */
     async cliRunnerControllerGetRunnerAssetProgress(requestParameters: CliRunnerControllerGetRunnerAssetProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerAssetProgressDto> {
         const response = await this.cliRunnerControllerGetRunnerAssetProgressRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Place in this workspace\'s queue, whether the run is in the priority lane, how many scans are running across the deployment, and the concurrency limit. All nulls once the run has left the queue.
+     * Why a queued run has not started yet
+     */
+    async cliRunnerControllerGetRunnerQueuePositionRaw(requestParameters: CliRunnerControllerGetRunnerQueuePositionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerQueuePositionDto>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerGetRunnerQueuePosition().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/runners/{runnerId}/queue-position`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RunnerQueuePositionDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Place in this workspace\'s queue, whether the run is in the priority lane, how many scans are running across the deployment, and the concurrency limit. All nulls once the run has left the queue.
+     * Why a queued run has not started yet
+     */
+    async cliRunnerControllerGetRunnerQueuePosition(requestParameters: CliRunnerControllerGetRunnerQueuePositionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerQueuePositionDto> {
+        const response = await this.cliRunnerControllerGetRunnerQueuePositionRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -970,7 +1016,8 @@ export const CliRunnerControllerListRunnersStatusEnum = {
     Running: 'RUNNING',
     Completed: 'COMPLETED',
     Warning: 'WARNING',
-    Error: 'ERROR'
+    Error: 'ERROR',
+    Stopped: 'STOPPED'
 } as const;
 export type CliRunnerControllerListRunnersStatusEnum = typeof CliRunnerControllerListRunnersStatusEnum[keyof typeof CliRunnerControllerListRunnersStatusEnum];
 /**
@@ -981,7 +1028,8 @@ export const CliRunnerControllerListSourceRunnersStatusEnum = {
     Running: 'RUNNING',
     Completed: 'COMPLETED',
     Warning: 'WARNING',
-    Error: 'ERROR'
+    Error: 'ERROR',
+    Stopped: 'STOPPED'
 } as const;
 export type CliRunnerControllerListSourceRunnersStatusEnum = typeof CliRunnerControllerListSourceRunnersStatusEnum[keyof typeof CliRunnerControllerListSourceRunnersStatusEnum];
 /**

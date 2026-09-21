@@ -14,9 +14,14 @@ import {
   EXPRESS_CONSECUTIVE_FAILURES,
   EXPRESS_IMPORTANCE_SCORE,
 } from '../autopilot/autopilot.constants';
-import { CORRELATION_QUEUE } from './correlation.constants';
+import {
+  CORRELATION_QUEUE,
+  SCAN_HANDOFF_QUEUE,
+  scanHandoffJobOptions,
+} from './correlation.constants';
 import { CORRELATION_RELATION_TYPES } from './correlation.service';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
+import { CorrelationSwitchService } from './correlation-switch.service';
 import {
   CorrelationJobScheduler,
   type CorrelationJobPayload,
@@ -28,6 +33,10 @@ import { CorrelationService } from './correlation.service';
  * finishes). For each job it runs the deterministic DUPLICATES FINDER AGENT,
  * then hands off to the autopilot cycle — guaranteeing the duplicate/cluster
  * results exist before the inquiry/case agents run.
+ *
+ * Also consumes SCAN_HANDOFF_QUEUE: the same hand-off without the duplicate
+ * check, used while duplicate detection is turned off (CORRELATION_QUEUE is
+ * then held paused, and the agents must not stop with it).
  */
 @Injectable()
 export class CorrelationWorker {
@@ -41,7 +50,12 @@ export class CorrelationWorker {
     private readonly correlationService: CorrelationService,
     private readonly jobs: CorrelationJobScheduler,
     @Optional() private readonly pause?: NamespacePauseService,
+    @Optional() private readonly featureSwitch?: CorrelationSwitchService,
   ) {}
+
+  private async duplicatesEnabled(): Promise<boolean> {
+    return this.featureSwitch ? this.featureSwitch.isEnabled() : true;
+  }
 
   /**
    * Registers this worker on the CURRENT namespace's pg-boss (invoked by the
@@ -55,6 +69,15 @@ export class CorrelationWorker {
     await this.pgBoss.work(CORRELATION_QUEUE, { localConcurrency: 1 }, (jobs) =>
       this.handle(jobs as Job[]),
     );
+    await boss.createQueue(SCAN_HANDOFF_QUEUE);
+    await this.pgBoss.work(
+      SCAN_HANDOFF_QUEUE,
+      { localConcurrency: 1 },
+      (jobs) => this.handleHandoff(jobs as Job[]),
+    );
+    this.logger.log(
+      `Registered workers for queues ${CORRELATION_QUEUE}, ${SCAN_HANDOFF_QUEUE}`,
+    );
     // A namespace scanned before the review queue existed has all the
     // correlation data and none of the rollups, so its queue would read empty
     // until the next scan — which on a quiet instance could be never.
@@ -62,8 +85,15 @@ export class CorrelationWorker {
     // Rebuilding the index is enough; a full recompute would refingerprint the
     // whole corpus to produce edges that are already there. Only done when the
     // index is empty AND there is something to roll up, so a genuinely fresh
-    // namespace does no work at boot.
+    // namespace does no work at boot — and neither does one whose duplicate
+    // detection is turned off (the rebuild would grow what it switched off).
     try {
+      if (!(await this.duplicatesEnabled())) {
+        this.logger.log(
+          `Duplicate detection is off; ${CORRELATION_QUEUE} stays held until it is turned back on.`,
+        );
+        return;
+      }
       const [patterns, pairs] = await Promise.all([
         this.prisma.correlationPattern.count(),
         this.prisma.edge.count({
@@ -86,7 +116,6 @@ export class CorrelationWorker {
         `Review index warm-up skipped: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
-    this.logger.log(`Registered worker for queue ${CORRELATION_QUEUE}`);
   }
 
   /**
@@ -120,8 +149,23 @@ export class CorrelationWorker {
       this.logger.debug('Workspace paused — skipping correlation job(s)');
       return;
     }
+    // Normally unreachable while the switch is off — the queue is held
+    // paused — but a batch fetched in the instant before the hold landed
+    // still arrives. It gets the hand-off and nothing else; the recompute that
+    // runs when the switch comes back on covers the duplicate check.
+    const enabled = await this.duplicatesEnabled();
     for (const job of jobs) {
       const data = job.data as CorrelationJobPayload;
+      if (!enabled) {
+        if (data?.sourceId && data?.runnerId) {
+          await this.handOffToAutopilot(
+            data.sourceId,
+            data.runnerId,
+            `scan:${data.sourceId}:${data.runnerId}`,
+          );
+        }
+        continue;
+      }
       if (data?.recomputeAll) {
         await this.duplicatesFinder.runForConfigChange();
         continue;
@@ -136,6 +180,70 @@ export class CorrelationWorker {
       // is needed here anymore.
       await this.process(data.sourceId, data.runnerId);
     }
+  }
+
+  /** SCAN_HANDOFF_QUEUE: enrol a scanned source in the autopilot, nothing else. */
+  private async handleHandoff(jobs: Job[]): Promise<void> {
+    if (await this.pause?.isPaused()) {
+      this.logger.debug('Workspace paused — skipping scan hand-off job(s)');
+      return;
+    }
+    for (const job of jobs) {
+      const data = job.data as CorrelationJobPayload;
+      if (!data?.sourceId || !data?.runnerId) continue;
+      await this.handOffToAutopilot(
+        data.sourceId,
+        data.runnerId,
+        `scan:${data.sourceId}:${data.runnerId}`,
+      );
+    }
+  }
+
+  /**
+   * Move the waiting CORRELATION_QUEUE backlog out of the way of a
+   * switched-off duplicate detection.
+   *
+   * Per-scan jobs carry the scan's autopilot hand-off, so each becomes a
+   * SCAN_HANDOFF_QUEUE job — the agents still hear about every scan. Recompute
+   * jobs are dropped: turning the switch back on schedules one full recompute
+   * that covers all of them. Fetched and completed through pg-boss rather than
+   * deleted by SQL, so a job a worker is running right now is never touched.
+   */
+  async drainToHandoff(): Promise<{ handedOff: number; dropped: number }> {
+    const boss = await this.pgBoss.getBossAsync();
+    let handedOff = 0;
+    let dropped = 0;
+    for (;;) {
+      const batch = await boss.fetch<CorrelationJobPayload>(CORRELATION_QUEUE, {
+        batchSize: 100,
+      });
+      if (!batch?.length) break;
+      for (const job of batch) {
+        const data = job.data;
+        if (data?.sourceId && data?.runnerId) {
+          await boss.send(
+            SCAN_HANDOFF_QUEUE,
+            { sourceId: data.sourceId, runnerId: data.runnerId },
+            scanHandoffJobOptions(data.sourceId),
+          );
+          handedOff += 1;
+        } else {
+          dropped += 1;
+        }
+      }
+      await boss.complete(
+        CORRELATION_QUEUE,
+        batch.map((job) => job.id),
+      );
+      if (batch.length < 100) break;
+    }
+    if (handedOff + dropped > 0) {
+      this.logger.log(
+        `Duplicate detection off: moved ${handedOff} scan hand-off(s) to ` +
+          `${SCAN_HANDOFF_QUEUE}, dropped ${dropped} recompute job(s).`,
+      );
+    }
+    return { handedOff, dropped };
   }
 
   private async process(sourceId: string, runnerId: string): Promise<void> {

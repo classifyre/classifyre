@@ -39,6 +39,7 @@ import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card"
 import { VersionSettingsSection } from "@/components/version-update-notifier";
 import { DataTransferCard } from "@/components/data-transfer/data-transfer-card";
 import { CleanupCard } from "@/components/maintenance/cleanup-card";
+import { FeatureSwitchesCard } from "@/components/maintenance/feature-switches-card";
 import { PauseWorkspaceCard } from "@/components/namespace/pause-workspace-card";
 import { WorkerQueuesCard } from "@/components/worker-queues-card";
 
@@ -413,6 +414,8 @@ export default function SettingsPage() {
           value="cleanup"
           className="space-y-6 duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
+          {/* Whether the engines run, then what their data costs to keep. */}
+          <FeatureSwitchesCard />
           <CleanupCard />
         </TabsContent>
       </Tabs>

@@ -18,6 +18,14 @@
  * Physical table names are snake_case (see the migrations); the pg-boss
  * queue tables live in a separate `pgboss_<id>` schema and are resolved at
  * runtime, so the scheduler dataset carries `bossTables` instead.
+ *
+ * One table is split between two datasets: `edges` holds both the asset
+ * lineage (protected — only a source rescan rebuilds it) and the duplicate
+ * engine's scored pairs (derived — the next duplicate check rebuilds them).
+ * The split is by `relation_type` ({@link SCORED_EDGE_RELATION_TYPES}); the
+ * overview attributes the table's size by the planner's frequency of each
+ * type, and the duplicates cleanup removes only the scored rows. Never
+ * TRUNCATE `edges` as a whole.
  */
 export interface ProtectedDataset {
   key: string;
@@ -29,7 +37,24 @@ export interface CleanableDataset {
   tables: string[];
   /** pg-boss tables inside the namespace's boss schema (not the app schema). */
   bossTables?: string[];
+  /**
+   * Rows of a shared table that belong to this dataset — the scored share of
+   * `edges` for duplicates. Listed apart from `tables` because the wipe must
+   * filter them, never truncate.
+   */
+  sharedRows?: { table: string; column: string; values: readonly string[] };
 }
+
+/**
+ * Edge types the duplicate engine writes — and therefore rebuilds. Mirrors
+ * `CORRELATION_RELATION_TYPES` in `correlation.service.ts` (a spec pins the
+ * two together). Every other relation type in `edges` is lineage.
+ */
+export const SCORED_EDGE_RELATION_TYPES = [
+  'related',
+  'likely_duplicate',
+  'identical_content',
+] as const;
 
 export type CleanupKey =
   | 'scans'
@@ -65,13 +90,14 @@ export const PROTECTED_DATASETS: readonly ProtectedDataset[] = [
     key: 'findings',
     tables: [
       'findings',
-      'finding_evidence_analyses',
       'custom_detector_extractions',
       'extraction_payloads',
       'custom_detector_feedback',
       'finding_bulk_operations',
     ],
   },
+  // `edges` here means its lineage share; the scored share is measured and
+  // cleaned under `duplicates`.
   {
     key: 'assets',
     tables: ['assets', 'edges'],
@@ -109,9 +135,12 @@ export const CLEANABLE_DATASETS: readonly CleanableDataset[] = [
   // nullable), notifications (auto-null) and runner_assets (auto-cascade);
   // the service nulls the asset side first and only touches terminal runs.
   { key: 'scans', tables: ['runners', 'runner_assets'] },
-  // Duplicate-detection artefacts. Human review decisions (verdicts) and
-  // review batches are deliberately NOT listed: they are triage work, and
-  // everything here is rebuilt by the next duplicate check.
+  // Duplicate-detection artefacts, including the scored pairs in `edges` —
+  // on a real incident 17 GB of a 42 GB database, which this dataset used to
+  // miss entirely. Human review decisions (verdicts) and review batches are
+  // deliberately NOT listed: they are triage work, and everything here is
+  // rebuilt by the next duplicate check. Owned by the duplicate-detection
+  // switch (Settings → Cleanup › Features).
   {
     key: 'duplicates',
     tables: [
@@ -127,10 +156,27 @@ export const CLEANABLE_DATASETS: readonly CleanableDataset[] = [
       'asset_label_profiles',
       'asset_lineage_profiles',
     ],
+    sharedRows: {
+      table: 'edges',
+      column: 'relation_type',
+      values: SCORED_EDGE_RELATION_TYPES,
+    },
   },
-  // Vectors and their chunk texts. Spaces and embedding settings (config)
-  // stay; re-running the embedding index rebuilds everything listed.
-  { key: 'embeddings', tables: ['content_embeddings', 'asset_chunks'] },
+  // The semantic layer: vectors, the evidence rankings derived from them
+  // (importance scores — reset to 0 on the findings they belong to), the
+  // document text chunks they were embedded from, and the spaces that tie
+  // them together. Embedding settings (config) stay. Owned by the embeddings
+  // switch: re-embedding findings is automatic when it is on, but chunk text
+  // only comes back by rescanning with the scan cache off.
+  {
+    key: 'embeddings',
+    tables: [
+      'content_embeddings',
+      'finding_evidence_analyses',
+      'asset_chunks',
+      'embedding_spaces',
+    ],
+  },
   // AI harness runs incl. dreams, with their logs and decisions, plus the
   // supervisor's journal and inbox (operational chatter). Learned agent
   // memory, briefs, configs, goals, live state and undo entries stay —

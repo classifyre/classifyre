@@ -123,6 +123,9 @@ class CustomSource(BaseSource):
         self._url_by_hash: dict[str, str] = {}
         self._mime_by_hash: dict[str, str] = {}
         self._tags_by_hash: dict[str, dict[str, str]] = {}
+        #: Per-tag severity the notebook asked for, keyed like _tags_by_hash.
+        #: Only the keys a Tag(..., severity=) named appear here.
+        self._tag_severities_by_hash: dict[str, dict[str, str]] = {}
         # Parsed once: asked per asset in phase 2, and the cells never change mid-run.
         self._defined_functions: frozenset[str] | None = None
         # Assets the notebook recorded with extract=False, until they are processed.
@@ -493,6 +496,7 @@ class CustomSource(BaseSource):
                 cohort_stats = frame.get("cohortStats")
                 self.cohort_stats = cohort_stats if isinstance(cohort_stats, dict) else {}
                 self._record_cursor(cursor_key, skip, frame)
+                self._warn_if_windowed(cursor_key, skip, limit, produced)
                 if frame.get("partialCoverage"):
                     self.declare_partial_coverage(
                         str(frame.get("partialCoverageReason") or "")
@@ -524,6 +528,25 @@ class CustomSource(BaseSource):
             yield batch
 
         logger.info("Notebook produced %d asset(s)", produced)
+
+    def _warn_if_windowed(
+        self, cursor_key: str | None, skip: int, limit: int | None, produced: int
+    ) -> None:
+        """Say so when AUTOMATIC sampling cut the notebook's stream short.
+
+        The run still completes, and without this nothing on it shows that most
+        of the notebook's assets were never scanned: under AUTOMATIC they are not
+        retired either, so their findings stay as they were (field report P15).
+        """
+        if cursor_key is None or not limit or produced < limit:
+            return
+        message = (
+            f"AUTOMATIC sampling ingested a window of {produced} asset(s) from offset {skip}; "
+            "the notebook yields more. Assets outside the window were not scanned this run and "
+            "keep their previous findings. A notebook that yields its whole universe each run "
+            "should use sampling ALL."
+        )
+        logger.warning(message)
 
     def _window(self) -> tuple[int, int | None, str | None, str]:
         """How much of the stream this run reads, and how it is sampled.
@@ -584,6 +607,12 @@ class CustomSource(BaseSource):
         # run's offset and page size, which mean nothing under other strategies.
         if key is None:
             return
+        # Keep what the notebook stored in earlier runs. A window can stop the
+        # notebook before it reaches ctx.set_cursor(); writing only the offset
+        # then replaced its whole run-to-run state with {"assets": N} — one such
+        # run erased a catalogue's empty/returned history (GENESIS field report
+        # P15). The offset is merged in, never substituted.
+        self.set_next_sampling_cursor({k: v for k, v in self._sampling_cursor.items() if k != key})
         self.record_automatic_offset(
             key, prev_offset=offset, fetched=int(frame.get("produced") or 0)
         )
@@ -686,6 +715,23 @@ class CustomSource(BaseSource):
         else:
             self._tags_by_hash.pop(asset_hash, None)
 
+        # Severities a Tag(value, severity=) asked for. Kept only for keys that
+        # actually carry a value, so a severity can never resurrect a dropped tag.
+        raw_severities = data.get("tag_severities")
+        severities = (
+            {
+                str(key): str(value).upper()
+                for key, value in raw_severities.items()
+                if str(key) in tags and str(value)
+            }
+            if isinstance(raw_severities, dict)
+            else {}
+        )
+        if severities:
+            self._tag_severities_by_hash[asset_hash] = severities
+        else:
+            self._tag_severities_by_hash.pop(asset_hash, None)
+
         # The notebook links assets by *its* ids; the graph needs hashes.
         links = [self.generate_hash_id(str(link)) for link in data.get("links") or []]
 
@@ -708,6 +754,14 @@ class CustomSource(BaseSource):
             # new tag.
             "tags": dict(sorted(tags.items())),
         }
+
+        # A tag whose severity moved from MEDIUM to HIGH while its value stayed
+        # the same is a changed finding, so the checksum has to see it. Added
+        # only when present, so an asset with no per-tag severity keeps the
+        # exact basis it had before this key existed and the corpus is not
+        # re-checksummed for a feature it does not use.
+        if severities:
+            checksum_basis["tag_severities"] = dict(sorted(severities.items()))
 
         # For a fetched file the text hashed above is what the parser
         # *extracted*, so two different documents that extract to the same text
@@ -898,6 +952,20 @@ class CustomSource(BaseSource):
         merged = dict(super().asset_tags(asset_hash))
         merged.update(self._tags_by_hash.get(asset_hash, {}))
         return merged
+
+    def asset_tag_severities(self, asset_hash: str) -> Mapping[str, str]:
+        """Severities the notebook asked for, for the keys that named one.
+
+        Not merged with the augmentation notebook's tags: only the connector
+        notebook can write a Tag(...) today, and inventing a severity for an
+        augmentation tag would be a guess.
+        """
+        return dict(self._tag_severities_by_hash.get(asset_hash, {}))
+
+    def asserts_complete_tags(self, asset_hash: str) -> bool:
+        # The notebook yields each asset with its full tag set, every run: a key
+        # it stopped writing is a fact it withdrew (GENESIS field report P4).
+        return asset_hash in self._id_by_hash
 
     def extracts_content(self, asset_hash: str) -> bool:
         return asset_hash not in self._reference_hashes

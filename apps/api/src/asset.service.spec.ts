@@ -1018,7 +1018,10 @@ describe('AssetService', () => {
         },
         customDetector: { findMany: jest.fn().mockResolvedValue([]) },
         runner: { update: jest.fn().mockResolvedValue({}) },
-        runnerAsset: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        runnerAsset: {
+          createMany: jest.fn().mockResolvedValue({ count: 1 }),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
       });
 
       const assetWithFindings = (count: number) => [
@@ -1167,6 +1170,7 @@ describe('AssetService', () => {
           customDetector: { findMany: jest.fn().mockResolvedValue([]) },
           runner: { update: jest.fn().mockResolvedValue({}) },
           runnerAsset: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         }),
@@ -1242,6 +1246,7 @@ describe('AssetService', () => {
             update: jest.fn().mockResolvedValue({}),
           },
           runnerAsset: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
@@ -1312,6 +1317,7 @@ describe('AssetService', () => {
             update: jest.fn().mockResolvedValue({}),
           },
           runnerAsset: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
@@ -1380,6 +1386,7 @@ describe('AssetService', () => {
             update: jest.fn().mockResolvedValue({}),
           },
           runnerAsset: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
@@ -1440,6 +1447,7 @@ describe('AssetService', () => {
             update: jest.fn().mockResolvedValue({}),
           },
           runnerAsset: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
@@ -1568,6 +1576,7 @@ describe('AssetService', () => {
             update: jest.fn().mockResolvedValue({}),
           },
           runnerAsset: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
@@ -1632,6 +1641,7 @@ describe('AssetService', () => {
             update: jest.fn().mockResolvedValue({}),
           },
           runnerAsset: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
@@ -1721,6 +1731,7 @@ describe('AssetService', () => {
             update: jest.fn().mockResolvedValue({}),
           },
           runnerAsset: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
@@ -1798,6 +1809,7 @@ describe('AssetService', () => {
             update: txRunnerUpdate,
           },
           runnerAsset: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
@@ -1911,6 +1923,7 @@ describe('AssetService', () => {
               update: jest.fn().mockResolvedValue({}),
             },
             runnerAsset: {
+              createMany: jest.fn().mockResolvedValue({ count: 0 }),
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
           };
@@ -2057,6 +2070,7 @@ describe('AssetService', () => {
                 update: jest.fn().mockResolvedValue({}),
               },
               runnerAsset: {
+                createMany: jest.fn().mockResolvedValue({ count: 0 }),
                 updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
             };
@@ -2165,6 +2179,7 @@ describe('AssetService', () => {
 
       let assetUpdateMany: jest.Mock;
       let runnerTxUpdate: jest.Mock;
+      let runnerAssetCreateMany: jest.Mock;
 
       beforeEach(() => {
         mockPrismaService.source.findUnique.mockResolvedValue({
@@ -2180,6 +2195,7 @@ describe('AssetService', () => {
 
         assetUpdateMany = jest.fn().mockResolvedValue({});
         runnerTxUpdate = jest.fn().mockResolvedValue({});
+        runnerAssetCreateMany = jest.fn().mockResolvedValue({ count: 0 });
         mockPrismaService.$transaction.mockImplementation((callback: any) =>
           callback({
             asset: { updateMany: assetUpdateMany },
@@ -2189,6 +2205,7 @@ describe('AssetService', () => {
             },
             runner: { update: runnerTxUpdate },
             runnerAsset: {
+              createMany: runnerAssetCreateMany,
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
           }),
@@ -2235,6 +2252,12 @@ describe('AssetService', () => {
         expect(result).toMatchObject({ deleted: 0, outOfScope: 1 });
         // The investigative state survives a scope change: nothing is retired.
         expect(assetUpdateMany).not.toHaveBeenCalled();
+        // But the run records that it looked here, so a second scan under the
+        // same scope can retire without needing an operator (§14 note).
+        expect(mockPrismaService.asset.updateMany).toHaveBeenCalledWith({
+          where: { id: { in: ['out-of-scope-asset'] } },
+          data: { absentUnderScope: currentScope },
+        });
         expect(runnerTxUpdate).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({
@@ -2284,6 +2307,96 @@ describe('AssetService', () => {
             data: { status: AssetStatus.DELETED, runnerId },
           }),
         );
+        // The retired asset was not discovered by this run, so it has no
+        // runner_assets row to update. completeRunner counts DELETED rows, and
+        // without a created row every run reported assetsDeleted = 0 (P16).
+        expect(runnerAssetCreateMany).toHaveBeenCalledWith({
+          data: [
+            expect.objectContaining({
+              runnerId,
+              assetHash: 'deleted-hash',
+              changeType: 'DELETED',
+              status: 'PROCESSED',
+            }),
+          ],
+          skipDuplicates: true,
+        });
+      });
+
+      // §14 operational note: changing a notebook variable moved the scope, and
+      // an asset that vanished in that same run kept the old fingerprint
+      // forever — every later run carried the new one, so the two never
+      // matched again and it had to be retired by hand.
+      it('retires an asset a second scan under the same scope also missed', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'vanished-at-the-variable-change',
+            hash: 'stale-hash',
+            // Still the pre-change fingerprint: this asset was never seen again.
+            scopeFingerprint: 'scope-before-the-variable-change',
+            // But the previous run under the CURRENT scope already looked.
+            absentUnderScope: currentScope,
+          },
+        ]);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        expect(result).toMatchObject({ deleted: 1, outOfScope: 0 });
+        expect(assetUpdateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: { in: ['vanished-at-the-variable-change'] } },
+          }),
+        );
+      });
+
+      it('does not retire on the first scan after a scope change', async () => {
+        // One pass is not evidence: absence in the run that moved the scope
+        // may only mean we stopped looking there. Two are.
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'vanished-at-the-variable-change',
+            hash: 'stale-hash',
+            scopeFingerprint: 'scope-before-the-variable-change',
+            absentUnderScope: null,
+          },
+        ]);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        expect(result).toMatchObject({ deleted: 0, outOfScope: 1 });
+        expect(assetUpdateMany).not.toHaveBeenCalled();
+      });
+
+      it('does not retire on a mark left by a different scope', async () => {
+        // The mark is only evidence for the exact scope that made it.
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'missing-under-a-third-scope',
+            hash: 'stale-hash',
+            scopeFingerprint: 'scope-a',
+            absentUnderScope: 'scope-b',
+          },
+        ]);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        expect(result).toMatchObject({ deleted: 0, outOfScope: 1 });
+        expect(assetUpdateMany).not.toHaveBeenCalled();
       });
 
       it('separates genuine deletions from scope moves in the same run', async () => {
@@ -2400,6 +2513,7 @@ describe('AssetService', () => {
             },
             runner: { update: jest.fn().mockResolvedValue({}) },
             runnerAsset: {
+              createMany: jest.fn().mockResolvedValue({ count: 0 }),
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
           }),
@@ -3132,6 +3246,7 @@ describe('AssetService', () => {
             update: jest.fn().mockResolvedValue({}),
           },
           runnerAsset: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
@@ -3379,6 +3494,7 @@ describe('AssetService', () => {
             },
             runner: { update: jest.fn().mockResolvedValue({}) },
             runnerAsset: {
+              createMany: jest.fn().mockResolvedValue({ count: 0 }),
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
           }),
@@ -3495,6 +3611,7 @@ describe('AssetService', () => {
             },
             runner: { update: jest.fn().mockResolvedValue({}) },
             runnerAsset: {
+              createMany: jest.fn().mockResolvedValue({ count: 0 }),
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
           }),

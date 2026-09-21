@@ -17,6 +17,13 @@
       "insertText": "Asset"
     },
     {
+      "label": "Tag",
+      "kind": "class",
+      "detail": "Tag(value, severity=\"HIGH\")",
+      "documentation": "A tag value that carries its own severity.\n\n``tags={\"insolvencies_yoy\": \"+34%\"}`` gives every asset the Tag detector's\nown severity. That is right when the fact itself is the finding, and wrong\nwhen the *degree* is: an early-warning rule reading \"HIGH at +30%, MEDIUM at\n+20%\" needed two detectors with duplicated descriptions, and every inquiry\nand case had to name both keys (GENESIS field report P9). Written instead\nas::\n\n    Asset(tags={\"insolvencies_yoy\": Tag(\"+34%\", severity=\"HIGH\")})\n\none detector covers the rule and the finding carries the band.\n\nThe detector's configured severity is the ceiling, never the default: a\nconnector can say \"this instance matters less than usual\" but cannot\npromote its own findings past what the operator who created the detector\nallowed. A severity above the ceiling is lowered to it and reported as a\nscan warning rather than silently applied or dropped.",
+      "insertText": "Tag"
+    },
+    {
       "label": "Ref",
       "kind": "class",
       "detail": "Ref.asset(id) | Ref.urn(urn)",
@@ -61,22 +68,22 @@
     {
       "label": "contains",
       "kind": "function",
-      "detail": "(parent: 'Ref', child: 'Ref', *, type: 'ContainmentType' = <ContainmentType.CONTAINS: 'CONTAINS'>) -> 'Edge'",
+      "detail": "(parent: 'Ref', child: 'Ref', *, type: 'ContainmentType' = <ContainmentType.CONTAINS: 'CONTAINS'>, evidence: 'dict[str, Any] | None' = None) -> 'Edge'",
       "documentation": "``child`` is a part of ``parent`` -- structural, not temporal.",
       "insertText": "contains(${1:parent}, ${2:child})"
     },
     {
       "label": "references",
       "kind": "function",
-      "detail": "(frm: 'Ref', to: 'Ref', *, type: 'ReferenceType' = <ReferenceType.REFERENCES: 'REFERENCES'>, method: 'Method' = <Method.SYSTEM_CATALOG: 'SYSTEM_CATALOG'>) -> 'Edge'",
+      "detail": "(frm: 'Ref', to: 'Ref', *, type: 'ReferenceType' = <ReferenceType.REFERENCES: 'REFERENCES'>, method: 'Method' = <Method.SYSTEM_CATALOG: 'SYSTEM_CATALOG'>, confidence: 'float | None' = None, evidence: 'dict[str, Any] | None' = None) -> 'Edge'",
       "documentation": "``frm`` points at ``to``. No data moves -- a foreign key is not lineage.",
       "insertText": "references(${1:frm}, ${2:to})"
     },
     {
       "label": "same_as",
       "kind": "function",
-      "detail": "(a: 'Ref', b: 'Ref', *, method: 'Method' = <Method.SYSTEM_CATALOG: 'SYSTEM_CATALOG'>) -> 'Edge'",
-      "documentation": "The same real-world object, seen from two systems.",
+      "detail": "(a: 'Ref', b: 'Ref', *, method: 'Method' = <Method.SYSTEM_CATALOG: 'SYSTEM_CATALOG'>, confidence: 'float | None' = None, evidence: 'dict[str, Any] | None' = None) -> 'Edge'",
+      "documentation": "The same real-world object, seen from two systems.\n\n``evidence`` says why the match holds -- e.g. ``{\"match\": \"alias\", \"checked_by\": \"hand\"}``\nfor a crosswalk entry a person verified -- so a reader can weigh a MANUAL match\ndifferently from a name heuristic.",
       "insertText": "same_as(${1:a}, ${2:b})"
     },
     {
@@ -171,8 +178,8 @@
         {
           "label": "log",
           "kind": "method",
-          "detail": "(*parts: 'Any') -> 'None'",
-          "documentation": "",
+          "detail": "(*parts: 'Any', level: 'str | None' = None) -> 'None'",
+          "documentation": "Write a line to the run log. ``level`` (\"warning\", \"error\", \u2026) sets its level there.",
           "insertText": "log()"
         },
         {
@@ -199,8 +206,8 @@
         {
           "label": "query_assets",
           "kind": "method",
-          "detail": "(source: 'str', *, kind: 'str | None' = None, where: 'Mapping[str, Mapping[str, Any]] | None' = None, exclude_visited: 'Mapping[str, Any] | None' = None, select: 'Iterable[str]' = (), limit: 'int' = 1000, cursor: 'str | None' = None) -> 'AssetQueryPage'",
-          "documentation": "Read assets another source in this namespace already wrote.\n\nWork the queue of things already known to be interesting instead of\nsweeping an external universe::\n\n    page = ctx.query_assets(\n        \"Firmenbuch Register\",\n        kind=\"record\",\n        where={\"filing_count\": {\"gt\": 0},\n               \"legal_form_code\": {\"in\": [\"GES\", \"AG\", \"SE\", \"FKG\"]}},\n        exclude_visited={\"key\": \"firmenbuchnummer\", \"since_days\": 90},\n        select=[\"firmenbuchnummer\", \"legal_form_code\"],\n        limit=1200,\n    )\n    for company in page.items:\n        fn = company.metadata[\"firmenbuchnummer\"]\n\n``source`` is a source's id or exact name. ``where`` filters metadata\nwith ``eq``, ``in``, ``exists``, ``gt``, ``gte``, ``lt`` and ``lte``;\nvalues compare as JSON, so ``{\"eq\": 5}`` matches the number 5 and not\nthe string \"5\". ``exclude_visited`` leaves out every asset whose\n``metadata[key]`` matches an asset *this* source scanned in the last\n``since_days``. Page with ``cursor=page.next_cursor``.\n\nRead-only, and bounded: at most 5,000 assets a page and 100 calls a run.\nCalling it declares this run's coverage partial, since a connector that\npicks its cohort from a query never sees the rest of its source.\nAvailable during scans only, not when running a cell in the editor.",
+          "detail": "(source: 'str', *, kind: 'str | None' = None, where: 'Mapping[str, Mapping[str, Any]] | None' = None, exclude_visited: 'Mapping[str, Any] | None' = None, select: 'Iterable[str]' = (), limit: 'int' = 1000, cursor: 'str | None' = None, cohort: 'bool' = True) -> 'AssetQueryPage'",
+          "documentation": "Read assets another source in this namespace already wrote.\n\nWork the queue of things already known to be interesting instead of\nsweeping an external universe::\n\n    page = ctx.query_assets(\n        \"Firmenbuch Register\",\n        kind=\"record\",\n        where={\"filing_count\": {\"gt\": 0},\n               \"legal_form_code\": {\"in\": [\"GES\", \"AG\", \"SE\", \"FKG\"]}},\n        exclude_visited={\"key\": \"firmenbuchnummer\", \"since_days\": 90},\n        select=[\"firmenbuchnummer\", \"legal_form_code\"],\n        limit=1200,\n    )\n    for company in page.items:\n        fn = company.metadata[\"firmenbuchnummer\"]\n\n``source`` is a source's id or exact name. ``where`` filters metadata\nwith ``eq``, ``in``, ``exists``, ``gt``, ``gte``, ``lt`` and ``lte``;\nvalues compare as JSON, so ``{\"eq\": 5}`` matches the number 5 and not\nthe string \"5\". ``exclude_visited`` leaves out every asset whose\n``metadata[key]`` matches an asset *this* source scanned in the last\n``since_days``. Page with ``cursor=page.next_cursor``.\n\nRead-only, and bounded: at most 5,000 assets a page and 100 calls a run.\nCalling it declares this run's coverage partial, since a connector that\npicks its cohort from a query never sees the rest of its source.\nAvailable during scans only, not when running a cell in the editor.\n\nPass ``cohort=False`` when the query only supplies *inputs* and this run\nstill yields its whole universe -- e.g. Land aggregates computed from\nevery district profile. Coverage then stays complete, so an asset the\nnotebook stops yielding is retired. Without it such a source could never\nretire anything (GENESIS field report P5). Fail the run rather than\nyield a partial universe if the input is incomplete.",
           "insertText": "query_assets(${1:source})"
         },
         {
@@ -538,6 +545,13 @@
           "insertText": "tags="
         },
         {
+          "label": "tag_severities",
+          "kind": "field",
+          "detail": "dict[str, str]",
+          "required": false,
+          "insertText": "tag_severities="
+        },
+        {
           "label": "extract",
           "kind": "field",
           "detail": "bool",
@@ -557,6 +571,25 @@
           "detail": "CohortItem | None",
           "required": false,
           "insertText": "cohort="
+        }
+      ]
+    },
+    "Tag": {
+      "documentation": "A tag value that carries its own severity.\n\n``tags={\"insolvencies_yoy\": \"+34%\"}`` gives every asset the Tag detector's\nown severity. That is right when the fact itself is the finding, and wrong\nwhen the *degree* is: an early-warning rule reading \"HIGH at +30%, MEDIUM at\n+20%\" needed two detectors with duplicated descriptions, and every inquiry\nand case had to name both keys (GENESIS field report P9). Written instead\nas::\n\n    Asset(tags={\"insolvencies_yoy\": Tag(\"+34%\", severity=\"HIGH\")})\n\none detector covers the rule and the finding carries the band.\n\nThe detector's configured severity is the ceiling, never the default: a\nconnector can say \"this instance matters less than usual\" but cannot\npromote its own findings past what the operator who created the detector\nallowed. A severity above the ceiling is lowered to it and reported as a\nscan warning rather than silently applied or dropped.",
+      "fields": [
+        {
+          "label": "value",
+          "kind": "field",
+          "detail": "str",
+          "required": true,
+          "insertText": "value="
+        },
+        {
+          "label": "severity",
+          "kind": "field",
+          "detail": "str | None",
+          "required": false,
+          "insertText": "severity="
         }
       ]
     },

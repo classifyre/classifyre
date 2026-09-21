@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ServiceUnavailableException,
   Injectable,
   Logger,
   NotFoundException,
@@ -13,6 +14,7 @@ import { CLS_SCHEMA } from '../namespace/namespace.constants';
 import { UnionFind } from '../utils/union-find';
 import { mapBounded } from '../utils/map-bounded';
 import { EmbeddingCapabilityService } from './embedding-capability.service';
+import { featureOffMessage } from '../maintenance/workspace-features.constants';
 import { EmbeddingAnalysisService } from './embedding-analysis.service';
 import { PutAssetChunksDto } from './dto/embedding.dto';
 import { EmbeddingConfigService } from './embedding-config.service';
@@ -198,6 +200,25 @@ export class EmbeddingService {
   clearForSchema(schema: string): void {
     this.configuredSpacePromises.delete(schema);
     this.configuredSpaceIds.delete(schema);
+  }
+
+  /**
+   * Refuse semantic reads while embeddings are turned off.
+   *
+   * A read resolves the configured space, and resolving creates a space that
+   * does not exist — so after "turn off and delete" the first similar-findings
+   * lookup would quietly re-create an empty corpus and an index build for it.
+   * Off means the semantic layer is unavailable, the same answer query
+   * embedding already gave: 503, which search callers treat as "fall back to
+   * exact text".
+   */
+  private async assertSemanticEnabled(): Promise<void> {
+    const enabled = this.settings
+      ? await this.settings.enabledNow()
+      : this.cfg.enabled;
+    if (!enabled) {
+      throw new ServiceUnavailableException(featureOffMessage('embeddings'));
+    }
   }
 
   async ensureSpace(
@@ -1076,6 +1097,7 @@ export class EmbeddingService {
     statuses?: FindingStatus[],
     includeResolved = false,
   ) {
+    await this.assertSemanticEnabled();
     return this.rowsForVector(
       queryVector,
       limit,
@@ -1090,6 +1112,7 @@ export class EmbeddingService {
     limit: number,
     sourceId?: string,
   ) {
+    await this.assertSemanticEnabled();
     const space = await this.activeSpace();
     if (queryVector.length !== space.dim) {
       throw new BadRequestException(
@@ -1147,6 +1170,7 @@ export class EmbeddingService {
   }
 
   async similarFindings(findingId: string, limitInput: number) {
+    await this.assertSemanticEnabled();
     const limit = Math.trunc(this.toNumber(limitInput, 20, 1, 100));
     const finding = await this.prisma.finding.findUnique({
       where: { id: findingId },
@@ -1202,6 +1226,7 @@ export class EmbeddingService {
     threshold?: number;
     limit?: number;
   }) {
+    await this.assertSemanticEnabled();
     const threshold = this.toNumber(options.threshold, 0.95, 0.8, 1);
     const limit = Math.trunc(this.toNumber(options.limit, 50, 1, 200));
     const sourceIds = (options.sourceIds ?? []).filter(

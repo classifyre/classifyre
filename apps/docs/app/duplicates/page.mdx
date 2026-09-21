@@ -105,6 +105,29 @@ a screen. See [How Matching Works](/duplicates/how-matching-works/).
 
 ---
 
+## Turning duplicate detection off
+
+Each engine has its own switch in
+[Settings → Cleanup › Features](/settings/cleanup/#feature-switches):
+**Duplicate detection** for weighted overlap, **Embeddings** for near-duplicate
+text. A workspace that does not need duplicate review — or cannot afford its
+storage on a large corpus — can turn it off:
+
+- **Keep data** pauses it. No duplicate check runs after scans, recomputes and
+  tuning changes wait, and this queue stays exactly as it was. Your decisions
+  are kept. Turning it back on runs one full recompute to catch up.
+- **Delete data** also removes everything it produced — match candidates,
+  signatures, clusters, patterns and its scored links in the asset graph —
+  and frees that storage now. Decisions and lineage are kept; the queue is
+  empty until it is turned back on and the recompute finishes.
+
+While it is off, every tab of this page says so above the queue and links to
+the switch, and the `correlation.scan` worker shows as held in
+[Settings → Workers](/settings/workers/). Scans still reach the AI harness —
+only the duplicate check is skipped.
+
+---
+
 ## Where duplicates go next
 
 A decision is only worth taking if it can go somewhere.
@@ -126,3 +149,4 @@ A decision is only worth taking if it can go somewhere.
 - [Every Number Explained](/duplicates/glossary/) — every figure and phrase on these screens
 - [Lineage & Relationships](/sources/lineage/) — why a lineage path changes what a duplicate means
 - [AI Agents & Duplicates](/duplicates/ai-agents/) — what the harness does here, and what it deliberately doesn't
+- [Storage & Cleanup](/settings/cleanup/) — the duplicate-detection switch, and what its data costs

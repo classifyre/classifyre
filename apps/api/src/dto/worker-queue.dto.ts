@@ -77,6 +77,16 @@ export class WorkerQueueDto {
   @ApiProperty({ example: false })
   paused: boolean;
 
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    enum: ['embeddings', 'duplicates'],
+    example: null,
+    description:
+      'Workspace feature holding this queue paused because it is turned off (Settings → Cleanup › Features), or null. A held queue cannot be resumed here — resuming answers 409 — and turning the feature back on releases it.',
+  })
+  heldBy: string | null;
+
   @ApiProperty({ example: 0 })
   activeJobs: number;
 

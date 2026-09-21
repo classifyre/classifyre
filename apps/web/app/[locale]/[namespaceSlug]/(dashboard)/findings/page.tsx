@@ -202,6 +202,14 @@ function FindingsPageContent() {
         label: t("findings.severityLabels.LOW"),
         value: baseCharts.totals.low,
       },
+      {
+        // Without this card the four severities summed to less than the total
+        // and nothing on the page said where the difference went — a fifth of
+        // one GENESIS namespace was INFO (field report P7).
+        key: SearchFindingsFiltersInputDtoSeverityEnum.Info as SeverityPanelKey,
+        label: t("findings.severityLabels.INFO"),
+        value: baseCharts.totals.info,
+      },
     ],
     [baseCharts, t],
   );
@@ -261,7 +269,7 @@ function FindingsPageContent() {
           ) : (
             <div className="space-y-6">
               {/* ── Severity panel cards ── */}
-              <div className="relative grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="relative grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
                 {panels.map((panel) => {
                   const isActive =
                     panel.key === "TOTAL"

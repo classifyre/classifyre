@@ -12,6 +12,7 @@ import {
   BadRequestException,
   NotFoundException,
   Query,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,6 +23,11 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { SourceService } from '../source.service';
+import { NotificationsService } from '../notifications.service';
+import {
+  NotificationEvent,
+  NotificationType,
+} from '../types/notification.types';
 import { ValidationService } from '../validation.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
@@ -34,6 +40,7 @@ import {
   Source as SourceModel,
   RunnerStatus,
   Prisma,
+  Severity,
   SourceScheduleMode,
 } from '@prisma/client';
 import { CreateSourceDto } from '../dto/create-source.dto';
@@ -53,7 +60,10 @@ import {
 } from '../dto/bulk-run-sources.dto';
 import { UpdateRunnerStatusDto } from '../dto/update-runner-status.dto';
 import { SourceResponseDto } from '../dto/source-response.dto';
-import { TestConnectionResponseDto } from '../dto/test-connection-response.dto';
+import {
+  ConnectionTestStatusDto,
+  TestConnectionResponseDto,
+} from '../dto/test-connection-response.dto';
 import {
   SearchSourcesFiltersDto,
   SearchSourcesRequestDto,
@@ -75,7 +85,10 @@ export class SourcesController {
     private readonly schedulerService: SchedulerService,
     private readonly autoScheduleService: AutoScheduleService,
     private readonly sourceFilesService: SourceFilesService,
+    private readonly notificationsService: NotificationsService,
   ) {}
+
+  private readonly logger = new Logger(SourcesController.name);
 
   @Post('bulk-update')
   @HttpCode(HttpStatus.OK)
@@ -114,10 +127,18 @@ export class SourcesController {
     // Validate every sampling merge before the first write so an incompatible
     // source cannot leave an otherwise valid batch half-applied.
     const preparedConfigs = new Map<string, Record<string, unknown>>();
+    const samplingBefore = new Map<string, string | null>();
     if (dto.sampling) {
       for (const source of sources) {
         const currentConfig = this.sourceService.decryptSourceConfig(
           source.config,
+        );
+        const previous = (
+          currentConfig as { sampling?: { strategy?: unknown } }
+        ).sampling?.strategy;
+        samplingBefore.set(
+          source.id,
+          typeof previous === 'string' ? previous : null,
         );
         const normalizedConfig = this.validationService.validate(
           String(source.type),
@@ -162,7 +183,69 @@ export class SourcesController {
       updatedIds.push(source.id);
     }
 
+    if (dto.sampling && updatedIds.length > 0) {
+      await this.notifySamplingChanged(
+        sources,
+        updatedIds,
+        samplingBefore,
+        dto,
+      );
+    }
+
     return { updatedCount: updatedIds.length, ids: updatedIds };
+  }
+
+  /**
+   * A sampling change decides how much of each source the next run reads.
+   * Switching a full-universe connector to AUTOMATIC silently cut every scan
+   * to a 100-asset window, and nothing recorded who did it or what it was
+   * before (GENESIS field report P15). Say so, with the before and after.
+   */
+  private async notifySamplingChanged(
+    sources: Array<{ id: string; name: string }>,
+    updatedIds: string[],
+    samplingBefore: Map<string, string | null>,
+    dto: BulkUpdateSourcesDto,
+  ): Promise<void> {
+    const after = dto.sampling?.strategy ?? null;
+    const changes = sources
+      .filter((s) => updatedIds.includes(s.id))
+      .map((s) => ({
+        sourceId: s.id,
+        name: s.name,
+        before: samplingBefore.get(s.id) ?? null,
+        after,
+      }))
+      .filter((c) => c.before !== c.after);
+    if (changes.length === 0) return;
+    const actor = dto.updatedBy?.trim() || null;
+    const fromSummary = [
+      ...new Set(changes.map((c) => c.before ?? 'default')),
+    ].join(', ');
+    try {
+      await this.notificationsService.create({
+        type: NotificationType.SOURCE,
+        event: NotificationEvent.SOURCE_CONFIG_CHANGED,
+        severity: Severity.MEDIUM,
+        title: `Sampling changed on ${changes.length} source(s)`,
+        message:
+          `A bulk update set sampling to ${after} (was ${fromSummary}) on ` +
+          changes
+            .slice(0, 10)
+            .map((c) => `"${c.name}"`)
+            .join(', ') +
+          (changes.length > 10 ? ` and ${changes.length - 10} more` : '') +
+          `${actor ? ` — by ${actor}` : ' — no actor given'}. The next run of each reads accordingly.`,
+        sourceId: changes.length === 1 ? changes[0].sourceId : undefined,
+        triggeredBy: actor ?? undefined,
+        metadata: { changes, updatedBy: actor, via: 'sources/bulk-update' },
+      });
+    } catch (error) {
+      // The change is made; a failed notification must not undo or fail it.
+      this.logger.warn(
+        `Failed to record sampling change notification: ${String(error)}`,
+      );
+    }
   }
 
   @BlockWhenPaused()
@@ -195,7 +278,9 @@ export class SourcesController {
         await this.cliRunnerService.startRun(
           source.id,
           'MANUAL',
-          undefined,
+          // A run with no actor cannot be traced back to the call that started
+          // it (GENESIS field report P15: three runs 4 s after a bulk update).
+          dto.triggeredBy?.trim() || 'bulk-run',
           dto.forceFullRescan === true,
         );
         ids.push(source.id);
@@ -1002,6 +1087,47 @@ export class SourcesController {
     await this.sourceFilesService.assertHasFiles(id);
     const result = await this.cliRunnerService.testConnection(id);
     return result as TestConnectionResponseDto;
+  }
+
+  @BlockWhenPaused()
+  @Post(':id/test/async')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Start a source connection test without waiting for it',
+    description:
+      'Returns immediately with status RUNNING; poll GET /sources/{id}/test for the answer. Use this rather than POST /sources/{id}/test wherever the test may be slow to start: on Kubernetes the test pod queues behind running scans, and one measured test returned after 422.5 s of which 3 s was the test itself. A second call while a test is already running joins that test instead of starting another.',
+  })
+  @ApiParam({ name: 'id', description: 'Source unique identifier' })
+  @ApiResponse({
+    status: 202,
+    description: 'Connection test started (or already running)',
+    type: ConnectionTestStatusDto,
+  })
+  @ApiResponse({ status: 404, description: 'Source not found' })
+  async startConnectionTest(
+    @Param('id') id: string,
+  ): Promise<ConnectionTestStatusDto> {
+    await this.sourceFilesService.assertHasFiles(id);
+    return this.cliRunnerService.startConnectionTest(id, 'api');
+  }
+
+  @Get(':id/test')
+  @ApiOperation({
+    summary: 'The result of the last connection test',
+    description:
+      'RUNNING while a test started by POST /sources/{id}/test/async is still going. Null when the source has never been tested.',
+  })
+  @ApiParam({ name: 'id', description: 'Source unique identifier' })
+  @ApiResponse({
+    status: 200,
+    description: 'The last connection test, or null',
+    type: ConnectionTestStatusDto,
+  })
+  @ApiResponse({ status: 404, description: 'Source not found' })
+  async getConnectionTest(
+    @Param('id') id: string,
+  ): Promise<ConnectionTestStatusDto | null> {
+    return this.cliRunnerService.getConnectionTest(id);
   }
 
   @BlockWhenPaused()

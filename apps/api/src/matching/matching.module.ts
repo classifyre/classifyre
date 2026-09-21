@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { NotificationsService } from '../notifications.service';
 import { InquiryMatchingService } from './inquiry-matching.service';
 
 /**
@@ -8,7 +9,7 @@ import { InquiryMatchingService } from './inquiry-matching.service';
  * Exposes the service so InquiriesService can drive preview / rematch.
  */
 @Module({
-  providers: [InquiryMatchingService, PrismaService],
+  providers: [InquiryMatchingService, PrismaService, NotificationsService],
   exports: [InquiryMatchingService],
 })
 export class MatchingModule {}

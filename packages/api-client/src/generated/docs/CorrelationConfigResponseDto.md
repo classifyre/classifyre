@@ -6,6 +6,7 @@
 
 Name | Type
 ------------ | -------------
+`enabled` | boolean
 `defaultWeight` | number
 `relatedMin` | number
 `duplicateMin` | number
@@ -20,6 +21,7 @@ import type { CorrelationConfigResponseDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
+  "enabled": null,
   "defaultWeight": null,
   "relatedMin": null,
   "duplicateMin": null,

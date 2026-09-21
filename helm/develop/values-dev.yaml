@@ -246,6 +246,16 @@ api:
       mountPath: /workspace/packages/typescript-config/node_modules
     - name: api-bun-cache
       mountPath: /var/cache/classifyre/bun
+    # Shared on purpose, and mounted into the worker too (deployment-worker.yaml
+    # reuses api.extraVolumeMounts). Both processes drive runs — the API when it
+    # promotes a queued runner, the worker when its scheduler starts one or
+    # re-attaches after a restart — while `POST /runners/{id}/logs` is served by
+    # the API alone. With RUNNER_LOG_DIR on each pod's own /tmp, the API served
+    # only the part it had written itself: a 455-asset scan whose Job printed
+    # 2,367 lines showed 64. The production chart leaves RUNNER_LOG_DIR unset for
+    # this exact reason and uses object storage instead; dev shares the node.
+    - name: runner-logs
+      mountPath: /tmp/classifyre/runner-logs
   extraVolumes:
     - name: development-source
       hostPath:
@@ -275,6 +285,10 @@ api:
       hostPath:
         path: /var/lib/classifyre/cache/api/bun
         type: Directory
+    - name: runner-logs
+      hostPath:
+        path: /var/lib/classifyre/runner-logs
+        type: DirectoryOrCreate
 
   # Every limit in this file is sized against ONE 16Gi / 10-CPU k3d node, and
   # they are meant to be read together. Before this pass the limits summed to

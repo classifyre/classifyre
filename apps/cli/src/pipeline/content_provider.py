@@ -18,6 +18,10 @@ class ContentProvider(Protocol):
 
     def asset_tags(self, asset_hash: str) -> Mapping[str, str]: ...
 
+    def asset_tag_severities(self, asset_hash: str) -> Mapping[str, str]: ...
+
+    def asserts_complete_tags(self, asset_hash: str) -> bool: ...
+
     def enrich_finding_location(
         self,
         finding: DetectionResult,

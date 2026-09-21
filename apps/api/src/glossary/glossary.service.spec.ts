@@ -278,7 +278,7 @@ describe('GlossaryService', () => {
   });
 
   it('uses case-insensitive SQL alias matches for lexical lookup', async () => {
-    prisma.$queryRaw.mockResolvedValue([{ id: baseTerm.id }]);
+    prisma.$queryRaw.mockResolvedValue([{ id: baseTerm.id, exact: true }]);
     prisma.glossaryTerm.findMany.mockResolvedValue([{ ...baseTerm }]);
     queryEmbedding.embed.mockRejectedValue(new Error('disabled'));
 
@@ -321,7 +321,7 @@ describe('GlossaryService', () => {
       entityType: 'TERM',
     });
     // The alias query returns only the GmbH entry: its alias is exactly 'GES'.
-    prisma.$queryRaw.mockResolvedValue([{ id: 'gmbh' }]);
+    prisma.$queryRaw.mockResolvedValue([{ id: 'gmbh', exact: true }]);
     // Alphabetical, as the database returns it — the order that used to win.
     prisma.glossaryTerm.findMany.mockResolvedValue([
       term('gf', 'Geschäftsführer'),
@@ -340,6 +340,38 @@ describe('GlossaryService', () => {
     ]);
   });
 
+  // GENESIS field report P10: codes and statute names live in aliases, and a
+  // query for part of one found nothing without embeddings.
+  it('finds a term through part of an alias, ranked below term matches', async () => {
+    const term = (id: string, name: string, aliases: string[] = []) => ({
+      ...baseTerm,
+      id,
+      term: name,
+      aliases,
+      entityType: 'TERM',
+    });
+    prisma.$queryRaw.mockResolvedValue([{ id: 'pks', exact: false }]);
+    prisma.glossaryTerm.findMany.mockResolvedValue([
+      term('pks', 'Ausländerrechtliche Verstöße', ['PKS 725000']),
+      term('code', 'Schlüssel 725000'),
+    ]);
+    queryEmbedding.embed.mockRejectedValue(new Error('disabled'));
+
+    const hits = await service.lookup('725000', 5);
+
+    expect(prisma.glossaryTerm.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([{ id: { in: ['pks'] } }]),
+        }),
+      }),
+    );
+    expect(hits.map((h) => [h.term, h.matchType])).toEqual([
+      ['Schlüssel 725000', 'partial'],
+      ['Ausländerrechtliche Verstöße', 'alias'],
+    ]);
+  });
+
   it('ranks an exact term above an exact alias on another term', async () => {
     const term = (id: string, name: string, aliases: string[] = []) => ({
       ...baseTerm,
@@ -348,7 +380,7 @@ describe('GlossaryService', () => {
       aliases,
       entityType: 'TERM',
     });
-    prisma.$queryRaw.mockResolvedValue([{ id: 'other' }]);
+    prisma.$queryRaw.mockResolvedValue([{ id: 'other', exact: true }]);
     prisma.glossaryTerm.findMany.mockResolvedValue([
       term('other', 'Aufsichtsrat', ['AR']),
       term('self', 'AR'),

@@ -9,6 +9,7 @@ Name | Type
 `queue` | string
 `status` | string
 `paused` | boolean
+`heldBy` | string
 `activeJobs` | number
 `queuedCount` | number
 `deferredCount` | number
@@ -29,6 +30,7 @@ const example = {
   "queue": embedding,
   "status": idle,
   "paused": false,
+  "heldBy": null,
   "activeJobs": 0,
   "queuedCount": 26000,
   "deferredCount": 0,
