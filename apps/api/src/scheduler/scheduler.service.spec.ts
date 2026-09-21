@@ -452,6 +452,24 @@ describe('SchedulerService cron catch-up', () => {
     });
   });
 
+  it('keeps the backoff across a namespace worker teardown', async () => {
+    // Namespace workers are torn down and re-registered routinely, and
+    // clearForSchema runs each time. Clearing the failure record there made
+    // the backoff meaningless: observed live, the same broken source logged
+    // "attempt 1/5" five times in twenty minutes.
+    mockPrisma.source.findMany.mockResolvedValue([source()]);
+    mockCliRunnerService.startRun.mockRejectedValue(new Error('bad creds'));
+
+    await service.catchUpMissedCronRuns();
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledTimes(1);
+
+    service.clearForSchema('ns_test');
+
+    jest.setSystemTime(new Date('2026-09-20T09:05:00Z'));
+    await service.catchUpMissedCronRuns();
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledTimes(1);
+  });
+
   it('does not let a failing source occupy a slot in the pass cap', async () => {
     // The held-back source is filtered before the cap, so five healthy
     // sources still start.

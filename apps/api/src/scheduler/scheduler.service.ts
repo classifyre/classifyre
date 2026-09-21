@@ -270,9 +270,13 @@ export class SchedulerService {
     for (const key of this.registeredQueues) {
       if (key.startsWith(prefix)) this.registeredQueues.delete(key);
     }
-    for (const key of this.catchUpFailures.keys()) {
-      if (key.startsWith(prefix)) this.catchUpFailures.delete(key);
-    }
+    // Deliberately NOT cleared here. A namespace's workers are torn down and
+    // re-registered routinely, and clearing the backoff on each cycle made it
+    // meaningless: observed live on 2026-09-21, the same broken source warned
+    // at "attempt 1/5" five times in twenty minutes because every pass started
+    // from an empty map. These records describe the source, not the worker
+    // registration, so they outlive it. What they cost is one small entry per
+    // source that has ever failed to start, until the process exits.
   }
 
   private getBoss() {
