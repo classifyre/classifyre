@@ -50,6 +50,20 @@ import {
   InquiryMatchesPanel,
   type InquiryMatchesStats,
 } from "@/components/inquiry-matches-panel";
+import { InquiryTimeline } from "@/components/inquiry-timeline";
+import {
+  ToneBadge,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs";
+import { formatRelative } from "@/lib/date";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -72,6 +86,7 @@ function InquiryDetailInner() {
   const [matchStats, setMatchStats] = React.useState<InquiryMatchesStats>({
     total: 0,
     newCount: 0,
+    goneCount: 0,
   });
   const [matchesReloadKey, setMatchesReloadKey] = React.useState(0);
   const [targetCaseId, setTargetCaseId] = React.useState<string | null>(null);
@@ -83,6 +98,15 @@ function InquiryDetailInner() {
   const load = React.useCallback(async () => {
     const q = await api.inquiries.inquiriesControllerFindOne({ id: inquiryId });
     setInquiry(q);
+    // Seed the tab counts from the stored counters so they read correctly
+    // before the matches panel has mounted — otherwise the History tab shows
+    // "Matches 0" on a watch with thousands. The panel overwrites these with
+    // its own filtered totals as soon as it loads.
+    setMatchStats({
+      total: q.matchCount,
+      newCount: q.newMatchCount,
+      goneCount: q.goneMatchCount,
+    });
     setMatchesReloadKey((k) => k + 1);
     setSelected(new Set());
     // Pick the pull target: explicit ?caseId, else the only linked case.
@@ -129,18 +153,25 @@ function InquiryDetailInner() {
 
   useRegisterAssistantBridge(assistantBridge);
 
-  // Viewing the matches clears the "new" badge — but only after the first page
-  // has loaded, so the server still flags rows as new for that initial fetch.
+  /**
+   * Opening the watch acknowledges it — it does NOT clear the new count.
+   *
+   * It used to, and that was the bug: reading a standing question destroyed the
+   * very signal it exists to raise. A match is new because the latest scan
+   * created it, so it stops being new when that source runs again and not
+   * before. The stamp is left as a record that someone looked.
+   */
   const seenMarked = React.useRef(false);
   const handleMatchStats = React.useCallback(
     (stats: InquiryMatchesStats) => {
       setMatchStats(stats);
-      if (!seenMarked.current && (stats.newCount > 0 || (inquiry?.newMatchCount ?? 0) > 0)) {
-        seenMarked.current = true;
-        void api.inquiries.inquiriesControllerMarkSeen({ id: inquiryId }).catch(() => {});
-      }
+      if (seenMarked.current || stats.newCount === 0) return;
+      seenMarked.current = true;
+      void api.inquiries
+        .inquiriesControllerMarkSeen({ id: inquiryId })
+        .catch(() => {});
     },
-    [inquiryId, inquiry?.newMatchCount],
+    [inquiryId],
   );
 
   React.useEffect(() => {
@@ -398,21 +429,50 @@ function InquiryDetailInner() {
         </CardContent>
       </Card>
 
-      {/* ── Matches ── */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-baseline gap-2">
-            <h2 className="font-serif text-lg font-black uppercase tracking-[0.04em]">{t("investigations.inquiryDetail.matchesTab")}</h2>
-            <span className="text-muted-foreground text-sm tabular-nums">{matchStats.total}</span>
-            {newCount > 0 && (
-              <Badge
-                variant="outline"
-                className="border-[color:var(--color-amber-600,#d97706)]/50 text-[color:var(--color-amber-600,#d97706)]"
-              >
-                {newCount} new
-              </Badge>
-            )}
-          </div>
+      {/* ── Matches and history ── */}
+      <Tabs defaultValue="matches" urlParam="tab" className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList>
+            <TabsTrigger value="matches">
+              {t("investigations.inquiryDetail.matchesTab")}
+              <span className="text-muted-foreground ml-1 tabular-nums">
+                {matchStats.total}
+              </span>
+              {newCount > 0 && (
+                <ToneBadge tone="fresh" className="ml-1">
+                  {newCount}
+                </ToneBadge>
+              )}
+              {matchStats.goneCount > 0 && (
+                <ToneBadge tone="error" className="ml-1">
+                  {matchStats.goneCount}
+                </ToneBadge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="timeline">
+              {t("investigations.inquiryDetail.timelineTab")}
+            </TabsTrigger>
+          </TabsList>
+          {/* What "new" is currently measured against — otherwise the flag is
+              a claim with no visible reference point. */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className="text-muted-foreground hidden cursor-default font-mono text-[10px] uppercase tracking-[0.14em] lg:block">
+                {inquiry.lastRunAt
+                  ? t("investigations.matchState.lastRun", {
+                      when: formatRelative(inquiry.lastRunAt),
+                    })
+                  : t("investigations.matchState.neverRun")}
+              </p>
+            </TooltipTrigger>
+            <TooltipContent>
+              {t("investigations.matchState.newTooltip")}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+
+        <TabsContent value="matches" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {inquiry.cases.length > 0 && (
             <div className="flex items-center gap-2">
               {inquiry.cases.length > 1 && (
@@ -453,15 +513,20 @@ function InquiryDetailInner() {
           </p>
         )}
 
-        <InquiryMatchesPanel
-          inquiryId={inquiryId}
-          reloadKey={matchesReloadKey}
-          onStats={handleMatchStats}
-          inCaseFindingIds={targetCaseId ? inCaseFindingIds : undefined}
-          selected={targetCaseId ? selected : undefined}
-          onSelectedChange={targetCaseId ? setSelected : undefined}
-        />
-      </div>
+          <InquiryMatchesPanel
+            inquiryId={inquiryId}
+            reloadKey={matchesReloadKey}
+            onStats={handleMatchStats}
+            inCaseFindingIds={targetCaseId ? inCaseFindingIds : undefined}
+            selected={targetCaseId ? selected : undefined}
+            onSelectedChange={targetCaseId ? setSelected : undefined}
+          />
+        </TabsContent>
+
+        <TabsContent value="timeline">
+          <InquiryTimeline inquiryId={inquiryId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -28,9 +28,15 @@ import { PgBossService } from '../scheduler/pg-boss.service';
 describe('candidate paging', () => {
   let service: InquiryMatchingService;
 
+  /** The run anchor: everything created at or after this second is NEW. */
+  const ANCHOR_AT = new Date(Date.UTC(2026, 6, 1, 0, 0, 30));
+
   const mockPrisma = {
     inquiry: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     finding: { findMany: jest.fn(), count: jest.fn() },
+    source: { findMany: jest.fn() },
+    caseInquiry: { findMany: jest.fn() },
+    $queryRaw: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -44,6 +50,11 @@ describe('candidate paging', () => {
     service = module.get(InquiryMatchingService);
     jest.clearAllMocks();
     mockPrisma.inquiry.update.mockResolvedValue({});
+    mockPrisma.source.findMany.mockResolvedValue([{ id: 's1' }]);
+    mockPrisma.caseInquiry.findMany.mockResolvedValue([]);
+    mockPrisma.$queryRaw.mockResolvedValue([
+      { sourceId: 's1', runnerId: 'run-anchor', startedAt: ANCHOR_AT },
+    ]);
   });
 
   const inquiry = (over: Record<string, unknown> = {}) => ({
@@ -109,7 +120,7 @@ describe('candidate paging', () => {
     expect(result.landed).toBe(size);
     expect(mockPrisma.inquiry.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { matchCount: size, newMatchCount: 0 },
+        data: expect.objectContaining({ matchCount: size }),
       }),
     );
   });
@@ -145,8 +156,21 @@ describe('candidate paging', () => {
     );
     expect(calls.length).toBeGreaterThan(1);
     expect(calls.every((args) => args.skip === undefined)).toBe(true);
-    expect(calls.slice(1).every((args) => args.where?.id?.gt)).toBe(true);
     expect(calls.every((args) => args.orderBy)).toEqual(true);
+    // A rematch runs two walks — the candidate set and the retired set — so a
+    // call without a cursor is a walk starting, not a regression. What must
+    // hold is that no walk restarts from the beginning partway through.
+    let cursor: string | undefined;
+    for (const args of calls) {
+      const gt = args.where?.id?.gt;
+      if (gt === undefined) {
+        cursor = undefined;
+        continue;
+      }
+      if (cursor !== undefined) expect(gt > cursor).toBe(true);
+      cursor = gt;
+    }
+    expect(cursor).toBeDefined();
   });
 
   it('returns exact counts and the correctly ranked page', async () => {
@@ -199,22 +223,40 @@ describe('candidate paging', () => {
   });
 
   it("counts 'new' against the whole match set, not the returned page", async () => {
-    const seenAt = new Date(Date.UTC(2026, 6, 1, 0, 0, 30));
     const size = 6000;
     corpus(size);
-    mockPrisma.inquiry.findUnique.mockResolvedValue(
-      inquiry({ matchesSeenAt: seenAt }),
-    );
+    mockPrisma.inquiry.findUnique.mockResolvedValue(inquiry());
 
     const page = await service.getLiveMatches('q1', { skip: 0, limit: 5 });
 
-    // createdAt cycles through 60 seconds, so 29 of each 60 fall after seenAt.
+    // createdAt cycles through 60 seconds and the anchor sits at second 30, so
+    // 30 of each 60 were created by the latest run.
     const expectedNew = Array.from({ length: size }).filter(
-      (_, i) => i % 60 > 30,
+      (_, i) => i % 60 >= 30,
     ).length;
     expect(page.newCount).toBe(expectedNew);
+    // The default state filter is NEW + ONGOING, so every match is still in
+    // the total — newCount narrows nothing.
     expect(page.total).toBe(size);
     expect(page.items).toHaveLength(5);
+  });
+
+  it('does not walk the retired set unless GONE was asked for', async () => {
+    corpus(120);
+    mockPrisma.inquiry.findUnique.mockResolvedValue(inquiry());
+
+    await service.getLiveMatches('q1', { limit: 5 });
+    const defaultWalks = mockPrisma.finding.findMany.mock.calls.length;
+
+    mockPrisma.finding.findMany.mockClear();
+    await service.getLiveMatches('q1', { limit: 5, state: ['NEW', 'GONE'] });
+
+    // The retired walk is a second pass over the candidate set. It must stay
+    // opt-in: getLiveMatches feeds case leads and the pull into a case, and a
+    // walk that ran by default would hand both of them resolved findings.
+    expect(mockPrisma.finding.findMany.mock.calls.length).toBeGreaterThan(
+      defaultWalks,
+    );
   });
 
   it('applies severity and search filters to the total, not just the page', async () => {

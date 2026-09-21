@@ -3,9 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DetectorType, Prisma } from '@prisma/client';
+import { DetectorType, InquiryActivityType, Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
+import { InquiryActivityService } from './inquiry-activity.service';
+import { InquiryTimelineResponseDto } from './dto/inquiry-activity.dto';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 import { InquiryMatchers } from './matching/inquiry-matcher';
 import {
@@ -103,6 +105,7 @@ export class InquiriesService {
     private readonly prisma: PrismaService,
     private readonly matching: InquiryMatchingService,
     private readonly agentMemory: AgentMemoryService,
+    private readonly activity: InquiryActivityService,
   ) {}
 
   private readonly caseInclude = {
@@ -123,8 +126,17 @@ export class InquiriesService {
         ...this.matcherData(dto),
       },
     });
-    // Seed matchCount with existing findings; resets newMatchCount to 0.
+    // Seed the counters from the findings that already exist. A brand new
+    // inquiry can legitimately open with matches already flagged NEW: newness
+    // is measured against the source's latest run, not against the question's
+    // own age.
     await this.matching.rematchInquiry(created.id);
+    await this.activity.record(
+      created.id,
+      InquiryActivityType.INQUIRY_CREATED,
+      { title: created.title, matchers: this.matcherSnapshot(created) },
+      dto.createdBy ?? undefined,
+    );
     await this.agentMemory.syncEntityMap('inquiry', created.id);
     return this.findOneOrThrow(created.id);
   }
@@ -165,14 +177,18 @@ export class InquiriesService {
       include: this.caseInclude,
     });
     if (!row) return null;
-    return this.mapInquiry(row);
+    // Detail view only. The list would pay one anchor query per row for a value
+    // no list column shows.
+    const lastRunAt = await this.matching.latestRunAt(row);
+    return { ...this.mapInquiry(row), lastRunAt };
   }
 
   async update(id: string, dto: UpdateInquiryDto): Promise<InquiryResponseDto> {
-    await this.ensureExists(id);
+    const before = await this.prisma.inquiry.findUnique({ where: { id } });
+    if (!before) throw new NotFoundException(`Inquiry ${id} not found`);
     assertValidRegexAll(dto);
 
-    await this.prisma.inquiry.update({
+    const after = await this.prisma.inquiry.update({
       where: { id },
       data: {
         title: dto.title,
@@ -183,12 +199,47 @@ export class InquiriesService {
       },
     });
 
-    // Matchers changed → recompute matchCount from scratch, reset newMatchCount.
+    if (dto.status && dto.status !== before.status) {
+      await this.activity.record(id, InquiryActivityType.STATUS_CHANGED, {
+        from: before.status,
+        to: dto.status,
+      });
+    }
+
+    // Matchers changed → recompute every counter from scratch. The before/after
+    // snapshot is the point: a question whose answers changed shape is usually
+    // a question whose definition changed, and without this the timeline shows
+    // the effect with no trace of the cause.
     if (touchesMatchers(dto)) {
+      await this.activity.record(id, InquiryActivityType.MATCHERS_UPDATED, {
+        before: this.matcherSnapshot(before),
+        after: this.matcherSnapshot(after),
+      });
       await this.matching.rematchInquiry(id);
     }
     await this.agentMemory.syncEntityMap('inquiry', id);
     return this.findOneOrThrow(id);
+  }
+
+  /** The matcher dimensions, for a timeline diff. */
+  private matcherSnapshot(row: {
+    matchAllSources: boolean;
+    sourceIds: string[];
+    detectorTypes: unknown[];
+    customDetectorKeys: string[];
+    findingTypes: string[];
+    findingTypeRegex: string[];
+    findingValueRegex: string[];
+  }): Record<string, unknown> {
+    return {
+      matchAllSources: row.matchAllSources,
+      sourceIds: row.sourceIds,
+      detectorTypes: row.detectorTypes.map(String),
+      customDetectorKeys: row.customDetectorKeys,
+      findingTypes: row.findingTypes,
+      findingTypeRegex: row.findingTypeRegex,
+      findingValueRegex: row.findingValueRegex,
+    };
   }
 
   async remove(id: string): Promise<void> {
@@ -212,19 +263,42 @@ export class InquiriesService {
     return this.matching.getLiveMatches(id, query);
   }
 
-  /** Mark the current matches as seen (clears the "new" badge). */
+  /**
+   * Acknowledge the current matches.
+   *
+   * This no longer clears the "new" badge, and that is the point. Newness is
+   * measured against the source's latest run, so reading an inquiry cannot make
+   * its answers stale — only another scan can. Zeroing the counter here meant
+   * the signal was destroyed by the act of looking at it, which is the opposite
+   * of what a standing question is for. The stamp survives as an
+   * acknowledgement other readers can use.
+   */
   async markSeen(id: string): Promise<void> {
     await this.ensureExists(id);
     await this.prisma.inquiry.update({
       where: { id },
-      data: { newMatchCount: 0, matchesSeenAt: new Date() },
+      data: { matchesSeenAt: new Date() },
     });
   }
 
   /** Recompute matches for a query (e.g. on demand). */
   async rematch(id: string): Promise<{ landed: number }> {
     await this.ensureExists(id);
-    return this.matching.rematchInquiry(id);
+    const result = await this.matching.rematchInquiry(id);
+    await this.activity.record(id, InquiryActivityType.REMATCHED, {
+      matchCount: result.landed,
+    });
+    return result;
+  }
+
+  /** The inquiry's own history: config changes and each run's deltas. */
+  async timeline(
+    id: string,
+    cursor?: string,
+    limit?: number,
+  ): Promise<InquiryTimelineResponseDto> {
+    await this.ensureExists(id);
+    return this.activity.getTimeline(id, cursor, limit);
   }
 
   /** Preview what a matcher config currently selects, before saving. */
@@ -241,32 +315,51 @@ export class InquiriesService {
       status: 'OPEN' as const,
       ...(scopedSources ? { sourceId: { in: scopedSources } } : {}),
     };
-    const [sources, customDetectors, typeRows, customTypeRows] =
-      await Promise.all([
-        this.prisma.source.findMany({
-          select: { id: true, name: true, type: true },
-          orderBy: { name: 'asc' },
-        }),
-        this.prisma.customDetector.findMany({
-          where: { isActive: true },
-          select: { key: true, name: true, pipelineSchema: true },
-          orderBy: { name: 'asc' },
-        }),
-        this.prisma.finding.groupBy({
-          by: ['findingType', 'detectorType'],
-          where: findingScope,
-          _count: { _all: true },
-        }),
-        // Which finding types each custom detector actually emits. This is what
-        // makes the answer-dimension hint actionable: for an LLM detector the
-        // author can put these straight into `findingTypes`, instead of writing
-        // a value regex that matches nothing.
-        this.prisma.finding.groupBy({
-          by: ['customDetectorKey', 'findingType'],
-          where: { ...findingScope, detectorType: 'CUSTOM' },
-          _count: { _all: true },
-        }),
-      ]);
+    // Per-source sizes are global (not scoped to the selected sources): the
+    // source picker lists every source, so each row needs its own totals.
+    // Both group-bys hit indexed source_id columns and return one row per
+    // source, so this stays a constant handful of queries either way.
+    const [
+      sources,
+      customDetectors,
+      typeRows,
+      customTypeRows,
+      assetCounts,
+      findingCounts,
+    ] = await Promise.all([
+      this.prisma.source.findMany({
+        select: { id: true, name: true, type: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.customDetector.findMany({
+        where: { isActive: true },
+        select: { key: true, name: true, pipelineSchema: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.finding.groupBy({
+        by: ['findingType', 'detectorType'],
+        where: findingScope,
+        _count: { _all: true },
+      }),
+      // Which finding types each custom detector actually emits. This is what
+      // makes the answer-dimension hint actionable: for an LLM detector the
+      // author can put these straight into `findingTypes`, instead of writing
+      // a value regex that matches nothing.
+      this.prisma.finding.groupBy({
+        by: ['customDetectorKey', 'findingType'],
+        where: { ...findingScope, detectorType: 'CUSTOM' },
+        _count: { _all: true },
+      }),
+      this.prisma.asset.groupBy({
+        by: ['sourceId'],
+        _count: { _all: true },
+      }),
+      this.prisma.finding.groupBy({
+        by: ['sourceId'],
+        where: { status: 'OPEN' },
+        _count: { _all: true },
+      }),
+    ]);
 
     const findingTypes = typeRows
       .map((r) => ({
@@ -284,11 +377,20 @@ export class InquiriesService {
       observed.set(row.customDetectorKey, list);
     }
 
+    const assetsBySource = new Map(
+      assetCounts.map((r) => [r.sourceId, r._count._all]),
+    );
+    const findingsBySource = new Map(
+      findingCounts.map((r) => [r.sourceId, r._count._all]),
+    );
+
     return {
       sources: sources.map((s) => ({
         id: s.id,
         name: s.name,
         type: String(s.type),
+        assetCount: assetsBySource.get(s.id) ?? 0,
+        openFindingCount: findingsBySource.get(s.id) ?? 0,
       })),
       customDetectors: customDetectors.map((d) => {
         const types = (observed.get(d.key) ?? []).sort(
@@ -401,6 +503,7 @@ export class InquiriesService {
       findingValueRegex: row.findingValueRegex,
       matchCount: row.matchCount,
       newMatchCount: row.newMatchCount,
+      goneMatchCount: row.goneMatchCount,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };

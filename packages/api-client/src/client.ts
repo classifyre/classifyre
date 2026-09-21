@@ -300,6 +300,11 @@ export type {
   LinkThreadSupportDto,
   CaseActivityDto,
   CaseTimelineResponseDto,
+  // An inquiry's own history — the durable record behind its derived NEW/GONE
+  // state, which expires the next time its source runs.
+  InquiryActivityDto,
+  InquiryTimelineResponseDto,
+  SetInquiryAutoPullDto,
   ExpandGraphDto,
   GraphNodeDto,
   GraphEdgeDto,
@@ -360,7 +365,10 @@ export {
 export {
   InquiriesControllerListStatusEnum,
   InquiriesControllerListMatchesSeverityEnum,
+  InquiriesControllerListMatchesStateEnum,
 } from "./generated/src/apis/InquiriesApi";
+export { InquiryMatchDtoStateEnum } from "./generated/src/models/InquiryMatchDto";
+export { InquiryActivityDtoActivityTypeEnum } from "./generated/src/models/InquiryActivityDto";
 export { TriggerAutopilotDtoAgentKindsEnum } from "./generated/src/models/TriggerAutopilotDto";
 export {
   AutopilotControllerListActivityAgentKindEnum,

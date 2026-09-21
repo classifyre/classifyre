@@ -105,9 +105,9 @@ describe('FindingsService.getStats', () => {
       info: 7,
     });
     // The keys still sum to the total: that is the invariant P7 broke.
-    expect(
-      Object.values(result.bySeverity).reduce((a, b) => a + b, 0),
-    ).toBe(result.total);
+    expect(Object.values(result.bySeverity).reduce((a, b) => a + b, 0)).toBe(
+      result.total,
+    );
   });
 
   it('falls back to live counts when the rollup is not built', async () => {

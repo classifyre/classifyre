@@ -5415,6 +5415,53 @@
       }
     },
     "/cases/{id}/inquiries/{inquiryId}": {
+      "patch": {
+        "operationId": "CasesController_setInquiryAutoPull",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inquiryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetInquiryAutoPullDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Turn automatic pulling of an inquiry's new matches on or off",
+        "tags": [
+          "cases"
+        ]
+      },
       "delete": {
         "operationId": "CasesController_unlinkInquiry",
         "parameters": [
@@ -5898,10 +5945,28 @@
             }
           },
           {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to these states. Defaults to NEW and ONGOING — GONE matches are RESOLVED findings and are only returned when asked for by name.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "NEW",
+                  "ONGOING",
+                  "GONE"
+                ]
+              }
+            }
+          },
+          {
             "name": "onlyNew",
             "required": false,
             "in": "query",
-            "description": "Only matches that appeared since last seen",
+            "deprecated": true,
+            "description": "Equivalent to state: [NEW].",
             "schema": {
               "type": "boolean"
             }
@@ -5943,6 +6008,53 @@
         ]
       }
     },
+    "/inquiries/{id}/timeline": {
+      "get": {
+        "operationId": "InquiriesController_timeline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InquiryTimelineResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The inquiry's own history: config changes and each run's deltas",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
     "/inquiries/{id}/seen": {
       "post": {
         "operationId": "InquiriesController_markSeen",
@@ -5961,7 +6073,7 @@
             "description": ""
           }
         },
-        "summary": "Mark the current matches as seen (clears the \"new\" badge)",
+        "summary": "Acknowledge the current matches. Does NOT clear the \"new\" count — that is measured against the source's latest run and clears when the source runs again.",
         "tags": [
           "inquiries"
         ]
@@ -18361,6 +18473,13 @@
             "items": {
               "type": "string"
             }
+          },
+          "autoPullInquiryIds": {
+            "description": "Of the linked inquiries, these also pull their new matches in by themselves as later scans land them. Additive rather than a shape change to inquiryIds, which MCP and autopilot callers already send.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -18501,7 +18620,15 @@
           },
           "newMatchCount": {
             "type": "number",
-            "description": "Matches that appeared since the inquiry was last viewed"
+            "description": "Matches the latest completed run of their source created. Clears when that source runs again, not when the inquiry is read."
+          },
+          "goneMatchCount": {
+            "type": "number",
+            "description": "Matches the latest run retired — they no longer exist"
+          },
+          "autoPull": {
+            "type": "boolean",
+            "description": "New matches land in this case by themselves"
           }
         },
         "required": [
@@ -18509,7 +18636,9 @@
           "title",
           "status",
           "matchCount",
-          "newMatchCount"
+          "newMatchCount",
+          "goneMatchCount",
+          "autoPull"
         ]
       },
       "CaseResponseDto": {
@@ -18769,10 +18898,29 @@
             "items": {
               "type": "string"
             }
+          },
+          "autoPullInquiryIds": {
+            "description": "Of the linked inquiries, these also pull their new matches in by themselves as later scans land them. Additive rather than a shape change to inquiryIds, which MCP and autopilot callers already send.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "inquiryIds"
+        ]
+      },
+      "SetInquiryAutoPullDto": {
+        "type": "object",
+        "properties": {
+          "autoPull": {
+            "type": "boolean",
+            "description": "Pull this inquiry's new matches into the case as later scans land them, without anyone re-opening the inquiry."
+          }
+        },
+        "required": [
+          "autoPull"
         ]
       },
       "CloseCaseDto": {
@@ -18893,6 +19041,14 @@
           "matchedContent": {
             "type": "string",
             "description": "For finding nodes: truncated matched text"
+          },
+          "matchState": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "GONE"
+            ],
+            "description": "For finding nodes on a CASE graph: how the latest run of the finding's source changed it, relative to the case's driving inquiries. NEW means that run created it; GONE means that run retired it, so the case still cites evidence the scan no longer finds. Absent when neither applies, and absent entirely outside a case graph."
           },
           "assetName": {
             "type": "string",
@@ -19441,11 +19597,21 @@
           },
           "matchCount": {
             "type": "number",
-            "description": "Findings currently matching this query"
+            "description": "Open findings currently matching this query"
           },
           "newMatchCount": {
             "type": "number",
-            "description": "Matches that appeared since you last viewed"
+            "description": "Matches the latest completed run of their source created. Clears when that source runs again, not when you read it."
+          },
+          "goneMatchCount": {
+            "type": "number",
+            "description": "Matches the latest run retired — they still answer the question, but the scan no longer finds them. Not counted in matchCount."
+          },
+          "lastRunAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "When the run that NEW and GONE are measured against started. Null until some source in scope has completed a run.",
+            "nullable": true
           },
           "createdAt": {
             "format": "date-time",
@@ -19471,6 +19637,7 @@
           "findingValueRegex",
           "matchCount",
           "newMatchCount",
+          "goneMatchCount",
           "createdAt",
           "updatedAt"
         ]
@@ -19565,9 +19732,23 @@
             "format": "date-time",
             "type": "string"
           },
+          "state": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "ONGOING",
+              "GONE"
+            ],
+            "description": "Where this match sits relative to the latest completed run of its source. NEW: the run created it. ONGOING: it was already there. GONE: the run retired it, so it matches the question but no longer exists."
+          },
           "isNew": {
             "type": "boolean",
-            "description": "Appeared since the question was last viewed"
+            "deprecated": true,
+            "description": "Equivalent to state === NEW. Kept for clients generated before state existed. Note the meaning changed: this used to mean \"appeared since you last looked\", which cleared when you read it rather than when the corpus moved on."
+          },
+          "goneReason": {
+            "type": "string",
+            "description": "Why a GONE match left — absent from the scan, asset deleted, or the detector removed. Absent for NEW and ONGOING."
           },
           "ranking": {
             "description": "Evidence ranking (importance, quality, reasons) when the finding has been analyzed",
@@ -19583,6 +19764,7 @@
           "label",
           "assetId",
           "matchedAt",
+          "state",
           "isNew"
         ]
       },
@@ -19655,12 +19837,22 @@
           },
           "type": {
             "type": "string"
+          },
+          "assetCount": {
+            "type": "number",
+            "description": "Total assets ingested under this source. Lets the matcher form show a per-source size without a second round-trip."
+          },
+          "openFindingCount": {
+            "type": "number",
+            "description": "Open findings currently under this source. Lets the matcher form show a per-source signal size without a second round-trip."
           }
         },
         "required": [
           "id",
           "name",
-          "type"
+          "type",
+          "assetCount",
+          "openFindingCount"
         ]
       },
       "MatchOptionCustomDetectorDto": {
@@ -19884,7 +20076,11 @@
           },
           "newCount": {
             "type": "number",
-            "description": "New matches after filters (appeared since last seen)"
+            "description": "Matches the latest run of their source created, after filters"
+          },
+          "goneCount": {
+            "type": "number",
+            "description": "Matches the latest run retired. Exact when GONE was requested; otherwise the count the last matching pass stored."
           },
           "skip": {
             "type": "number"
@@ -19897,8 +20093,70 @@
           "items",
           "total",
           "newCount",
+          "goneCount",
           "skip",
           "limit"
+        ]
+      },
+      "InquiryActivityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "inquiryId": {
+            "type": "string"
+          },
+          "activityType": {
+            "type": "string",
+            "enum": [
+              "INQUIRY_CREATED",
+              "MATCHERS_UPDATED",
+              "STATUS_CHANGED",
+              "REMATCHED",
+              "MATCHES_LANDED",
+              "MATCHES_RETIRED",
+              "CASE_LINKED",
+              "CASE_UNLINKED",
+              "PULLED_TO_CASE",
+              "AUTO_PULLED"
+            ]
+          },
+          "actor": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "inquiryId",
+          "activityType",
+          "payload",
+          "createdAt"
+        ]
+      },
+      "InquiryTimelineResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InquiryActivityDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items"
         ]
       },
       "RematchResponseDto": {

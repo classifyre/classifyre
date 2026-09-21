@@ -65,6 +65,14 @@ import {
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { CaseStatusBadge } from "@/components/case-status-badge";
+import { CaseInquiriesTab } from "@/components/case-inquiries-tab";
+import { ToneBadge } from "@workspace/ui/components";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu";
 import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
 import { CaseAutopilotStatus } from "@/components/autopilot/case-autopilot-status";
 import { DetailBackButton } from "@/components/detail-back-button";
@@ -81,7 +89,14 @@ const CaseGraphView = dynamic(
 );
 
 // The graph is the case's front door — every other view is a drill-down.
-type TabValue = "graph" | "evidence" | "explore" | "threads" | "timeline" | "overview";
+type TabValue =
+  | "graph"
+  | "evidence"
+  | "inquiries"
+  | "explore"
+  | "threads"
+  | "timeline"
+  | "overview";
 const DEFAULT_TAB: TabValue = "graph";
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "CLOSED", "ARCHIVED"] as const;
@@ -112,8 +127,6 @@ function CaseWorkspaceInner() {
   const [caseData, setCaseData] = React.useState<CaseResponseDto | null>(null);
   const [threads, setThreads] = React.useState<ThreadResponseDto[]>([]);
   const [allInquiries, setAllInquiries] = React.useState<InquiryResponseDto[]>([]);
-  const [inquiryToLink, setInquiryToLink] = React.useState("");
-  const [linkingInquiry, setLinkingInquiry] = React.useState(false);
   const [recentActivity, setRecentActivity] = React.useState<CaseActivityDto[]>([]);
 
   const [leads, setLeads] = React.useState<CaseLeadDto[]>([]);
@@ -265,6 +278,14 @@ function CaseWorkspaceInner() {
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const evidence = React.useMemo(() => caseData?.evidence ?? [], [caseData]);
+
+  /** Findings already attached, so a watch can mark its own rows "in case". */
+  const inCaseFindingIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of caseData?.evidence ?? [])
+      for (const f of e.findings ?? []) ids.add(f.findingId);
+    return ids;
+  }, [caseData]);
   const findingCount = evidence.reduce((sum, e) => sum + (e.findings?.length ?? 0), 0);
 
   const proposedLeadsCount = leads.filter((l) => l.status === "PROPOSED").length;
@@ -361,52 +382,6 @@ function CaseWorkspaceInner() {
 
   const reopen = async () => changeStatus("IN_PROGRESS");
 
-  const linkInquiry = async () => {
-    if (!inquiryToLink) return;
-    setLinkingInquiry(true);
-    try {
-      await api.cases.casesControllerLinkInquiries({
-        id: caseId,
-        linkInquiriesDto: { inquiryIds: [inquiryToLink] },
-      });
-      toast.success(t("investigations.caseDetail.inquiryLinked"));
-      setInquiryToLink("");
-      reloadAll();
-    } catch (err) {
-      console.error(err);
-      toast.error(t("investigations.caseDetail.failedToLinkInquiry"));
-    } finally {
-      setLinkingInquiry(false);
-    }
-  };
-
-  const unlinkInquiry = async (inquiryId: string) => {
-    try {
-      await api.cases.casesControllerUnlinkInquiry({ id: caseId, inquiryId });
-      toast.success(t("investigations.caseDetail.inquiryUnlinked"));
-      reloadAll();
-    } catch (err) {
-      console.error(err);
-      toast.error(t("investigations.caseDetail.failedToUnlinkInquiry"));
-    }
-  };
-
-  const pullInquiry = async (inquiryId: string) => {
-    setPulling(inquiryId);
-    try {
-      const res = await api.cases.casesControllerPull({
-        id: caseId,
-        pullFromInquiryDto: { inquiryId },
-      });
-      toast.success(t("investigations.caseDetail.pulled", { count: String(res.pulled) }));
-      reloadAll();
-    } catch (err) {
-      console.error(err);
-      toast.error(t("investigations.caseDetail.failedToPull"));
-    } finally {
-      setPulling(null);
-    }
-  };
 
   const removeEvidence = async (evidenceId: string) => {
     await api.cases.casesControllerRemoveEvidence({ id: caseId, evidenceId });
@@ -507,6 +482,14 @@ function CaseWorkspaceInner() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 self-start">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(nsPath(`/investigations/${caseId}/edit`))}
+          >
+            <Pencil className="h-3.5 w-3.5" />{" "}
+            {t("investigations.caseDetail.edit")}
+          </Button>
           {!isClosed && (
             <Button
               variant="outline"
@@ -588,6 +571,15 @@ function CaseWorkspaceInner() {
             </TabsTrigger>
             <TabsTrigger value="evidence">
               <Paperclip className="h-3.5 w-3.5" /> {t("investigations.caseDetail.tabEvidence")} ({evidence.length})
+            </TabsTrigger>
+            <TabsTrigger value="inquiries">
+              <Sparkles className="h-3.5 w-3.5" />{" "}
+              {t("investigations.caseDetail.tabInquiries")}
+              {newMatchTotal > 0 && (
+                <ToneBadge tone="fresh" className="ml-1">
+                  {newMatchTotal}
+                </ToneBadge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="explore">
               <Compass className="h-3.5 w-3.5" /> {t("investigations.caseDetail.tabExplore")}
@@ -713,147 +705,49 @@ function CaseWorkspaceInner() {
               )}
             </div>
 
-            {/* ── Linked inquiry + recent activity ── */}
+            {/* ── Driving watches (summary) + recent activity ── */}
             <div className="space-y-5">
+              {/* The watches themselves live on their own tab now: reviewing
+                  what a scan landed is its own job, not a sidebar of the tab
+                  about writing the conclusion. */}
               <div className="space-y-2">
-                <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
-                  {t("investigations.caseDetail.drivingInquiries")} ({linkedInquiries.length})
-                </p>
-                {linkedInquiries.length === 0 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
+                    {t("investigations.caseDetail.drivingInquiries")} ({linkedInquiries.length})
+                  </p>
+                  <button
+                    className="text-muted-foreground text-xs underline"
+                    onClick={() => changeTab("inquiries")}
+                  >
+                    {t("investigations.caseDetail.tabInquiries")}
+                  </button>
+                </div>
+                {linkedInquiries.length === 0 ? (
                   <Card>
                     <CardContent className="text-muted-foreground p-3 text-xs">
                       {t("investigations.caseDetail.noInquiryLinked")}
                     </CardContent>
                   </Card>
-                )}
-                {linkedInquiries.map((q) => (
-                  <Card key={q.id}>
-                    <CardContent className="space-y-2 p-3">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 shrink-0 text-[color:var(--color-amber-600,#d97706)]" />
-                        <button
-                          className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline"
-                          onClick={() =>
-                            router.push(nsPath(`/investigations/inquiries/${q.id}?caseId=${caseId}`))
-                          }
-                        >
+                ) : (
+                  <div className="divide-y divide-border rounded-[4px] border-2 border-border bg-card">
+                    {linkedInquiries.map((q) => (
+                      <button
+                        key={q.id}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+                        onClick={() => changeTab("inquiries")}
+                      >
+                        <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent-ink" />
+                        <span className="min-w-0 flex-1 truncate text-xs">
                           {q.title}
-                        </button>
-                        {q.status === "ARCHIVED" && (
-                          <Badge variant="outline" className="text-[10px] uppercase">
-                            archived
-                          </Badge>
+                        </span>
+                        {q.newMatchCount > 0 && (
+                          <ToneBadge tone="fresh">{q.newMatchCount}</ToneBadge>
                         )}
-                        {q.status !== "ARCHIVED" && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6"
-                            aria-label={t("investigations.caseDetail.editInquiryQuery")}
-                            onClick={() =>
-                              router.push(nsPath(`/investigations/inquiries/${q.id}/edit`))
-                            }
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
+                        {q.goneMatchCount > 0 && (
+                          <ToneBadge tone="error">{q.goneMatchCount}</ToneBadge>
                         )}
-                        {!isClosed && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 text-muted-foreground"
-                                aria-label={t("investigations.caseDetail.unlinkInquiry")}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>{t("investigations.caseDetail.unlinkInquiryTitle", { title: q.title })}</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  {t("investigations.caseDetail.unlinkInquiryDesc")}
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => unlinkInquiry(q.id)}>
-                                  {t("investigations.caseDetail.unlink")}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                      <p className="text-muted-foreground text-xs">
-                        {q.matchCount} current match{q.matchCount === 1 ? "" : "es"}
-                        {q.newMatchCount > 0 ? (
-                          <span className="text-[color:var(--color-amber-600,#d97706)]">
-                            {" "}· {q.newMatchCount} new
-                          </span>
-                        ) : (
-                          ""
-                        )}
-                      </p>
-                      {!isClosed && q.matchCount > 0 && (
-                        <div className="flex gap-1.5">
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={() =>
-                              router.push(nsPath(`/investigations/inquiries/${q.id}?caseId=${caseId}`))
-                            }
-                          >
-                            {t("investigations.caseDetail.selectMatchesToPull")} <ArrowRight className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={pulling === q.id}
-                            onClick={() => pullInquiry(q.id)}
-                            title={t("investigations.caseDetail.pullAllMatches")}
-                          >
-                            {pulling === q.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <DownloadCloud className="h-3.5 w-3.5" />
-                            )}
-                            {t("investigations.caseDetail.all")}
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-                {!isClosed && linkableInquiries.length > 0 && (
-                  <div className="flex gap-1.5">
-                    <Select value={inquiryToLink} onValueChange={setInquiryToLink}>
-                      <SelectTrigger className="h-8 flex-1 text-xs">
-                        <SelectValue placeholder={t("investigations.caseDetail.linkAnotherInquiry")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {linkableInquiries.map((q) => (
-                          <SelectItem key={q.id} value={q.id}>
-                            {q.title}{" "}
-                            <span className="text-muted-foreground">({q.matchCount})</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={linkInquiry}
-                      disabled={!inquiryToLink || linkingInquiry}
-                    >
-                      {linkingInquiry ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Link2 className="h-3.5 w-3.5" />
-                      )}
-                      {t("investigations.caseDetail.link")}
-                    </Button>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -889,6 +783,18 @@ function CaseWorkspaceInner() {
               </div>
             </div>
           </div>
+        </TabsContent>
+
+        {/* ════ Driving watches ════ */}
+        <TabsContent value="inquiries">
+          <CaseInquiriesTab
+            caseId={caseId}
+            linked={linkedInquiries}
+            linkable={linkableInquiries}
+            isClosed={isClosed}
+            inCaseFindingIds={inCaseFindingIds}
+            onChanged={reloadAll}
+          />
         </TabsContent>
 
         {/* ════ Evidence ════ */}

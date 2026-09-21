@@ -9,6 +9,7 @@ Name | Type
 `items` | [Array&lt;InquiryMatchDto&gt;](InquiryMatchDto.md)
 `total` | number
 `newCount` | number
+`goneCount` | number
 `skip` | number
 `limit` | number
 
@@ -22,6 +23,7 @@ const example = {
   "items": null,
   "total": null,
   "newCount": null,
+  "goneCount": null,
   "skip": null,
   "limit": null,
 } satisfies InquiryMatchListResponseDto
