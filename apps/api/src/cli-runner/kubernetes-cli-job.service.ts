@@ -1230,7 +1230,18 @@ export class KubernetesCliJobService {
       return previousOutput;
     }
 
-    if (!onLogChunk || latestOutput === previousOutput) {
+    // A read that comes back empty -- or shorter than what we already have --
+    // is an unavailable read, not a shrinking log: `findJobPod` finds no pod
+    // while the Job is between attempts, and a response with no Content-Type
+    // yields ''. Adopting it as the cursor would make the NEXT good read look
+    // like a brand-new log and re-emit every line already stored, so the run's
+    // output is duplicated rather than lost. Covers `latestOutput ===
+    // previousOutput` too.
+    if (previousOutput.startsWith(latestOutput)) {
+      return previousOutput;
+    }
+
+    if (!onLogChunk) {
       return latestOutput;
     }
 
