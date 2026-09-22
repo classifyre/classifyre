@@ -77,7 +77,9 @@ function toPostSummary(
   const routeDir = path
     .dirname(path.relative(contentRoot, filePath))
     .replace(/\\/g, "/");
-  const route = `${routePrefixForLocale(locale)}/${routeDir}`;
+  // `contentRoot` is the `blog` folder itself, so `routeDir` is
+  // `cases/<slug>` — re-add the `/blog` segment dropped by `relative`.
+  const route = `${routePrefixForLocale(locale)}/blog/${routeDir}`;
   const section: BlogPostSection =
     route.startsWith("/blog/cases/") || route.startsWith("/de/blog/cases/")
       ? "cases"
