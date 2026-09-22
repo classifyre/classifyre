@@ -279,7 +279,7 @@ All URIs are relative to *http://localhost*
 *NamespacesApi* | [**namespacesControllerListCategories**](docs/NamespacesApi.md#namespacescontrollerlistcategories) | **GET** /namespaces/categories | List workspace categories with workspace counts
 *NamespacesApi* | [**namespacesControllerRemove**](docs/NamespacesApi.md#namespacescontrollerremove) | **DELETE** /namespaces/{id} | Soft-delete a namespace (hidden from listings; data retained)
 *NamespacesApi* | [**namespacesControllerRemoveCategory**](docs/NamespacesApi.md#namespacescontrollerremovecategory) | **DELETE** /namespaces/categories/{categoryId} | Delete a category (its workspaces fall back to the default category)
-*NamespacesApi* | [**namespacesControllerStats**](docs/NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing)
+*NamespacesApi* | [**namespacesControllerStats**](docs/NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing + running + pending)
 *NamespacesApi* | [**namespacesControllerThumbnail**](docs/NamespacesApi.md#namespacescontrollerthumbnail) | **GET** /namespaces/{id}/thumbnail | Stream a namespace\&#39;s thumbnail image
 *NamespacesApi* | [**namespacesControllerUpdate**](docs/NamespacesApi.md#namespacescontrollerupdate) | **PATCH** /namespaces/{id} | Update a namespace
 *NamespacesApi* | [**namespacesControllerUpdateCategory**](docs/NamespacesApi.md#namespacescontrollerupdatecategory) | **PATCH** /namespaces/categories/{categoryId} | Rename or re-describe a workspace category

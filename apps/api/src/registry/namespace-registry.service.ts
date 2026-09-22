@@ -380,19 +380,31 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
           const { rows } = await this.pool.query<{
             total: number;
             failing: number;
+            running: number;
+            pending: number;
           }>(
             `SELECT
                count(*)::int AS total,
-               count(*) FILTER (WHERE runner_status = 'ERROR')::int AS failing
+               count(*) FILTER (WHERE runner_status = 'ERROR')::int AS failing,
+               count(*) FILTER (WHERE runner_status = 'RUNNING')::int AS running,
+               count(*) FILTER (WHERE runner_status = 'PENDING')::int AS pending
              FROM "${ns.schemaName}".sources`,
           );
           return {
             id: ns.id,
             totalSources: rows[0]?.total ?? 0,
             failingSources: rows[0]?.failing ?? 0,
+            runningSources: rows[0]?.running ?? 0,
+            pendingSources: rows[0]?.pending ?? 0,
           };
         } catch {
-          return { id: ns.id, totalSources: 0, failingSources: 0 };
+          return {
+            id: ns.id,
+            totalSources: 0,
+            failingSources: 0,
+            runningSources: 0,
+            pendingSources: 0,
+          };
         }
       }),
     );

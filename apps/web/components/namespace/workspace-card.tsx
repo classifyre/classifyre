@@ -6,8 +6,10 @@ import Link from "next/link";
 import {
   ArrowRight,
   ArrowUpRight,
+  Clock,
   ExternalLink,
   Layers,
+  Loader2,
   OctagonPause,
   Settings,
   TriangleAlert,
@@ -58,6 +60,11 @@ export function WorkspaceCard({
   const { t } = useTranslation();
   const localePath = useLocalePath();
   const initial = ns.name.trim().charAt(0).toUpperCase() || "?";
+  const failingCount = stats?.failingSources ?? 0;
+  const runningCount = stats?.runningSources ?? 0;
+  const pendingCount = stats?.pendingSources ?? 0;
+  const hasStatusBadges =
+    failingCount > 0 || runningCount > 0 || pendingCount > 0;
 
   return (
     <Card
@@ -188,33 +195,58 @@ export function WorkspaceCard({
           </ul>
         )}
 
-        <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4">
-          {stats ? (
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Layers className="size-3.5 shrink-0" />
-                <span>
-                  <span className="font-semibold text-foreground">
-                    {stats.totalSources}
-                  </span>{" "}
-                  {t("workspaces.sourcesCount", { count: stats.totalSources })}
-                </span>
-              </span>
-              {stats.failingSources > 0 && (
+        <div className="mt-auto pt-4">
+          {stats && hasStatusBadges && (
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              {failingCount > 0 && (
                 <span className="flex items-center gap-1 rounded-sm border border-destructive/40 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-destructive">
                   <TriangleAlert className="size-3 shrink-0" />
                   {t("workspaces.failingCount", {
-                    count: stats.failingSources,
+                    count: failingCount,
+                  })}
+                </span>
+              )}
+              {runningCount > 0 && (
+                <span className="flex items-center gap-1 rounded-sm border border-sky-600/35 bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-sky-700 dark:border-sky-400/30 dark:bg-sky-950/40 dark:text-sky-300">
+                  <Loader2
+                    aria-hidden="true"
+                    className="size-3 shrink-0 animate-spin"
+                  />
+                  {t("workspaces.runningCount", {
+                    count: runningCount,
+                  })}
+                </span>
+              )}
+              {pendingCount > 0 && (
+                <span className="flex items-center gap-1 rounded-sm border border-border/60 bg-muted px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  <Clock aria-hidden="true" className="size-3 shrink-0" />
+                  {t("workspaces.pendingCount", {
+                    count: pendingCount,
                   })}
                 </span>
               )}
             </div>
-          ) : (
-            <span aria-hidden="true" />
           )}
-          <span className="flex shrink-0 items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors group-hover:text-foreground">
-            {t("common.open")} <ArrowRight className="size-3.5" />
-          </span>
+          <div className="flex items-center justify-between gap-3 border-t pt-4">
+            {stats ? (
+              <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                <Layers className="size-3.5 shrink-0" />
+                <span className="truncate">
+                  <span className="font-semibold text-foreground">
+                    {stats.totalSources}
+                  </span>{" "}
+                  {t("workspaces.sourcesCount", {
+                    count: stats.totalSources,
+                  })}
+                </span>
+              </span>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+            <span className="flex shrink-0 items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors group-hover:text-foreground">
+              {t("common.open")} <ArrowRight className="size-3.5" />
+            </span>
+          </div>
         </div>
       </CardContent>
     </Card>
