@@ -10,6 +10,7 @@ Name | Type
 `filters` | [SearchSourcesFiltersDto](SearchSourcesFiltersDto.md)
 `schedule` | [BulkUpdateSourcesScheduleDto](BulkUpdateSourcesScheduleDto.md)
 `sampling` | [BulkUpdateSourcesSamplingDto](BulkUpdateSourcesSamplingDto.md)
+`updatedBy` | string
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "filters": null,
   "schedule": null,
   "sampling": null,
+  "updatedBy": null,
 } satisfies BulkUpdateSourcesDto
 
 console.log(example)

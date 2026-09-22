@@ -300,10 +300,25 @@ export type {
   LinkThreadSupportDto,
   CaseActivityDto,
   CaseTimelineResponseDto,
+  // An inquiry's own history — the durable record behind its derived NEW/GONE
+  // state, which expires the next time its source runs.
+  InquiryActivityDto,
+  InquiryTimelineResponseDto,
+  SetInquiryAutoPullDto,
   ExpandGraphDto,
   GraphNodeDto,
   GraphEdgeDto,
   GraphResponseDto,
+  // Findings about an asset, and how many each asset in a graph carries
+  // (GENESIS field report P12/P13).
+  ReferencingFindingDto,
+  ReferencingFindingsResponseDto,
+  AssetSeverityCountsItemDto,
+  AssetSeverityCountsResponseDto,
+  // Why a queued run has not started (P1), and the poll-based connection
+  // test that replaces a request held open for minutes (P2).
+  RunnerQueuePositionDto,
+  ConnectionTestStatusDto,
   ConstellationResponseDto,
   ConstellationSourceDto,
   ConstellationLinkDto,
@@ -350,7 +365,10 @@ export {
 export {
   InquiriesControllerListStatusEnum,
   InquiriesControllerListMatchesSeverityEnum,
+  InquiriesControllerListMatchesStateEnum,
 } from "./generated/src/apis/InquiriesApi";
+export { InquiryMatchDtoStateEnum } from "./generated/src/models/InquiryMatchDto";
+export { InquiryActivityDtoActivityTypeEnum } from "./generated/src/models/InquiryActivityDto";
 export { TriggerAutopilotDtoAgentKindsEnum } from "./generated/src/models/TriggerAutopilotDto";
 export {
   AutopilotControllerListActivityAgentKindEnum,
@@ -1650,8 +1668,48 @@ export interface MaintenanceCleanupProgress {
   currentTable: string | null;
   tablesTotal: number;
   tablesDone: number;
+  /** What the run is doing when it is not draining a table (waiting, dropping indexes). */
+  note?: string | null;
   result?: MaintenanceCleanupResult;
   error?: string;
+}
+
+/** A workspace feature switch (Settings → Cleanup › Features). */
+export type WorkspaceFeatureKey = "embeddings" | "duplicates";
+
+/** One feature switch: its state, the data it owns and the queues it holds. */
+export interface WorkspaceFeatureState {
+  key: WorkspaceFeatureKey;
+  enabled: boolean;
+  /** How it was turned off: data kept (a pause) or deleted. Null while on. */
+  disabledMode: "kept" | "deleted" | null;
+  /** When the switch last moved; null if it never did. */
+  changedAt: string | null;
+  /** The deployment default where one exists (embeddings); null otherwise. */
+  deploymentDefault: boolean | null;
+  /** The cleanup dataset this feature produces, measured live. */
+  dataset: string;
+  dataRows: number;
+  dataBytes: number;
+  tables: string[];
+  /** Queues held paused while the feature is off (shown in the Workers tab). */
+  heldQueues: string[];
+  /** A cleanup of this feature's data running right now, if any. */
+  cleanupRunId: string | null;
+}
+
+export interface WorkspaceFeaturesOverview {
+  features: WorkspaceFeatureState[];
+}
+
+/** Answer of turning a feature on or off. */
+export interface SetWorkspaceFeatureResult {
+  feature: WorkspaceFeatureState;
+  /** The run deleting the feature's data; poll `cleanupProgress(runId)`. */
+  cleanupRunId: string | null;
+  /** Duplicate detection turned back on: its catch-up recompute was queued. */
+  recomputeScheduled: boolean;
+  note: string;
 }
 
 class MaintenanceApi {
@@ -1688,6 +1746,35 @@ class MaintenanceApi {
     if (!res.ok)
       throw new Error(await errorMessage(res, "poll cleanup progress"));
     return (await res.json()) as MaintenanceCleanupProgress;
+  }
+
+  async features(): Promise<WorkspaceFeaturesOverview> {
+    const res = await resilientFetch(this.url("/features"), {
+      cache: "no-store",
+    });
+    if (!res.ok)
+      throw new Error(await errorMessage(res, "load feature switches"));
+    return (await res.json()) as WorkspaceFeaturesOverview;
+  }
+
+  /**
+   * Turn a feature on or off. `deleteData` (only when turning off, or for a
+   * feature already off) also wipes its data in the background.
+   */
+  async setFeature(
+    key: WorkspaceFeatureKey,
+    input: { enabled: boolean; deleteData?: boolean },
+  ): Promise<SetWorkspaceFeatureResult> {
+    const res = await resilientFetch(
+      this.url(`/features/${encodeURIComponent(key)}`),
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    if (!res.ok) throw new Error(await errorMessage(res, "change feature"));
+    return (await res.json()) as SetWorkspaceFeatureResult;
   }
 }
 

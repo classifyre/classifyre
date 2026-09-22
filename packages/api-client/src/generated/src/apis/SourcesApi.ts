@@ -22,6 +22,7 @@ import type {
   BulkUpdateSourcesDto,
   BulkUpdateSourcesResponseDto,
   CohortWeightsPreviewDto,
+  ConnectionTestStatusDto,
   CreateSourceDto,
   FinalizeIngestRunDto,
   PurgeSourceAssetsResponseDto,
@@ -50,6 +51,8 @@ import {
     BulkUpdateSourcesResponseDtoToJSON,
     CohortWeightsPreviewDtoFromJSON,
     CohortWeightsPreviewDtoToJSON,
+    ConnectionTestStatusDtoFromJSON,
+    ConnectionTestStatusDtoToJSON,
     CreateSourceDtoFromJSON,
     CreateSourceDtoToJSON,
     FinalizeIngestRunDtoFromJSON,
@@ -139,6 +142,10 @@ export interface SourcesControllerDeleteSourceRequest {
     id: string;
 }
 
+export interface SourcesControllerGetConnectionTestRequest {
+    id: string;
+}
+
 export interface SourcesControllerGetScheduleRequest {
     id: string;
 }
@@ -163,6 +170,10 @@ export interface SourcesControllerPurgeFindingsRequest {
 }
 
 export interface SourcesControllerResumeScheduleRequest {
+    id: string;
+}
+
+export interface SourcesControllerStartConnectionTestRequest {
     id: string;
 }
 
@@ -781,6 +792,45 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
+     * RUNNING while a test started by POST /sources/{id}/test/async is still going. Null when the source has never been tested.
+     * The result of the last connection test
+     */
+    async sourcesControllerGetConnectionTestRaw(requestParameters: SourcesControllerGetConnectionTestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ConnectionTestStatusDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling sourcesControllerGetConnectionTest().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sources/{id}/test`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ConnectionTestStatusDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * RUNNING while a test started by POST /sources/{id}/test/async is still going. Null when the source has never been tested.
+     * The result of the last connection test
+     */
+    async sourcesControllerGetConnectionTest(requestParameters: SourcesControllerGetConnectionTestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ConnectionTestStatusDto> {
+        const response = await this.sourcesControllerGetConnectionTestRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Retrieve the current cron schedule settings for a data source.
      * Get source schedule
      */
@@ -1030,6 +1080,45 @@ export class SourcesApi extends runtime.BaseAPI {
      */
     async sourcesControllerResumeSchedule(requestParameters: SourcesControllerResumeScheduleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.sourcesControllerResumeScheduleRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Returns immediately with status RUNNING; poll GET /sources/{id}/test for the answer. Use this rather than POST /sources/{id}/test wherever the test may be slow to start: on Kubernetes the test pod queues behind running scans, and one measured test returned after 422.5 s of which 3 s was the test itself. A second call while a test is already running joins that test instead of starting another.
+     * Start a source connection test without waiting for it
+     */
+    async sourcesControllerStartConnectionTestRaw(requestParameters: SourcesControllerStartConnectionTestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ConnectionTestStatusDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling sourcesControllerStartConnectionTest().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sources/{id}/test/async`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ConnectionTestStatusDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Returns immediately with status RUNNING; poll GET /sources/{id}/test for the answer. Use this rather than POST /sources/{id}/test wherever the test may be slow to start: on Kubernetes the test pod queues behind running scans, and one measured test returned after 422.5 s of which 3 s was the test itself. A second call while a test is already running joins that test instead of starting another.
+     * Start a source connection test without waiting for it
+     */
+    async sourcesControllerStartConnectionTest(requestParameters: SourcesControllerStartConnectionTestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ConnectionTestStatusDto> {
+        const response = await this.sourcesControllerStartConnectionTestRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

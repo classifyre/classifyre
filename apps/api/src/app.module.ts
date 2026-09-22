@@ -50,6 +50,8 @@ import { ConstellationService } from './constellation.service';
 import { InquiriesService } from './inquiries.service';
 import { CaseThreadsService } from './case-threads.service';
 import { CaseActivityService } from './case-activity.service';
+import { InquiryActivityService } from './inquiry-activity.service';
+import { CASE_PULL } from './cases/case-pull.port';
 import { GraphService } from './graph.service';
 import { BuiltinMcpToolsService } from './chat-gateway/builtin-mcp-tools.service';
 import { ChatAgentService } from './chat-gateway/chat-agent.service';
@@ -186,7 +188,13 @@ import {
     AssistantService,
     AssistantMcpService,
     CaseActivityService,
+    InquiryActivityService,
     CasesService,
+    // The one live CasesService behind a token, so the matching worker can pull
+    // into a case without injecting it — which would close a Nest dependency
+    // cycle, and under this runtime that hangs the boot silently instead of
+    // failing. See cases/case-pull.port.ts.
+    { provide: CASE_PULL, useExisting: CasesService },
     CaseworkSummaryService,
     ConstellationService,
     InquiriesService,

@@ -76,11 +76,18 @@ export function hashSet(hashes: Iterable<string>): string {
 
 /**
  * True when phonetic matching makes sense for `label`. Structured identifiers
- * (email, phone, SSN, …) are excluded; person names, addresses, and all
- * custom/unknown labels are eligible.
+ * (email, phone, SSN, …) and Tag findings (`tag:*`, a connector's reason text)
+ * are excluded; person names, addresses and other custom labels are eligible.
  */
 export function isPhoneticEligible(label: string): boolean {
-  return !NON_PHONETIC_LABELS.has(normalizeLabel(label));
+  const key = normalizeLabel(label);
+  // A Tag finding's value is the reason a connector wrote ("aufgelöst am
+  // 31.10.2001 — Nachfolger: …"), not a name. Templated reasons are
+  // phonetically near-identical across unrelated assets, and matching them
+  // filled duplicate review with 3,556 same-detector pairs of pure noise
+  // (GENESIS field report P6). Exact values still correlate.
+  if (key.startsWith('tag_')) return false;
+  return !NON_PHONETIC_LABELS.has(key);
 }
 
 /**

@@ -20,11 +20,13 @@ Name | Type
 `customDetectorName` | string
 `status` | string
 `matchedContent` | string
+`matchState` | string
 `assetName` | string
 `assetId` | string
 `hypothesisIds` | Array&lt;string&gt;
 `caseFindingId` | string
 `missing` | boolean
+`fanOut` | number
 
 ## Example
 
@@ -47,11 +49,13 @@ const example = {
   "customDetectorName": null,
   "status": null,
   "matchedContent": null,
+  "matchState": null,
   "assetName": null,
   "assetId": null,
   "hypothesisIds": null,
   "caseFindingId": null,
   "missing": null,
+  "fanOut": null,
 } satisfies GraphNodeDto
 
 console.log(example)

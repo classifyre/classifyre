@@ -35,6 +35,14 @@ export class BulkRunSourcesDto {
   @IsOptional()
   @IsBoolean()
   forceFullRescan?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "Who started these runs, recorded as each run's triggeredBy. Defaults to 'bulk-run' so a run started this way is never anonymous.",
+  })
+  @IsOptional()
+  @IsString()
+  triggeredBy?: string;
 }
 
 export class BulkRunSourcesSkippedDto {

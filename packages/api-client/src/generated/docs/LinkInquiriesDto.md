@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `inquiryIds` | Array&lt;string&gt;
+`autoPullInquiryIds` | Array&lt;string&gt;
 
 ## Example
 
@@ -16,6 +17,7 @@ import type { LinkInquiriesDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "inquiryIds": null,
+  "autoPullInquiryIds": null,
 } satisfies LinkInquiriesDto
 
 console.log(example)

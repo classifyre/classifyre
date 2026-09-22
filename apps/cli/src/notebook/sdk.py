@@ -31,10 +31,15 @@ from pathlib import Path
 from typing import IO, Any
 
 from ..graph.edges import (
+    ContainmentType,
     Edge,
     FieldMapping,
+    FieldTransform,
     FlowType,
+    Method,
     Ref,
+    ReferenceType,
+    UsageType,
     contains,
     flow,
     references,
@@ -52,6 +57,48 @@ MODULE_NAME = "classifyre"
 CONTENT_TYPES = ("TXT", "TABLE", "IMAGE", "VIDEO", "AUDIO", "URL", "BINARY", "OTHER")
 
 DEFAULT_KIND = "record"
+
+#: Most severe first. A tag's severity is bounded by its detector's, so this is
+#: also the order the bound is applied in.
+TAG_SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
+
+
+@dataclass(frozen=True)
+class Tag:
+    """A tag value that carries its own severity.
+
+    ``tags={"insolvencies_yoy": "+34%"}`` gives every asset the Tag detector's
+    own severity. That is right when the fact itself is the finding, and wrong
+    when the *degree* is: an early-warning rule reading "HIGH at +30%, MEDIUM at
+    +20%" needed two detectors with duplicated descriptions, and every inquiry
+    and case had to name both keys (GENESIS field report P9). Written instead
+    as::
+
+        Asset(tags={"insolvencies_yoy": Tag("+34%", severity="HIGH")})
+
+    one detector covers the rule and the finding carries the band.
+
+    The detector's configured severity is the ceiling, never the default: a
+    connector can say "this instance matters less than usual" but cannot
+    promote its own findings past what the operator who created the detector
+    allowed. A severity above the ceiling is lowered to it and reported as a
+    scan warning rather than silently applied or dropped.
+    """
+
+    value: str
+    severity: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "value", str(self.value).strip())
+        raw = self.severity
+        if raw is None:
+            return
+        normalized = str(raw).strip().upper()
+        if normalized not in TAG_SEVERITIES:
+            raise ValueError(
+                f"Tag severity must be one of {', '.join(TAG_SEVERITIES)}, got {raw!r}"
+            )
+        object.__setattr__(self, "severity", normalized)
 
 
 @dataclass
@@ -95,7 +142,15 @@ class Asset:
     #: when the source system already has the answer and running a classifier
     #: over the content could only re-derive it less reliably. A key with no
     #: matching Tag detector is reported as a scan warning and skipped.
+    #:
+    #: A value may also be a :class:`Tag`, which carries a severity for that one
+    #: assertion: ``tags={"insolvencies_yoy": Tag("+34%", severity="HIGH")}``.
     tags: dict[str, str] = field(default_factory=dict)
+    #: Per-tag severity overrides, keyed exactly like ``tags``. Filled in from
+    #: any :class:`Tag` values above rather than written directly, so ``tags``
+    #: keeps its plain ``{key: value}`` shape for everything that already reads
+    #: it. Bounded by each detector's own severity when the finding is built.
+    tag_severities: dict[str, str] = field(default_factory=dict)
     #: ``False`` records the asset without extracting or scanning its content:
     #: ``Asset(id=..., metadata={...}, extract=False, reference_reason="...")``.
     #: Use it for an artefact whose existence and metadata matter but whose
@@ -139,7 +194,7 @@ class Asset:
                 f"{type(self.content_bytes).__name__}); encode text first"
             )
         self.links = [str(link) for link in self.links if str(link).strip()]
-        self.tags = _normalize_tags(self.tags)
+        self.tags, self.tag_severities = _normalize_tags(self.tags)
         if self.cohort is not None:
             if not isinstance(self.cohort, CohortItem):
                 raise TypeError("Asset.cohort must be an item from ctx.cohort()")
@@ -166,15 +221,19 @@ class Asset:
             )
 
 
-def _normalize_tags(value: Any) -> dict[str, str]:
+def _normalize_tags(value: Any) -> tuple[dict[str, str], dict[str, str]]:
     """Accept the two shapes an author reasonably writes, reject the rest.
 
     A dict is the ordinary case. A sequence of pairs is accepted because it is
     what someone reaches for to assert two values under one key, and silently
     keeping only the last one would be worse than supporting it.
+
+    Returns the values and, separately, the severities any :class:`Tag` entries
+    asked for. Splitting them keeps ``Asset.tags`` a plain ``{key: value}`` map
+    for the adapter, the checksum and every reader that predates severities.
     """
     if not value:
-        return {}
+        return {}, {}
     if isinstance(value, Mapping):
         items: Iterable[Any] = value.items()
     elif isinstance(value, str | bytes):
@@ -191,6 +250,7 @@ def _normalize_tags(value: Any) -> dict[str, str]:
             ) from None
 
     tags: dict[str, str] = {}
+    severities: dict[str, str] = {}
     for item in items:
         if isinstance(item, Mapping):
             pair: Any = (item.get("key"), item.get("value"))
@@ -203,6 +263,10 @@ def _normalize_tags(value: Any) -> dict[str, str]:
                 f"Asset.tags entries must be (detector key, value) pairs; got {item!r}"
             ) from None
         key = str(key or "").strip()
+        severity: str | None = None
+        if isinstance(tag_value, Tag):
+            severity = tag_value.severity
+            tag_value = tag_value.value
         tag_value = str("" if tag_value is None else tag_value).strip()
         if not key or not tag_value:
             continue
@@ -211,7 +275,15 @@ def _normalize_tags(value: Any) -> dict[str, str]:
         # one silently would lose the other.
         existing = tags.get(key)
         tags[key] = f"{existing}, {tag_value}" if existing else tag_value
-    return tags
+        if severity is None:
+            continue
+        # Joined values share one finding, so they share one severity: the most
+        # severe of the two, because lowering it would understate a fact the
+        # connector asserted.
+        current = severities.get(key)
+        if current is None or TAG_SEVERITIES.index(severity) < TAG_SEVERITIES.index(current):
+            severities[key] = severity
+    return tags, severities
 
 
 def urn_for(platform: str, authority: str, *path: str) -> str:
@@ -629,6 +701,7 @@ class Context:
         select: Iterable[str] = (),
         limit: int = 1000,
         cursor: str | None = None,
+        cohort: bool = True,
     ) -> AssetQueryPage:
         """Read assets another source in this namespace already wrote.
 
@@ -658,6 +731,13 @@ class Context:
         Calling it declares this run's coverage partial, since a connector that
         picks its cohort from a query never sees the rest of its source.
         Available during scans only, not when running a cell in the editor.
+
+        Pass ``cohort=False`` when the query only supplies *inputs* and this run
+        still yields its whole universe -- e.g. Land aggregates computed from
+        every district profile. Coverage then stays complete, so an asset the
+        notebook stops yielding is retired. Without it such a source could never
+        retire anything (GENESIS field report P5). Fail the run rather than
+        yield a partial universe if the input is incomplete.
         """
         if self._query_assets is None:
             raise AssetQueryError(
@@ -701,7 +781,7 @@ class Context:
             payload["cursor"] = str(cursor)
 
         response = self._query_assets(payload) or {}
-        if not self._partial_coverage:
+        if cohort and not self._partial_coverage:
             # Only on success: a refused query read nothing, so the run still
             # covers what it covers. Never over the notebook's own reason.
             self.set_partial_coverage("the notebook chose its cohort with ctx.query_assets()")
@@ -730,8 +810,12 @@ class Context:
         """
         return bool(self._should_abort())
 
-    def log(self, *parts: Any) -> None:
-        self._logger(" ".join(str(part) for part in parts))
+    def log(self, *parts: Any, level: str | None = None) -> None:
+        """Write a line to the run log. ``level`` ("warning", "error", …) sets its level there."""
+        message = " ".join(str(part) for part in parts)
+        if level:
+            message = f"{level.strip().upper()}: {message}"
+        self._logger(message)
 
     @staticmethod
     def now() -> datetime:
@@ -743,9 +827,19 @@ def build_module(context: Context) -> types.ModuleType:
     module = types.ModuleType(MODULE_NAME)
     module.__doc__ = "Runtime helpers available to a Classifyre custom connector."
     module.Asset = Asset  # type: ignore[attr-defined]
+    # A tag value that carries its own severity, so one detector can cover a
+    # banded rule instead of one detector per band (field report P9).
+    module.Tag = Tag  # type: ignore[attr-defined]
     module.Ref = Ref  # type: ignore[attr-defined]
     module.FieldMapping = FieldMapping  # type: ignore[attr-defined]
     module.FlowType = FlowType  # type: ignore[attr-defined]
+    # The enums the edge builders take. A string worked only because they are
+    # StrEnums; a typo in one failed at ingest, not at import (field report P11).
+    module.Method = Method  # type: ignore[attr-defined]
+    module.ReferenceType = ReferenceType  # type: ignore[attr-defined]
+    module.ContainmentType = ContainmentType  # type: ignore[attr-defined]
+    module.FieldTransform = FieldTransform  # type: ignore[attr-defined]
+    module.UsageType = UsageType  # type: ignore[attr-defined]
     module.flow = flow  # type: ignore[attr-defined]
     module.contains = contains  # type: ignore[attr-defined]
     module.references = references  # type: ignore[attr-defined]
@@ -765,11 +859,17 @@ def build_module(context: Context) -> types.ModuleType:
     module.__all__ = [  # type: ignore[attr-defined]
         "Asset",
         "Context",
+        "ContainmentType",
         "FieldMapping",
+        "FieldTransform",
         "FlowType",
+        "Method",
         "NotebookFile",
         "ParsedContent",
         "Ref",
+        "ReferenceType",
+        "Tag",
+        "UsageType",
         "contains",
         "ctx",
         "flow",
@@ -802,9 +902,11 @@ def namespace(context: Context) -> dict[str, Any]:
         "__name__": "classifyre_notebook",
         "__builtins__": __builtins__,
         "Asset": Asset,
+        "Tag": Tag,
         "Ref": Ref,
         "FieldMapping": FieldMapping,
         "FlowType": FlowType,
+        "Method": Method,
         "flow": flow,
         "contains": contains,
         "references": references,

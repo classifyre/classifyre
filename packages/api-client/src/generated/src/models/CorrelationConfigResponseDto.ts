@@ -42,6 +42,12 @@ import {
  */
 export interface CorrelationConfigResponseDto {
     /**
+     * Whether duplicate detection runs in this workspace (Settings → Cleanup › Features). Tuning can be saved while it is off; it takes effect in the full recompute that runs when it is turned back on.
+     * @type {boolean}
+     * @memberof CorrelationConfigResponseDto
+     */
+    enabled: boolean;
+    /**
      * Fallback weight for any unlisted label
      * @type {number}
      * @memberof CorrelationConfigResponseDto
@@ -83,6 +89,7 @@ export interface CorrelationConfigResponseDto {
  * Check if a given object implements the CorrelationConfigResponseDto interface.
  */
 export function instanceOfCorrelationConfigResponseDto(value: object): value is CorrelationConfigResponseDto {
+    if (!('enabled' in value) || value['enabled'] === undefined) return false;
     if (!('defaultWeight' in value) || value['defaultWeight'] === undefined) return false;
     if (!('relatedMin' in value) || value['relatedMin'] === undefined) return false;
     if (!('duplicateMin' in value) || value['duplicateMin'] === undefined) return false;
@@ -102,6 +109,7 @@ export function CorrelationConfigResponseDtoFromJSONTyped(json: any, ignoreDiscr
     }
     return {
         
+        'enabled': json['enabled'],
         'defaultWeight': json['defaultWeight'],
         'relatedMin': json['relatedMin'],
         'duplicateMin': json['duplicateMin'],
@@ -122,6 +130,7 @@ export function CorrelationConfigResponseDtoToJSONTyped(value?: CorrelationConfi
 
     return {
         
+        'enabled': value['enabled'],
         'defaultWeight': value['defaultWeight'],
         'relatedMin': value['relatedMin'],
         'duplicateMin': value['duplicateMin'],

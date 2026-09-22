@@ -5,6 +5,7 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**assetsControllerGetAsset**](AssetsApi.md#assetscontrollergetasset) | **GET** /assets/{id} | Get asset by ID |
+| [**assetsControllerGetReferencingFindings**](AssetsApi.md#assetscontrollergetreferencingfindings) | **GET** /assets/{id}/referencing-findings | Findings recorded on assets that point at this one |
 | [**searchAssetsControllerExportAssets**](AssetsApi.md#searchassetscontrollerexportassets) | **GET** /search/assets/export | Export assets (with findings) as CSV |
 | [**searchAssetsControllerExportFindings**](AssetsApi.md#searchassetscontrollerexportfindings) | **GET** /search/findings/export | Export findings as CSV |
 | [**searchAssetsControllerQueryAssets**](AssetsApi.md#searchassetscontrollerqueryassets) | **GET** /search/assets/query | Query assets with findings (cursor-paginated JSON) |
@@ -83,6 +84,77 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | Asset details |  -  |
+| **404** | Asset not found |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## assetsControllerGetReferencingFindings
+
+> ReferencingFindingsResponseDto assetsControllerGetReferencingFindings(id, limit)
+
+Findings recorded on assets that point at this one
+
+An integrity check or a derived profile is its own asset that references the thing it is about, so the subject\&#39;s own Findings tab can be empty while a finding points straight at it. Incoming asset-to-asset edges only, worst severity first, unresolved only.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AssetsApi,
+} from '@workspace/api-client';
+import type { AssetsControllerGetReferencingFindingsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AssetsApi();
+
+  const body = {
+    // string | Asset unique identifier
+    id: id_example,
+    // number | Findings to return, 1–200. Defaults to 50. (optional)
+    limit: 8.14,
+  } satisfies AssetsControllerGetReferencingFindingsRequest;
+
+  try {
+    const data = await api.assetsControllerGetReferencingFindings(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` | Asset unique identifier | [Defaults to `undefined`] |
+| **limit** | `number` | Findings to return, 1–200. Defaults to 50. | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**ReferencingFindingsResponseDto**](ReferencingFindingsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 | **404** | Asset not found |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma.service';
 import { MatchingModule } from '../matching/matching.module';
 import { GraphService } from '../graph.service';
 import { CaseActivityService } from '../case-activity.service';
+import { InquiryActivityService } from '../inquiry-activity.service';
 import { CasesService } from '../cases.service';
 import { InquiriesService } from '../inquiries.service';
 import { AgentMemoryService } from '../autopilot/memory/agent-memory.service';
@@ -14,6 +15,7 @@ import { CorrelationWorker } from './correlation.worker';
 import { CorrelationController } from './correlation.controller';
 import { CorrelationJobScheduler } from './correlation-job-scheduler.service';
 import { CorrelationLockService } from './correlation-lock.service';
+import { CorrelationSwitchService } from './correlation-switch.service';
 import { CorrelationReviewIndexService } from './review/correlation-review-index.service';
 import { CorrelationReviewService } from './review/correlation-review.service';
 import { CorrelationReviewController } from './review/correlation-review.controller';
@@ -33,12 +35,14 @@ import { SourceGraphModule } from '../stats/source-graph.module';
     PrismaService,
     GraphService,
     CaseActivityService,
+    InquiryActivityService,
     AgentMemoryService,
     CasesService,
     InquiriesService,
     AgentAuditService,
     AgentLoggerService,
     CorrelationLockService,
+    CorrelationSwitchService,
     CorrelationJobScheduler,
     CorrelationReviewIndexService,
     CorrelationService,
@@ -48,6 +52,11 @@ import { SourceGraphModule } from '../stats/source-graph.module';
   ],
   exports: [
     CorrelationService,
+    // The feature switch and the lock are what storage maintenance needs to
+    // turn duplicate detection off and wipe its results without racing a
+    // recompute.
+    CorrelationSwitchService,
+    CorrelationLockService,
     CorrelationReviewIndexService,
     CorrelationReviewService,
     CorrelationJobScheduler,

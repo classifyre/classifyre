@@ -373,7 +373,7 @@
     },
     "cleanup": {
       "title": "Speicher & Bereinigung",
-      "description": "Wie viel Speicher dieser Arbeitsbereich belegt, und ein sicherer Weg, ihn zurückzugewinnen. Die Untersuchung selbst — Quellen, Befunde, Assets, Fälle, Anfragen, Glossar — wird gemessen, aber hier nie gelöscht.",
+      "description": "Wie viel Speicher dieser Arbeitsbereich belegt, und ein sicherer Weg, ihn zurückzugewinnen. Die Untersuchung selbst — Quellen, Befunde, Assets, Fälle, Anfrage-Beobachtung-Beobachtungen, Glossar — wird gemessen, aber hier nie gelöscht.",
       "totalData": "{{size}} Arbeitsbereichsdaten",
       "totalQueues": "{{size}} abgeschlossene Queue-Jobs",
       "colDataset": "Datensatz",
@@ -400,6 +400,8 @@
       "runFailed": "Bereinigung fehlgeschlagen: {{error}}",
       "runGone": "Bereinigung hat diese Ansicht verlassen; die Übersicht zeigt das Ergebnis nach dem Neuladen.",
       "activeJobsHint": "{{count}} Scan(s) laufen noch — Arbeitsbereich zuerst pausieren, sonst schreiben Worker während der Bereinigung neue Zeilen.",
+      "featureOnNote": "{{feature}} ist eingeschaltet; diese Daten wachsen mit dem nächsten Scan oder der nächsten Neuberechnung wieder an. Damit sie leer bleiben, schalten Sie {{feature}} stattdessen oben unter Funktionen aus.",
+      "featureOffNote": "{{feature}} ist ausgeschaltet; diese Daten bleiben gelöscht, bis Sie die Funktion wieder einschalten.",
       "loading": "Speicherverbrauch wird gemessen…",
       "loadFailed": "Die Speicherübersicht konnte nicht geladen werden",
       "retry": "Erneut versuchen",
@@ -423,7 +425,7 @@
           "desc": "Fallakten mit Spuren, Threads, Nachweislinks und Hypothesen."
         },
         "inquiries": {
-          "name": "Anfragen",
+          "name": "Anfrage-Beobachtung-Beobachtungen",
           "desc": "Gespeicherte Untersuchungsfragen."
         },
         "glossary": {
@@ -437,13 +439,13 @@
         },
         "duplicates": {
           "name": "Duplikat-Artefakte",
-          "desc": "Trefferkandidaten, Signaturen und Korrelationsprofile. Menschliche Review-Entscheidungen bleiben; die nächste Duplikatprüfung baut den Rest neu.",
-          "impact": "Match-Kandidaten, Signaturen und Cluster werden entfernt; die Duplikat-Warteschlange bleibt bis zur nächsten Duplikatprüfung leer. Bereits getroffene Prüfentscheidungen bleiben erhalten."
+          "desc": "Trefferkandidaten, Signaturen, Korrelationswerte, Cluster und die bewerteten Duplikat-Verbindungen im Asset-Graphen. Prüfentscheidungen und Lineage bleiben erhalten; die nächste Duplikatprüfung baut den Rest neu auf.",
+          "impact": "Alles, was die Duplikaterkennung erzeugt hat, wird entfernt — einschließlich ihrer bewerteten Verbindungen im Asset-Graphen; die Duplikatprüfung bleibt bis zur nächsten Duplikatprüfung leer. Lineage und Ihre Prüfentscheidungen bleiben erhalten."
         },
         "embeddings": {
           "name": "Embeddings",
-          "desc": "Vektoren und Chunk-Texte. Spaces und Einstellungen bleiben; ein erneuter Embedding-Index baut den Rest neu.",
-          "impact": "Vektoren und Chunk-Texte werden entfernt. Semantische Suche, ähnliche Fundstellen und semantische Glossartreffer liefern nichts, bis der Embedding-Index neu erstellt wird."
+          "desc": "Vektoren, die daraus abgeleiteten Wichtigkeits-Rankings, Text-Chunks der Dokumente und die Vektorräume. Die Embedding-Einstellungen bleiben erhalten.",
+          "impact": "Vektoren, Rankings (Wichtigkeitswerte werden auf 0 gesetzt) und Text-Chunks der Dokumente werden entfernt. Befunde werden automatisch neu eingebettet, solange Embeddings eingeschaltet sind; Dokumenttext kommt nur durch einen vollständigen erneuten Scan der Quellen zurück."
         },
         "harness": {
           "name": "KI-Harness-Verlauf",
@@ -520,7 +522,7 @@
     "autopilot": {
       "subtitle": "Ermittlungs-Autopilot",
       "title": "Autopilot",
-      "description": "Autonome KI-Agenten, die nach jedem Scan Anfragen und Ermittlungsfälle verwalten. Alle Aktionen werden der KI zugeordnet und vollständig protokolliert.",
+      "description": "Autonome KI-Agenten, die nach jedem Scan Anfrage-Beobachtung-Beobachtungen und Ermittlungsfälle verwalten. Alle Aktionen werden der KI zugeordnet und vollständig protokolliert.",
       "inquiryEnable": "Automatische Anfragenverwaltung",
       "inquiryEnableDesc": "Nach jedem Scan prüft die KI neue Funde, erstellt oder erweitert Anfragen, vermeidet Duplikate und signalisiert, wenn ein Fall angebracht ist.",
       "inquiryDesired": "Was gewünscht ist",
@@ -528,7 +530,7 @@
       "inquirySearchable": "Was durchsuchbar ist",
       "inquirySearchablePlaceholder": "Beschreiben Sie, welche Daten vorhanden und relevant sind, z. B. Confluence-Bereiche mit API-Doku, Jira-Projekte mit Support-Tickets…",
       "caseEnable": "Vollständige Fallverwaltung",
-      "caseEnableDesc": "Die KI erstellt und entwickelt Ermittlungsfälle aus Anfragen: Hypothesen, Beweise, Funde, Notizen, Kanten und Statusänderungen.",
+      "caseEnableDesc": "Die KI erstellt und entwickelt Ermittlungsfälle aus Anfrage-Beobachtung-Beobachtungen: Hypothesen, Beweise, Funde, Notizen, Kanten und Statusänderungen.",
       "caseGuidance": "Fall-Leitlinien",
       "caseGuidancePlaceholder": "Zusätzliche Anweisungen für die Fallverwaltung, z. B. Schweregrad-Konventionen, wann ein Fall geschlossen wird, Namensregeln…",
       "enabledToast": "Autopilot-Einstellung gespeichert",
@@ -609,6 +611,109 @@
       }
     }
   },
+  "features": {
+    "title": "Funktionen",
+    "subtitle": "Die beiden Hintergrund-Engines, die den Großteil der abgeleiteten Daten dieses Arbeitsbereichs erzeugen. Wird eine ausgeschaltet, stoppt ihre Arbeit und ihre Worker pausieren; die Untersuchung selbst — Quellen, Befunde, Assets, Fälle, Anfrage-Beobachtung-Beobachtungen, Glossar — bleibt immer unberührt.",
+    "loading": "Funktionsschalter werden gelesen…",
+    "loadFailed": "Die Funktionsschalter konnten nicht geladen werden",
+    "retry": "Erneut versuchen",
+    "stateOn": "An",
+    "stateOffKept": "Aus · Daten behalten",
+    "stateOffDeleted": "Aus · Daten gelöscht",
+    "stateDefaultOff": "Standardmäßig aus",
+    "defaultOffHint": "Diese Installation liefert die Funktion ausgeschaltet aus. Das Einschalten gilt nur für diesen Arbeitsbereich.",
+    "since": "seit {{when}}",
+    "dataSize": "{{size}} Daten · ~{{rows}} Zeilen",
+    "noData": "Keine Daten gespeichert",
+    "workersPaused": "Pausierte Worker: {{queues}}",
+    "viewWorkers": "Worker anzeigen",
+    "deleteData": "Behaltene Daten löschen",
+    "deleting": "Daten werden gelöscht… {{rows}} Zeilen entfernt",
+    "switchLabel": "{{name}} ein- oder ausschalten",
+    "items": {
+      "embeddings": {
+        "name": "Embeddings",
+        "desc": "Die semantische Ebene: Wichtigkeits-Ranking, Gruppen nahezu identischer Texte, semantische Suche, ähnliche Befunde, Fall-Hinweise und die Evidenzsuche des KI-Harness.",
+        "configure": "Modell & Leistung"
+      },
+      "duplicates": {
+        "name": "Duplikaterkennung",
+        "desc": "Ordnet nach jedem Scan Assets einander zu, die identifizierende Werte teilen. Speist die Duplikatprüfung, „Wo sonst gefunden“, Ähnlichkeitsverbindungen im Graphen und die Duplikat-Werkzeuge des Harness.",
+        "configure": "Feinabstimmung"
+      }
+    },
+    "off": {
+      "title": "{{name}} ausschalten?",
+      "stops": "Solange ausgeschaltet",
+      "keepLabel": "Ausschalten, Daten behalten",
+      "keepDesc": "Eine Pause. Alles bleibt, wie es ist, und nach dem Wiedereinschalten geht es dort weiter, wo es aufgehört hat.",
+      "deleteLabel": "Ausschalten und Daten löschen ({{size}})",
+      "deleteDesc": "Gibt den Speicher sofort frei. Nach dem Wiedereinschalten wird alles neu aufgebaut.",
+      "cancel": "Abbrechen",
+      "confirmKeep": "Ausschalten",
+      "confirmDelete": "Ausschalten und löschen",
+      "embeddings": {
+        "stop1": "Keine neuen Vektoren: neu gescannte Befunde bleiben ohne Ranking, bestehende Wichtigkeitswerte werden eingefroren.",
+        "stop2": "Die semantische Suche fällt auf exakten Text zurück; ähnliche Befunde, Gruppen nahezu identischer Texte und semantische Fall-Hinweise entfallen.",
+        "stop3": "Das KI-Harness verliert seine semantische Evidenzsuche.",
+        "stop4": "Die Embedding- und Rekalibrierungs-Worker werden pausiert (Einstellungen → Worker) und lassen sich dort nicht fortsetzen.",
+        "keep": "Behalten werden Vektoren, Rankings und Text-Chunks der Dokumente. Scans speichern weiterhin Text-Chunks, sodass nach dem Wiedereinschalten ohne erneuten Scan aufgeholt wird.",
+        "delete": "Löscht Vektoren, Wichtigkeits-Rankings (Werte werden auf 0 gesetzt), Text-Chunks der Dokumente und Vektorindizes; neue Scans speichern keine Text-Chunks mehr. Nach dem Wiedereinschalten wird jeder Befund neu eingebettet (bei großen Korpora Stunden Worker-CPU); Dokumenttext kommt nur durch einen vollständigen erneuten Scan der Quellen zurück."
+      },
+      "duplicates": {
+        "stop1": "Keine Duplikatprüfung nach Scans; Neuberechnungen und Änderungen der Feinabstimmung warten bis zum Wiedereinschalten.",
+        "stop2": "Duplikatprüfung, „Wo sonst gefunden“, Ähnlichkeitsverbindungen im Graphen und die Duplikat-Werkzeuge des Harness werden nicht mehr aktualisiert.",
+        "stop3": "Scans werden weiterhin an das KI-Harness übergeben — nur die Duplikatprüfung entfällt.",
+        "stop4": "Der Worker correlation.scan wird pausiert (Einstellungen → Worker) und lässt sich dort nicht fortsetzen.",
+        "keep": "Behalten werden alle Treffer und Muster im aktuellen Stand sowie alle Prüfentscheidungen.",
+        "delete": "Löscht Trefferkandidaten, Signaturen, Korrelationswerte, Cluster, Muster und die bewerteten Duplikat-Verbindungen im Asset-Graphen. Herkunftsverbindungen (Lineage) und Ihre Prüfentscheidungen bleiben erhalten. Die Duplikatprüfung bleibt leer, bis die Funktion wieder eingeschaltet ist und die Neuberechnung abgeschlossen ist."
+      }
+    },
+    "enable": {
+      "title": "{{name}} einschalten?",
+      "confirm": "Einschalten",
+      "cancel": "Abbrechen",
+      "embeddingsKept": "Das Einbetten wird dort fortgesetzt, wo es aufgehört hat: Inhalte, die während der Pause gescannt wurden, werden im Hintergrund eingebettet, und die Rankings werden beim Aufholen aktualisiert.",
+      "embeddingsDeleted": "Das Einbetten beginnt von vorn: Jeder Befund wird im Hintergrund neu eingebettet — bei großen Korpora Stunden Worker-CPU. Zuvor gelöschter Dokumenttext kommt nur durch einen vollständigen erneuten Scan der Quellen zurück.",
+      "duplicates": "Führt eine vollständige Neuberechnung über alle Assets aus, um alles aufzuholen, was während der Pause gescannt wurde — bei großen Korpora etwa eine Stunde Worker-Zeit. Die Duplikatprüfung füllt sich, sobald sie abgeschlossen ist."
+    },
+    "deleteKept": {
+      "title": "Von {{name}} behaltene Daten löschen?",
+      "desc": "{{name}} bleibt ausgeschaltet. Dadurch werden jetzt {{size}} frei; nach dem Wiedereinschalten wird alles neu aufgebaut.",
+      "confirm": "Daten löschen",
+      "cancel": "Abbrechen"
+    },
+    "toast": {
+      "turnedOn": "{{name}} ist eingeschaltet",
+      "turnedOff": "{{name}} ist ausgeschaltet",
+      "recompute": "{{name}} ist eingeschaltet — eine vollständige Neuberechnung wurde zum Aufholen eingeplant",
+      "deleted": "Daten von {{name}} gelöscht: {{rows}} Zeilen in {{seconds}} s",
+      "deleteFailed": "Löschen der Daten von {{name}} fehlgeschlagen: {{error}}",
+      "failed": "{{name}} konnte nicht geändert werden"
+    },
+    "notice": {
+      "action": "In Einstellungen → Bereinigung einschalten",
+      "embeddings": {
+        "title": "Embeddings sind ausgeschaltet",
+        "search": "Semantisches Ranking ist nicht verfügbar — Ergebnisse treffen nur exakten Text.",
+        "similar": "Ähnliche Befunde stammen aus Embeddings, die für diesen Arbeitsbereich ausgeschaltet sind.",
+        "leads": "Solange Embeddings ausgeschaltet sind, werden keine semantischen Nachbarn vorgeschlagen; Hinweise stammen nur aus verknüpften Anfrage-Beobachtung-Beobachtungen.",
+        "duplicates": "Gruppen nahezu identischer Texte werden nicht aktualisiert, solange Embeddings ausgeschaltet sind.",
+        "index": "Der semantische Index ist pausiert; es wird nichts neu indiziert oder rekalibriert."
+      },
+      "duplicates": {
+        "title": "Duplikaterkennung ist ausgeschaltet",
+        "review": "Neue Scans werden nicht auf Duplikate geprüft; diese Liste zeigt den Stand vor dem Ausschalten.",
+        "reviewDeleted": "Ihre Ergebnisse wurden gelöscht; bis zum Wiedereinschalten gibt es nichts zu prüfen.",
+        "occurrences": "Abfragen gemeinsamer Werte stammen aus der Duplikaterkennung, die für diesen Arbeitsbereich ausgeschaltet ist."
+      }
+    },
+    "workers": {
+      "heldBy": "Angehalten · {{feature}} aus",
+      "heldHint": "Pausiert, weil {{feature}} für diesen Arbeitsbereich ausgeschaltet ist. Wird fortgesetzt, sobald Sie die Funktion unter Einstellungen → Bereinigung wieder einschalten.",
+      "turnOn": "In Bereinigung einschalten"
+    }
+  },
   "dataTransfer": {
     "heading": "Export & Import",
     "description": "Daten dieses Workspace auf eine andere Classifyre-Instanz übertragen oder ein Archiv einlesen.",
@@ -617,7 +722,7 @@
     "importHeading": "Import",
     "importDesc": "Lädt ein aus einem anderen Workspace exportiertes Archiv. Sie wählen, welche Teile übernommen werden.",
     "secretsHeading": "Zugangsdaten werden nie exportiert",
-    "secretsExportBody": "Passwörter und Token von Quellen, API-Schlüssel von KI-Anbietern, MCP-Anfrage-Header, Chatbot-Token und das Hugging-Face-Token werden aus jedem Archiv entfernt. Wer es importiert, muss eigene eintragen.",
+    "secretsExportBody": "Passwörter und Token von Quellen, API-Schlüssel von KI-Anbietern, MCP-Anfrage-Beobachtung-Header, Chatbot-Token und das Hugging-Face-Token werden aus jedem Archiv entfernt. Wer es importiert, muss eigene eintragen.",
     "secretsImportBody": "Dieses Archiv enthält keine Zugangsdaten. Importierte Quellen, KI-Anbieter, MCP-Server und Chatbots sind deaktiviert bzw. nicht authentifiziert, bis Sie Zugangsdaten hinterlegen.",
     "newIdsHeading": "Importierte Datensätze erhalten neue IDs",
     "newIdsBody": "Alles wird zusätzlich zum vorhandenen Bestand angelegt — nichts wird ersetzt oder überschrieben. Verweise zwischen Datensätzen werden passend umgeschrieben, die Daten bleiben also konsistent. Wird dasselbe Archiv zweimal importiert, entstehen zwei unabhängige Kopien.",
@@ -715,7 +820,7 @@
       },
       "investigations": {
         "label": "Untersuchungen",
-        "description": "Fälle und Anfragen mit Belegen, Spuren, Chronologie, Notizen und Threads."
+        "description": "Fälle und Anfrage-Beobachtung-Beobachtungen mit Belegen, Spuren, Chronologie, Notizen und Threads."
       },
       "scanData": {
         "label": "Scan-Verlauf",
@@ -723,7 +828,7 @@
       },
       "harness": {
         "label": "KI-Harness",
-        "description": "Agentenläufe, Entscheidungen, Logs, Langzeitgedächtnis, Agentenkonfiguration und verbundene MCP-Server. MCP-Anfrage-Header werden entfernt."
+        "description": "Agentenläufe, Entscheidungen, Logs, Langzeitgedächtnis, Agentenkonfiguration und verbundene MCP-Server. MCP-Anfrage-Beobachtung-Header werden entfernt."
       },
       "instanceConfig": {
         "label": "Instanzkonfiguration",
@@ -806,6 +911,7 @@
     "statusCompleted": "Abgeschlossen",
     "statusWarning": "Warnung",
     "statusError": "Fehler",
+    "statusStopped": "Gestoppt",
     "scheduleEnabled": "Zeitplan aktiv",
     "findingsLatestRun": "Befunde aus letztem Lauf",
     "noChanges": "Keine Änderungen",
@@ -1893,9 +1999,9 @@
       "reasonAssetKind": "Asset-Art \"{{value}}\" liegt außerhalb des Geltungsbereichs",
       "reasonPatternRemoved": "Muster \"{{value}}\" wurde entfernt",
       "keptCited": "Behalten — in einem Fall zitiert: {{count}}",
-      "keptWatched": "Behalten — von einer aktiven Anfrage beobachtet: {{count}}",
-      "includeWatched": "Auch die {{count}} Befunde zurückziehen, die aktive Anfragen beobachten",
-      "includeWatchedHint": "Diese Anfragen verlieren diese Treffer. In einem Fall zitierte Befunde werden nie zurückgezogen.",
+      "keptWatched": "Behalten — von einer aktiven Anfrage-Beobachtung beobachtet: {{count}}",
+      "includeWatched": "Auch die {{count}} Befunde zurückziehen, die aktive Anfrage-Beobachtung-Beobachtungen beobachten",
+      "includeWatchedHint": "Diese Anfrage-Beobachtung-Beobachtungen verlieren diese Treffer. In einem Fall zitierte Befunde werden nie zurückgezogen.",
       "willRetire": "{{count}} Befunde werden als erledigt markiert. Es wird kein Detektor-Feedback gespeichert, und sie öffnen sich automatisch wieder, wenn der Geltungsbereich erneut erweitert wird.",
       "notProvable": "Was diese Prüfung nicht beurteilen kann",
       "retireButton": "{{count}} Befunde zurückziehen",
@@ -2053,7 +2159,7 @@
       "item": "hat {{skipped}} Assets übersprungen, weil {{cause}}.",
       "retryNote": "Übersprungene Assets behalten ihre bisherigen Befunde und werden im nächsten Lauf erneut geprüft.",
       "cause": {
-        "provider_refused": "der KI-Anbieter die Anfrage abgelehnt hat (Kontingent, Schlüssel oder Abrechnung)",
+        "provider_refused": "der KI-Anbieter die Anfrage-Beobachtung abgelehnt hat (Kontingent, Schlüssel oder Abrechnung)",
         "consecutive_failures": "er zu oft hintereinander fehlgeschlagen ist",
         "wall_clock_budget": "sein Zeitbudget aufgebraucht war",
         "other": "ein nicht behebbares Problem aufgetreten ist"
@@ -2154,7 +2260,8 @@
       "warning": "Warnung",
       "running": "Läuft",
       "pending": "Ausstehend",
-      "error": "Fehler"
+      "error": "Fehler",
+      "stopped": "Gestoppt"
     },
     "logs": {
       "title": "Protokolle",
@@ -2205,7 +2312,7 @@
       "title": "Titel",
       "status": "Status",
       "severity": "Priorität",
-      "inquiries": "Anfragen",
+      "inquiries": "Anfrage-Beobachtung-Beobachtungen",
       "updated": "Aktualisiert"
     },
     "statusLabels": {
@@ -2444,7 +2551,7 @@
     "provider": "Anbieter",
     "model": "Modell",
     "baseUrl": "Basis-URL",
-    "baseUrlDesc": "Endpunkt für OpenAI-kompatible Anfragen (z.B. OpenRouter, Ollama, Azure OpenAI).",
+    "baseUrlDesc": "Endpunkt für OpenAI-kompatible Anfrage-Beobachtung-Beobachtungen (z.B. OpenRouter, Ollama, Azure OpenAI).",
     "apiKey": "API-Schlüssel",
     "keyStored": "Schlüssel gespeichert. Klicken Sie auf das Feld, um ihn zu ersetzen.",
     "keyNotStored": "Der Schlüssel wird im Ruhezustand verschlüsselt und niemals zurückgegeben.",
@@ -2517,7 +2624,7 @@
     "backToProviders": "Zurück zur Harness-Konfiguration",
     "editorDesc": "Konfigurieren Sie Zugangsdaten, Modellgrenzen und Funktionszuweisungen und prüfen Sie den Anbieter vor der Verwendung.",
     "providerAndModel": "Anbieter und Modell",
-    "providerAndModelDesc": "Wählen Sie Endpunkt und Modellkennung für Anfragen.",
+    "providerAndModelDesc": "Wählen Sie Endpunkt und Modellkennung für Anfrage-Beobachtung-Beobachtungen.",
     "runtimeAndPricing": "Laufzeit und Preise",
     "runtimeAndPricingDesc": "Beschreiben Sie Modellgrenzen und optionale Preise für Harness-Schätzungen.",
     "featureAssignments": "Funktionszuweisungen",
@@ -2614,7 +2721,7 @@
   },
   "casework": {
     "title": "Fallarbeit",
-    "subtitle": "Laufende Fälle und Anfragen",
+    "subtitle": "Laufende Fälle und Anfrage-Beobachtung-Beobachtungen",
     "viewAll": "Alle anzeigen"
   },
   "connections": {
@@ -2681,10 +2788,10 @@
   },
   "investigations": {
     "page": {
-      "newInquiry": "Neue Anfrage",
+      "newInquiry": "Neue Anfrage-Beobachtung",
       "newCase": "Neuer Fall",
       "tabCases": "Fälle",
-      "tabInquiries": "Anfragen",
+      "tabInquiries": "Anfrage-Beobachtung-Beobachtungen",
       "tabAutopilot": "Autopilot",
       "tabFingerprints": "Fingerabdrücke"
     },
@@ -2692,49 +2799,49 @@
       "loading": "Fall wird geladen…",
       "buildingGraph": "Graph wird erstellt…",
       "emptyGraph": "Leerer Graph",
-      "emptyGraphDesc": "Fügen Sie Beweise hinzu, um den Beziehungsgraphen zu befüllen – ziehen Sie Treffer aus einer verknüpften Anfrage oder fügen Sie Funde direkt hinzu.",
+      "emptyGraphDesc": "Fügen Sie Beweise hinzu, um den Beziehungsgraphen zu befüllen – ziehen Sie Treffer aus einer verknüpften Anfrage-Beobachtung oder fügen Sie Funde direkt hinzu.",
       "addEvidence": "Beweis hinzufügen",
       "openCaseFile": "Fallakte öffnen",
       "conclusion": "Schlussfolgerung",
       "caseClosed": "Fall geschlossen",
       "noConclusion": "Keine Schlussfolgerung erfasst.",
-      "conclusionDesc": "Fassen Sie zusammen, was die Beweise zeigen, welche Hypothese sie stützen und wie stark. Das Schließen des Falls archiviert die zugehörige Anfrage.",
+      "conclusionDesc": "Fassen Sie zusammen, was die Beweise zeigen, welche Hypothese sie stützen und wie stark. Das Schließen des Falls archiviert die zugehörige Anfrage-Beobachtung.",
       "saveDraft": "Entwurf speichern",
       "closeCase": "Fall schließen",
       "closeCaseTitle": "Diesen Fall schließen?",
-      "closeCaseDesc": "Die Schlussfolgerung wird festgehalten, der Fall als geschlossen markiert und die verknüpfte Anfrage archiviert (sie zeigt keine neuen Treffer mehr). Sie können ihn später wieder öffnen.",
+      "closeCaseDesc": "Die Schlussfolgerung wird festgehalten, der Fall als geschlossen markiert und die verknüpfte Anfrage-Beobachtung archiviert (sie zeigt keine neuen Treffer mehr). Sie können ihn später wieder öffnen.",
       "conclusionRequired": "Eine Schlussfolgerung ist zum Schließen erforderlich",
-      "drivingInquiries": "Treibende Anfragen",
-      "noInquiryLinked": "Keine Anfrage verknüpft – Beweise werden manuell hinzugefügt. Verknüpfen Sie eine, um deren Treffer als Beweise zu ziehen.",
+      "drivingInquiries": "Treibende Anfrage-Beobachtung-Beobachtungen",
+      "noInquiryLinked": "Keine Anfrage-Beobachtung verknüpft – Beweise werden manuell hinzugefügt. Verknüpfen Sie eine, um deren Treffer als Beweise zu ziehen.",
       "archived": "archiviert",
-      "editInquiryQuery": "Anfrage bearbeiten",
-      "unlinkInquiry": "Anfrage trennen",
+      "editInquiryQuery": "Anfrage-Beobachtung bearbeiten",
+      "unlinkInquiry": "Anfrage-Beobachtung trennen",
       "unlinkInquiryTitle": "\"{{title}}\" trennen?",
-      "unlinkInquiryDesc": "Die Anfrage und die bereits daraus gezogenen Beweise bleiben erhalten – nur die Verknüpfung mit diesem Fall wird entfernt.",
+      "unlinkInquiryDesc": "Die Anfrage-Beobachtung und die bereits daraus gezogenen Beweise bleiben erhalten – nur die Verknüpfung mit diesem Fall wird entfernt.",
       "unlink": "Trennen",
       "currentMatch": "aktueller Treffer",
       "newMatch": "neu",
       "selectMatchesToPull": "Zu übernehmende Treffer auswählen",
       "pullAllMatches": "Alle aktuellen Treffer übernehmen",
       "all": "Alle",
-      "linkAnotherInquiry": "Weitere Anfrage verknüpfen…",
+      "linkAnotherInquiry": "Weitere Anfrage-Beobachtung verknüpfen…",
       "link": "Verknüpfen",
       "recentActivity": "Letzte Aktivität",
       "fullTimeline": "Vollständige Zeitleiste",
       "noActivity": "Noch keine Aktivität.",
-      "evidenceTabDesc": "Der gespeicherte Datensatz dieses Falls – Snapshots bleiben erhalten, auch wenn sich die Quelldaten ändern. Über den Reiter „Übersicht” aus der treibenden Anfrage ziehen oder Funde direkt anhängen.",
+      "evidenceTabDesc": "Der gespeicherte Datensatz dieses Falls – Snapshots bleiben erhalten, auch wenn sich die Quelldaten ändern. Über den Reiter „Übersicht” aus der treibenden Anfrage-Beobachtung ziehen oder Funde direkt anhängen.",
       "aiModeUpdated": "KI-Modus aktualisiert",
       "failedToChangeAiMode": "KI-Modus konnte nicht geändert werden",
       "statusSet": "Status auf {{status}} gesetzt",
       "failedToChangeStatus": "Status konnte nicht geändert werden",
       "conclusionSaved": "Schlussfolgerung gespeichert",
       "failedToSaveConclusion": "Schlussfolgerung konnte nicht gespeichert werden",
-      "caseClosedWithArchived": "Fall geschlossen — {{count}} Anfrage(n) archiviert",
+      "caseClosedWithArchived": "Fall geschlossen — {{count}} Anfrage-Beobachtung(n) archiviert",
       "failedToCloseCase": "Fall konnte nicht geschlossen werden",
-      "inquiryLinked": "Anfrage verknüpft",
-      "failedToLinkInquiry": "Anfrage konnte nicht verknüpft werden",
-      "inquiryUnlinked": "Anfrage getrennt",
-      "failedToUnlinkInquiry": "Anfrage konnte nicht getrennt werden",
+      "inquiryLinked": "Anfrage-Beobachtung verknüpft",
+      "failedToLinkInquiry": "Anfrage-Beobachtung konnte nicht verknüpft werden",
+      "inquiryUnlinked": "Anfrage-Beobachtung getrennt",
+      "failedToUnlinkInquiry": "Anfrage-Beobachtung konnte nicht getrennt werden",
       "pulled": "{{count}} Fund/Funde als Beweise übernommen",
       "failedToPull": "Treffer konnten nicht übernommen werden",
       "failedToSaveNote": "Notiz konnte nicht gespeichert werden",
@@ -2745,8 +2852,21 @@
       "tabCaseFile": "Fallakte",
       "runAI": "KI ausführen",
       "reopen": "Wiedereröffnen",
+      "edit": "Bearbeiten",
+      "moreActions": "Weitere Aktionen",
+      "tabInquiries": "Beobachtungen",
+      "autoPull": "Neue Antworten automatisch hinzufügen",
+      "autoPullOn": "Neue Antworten werden diesem Fall hinzugefügt, sobald Scans sie liefern.",
+      "autoPullOff": "Neue Antworten warten hier, bis Sie sie hinzufügen.",
+      "autoPullUpdated": "Automatisches Hinzufügen aktualisiert",
+      "failedToSetAutoPull": "Automatisches Hinzufügen konnte nicht geändert werden",
+      "goneMatch": "verschwunden",
+      "goneWarning": "{{count}} Beleg(e), die dieser Fall zitiert, werden von ihrer Quelle nicht mehr gefunden.",
+      "inquiriesTabDesc": "Die stehenden Fragen, die diesen Fall treiben. Prüfen Sie, was die letzten Scans geliefert haben, ohne den Fall zu verlassen.",
+      "selectInquiry": "Wählen Sie eine Beobachtung, um ihre Antworten zu prüfen",
+      "addSelectedToCase": "Auswahl zum Fall hinzufügen",
       "reviewMatches": "Treffer prüfen",
-      "newMatchesBanner": "{{count}} neue Treffer sind in den verknüpften Anfragen seit der letzten Prüfung erschienen.",
+      "newMatchesBanner": "{{count}} neue Treffer sind in den verknüpften Anfrage-Beobachtung-Beobachtungen seit der letzten Prüfung erschienen.",
       "tabExplore": "Erkunden",
       "timelineChronology": "Chronologie",
       "timelineActivity": "Aktivität"
@@ -2763,19 +2883,21 @@
       "failedToAttach": "Funde konnten nicht angehängt werden"
     },
     "inquiryDetail": {
-      "loading": "Anfrage wird geladen…",
-      "editQuery": "Anfrage bearbeiten",
+      "loading": "Anfrage-Beobachtung wird geladen…",
+      "editQuery": "Anfrage-Beobachtung bearbeiten",
       "rescan": "Erneut scannen",
       "archive": "Archivieren",
-      "deleteTitle": "Diese Anfrage löschen?",
-      "deleteDesc": "Die gespeicherte Anfrage und ihr Trefferprotokoll werden entfernt. Bereits in Fälle übernommene Beweise bleiben erhalten.",
-      "casesDriven": "Von dieser Anfrage getriebene Fälle",
+      "deleteTitle": "Diese Anfrage-Beobachtung löschen?",
+      "deleteDesc": "Die gespeicherte Anfrage-Beobachtung und ihr Trefferprotokoll werden entfernt. Bereits in Fälle übernommene Beweise bleiben erhalten.",
+      "casesDriven": "Von dieser Anfrage-Beobachtung getriebene Fälle",
       "openNewCase": "Neuen Fall öffnen",
       "matchesLiveDesc": "Treffer werden live berechnet – sie sind noch keine Beweise. Öffnen Sie einen Fall für eine Untersuchung und behalten Sie einen Snapshot der ausgewählten Treffer.",
-      "thisQueryLands": "Diese Anfrage liefert Funde aus",
+      "thisQueryLands": "Diese Anfrage-Beobachtung liefert Funde aus",
       "allSources": "allen Quellen",
       "anyFindingType": "jedem Befundtyp",
       "matchesTab": "Treffer",
+      "timelineTab": "Verlauf",
+      "goneCount": "{{count}} verschwunden",
       "newCount": "{{count}} neu",
       "targetCase": "Zielfall…",
       "addToCase": "Zum Fall hinzufügen",
@@ -2785,13 +2907,83 @@
       "addedToCase": "{{count}} Fund/Funde zum Fall hinzugefügt",
       "failedToAddToCase": "Konnte nicht zum Fall hinzugefügt werden",
       "aiModeUpdated": "KI-Modus aktualisiert",
-      "archived": "Anfrage archiviert",
-      "deleted": "Anfrage gelöscht",
-      "failedToLoadInquiries": "Anfragen konnten nicht geladen werden",
-      "failedToLoadMatches": "Anfrage-Treffer konnten nicht geladen werden"
+      "archived": "Anfrage-Beobachtung archiviert",
+      "deleted": "Anfrage-Beobachtung gelöscht",
+      "failedToLoadInquiries": "Anfrage-Beobachtung-Beobachtungen konnten nicht geladen werden",
+      "failedToLoadMatches": "Anfrage-Beobachtung-Treffer konnten nicht geladen werden"
+    },
+    "matchState": {
+      "new": "Neu",
+      "ongoing": "Laufend",
+      "gone": "Verschwunden",
+      "newTooltip": "Vom letzten Scan der Quelle erzeugt. Wird zurückgesetzt, wenn die Quelle erneut läuft — nicht, wenn Sie es lesen.",
+      "ongoingTooltip": "Bereits vor dem letzten Scan vorhanden.",
+      "goneTooltip": "Der letzte Scan findet es nicht mehr. Es beantwortet die Frage weiterhin, aber der Beleg ist weg.",
+      "filterPlaceholder": "Status",
+      "goneReason": "Grund: {{reason}}",
+      "lastRun": "Gemessen am Lauf, der {{when}} begann",
+      "neverRun": "Noch keine Quelle im Geltungsbereich hat einen Scan abgeschlossen"
+    },
+    "matchesPanel": {
+      "search": "Treffer durchsuchen — Fund, Asset, Inhalt…",
+      "severity": "Schweregrad",
+      "searchSeverities": "Schweregrade suchen…",
+      "noSeverities": "Keine Schweregrade gefunden",
+      "loading": "Treffer werden geladen…",
+      "updating": "Wird aktualisiert…",
+      "rowsPerPage": "Zeilen pro Seite",
+      "rows": "{{count}} Zeilen",
+      "range": "{{from}}–{{to}} von {{total}}",
+      "empty": "0 Treffer",
+      "previous": "Zurück",
+      "next": "Weiter",
+      "morePages": "Weitere Seiten",
+      "failedToLoad": "Treffer konnten nicht geladen werden",
+      "allSelected": "Alle {{count}} Treffer werden übernommen, einschließlich der von den nächsten Scans.",
+      "selectAll": "Alle {{count}} auswählen",
+      "chooseIndividually": "Einzeln auswählen",
+      "selectedCount": "{{count}} ausgewählt"
+    },
+    "inquiryTimeline": {
+      "title": "Verlauf",
+      "desc": "Was mit dieser Beobachtung geschehen ist und was jeder Scan gebracht hat. Die Kennzeichen Neu und Verschwunden verfallen beim nächsten Lauf — dieser Verlauf nicht.",
+      "empty": "Mit dieser Beobachtung ist noch nichts geschehen.",
+      "loadMore": "Mehr laden",
+      "loading": "Verlauf wird geladen…",
+      "failed": "Verlauf konnte nicht geladen werden",
+      "created": "Beobachtung erstellt",
+      "matchersUpdated": "Frage geändert",
+      "statusChanged": "Status geändert",
+      "rematched": "Neu berechnet",
+      "matchesLanded": "{{count}} neue Antwort(en) eingetroffen",
+      "matchesRetired": "{{count}} Antwort(en) zurückgezogen",
+      "caseLinked": "Mit einem Fall verknüpft",
+      "caseUnlinked": "Von einem Fall getrennt",
+      "pulledToCase": "{{count}} zu einem Fall hinzugefügt",
+      "autoPulled": "{{count}} automatisch zu einem Fall hinzugefügt",
+      "cappedNote": "Begrenzt — {{available}} waren verfügbar",
+      "diffAdded": "hinzugefügt",
+      "diffRemoved": "entfernt",
+      "showDiff": "Was sich geändert hat"
     },
     "newCase": {
       "title": "Fall öffnen",
+      "description": "Benennen Sie die Untersuchung, wählen Sie die treibenden Beobachtungen und dann, welche ihrer Antworten den Fall eröffnen.",
+      "navLabel": "Schritte zur Fallerstellung",
+      "back": "Untersuchungen",
+      "stepDetails": "Details",
+      "stepDetailsDesc": "Was untersucht wird.",
+      "stepInquiries": "Treibende Beobachtungen",
+      "stepInquiriesDesc": "Die stehenden Fragen, die diesen Fall speisen.",
+      "stepEvidence": "Erste Belege",
+      "stepEvidenceDesc": "Welche aktuellen Antworten mitkommen.",
+      "newInquiry": "Neue Beobachtung",
+      "newInquiryHint": "Öffnet einen neuen Tab. Kommen Sie zurück, dann steht sie in der Liste bereit.",
+      "autoPullLabel": "Diesen Fall aktuell halten",
+      "autoPullDesc": "Spätere Scans fügen die neuen Antworten dieser Beobachtung selbst hinzu. Standardmäßig aus — ein Fall, der seine Belege selbst erweitert, ist sonst eine Überraschung.",
+      "noInquiriesSelected": "Noch keine Beobachtungen ausgewählt",
+      "noInquiriesSelectedDesc": "Wählen Sie im vorherigen Schritt eine aus, um hier ihre aktuellen Antworten zu sehen — oder eröffnen Sie den Fall leer.",
+      "creating": "Fall wird eröffnet…",
       "caseDetails": "Falldetails",
       "titleLabel": "Titel",
       "titlePlaceholder": "Was wird untersucht?",
@@ -2800,15 +2992,15 @@
       "severityLabel": "Priorität",
       "assigneeLabel": "Zugewiesen an",
       "assigneePlaceholder": "Wer leitet diesen Fall? (optional)",
-      "drivingInquiries": "Treibende Anfragen",
-      "selectInquiries": "Anfragen auswählen (optional)",
-      "searchInquiries": "Anfragen suchen…",
-      "noInquiriesFound": "Keine Anfragen gefunden",
+      "drivingInquiries": "Treibende Anfrage-Beobachtung-Beobachtungen",
+      "selectInquiries": "Anfrage-Beobachtung-Beobachtungen auswählen (optional)",
+      "searchInquiries": "Anfrage-Beobachtung-Beobachtungen suchen…",
+      "noInquiriesFound": "Keine Anfrage-Beobachtung-Beobachtungen gefunden",
       "matchCount": "({{count}} Treffer)",
-      "inquiryDrivesMany": "Eine Anfrage kann mehrere Fälle gleichzeitig treiben.",
+      "inquiryDrivesMany": "Eine Anfrage-Beobachtung kann mehrere Fälle gleichzeitig treiben.",
       "openCaseWithFindings": "Fall mit {{count}} Fund/Funden öffnen",
       "openCase": "Fall öffnen",
-      "emptyStartDesc": "Dieser Fall startet leer. Wählen Sie links Anfragen aus, um deren Treffer als erste Beweise einzubringen – oder fügen Sie Beweise später direkt aus dem Fallarbeitsbereich hinzu.",
+      "emptyStartDesc": "Dieser Fall startet leer. Wählen Sie links Anfrage-Beobachtung-Beobachtungen aus, um deren Treffer als erste Beweise einzubringen – oder fügen Sie Beweise später direkt aus dem Fallarbeitsbereich hinzu.",
       "loadingMatches": "Treffer werden geladen…",
       "selectionCount": "{{selected}}/{{total}} ausgewählt",
       "selectionDesc": "Ausgewählte Treffer werden als Beweise in den Fall kopiert – der Fall behält seinen eigenen Snapshot und Sie können jederzeit neuere Treffer ziehen.",
@@ -2817,8 +3009,19 @@
       "pullFailed": "Fall geöffnet, aber einige Beweise konnten nicht übernommen werden – erneut aus dem Fall ziehen.",
       "failedToOpenCase": "Fall konnte nicht geöffnet werden",
       "titleRequired": "Geben Sie dem Fall einen Titel",
-      "failedToLoadInquiries": "Anfragen konnten nicht geladen werden",
-      "failedToLoadMatches": "Anfrage-Treffer konnten nicht geladen werden"
+      "failedToLoadInquiries": "Anfrage-Beobachtung-Beobachtungen konnten nicht geladen werden",
+      "failedToLoadMatches": "Anfrage-Beobachtung-Treffer konnten nicht geladen werden"
+    },
+    "editCase": {
+      "title": "Fall bearbeiten",
+      "description": "Ändern Sie, worum es in diesem Fall geht. Belege, Stränge und Zeitleiste bleiben unberührt.",
+      "back": "Zurück zum Fall",
+      "save": "Änderungen speichern",
+      "saving": "Wird gespeichert…",
+      "saved": "Fall aktualisiert",
+      "failed": "Fall konnte nicht gespeichert werden",
+      "loading": "Fall wird geladen…",
+      "notFound": "Fall nicht gefunden"
     },
     "autopilot": {
       "toggleActivity": "Aktivität",
@@ -2841,7 +3044,7 @@
         "editTitle": "Bearbeiten",
         "forgetTitle": "Vergessen",
         "openCase": "Fall öffnen",
-        "openInquiry": "Anfrage öffnen",
+        "openInquiry": "Anfrage-Beobachtung öffnen",
         "labelTags": "Tags",
         "labelWeight": "Gewichtung",
         "placeholders": {
@@ -2937,13 +3140,13 @@
       "runDialog": {
         "titleGeneral": "Autopilot jetzt starten",
         "titleCase": "KI auf diesen Fall anwenden",
-        "descGeneral": "Überprüft alle vorhandenen offenen Befunde — nicht nur neue — und verwaltet Anfragen und Fälle. Auf „Nur beobachten” gesetzte Elemente werden nie berührt.",
+        "descGeneral": "Überprüft alle vorhandenen offenen Befunde — nicht nur neue — und verwaltet Anfrage-Beobachtung-Beobachtungen und Fälle. Auf „Nur beobachten” gesetzte Elemente werden nie berührt.",
         "descCase": "Der Fall-Agent arbeitet an {{title}} mit vollständigen Details: Er kann Kanten verbinden oder trennen, Beweispfade erstellen und Hypothesen mit unterstützenden Beweisen erstellen oder aktualisieren. Beschreiben Sie in einfacher Sprache, was Sie wollen — die KI löst die Ziele selbst.",
         "instructionLabelGeneral": "Worauf soll geachtet werden?",
         "instructionLabelCase": "Was soll in diesem Fall getan werden?",
         "instructionOptionalGeneral": "Optional — ohne Anweisung führen die Agenten eine allgemeine Überprüfung durch.",
         "instructionOptionalCase": "Optional — ohne Anweisung tut der Agent alles, was die Ermittlung am meisten voranbringt.",
-        "placeholderGeneral": "z.B. Eine Anfrage für exponierte Datenbankzugangsdaten erstellen, falls vorhanden…",
+        "placeholderGeneral": "z.B. Eine Anfrage-Beobachtung für exponierte Datenbankzugangsdaten erstellen, falls vorhanden…",
         "placeholderCase": "z.B. Befunde mit demselben Credential-Wert mit Kanten verbinden…",
         "agentLabel": "Agent",
         "scopeLabel": "Bereich",
@@ -2965,11 +3168,11 @@
         "agents": {
           "inquiry": {
             "label": "Anfrage",
-            "desc": "Prüft offene Funde und hält gespeicherte Monitore (Anfragen) aktuell."
+            "desc": "Prüft offene Funde und hält gespeicherte Monitore (Anfrage-Beobachtung-Beobachtungen) aktuell."
           },
           "case": {
             "label": "Fall",
-            "desc": "Erstellt und erweitert Ermittlungsfälle aus Anfragen mit neuen Treffern."
+            "desc": "Erstellt und erweitert Ermittlungsfälle aus Anfrage-Beobachtung-Beobachtungen mit neuen Treffern."
           },
           "config": {
             "label": "Konfiguration",
@@ -3003,12 +3206,12 @@
       }
     },
     "inquiryForm": {
-      "navLabel": "Anfrage-Schritte",
-      "backToInquiry": "Zurück zur Anfrage",
+      "navLabel": "Anfrage-Beobachtung-Schritte",
+      "backToInquiry": "Zurück zur Anfrage-Beobachtung",
       "backToInvestigations": "Zurück zu Untersuchungen",
-      "createTitle": "Neue Anfrage",
-      "editTitle": "Anfrage bearbeiten",
-      "createDescription": "Eine Anfrage ist eine gespeicherte Abfrage. Passende Funde werden verfolgt, sodass Sie sie in einen Fall übernehmen können. Passen Sie die Filter an und prüfen Sie die aktuelle Vorschau, bevor Sie speichern.",
+      "createTitle": "Neue Anfrage-Beobachtung",
+      "editTitle": "Anfrage-Beobachtung bearbeiten",
+      "createDescription": "Eine Anfrage-Beobachtung ist eine gespeicherte Abfrage. Passende Funde werden verfolgt, sodass Sie sie in einen Fall übernehmen können. Passen Sie die Filter an und prüfen Sie die aktuelle Vorschau, bevor Sie speichern.",
       "editDescription": "Aktualisieren Sie die gespeicherte Abfrage. Geänderte Filter berechnen die Treffer neu.",
       "stepDefine": "Definieren",
       "stepDefineDesc": "Benennen Sie die Frage, die Sie stellen.",
@@ -3016,13 +3219,13 @@
       "stepFiltersDesc": "Legen Sie fest, welche Funde hier landen.",
       "stepPreview": "Vorschau",
       "stepPreviewDesc": "Prüfen Sie, was aktuell passt.",
-      "defineCardTitle": "Anfrage definieren",
-      "defineCardDesc": "Die Frage, die diese Anfrage laufend beantwortet",
+      "defineCardTitle": "Anfrage-Beobachtung definieren",
+      "defineCardDesc": "Die Frage, die diese Anfrage-Beobachtung laufend beantwortet",
       "filtersCardTitle": "Was soll hier landen?",
       "filtersCardDesc": "Quellen, Detektoren und Fundtypen zum Abgleich",
       "previewCardTitle": "Treffer-Vorschau",
       "previewCardDesc": "Live-Ergebnis der aktuellen Filter",
-      "titleLabel": "Anfrage",
+      "titleLabel": "Anfrage-Beobachtung",
       "titlePlaceholder": "Wurden sensible Daten nach außen gesendet?",
       "descriptionLabel": "Beschreibung",
       "descriptionPlaceholder": "Auf welches Signal achten Sie?",
@@ -3047,33 +3250,47 @@
       "findingsMatchNow": "Funde passen aktuell",
       "showingOf": "{{shown}} von {{total}} werden angezeigt.",
       "currentMatches": "{{count}} aktuelle Treffer",
-      "create": "Anfrage erstellen",
-      "update": "Anfrage aktualisieren",
-      "titleRequired": "Geben Sie der Anfrage einen Namen",
-      "created": "Anfrage erstellt",
-      "updated": "Anfrage aktualisiert",
-      "createFailed": "Anfrage konnte nicht erstellt werden",
-      "updateFailed": "Anfrage konnte nicht aktualisiert werden",
-      "assistantTitle": "Assistent für Anfragen",
-      "loading": "Anfrage wird geladen…"
+      "create": "Anfrage-Beobachtung erstellen",
+      "update": "Anfrage-Beobachtung aktualisieren",
+      "titleRequired": "Geben Sie der Anfrage-Beobachtung einen Namen",
+      "created": "Anfrage-Beobachtung erstellt",
+      "updated": "Anfrage-Beobachtung aktualisiert",
+      "createFailed": "Anfrage-Beobachtung konnte nicht erstellt werden",
+      "updateFailed": "Anfrage-Beobachtung konnte nicht aktualisiert werden",
+      "assistantTitle": "Assistent für Anfrage-Beobachtung-Beobachtungen",
+      "loading": "Anfrage-Beobachtung wird geladen…",
+      "optionsLoading": "Optionen werden geladen…",
+      "sourcesMultiselectPlaceholder": "Quellen wählen…",
+      "sourcesSearchPlaceholder": "Quellen suchen…",
+      "sourcesCounts": "{{assets}} Assets · {{findings}} Befunde",
+      "searchEmpty": "Keine Treffer",
+      "detectorsPlaceholder": "Detektoren wählen…",
+      "detectorsSearchPlaceholder": "Detektoren suchen…",
+      "detectorsGroupBuiltIn": "Integriert",
+      "detectorsGroupCustom": "Benutzerdefiniert",
+      "findingTypesPlaceholder": "Finding-Typen wählen…",
+      "findingTypesFilteredHint": "Aufgelistete Typen folgen der Detektorauswahl oben.",
+      "advancedTitle": "Erweitert",
+      "advancedDesc": "Regex-Filter auf Finding-Typ und erkannten Wert",
+      "unobservedType": "derzeit nicht beobachtet"
     },
     "inquiries": {
-      "searchPlaceholder": "Anfragen suchen…",
+      "searchPlaceholder": "Anfrage-Beobachtung-Beobachtungen suchen…",
       "statusPlaceholder": "Status",
       "searchStatuses": "Status suchen…",
       "noStatusesFound": "Kein Status gefunden",
       "updating": "Wird aktualisiert…",
-      "loading": "Anfragen werden geladen…",
-      "loadFailed": "Anfragen konnten nicht geladen werden",
-      "emptyTitle": "Keine Anfragen gefunden",
-      "emptyFiltered": "Keine Anfragen entsprechen den aktuellen Filtern.",
-      "emptyDescription": "Erstellen Sie eine Anfrage, um Funde über Ihre Quellen hinweg zu überwachen.",
-      "colInquiry": "Anfrage",
+      "loading": "Anfrage-Beobachtung-Beobachtungen werden geladen…",
+      "loadFailed": "Anfrage-Beobachtung-Beobachtungen konnten nicht geladen werden",
+      "emptyTitle": "Keine Anfrage-Beobachtung-Beobachtungen gefunden",
+      "emptyFiltered": "Keine Anfrage-Beobachtung-Beobachtungen entsprechen den aktuellen Filtern.",
+      "emptyDescription": "Erstellen Sie eine Anfrage-Beobachtung, um Funde über Ihre Quellen hinweg zu überwachen.",
+      "colInquiry": "Anfrage-Beobachtung",
       "colInquiryHint": "Die gespeicherte Frage und ihr Umfang",
       "colMatches": "Treffer",
-      "colMatchesHint": "Funde, die aktuell zu dieser Anfrage passen",
+      "colMatchesHint": "Funde, die aktuell zu dieser Anfrage-Beobachtung passen",
       "colCases": "Fälle",
-      "colCasesHint": "Fälle, die von dieser Anfrage getrieben werden",
+      "colCasesHint": "Fälle, die von dieser Anfrage-Beobachtung getrieben werden",
       "scopeAllSources": "alle Quellen",
       "scopeSources": "{{count}} Quellen",
       "scopeAnyFinding": "beliebiger Fund",
@@ -3084,10 +3301,10 @@
       "statusActive": "aktiv",
       "statusArchived": "archiviert",
       "openCase": "Fall öffnen",
-      "openCaseFromInquiry": "Fall aus Anfrage öffnen",
-      "editInquiry": "Anfrage bearbeiten",
+      "openCaseFromInquiry": "Fall aus Anfrage-Beobachtung öffnen",
+      "editInquiry": "Anfrage-Beobachtung bearbeiten",
       "editQuery": "Abfrage bearbeiten",
-      "noInquiries": "0 Anfragen"
+      "noInquiries": "0 Anfrage-Beobachtung-Beobachtungen"
     }
   },
   "caseGraph": {
@@ -3213,6 +3430,8 @@
       "legendHypothesis": "gestricheltes Lila = umfasst Hypothesen",
       "legendManual": "bernsteinfarbene gestrichelte Kante = manuelle Verknüpfung",
       "legendUnattached": "noch nicht angehängte Funde – klicken zum Prüfen",
+      "legendNewMatch": "Vom letzten Scan geliefert",
+      "legendGoneMatch": "Vom letzten Scan zurückgezogen",
       "statsAssets": "Assets",
       "statsFindings": "Funde",
       "statsEvidenceRecords": "Beweisdatensätze",
@@ -3642,8 +3861,11 @@
       "desc": "Embeddings wandeln Beweistexte in Vektoren um, damit Classifyre Near-Duplicates findet, Wichtigkeit bewertet und semantische Suche beantwortet. Alles hier gilt nur für diesen Workspace.",
       "on": "An",
       "off": "Aus",
-      "enableLabel": "Semantische Embeddings",
-      "enableDesc": "Wird dies deaktiviert, stoppt jede Inferenz und alle gespeicherten Vektoren dieses Workspace werden gelöscht. Near-Duplicate-Gruppierung, Bewertung und semantische Suche funktionieren erst wieder nach dem Einschalten.",
+      "switchLabel": "Embeddings für diesen Arbeitsbereich",
+      "switchOnDesc": "An. Embeddings werden unter Einstellungen → Bereinigung ein- oder ausgeschaltet, neben der Duplikaterkennung — beim Ausschalten wird dort angeboten, den Korpus zu behalten oder zu löschen.",
+      "switchOffKeptDesc": "Aus — der Korpus bleibt erhalten (eine Pause). Schalten Sie Embeddings unter Einstellungen → Bereinigung wieder ein, um aufzuholen.",
+      "switchOffDeletedDesc": "Aus — der Korpus wurde gelöscht. Schalten Sie Embeddings unter Einstellungen → Bereinigung wieder ein, um ihn neu aufzubauen.",
+      "switchManage": "Einstellungen → Bereinigung",
       "providerHeading": "Modell",
       "providerDesc": "Welches Modell Text in Vektoren umwandelt. Eine Änderung erzeugt den gesamten Korpus neu.",
       "providerLocal": "Lokale Inferenz",
@@ -3670,9 +3892,6 @@
       "aiProviderNotEmbedding": "Dieser Anbieter ist nicht als Embedding-Modell markiert.",
       "inheritedHeading": "Vom Anbieter",
       "inheritedHint": "Modell, Dimensionen und Pooling stammen vom gewählten KI-Anbieter. Ändern Sie sie dort.",
-      "confirmDisableTitle": "Alle Embeddings löschen?",
-      "confirmDisableBody": "Beim Deaktivieren werden alle gespeicherten Vektoren dieses Workspace gelöscht. Es wird nichts neu eingebettet — beim späteren Einschalten beginnt ein neuer Aufbau.",
-      "confirmDisableProceed": "Embeddings löschen",
       "offlineWarning": "Diese Installation läuft offline und liefert ein fest hinterlegtes Modell mit; ein anderes lokales Modell kann nicht geladen werden. Verwenden Sie stattdessen einen externen Anbieter oder erlauben Sie Modell-Downloads in der Installation.",
       "performanceHeading": "Durchsatz",
       "performanceDesc": "Wie schnell Vektoren erzeugt werden. Dies beeinflusst nie die Bedeutung eines Vektors, ein Neuaufbau entfällt — Batchgröße, Worker-Parallelität und Startabgleich werden jedoch bei der Registrierung des Workers gebunden und gelten daher erst nach einem Neustart des Dienstes.",
@@ -3735,7 +3954,7 @@
       "confirmChanges": "Wird geändert: {{fields}}",
       "confirmProceed": "Löschen und neu einbetten",
       "confirmCancel": "Abbrechen",
-      "disabledNotice": "Embedding ist für diesen Workspace deaktiviert. Near-Duplicate-Gruppierung, Bewertung und semantische Suche sind nicht verfügbar."
+      "disabledNotice": "Das Einbetten ist für diesen Arbeitsbereich ausgeschaltet; Wichtigkeits-Ranking, Gruppen nahezu identischer Texte und semantische Suche sind nicht verfügbar. Schalten Sie es unter Einstellungen → Bereinigung wieder ein."
     },
     "kinds": {
       "INQUIRY": "Inquiry",
@@ -4662,38 +4881,38 @@
       "descriptionWithEntity": "{{name}} — Konfiguration, Trainingsverlauf und Testszenarien."
     },
     "investigations": {
-      "title": "Ermittlungen — Fälle, Anfragen & KI-Autopilot",
-      "description": "Führen Sie Ermittlungen, in denen aus Funden Antworten werden: Anfragen wachen über Treffer, Fingerabdrücke verknüpfen Duplikate systemübergreifend, und Fälle sammeln Belege, Hypothesen und ein Fazit — mit oder ohne KI-Autopilot.",
-      "ogTitle": "Ermittlungen — Fälle & Anfragen | Classifyre",
-      "ogDescription": "Anfragen, die auf Treffer achten, Duplikat-Fingerabdrücke und belegte Fälle — automatisch oder manuell."
+      "title": "Ermittlungen — Fälle, Anfrage-Beobachtung-Beobachtungen & KI-Autopilot",
+      "description": "Führen Sie Ermittlungen, in denen aus Funden Antworten werden: Anfrage-Beobachtung-Beobachtungen wachen über Treffer, Fingerabdrücke verknüpfen Duplikate systemübergreifend, und Fälle sammeln Belege, Hypothesen und ein Fazit — mit oder ohne KI-Autopilot.",
+      "ogTitle": "Ermittlungen — Fälle & Anfrage-Beobachtung-Beobachtungen | Classifyre",
+      "ogDescription": "Anfrage-Beobachtung-Beobachtungen, die auf Treffer achten, Duplikat-Fingerabdrücke und belegte Fälle — automatisch oder manuell."
     },
     "caseDetail": {
       "title": "Falldetails — Belegdiagramm, Hypothesen & Zeitachse",
-      "description": "Untersuchen Sie einen Fall mit Belegdiagramm, Diskussionssträngen, Chronologie und Fallakte. Verknüpfen Sie Anfragen, ziehen Sie Treffer heran, ergänzen Sie Hypothesen und halten Sie ein Fazit fest — oder lassen Sie das KI-Harness auf dem Fall laufen.",
+      "description": "Untersuchen Sie einen Fall mit Belegdiagramm, Diskussionssträngen, Chronologie und Fallakte. Verknüpfen Sie Anfrage-Beobachtung-Beobachtungen, ziehen Sie Treffer heran, ergänzen Sie Hypothesen und halten Sie ein Fazit fest — oder lassen Sie das KI-Harness auf dem Fall laufen.",
       "ogTitle": "Falldetails — Belege & Hypothesen | Classifyre",
-      "ogDescription": "Belegdiagramm, verknüpfte Anfragen, Hypothesen und Aktivitätsverlauf eines Ermittlungsfalls.",
+      "ogDescription": "Belegdiagramm, verknüpfte Anfrage-Beobachtung-Beobachtungen, Hypothesen und Aktivitätsverlauf eines Ermittlungsfalls.",
       "titleWithEntity": "{{name}} — Falldetails",
-      "descriptionWithEntity": "{{name}} — Belegdiagramm, Hypothesen, verknüpfte Anfragen und Zeitachse."
+      "descriptionWithEntity": "{{name}} — Belegdiagramm, Hypothesen, verknüpfte Anfrage-Beobachtung-Beobachtungen und Zeitachse."
     },
     "inquiryDetail": {
       "title": "Anfragedetails — gespeicherte Abfrage, Treffer & verknüpfte Fälle",
-      "description": "Eine gespeicherte Anfrage, die alle Funde beobachtet, die ihren Filtern entsprechen. Prüfen Sie laufende Treffer, sehen Sie die getriebenen Fälle, suchen Sie erneut nach neuen Treffern und übernehmen Sie Funde als Belege in einen Fall.",
+      "description": "Eine gespeicherte Anfrage-Beobachtung, die alle Funde beobachtet, die ihren Filtern entsprechen. Prüfen Sie laufende Treffer, sehen Sie die getriebenen Fälle, suchen Sie erneut nach neuen Treffern und übernehmen Sie Funde als Belege in einen Fall.",
       "ogTitle": "Anfragedetails — Treffer & Fälle | Classifyre",
       "ogDescription": "Laufende Treffer einer gespeicherten Fundabfrage — samt getriebener Fälle und Belegübernahme mit einem Klick.",
       "titleWithEntity": "{{name}} — Anfragedetails",
       "descriptionWithEntity": "{{name}} — laufende Treffer dieser gespeicherten Abfrage und die Fälle, die sie treibt."
     },
     "inquiryNew": {
-      "title": "Neue Anfrage — gespeicherte Fundabfrage anlegen",
-      "description": "Legen Sie eine gespeicherte Anfrage an, die alle künftigen Funde beobachtet, die ihren Filtern entsprechen — nach Quelle, Detektor, Typ und Wert. Sehen Sie laufende Treffer schon vor dem Speichern.",
-      "ogTitle": "Neue Anfrage — gespeicherte Fundabfrage | Classifyre",
+      "title": "Neue Anfrage-Beobachtung — gespeicherte Fundabfrage anlegen",
+      "description": "Legen Sie eine gespeicherte Anfrage-Beobachtung an, die alle künftigen Funde beobachtet, die ihren Filtern entsprechen — nach Quelle, Detektor, Typ und Wert. Sehen Sie laufende Treffer schon vor dem Speichern.",
+      "ogTitle": "Neue Anfrage-Beobachtung — gespeicherte Fundabfrage | Classifyre",
       "ogDescription": "Formulieren Sie eine Frage, die weiter antwortet — Filter, Vorschau und Fallanlage mit einem Klick."
     },
     "caseNew": {
       "title": "Fall eröffnen — Belege & Hypothesen sammeln",
-      "description": "Eröffnen Sie einen neuen Ermittlungsfall. Ergänzen Sie Titel, Beschreibung, Schweregrad und treibende Anfragen — übernehmen Sie deren laufende Treffer als erste Belege oder beginnen Sie leer und hängen Sie Funde später an.",
+      "description": "Eröffnen Sie einen neuen Ermittlungsfall. Ergänzen Sie Titel, Beschreibung, Schweregrad und treibende Anfrage-Beobachtung-Beobachtungen — übernehmen Sie deren laufende Treffer als erste Belege oder beginnen Sie leer und hängen Sie Funde später an.",
       "ogTitle": "Fall eröffnen — neue Ermittlung | Classifyre",
-      "ogDescription": "Titel, Schweregrad, Anfragen und Belege — starten Sie einen neuen Ermittlungsfall."
+      "ogDescription": "Titel, Schweregrad, Anfrage-Beobachtung-Beobachtungen und Belege — starten Sie einen neuen Ermittlungsfall."
     },
     "duplicates": {
       "title": "Duplikatprüfung — Kopien über alle Quellen hinweg finden",
@@ -4703,9 +4922,9 @@
     },
     "duplicatesDecisions": {
       "title": "Duplikatentscheidungen — Verlauf & Verwendung in Fällen",
-      "description": "Prüfen Sie jede Duplikatentscheidung — behalten, verworfen oder eskaliert — und sehen Sie, ob sie in einem Fall oder einer Anfrage verwendet wurde. Der vollständige Verlauf der Duplikatprüfung dieses Arbeitsbereichs.",
+      "description": "Prüfen Sie jede Duplikatentscheidung — behalten, verworfen oder eskaliert — und sehen Sie, ob sie in einem Fall oder einer Anfrage-Beobachtung verwendet wurde. Der vollständige Verlauf der Duplikatprüfung dieses Arbeitsbereichs.",
       "ogTitle": "Duplikatentscheidungen — Verlauf | Classifyre",
-      "ogDescription": "Jede getroffene Duplikatentscheidung und wo sie verwendet wurde — Fälle und Anfragen."
+      "ogDescription": "Jede getroffene Duplikatentscheidung und wo sie verwendet wurde — Fälle und Anfrage-Beobachtung-Beobachtungen."
     },
     "duplicatePair": {
       "title": "Duplikatpaar — zwei Assets nebeneinander vergleichen",

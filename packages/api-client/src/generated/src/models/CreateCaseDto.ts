@@ -61,6 +61,12 @@ export interface CreateCaseDto {
      * @memberof CreateCaseDto
      */
     inquiryIds?: Array<string>;
+    /**
+     * Of the linked inquiries, these also pull their new matches in by themselves as later scans land them. Additive rather than a shape change to inquiryIds, which MCP and autopilot callers already send.
+     * @type {Array<string>}
+     * @memberof CreateCaseDto
+     */
+    autoPullInquiryIds?: Array<string>;
 }
 
 
@@ -113,6 +119,7 @@ export function CreateCaseDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'assignee': json['assignee'] == null ? undefined : json['assignee'],
         'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
         'inquiryIds': json['inquiryIds'] == null ? undefined : json['inquiryIds'],
+        'autoPullInquiryIds': json['autoPullInquiryIds'] == null ? undefined : json['autoPullInquiryIds'],
     };
 }
 
@@ -134,6 +141,7 @@ export function CreateCaseDtoToJSONTyped(value?: CreateCaseDto | null, ignoreDis
         'assignee': value['assignee'],
         'createdBy': value['createdBy'],
         'inquiryIds': value['inquiryIds'],
+        'autoPullInquiryIds': value['autoPullInquiryIds'],
     };
 }
 

@@ -16,6 +16,8 @@
 import * as runtime from '../runtime';
 import type {
   AssetFindingSummaryListResponseDto,
+  AssetSeverityCountsRequestDto,
+  AssetSeverityCountsResponseDto,
   BulkUpdateFindingsDto,
   BulkUpdateFindingsResponseDto,
   CreateFindingDto,
@@ -29,6 +31,10 @@ import type {
 import {
     AssetFindingSummaryListResponseDtoFromJSON,
     AssetFindingSummaryListResponseDtoToJSON,
+    AssetSeverityCountsRequestDtoFromJSON,
+    AssetSeverityCountsRequestDtoToJSON,
+    AssetSeverityCountsResponseDtoFromJSON,
+    AssetSeverityCountsResponseDtoToJSON,
     BulkUpdateFindingsDtoFromJSON,
     BulkUpdateFindingsDtoToJSON,
     BulkUpdateFindingsResponseDtoFromJSON,
@@ -48,6 +54,10 @@ import {
     UpdateFindingDtoFromJSON,
     UpdateFindingDtoToJSON,
 } from '../models/index';
+
+export interface FindingsControllerAssetSeverityCountsRequest {
+    assetSeverityCountsRequestDto: AssetSeverityCountsRequestDto;
+}
 
 export interface FindingsControllerBulkUpdateRequest {
     bulkUpdateFindingsDto: BulkUpdateFindingsDto;
@@ -108,6 +118,47 @@ export interface FindingsControllerUpdateRequest {
  * 
  */
 export class FindingsApi extends runtime.BaseAPI {
+
+    /**
+     * For a graph view that already has its nodes: how many unresolved findings each carries, by severity. POST because the id list does not belong in a query string. Ids beyond the first 500 are ignored.
+     * Unresolved finding counts per asset, for a set of assets
+     */
+    async findingsControllerAssetSeverityCountsRaw(requestParameters: FindingsControllerAssetSeverityCountsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssetSeverityCountsResponseDto>> {
+        if (requestParameters['assetSeverityCountsRequestDto'] == null) {
+            throw new runtime.RequiredError(
+                'assetSeverityCountsRequestDto',
+                'Required parameter "assetSeverityCountsRequestDto" was null or undefined when calling findingsControllerAssetSeverityCounts().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/findings/assets/severity-counts`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AssetSeverityCountsRequestDtoToJSON(requestParameters['assetSeverityCountsRequestDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssetSeverityCountsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * For a graph view that already has its nodes: how many unresolved findings each carries, by severity. POST because the id list does not belong in a query string. Ids beyond the first 500 are ignored.
+     * Unresolved finding counts per asset, for a set of assets
+     */
+    async findingsControllerAssetSeverityCounts(requestParameters: FindingsControllerAssetSeverityCountsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetSeverityCountsResponseDto> {
+        const response = await this.findingsControllerAssetSeverityCountsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Update status, severity, and/or comment on multiple findings at once.

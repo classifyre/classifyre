@@ -38,6 +38,7 @@ import type {
   PullFromInquiryDto,
   PullFromInquiryResponseDto,
   ReviewCaseLeadDto,
+  SetInquiryAutoPullDto,
   UpdateCaseDto,
   UpdateCaseEventDto,
   UpdateCaseFindingNoteDto,
@@ -90,6 +91,8 @@ import {
     PullFromInquiryResponseDtoToJSON,
     ReviewCaseLeadDtoFromJSON,
     ReviewCaseLeadDtoToJSON,
+    SetInquiryAutoPullDtoFromJSON,
+    SetInquiryAutoPullDtoToJSON,
     UpdateCaseDtoFromJSON,
     UpdateCaseDtoToJSON,
     UpdateCaseEventDtoFromJSON,
@@ -222,6 +225,12 @@ export interface CasesControllerRemoveEvidenceRequest {
 export interface CasesControllerRemoveFindingRequest {
     id: string;
     caseFindingId: string;
+}
+
+export interface CasesControllerSetInquiryAutoPullRequest {
+    id: string;
+    inquiryId: string;
+    setInquiryAutoPullDto: SetInquiryAutoPullDto;
 }
 
 export interface CasesControllerUnlinkInquiryRequest {
@@ -1333,6 +1342,61 @@ export class CasesApi extends runtime.BaseAPI {
      */
     async casesControllerRemoveFinding(requestParameters: CasesControllerRemoveFindingRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.casesControllerRemoveFindingRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Turn automatic pulling of an inquiry\'s new matches on or off
+     */
+    async casesControllerSetInquiryAutoPullRaw(requestParameters: CasesControllerSetInquiryAutoPullRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling casesControllerSetInquiryAutoPull().'
+            );
+        }
+
+        if (requestParameters['inquiryId'] == null) {
+            throw new runtime.RequiredError(
+                'inquiryId',
+                'Required parameter "inquiryId" was null or undefined when calling casesControllerSetInquiryAutoPull().'
+            );
+        }
+
+        if (requestParameters['setInquiryAutoPullDto'] == null) {
+            throw new runtime.RequiredError(
+                'setInquiryAutoPullDto',
+                'Required parameter "setInquiryAutoPullDto" was null or undefined when calling casesControllerSetInquiryAutoPull().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/inquiries/{inquiryId}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"inquiryId"}}`, encodeURIComponent(String(requestParameters['inquiryId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SetInquiryAutoPullDtoToJSON(requestParameters['setInquiryAutoPullDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Turn automatic pulling of an inquiry\'s new matches on or off
+     */
+    async casesControllerSetInquiryAutoPull(requestParameters: CasesControllerSetInquiryAutoPullRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseResponseDto> {
+        const response = await this.casesControllerSetInquiryAutoPullRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

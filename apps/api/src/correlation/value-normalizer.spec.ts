@@ -78,6 +78,14 @@ describe('value-normalizer', () => {
   });
 
   describe('isPhoneticEligible', () => {
+    it('excludes Tag findings, whose values are templated reasons (field report P6)', () => {
+      expect(isPhoneticEligible('tag:Kreis aufgelöst')).toBe(false);
+      expect(isPhoneticEligible('tag_entwicklungspfad')).toBe(false);
+      expect(
+        phoneticFingerprint('tag:Entwicklungspfad', 'migrationsgetragen'),
+      ).toBeNull();
+    });
+
     it('allows person and name labels', () => {
       expect(isPhoneticEligible('person')).toBe(true);
       expect(isPhoneticEligible('name')).toBe(true);

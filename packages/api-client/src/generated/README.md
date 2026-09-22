@@ -60,6 +60,7 @@ All URIs are relative to *http://localhost*
 *AIProviderConfigsApi* | [**aiProviderConfigControllerTest**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollertest) | **POST** /ai-provider-configs/{id}/test | Test an AI provider configuration
 *AIProviderConfigsApi* | [**aiProviderConfigControllerUpdate**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerupdate) | **PUT** /ai-provider-configs/{id} | Update an AI provider configuration
 *AssetsApi* | [**assetsControllerGetAsset**](docs/AssetsApi.md#assetscontrollergetasset) | **GET** /assets/{id} | Get asset by ID
+*AssetsApi* | [**assetsControllerGetReferencingFindings**](docs/AssetsApi.md#assetscontrollergetreferencingfindings) | **GET** /assets/{id}/referencing-findings | Findings recorded on assets that point at this one
 *AssetsApi* | [**searchAssetsControllerExportAssets**](docs/AssetsApi.md#searchassetscontrollerexportassets) | **GET** /search/assets/export | Export assets (with findings) as CSV
 *AssetsApi* | [**searchAssetsControllerExportFindings**](docs/AssetsApi.md#searchassetscontrollerexportfindings) | **GET** /search/findings/export | Export findings as CSV
 *AssetsApi* | [**searchAssetsControllerQueryAssets**](docs/AssetsApi.md#searchassetscontrollerqueryassets) | **GET** /search/assets/query | Query assets with findings (cursor-paginated JSON)
@@ -136,6 +137,7 @@ All URIs are relative to *http://localhost*
 *CasesApi* | [**casesControllerRemove**](docs/CasesApi.md#casescontrollerremove) | **DELETE** /cases/{id} | Delete a case (its questions become standalone)
 *CasesApi* | [**casesControllerRemoveEvidence**](docs/CasesApi.md#casescontrollerremoveevidence) | **DELETE** /cases/{id}/evidence/{evidenceId} | Remove evidence from the case
 *CasesApi* | [**casesControllerRemoveFinding**](docs/CasesApi.md#casescontrollerremovefinding) | **DELETE** /cases/{id}/findings/{caseFindingId} | Remove a finding from the case
+*CasesApi* | [**casesControllerSetInquiryAutoPull**](docs/CasesApi.md#casescontrollersetinquiryautopull) | **PATCH** /cases/{id}/inquiries/{inquiryId} | Turn automatic pulling of an inquiry\&#39;s new matches on or off
 *CasesApi* | [**casesControllerUnlinkInquiry**](docs/CasesApi.md#casescontrollerunlinkinquiry) | **DELETE** /cases/{id}/inquiries/{inquiryId} | Unlink an inquiry from a case (the inquiry is untouched)
 *CasesApi* | [**casesControllerUpdate**](docs/CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case
 *CasesApi* | [**caseworkControllerSummary**](docs/CasesApi.md#caseworkcontrollersummary) | **GET** /casework/summary | Counts and recent activity across cases, inquiries and leads
@@ -214,6 +216,7 @@ All URIs are relative to *http://localhost*
 *EmbeddingsApi* | [**embeddingControllerSimilar**](docs/EmbeddingsApi.md#embeddingcontrollersimilar) | **GET** /findings/{findingId}/similar | Find semantically similar findings with ranking evidence
 *EmbeddingsApi* | [**embeddingControllerStatus**](docs/EmbeddingsApi.md#embeddingcontrollerstatus) | **GET** /embeddings/status | Get semantic storage and search capability
 *EmbeddingsApi* | [**embeddingControllerUpdateSettings**](docs/EmbeddingsApi.md#embeddingcontrollerupdatesettings) | **PUT** /embeddings/settings | Change embedding configuration; redefining the vector space purges the corpus and re-embeds it
+*FindingsApi* | [**findingsControllerAssetSeverityCounts**](docs/FindingsApi.md#findingscontrollerassetseveritycounts) | **POST** /findings/assets/severity-counts | Unresolved finding counts per asset, for a set of assets
 *FindingsApi* | [**findingsControllerBulkUpdate**](docs/FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings
 *FindingsApi* | [**findingsControllerCancelBulkOperation**](docs/FindingsApi.md#findingscontrollercancelbulkoperation) | **POST** /findings/bulk-operations/{operationId}/cancel | Cancel a background bulk finding operation
 *FindingsApi* | [**findingsControllerCreate**](docs/FindingsApi.md#findingscontrollercreate) | **POST** /findings/create | Create a new finding
@@ -249,11 +252,12 @@ All URIs are relative to *http://localhost*
 *InquiriesApi* | [**inquiriesControllerFindOne**](docs/InquiriesApi.md#inquiriescontrollerfindone) | **GET** /inquiries/{id} | Get an inquiry
 *InquiriesApi* | [**inquiriesControllerList**](docs/InquiriesApi.md#inquiriescontrollerlist) | **GET** /inquiries | List inquiries (with match counts)
 *InquiriesApi* | [**inquiriesControllerListMatches**](docs/InquiriesApi.md#inquiriescontrollerlistmatches) | **GET** /inquiries/{id}/matches | List the findings currently matching this inquiry (paginated)
-*InquiriesApi* | [**inquiriesControllerMarkSeen**](docs/InquiriesApi.md#inquiriescontrollermarkseen) | **POST** /inquiries/{id}/seen | Mark the current matches as seen (clears the \&quot;new\&quot; badge)
+*InquiriesApi* | [**inquiriesControllerMarkSeen**](docs/InquiriesApi.md#inquiriescontrollermarkseen) | **POST** /inquiries/{id}/seen | Acknowledge the current matches. Does NOT clear the \&quot;new\&quot; count — that is measured against the source\&#39;s latest run and clears when the source runs again.
 *InquiriesApi* | [**inquiriesControllerMatchOptions**](docs/InquiriesApi.md#inquiriescontrollermatchoptions) | **GET** /inquiries/match-options | Sources, custom detectors and distinct finding types for the matcher form
 *InquiriesApi* | [**inquiriesControllerPreview**](docs/InquiriesApi.md#inquiriescontrollerpreview) | **POST** /inquiries/preview | Preview findings a matcher config currently selects (no save)
 *InquiriesApi* | [**inquiriesControllerRematch**](docs/InquiriesApi.md#inquiriescontrollerrematch) | **POST** /inquiries/{id}/rematch | Recompute matches against all current findings
 *InquiriesApi* | [**inquiriesControllerRemove**](docs/InquiriesApi.md#inquiriescontrollerremove) | **DELETE** /inquiries/{id} | Delete an inquiry
+*InquiriesApi* | [**inquiriesControllerTimeline**](docs/InquiriesApi.md#inquiriescontrollertimeline) | **GET** /inquiries/{id}/timeline | The inquiry\&#39;s own history: config changes and each run\&#39;s deltas
 *InquiriesApi* | [**inquiriesControllerUpdate**](docs/InquiriesApi.md#inquiriescontrollerupdate) | **PATCH** /inquiries/{id} | Update an inquiry (matchers change → matches recomputed)
 *InstanceSettingsApi* | [**instanceSettingsControllerGetSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollergetsettings) | **GET** /instance-settings | Get instance settings
 *InstanceSettingsApi* | [**instanceSettingsControllerUpdateSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollerupdatesettings) | **PUT** /instance-settings | Update instance settings
@@ -264,7 +268,9 @@ All URIs are relative to *http://localhost*
 *InstanceSettingsApi* | [**mcpSettingsControllerListTokens**](docs/InstanceSettingsApi.md#mcpsettingscontrollerlisttokens) | **GET** /instance-settings/mcp/tokens | List MCP access tokens
 *InstanceSettingsApi* | [**mcpSettingsControllerUpdateToken**](docs/InstanceSettingsApi.md#mcpsettingscontrollerupdatetoken) | **PATCH** /instance-settings/mcp/tokens/{id} | Update MCP access token
 *MaintenanceApi* | [**maintenanceControllerCleanupRun**](docs/MaintenanceApi.md#maintenancecontrollercleanuprun) | **GET** /maintenance/cleanup/runs/{runId} | Poll one cleanup run: rows removed so far, current table, and the final result once done
+*MaintenanceApi* | [**maintenanceControllerListFeatures**](docs/MaintenanceApi.md#maintenancecontrollerlistfeatures) | **GET** /maintenance/features | Workspace feature switches (embeddings, duplicate detection): state, how each was turned off, the data each owns and the queues held while off
 *MaintenanceApi* | [**maintenanceControllerOverview**](docs/MaintenanceApi.md#maintenancecontrolleroverview) | **GET** /maintenance/overview | Workspace storage overview: per-table row estimates and byte sizes, grouped into protected and cleanable datasets
+*MaintenanceApi* | [**maintenanceControllerSetFeature**](docs/MaintenanceApi.md#maintenancecontrollersetfeature) | **PUT** /maintenance/features/{key} | Turn a workspace feature on or off. Off holds its worker queues paused (every replica stops; the Workers tab cannot resume them) and either keeps its data (a pause — turning back on catches up) or, with deleteData, wipes it in the background (poll GET cleanup/runs/:runId). On resumes the queues and catches up: one full duplicate recompute, or an embedding backfill. Body: { enabled: boolean, deleteData?: boolean }. Allowed while the workspace is paused.
 *MaintenanceApi* | [**maintenanceControllerStartCleanup**](docs/MaintenanceApi.md#maintenancecontrollerstartcleanup) | **POST** /maintenance/cleanup/{key} | Start wiping one cleanable dataset in the background (scan history, duplicates, embeddings, harness runs, finished queue jobs, derived stats/graph, finished transfers). Protected data is never accepted here. Poll GET cleanup/runs/:runId for progress. Deliberately allowed while paused: freezing the workers first is the recommended quiet window (pause, clean, resume), since no writer can race the wipe.
 *NamespacesApi* | [**namespacesControllerCreate**](docs/NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations)
 *NamespacesApi* | [**namespacesControllerCreateCategory**](docs/NamespacesApi.md#namespacescontrollercreatecategory) | **POST** /namespaces/categories | Create a workspace category
@@ -295,6 +301,7 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**cliRunnerControllerDeleteRunner**](docs/RunnersApi.md#clirunnercontrollerdeleterunner) | **DELETE** /runners/{runnerId} | Delete runner metadata and cleanup filesystem logs for this runner
 *RunnersApi* | [**cliRunnerControllerGetRunner**](docs/RunnersApi.md#clirunnercontrollergetrunner) | **GET** /runners/{runnerId} | Get runner status and details
 *RunnersApi* | [**cliRunnerControllerGetRunnerAssetProgress**](docs/RunnersApi.md#clirunnercontrollergetrunnerassetprogress) | **GET** /runners/{runnerId}/assets/progress | Get runner asset processing progress
+*RunnersApi* | [**cliRunnerControllerGetRunnerQueuePosition**](docs/RunnersApi.md#clirunnercontrollergetrunnerqueueposition) | **GET** /runners/{runnerId}/queue-position | Why a queued run has not started yet
 *RunnersApi* | [**cliRunnerControllerListRunners**](docs/RunnersApi.md#clirunnercontrollerlistrunners) | **GET** /runners | List all runners
 *RunnersApi* | [**cliRunnerControllerListSourceRunners**](docs/RunnersApi.md#clirunnercontrollerlistsourcerunners) | **GET** /sources/{sourceId}/runners | List runners for source
 *RunnersApi* | [**cliRunnerControllerQueryAssets**](docs/RunnersApi.md#clirunnercontrollerqueryassets) | **POST** /runners/{runnerId}/assets/query | Read assets of a source in this namespace, for a running connector
@@ -324,12 +331,14 @@ All URIs are relative to *http://localhost*
 *SourcesApi* | [**sourcesControllerBulkUpdateSources**](docs/SourcesApi.md#sourcescontrollerbulkupdatesources) | **POST** /sources/bulk-update | Bulk update data sources
 *SourcesApi* | [**sourcesControllerCreateSource**](docs/SourcesApi.md#sourcescontrollercreatesource) | **POST** /sources | Create a new data source
 *SourcesApi* | [**sourcesControllerDeleteSource**](docs/SourcesApi.md#sourcescontrollerdeletesource) | **DELETE** /sources/{id} | Delete a data source
+*SourcesApi* | [**sourcesControllerGetConnectionTest**](docs/SourcesApi.md#sourcescontrollergetconnectiontest) | **GET** /sources/{id}/test | The result of the last connection test
 *SourcesApi* | [**sourcesControllerGetSchedule**](docs/SourcesApi.md#sourcescontrollergetschedule) | **GET** /sources/{id}/schedule | Get source schedule
 *SourcesApi* | [**sourcesControllerGetSource**](docs/SourcesApi.md#sourcescontrollergetsource) | **GET** /sources/{id} | Get source by ID
 *SourcesApi* | [**sourcesControllerListSources**](docs/SourcesApi.md#sourcescontrollerlistsources) | **GET** /sources | List all data sources
 *SourcesApi* | [**sourcesControllerPurgeAssets**](docs/SourcesApi.md#sourcescontrollerpurgeassets) | **DELETE** /sources/{id}/assets | Retire a source\&#39;s assets — all of them, or a named subset
 *SourcesApi* | [**sourcesControllerPurgeFindings**](docs/SourcesApi.md#sourcescontrollerpurgefindings) | **DELETE** /sources/{id}/findings | Purge all findings of a data source
 *SourcesApi* | [**sourcesControllerResumeSchedule**](docs/SourcesApi.md#sourcescontrollerresumeschedule) | **POST** /sources/{id}/schedule/resume | Resume automatic scanning
+*SourcesApi* | [**sourcesControllerStartConnectionTest**](docs/SourcesApi.md#sourcescontrollerstartconnectiontest) | **POST** /sources/{id}/test/async | Start a source connection test without waiting for it
 *SourcesApi* | [**sourcesControllerStartRun**](docs/SourcesApi.md#sourcescontrollerstartrun) | **POST** /sources/{id}/runs | Start a new ingestion run
 *SourcesApi* | [**sourcesControllerTestConnection**](docs/SourcesApi.md#sourcescontrollertestconnection) | **POST** /sources/{id}/test | Test source connection
 *SourcesApi* | [**sourcesControllerUpdateSource**](docs/SourcesApi.md#sourcescontrollerupdatesource) | **PUT** /sources/{id} | Update a data source
@@ -389,6 +398,9 @@ All URIs are relative to *http://localhost*
 - [AssetListItemDto](docs/AssetListItemDto.md)
 - [AssetListResponseDto](docs/AssetListResponseDto.md)
 - [AssetResponseDto](docs/AssetResponseDto.md)
+- [AssetSeverityCountsItemDto](docs/AssetSeverityCountsItemDto.md)
+- [AssetSeverityCountsRequestDto](docs/AssetSeverityCountsRequestDto.md)
+- [AssetSeverityCountsResponseDto](docs/AssetSeverityCountsResponseDto.md)
 - [AssetSimilarityDto](docs/AssetSimilarityDto.md)
 - [AssistantCapabilityReportDto](docs/AssistantCapabilityReportDto.md)
 - [AssistantControllerRespond200Response](docs/AssistantControllerRespond200Response.md)
@@ -451,6 +463,7 @@ All URIs are relative to *http://localhost*
 - [ColumnLineageDto](docs/ColumnLineageDto.md)
 - [ColumnLineageResponseDto](docs/ColumnLineageResponseDto.md)
 - [ColumnLineageStepDto](docs/ColumnLineageStepDto.md)
+- [ConnectionTestStatusDto](docs/ConnectionTestStatusDto.md)
 - [ConstellationBoundaryAssetDto](docs/ConstellationBoundaryAssetDto.md)
 - [ConstellationBoundaryEdgeDto](docs/ConstellationBoundaryEdgeDto.md)
 - [ConstellationBundleDto](docs/ConstellationBundleDto.md)
@@ -545,11 +558,13 @@ All URIs are relative to *http://localhost*
 - [HarnessToolsResponseDto](docs/HarnessToolsResponseDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
+- [InquiryActivityDto](docs/InquiryActivityDto.md)
 - [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
 - [InquiryListResponseDto](docs/InquiryListResponseDto.md)
 - [InquiryMatchDto](docs/InquiryMatchDto.md)
 - [InquiryMatchListResponseDto](docs/InquiryMatchListResponseDto.md)
 - [InquiryResponseDto](docs/InquiryResponseDto.md)
+- [InquiryTimelineResponseDto](docs/InquiryTimelineResponseDto.md)
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)
 - [LineageGraphDto](docs/LineageGraphDto.md)
@@ -606,6 +621,8 @@ All URIs are relative to *http://localhost*
 - [RecomputeCorrelationResponseDto](docs/RecomputeCorrelationResponseDto.md)
 - [RecordVerdictDto](docs/RecordVerdictDto.md)
 - [RecordVerdictResponseDto](docs/RecordVerdictResponseDto.md)
+- [ReferencingFindingDto](docs/ReferencingFindingDto.md)
+- [ReferencingFindingsResponseDto](docs/ReferencingFindingsResponseDto.md)
 - [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
 - [RejectCauseDto](docs/RejectCauseDto.md)
@@ -649,6 +666,7 @@ All URIs are relative to *http://localhost*
 - [RunnerDto](docs/RunnerDto.md)
 - [RunnerLogEntryDto](docs/RunnerLogEntryDto.md)
 - [RunnerLogsResponseDto](docs/RunnerLogsResponseDto.md)
+- [RunnerQueuePositionDto](docs/RunnerQueuePositionDto.md)
 - [RunnersChartsTimelineBucketDto](docs/RunnersChartsTimelineBucketDto.md)
 - [RunnersChartsTopSourceDto](docs/RunnersChartsTopSourceDto.md)
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)
@@ -697,6 +715,7 @@ All URIs are relative to *http://localhost*
 - [SearchSourcesResponseDto](docs/SearchSourcesResponseDto.md)
 - [SearchSourcesTotalsDto](docs/SearchSourcesTotalsDto.md)
 - [SemanticFindingsSearchDto](docs/SemanticFindingsSearchDto.md)
+- [SetInquiryAutoPullDto](docs/SetInquiryAutoPullDto.md)
 - [SetWorkerQueuePausedDto](docs/SetWorkerQueuePausedDto.md)
 - [SimilarFindingAssetDto](docs/SimilarFindingAssetDto.md)
 - [SimilarFindingDto](docs/SimilarFindingDto.md)

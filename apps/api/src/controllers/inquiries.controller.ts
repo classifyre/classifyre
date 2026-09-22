@@ -31,6 +31,7 @@ import {
   InquiryResponseDto,
   UpdateInquiryDto,
 } from '../dto/inquiry.dto';
+import { InquiryTimelineResponseDto } from '../dto/inquiry-activity.dto';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 
 class RematchResponseDto {
@@ -129,10 +130,32 @@ export class InquiriesController {
     return this.inquiries.listMatches(id, query);
   }
 
+  @Get(':id/timeline')
+  @ApiOperation({
+    summary: "The inquiry's own history: config changes and each run's deltas",
+  })
+  @ApiQuery({ name: 'cursor', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiResponse({ status: 200, type: InquiryTimelineResponseDto })
+  timeline(
+    @Param('id') id: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ): Promise<InquiryTimelineResponseDto> {
+    return this.inquiries.timeline(
+      id,
+      cursor,
+      limit ? Number(limit) : undefined,
+    );
+  }
+
   @Post(':id/seen')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
-    summary: 'Mark the current matches as seen (clears the "new" badge)',
+    summary:
+      'Acknowledge the current matches. Does NOT clear the "new" count — ' +
+      "that is measured against the source's latest run and clears when the " +
+      'source runs again.',
   })
   async markSeen(@Param('id') id: string): Promise<void> {
     await this.inquiries.markSeen(id);

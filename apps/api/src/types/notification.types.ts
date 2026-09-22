@@ -14,6 +14,8 @@ export enum NotificationEvent {
   CASE_ESCALATED = 'case.escalated',
   // Autopilot changed a source's editable (detector/sampling/…) config.
   SOURCE_CONFIG_CHANGED = 'source.config_changed',
+  // A standing inquiry gained unseen matches after a run.
+  INQUIRY_NEW_MATCHES = 'inquiry.new_matches',
   // Autopilot triggered a re-scan of a source (e.g. to apply a config change).
   SOURCE_AUTOPILOT_RESCAN = 'source.autopilot_rescan',
   // The adaptive scheduler stopped running a source after repeated failures.

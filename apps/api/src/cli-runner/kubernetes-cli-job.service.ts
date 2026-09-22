@@ -694,6 +694,23 @@ export class KubernetesCliJobService {
       this.attachNotebookFilesVolume(jobAny, container, envMap);
     }
 
+    // A connection test answers in seconds and holds no corpus, but it was built
+    // from the extract template: a 3-second test waited 6.5 minutes Pending for
+    // a 7 GiB slot behind a running scan (GENESIS field report P2). It gets its
+    // own small profile, request == limit so the scheduler can place it next to
+    // an extract. Recipe `resources` below can still raise it for one source.
+    if (params.mode === 'test') {
+      const memory = process.env.K8S_CLI_TEST_JOB_MEMORY || '2Gi';
+      const cpu = process.env.K8S_CLI_TEST_JOB_CPU || '1';
+      container.resources = {
+        requests: {
+          memory,
+          cpu: process.env.K8S_CLI_TEST_JOB_CPU_REQUEST || '250m',
+        },
+        limits: { memory, cpu },
+      };
+    }
+
     // Apply per-source resource overrides from recipe
     const recipeResources = (params.recipe as any)?.resources;
     if (recipeResources && typeof recipeResources === 'object') {
@@ -1035,6 +1052,29 @@ export class KubernetesCliJobService {
     return `set -eu; python3 - <<'PYEOF'\n${py}\nPYEOF`;
   }
 
+  /**
+   * Follow the logs of a Job this process did not start.
+   *
+   * A scan outlives an API restart: the Job keeps running and the CLI reports
+   * its own result over REST, but the process that was streaming the Job's
+   * output is gone, so the run finished with no stored log at all. Re-attaching
+   * on boot restores it — without the live tail for the part that was missed,
+   * which nothing kept.
+   */
+  async followExistingJob(
+    jobName: string,
+    onLogChunk: CliJobLogHandler,
+    namespace = this.namespace,
+  ): Promise<{ succeeded: boolean; exitCode?: number }> {
+    await this.ensureKubernetesClients();
+    const result = await this.waitForJobCompletion(
+      namespace,
+      jobName,
+      onLogChunk,
+    );
+    return { succeeded: result.succeeded, exitCode: result.exitCode };
+  }
+
   private async waitForJobCompletion(
     namespace: string,
     jobName: string,
@@ -1190,7 +1230,18 @@ export class KubernetesCliJobService {
       return previousOutput;
     }
 
-    if (!onLogChunk || latestOutput === previousOutput) {
+    // A read that comes back empty -- or shorter than what we already have --
+    // is an unavailable read, not a shrinking log: `findJobPod` finds no pod
+    // while the Job is between attempts, and a response with no Content-Type
+    // yields ''. Adopting it as the cursor would make the NEXT good read look
+    // like a brand-new log and re-emit every line already stored, so the run's
+    // output is duplicated rather than lost. Covers `latestOutput ===
+    // previousOutput` too.
+    if (previousOutput.startsWith(latestOutput)) {
+      return previousOutput;
+    }
+
+    if (!onLogChunk) {
       return latestOutput;
     }
 

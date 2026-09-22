@@ -11,6 +11,8 @@ Name | Type
 `status` | string
 `matchCount` | number
 `newMatchCount` | number
+`goneMatchCount` | number
+`autoPull` | boolean
 
 ## Example
 
@@ -24,6 +26,8 @@ const example = {
   "status": null,
   "matchCount": null,
   "newMatchCount": null,
+  "goneMatchCount": null,
+  "autoPull": null,
 } satisfies CaseLinkedInquiryDto
 
 console.log(example)

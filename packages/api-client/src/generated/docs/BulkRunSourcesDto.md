@@ -9,6 +9,7 @@ Name | Type
 `ids` | Array&lt;string&gt;
 `filters` | [SearchSourcesFiltersDto](SearchSourcesFiltersDto.md)
 `forceFullRescan` | boolean
+`triggeredBy` | string
 
 ## Example
 
@@ -20,6 +21,7 @@ const example = {
   "ids": null,
   "filters": null,
   "forceFullRescan": null,
+  "triggeredBy": null,
 } satisfies BulkRunSourcesDto
 
 console.log(example)

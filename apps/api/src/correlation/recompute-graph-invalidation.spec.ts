@@ -78,3 +78,52 @@ describe('recompute → review index', () => {
     expect(h.correlationLock.runExclusive).toHaveBeenCalledTimes(1);
   });
 });
+
+// GENESIS field report P6: a full recompute (what a config change schedules)
+// rescored every pair but left the review queue on the old weights.
+describe('full recompute → review index', () => {
+  function fullHarness(refresh: jest.Mock) {
+    const service = Object.create(
+      CorrelationService.prototype,
+    ) as CorrelationService;
+    Object.assign(service, {
+      reviewIndex: { refresh },
+      logger: { error: jest.fn(), log: jest.fn(), warn: jest.fn() },
+      prisma: {
+        asset: {
+          count: jest.fn().mockResolvedValue(0),
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+      },
+      loadConfig: jest.fn().mockResolvedValue({
+        rawWeights: { tag_x: 0 },
+        defaultWeight: 1,
+        weightOf: () => 1,
+      }),
+      scoreAndLink: jest
+        .fn()
+        .mockResolvedValue({ relatedPairs: 0, duplicatePairs: 0 }),
+      linkIdenticalContent: jest
+        .fn()
+        .mockResolvedValue({ groups: 0, pairs: 0 }),
+      rebuildAllClusters: jest.fn().mockResolvedValue(0),
+    });
+    return service;
+  }
+
+  it('rebuilds the review queue under the new weights', async () => {
+    const refresh = jest.fn().mockResolvedValue(undefined);
+    await (fullHarness(refresh) as any).recomputeAllUnlocked();
+    expect(refresh).toHaveBeenCalledWith({
+      labelWeights: { tag_x: 0 },
+      defaultWeight: 1,
+    });
+  });
+
+  it('still completes the recompute when the queue rebuild fails', async () => {
+    const refresh = jest.fn().mockRejectedValue(new Error('boom'));
+    await expect(
+      (fullHarness(refresh) as any).recomputeAllUnlocked(),
+    ).resolves.toMatchObject({ duplicatePairs: 0 });
+  });
+});

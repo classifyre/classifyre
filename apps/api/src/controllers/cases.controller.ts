@@ -26,6 +26,7 @@ import {
   CloseCaseResponseDto,
   CreateCaseDto,
   LinkInquiriesDto,
+  SetInquiryAutoPullDto,
   PullFromInquiryDto,
   PullFromInquiryResponseDto,
   QueryCasesDto,
@@ -173,6 +174,26 @@ export class CasesController {
     @Body() dto: LinkInquiriesDto,
   ): Promise<CaseResponseDto> {
     return this.casesService.linkInquiries(id, dto);
+  }
+
+  @Patch(':id/inquiries/:inquiryId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Turn automatic pulling of an inquiry's new matches on or off",
+  })
+  @ApiResponse({ status: 200, type: CaseResponseDto })
+  setInquiryAutoPull(
+    @Param('id') id: string,
+    @Param('inquiryId') inquiryId: string,
+    @Body() dto: SetInquiryAutoPullDto,
+  ): Promise<CaseResponseDto> {
+    // No global ValidationPipe runs here, so the boolean arrives as whatever
+    // the client sent — including the string "true" from an older MCP session.
+    return this.casesService.setInquiryAutoPull(
+      id,
+      inquiryId,
+      dto.autoPull === true || String(dto.autoPull) === 'true',
+    );
   }
 
   @Delete(':id/inquiries/:inquiryId')

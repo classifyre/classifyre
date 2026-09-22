@@ -13,6 +13,7 @@ Name | Type
 `assignee` | string
 `createdBy` | string
 `inquiryIds` | Array&lt;string&gt;
+`autoPullInquiryIds` | Array&lt;string&gt;
 
 ## Example
 
@@ -28,6 +29,7 @@ const example = {
   "assignee": null,
   "createdBy": null,
   "inquiryIds": null,
+  "autoPullInquiryIds": null,
 } satisfies CreateCaseDto
 
 console.log(example)

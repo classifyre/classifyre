@@ -31,6 +31,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@workspace/ui/components/dialog";
+import { FeatureOffNotice } from "@/components/feature-off-notice";
 
 const ORIGIN_META: Record<string, { label: string; icon: React.ReactNode }> = {
   SEMANTIC_NEIGHBOR: { label: "Semantic neighbor", icon: <Sparkles className="h-3 w-3" /> },
@@ -226,6 +227,7 @@ export function CaseLeads({
 
   return (
     <div className="space-y-4">
+      <FeatureOffNotice feature="embeddings" context="leads" variant="inline" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-muted-foreground max-w-2xl text-xs">
           Leads are candidate findings surfaced from semantic neighbours of your evidence and

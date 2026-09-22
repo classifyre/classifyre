@@ -25,6 +25,12 @@ export interface LinkInquiriesDto {
      * @memberof LinkInquiriesDto
      */
     inquiryIds: Array<string>;
+    /**
+     * Of the linked inquiries, these also pull their new matches in by themselves as later scans land them. Additive rather than a shape change to inquiryIds, which MCP and autopilot callers already send.
+     * @type {Array<string>}
+     * @memberof LinkInquiriesDto
+     */
+    autoPullInquiryIds?: Array<string>;
 }
 
 /**
@@ -46,6 +52,7 @@ export function LinkInquiriesDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
     return {
         
         'inquiryIds': json['inquiryIds'],
+        'autoPullInquiryIds': json['autoPullInquiryIds'] == null ? undefined : json['autoPullInquiryIds'],
     };
 }
 
@@ -61,6 +68,7 @@ export function LinkInquiriesDtoToJSONTyped(value?: LinkInquiriesDto | null, ign
     return {
         
         'inquiryIds': value['inquiryIds'],
+        'autoPullInquiryIds': value['autoPullInquiryIds'],
     };
 }
 

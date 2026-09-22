@@ -47,6 +47,7 @@ const overview = {
       })),
     }),
     queueEntry("autopilot.cycle"),
+    queueEntry("correlation.scan", { paused: true, heldBy: "duplicates" }),
   ],
 };
 
@@ -147,4 +148,22 @@ test("purge is offered on backlogged queues and confirms side effects", async ({
   ).toHaveCount(0);
   expect(purged).toHaveLength(1);
   expect(purged[0]).toContain("auto-schedule.tick/purge");
+});
+
+test("a queue held by a feature switch cannot be resumed here", async ({
+  mount,
+  page,
+}) => {
+  await mockQueuesApi(page);
+  const component = await mount(<WorkerQueuesCardHarness />);
+
+  const held = component
+    .getByRole("table")
+    .getByRole("row", { name: /correlation\.scan/ });
+  await expect(held.getByText("Held · Duplicate detection off")).toBeVisible();
+  // No resume button: the way back is the switch.
+  await expect(held.getByRole("button", { name: "Resume" })).toHaveCount(0);
+  await expect(
+    held.getByRole("link", { name: "Turn on in Cleanup" }),
+  ).toBeVisible();
 });

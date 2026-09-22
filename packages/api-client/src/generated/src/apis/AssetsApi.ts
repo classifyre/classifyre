@@ -20,6 +20,7 @@ import type {
   BulkIngestAssetsDto,
   FinalizeIngestRunDto,
   LiveQueryResponseDto,
+  ReferencingFindingsResponseDto,
   SearchAssetsChartsRequestDto,
   SearchAssetsChartsResponseDto,
   SearchAssetsRequestDto,
@@ -42,6 +43,8 @@ import {
     FinalizeIngestRunDtoToJSON,
     LiveQueryResponseDtoFromJSON,
     LiveQueryResponseDtoToJSON,
+    ReferencingFindingsResponseDtoFromJSON,
+    ReferencingFindingsResponseDtoToJSON,
     SearchAssetsChartsRequestDtoFromJSON,
     SearchAssetsChartsRequestDtoToJSON,
     SearchAssetsChartsResponseDtoFromJSON,
@@ -66,6 +69,11 @@ import {
 
 export interface AssetsControllerGetAssetRequest {
     id: string;
+}
+
+export interface AssetsControllerGetReferencingFindingsRequest {
+    id: string;
+    limit?: number;
 }
 
 export interface SearchAssetsControllerExportAssetsRequest {
@@ -203,6 +211,49 @@ export class AssetsApi extends runtime.BaseAPI {
      */
     async assetsControllerGetAsset(requestParameters: AssetsControllerGetAssetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetListItemDto> {
         const response = await this.assetsControllerGetAssetRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * An integrity check or a derived profile is its own asset that references the thing it is about, so the subject\'s own Findings tab can be empty while a finding points straight at it. Incoming asset-to-asset edges only, worst severity first, unresolved only.
+     * Findings recorded on assets that point at this one
+     */
+    async assetsControllerGetReferencingFindingsRaw(requestParameters: AssetsControllerGetReferencingFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ReferencingFindingsResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling assetsControllerGetReferencingFindings().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/assets/{id}/referencing-findings`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ReferencingFindingsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * An integrity check or a derived profile is its own asset that references the thing it is about, so the subject\'s own Findings tab can be empty while a finding points straight at it. Incoming asset-to-asset edges only, worst severity first, unresolved only.
+     * Findings recorded on assets that point at this one
+     */
+    async assetsControllerGetReferencingFindings(requestParameters: AssetsControllerGetReferencingFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ReferencingFindingsResponseDto> {
+        const response = await this.assetsControllerGetReferencingFindingsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

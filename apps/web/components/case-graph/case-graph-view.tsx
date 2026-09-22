@@ -58,6 +58,7 @@ import { severityArcsOf } from "../graph-explorer/node-render";
 import {
   ACCENT,
   CROSS_HYP_COLOR,
+  GONE_RING_COLOR,
   keyOf,
   nodeKey,
   type GraphMode,
@@ -666,7 +667,16 @@ export function CaseGraphView({
 
   const [hoverKey, setHoverKey] = React.useState<string | null>(null);
 
-  /** Case-specific node visuals: evidence ring, hypothesis dots, attach/collapse badges. */
+  /**
+   * Case-specific node visuals: evidence ring, hypothesis dots, watch state,
+   * attach/collapse badges.
+   *
+   * Watch state arrives on the node as `matchState`, stamped by the API from
+   * the case's driving watches. NEW is a badge rather than a ring because the
+   * evidence ring already owns that slot and a node is routinely both — the
+   * fresh thing the last scan brought in is usually the thing you just pulled.
+   * GONE takes the dashed ring, which nothing else uses on a finding.
+   */
   const nodeDecorator = React.useCallback(
     (n: GraphNodeDto): NodeDecoration | null => {
       const key = keyOf(n);
@@ -680,9 +690,13 @@ export function CaseGraphView({
         const cc = collapsedCounts.get(n.id) ?? 0;
         if (cc > 0) badges.push({ id: "collapse", text: `▸${cc}`, placement: "br" });
       }
+      if (n.matchState === "NEW") {
+        badges.push({ id: "new", text: "NEW", placement: "tr", accent: true });
+      }
       const deco: NodeDecoration = {};
       if (evidenceKeys.has(key)) deco.ringColor = ACCENT;
-      if (hypColors.length > 1) deco.dashedRingColor = CROSS_HYP_COLOR;
+      if (n.matchState === "GONE") deco.dashedRingColor = GONE_RING_COLOR;
+      else if (hypColors.length > 1) deco.dashedRingColor = CROSS_HYP_COLOR;
       if (hypColors.length > 0) deco.dots = hypColors;
       if (badges.length > 0) deco.badges = badges;
       if (n.type === "asset" && !isAssetExpanded(n.id)) {
@@ -802,8 +816,8 @@ export function CaseGraphView({
               onToggleCollapse={() => expandAssetWithFan(selectedNode.id)}
               onAttachFindingsDialog={() => setAttachAsset(selectedNode)}
               onReleasePin={() => layout.releasePin(keyOf(selectedNode))}
-              onOpenAsset={() => window.open(`/assets/${selectedNode.id}`, "_blank")}
-              onOpenFinding={() => window.open(`/findings/${selectedNode.id}`, "_blank")}
+              onOpenAsset={() => window.open(nsPath(`/assets/${selectedNode.id}`), "_blank")}
+              onOpenFinding={() => window.open(nsPath(`/findings/${selectedNode.id}`), "_blank")}
             />
           ) : selectedEdge ? (
             <EdgeDetailPanel
@@ -888,8 +902,8 @@ export function CaseGraphView({
           onExpand={(n) => void expandNode(n)}
           onAttachFindingsDialog={(n) => setAttachAsset(n)}
           onReleasePin={(n) => layout.releasePin(keyOf(n))}
-          onOpenAsset={(n) => window.open(`/assets/${n.id}`, "_blank")}
-          onOpenFinding={(n) => window.open(`/findings/${n.id}`, "_blank")}
+          onOpenAsset={(n) => window.open(nsPath(`/assets/${n.id}`), "_blank")}
+          onOpenFinding={(n) => window.open(nsPath(`/findings/${n.id}`), "_blank")}
           onRenameEdge={(e) => setRenameEdge(e)}
           onDeleteEdge={(e) => setEdgeToDelete(e)}
         />

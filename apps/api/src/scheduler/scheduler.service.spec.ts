@@ -80,9 +80,12 @@ describe('SchedulerService', () => {
       );
     });
 
-    it('does not register any worker when no sources are enabled', async () => {
+    it('registers no source worker when no sources are enabled', async () => {
       await service.registerForNamespace();
-      expect(mockBoss.work).not.toHaveBeenCalled();
+      // Only the missed-window sweep, which is per namespace and not per source.
+      expect(mockBoss.work.mock.calls.map((c) => c[0])).toEqual([
+        'cron-catchup',
+      ]);
     });
 
     it('registers missing DB schedules on startup sync', async () => {
@@ -113,7 +116,11 @@ describe('SchedulerService', () => {
 
       await service.registerForNamespace();
 
-      expect(mockBoss.schedule).not.toHaveBeenCalled();
+      expect(
+        mockBoss.schedule.mock.calls.filter((c) =>
+          String(c[0]).startsWith('ingest-source-'),
+        ),
+      ).toEqual([]);
     });
 
     it('removes stale pg-boss schedules for disabled/deleted sources', async () => {
@@ -140,7 +147,11 @@ describe('SchedulerService', () => {
       await service.registerForNamespace();
 
       // worker should only be registered once despite two bootstrap calls
-      expect(mockBoss.work).toHaveBeenCalledTimes(1);
+      expect(
+        mockBoss.work.mock.calls.filter((c) =>
+          String(c[0]).startsWith('ingest-source-'),
+        ),
+      ).toHaveLength(1);
     });
   });
 
@@ -276,5 +287,311 @@ describe('SchedulerService', () => {
         capturedHandler([{ id: 'job-4', data: { sourceId } }]),
       ).resolves.toBeUndefined();
     });
+  });
+});
+
+/**
+ * A cron window that passes while nothing is scheduling is lost: pg-boss only
+ * fires while a listener is up, and no replay exists. On an instance that is
+ * not up around the clock that silently turns a daily schedule into no runs at
+ * all — the GENESIS namespaces went 25 hours stale with every schedule enabled.
+ */
+describe('SchedulerService cron catch-up', () => {
+  let service: SchedulerService;
+
+  const source = (over: Record<string, unknown> = {}) => ({
+    id: 's1',
+    name: 'Destatis Pressemitteilungen',
+    scheduleCron: '15 6 * * *',
+    scheduleTimezone: 'Europe/Berlin',
+    // The window at 04:15 UTC on the 20th passed unserved.
+    lastRunAt: new Date('2026-09-19T07:40:00Z'),
+    runnerStatus: 'COMPLETED',
+    updatedAt: new Date('2026-09-01T00:00:00Z'),
+    ...over,
+  });
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    // clearAllMocks clears calls but keeps implementations, so a test that
+    // makes startRun reject would otherwise leak into the next one.
+    mockCliRunnerService.startRun.mockReset().mockResolvedValue(undefined);
+    mockPrisma.source.findUnique.mockReset().mockResolvedValue(null);
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-20T09:00:00Z'));
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        SchedulerService,
+        { provide: PgBossService, useValue: mockPgBossService },
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: CliRunnerService, useValue: mockCliRunnerService },
+        { provide: ClsService, useValue: mockCls },
+      ],
+    }).compile();
+    service = module.get<SchedulerService>(SchedulerService);
+  });
+
+  afterEach(() => jest.useRealTimers());
+
+  it('starts one run for a source whose window passed while nothing ran', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([source()]);
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 1,
+    });
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledWith(
+      's1',
+      TriggerType.SCHEDULED,
+      'Scheduler (catch-up)',
+    );
+  });
+
+  it('starts nothing when the last run is newer than the window', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([
+      source({ lastRunAt: new Date('2026-09-20T05:00:00Z') }),
+    ]);
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 0,
+    });
+    expect(mockCliRunnerService.startRun).not.toHaveBeenCalled();
+  });
+
+  it('leaves a source that is already running or queued alone', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([
+      source({ runnerStatus: 'RUNNING' }),
+      source({ id: 's2', runnerStatus: 'PENDING' }),
+    ]);
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 0,
+    });
+  });
+
+  it('never starts a run for a window that has not come round yet', async () => {
+    // Weekly on Tuesday; 2026-09-20 is a Sunday and the source ran on Saturday.
+    mockPrisma.source.findMany.mockResolvedValue([
+      source({ scheduleCron: '0 4 * * 2' }),
+    ]);
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 0,
+    });
+  });
+
+  it('gives up on a source that will not start, instead of retrying forever', async () => {
+    // A source whose credentials will not decrypt can never start, and
+    // lastRunAt only advances when a run does start -- so it stays due. The
+    // old sweep retried and warned every 10 minutes indefinitely: 8 warnings
+    // in 70 minutes against one HIVE source.
+    mockPrisma.source.findMany.mockResolvedValue([source()]);
+    mockCliRunnerService.startRun.mockRejectedValue(
+      new Error('Failed to decrypt source credentials'),
+    );
+
+    // Each pass is attempted only once its backoff has elapsed: 10, 20, 40
+    // and 80 minutes after the preceding failure.
+    for (const at of [
+      '2026-09-20T09:00:00Z',
+      '2026-09-20T09:11:00Z',
+      '2026-09-20T09:35:00Z',
+      '2026-09-20T10:20:00Z',
+      '2026-09-20T11:45:00Z',
+      '2026-09-20T20:00:00Z',
+      '2026-09-21T09:00:00Z',
+    ]) {
+      jest.setSystemTime(new Date(at));
+      await service.catchUpMissedCronRuns();
+    }
+
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledTimes(5);
+  });
+
+  it('waits out the backoff rather than retrying on the very next pass', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([source()]);
+    mockCliRunnerService.startRun.mockRejectedValue(new Error('nope'));
+
+    await service.catchUpMissedCronRuns();
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledTimes(1);
+
+    // The next sweep is 10 minutes later by cron, but only 5 have passed here.
+    jest.setSystemTime(new Date('2026-09-20T09:05:00Z'));
+    await service.catchUpMissedCronRuns();
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledTimes(1);
+
+    jest.setSystemTime(new Date('2026-09-20T09:11:00Z'));
+    await service.catchUpMissedCronRuns();
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries at once when the source has been edited since it last failed', async () => {
+    mockCliRunnerService.startRun.mockRejectedValue(new Error('bad creds'));
+    mockPrisma.source.findMany.mockResolvedValue([source()]);
+
+    // Fail all the way to the give-up state.
+    for (const at of [
+      '2026-09-20T09:00:00Z',
+      '2026-09-20T09:11:00Z',
+      '2026-09-20T09:35:00Z',
+      '2026-09-20T10:20:00Z',
+      '2026-09-20T11:45:00Z',
+    ]) {
+      jest.setSystemTime(new Date(at));
+      await service.catchUpMissedCronRuns();
+    }
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledTimes(5);
+
+    // Someone fixes the credentials. The source row changes, so the record
+    // describing the old failures is stale and the backoff does not apply.
+    mockCliRunnerService.startRun.mockResolvedValue(undefined);
+    mockPrisma.source.findMany.mockResolvedValue([
+      source({ updatedAt: new Date('2026-09-20T11:50:00Z') }),
+    ]);
+    jest.setSystemTime(new Date('2026-09-20T11:51:00Z'));
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 1,
+    });
+  });
+
+  it('advances the attempt count although failing to start writes to the source row', async () => {
+    // `startRun` claims the source with a `currentRunnerId` and then puts it
+    // back on its way to failing, so Source.updatedAt is bumped by the failed
+    // attempt itself. Comparing against the value read BEFORE the attempt
+    // therefore found a difference every time and cleared the backoff on every
+    // failure -- the live counter sat at "attempt 1/5" indefinitely.
+    let updatedAt = new Date('2026-09-01T00:00:00Z');
+    mockPrisma.source.findMany.mockImplementation(() =>
+      Promise.resolve([source({ updatedAt })]),
+    );
+    mockPrisma.source.findUnique.mockImplementation(() =>
+      Promise.resolve({ updatedAt }),
+    );
+    mockCliRunnerService.startRun.mockImplementation(() => {
+      updatedAt = new Date(Date.now());
+      return Promise.reject(
+        new Error('Unsupported state or unable to authenticate data'),
+      );
+    });
+
+    for (const at of [
+      '2026-09-20T09:00:00Z',
+      '2026-09-20T09:11:00Z',
+      '2026-09-20T09:35:00Z',
+      '2026-09-20T10:20:00Z',
+      '2026-09-20T11:45:00Z',
+      '2026-09-20T23:00:00Z',
+    ]) {
+      jest.setSystemTime(new Date(at));
+      await service.catchUpMissedCronRuns();
+    }
+
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledTimes(5);
+
+    // And an edit by someone else still clears it: a different updatedAt that
+    // no failed attempt produced.
+    mockCliRunnerService.startRun.mockReset().mockResolvedValue(undefined);
+    updatedAt = new Date('2026-09-20T23:30:00Z');
+    jest.setSystemTime(new Date('2026-09-20T23:31:00Z'));
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 1,
+    });
+  });
+
+  it('keeps the backoff across a namespace worker teardown', async () => {
+    // Namespace workers are torn down and re-registered routinely, and
+    // clearForSchema runs each time. Clearing the failure record there made
+    // the backoff meaningless: observed live, the same broken source logged
+    // "attempt 1/5" five times in twenty minutes.
+    mockPrisma.source.findMany.mockResolvedValue([source()]);
+    mockCliRunnerService.startRun.mockRejectedValue(new Error('bad creds'));
+
+    await service.catchUpMissedCronRuns();
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledTimes(1);
+
+    service.clearForSchema('ns_test');
+
+    jest.setSystemTime(new Date('2026-09-20T09:05:00Z'));
+    await service.catchUpMissedCronRuns();
+    expect(mockCliRunnerService.startRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let a failing source occupy a slot in the pass cap', async () => {
+    // The held-back source is filtered before the cap, so five healthy
+    // sources still start.
+    const sources = Array.from({ length: 6 }, (_, i) =>
+      source({
+        id: `s${i}`,
+        scheduleTimezone: 'UTC',
+        scheduleCron: '0 4 * * *',
+      }),
+    );
+    mockPrisma.source.findMany.mockResolvedValue(sources);
+    mockCliRunnerService.startRun.mockImplementation((id: string) =>
+      id === 's0'
+        ? Promise.reject(new Error('bad creds'))
+        : Promise.resolve(undefined),
+    );
+
+    await service.catchUpMissedCronRuns();
+    mockCliRunnerService.startRun.mockClear();
+
+    jest.setSystemTime(new Date('2026-09-20T09:05:00Z'));
+    const { started } = await service.catchUpMissedCronRuns();
+
+    expect(started).toBe(5);
+    expect(
+      mockCliRunnerService.startRun.mock.calls.map((c) => c[0]),
+    ).not.toContain('s0');
+  });
+
+  it('caps one pass and takes the oldest miss first', async () => {
+    // Daily windows at 07:00–13:00 UTC, with "now" at 09:00 on the 20th: for
+    // s3..s6 today's window has not arrived, so their last one is yesterday's
+    // — which makes them the oldest misses, ahead of this morning's 07:00.
+    const missed = Array.from({ length: 7 }, (_, i) =>
+      source({
+        id: `s${i}`,
+        scheduleCron: `0 ${7 + i} * * *`,
+        scheduleTimezone: 'UTC',
+        lastRunAt: new Date('2026-09-19T00:00:00Z'),
+      }),
+    );
+    mockPrisma.source.findMany.mockResolvedValue(missed);
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 5,
+    });
+    expect(mockCliRunnerService.startRun.mock.calls.map((c) => c[0])).toEqual([
+      's3',
+      's4',
+      's5',
+      's6',
+      's0',
+    ]);
+  });
+
+  it('keeps sweeping when one source refuses to start', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([
+      source({ id: 'paused' }),
+      source({ id: 'fine', scheduleCron: '0 7 * * *' }),
+    ]);
+    mockCliRunnerService.startRun
+      .mockRejectedValueOnce(new ConflictException('workspace is paused'))
+      .mockResolvedValueOnce({});
+
+    await expect(service.catchUpMissedCronRuns()).resolves.toEqual({
+      started: 1,
+    });
+  });
+
+  it('registers the recurring sweep alongside the source schedules', async () => {
+    mockPrisma.source.findMany.mockResolvedValue([]);
+    await service.registerForNamespace();
+    expect(mockBoss.schedule).toHaveBeenCalledWith(
+      'cron-catchup',
+      '*/10 * * * *',
+      {},
+      { tz: 'UTC' },
+    );
   });
 });

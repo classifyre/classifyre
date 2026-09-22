@@ -9,6 +9,8 @@ import { Button } from "@workspace/ui/components/button";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { formatDate } from "@/lib/date";
 import { useTranslation } from "@/hooks/use-translation";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
+import { FeatureOffNotice } from "@/components/feature-off-notice";
 
 const POLL_MS = 5000;
 
@@ -29,6 +31,8 @@ export function SemanticIndexControls() {
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [reindexing, setReindexing] = React.useState(false);
   const [recalibrating, setRecalibrating] = React.useState(false);
+  // Both actions answer 409 while embeddings are off; don't offer them.
+  const embeddingsOff = useWorkspaceFeatures().isOff("embeddings");
 
   const refresh = React.useCallback(() => {
     fetchStatus()
@@ -93,6 +97,8 @@ export function SemanticIndexControls() {
         <Sparkles className="h-3.5 w-3.5" />
         {t("correlation.semanticIndex.title")}
       </h3>
+
+      <FeatureOffNotice feature="embeddings" context="index" variant="inline" />
 
       {loadError ? (
         <p className="text-xs text-destructive">{loadError}</p>
@@ -199,6 +205,7 @@ export function SemanticIndexControls() {
             variant="outline"
             className="w-full"
             disabled={
+              embeddingsOff ||
               reindexing ||
               status?.backfillRunning ||
               !status?.workerRegistered
@@ -221,6 +228,7 @@ export function SemanticIndexControls() {
             variant="outline"
             className="w-full"
             disabled={
+              embeddingsOff ||
               recalibrating || status?.recalibrationScheduled || status?.recalibrationRunning
             }
             onClick={() => void recalibrate()}
