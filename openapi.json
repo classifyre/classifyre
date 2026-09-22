@@ -7599,7 +7599,7 @@
             "description": ""
           }
         },
-        "summary": "Per-namespace source rollups (total + failing)",
+        "summary": "Per-namespace source rollups (total + failing + running + pending)",
         "tags": [
           "Namespaces"
         ]

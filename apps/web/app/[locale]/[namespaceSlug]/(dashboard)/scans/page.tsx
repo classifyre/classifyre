@@ -1,12 +1,14 @@
 "use client";
 
 import { nsPath } from "@/lib/ns-path";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useUrlParams } from "@/lib/url-filters";
 import * as echarts from "echarts";
 import { Activity, Loader2, Play, ScanSearch } from "lucide-react";
 import {
   api,
+  SearchRunnersFiltersInputDtoStatusEnum,
   type SearchRunnersChartsResponseDto,
   type SearchRunnersFiltersInputDto,
   type SearchRunnersStatus,
@@ -68,9 +70,41 @@ function resolveThemeColors(): ThemeColors {
   };
 }
 
+/**
+ * URL-provided statuses must be real runner statuses the panels can show as
+ * active. STOPPED is a genuine API value but has no panel, so it is excluded
+ * rather than duplicating the list by hand — the generated OpenAPI enum stays
+ * the single source of truth.
+ */
+function isSelectableRunnerStatus(
+  value: string,
+): value is SearchRunnersStatus {
+  return (
+    value !== SearchRunnersFiltersInputDtoStatusEnum.Stopped &&
+    (Object.values(SearchRunnersFiltersInputDtoStatusEnum) as string[]).includes(
+      value,
+    )
+  );
+}
+
 export default function ScansPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-16 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+      }
+    >
+      <ScansContent />
+    </Suspense>
+  );
+}
+
+function ScansContent() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { searchParams, setParams } = useUrlParams();
   const [themeColors, setThemeColors] = useState<ThemeColors>(resolveThemeColors);
 
   useEffect(() => {
@@ -82,9 +116,20 @@ export default function ScansPage() {
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [windowDays, setWindowDays] = useState("30");
+  // Deep-linkable status filter (?status=RUNNING): read once on mount, panel
+  // clicks below keep the URL in sync so filtered views are shareable.
   const [selectedStatuses, setSelectedStatuses] = useState<
     SearchRunnersStatus[]
-  >([]);
+  >(() => searchParams.getAll("status").filter(isSelectableRunnerStatus));
+
+  const selectStatusPanel = useCallback(
+    (key: StatusPanelKey) => {
+      const next = key === "TOTAL" ? [] : [key as SearchRunnersStatus];
+      setSelectedStatuses(next);
+      setParams({ status: next });
+    },
+    [setParams],
+  );
   const [tableFilters, setTableFilters] = useState<
     SearchRunnersFiltersInputDto | undefined | null
   >(null);
@@ -370,13 +415,7 @@ export default function ScansPage() {
                   key={panel.key}
                   type="button"
                   className="group text-left cursor-pointer transition-transform hover:-translate-y-px focus-visible:outline-none"
-                  onClick={() => {
-                    if (panel.key === "TOTAL") {
-                      setSelectedStatuses([]);
-                    } else {
-                      setSelectedStatuses([panel.key as SearchRunnersStatus]);
-                    }
-                  }}
+                  onClick={() => selectStatusPanel(panel.key)}
                 >
                   <Card
                     className={

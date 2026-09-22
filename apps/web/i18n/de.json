@@ -60,6 +60,8 @@
     "thumbnailReadError": "Das Bild konnte nicht gelesen werden.",
     "sourcesCount": "Quellen",
     "failingCount": "{{count}} fehlgeschlagen",
+    "runningCount": "{{count}} laufend",
+    "pendingCount": "{{count}} ausstehend",
     "settingsLoadFailed": "Arbeitsbereichseinstellungen konnten nicht geladen werden",
     "settingsSaved": "Arbeitsbereichseinstellungen gespeichert",
     "settingsSaveFailed": "Arbeitsbereichseinstellungen konnten nicht gespeichert werden",

@@ -11,7 +11,7 @@ All URIs are relative to *http://localhost*
 | [**namespacesControllerListCategories**](NamespacesApi.md#namespacescontrollerlistcategories) | **GET** /namespaces/categories | List workspace categories with workspace counts |
 | [**namespacesControllerRemove**](NamespacesApi.md#namespacescontrollerremove) | **DELETE** /namespaces/{id} | Soft-delete a namespace (hidden from listings; data retained) |
 | [**namespacesControllerRemoveCategory**](NamespacesApi.md#namespacescontrollerremovecategory) | **DELETE** /namespaces/categories/{categoryId} | Delete a category (its workspaces fall back to the default category) |
-| [**namespacesControllerStats**](NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing) |
+| [**namespacesControllerStats**](NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing + running + pending) |
 | [**namespacesControllerThumbnail**](NamespacesApi.md#namespacescontrollerthumbnail) | **GET** /namespaces/{id}/thumbnail | Stream a namespace\&#39;s thumbnail image |
 | [**namespacesControllerUpdate**](NamespacesApi.md#namespacescontrollerupdate) | **PATCH** /namespaces/{id} | Update a namespace |
 | [**namespacesControllerUpdateCategory**](NamespacesApi.md#namespacescontrollerupdatecategory) | **PATCH** /namespaces/categories/{categoryId} | Rename or re-describe a workspace category |
@@ -445,7 +445,7 @@ No authorization required
 
 > namespacesControllerStats()
 
-Per-namespace source rollups (total + failing)
+Per-namespace source rollups (total + failing + running + pending)
 
 ### Example
 

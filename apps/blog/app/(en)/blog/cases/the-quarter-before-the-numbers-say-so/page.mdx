@@ -1,0 +1,322 @@
+---
+title: "The Quarter Before the Numbers Say So: Early Warning From Public Statistics"
+description: Schleswig-Holstein's company insolvencies rose 36.6% in one quarter. Building permits collapsed two years earlier. And the signal everyone treats as leading turned out to lag. What monthly public data can and cannot warn you about.
+date: 2026-09-22T00:00:00.000Z
+tags:
+  - investigations
+  - public-data
+  - early-warning
+  - risk
+categories:
+  - Field Notes
+author: Banandre
+image: /blog/assets/images/the-quarter-before-the-numbers-say-so.jpg
+keywords:
+  - early warning indicators
+  - insolvency statistics Germany
+  - credit risk
+  - supply chain risk
+  - leading indicators
+  - building permits
+  - GENESIS-Online
+  - Classifyre
+alternates:
+  canonical: /blog/cases/the-quarter-before-the-numbers-say-so
+  languages:
+    en: /blog/cases/the-quarter-before-the-numbers-say-so/
+    de: /de/blog/cases/the-quarter-before-the-numbers-say-so/
+    x-default: /blog/cases/the-quarter-before-the-numbers-say-so/
+openGraph:
+  type: article
+  title: "The Quarter Before the Numbers Say So: Early Warning From Public Statistics"
+  description: Schleswig-Holstein's insolvencies rose 36.6% in a quarter. Permits collapsed two years earlier. And the signal everyone treats as leading turned out to lag.
+  url: /blog/cases/the-quarter-before-the-numbers-say-so
+  siteName: Classifyre
+  publishedTime: 2026-09-22T00:00:00.000Z
+  modifiedTime: 2026-09-22T00:00:00.000Z
+  authors:
+    - Banandre
+  section: Field Notes
+  tags:
+    - early warning
+    - credit risk
+    - insolvency
+    - public data
+  images:
+    - /blog/assets/images/the-quarter-before-the-numbers-say-so.jpg
+twitter:
+  card: summary
+  title: "The Quarter Before the Numbers Say So"
+  description: Insolvencies up 36.6% in a quarter, permits collapsing two years ahead of it, and the leading indicator that turned out to lag.
+  images:
+    - /blog/assets/images/the-quarter-before-the-numbers-say-so.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/the-quarter-before-the-numbers-say-so.jpg"
+  eyebrow="Field notes"
+  title="The Quarter Before the Numbers Say So"
+  description="Schleswig-Holstein's company insolvencies rose 36.6% in one quarter. Building permits collapsed two years earlier. And the signal everyone treats as leading turned out to lag."
+/>
+
+<ArticleJsonLd
+  headline="The Quarter Before the Numbers Say So: Early Warning From Public Statistics"
+  description="A Classifyre namespace turning monthly German public statistics into standing early-warning signals for insolvency, labour market and construction risk."
+  path="/blog/cases/the-quarter-before-the-numbers-say-so"
+  datePublished="2026-09-22T00:00:00.000Z"
+  dateModified="2026-09-22T00:00:00.000Z"
+  authorName="Banandre"
+  articleSection="Field Notes"
+  about={[
+    "Early warning indicators",
+    "Insolvency risk",
+    "Labour market statistics",
+    "Construction sector",
+  ]}
+  mentions={[
+    {
+      "@type": "Dataset",
+      name: "GENESIS-Online (Statistisches Bundesamt)",
+      url: "https://www-genesis.destatis.de/",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://showcase.classifyre.com/de-fruehwarnung",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://showcase.classifyre.com/de-fruehwarnung"
+  liveCaseName="DE Frühwarnung namespace"
+/>
+
+<LiveCaseLink
+  href="https://showcase.classifyre.com/de-fruehwarnung"
+  caseName="DE Frühwarnung namespace"
+/>
+
+<ArticleSideRail
+  title="The Quarter Before the Numbers Say So"
+  path="/blog/cases/the-quarter-before-the-numbers-say-so/"
+  tags={["investigations", "public-data", "early-warning", "risk"]}
+  backHref="/blog/cases"
+  backLabel="All case files"
+/>
+
+Between April and June 2026, 291 companies in Schleswig-Holstein filed for
+insolvency. A year earlier, over the same three months, it was 213.
+
+That is +36.6%, and it is the third alert in that state since the turn of the
+year: +28.6% for November–January, +31.8% for December–February, +36.6% for
+April–June. The trend is not a spike. It is escalating.
+
+All of it comes from statistics anyone can download for free. The question this
+namespace exists to answer is what you have to build around that data before it
+can tell you something in time to act on.
+
+> **The short version:** monthly, state-level early warning from public German
+> statistics — 5 sources, 15 detectors, 234 findings, 6 investigations. Company
+> insolvencies, unemployment, business registrations and deregistrations,
+> building permits, births and deaths, plus the statistical office's own change
+> feed and the EU legal framework underneath it all. One of its most useful
+> results is a hypothesis it **refuted**.
+
+{/* SCREENSHOT: the namespace overview — five sources, their schedules and last
+    run, with the findings-by-severity tiles showing the HIGH band. */}
+
+## What an alert has to survive to be worth sending
+
+The naive version of this is easy and useless: compare the latest month to the
+same month a year ago, alert when it moves. You get an alert every month, in
+every state, forever.
+
+Three design decisions make the difference.
+
+**Three-month windows, not months.** Monthly insolvency counts in a small state
+are noisy — Bremen runs in the dozens. Rolling three-month windows against the
+same window a year earlier smooth that without hiding a turn.
+
+**A floor under the base.** A rule with no minimum fires on 4 → 7 and calls it
++75%. Alerts require a base of at least 60 in the comparison window, so a
+percentage means something.
+
+**Alerts are onsets, not states.** This is the one that matters most. The first
+version tagged every month a rule held — and produced 252 "natural balance"
+findings, because births have fallen every year since 2021 and every window was
+a new low. Now a finding is kept only on the month a *streak begins*. An alert
+that started in June stays on June when July arrives, instead of resolving
+because the window moved on. An eight-month rise is one finding, not eight, and
+the running streak sits in the month's metadata.
+
+There is a subtlety in that rule worth stating, because it is where an
+early-warning system usually goes wrong: an escalation inside an existing streak
+has to be its own finding. Schleswig-Holstein's +36.6% would have been silent —
+swallowed by a streak that began in January at +28.6% — if the severe band were
+not tracked separately from the ordinary one.
+
+{/* SCREENSHOT: the Schleswig-Holstein case timeline, showing the three alerts
+    (Nov–Jan, Dec–Feb, Apr–Jun) and their escalating severity. */}
+
+## The signal everyone gets backwards
+
+Here is the finding we would send to a credit or procurement team first, and it
+is a negative result.
+
+In January 2024, unemployment rose by at least half a percentage point year on
+year in **five German states in the same month**. Insolvency jumps in those same
+states arrived two to three months *later*.
+
+The namespace wrote that down as a testable claim in the opposite direction —
+*"unemployment turns follow insolvency jumps within six months"* — and recorded
+it as **refuted**.
+
+That matters because insolvency statistics are widely treated as the leading
+indicator of regional distress. In this data they are not. They are the
+confirmation. The labour market moved first.
+
+A second hypothesis in the same case — that the end-2024 wave of business
+deregistrations leads 2025 insolvencies — sits at *proposed*, with the test
+written and waiting for data.
+
+And the shape of the January 2024 event is itself a finding: five states
+simultaneously is a **national step, not five regional shocks**, which changes
+what you do about it.
+
+## Two years of warning in the construction sector
+
+The longest lead time in the namespace comes from building permits.
+
+Permits for dwellings collapsed across most German states at once in early
+2024. Construction then appears in the sector-level insolvency alerts one to two
+years afterwards.
+
+The mechanism is not mysterious — a permit is a commitment to build, and its
+absence works through the order books of everyone downstream — but the lag is
+long enough to be genuinely actionable for anyone with construction exposure.
+
+Getting the permits data at all took work worth mentioning. Table 31111-0120 is
+too large to request in one call and has to be fetched per state. Its totals sit
+under codes that the documented "give me the total" query does not return —
+`BTK-GEB` and `GBD-W-NW` — so a query written exactly as documented comes back
+empty. That trap is recorded as its own finding.
+
+A third hypothesis notes that **the slump is not over everywhere**: supported,
+which is the part a 2024-vintage analysis would miss.
+
+{/* SCREENSHOT: the "Bauflaute" case with its three hypotheses and the permit
+    findings across states, showing the 2024 collapse. */}
+
+## Watching the ground the alerts stand on
+
+Two of the six investigations are not about the economy at all. They watch the
+data supply itself, which is what separates a system from a script.
+
+**Publication lag.** The statistical office's change feed says when each watched
+statistic was updated. Lags differ by an order of magnitude: unemployment
+arrives three days *before* its month ends, deaths at 15 days, business
+registrations at 42, migration at 70, insolvencies at 73, births at 76.
+
+If you build a monthly risk review, that table is the schedule. There is no
+point asking about insolvencies in week one.
+
+A standing question watches for anything arriving more than twice as late as its
+own median — a plausible precursor to a revision or a withdrawal. It is empty
+today, and that is the correct state: the median is built from lag history the
+feed accumulates across runs, and nothing has been unusually late. The question
+says so on its face, so an operator reading "0 matches" does not mistake silence
+for breakage.
+
+**The legal framework.** The EU rules behind insolvency and business statistics
+changed repeatedly across 2025–2026, and the Court of Justice keeps refining
+cross-border insolvency. Both are tracked as findings on the acts themselves,
+because a definition change is indistinguishable from a trend change if you only
+watch the numbers.
+
+{/* SCREENSHOT: the publication-lag findings, one per watched statistic, ordered
+    by lag — the "when can I ask about this" table. */}
+
+## One rule, two severities
+
+A small change with an outsized effect on how usable the alerts are.
+
+The insolvency rule has two bands: **medium at +20%**, **high at +30%**. That
+used to require two separate detectors with duplicated descriptions, and every
+standing question and every case had to name both.
+
+Now one detector carries the rule and each finding carries its own band. The
+question *"insolvency jumps"* names one thing. A reader sees severity on the
+finding, where it belongs, rather than inferring it from which of two
+near-identical detectors fired.
+
+The constraint that makes this safe: a connector may lower a finding's severity
+within what the detector allows, and may never raise it past it. The detector is
+where the operator's decision lives.
+
+## What Classifyre contributed
+
+**Alerts arrive without anyone opening a page.** Each standing question raises a
+notification when a run produces new matches — including on questions nobody has
+opened yet. An insolvency onset, a permit collapse, a withdrawn table each
+surface on their own.
+
+**Every alert carries its arithmetic.** A finding is not "Schleswig-Holstein:
+risk up". It is `2026-04..2026-06: +36.6% — 291 vs 213 Unternehmensinsolvenzen`,
+with a lineage edge back to the exact table and measure code, and the sector
+split beside it.
+
+**The investigation holds its own disconfirmation.** The Schleswig-Holstein case
+has five hypotheses. *"One or two sectors carry the rise"* is **refuted** — the
+rise is broad. *"Construction led the February escalation"* is supported. *"It
+is not a single large group filing"* is proposed, with the test written down.
+That is a document a credit committee can argue with.
+
+**The sources run themselves.** Monthly indicators on a weekly cron, the change
+feed daily, the legal sources weekly. Windows missed while the instance is down
+are caught up rather than silently skipped.
+
+{/* SCREENSHOT: a notification raised by a standing question when a new onset
+    appeared, next to the finding it points at. */}
+
+## What it will not tell you
+
+Stated plainly, because an early-warning system that oversells itself is worse
+than none:
+
+- It is **state-level, not company-level**. It tells you Schleswig-Holstein's
+  construction sector is deteriorating. It does not name your counterparty.
+- **Insolvency statistics lag.** The namespace's own refuted hypothesis says so.
+- **Three months is the resolution.** A shock inside one month is not visible.
+- **The unusually-late signal needs history.** It cannot fire until the feed has
+  been watched long enough to have a median to compare against.
+
+Used as one input among several — with the publication-lag table telling you
+when each number is actually worth asking about — it does something a quarterly
+report cannot: it says *which state, which sector, which month it started, and
+whether it is still escalating*.
+
+## Who this is for
+
+Credit and counterparty risk, trade credit insurance, supply-chain and supplier
+monitoring, regional banking, construction and building materials, staffing,
+and public-sector economic development.
+
+Two things transfer to any early-warning problem regardless of domain: **alert
+on the start of a streak, not on every month it holds**, and **write down the
+lead-lag relationship you believe in and test it**, because the one in this data
+ran the opposite way to the consensus.
+
+## See it yourself
+
+The namespace is live, with every source, detector, standing question, case and
+lineage edge described above:
+
+**[showcase.classifyre.com/de-fruehwarnung](https://showcase.classifyre.com/de-fruehwarnung)**
+
+Start with *Arbeitsmarkt: Januar 2024 kippte in fünf Ländern zugleich* and read
+the refuted hypothesis — then follow Schleswig-Holstein's three alerts back to
+the monthly table they were computed from.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/blog/cases/the-quarter-before-the-numbers-say-so"
+/>
