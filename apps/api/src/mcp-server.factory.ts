@@ -2429,7 +2429,14 @@ export class McpServerFactoryService {
         inputSchema: {
           sourceId: z.string().uuid(),
           status: z
-            .enum(['PENDING', 'RUNNING', 'COMPLETED', 'WARNING', 'ERROR'])
+            .enum([
+              'PENDING',
+              'RUNNING',
+              'COMPLETED',
+              'WARNING',
+              'ERROR',
+              'STOPPED',
+            ])
             .optional()
             .describe('Filter to runs in this status.'),
           skip: z
@@ -3279,13 +3286,18 @@ export class McpServerFactoryService {
       {
         title: 'List Inquiry Matches',
         description:
-          'Findings currently matching a saved question (live query, never persisted).',
+          'Findings currently matching a saved question (live query, never ' +
+          "persisted). NEW means the latest completed run of the finding's " +
+          'source created it; GONE means that run retired it, so it answers ' +
+          'the question but no longer exists. Defaults to NEW and ONGOING — ' +
+          'ask for GONE by name.',
         inputSchema: {
           id: z.string().uuid(),
           search: z.string().optional(),
           severity: z
             .array(z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']))
             .optional(),
+          state: z.array(z.enum(['NEW', 'ONGOING', 'GONE'])).optional(),
           onlyNew: z.boolean().optional(),
           skip: z.number().int().min(0).optional(),
           limit: z.number().int().min(1).max(200).optional(),
@@ -3469,11 +3481,12 @@ export class McpServerFactoryService {
       {
         title: 'Close Case',
         description:
-          'Close a case with a conclusion. Linked questions are archived unless they drive another open case.',
+          'Close a case with a conclusion. Linked questions are archived unless they drive another open case, or keepInquiries is true (use it when the questions are standing checks that should keep running after the case is answered).',
         inputSchema: {
           id: z.string().uuid(),
           conclusion: z.string(),
           closedBy: z.string().optional(),
+          keepInquiries: z.boolean().optional(),
         },
         annotations: {
           readOnlyHint: false,
@@ -3583,22 +3596,51 @@ export class McpServerFactoryService {
       {
         title: 'Link Case Inquiries',
         description:
-          'Link additional questions to a case. Already-linked ones are ignored.',
+          'Link additional questions to a case. Already-linked ones are ' +
+          'ignored. Ids also named in autoPullInquiryIds will pull their new ' +
+          'matches into the case by themselves as later scans land them.',
         inputSchema: {
           id: z.string().uuid(),
           inquiryIds: z.array(z.string()),
+          autoPullInquiryIds: z.array(z.string()).optional(),
         },
         annotations: {
           readOnlyHint: false,
           destructiveHint: false,
         },
       },
-      async ({ id, inquiryIds }) => {
+      async ({ id, inquiryIds, autoPullInquiryIds }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.casesService.linkInquiries(id, { inquiryIds }),
+          await this.casesService.linkInquiries(id, {
+            inquiryIds,
+            autoPullInquiryIds,
+          }),
         );
       },
+    );
+
+    server.registerTool(
+      'get_inquiry_timeline',
+      {
+        title: 'Get Inquiry Timeline',
+        description:
+          "A saved question's own history: matcher changes, and what each run " +
+          "landed or retired. The durable record — a match's NEW state is " +
+          'live and expires the next time its source runs, but the run that ' +
+          'produced it stays here.',
+        inputSchema: {
+          id: z.string().uuid(),
+          cursor: z.string().optional(),
+          limit: z.number().int().min(1).max(100).optional(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ id, cursor, limit }) =>
+        jsonResult(await this.inquiriesService.timeline(id, cursor, limit)),
     );
 
     server.registerTool(
@@ -3807,10 +3849,19 @@ export class McpServerFactoryService {
       },
       async (dto) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        const config = await this.correlationService.saveConfig(dto);
+        const saved = await this.correlationService.saveConfig(dto);
+        // The status below promised this; nothing scheduled it (field report P6).
+        await this.correlationService.scheduleFullRecompute(
+          'correlation config updated (MCP)',
+        );
+        // Re-read so `recompute` describes what actually happens — including
+        // "nothing, duplicate detection is off".
+        const config = await this.correlationService.getConfig(saved.recompute);
         return jsonResult({
           config,
-          status: 'Config saved; a background recompute has been scheduled.',
+          status: config.enabled
+            ? 'Config saved; a background recompute has been scheduled.'
+            : `Config saved. ${config.recompute.note}`,
         });
       },
     );
@@ -3838,9 +3889,14 @@ export class McpServerFactoryService {
           label: label ?? null,
           value: value ?? null,
         });
+        await this.correlationService.scheduleFullRecompute(
+          'correlation exclusion added (MCP)',
+        );
         return jsonResult({
           config,
-          status: 'Exclusion added; a background recompute has been scheduled.',
+          status: config.enabled
+            ? 'Exclusion added; a background recompute has been scheduled.'
+            : `Exclusion added. ${config.recompute.note}`,
         });
       },
     );
@@ -3862,10 +3918,14 @@ export class McpServerFactoryService {
       async ({ id }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         const config = await this.correlationService.removeExclusion(id);
+        await this.correlationService.scheduleFullRecompute(
+          'correlation exclusion removed (MCP)',
+        );
         return jsonResult({
           config,
-          status:
-            'Exclusion removed; a background recompute has been scheduled.',
+          status: config.enabled
+            ? 'Exclusion removed; a background recompute has been scheduled.'
+            : `Exclusion removed. ${config.recompute.note}`,
         });
       },
     );
@@ -3890,6 +3950,9 @@ export class McpServerFactoryService {
       },
       async ({ assetId }) => {
         this.mcpToolExecutor.assertNotDemoMode();
+        // Explicit request: say why nothing happens rather than report a
+        // recompute that the switched-off scheduler silently refused.
+        await this.correlationService.assertEnabled();
         if (assetId) {
           const summary =
             await this.correlationService.recomputeForAsset(assetId);

@@ -17,6 +17,16 @@ model Source {
   lastRunStatus              RunnerStatus?               @map("last_run_status")
   lastRunAt                  DateTime?                   @map("last_run_at")
   lastErrorMessage           String?                     @map("last_error_message")
+  /// The most recent connection test, as
+  /// `{ status, startedAt, finishedAt, message, result, triggeredBy }`.
+  ///
+  /// Held on the row rather than in a Map so the asynchronous test endpoint
+  /// works across API replicas and survives a restart: a test can take minutes
+  /// on Kubernetes (the pod has to be scheduled), and holding the HTTP request
+  /// open for it fails behind any ingress with a 60 s timeout (field report
+  /// P2). One record per source, because a second test of the same source
+  /// while one is in flight is the same question.
+  connectionTest             Json?                       @map("connection_test") @db.JsonB
   createdAt                  DateTime                    @default(now()) @map("created_at")
   updatedAt                  DateTime                    @updatedAt @map("updated_at")
   currentRunnerId            String?                     @map("current_runner_id")
@@ -230,6 +240,19 @@ model Asset {
   // gone. Null for assets ingested before scope fingerprinting existed; they
   // are treated as out-of-scope (retained) until their next ingest.
   scopeFingerprint          String?                    @map("scope_fingerprint") @db.VarChar(64)
+  // The scope a *full scan has already looked for this asset under and not
+  // found*. Set when a run retains the asset because the scope moved between
+  // its last ingest and now; cleared the moment it is seen again.
+  //
+  // It is what makes a scope change recoverable. Without it the very first run
+  // after (say) a notebook variable change permanently exempted anything that
+  // disappeared in that same run: the asset kept its old fingerprint, every
+  // later run carried the new one, and the two never matched again, so it had
+  // to be retired by hand (GENESIS field report, §14 operational note). With
+  // it, the first run under the new scope records that it looked, and the
+  // second retires — absence is still never acted on in the same run as a
+  // scope move.
+  absentUnderScope          String?                    @map("absent_under_scope") @db.VarChar(64)
   // SHA-256 of the bytes that were actually scanned. Distinct from `checksum`,
   // which hashes source-reported *metadata* (for a local folder, just mtime and
   // size) and so cannot tell a restored backup from an unmodified file.
@@ -440,6 +463,15 @@ model EmbeddingSettings {
   rebuildError       String?   @map("rebuild_error")
   /// What the rebuild was for, shown in the UI's history line.
   rebuildReason      String?   @map("rebuild_reason")
+
+  // ── On/off switch bookkeeping ─────────────────────────────────────────────
+  // `enabled` above is the switch; it is flipped from Settings → Cleanup, never
+  // from the model page. `disabledMode` records HOW it was turned off: "kept"
+  // is a pause (scans keep saving text chunks, so turning back on catches up
+  // without rescans), "deleted" purged the corpus and stops collecting chunks.
+  // Null while on.
+  disabledMode     String?   @map("disabled_mode")
+  enabledChangedAt DateTime? @map("enabled_changed_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -815,6 +847,14 @@ model Runner {
   @@index([executionMode])
   @@index([status])
   @@index([triggeredAt])
+  // Read by the cross-namespace queue to answer "when was this workspace last
+  // given a slot" — a MAX(started_at) per namespace on every dequeue, which
+  // without this is a sequential scan of the whole run history.
+  @@index([startedAt])
+  // The inquiry run anchor: "latest COMPLETED|WARNING run per source", as a
+  // DISTINCT ON. None of the three single-column indexes above can seek that —
+  // [sourceId] alone still has to sort every run a source ever had.
+  @@index([sourceId, status, startedAt(sort: Desc)])
   @@map("runners")
 }
 
@@ -1120,6 +1160,12 @@ enum RunnerStatus {
   COMPLETED
   WARNING
   ERROR
+  // An operator stopped this run. Terminal like ERROR, but a decision rather
+  // than a failure: it must not count towards a source's failure streak or
+  // back off its adaptive schedule (GENESIS field report P8). Before this
+  // existed a stop was ERROR with errorMessage 'Manually stopped', which every
+  // dashboard that counts errors read as a failed scan.
+  STOPPED
 }
 
 enum RunnerExecutionMode {
@@ -1509,6 +1555,14 @@ model CorrelationConfig {
   // { id, mode: "value"|"regex"|"label", label, value }. Applied at indexing
   // time; editing triggers a full recompute.
   exclusions    Json     @default("[]") @map("exclusions") @db.JsonB
+  // Duplicate detection on/off (Settings → Cleanup). Off stops the post-scan
+  // check, every recompute and the review-index build, and holds the
+  // `correlation.scan` queue paused; the tuning above is kept either way.
+  // `disabledMode` is "kept" or "deleted" (whether the results were wiped when
+  // it was turned off), null while on.
+  enabled          Boolean   @default(true)
+  disabledMode     String?   @map("disabled_mode")
+  enabledChangedAt DateTime? @map("enabled_changed_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("correlation_config")
@@ -1919,9 +1973,17 @@ model CaseEvent {
   @@map("case_events")
 }
 
-// A saved query / monitor. It does NOT persist evidence — it only defines matchers
-// and tracks which findings currently match (QuestionMatch) so we can surface new
-// matches. An inquiry is standalone or linked to any number of cases (CaseInquiry).
+// A saved query / monitor ("Inquiry Watch" in the UI). It persists no match rows
+// at all: it defines matchers, and its counters are recomputed from the live
+// finding set. An inquiry is standalone or linked to any number of cases
+// (CaseInquiry).
+//
+// Newness is a property of (finding, run), not of (finding, reader). A match is
+// NEW when it was created by the latest completed run of its source, and stops
+// being new the moment that source runs again — whether or not anyone looked.
+// Its mirror is GONE: a match the latest run retired. Both are derived at read
+// time from the run anchor; matchesSeenAt is only an acknowledgement stamp and
+// no longer defines either.
 //
 // Matchers: a finding matches iff source matches AND (detector OR customDetector
 // matches) AND type matches, where an empty list for a dimension means "any".
@@ -1942,16 +2004,58 @@ model Inquiry {
   findingTypeRegex   String[]       @map("finding_type_regex")
   findingValueRegex  String[]       @map("finding_value_regex")
 
-  matchCount    Int       @default(0) @map("match_count")
-  newMatchCount Int       @default(0) @map("new_match_count")
-  matchesSeenAt DateTime? @map("matches_seen_at")
+  // Counters, all recomputed from the live set — never incremented. An
+  // accumulator drifts permanently once any run miscounts and cannot be
+  // reconciled. matchCount counts OPEN matches only; goneMatchCount counts the
+  // ones the latest run retired, which are RESOLVED and so outside matchCount.
+  matchCount     Int       @default(0) @map("match_count")
+  newMatchCount  Int       @default(0) @map("new_match_count")
+  goneMatchCount Int       @default(0) @map("gone_match_count")
+  // Acknowledgement only: "an operator has looked since this stamp". Does not
+  // decide newness — see the run-anchor note above.
+  matchesSeenAt  DateTime? @map("matches_seen_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  caseLinks CaseInquiry[]
+  caseLinks  CaseInquiry[]
+  activities InquiryActivity[]
 
   @@index([status])
   @@map("inquiries")
+}
+
+// Append-only log of everything that happened to an inquiry: its own config
+// changes, and each run's landed/retired deltas.
+//
+// This is what makes derived newness safe. The NEW/GONE state of a match is
+// live and therefore ephemeral — it is gone the next time the source runs. The
+// timeline is the durable record of what arrived when, so "what was new last
+// Tuesday" survives even though no match rows do.
+enum InquiryActivityType {
+  INQUIRY_CREATED
+  MATCHERS_UPDATED
+  STATUS_CHANGED
+  REMATCHED
+  MATCHES_LANDED
+  MATCHES_RETIRED
+  CASE_LINKED
+  CASE_UNLINKED
+  PULLED_TO_CASE
+  AUTO_PULLED
+}
+
+model InquiryActivity {
+  id           String              @id @default(uuid())
+  inquiryId    String              @map("inquiry_id")
+  activityType InquiryActivityType @map("activity_type")
+  actor        String?
+  payload      Json?               @db.JsonB
+  createdAt    DateTime            @default(now()) @map("created_at")
+
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId, createdAt(sort: Desc)])
+  @@map("inquiry_activities")
 }
 
 // Many-to-many link: an inquiry can guide several cases and a case can be
@@ -1960,6 +2064,11 @@ model CaseInquiry {
   id        String   @id @default(uuid())
   caseId    String   @map("case_id")
   inquiryId String   @map("inquiry_id")
+  // When set, findings the inquiry newly matches are pulled into this case as
+  // they land, without anyone re-opening the inquiry. Off by default: a case
+  // that silently grows its own evidence base is a surprise, not a feature,
+  // unless the investigator asked for it.
+  autoPull  Boolean  @default(false) @map("auto_pull")
   createdAt DateTime @default(now()) @map("created_at")
 
   case    Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)

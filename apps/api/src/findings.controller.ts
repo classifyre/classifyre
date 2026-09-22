@@ -28,7 +28,11 @@ import {
 } from './dto/bulk-update-findings.dto';
 import { QueryFindingsAssetsDto } from './dto/query-findings-assets.dto';
 import { FindingResponseDto } from './dto/finding-response.dto';
-import { AssetFindingSummaryListResponseDto } from './dto/asset-finding-summary.dto';
+import {
+  AssetFindingSummaryListResponseDto,
+  AssetSeverityCountsRequestDto,
+  AssetSeverityCountsResponseDto,
+} from './dto/asset-finding-summary.dto';
 import { QueryFindingsDiscoveryDto } from './dto/query-findings-discovery.dto';
 import { BlockWhenPaused } from './namespace/block-when-paused.decorator';
 import {
@@ -126,6 +130,22 @@ export class FindingsController {
   @ApiResponse({ status: 200, description: 'Finding statistics' })
   async getStats(@Query('sourceId') sourceId?: string) {
     return this.findingsService.getStats(sourceId);
+  }
+
+  @Post('assets/severity-counts')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Unresolved finding counts per asset, for a set of assets',
+    description:
+      'For a graph view that already has its nodes: how many unresolved findings each carries, by severity. POST because the id list does not belong in a query string. Ids beyond the first 500 are ignored.',
+  })
+  @ApiResponse({ status: 200, type: AssetSeverityCountsResponseDto })
+  async assetSeverityCounts(
+    @Body() body: AssetSeverityCountsRequestDto,
+  ): Promise<AssetSeverityCountsResponseDto> {
+    return {
+      items: await this.findingsService.assetSeverityCounts(body?.assetIds),
+    };
   }
 
   @Get('assets')

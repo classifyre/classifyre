@@ -29,6 +29,7 @@ const runnerStatusEnum = z.enum([
   'COMPLETED',
   'WARNING',
   'ERROR',
+  'STOPPED',
 ]);
 const triggerTypeEnum = z.enum([
   'MANUAL',

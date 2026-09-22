@@ -42,11 +42,17 @@ import {
  */
 export interface EmbeddingSettingsResponseDto {
     /**
-     * Semantic embedding is on for this workspace
+     * Semantic embedding is on for this workspace. Read-only here: it is turned on or off in Settings → Cleanup › Features (PUT /maintenance/features/embeddings).
      * @type {boolean}
      * @memberof EmbeddingSettingsResponseDto
      */
     enabled: boolean;
+    /**
+     * How embeddings were turned off: "kept" is a pause (vectors, rankings and text chunks stay, and scans keep saving chunks), "deleted" purged all of it. Null while on.
+     * @type {string}
+     * @memberof EmbeddingSettingsResponseDto
+     */
+    disabledMode?: EmbeddingSettingsResponseDtoDisabledModeEnum | null;
     /**
      * transformers-js (local inference) or openai-compatible
      * @type {string}
@@ -211,6 +217,17 @@ export interface EmbeddingSettingsResponseDto {
     rebuildReason?: string | null;
 }
 
+
+/**
+ * @export
+ */
+export const EmbeddingSettingsResponseDtoDisabledModeEnum = {
+    Kept: 'kept',
+    Deleted: 'deleted'
+} as const;
+export type EmbeddingSettingsResponseDtoDisabledModeEnum = typeof EmbeddingSettingsResponseDtoDisabledModeEnum[keyof typeof EmbeddingSettingsResponseDtoDisabledModeEnum];
+
+
 /**
  * Check if a given object implements the EmbeddingSettingsResponseDto interface.
  */
@@ -252,6 +269,7 @@ export function EmbeddingSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscr
     return {
         
         'enabled': json['enabled'],
+        'disabledMode': json['disabledMode'] == null ? undefined : json['disabledMode'],
         'provider': json['provider'],
         'model': json['model'],
         'revision': json['revision'],
@@ -294,6 +312,7 @@ export function EmbeddingSettingsResponseDtoToJSONTyped(value?: EmbeddingSetting
     return {
         
         'enabled': value['enabled'],
+        'disabledMode': value['disabledMode'],
         'provider': value['provider'],
         'model': value['model'],
         'revision': value['revision'],

@@ -41,6 +41,7 @@ import {
 import { PanelCard } from "@/components/panel-card";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
+import { nsPath } from "@/lib/ns-path";
 import { ConnectionsRail } from "./connections-rail";
 
 const SELECT_MODE = { kind: "select" } as const;
@@ -622,7 +623,7 @@ export function ConnectionsCanvas({
               if (isClusterNode(node) && sourceById.has(node.id)) {
                 void expandSource(node.id);
               } else if (node.type === "asset" && node.assetId) {
-                router.push(`/assets/${node.assetId}`);
+                router.push(nsPath(`/assets/${node.assetId}`));
               }
             }}
             onNodeContextMenu={(node) => {

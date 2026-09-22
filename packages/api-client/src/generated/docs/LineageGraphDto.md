@@ -9,6 +9,7 @@ Name | Type
 `assetId` | string
 `direction` | string
 `depth` | number
+`hubFanOut` | number
 `collapseContainers` | boolean
 `mergeIdentity` | boolean
 
@@ -22,6 +23,7 @@ const example = {
   "assetId": null,
   "direction": null,
   "depth": null,
+  "hubFanOut": null,
   "collapseContainers": null,
   "mergeIdentity": null,
 } satisfies LineageGraphDto

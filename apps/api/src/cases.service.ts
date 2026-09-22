@@ -8,6 +8,8 @@ import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { CaseActivityService } from './case-activity.service';
+import { InquiryActivityService } from './inquiry-activity.service';
+import { AUTO_PULL_ACTOR } from './cases/case-pull.port';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 import {
   AddEvidenceDto,
@@ -66,6 +68,7 @@ export class CasesService {
     private readonly graph: GraphService,
     private readonly matching: InquiryMatchingService,
     private readonly activity: CaseActivityService,
+    private readonly inquiryActivity: InquiryActivityService,
     private readonly agentMemory: AgentMemoryService,
   ) {}
 
@@ -99,10 +102,12 @@ export class CasesService {
       dto.createdBy,
     );
     if (inquiryIds.length > 0) {
+      const autoPullIds = new Set(dto.autoPullInquiryIds ?? []);
       await this.prisma.caseInquiry.createMany({
         data: inquiryIds.map((inquiryId) => ({
           caseId: created.id,
           inquiryId,
+          autoPull: autoPullIds.has(inquiryId),
         })),
         skipDuplicates: true,
       });
@@ -110,7 +115,11 @@ export class CasesService {
         await this.activity.record(
           created.id,
           CaseActivityType.INQUIRY_LINKED,
-          { inquiryId: q.id, inquiryTitle: q.title },
+          {
+            inquiryId: q.id,
+            inquiryTitle: q.title,
+            autoPull: autoPullIds.has(q.id),
+          },
           dto.createdBy,
         );
       }
@@ -142,8 +151,13 @@ export class CasesService {
       select: { inquiryId: true },
     });
     const existingIds = new Set(existing.map((l) => l.inquiryId));
+    const autoPullIds = new Set(dto.autoPullInquiryIds ?? []);
     await this.prisma.caseInquiry.createMany({
-      data: inquiryIds.map((inquiryId) => ({ caseId, inquiryId })),
+      data: inquiryIds.map((inquiryId) => ({
+        caseId,
+        inquiryId,
+        autoPull: autoPullIds.has(inquiryId),
+      })),
       skipDuplicates: true,
     });
     for (const q of inquiries) {
@@ -151,11 +165,55 @@ export class CasesService {
       await this.activity.record(
         caseId,
         CaseActivityType.INQUIRY_LINKED,
-        { inquiryId: q.id, inquiryTitle: q.title },
+        {
+          inquiryId: q.id,
+          inquiryTitle: q.title,
+          autoPull: autoPullIds.has(q.id),
+        },
         actor,
       );
+      await this.inquiryActivity.tryRecord(q.id, 'CASE_LINKED', {
+        caseId,
+        autoPull: autoPullIds.has(q.id),
+      });
     }
     await this.syncEntityMaps(caseId, inquiryIds);
+    return (await this.findOne(caseId))!;
+  }
+
+  /**
+   * Turn automatic pulling on or off for one linked inquiry.
+   *
+   * Per link rather than per inquiry: the same standing question can drive
+   * several cases, and only one of them may want its answers to arrive by
+   * themselves.
+   */
+  async setInquiryAutoPull(
+    caseId: string,
+    inquiryId: string,
+    autoPull: boolean,
+    actor?: string,
+  ): Promise<CaseResponseDto> {
+    await this.ensureExists(caseId);
+    const link = await this.prisma.caseInquiry.findUnique({
+      where: { caseId_inquiryId: { caseId, inquiryId } },
+      select: { id: true, inquiry: { select: { title: true } } },
+    });
+    if (!link) {
+      throw new NotFoundException(
+        `Inquiry ${inquiryId} is not linked to case ${caseId}`,
+      );
+    }
+    await this.prisma.caseInquiry.update({
+      where: { id: link.id },
+      data: { autoPull },
+    });
+    await this.activity.record(
+      caseId,
+      CaseActivityType.CASE_UPDATED,
+      { inquiryId, inquiryTitle: link.inquiry.title, autoPull },
+      actor,
+    );
     return (await this.findOne(caseId))!;
   }
 
@@ -178,11 +236,14 @@ export class CasesService {
       inquiryId,
       inquiryTitle: link.inquiry.title,
     });
+    await this.inquiryActivity.tryRecord(inquiryId, 'CASE_UNLINKED', {
+      caseId,
+    });
     await this.syncEntityMaps(caseId, [inquiryId]);
     return (await this.findOne(caseId))!;
   }
 
-  /** Close the case with a conclusion and archive its linked inquiries. */
+  /** Close the case with a conclusion and archive its linked inquiries (unless `keepInquiries`). */
   async close(id: string, dto: CloseCaseDto): Promise<CloseCaseResponseDto> {
     await this.ensureExists(id);
     const conclusion = (dto.conclusion ?? '').trim();
@@ -195,14 +256,24 @@ export class CasesService {
       where: { id },
       data: { status: 'CLOSED', conclusion },
     });
-    // Archive linked inquiries — but only those not driving another open case.
-    const linked = await this.prisma.inquiry.findMany({
-      where: { status: 'ACTIVE', caseLinks: { some: { caseId: id } } },
-      select: {
-        id: true,
-        caseLinks: { select: { case: { select: { id: true, status: true } } } },
-      },
-    });
+    // Archive linked inquiries — but only those not driving another open case,
+    // and not at all when the caller keeps them: an answered case can have
+    // standing checks behind it (GENESIS field report P14).
+    // No global ValidationPipe: a query-string or form "true" arrives as text.
+    const keepInquiries =
+      (dto.keepInquiries as unknown) === true ||
+      (dto.keepInquiries as unknown) === 'true';
+    const linked = keepInquiries
+      ? []
+      : await this.prisma.inquiry.findMany({
+          where: { status: 'ACTIVE', caseLinks: { some: { caseId: id } } },
+          select: {
+            id: true,
+            caseLinks: {
+              select: { case: { select: { id: true, status: true } } },
+            },
+          },
+        });
     const archivable = linked
       .filter((q) =>
         q.caseLinks.every(
@@ -335,6 +406,8 @@ export class CasesService {
       status: l.inquiry.status,
       matchCount: l.inquiry.matchCount,
       newMatchCount: l.inquiry.newMatchCount,
+      goneMatchCount: l.inquiry.goneMatchCount,
+      autoPull: l.autoPull,
     }));
     return { ...this.mapCase(row), evidence, inquiries };
   }
@@ -541,7 +614,12 @@ export class CasesService {
       if (!evidenceByAsset.has(f.assetId)) {
         evidenceByAsset.set(
           f.assetId,
-          await this.ensureAssetEvidence(caseId, f.assetId, f.asset),
+          await this.ensureAssetEvidence(
+            caseId,
+            f.assetId,
+            f.asset,
+            dto.addedBy,
+          ),
         );
       }
     }
@@ -665,6 +743,7 @@ export class CasesService {
   async pullFromInquiry(
     caseId: string,
     dto: PullFromInquiryDto,
+    actor?: string,
   ): Promise<PullFromInquiryResponseDto> {
     await this.ensureExists(caseId);
     const inquiry = await this.prisma.inquiry.findUnique({
@@ -720,15 +799,32 @@ export class CasesService {
     });
     for (const assetId of evidenceByAsset.keys())
       await this.graph.inferEdgesForAsset(assetId);
-    await this.activity.record(caseId, CaseActivityType.INQUIRY_PULLED, {
-      inquiryId: dto.inquiryId,
-      inquiryTitle: inquiry.title,
-      pulled: created.count,
-      findingLabels: findings.slice(0, 10).map((f) => f.findingType),
-      assetLabels: [
-        ...new Set(findings.map((f) => f.asset?.name).filter(Boolean)),
-      ].slice(0, 10),
-    });
+    const automatic = actor === AUTO_PULL_ACTOR;
+    await this.activity.record(
+      caseId,
+      CaseActivityType.INQUIRY_PULLED,
+      {
+        inquiryId: dto.inquiryId,
+        inquiryTitle: inquiry.title,
+        pulled: created.count,
+        automatic,
+        findingLabels: findings.slice(0, 10).map((f) => f.findingType),
+        assetLabels: [
+          ...new Set(findings.map((f) => f.asset?.name).filter(Boolean)),
+        ].slice(0, 10),
+      },
+      actor,
+    );
+    // The same event on the other timeline — but only for a deliberate pull.
+    // An automatic one is recorded by the matching pass instead, as AUTO_PULLED
+    // and with the run that caused it, so a person reading the inquiry can tell
+    // which of its answers walked into a case by themselves.
+    if (!automatic) {
+      await this.inquiryActivity.tryRecord(dto.inquiryId, 'PULLED_TO_CASE', {
+        caseId,
+        pulled: created.count,
+      });
+    }
     return { pulled: created.count };
   }
 
@@ -762,6 +858,7 @@ export class CasesService {
       assetType: string;
       sourceType: { toString(): string };
     } | null,
+    addedBy?: string,
   ): Promise<string> {
     const ev = await this.prisma.caseEvidence.upsert({
       where: {
@@ -778,6 +875,9 @@ export class CasesService {
         label: asset?.name ?? null,
         assetType: asset?.assetType ?? null,
         sourceType: asset ? String(asset.sourceType) : null,
+        // Recorded on the evidence the attach creates; it used to be dropped,
+        // leaving addedBy null on every evidence row (field report P14).
+        addedBy: addedBy ?? null,
       },
       update: {},
       select: { id: true },

@@ -21,6 +21,8 @@ All URIs are relative to *http://localhost*
 
 Add a note, statement revision, or status entry to a thread
 
+A STATEMENT entry revises the claim itself: the thread title becomes the first 200 characters of its body. Use NOTE for commentary, evidence or dated review remarks that must leave the title unchanged.
+
 ### Example
 
 ```ts

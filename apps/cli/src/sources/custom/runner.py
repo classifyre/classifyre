@@ -17,6 +17,7 @@ import base64
 import itertools
 import json
 import random
+import re
 import signal
 import sys
 from dataclasses import asdict
@@ -40,6 +41,11 @@ from ...notebook.serialize import (
     cell_source_of,
     code_cells,
     to_module_source,
+)
+
+# The run log's level prefixes (runner-log-storage.service.ts matchLevelPrefix).
+_LEVEL_PREFIX = re.compile(
+    r"^\s*\[?(TRACE|DEBUG|INFO|WARNING|WARN|ERROR|FATAL|CRITICAL)\]?\s*[:\-|\s]", re.I
 )
 
 ITEM = "item"
@@ -159,7 +165,12 @@ class NotebookRuntime:
     @staticmethod
     def _log(message: str) -> None:
         # ctx.log goes to stderr: stdout is the data channel, and a notebook
-        # that logs would otherwise corrupt the asset stream.
+        # that logs would otherwise corrupt the asset stream. The run log infers
+        # a line's level from its prefix; without one every notebook line was
+        # stored as UNKNOWN and vanished under any level filter (GENESIS field
+        # report P11). A line that already names its level keeps it.
+        if not _LEVEL_PREFIX.match(message):
+            message = f"INFO:notebook: {message}"
         print(message, file=sys.stderr, flush=True)
 
     def load(self) -> None:

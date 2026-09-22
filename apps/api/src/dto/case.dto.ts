@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -55,6 +56,18 @@ export class CreateCaseDto {
   @IsArray()
   @IsString({ each: true })
   inquiryIds?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Of the linked inquiries, these also pull their new matches in by ' +
+      'themselves as later scans land them. Additive rather than a shape ' +
+      'change to inquiryIds, which MCP and autopilot callers already send.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  autoPullInquiryIds?: string[];
 }
 
 export class UpdateCaseDto {
@@ -323,9 +336,21 @@ export class CaseLinkedInquiryDto {
   matchCount!: number;
 
   @ApiProperty({
-    description: 'Matches that appeared since the inquiry was last viewed',
+    description:
+      'Matches the latest completed run of their source created. Clears when ' +
+      'that source runs again, not when the inquiry is read.',
   })
   newMatchCount!: number;
+
+  @ApiProperty({
+    description: 'Matches the latest run retired — they no longer exist',
+  })
+  goneMatchCount!: number;
+
+  @ApiProperty({
+    description: 'New matches land in this case by themselves',
+  })
+  autoPull!: boolean;
 }
 
 /** Link inquiries to an existing case. */
@@ -334,6 +359,29 @@ export class LinkInquiriesDto {
   @IsArray()
   @IsString({ each: true })
   inquiryIds!: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Of the linked inquiries, these also pull their new matches in by ' +
+      'themselves as later scans land them. Additive rather than a shape ' +
+      'change to inquiryIds, which MCP and autopilot callers already send.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  autoPullInquiryIds?: string[];
+}
+
+/** Turn automatic pulling on or off for one linked inquiry. */
+export class SetInquiryAutoPullDto {
+  @ApiProperty({
+    description:
+      "Pull this inquiry's new matches into the case as later scans land " +
+      'them, without anyone re-opening the inquiry.',
+  })
+  @IsBoolean()
+  autoPull!: boolean;
 }
 
 export class CaseResponseDto {
@@ -396,6 +444,15 @@ export class CloseCaseDto {
   @IsOptional()
   @IsString()
   closedBy?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Keep the linked inquiries active. By default closing archives them; an answered case whose inquiries are standing checks (they catch next year's occurrence) should keep them.",
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  keepInquiries?: boolean;
 }
 
 export class CloseCaseResponseDto {

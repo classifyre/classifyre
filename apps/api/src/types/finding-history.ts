@@ -92,6 +92,28 @@ const REASON_CODES = new Map<string, string>(
   Object.entries(SYSTEM_REASONS).map(([code, text]) => [text, code]),
 );
 
+/**
+ * The sentences a SCAN writes when it takes a finding away by itself, as stored
+ * in `resolution_reason`.
+ *
+ * This is the only sound way to tell an automatic retirement from an operator
+ * resolving something by hand. The obvious alternative — "the finding carries
+ * the latest run's id" — is wrong: a manual resolve sets `resolvedAt` and never
+ * touches `runnerId`, so a finding the latest run re-detected and a human then
+ * triaged an hour later looks exactly like one the run retired. Triage right
+ * after a scan is the common case, not the edge case.
+ *
+ * `#detector-removed` is included deliberately. The detection genuinely stopped
+ * existing, which is what a reader of "gone" wants to know; the reason travels
+ * alongside so the UI can say the corpus did not change, the question did.
+ */
+export const AUTO_RETIREMENT_REASONS: readonly string[] = [
+  SYSTEM_REASONS['#gone'],
+  SYSTEM_REASONS['#asset-deleted'],
+  SYSTEM_REASONS['#detector-removed'],
+  SYSTEM_REASONS['#file-deleted'],
+] as string[];
+
 /** The code for a system sentence, or the sentence itself if it is not one. */
 export function reasonForStorage(reason: string): string {
   return REASON_CODES.get(reason) ?? reason;

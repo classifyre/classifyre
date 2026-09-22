@@ -150,6 +150,90 @@ describe('WorkerQueueRegistryService', () => {
     expect(service.isPaused({ namespaceId, queue: 'embedding' })).toBe(false);
   });
 
+  describe('feature holds', () => {
+    it('holds queues for a feature without clobbering a manual pause', async () => {
+      const { service, pool } = serviceWith(() =>
+        Promise.resolve({ rows: [] }),
+      );
+
+      await service.holdForFeature(namespaceId, 'duplicates', [
+        'correlation.scan',
+        'correlation.scan',
+      ]);
+
+      const [sql, params] = pool.query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain(
+        'ON CONFLICT (namespace_id, queue) DO UPDATE SET feature',
+      );
+      // The manual flag is only ever set by a manual pause.
+      expect(sql).not.toContain('manual = EXCLUDED');
+      expect(params).toEqual([namespaceId, 'duplicates', ['correlation.scan']]);
+      expect(service.isPaused({ namespaceId, queue: 'correlation.scan' })).toBe(
+        true,
+      );
+    });
+
+    it('releases only what the feature alone held', async () => {
+      const { service, pool } = serviceWith((sql) =>
+        Promise.resolve({
+          rows: sql.startsWith('DELETE') ? [{ queue: 'correlation.scan' }] : [],
+        }),
+      );
+      await service.holdForFeature(namespaceId, 'duplicates', [
+        'correlation.scan',
+      ]);
+
+      const released = await service.releaseFeature(namespaceId, 'duplicates');
+
+      expect(released).toEqual(['correlation.scan']);
+      const sqls = pool.query.mock.calls.map((call) => String(call[0]));
+      expect(sqls.some((q) => q.includes('AND manual = false'))).toBe(true);
+      // A queue the operator also paused keeps its pause, minus the hold.
+      expect(sqls.some((q) => q.includes('SET feature = NULL'))).toBe(true);
+      expect(service.isPaused({ namespaceId, queue: 'correlation.scan' })).toBe(
+        false,
+      );
+    });
+
+    it('refuses a manual resume of a held queue and names the feature', async () => {
+      const { service, pool } = serviceWith((sql) =>
+        Promise.resolve({
+          rows: sql.includes('SELECT feature')
+            ? [{ feature: 'embeddings' }]
+            : [],
+        }),
+      );
+
+      const out = await service.setPaused(
+        { namespaceId, queue: 'semantic-embeddings-s1' },
+        false,
+      );
+
+      expect(out.heldBy).toBe('embeddings');
+      const sqls = pool.query.mock.calls.map((call) => String(call[0]));
+      expect(sqls.some((q) => q.startsWith('DELETE'))).toBe(false);
+    });
+
+    it('maps each paused queue to its holder', async () => {
+      const { service } = serviceWith(() =>
+        Promise.resolve({
+          rows: [
+            { queue: 'correlation.scan', feature: 'duplicates' },
+            { queue: 'auto-schedule.tick', feature: null },
+          ],
+        }),
+      );
+
+      const holds = await service.listPauseHolds(namespaceId);
+
+      expect(holds.get('correlation.scan')).toBe('duplicates');
+      expect(holds.get('auto-schedule.tick')).toBeNull();
+      expect(await service.listPaused(namespaceId)).toEqual(
+        new Set(['correlation.scan', 'auto-schedule.tick']),
+      );
+    });
+  });
+
   it('refreshes the pause cache from the database on every flush', async () => {
     const { service } = serviceWith((sql) => {
       if (sql.includes('FROM public.worker_queue_pauses')) {

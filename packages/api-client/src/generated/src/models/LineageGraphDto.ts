@@ -38,6 +38,12 @@ export interface LineageGraphDto {
      */
     depth?: number;
     /**
+     * Edges above which a node is drawn but not walked through. A hub table feeding hundreds of assets otherwise makes depth 2 return the whole namespace. 0 turns the guard off. Defaults to 40.
+     * @type {number}
+     * @memberof LineageGraphDto
+     */
+    hubFanOut?: number;
+    /**
      * Roll each node up into its container (table -> schema, chart -> dashboard). Containment is never a hop in a lineage path; it is what the path is collapsed *by*, which is how 400 tables become 12 schemas without losing an edge.
      * @type {boolean}
      * @memberof LineageGraphDto
@@ -84,6 +90,7 @@ export function LineageGraphDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'assetId': json['assetId'],
         'direction': json['direction'] == null ? undefined : json['direction'],
         'depth': json['depth'] == null ? undefined : json['depth'],
+        'hubFanOut': json['hubFanOut'] == null ? undefined : json['hubFanOut'],
         'collapseContainers': json['collapseContainers'] == null ? undefined : json['collapseContainers'],
         'mergeIdentity': json['mergeIdentity'] == null ? undefined : json['mergeIdentity'],
     };
@@ -103,6 +110,7 @@ export function LineageGraphDtoToJSONTyped(value?: LineageGraphDto | null, ignor
         'assetId': value['assetId'],
         'direction': value['direction'],
         'depth': value['depth'],
+        'hubFanOut': value['hubFanOut'],
         'collapseContainers': value['collapseContainers'],
         'mergeIdentity': value['mergeIdentity'],
     };

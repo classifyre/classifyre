@@ -40,11 +40,17 @@ export interface InquiryMatchListResponseDto {
      */
     total: number;
     /**
-     * New matches after filters (appeared since last seen)
+     * Matches the latest run of their source created, after filters
      * @type {number}
      * @memberof InquiryMatchListResponseDto
      */
     newCount: number;
+    /**
+     * Matches the latest run retired. Exact when GONE was requested; otherwise the count the last matching pass stored.
+     * @type {number}
+     * @memberof InquiryMatchListResponseDto
+     */
+    goneCount: number;
     /**
      * 
      * @type {number}
@@ -66,6 +72,7 @@ export function instanceOfInquiryMatchListResponseDto(value: object): value is I
     if (!('items' in value) || value['items'] === undefined) return false;
     if (!('total' in value) || value['total'] === undefined) return false;
     if (!('newCount' in value) || value['newCount'] === undefined) return false;
+    if (!('goneCount' in value) || value['goneCount'] === undefined) return false;
     if (!('skip' in value) || value['skip'] === undefined) return false;
     if (!('limit' in value) || value['limit'] === undefined) return false;
     return true;
@@ -84,6 +91,7 @@ export function InquiryMatchListResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'items': ((json['items'] as Array<any>).map(InquiryMatchDtoFromJSON)),
         'total': json['total'],
         'newCount': json['newCount'],
+        'goneCount': json['goneCount'],
         'skip': json['skip'],
         'limit': json['limit'],
     };
@@ -103,6 +111,7 @@ export function InquiryMatchListResponseDtoToJSONTyped(value?: InquiryMatchListR
         'items': ((value['items'] as Array<any>).map(InquiryMatchDtoToJSON)),
         'total': value['total'],
         'newCount': value['newCount'],
+        'goneCount': value['goneCount'],
         'skip': value['skip'],
         'limit': value['limit'],
     };

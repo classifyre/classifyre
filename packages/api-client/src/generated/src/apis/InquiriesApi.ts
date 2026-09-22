@@ -19,6 +19,7 @@ import type {
   InquiryListResponseDto,
   InquiryMatchListResponseDto,
   InquiryResponseDto,
+  InquiryTimelineResponseDto,
   MatchOptionsResponseDto,
   PreviewInquiryDto,
   PreviewResponseDto,
@@ -34,6 +35,8 @@ import {
     InquiryMatchListResponseDtoToJSON,
     InquiryResponseDtoFromJSON,
     InquiryResponseDtoToJSON,
+    InquiryTimelineResponseDtoFromJSON,
+    InquiryTimelineResponseDtoToJSON,
     MatchOptionsResponseDtoFromJSON,
     MatchOptionsResponseDtoToJSON,
     PreviewInquiryDtoFromJSON,
@@ -66,6 +69,7 @@ export interface InquiriesControllerListMatchesRequest {
     id: string;
     search?: string;
     severity?: Array<InquiriesControllerListMatchesSeverityEnum>;
+    state?: Array<InquiriesControllerListMatchesStateEnum>;
     onlyNew?: boolean;
     skip?: number;
     limit?: number;
@@ -89,6 +93,12 @@ export interface InquiriesControllerRematchRequest {
 
 export interface InquiriesControllerRemoveRequest {
     id: string;
+}
+
+export interface InquiriesControllerTimelineRequest {
+    id: string;
+    cursor?: string;
+    limit?: string;
 }
 
 export interface InquiriesControllerUpdateRequest {
@@ -247,6 +257,10 @@ export class InquiriesApi extends runtime.BaseAPI {
             queryParameters['severity'] = requestParameters['severity'];
         }
 
+        if (requestParameters['state'] != null) {
+            queryParameters['state'] = requestParameters['state'];
+        }
+
         if (requestParameters['onlyNew'] != null) {
             queryParameters['onlyNew'] = requestParameters['onlyNew'];
         }
@@ -284,7 +298,7 @@ export class InquiriesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Mark the current matches as seen (clears the \"new\" badge)
+     * Acknowledge the current matches. Does NOT clear the \"new\" count — that is measured against the source\'s latest run and clears when the source runs again.
      */
     async inquiriesControllerMarkSeenRaw(requestParameters: InquiriesControllerMarkSeenRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
         if (requestParameters['id'] == null) {
@@ -313,7 +327,7 @@ export class InquiriesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Mark the current matches as seen (clears the \"new\" badge)
+     * Acknowledge the current matches. Does NOT clear the \"new\" count — that is measured against the source\'s latest run and clears when the source runs again.
      */
     async inquiriesControllerMarkSeen(requestParameters: InquiriesControllerMarkSeenRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.inquiriesControllerMarkSeenRaw(requestParameters, initOverrides);
@@ -465,6 +479,51 @@ export class InquiriesApi extends runtime.BaseAPI {
     }
 
     /**
+     * The inquiry\'s own history: config changes and each run\'s deltas
+     */
+    async inquiriesControllerTimelineRaw(requestParameters: InquiriesControllerTimelineRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<InquiryTimelineResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling inquiriesControllerTimeline().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['cursor'] != null) {
+            queryParameters['cursor'] = requestParameters['cursor'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/inquiries/{id}/timeline`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => InquiryTimelineResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * The inquiry\'s own history: config changes and each run\'s deltas
+     */
+    async inquiriesControllerTimeline(requestParameters: InquiriesControllerTimelineRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<InquiryTimelineResponseDto> {
+        const response = await this.inquiriesControllerTimelineRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Update an inquiry (matchers change → matches recomputed)
      */
     async inquiriesControllerUpdateRaw(requestParameters: InquiriesControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<InquiryResponseDto>> {
@@ -532,3 +591,12 @@ export const InquiriesControllerListMatchesSeverityEnum = {
     Info: 'INFO'
 } as const;
 export type InquiriesControllerListMatchesSeverityEnum = typeof InquiriesControllerListMatchesSeverityEnum[keyof typeof InquiriesControllerListMatchesSeverityEnum];
+/**
+ * @export
+ */
+export const InquiriesControllerListMatchesStateEnum = {
+    New: 'NEW',
+    Ongoing: 'ONGOING',
+    Gone: 'GONE'
+} as const;
+export type InquiriesControllerListMatchesStateEnum = typeof InquiriesControllerListMatchesStateEnum[keyof typeof InquiriesControllerListMatchesStateEnum];

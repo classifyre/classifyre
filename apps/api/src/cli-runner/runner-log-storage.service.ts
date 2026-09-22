@@ -302,6 +302,20 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
 
   // Per-runner sourceId lookup (needed by onModuleDestroy)
   private readonly runnerSourceIds = new Map<string, string>();
+  /**
+   * Output that arrived after the run was finalised, by runner.
+   *
+   * On Kubernetes the CLI reports its own completion over REST while the API
+   * is still polling the Job for output, so `finalizeRunner` (which clears the
+   * in-memory buffer) can run *before* the last log read. Those lines used to
+   * hit `appendChunk` with no buffer and be dropped silently: across seven runs
+   * 2 to 19 trailing lines never reached the stored log, one stopping exactly
+   * where phase 2 begins. Held here instead, and folded into the stored log by
+   * `flushLateChunks`.
+   */
+  private readonly lateChunks = new Map<string, string>();
+  /** Per-runner ceiling on that holding area; beyond it the tail is what matters. */
+  private static readonly MAX_LATE_CHUNK_BYTES = 1024 * 1024;
 
   /**
    * Serialized upload chain per runner.
@@ -493,6 +507,22 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
       return entries.map((e, i) => this.entryToDto(e, baseIndex + i));
     }
 
+    // No buffer: either this run was already finalised (the Kubernetes race
+    // described on `lateChunks`) or it belongs to another replica. Hold the
+    // lines so a later flush can persist them; a replica that never flushes
+    // simply drops the memory.
+    if (this.store) {
+      const held = this.lateChunks.get(runnerId) ?? '';
+      const text = entries.map((e) => `${e.message}\n`).join('');
+      const combinedHeld = held + text;
+      this.lateChunks.set(
+        runnerId,
+        combinedHeld.length > RunnerLogStorageService.MAX_LATE_CHUNK_BYTES
+          ? combinedHeld.slice(-RunnerLogStorageService.MAX_LATE_CHUNK_BYTES)
+          : combinedHeld,
+      );
+    }
+
     // Runner not initialised on this replica — return DTOs with ephemeral index
     return entries.map((e, i) => this.entryToDto(e, i));
   }
@@ -588,7 +618,56 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Append output that arrived after finalisation to the stored log.
+   *
+   * Idempotent and safe to call when nothing is held. Reads the persisted
+   * NDJSON, appends, and writes it back — the log of a finished run is small
+   * and this runs at most once per run.
+   */
+  async flushLateChunks(sourceId: string, runnerId: string): Promise<number> {
+    const held = this.lateChunks.get(runnerId);
+    if (!held || !this.store) return 0;
+    this.lateChunks.delete(runnerId);
+
+    const lines = held.split('\n').filter((line) => line.length > 0);
+    if (lines.length === 0) return 0;
+
+    const now = new Date().toISOString();
+    const entries: StoredRunnerLogEntry[] = lines.map((message) => ({
+      timestamp: now,
+      stream: 'combined',
+      message,
+    }));
+
+    try {
+      const stream = await this.store.getStream(sourceId, runnerId);
+      const existing = stream
+        ? (await this.readAllEntriesFromStream(stream)).map((dto) => ({
+            timestamp: dto.timestamp ?? now,
+            stream: dto.stream,
+            message: dto.message,
+          }))
+        : [];
+      const ndjson = this.encodeEntriesForPersist([
+        ...existing,
+        ...entries,
+      ]).join('');
+      await this.store.put(sourceId, runnerId, ndjson);
+      this.logger.log(
+        `Runner ${runnerId}: appended ${entries.length} log line(s) that arrived after the run was finalised.`,
+      );
+      return entries.length;
+    } catch (error: any) {
+      this.logger.warn(
+        `Runner ${runnerId}: could not append ${entries.length} late log line(s): ${error?.message ?? String(error)}`,
+      );
+      return 0;
+    }
+  }
+
   async deleteRunnerLogs(sourceId: string, runnerId: string): Promise<void> {
+    this.lateChunks.delete(runnerId);
     this.inMemoryLogs.delete(runnerId);
     this.bufferBytes.delete(runnerId);
     this.droppedLines.delete(runnerId);

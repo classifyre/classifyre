@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `enabled` | boolean
+`disabledMode` | string
 `provider` | string
 `model` | string
 `revision` | string
@@ -43,6 +44,7 @@ import type { EmbeddingSettingsResponseDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "enabled": null,
+  "disabledMode": null,
   "provider": null,
   "model": null,
   "revision": null,

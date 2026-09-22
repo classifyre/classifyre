@@ -58,6 +58,15 @@ describe('scorePair', () => {
     expect(scorePair([tok('email', 'a@x.com')], []).weighted).toBe(0);
   });
 
+  // GENESIS field report P6: an operator weighted Tag labels 0, and pairs whose
+  // only shared value was such a tag still became 0 %-confidence duplicates.
+  it('does not call a pair exact when every shared value is weighted 0', () => {
+    const rows = [tok('tag_kreis_aufgel_st', 'aufgelöst')];
+    const s = scorePair(rows, [...rows], () => 0);
+    expect(s.weighted).toBe(0);
+    expect(s.exact).toBe(false);
+  });
+
   it('honors a custom weight function (DB-backed tuning)', () => {
     const a = [tok('email', 'shared@x.com'), tok('country', 'at')];
     const b = [tok('email', 'shared@x.com'), tok('country', 'de')];

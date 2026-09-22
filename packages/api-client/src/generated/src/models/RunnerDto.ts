@@ -273,7 +273,8 @@ export const RunnerDtoStatusEnum = {
     Running: 'RUNNING',
     Completed: 'COMPLETED',
     Warning: 'WARNING',
-    Error: 'ERROR'
+    Error: 'ERROR',
+    Stopped: 'STOPPED'
 } as const;
 export type RunnerDtoStatusEnum = typeof RunnerDtoStatusEnum[keyof typeof RunnerDtoStatusEnum];
 

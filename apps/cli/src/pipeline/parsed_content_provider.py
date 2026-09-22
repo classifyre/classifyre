@@ -91,6 +91,12 @@ class ParsedContentProvider:
     def asset_tags(self, asset_hash: str) -> Mapping[str, str]:
         return self._source.asset_tags(asset_hash)
 
+    def asset_tag_severities(self, asset_hash: str) -> Mapping[str, str]:
+        return self._source.asset_tag_severities(asset_hash)
+
+    def asserts_complete_tags(self, asset_hash: str) -> bool:
+        return self._source.asserts_complete_tags(asset_hash)
+
     def extracts_content(self, asset_hash: str) -> bool:
         return self._source.extracts_content(asset_hash)
 

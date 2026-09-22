@@ -261,7 +261,8 @@ export const SearchRunnerItemDtoStatusEnum = {
     Running: 'RUNNING',
     Completed: 'COMPLETED',
     Warning: 'WARNING',
-    Error: 'ERROR'
+    Error: 'ERROR',
+    Stopped: 'STOPPED'
 } as const;
 export type SearchRunnerItemDtoStatusEnum = typeof SearchRunnerItemDtoStatusEnum[keyof typeof SearchRunnerItemDtoStatusEnum];
 

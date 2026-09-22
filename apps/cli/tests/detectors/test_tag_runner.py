@@ -87,3 +87,87 @@ def test_custom_detector_exposes_tag_runner() -> None:
     )
     assert isinstance(detector.runner, TagRunner)
     assert detector.get_supported_content_types() == []
+
+
+# ── Per-tag severity (field report P9) ────────────────────────────────────────
+
+
+def test_tag_finding_takes_a_severity_within_the_detector_ceiling() -> None:
+    # The early-warning rule is "HIGH at +30%, MEDIUM at +20%". One detector at
+    # HIGH now covers both bands instead of two detectors with duplicated
+    # descriptions that every inquiry and case had to name separately.
+    runner = TagRunner(
+        TagPipelineSchema(label="Insolvenzen YoY", severity=Severity.high),
+        "insolvencies_yoy",
+        "Insolvenzen",
+    )
+
+    finding = runner.tag_finding("+22%", Severity.medium)
+
+    assert finding.severity == Severity.medium
+    assert finding.metadata["tag_severity"] == "medium"
+
+
+def test_a_tag_may_not_outrank_its_detector() -> None:
+    # The detector is where the operator's decision lives; a connector asking
+    # for more than it allows gets the ceiling, and the caller is told.
+    runner = TagRunner(
+        TagPipelineSchema(label="Insolvenzen YoY", severity=Severity.medium),
+        "insolvencies_yoy",
+        "Insolvenzen",
+    )
+
+    applied, lowered = runner.bound_severity("CRITICAL")
+
+    assert applied == Severity.medium
+    assert lowered is True
+    assert runner.tag_finding("+80%", "CRITICAL").severity == Severity.medium
+
+
+def test_no_severity_leaves_the_detector_in_charge() -> None:
+    runner = TagRunner(
+        TagPipelineSchema(label="Legal hold", severity=Severity.low), "legal_hold", "Legal Hold"
+    )
+
+    applied, lowered = runner.bound_severity(None)
+
+    assert (applied, lowered) == (Severity.low, False)
+    # An untouched severity leaves no trace in metadata: nothing was overridden.
+    assert "tag_severity" not in runner.tag_finding("retained").metadata
+
+
+def test_an_unreadable_severity_lands_on_the_ceiling_and_is_reported() -> None:
+    runner = TagRunner(TagPipelineSchema(severity=Severity.high), "k", "n")
+
+    assert runner.bound_severity("URGENT") == (Severity.high, True)
+
+
+def test_severity_is_case_insensitive() -> None:
+    # The schema spells them lowercase; a notebook author writes "HIGH".
+    runner = TagRunner(TagPipelineSchema(severity=Severity.critical), "k", "n")
+
+    assert runner.bound_severity("Info") == (Severity.info, False)
+    assert runner.bound_severity("high") == (Severity.high, False)
+
+
+def test_a_refused_promotion_is_recorded_on_the_finding() -> None:
+    # The interesting case left no trace on the finding at all: only a warning
+    # in a runner log, and on Kubernetes the tail of that log is not reliably
+    # kept. The finding now carries what was asked for and what was applied.
+    runner = TagRunner(TagPipelineSchema(severity=Severity.medium), "insolvencies_yoy", "Ins")
+
+    metadata = runner.tag_finding("+80%", "CRITICAL").metadata
+
+    assert metadata["tag_severity_requested"] == "CRITICAL"
+    # No tag_severity: the finding landed on the detector's own severity, so
+    # there is no override to record -- only a refusal.
+    assert "tag_severity" not in metadata
+
+
+def test_an_applied_override_records_what_it_became() -> None:
+    runner = TagRunner(TagPipelineSchema(severity=Severity.high), "k", "n")
+
+    metadata = runner.tag_finding("+22%", "LOW").metadata
+
+    assert metadata["tag_severity"] == "low"
+    assert "tag_severity_requested" not in metadata

@@ -1,6 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type { Job } from 'pg-boss';
-import { DetectorType, Prisma } from '@prisma/client';
+import { DetectorType, Prisma, Severity } from '@prisma/client';
+import { NotificationsService } from '../notifications.service';
+import {
+  NotificationEvent,
+  NotificationType,
+} from '../types/notification.types';
 import { PrismaService } from '../prisma.service';
 import { renderReasons } from '../embedding/reason-labels';
 import { PgBossService } from '../scheduler/pg-boss.service';
@@ -10,8 +16,21 @@ import {
   FindingCandidate,
   InquiryMatchers,
 } from './inquiry-matcher';
+import {
+  classifyMatch,
+  InquiryMatchState,
+  retiredCandidateWhere,
+  RunAnchor,
+  RunAnchors,
+} from './match-state';
 import { INQUIRY_MATCH_QUEUE } from './matching.constants';
-import { OPERATOR_CREATED } from '../autopilot/autopilot.constants';
+import { AI_ACTOR, OPERATOR_CREATED } from '../autopilot/autopilot.constants';
+import {
+  AUTO_PULL_ACTOR,
+  CASE_PULL,
+  CasePullPort,
+} from '../cases/case-pull.port';
+import { InquiryActivityService } from '../inquiry-activity.service';
 import {
   PreviewDiagnosticDto,
   PreviewResponseDto,
@@ -30,6 +49,11 @@ interface FindingRow {
   severity: { toString(): string };
   matchedContent: string | null;
   createdAt?: Date;
+  // Present only on the retired walk — the OPEN walk knows its own status and
+  // would pay for three more columns on every row of the corpus to learn it.
+  status?: { toString(): string };
+  resolvedAt?: Date | null;
+  resolutionReason?: string | null;
   asset?: { name: string; sourceType: { toString(): string } } | null;
   evidenceAnalysis?: {
     importanceScore: number;
@@ -49,9 +73,23 @@ const FINDING_SELECT = {
   findingType: true,
   severity: true,
   matchedContent: true,
-  // Newness is decided by createdAt vs the inquiry's matchesSeenAt, so every
-  // path that counts matches needs it — not just the one that renders them.
+  // Newness is decided by createdAt vs the source's latest run, so every path
+  // that counts matches needs it — not just the one that renders them.
   createdAt: true,
+} as const;
+
+/**
+ * The retired walk's extra columns.
+ *
+ * Deliberately not folded into FINDING_SELECT: that one is walked across the
+ * whole corpus by every counter, id-collector and probe, and `resolution_reason`
+ * is a TEXT column none of them read.
+ */
+const RETIRED_FINDING_SELECT = {
+  ...FINDING_SELECT,
+  status: true,
+  resolvedAt: true,
+  resolutionReason: true,
 } as const;
 
 /**
@@ -88,6 +126,20 @@ const DIAGNOSTIC_SCAN_CAP = 5000;
  */
 const PROBE_SCAN_LIMIT = 2000;
 
+/**
+ * Ceilings on one run's automatic pull into a linked case.
+ *
+ * The asset cap is the binding one: `pullFromInquiry` rebuilds lineage edges
+ * once per distinct asset, so a pull is priced in assets, not findings, and it
+ * runs inside the matching worker at localConcurrency 1. A run that lands more
+ * than this is reported on the timeline and left for a person to pull.
+ */
+const AUTO_PULL_FINDING_CAP = 500;
+const AUTO_PULL_ASSET_CAP = 100;
+
+/** Labels carried on a timeline entry, so the row reads without a join. */
+const TIMELINE_SAMPLES = 10;
+
 /** Sample finding ids/values per unmonitored group. */
 const UNMONITORED_SAMPLES = 5;
 /** Distinct unmonitored groups reported. */
@@ -106,7 +158,26 @@ export class InquiryMatchingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pgBoss: PgBossService,
+    @Optional() private readonly notifications?: NotificationsService,
+    @Optional() private readonly activity?: InquiryActivityService,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
+
+  /**
+   * CasesService, resolved from the whole application graph at call time rather
+   * than injected — see {@link CASE_PULL} for why injecting it would hang the
+   * process on boot with no error. Returns null when the token is absent, which
+   * is the case in every unit test that constructs this service by hand.
+   */
+  private get casePull(): CasePullPort | null {
+    try {
+      return (
+        this.moduleRef?.get<CasePullPort>(CASE_PULL, { strict: false }) ?? null
+      );
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Registers this worker on the CURRENT namespace's pg-boss (invoked by the
@@ -143,32 +214,99 @@ export class InquiryMatchingService {
   }
 
   /**
-   * Count an inquiry's live matches the same way `getLiveMatches` does.
+   * The latest run per source that actually finished observing the corpus.
+   *
+   * This is the anchor every NEW/GONE answer is measured against, so it is
+   * built ONCE per public entry point and threaded down — never per inquiry,
+   * and certainly never per finding.
+   *
+   * STOPPED and ERROR runs are excluded deliberately. A run that did not finish
+   * did not re-observe the source, so letting it move the anchor would retire
+   * the newness of everything the last real scan found.
+   *
+   * Read from the database rather than from the job payload. The matching queue
+   * coalesces on `singletonKey: sourceId` with `singletonNextSlot`, so the
+   * runnerId a job carries can already be stale by the time it runs; deriving
+   * the anchor here is what makes that self-healing.
+   */
+  private async runAnchors(sourceIds: string[]): Promise<RunAnchors> {
+    const anchors = new Map<string, RunAnchor>();
+    if (sourceIds.length === 0) return anchors;
+
+    // DISTINCT ON, not Prisma `distinct`: Prisma applies distinct in the query
+    // engine AFTER the rows arrive, which on this shape means every run every
+    // source ever had is fetched to yield one row apiece.
+    const rows = await this.prisma.$queryRaw<
+      Array<{ sourceId: string; runnerId: string; startedAt: Date }>
+    >(Prisma.sql`
+      SELECT DISTINCT ON (source_id)
+             source_id AS "sourceId",
+             id        AS "runnerId",
+             COALESCE(started_at, triggered_at) AS "startedAt"
+      FROM runners
+      WHERE source_id = ANY(${sourceIds}::text[])
+        AND status IN ('COMPLETED'::"RunnerStatus", 'WARNING'::"RunnerStatus")
+      ORDER BY source_id, COALESCE(started_at, triggered_at) DESC, id DESC
+    `);
+    for (const row of rows) {
+      anchors.set(row.sourceId, {
+        runnerId: row.runnerId,
+        startedAt: row.startedAt,
+      });
+    }
+    return anchors;
+  }
+
+  /** Every source an inquiry's matchers can reach, for the anchor lookup. */
+  private async anchorsFor(m: InquiryMatchers): Promise<RunAnchors> {
+    if (!m.matchAllSources) return this.runAnchors(m.sourceIds);
+    const sources = await this.prisma.source.findMany({ select: { id: true } });
+    return this.runAnchors(sources.map((source) => source.id));
+  }
+
+  /**
+   * Count an inquiry's matches the same way `getLiveMatches` does.
    *
    * Both the stored counters and the /matches endpoint go through here, so they
-   * cannot disagree about what a match is or what makes one "new". They used to
+   * cannot disagree about what a match is or what makes one new. They used to
    * apply different rules: newMatchCount incremented by every finding *this run
    * touched* — including ones merely re-detected, whose createdAt is old — while
    * /matches counted only findings created since matchesSeenAt. A re-scan that
    * re-detected 15 existing findings reported "15 new" next to "0 new".
+   *
+   * `total` stays OPEN-only. A retired match is reported separately rather than
+   * inflating the size of the set an investigator is working through.
    */
   private async computeMatchCounts(
     m: InquiryMatchers,
-    seenAt: Date | null,
-  ): Promise<{ total: number; newCount: number }> {
+    anchors: RunAnchors,
+    options: { collectNewIds?: boolean } = {},
+  ): Promise<{
+    total: number;
+    newCount: number;
+    goneCount: number;
+    newIds: string[];
+  }> {
     // Counters only: there is no reason to hold a single row past the moment
     // it has been counted, and holding them all is what killed the process.
     let total = 0;
     let newCount = 0;
+    const newIds: string[] = [];
     for await (const page of this.candidateFindingPages(m, false)) {
       total += page.rows.length;
-      if (seenAt) {
-        for (const f of page.rows) {
-          if ((f.createdAt ?? new Date(0)) > seenAt) newCount += 1;
-        }
+      for (const f of page.rows) {
+        if (classifyMatch(f as never, anchors) !== 'NEW') continue;
+        newCount += 1;
+        if (options.collectNewIds && newIds.length < AUTO_PULL_FINDING_CAP)
+          newIds.push(f.id);
       }
     }
-    return { total, newCount };
+
+    let goneCount = 0;
+    for await (const page of this.retiredFindingPages(m, anchors, false))
+      goneCount += page.rows.length;
+
+    return { total, newCount, goneCount, newIds };
   }
 
   /**
@@ -177,7 +315,7 @@ export class InquiryMatchingService {
    */
   async processSourceCompletion(
     sourceId: string,
-    _runnerId: string | null,
+    runnerId: string | null,
   ): Promise<{ landed: number }> {
     const inquiries = await this.prisma.inquiry.findMany({
       where: {
@@ -186,27 +324,68 @@ export class InquiryMatchingService {
       },
       select: {
         ...this.matcherSelect,
+        title: true,
+        createdBy: true,
         matchCount: true,
         newMatchCount: true,
-        matchesSeenAt: true,
+        goneMatchCount: true,
       },
     });
     if (inquiries.length === 0) return { landed: 0 };
 
+    // One anchor build for the whole job, covering every source any matched
+    // inquiry can reach — not one per inquiry, and never one per finding.
+    const anchors = await this.anchorsForAll(inquiries);
+
+    // Findings this run created, for the notification. Deliberately narrower
+    // than the NEW count, which is corpus-wide: a person should be told about
+    // answers THIS scan produced, not re-told about every answer still fresh.
+    const created = await this.findingsCreatedByRun(sourceId, runnerId);
+
     let landed = 0;
     for (const q of inquiries) {
-      const { total, newCount } = await this.computeMatchCounts(
-        q,
-        q.matchesSeenAt,
-      );
+      const { total, newCount, goneCount, newIds } =
+        await this.computeMatchCounts(q, anchors, {
+          // A retire-driven recompute passes no runnerId. It is a bookkeeping
+          // refresh, not a scan, so it must not pull anything into a case.
+          collectNewIds: runnerId != null,
+        });
 
       // Assigned, never incremented: an accumulator drifts permanently once any
       // run miscounts, and cannot be reconciled against the live set.
-      if (total !== q.matchCount || newCount !== q.newMatchCount) {
+      if (
+        total !== q.matchCount ||
+        newCount !== q.newMatchCount ||
+        goneCount !== q.goneMatchCount
+      ) {
         await this.prisma.inquiry.update({
           where: { id: q.id },
-          data: { matchCount: total, newMatchCount: newCount },
+          data: {
+            matchCount: total,
+            newMatchCount: newCount,
+            goneMatchCount: goneCount,
+          },
         });
+      }
+
+      // Only questions a person asked: the autopilot's own inquiries are its
+      // working set and would turn every run into a notification.
+      if (created.length > 0 && q.createdBy !== AI_ACTOR) {
+        const matcher = new CompiledMatcher(q);
+        const added = created.filter((f) => matcher.matches(f)).length;
+        if (added > 0) {
+          await this.notifyNewMatches(q, added, { newCount, total, sourceId });
+        }
+      }
+
+      if (runnerId) {
+        await this.recordRunDeltas(q, {
+          sourceId,
+          runnerId,
+          newIds,
+          goneCount,
+        });
+        await this.autoPullToCases(q, newIds, { sourceId, runnerId });
       }
       landed += newCount;
     }
@@ -218,14 +397,203 @@ export class InquiryMatchingService {
     return { landed };
   }
 
+  /** The union of every source the given inquiries' matchers can reach. */
+  private async anchorsForAll(
+    inquiries: Array<Pick<InquiryMatchers, 'matchAllSources' | 'sourceIds'>>,
+  ): Promise<RunAnchors> {
+    if (inquiries.some((q) => q.matchAllSources)) {
+      const sources = await this.prisma.source.findMany({
+        select: { id: true },
+      });
+      return this.runAnchors(sources.map((source) => source.id));
+    }
+    const ids = new Set<string>();
+    for (const q of inquiries) for (const id of q.sourceIds) ids.add(id);
+    return this.runAnchors(Array.from(ids));
+  }
+
+  /**
+   * Write this run's deltas to the inquiry's timeline.
+   *
+   * The live NEW/GONE state expires the next time the source runs, so without
+   * this a scan's effect on a standing question leaves no trace at all once the
+   * next one lands. Labels are denormalised onto the row so the timeline reads
+   * without joining back to findings that may since have been retired.
+   */
+  private async recordRunDeltas(
+    q: { id: string; title: string },
+    run: {
+      sourceId: string;
+      runnerId: string;
+      newIds: string[];
+      goneCount: number;
+    },
+  ): Promise<void> {
+    if (!this.activity) return;
+    if (run.newIds.length > 0) {
+      const labels = await this.prisma.finding.findMany({
+        where: { id: { in: run.newIds.slice(0, TIMELINE_SAMPLES) } },
+        select: { findingType: true },
+      });
+      await this.activity.tryRecord(q.id, 'MATCHES_LANDED', {
+        sourceId: run.sourceId,
+        runnerId: run.runnerId,
+        count: run.newIds.length,
+        sampleLabels: labels.map((l) => l.findingType),
+      });
+    }
+    if (run.goneCount > 0) {
+      await this.activity.tryRecord(q.id, 'MATCHES_RETIRED', {
+        sourceId: run.sourceId,
+        runnerId: run.runnerId,
+        count: run.goneCount,
+      });
+    }
+  }
+
+  /**
+   * Copy this run's new matches into every linked case that asked for them.
+   *
+   * Bounded by ASSETS, not findings: `pullFromInquiry` rebuilds lineage edges
+   * once per distinct asset, and this runs inside the matching worker at
+   * localConcurrency 1, so an unbounded pull would stall matching for every
+   * other inquiry in the workspace. A run that exceeds the cap says so on the
+   * timeline and leaves the remainder for a person.
+   *
+   * Every failure is swallowed: the counters are already committed, and a case
+   * that could not be topped up must not fail the run or have it retried.
+   */
+  private async autoPullToCases(
+    q: { id: string; title: string },
+    newIds: string[],
+    run: { sourceId: string; runnerId: string },
+  ): Promise<void> {
+    if (newIds.length === 0) return;
+    const pull = this.casePull;
+    if (!pull) return;
+
+    const links = await this.prisma.caseInquiry.findMany({
+      where: {
+        inquiryId: q.id,
+        autoPull: true,
+        case: { status: { notIn: ['CLOSED', 'ARCHIVED'] } },
+      },
+      select: { caseId: true, case: { select: { title: true } } },
+    });
+    if (links.length === 0) return;
+
+    // Price the pull in assets before committing to it.
+    const assets = await this.prisma.finding.findMany({
+      where: { id: { in: newIds } },
+      select: { id: true, assetId: true },
+    });
+    const seen = new Set<string>();
+    const admitted: string[] = [];
+    for (const f of assets) {
+      if (!seen.has(f.assetId)) {
+        if (seen.size >= AUTO_PULL_ASSET_CAP) continue;
+        seen.add(f.assetId);
+      }
+      admitted.push(f.id);
+    }
+    const capped = admitted.length < newIds.length;
+
+    for (const link of links) {
+      try {
+        const res = await pull.pullFromInquiry(
+          link.caseId,
+          { inquiryId: q.id, findingIds: admitted },
+          AUTO_PULL_ACTOR,
+        );
+        if (res.pulled === 0) continue;
+        await this.activity?.tryRecord(
+          q.id,
+          'AUTO_PULLED',
+          {
+            caseId: link.caseId,
+            caseTitle: link.case.title,
+            pulled: res.pulled,
+            sourceId: run.sourceId,
+            runnerId: run.runnerId,
+            ...(capped ? { capped: true, available: newIds.length } : {}),
+          },
+          AUTO_PULL_ACTOR,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Auto-pull into case ${link.caseId} from inquiry ${q.id} failed: ${String(error)}`,
+        );
+      }
+    }
+  }
+
+  /** OPEN findings first created by this run (re-detections keep their createdAt). */
+  private async findingsCreatedByRun(
+    sourceId: string,
+    runnerId: string | null,
+  ) {
+    if (!runnerId) return [];
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { startedAt: true, triggeredAt: true },
+    });
+    const since = runner?.startedAt ?? runner?.triggeredAt;
+    if (!since) return [];
+    return this.prisma.finding.findMany({
+      where: { sourceId, runnerId, status: 'OPEN', createdAt: { gte: since } },
+      select: FINDING_SELECT,
+    });
+  }
+
+  /**
+   * Tell someone a standing question has new answers. Matching used to update
+   * the counters silently, so an early-warning inquiry ("insolvencies +30 %
+   * year on year") warned no one until an operator happened to open it
+   * (GENESIS journal §13). Raised only for findings the run created, so a
+   * run that merely re-detects stays quiet.
+   */
+  private async notifyNewMatches(
+    inquiry: { id: string; title: string },
+    added: number,
+    counts: { newCount: number; total: number; sourceId: string },
+  ): Promise<void> {
+    if (!this.notifications) return;
+    try {
+      await this.notifications.create({
+        type: NotificationType.FINDING,
+        event: NotificationEvent.INQUIRY_NEW_MATCHES,
+        severity: Severity.MEDIUM,
+        title: `New matches: ${inquiry.title}`,
+        message:
+          `${added} new finding(s) answer "${inquiry.title}" ` +
+          `(${counts.newCount} from the latest run, ${counts.total} in total).`,
+        sourceId: counts.sourceId,
+        actionUrl: `/investigations/inquiries/${inquiry.id}`,
+        isImportant: true,
+        metadata: {
+          inquiryId: inquiry.id,
+          added,
+          newCount: counts.newCount,
+          total: counts.total,
+        },
+      });
+    } catch (error) {
+      // Counters are already stored; a failed notification must not fail matching.
+      this.logger.warn(
+        `Failed to notify new matches for inquiry ${inquiry.id}: ${String(error)}`,
+      );
+    }
+  }
+
   /**
    * Find an inquiry with a genuinely new match in one completed runner.
    *
-   * Stored `newMatchCount` is corpus-wide and remains positive until an
-   * operator marks the inquiry seen. It therefore cannot decide whether this
-   * particular scan should bypass corpus coalescing. This live check applies
-   * the canonical matcher to only this runner's findings and uses the same
-   * createdAt > matchesSeenAt definition as the matching counters and API.
+   * Stored `newMatchCount` is corpus-wide and stays positive for as long as the
+   * latest run's answers are fresh, so it cannot decide whether THIS particular
+   * scan should bypass corpus coalescing. This live check applies the canonical
+   * matcher to only this runner's findings, against the same run anchor the
+   * counters and the API use — one definition of new in one service, which is
+   * exactly what this file lost the last time it had two.
    */
   async findNewInquiryMatchForRunner(args: {
     sourceId: string;
@@ -235,7 +603,6 @@ export class InquiryMatchingService {
     const inquiries = await this.prisma.inquiry.findMany({
       where: {
         status: 'ACTIVE',
-        matchesSeenAt: { not: null },
         AND: [
           { OR: [...OPERATOR_CREATED.OR] },
           {
@@ -249,7 +616,6 @@ export class InquiryMatchingService {
       select: {
         ...this.matcherSelect,
         title: true,
-        matchesSeenAt: true,
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -265,14 +631,19 @@ export class InquiryMatchingService {
     });
     if (findings.length === 0) return null;
 
+    // Only this one source is in play, so the anchor lookup is a single row.
+    const anchors = await this.runAnchors([args.sourceId]);
+
     for (const inquiry of inquiries) {
-      const seenAt = inquiry.matchesSeenAt;
+      const matcher = new CompiledMatcher(inquiry);
       if (
-        seenAt &&
         findings.some(
           (finding) =>
-            (finding.createdAt?.getTime() ?? 0) > seenAt.getTime() &&
-            new CompiledMatcher(inquiry).matches(finding),
+            matcher.matches(finding) &&
+            classifyMatch(
+              { ...finding, sourceId: args.sourceId, status: 'OPEN' },
+              anchors,
+            ) === 'NEW',
         )
       ) {
         return { id: inquiry.id, title: inquiry.title };
@@ -282,9 +653,15 @@ export class InquiryMatchingService {
   }
 
   /**
-   * Re-evaluate ALL current OPEN findings against a single inquiry. Seeds a newly
-   * created inquiry with existing findings and refreshes its match set. Resets
-   * newMatchCount to 0 (fresh baseline).
+   * Re-evaluate every current finding against a single inquiry. Seeds a newly
+   * created inquiry with existing findings and refreshes all three counters.
+   *
+   * This used to write `newMatchCount: 0`, on the reasoning that a rematch is
+   * "the fresh baseline". Under the run-anchored definition there is no
+   * baseline to reset: NEW is a pure function of the corpus and the latest run.
+   * Zeroing it here would make every inquiry report no new matches at the
+   * moment of its creation — which is precisely when its answers are freshest —
+   * because create and every matcher edit both come through here.
    */
   async rematchInquiry(inquiryId: string): Promise<{ landed: number }> {
     const q = await this.prisma.inquiry.findUnique({
@@ -292,16 +669,20 @@ export class InquiryMatchingService {
       select: this.matcherSelect,
     });
     if (!q) return { landed: 0 };
-    let matchCount = 0;
-    for await (const page of this.candidateFindingPages(q, false))
-      matchCount += page.rows.length;
-    // newMatchCount resets to 0 because a rematch *is* the fresh baseline; the
-    // next run recomputes it against matchesSeenAt like everything else.
+    const anchors = await this.anchorsFor(q);
+    const { total, newCount, goneCount } = await this.computeMatchCounts(
+      q,
+      anchors,
+    );
     await this.prisma.inquiry.update({
       where: { id: inquiryId },
-      data: { matchCount, newMatchCount: 0 },
+      data: {
+        matchCount: total,
+        newMatchCount: newCount,
+        goneMatchCount: goneCount,
+      },
     });
-    return { landed: matchCount };
+    return { landed: total };
   }
 
   /**
@@ -315,14 +696,21 @@ export class InquiryMatchingService {
   ): Promise<InquiryMatchListResponseDto> {
     const skip = Math.max(0, Number(query.skip ?? 0) || 0);
     const limit = Math.min(Math.max(1, Number(query.limit ?? 50) || 50), 200);
-    const empty = { items: [], total: 0, newCount: 0, skip, limit };
+    const empty = {
+      items: [],
+      total: 0,
+      newCount: 0,
+      goneCount: 0,
+      skip,
+      limit,
+    };
 
     const q = await this.prisma.inquiry.findUnique({
       where: { id: inquiryId },
-      select: { ...this.matcherSelect, matchesSeenAt: true },
+      select: { ...this.matcherSelect, goneMatchCount: true },
     });
     if (!q) return empty;
-    const seenAt = q.matchesSeenAt;
+    const anchors = await this.anchorsFor(q);
 
     const term =
       typeof query.search === 'string' ? query.search.trim().toLowerCase() : '';
@@ -333,7 +721,24 @@ export class InquiryMatchingService {
           ? [query.severity]
           : []
     ).map((s) => String(s).toUpperCase());
-    const onlyNew = query.onlyNew === true || String(query.onlyNew) === 'true';
+    const states = this.requestedStates(query);
+
+    const passesFilters = (match: InquiryMatchDto): boolean => {
+      if (
+        term.length > 0 &&
+        !(
+          match.label.toLowerCase().includes(term) ||
+          (match.assetName ?? '').toLowerCase().includes(term) ||
+          (match.matchedContent ?? '').toLowerCase().includes(term)
+        )
+      ) {
+        return false;
+      }
+      return (
+        severities.length === 0 ||
+        severities.includes((match.severity ?? '').toUpperCase())
+      );
+    };
 
     // Only the requested page is ever retained. The counters below are still
     // exact — every match is visited — but the sort no longer needs the whole
@@ -342,43 +747,80 @@ export class InquiryMatchingService {
     const ranked: InquiryMatchDto[] = [];
     let total = 0;
     let newCount = 0;
+    let goneCount = 0;
 
     for await (const page of this.candidateFindingPages(q, true)) {
       for (const f of page.rows) {
-        const match = this.toMatchDto(f, seenAt);
-        if (
-          term.length > 0 &&
-          !(
-            match.label.toLowerCase().includes(term) ||
-            (match.assetName ?? '').toLowerCase().includes(term) ||
-            (match.matchedContent ?? '').toLowerCase().includes(term)
-          )
-        ) {
-          continue;
-        }
-        if (
-          severities.length > 0 &&
-          !severities.includes((match.severity ?? '').toUpperCase())
-        ) {
-          continue;
-        }
-        // Counted before `onlyNew` narrows the set, so "3 new" stays the same
-        // number whether or not the caller is filtering to new.
-        if (match.isNew) newCount += 1;
-        if (onlyNew && !match.isNew) continue;
+        const state = classifyMatch(f as never, anchors) ?? 'ONGOING';
+        const match = this.toMatchDto(f, state);
+        if (!passesFilters(match)) continue;
+        // Counted before the state filter narrows the set, so "3 new" stays the
+        // same number whether or not the caller is filtering to new.
+        if (state === 'NEW') newCount += 1;
+        if (!states.has(state)) continue;
 
         total += 1;
         this.keepTopMatch(ranked, match, wanted);
       }
     }
 
+    // The retired walk is opt-in. It is cheap, but it must never run by
+    // default: `getLiveMatches` feeds case leads, the agent's evidence sampler
+    // and — through `getMatchingFindingIds` — the pull into a case, and every
+    // one of those would then be handed findings that no longer exist.
+    if (states.has('GONE')) {
+      for await (const page of this.retiredFindingPages(q, anchors, true)) {
+        for (const f of page.rows) {
+          const match = this.toMatchDto(f, 'GONE');
+          if (!passesFilters(match)) continue;
+          goneCount += 1;
+          total += 1;
+          this.keepTopMatch(ranked, match, wanted);
+        }
+      }
+    } else {
+      // The stored counter, refreshed by the last matching pass. Enough for a
+      // badge saying the tab is worth opening; opening it does the real walk.
+      goneCount = q.goneMatchCount;
+    }
+
     return {
       items: ranked.slice(skip, skip + limit),
       total,
       newCount,
+      goneCount,
       skip,
       limit,
     };
+  }
+
+  /**
+   * Which states the caller wants back, defaulting to the live ones.
+   *
+   * GONE is never included by default — see the retired walk in
+   * `getLiveMatches`. `onlyNew` is the pre-state spelling of `state: ['NEW']`
+   * and is still honoured, including as the string a query parameter arrives as.
+   */
+  private requestedStates(
+    query: QueryInquiryMatchesDto,
+  ): ReadonlySet<InquiryMatchState> {
+    const raw = Array.isArray(query.state)
+      ? query.state
+      : query.state
+        ? [query.state]
+        : [];
+    const asked = new Set<InquiryMatchState>(
+      raw
+        .map((v) => String(v).toUpperCase())
+        .filter(
+          (v): v is InquiryMatchState =>
+            v === 'NEW' || v === 'ONGOING' || v === 'GONE',
+        ),
+    );
+    if (asked.size > 0) return asked;
+    if (query.onlyNew === true || String(query.onlyNew) === 'true')
+      return new Set<InquiryMatchState>(['NEW']);
+    return new Set<InquiryMatchState>(['NEW', 'ONGOING']);
   }
 
   /**
@@ -429,7 +871,7 @@ export class InquiryMatchingService {
     if (ranked.length > capacity) ranked.length = capacity;
   }
 
-  private toMatchDto(f: FindingRow, seenAt: Date | null): InquiryMatchDto {
+  private toMatchDto(f: FindingRow, state: InquiryMatchState): InquiryMatchDto {
     return {
       findingId: f.id,
       label: f.findingType,
@@ -440,7 +882,12 @@ export class InquiryMatchingService {
       assetName: f.asset?.name,
       sourceType: f.asset ? String(f.asset.sourceType) : undefined,
       matchedAt: f.createdAt ?? new Date(),
-      isNew: seenAt ? (f.createdAt ?? new Date(0)) > seenAt : false,
+      state,
+      // Kept as the pre-state spelling of the same fact, for callers generated
+      // against the older client.
+      isNew: state === 'NEW',
+      goneReason:
+        state === 'GONE' ? (f.resolutionReason ?? undefined) : undefined,
       ranking: f.evidenceAnalysis
         ? {
             importance: f.evidenceAnalysis.importanceScore,
@@ -456,6 +903,82 @@ export class InquiryMatchingService {
             coverage: 'pending' as const,
           },
     };
+  }
+
+  /**
+   * Classify a KNOWN set of findings against a set of inquiries.
+   *
+   * The bounded counterpart of the candidate walk, for callers that already
+   * hold the findings they care about — the case graph holds a few hundred
+   * nodes and wants to badge the fresh ones. Walking every match of every
+   * linked inquiry to answer that would be the whole corpus for a question
+   * about one screenful.
+   *
+   * A finding watched by several of the case's inquiries reports the most
+   * notable state: NEW over GONE over ONGOING.
+   */
+  async matchStatesForFindings(
+    inquiryIds: string[],
+    findingIds: string[],
+  ): Promise<Map<string, InquiryMatchState>> {
+    const states = new Map<string, InquiryMatchState>();
+    if (inquiryIds.length === 0 || findingIds.length === 0) return states;
+
+    const inquiries = await this.prisma.inquiry.findMany({
+      where: { id: { in: inquiryIds } },
+      select: this.matcherSelect,
+    });
+    if (inquiries.length === 0) return states;
+
+    const findings = await this.prisma.finding.findMany({
+      where: { id: { in: findingIds } },
+      select: RETIRED_FINDING_SELECT,
+    });
+    if (findings.length === 0) return states;
+
+    const anchors = await this.anchorsForAll(inquiries);
+    const rank: Record<InquiryMatchState, number> = {
+      NEW: 3,
+      GONE: 2,
+      ONGOING: 1,
+    };
+
+    for (const inquiry of inquiries) {
+      const matcher = new CompiledMatcher(inquiry);
+      for (const f of findings) {
+        if (!matcher.matches(f)) continue;
+        const state = classifyMatch(
+          {
+            sourceId: f.sourceId,
+            createdAt: f.createdAt,
+            status: String(f.status),
+            resolvedAt: f.resolvedAt,
+            resolutionReason: f.resolutionReason,
+          },
+          anchors,
+        );
+        if (!state) continue;
+        const current = states.get(f.id);
+        if (!current || rank[state] > rank[current]) states.set(f.id, state);
+      }
+    }
+    return states;
+  }
+
+  /**
+   * When the run that this inquiry's NEW and GONE are measured against started.
+   *
+   * The most recent anchor across every source in scope — so a reader can see
+   * what "new" currently means without inferring it from the counters.
+   */
+  async latestRunAt(m: InquiryMatchers): Promise<Date | null> {
+    const anchors = await this.anchorsFor(m);
+    let latest: Date | null = null;
+    for (const anchor of anchors.values()) {
+      if (!latest || anchor.startedAt.getTime() > latest.getTime())
+        latest = anchor.startedAt;
+    }
+    return latest;
   }
 
   /** Return live matching finding IDs for an inquiry (used by pullFromInquiry). */
@@ -680,6 +1203,10 @@ export class InquiryMatchingService {
       assetName: f.asset?.name,
       sourceType: f.asset ? String(f.asset.sourceType) : undefined,
       matchedAt: new Date(),
+      // A preview answers "what would this matcher select", before any inquiry
+      // exists to measure newness against. ONGOING is the neutral answer; the
+      // alternative would be claiming a run relationship there isn't one.
+      state: 'ONGOING' as const,
       isNew: false,
     }));
     return {
@@ -1019,11 +1546,50 @@ export class InquiryMatchingService {
     withAsset: boolean,
     scanLimit?: number,
   ): AsyncGenerator<{ rows: FindingRow[]; scanned: number }> {
-    const where = candidateWhere(m);
-    const matcher = new CompiledMatcher(m);
-    const select = withAsset
+    yield* this.findingPages(
+      candidateWhere(m),
+      m,
+      this.pageSelect(FINDING_SELECT, withAsset),
+      scanLimit,
+    );
+  }
+
+  /**
+   * The mirror walk: matches the latest run of their source RETIRED.
+   *
+   * Separate from the candidate walk rather than a widened scope on it, because
+   * the two have opposite shapes. The OPEN candidate set is the corpus and is
+   * bounded only by paging; this one is bounded in SQL to a single run's
+   * retirements per source, so it stays small even for a matcher naming every
+   * source — and it never makes the hot counter walk carry three more columns.
+   */
+  private async *retiredFindingPages(
+    m: InquiryMatchers,
+    anchors: RunAnchors,
+    withAsset: boolean,
+  ): AsyncGenerator<{ rows: FindingRow[]; scanned: number }> {
+    const where = retiredCandidateWhere(m, anchors);
+    if (!where) return;
+    for await (const page of this.findingPages(
+      where,
+      m,
+      this.pageSelect(RETIRED_FINDING_SELECT, withAsset),
+    )) {
+      // The SQL bounds retirement to the latest run; `classifyMatch` is what
+      // rejects a manual resolve that happens to fall inside the same window.
+      yield {
+        rows: page.rows.filter(
+          (f) => classifyMatch(f as never, anchors) === 'GONE',
+        ),
+        scanned: page.scanned,
+      };
+    }
+  }
+
+  private pageSelect<T extends object>(base: T, withAsset: boolean) {
+    return withAsset
       ? {
-          ...FINDING_SELECT,
+          ...base,
           asset: { select: { name: true, sourceType: true } },
           evidenceAnalysis: {
             select: {
@@ -1035,7 +1601,16 @@ export class InquiryMatchingService {
             },
           },
         }
-      : FINDING_SELECT;
+      : base;
+  }
+
+  private async *findingPages(
+    where: Prisma.FindingWhereInput,
+    m: InquiryMatchers,
+    select: object,
+    scanLimit?: number,
+  ): AsyncGenerator<{ rows: FindingRow[]; scanned: number }> {
+    const matcher = new CompiledMatcher(m);
 
     let cursor: string | null = null;
     let scanned = 0;

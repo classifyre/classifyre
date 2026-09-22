@@ -47,6 +47,7 @@ const TERMINAL_STATUSES = [
   RunnerStatus.COMPLETED,
   RunnerStatus.WARNING,
   RunnerStatus.ERROR,
+  RunnerStatus.STOPPED,
 ];
 
 /**

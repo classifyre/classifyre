@@ -31,6 +31,10 @@ import {
 import { CorrelationJobScheduler } from './correlation-job-scheduler.service';
 import { CorrelationLockService } from './correlation-lock.service';
 import {
+  CorrelationSwitchService,
+  DuplicateDetectionOffException,
+} from './correlation-switch.service';
+import {
   CorrelationReviewIndexService,
   type ReviewIndexStats,
 } from './review/correlation-review-index.service';
@@ -184,6 +188,12 @@ interface ResolvedConfig {
 }
 
 export interface CorrelationConfigDto {
+  /**
+   * Whether duplicate detection runs in this workspace (Settings → Cleanup ›
+   * Features). Tuning can still be saved while it is off; it takes effect in
+   * the full recompute that runs when it is turned back on.
+   */
+  enabled: boolean;
   defaultWeight: number;
   relatedMin: number;
   duplicateMin: number;
@@ -326,6 +336,9 @@ export class CorrelationService {
     private readonly jobs: CorrelationJobScheduler,
     private readonly reviewIndex: CorrelationReviewIndexService,
     @Optional() private readonly pause?: NamespacePauseService,
+    // Optional and last: the specs construct this service positionally, and
+    // an absent switch reads as "on", which is every workspace's default.
+    @Optional() private readonly featureSwitch?: CorrelationSwitchService,
   ) {
     this.batches = computeCorrelationBatchSizes();
     this.logger.log(
@@ -344,6 +357,7 @@ export class CorrelationService {
     runnerId: string,
     onProgress?: ProgressFn,
   ): Promise<CorrelationRunSummary> {
+    await this.featureSwitch?.assertEnabled();
     const touched = await this.prisma.asset.findMany({
       where: { runnerId },
       select: { id: true },
@@ -364,11 +378,13 @@ export class CorrelationService {
   /** On-demand correlation for a single asset (and its neighbourhood). */
   async recomputeForAsset(assetId: string): Promise<CorrelationRunSummary> {
     await this.pause?.assertNotPaused();
+    await this.featureSwitch?.assertEnabled();
     return this.runRecompute(() => this.recompute([assetId]));
   }
 
   async recomputeForAssets(assetIds: string[]): Promise<CorrelationRunSummary> {
     await this.pause?.assertNotPaused();
+    await this.featureSwitch?.assertEnabled();
     const unique = [...new Set(assetIds)].filter(Boolean);
     return this.runRecompute(() => this.recompute(unique));
   }
@@ -380,7 +396,22 @@ export class CorrelationService {
    */
   async recomputeAll(onProgress?: ProgressFn): Promise<CorrelationRunSummary> {
     await this.pause?.assertNotPaused();
+    await this.featureSwitch?.assertEnabled();
     return this.runRecompute(() => this.recomputeAllUnlocked(onProgress));
+  }
+
+  /**
+   * Stop a long recompute once duplicate detection has been turned off.
+   *
+   * A full recompute runs for an hour on a large corpus, and "off" has to mean
+   * off rather than "off after this one finishes writing another few million
+   * pairs". Checked between pages: the statement in flight completes, nothing
+   * after it starts. The duplicates finder records the stop as a skipped run.
+   */
+  private async assertStillEnabled(): Promise<void> {
+    if (this.featureSwitch && !(await this.featureSwitch.isEnabled())) {
+      throw new DuplicateDetectionOffException();
+    }
   }
 
   private async recomputeAllUnlocked(
@@ -415,8 +446,10 @@ export class CorrelationService {
         );
       cursor = rows.at(-1)!.id;
       if (rows.length < PAGE) break;
+      await this.assertStillEnabled();
     }
 
+    await this.assertStillEnabled();
     if (onProgress) await onProgress('Scoring all pairs…');
     // full=true: workingIds=null, touchFilter=empty — touchedIds is unused in SQL.
     const { relatedPairs, duplicatePairs, topMatch } = await this.scoreAndLink(
@@ -432,6 +465,24 @@ export class CorrelationService {
     const identical = await this.linkIdenticalContent([], true, onProgress);
     if (onProgress) await onProgress('Rebuilding clusters…');
     const clustersTouched = await this.rebuildAllClusters(cfg);
+    // The incremental path refreshes the review queue's read model; this one
+    // did not, so after a config change the queue kept serving the pairs the
+    // new weights had just removed (20,506 of them in one namespace, against 0
+    // real pairs) until some later scan rebuilt it (GENESIS field report P6).
+    // Same contract as there: a failed refresh leaves the previous index.
+    if (onProgress) await onProgress('Rebuilding the review queue…');
+    try {
+      await this.reviewIndex.refresh({
+        labelWeights: cfg.rawWeights,
+        defaultWeight: cfg.defaultWeight,
+      });
+    } catch (e) {
+      this.logger.error(
+        `Review index refresh failed after a full recompute: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    }
     return {
       assetsProcessed: processed,
       valuesIndexed,
@@ -503,7 +554,7 @@ export class CorrelationService {
   async getConfig(
     recompute?: CorrelationConfigDto['recompute'],
   ): Promise<CorrelationConfigDto> {
-    const [row, labelRows] = await Promise.all([
+    const [row, labelRows, switchState] = await Promise.all([
       this.prisma.correlationConfig.findUnique({ where: { id: 1 } }),
       // groupBy, not findMany+distinct: Prisma applies `distinct` on a
       // findMany in the client, so that form read every correlation value in
@@ -513,6 +564,7 @@ export class CorrelationService {
         by: ['label'],
         orderBy: { label: 'asc' },
       }),
+      this.featureSwitch?.state() ?? Promise.resolve({ enabled: true }),
     ]);
     const weights = effectiveLabelWeights(
       (row?.labelWeights as Record<string, number> | undefined) ?? {},
@@ -533,12 +585,29 @@ export class CorrelationService {
       }));
 
     return {
+      enabled: switchState.enabled,
       defaultWeight,
       relatedMin: row ? Number(row.relatedMin) : RELATED_MIN,
       duplicateMin: row ? Number(row.duplicateMin) : DUPLICATE_MIN,
       labels,
       exclusions: parseExclusions(row?.exclusions),
-      recompute: recompute ?? this.recomputeNote(null),
+      // Nothing is queued while the switch is off (the scheduler refuses), so
+      // "could not be queued" would read as a fault. Say what actually happens.
+      recompute: switchState.enabled
+        ? (recompute ?? this.recomputeNote(null))
+        : this.disabledRecomputeNote(),
+    };
+  }
+
+  private disabledRecomputeNote(): CorrelationConfigDto['recompute'] {
+    return {
+      scheduled: false,
+      startsWithinSeconds: this.jobs.coalesceSeconds,
+      note:
+        'Duplicate detection is turned off for this workspace, so nothing ' +
+        'recomputes now. Tuning is saved and takes effect in the full ' +
+        'recompute that runs when it is turned back on (Settings → Cleanup › ' +
+        'Features).',
     };
   }
 
@@ -1230,7 +1299,13 @@ export class CorrelationService {
 
           const denom = nfWeightA + nfWeightB;
           const weighted = denom === 0 ? 0 : (2 * weightedShared) / denom;
+          // Identical value sets are a duplicate by definition — unless every
+          // shared value sits under a label weighted 0. Zero means "this label
+          // is no evidence"; without the weight check, two assets whose only
+          // value was a zero-weighted Tag became 0 %-confidence DUPLICATE pairs
+          // (1,928 of them in one namespace; GENESIS field report P6).
           const exact =
+            weightedShared > 0 &&
             sharedCount > 0 &&
             sharedCount === nfCountA &&
             sharedCount === nfCountB;
@@ -2062,6 +2137,10 @@ export class CorrelationService {
    * enough to run on worker boot.
    */
   async refreshReviewIndexNow(): Promise<ReviewIndexStats> {
+    // The rebuild re-projects near-duplicate text groups into the queue as
+    // well, so while duplicate detection is off it would grow the very tables
+    // the operator switched off.
+    await this.featureSwitch?.assertEnabled();
     const cfg = await this.loadConfig();
     return this.reviewIndex.refresh({
       labelWeights: cfg.rawWeights,
@@ -2069,8 +2148,25 @@ export class CorrelationService {
     });
   }
 
-  async scheduleFullRecompute(reason: string, manual = false): Promise<void> {
-    await this.jobs.scheduleFull(reason, manual);
+  /**
+   * Queue a full recompute. False when nothing was queued — duplicate
+   * detection is turned off, or the queue refused the job.
+   */
+  async scheduleFullRecompute(
+    reason: string,
+    manual = false,
+  ): Promise<boolean> {
+    return this.jobs.scheduleFull(reason, manual);
+  }
+
+  /** Whether duplicate detection is on for the current workspace. */
+  async isEnabled(): Promise<boolean> {
+    return this.featureSwitch ? this.featureSwitch.isEnabled() : true;
+  }
+
+  /** 409 while duplicate detection is off; for explicit recompute requests. */
+  async assertEnabled(): Promise<void> {
+    await this.featureSwitch?.assertEnabled();
   }
 
   private async buildGraphFromDatabase(opts?: {
@@ -2628,8 +2724,10 @@ export function scorePair(
   const union = new Set([...aByHash.keys(), ...bSet]).size;
   const jaccard = union === 0 ? 0 : sharedCount / union;
 
-  // "Exact" when both assets carry the same non-empty value set.
+  // "Exact" when both assets carry the same non-empty value set — and that set
+  // carries weight: a label weighted 0 is no evidence (field report P6).
   const exact =
+    weightedShared > 0 &&
     sharedCount > 0 &&
     sharedCount === aByHash.size &&
     sharedCount === bSet.size;

@@ -14,6 +14,7 @@ import {
 import {
   ACCENT,
   CROSS_HYP_COLOR,
+  GONE_RING_COLOR,
   EDGE_CLASS_STYLE,
   FLOW_SUBTYPE_LABEL,
   MANUAL_EDGE_COLOR,
@@ -326,6 +327,19 @@ export function GraphLegendAndStats(props: GraphStatsProps) {
             +n
           </span>
           <span className="text-muted-foreground">{t("caseGraph.sidebar.legendUnattached")}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center border font-mono text-[7px] font-bold" style={{ background: ACCENT, color: "#0a0a0a" }}>
+            N
+          </span>
+          <span className="text-muted-foreground">{t("caseGraph.sidebar.legendNewMatch")}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-dashed"
+            style={{ borderColor: GONE_RING_COLOR }}
+          />
+          <span className="text-muted-foreground">{t("caseGraph.sidebar.legendGoneMatch")}</span>
         </div>
       </div>
       <div className="divide-y divide-border border-2 border-border bg-card">

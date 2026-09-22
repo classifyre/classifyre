@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -11,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
+  ApiConflictResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -39,6 +41,7 @@ import {
 import { EmbeddingStatsService } from './embedding-stats.service';
 import { EmbeddingRebuildService } from './embedding-rebuild.service';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
+import { featureOffMessage } from '../maintenance/workspace-features.constants';
 import {
   EmbeddingRebuildResponseDto,
   EmbeddingSettingsResponseDto,
@@ -132,8 +135,17 @@ export class EmbeddingController {
       'Purge every stored vector for this workspace and re-embed the corpus from scratch',
   })
   @ApiAcceptedResponse({ type: EmbeddingRebuildResponseDto })
-  rebuild(): EmbeddingRebuildResponseDto {
+  @ApiConflictResponse({ description: 'Embeddings are turned off' })
+  async rebuild(): Promise<EmbeddingRebuildResponseDto> {
+    await this.assertEnabled();
     return this.rebuilds.start('Requested from the settings page');
+  }
+
+  /** 409 for work that only makes sense while embeddings are on. */
+  private async assertEnabled(): Promise<void> {
+    if (!(await this.settings.enabledNow())) {
+      throw new ConflictException(featureOffMessage('embeddings'));
+    }
   }
 
   private async describeSettings(): Promise<EmbeddingSettingsResponseDto> {
@@ -165,6 +177,9 @@ export class EmbeddingController {
 
     return {
       enabled: effective.enabled,
+      disabledMode: effective.enabled
+        ? null
+        : (effective.disabledMode ?? 'kept'),
       provider: effective.provider,
       model: effective.model,
       revision: effective.revision,
@@ -204,7 +219,10 @@ export class EmbeddingController {
           hasApiKey: provider.hasApiKey,
           supportsEmbedding: provider.supportsEmbedding,
         })),
-      rebuildTriggerFields: [...SPACE_DEFINING_FIELDS, 'enabled'],
+      // `enabled` is not a trigger any more: turning embeddings off keeps or
+      // deletes the corpus by explicit choice (Settings → Cleanup), and on
+      // resumes into the same space.
+      rebuildTriggerFields: [...SPACE_DEFINING_FIELDS],
       stats,
       rebuildRunning: this.rebuilds.isRunning(),
       rebuildStartedAt: overrides?.rebuildStartedAt?.toISOString() ?? null,
@@ -229,7 +247,9 @@ export class EmbeddingController {
       'Reconcile stored findings and asset chunks into the configured embedding space',
   })
   @ApiAcceptedResponse({ type: EmbeddingReindexResponseDto })
-  reindex(): EmbeddingReindexResponseDto {
+  @ApiConflictResponse({ description: 'Embeddings are turned off' })
+  async reindex(): Promise<EmbeddingReindexResponseDto> {
+    await this.assertEnabled();
     return this.queue.requestBackfill();
   }
 
@@ -240,6 +260,13 @@ export class EmbeddingController {
     @Param('sourceId') sourceId: string,
     @Body() dto: PutAssetChunksDto,
   ) {
+    // After "turn off and delete" the corpus is meant to stay empty, so a
+    // scan's chunks are acknowledged and dropped. Off as a pause keeps saving
+    // them (only the embedding stops), because an asset whose chunks were
+    // skipped is never sent again — the scan cache marks it done.
+    if (!(await this.settings.collectsChunks())) {
+      return { stored: 0, queued: 0 };
+    }
     const result = await this.embeddings.putChunks(sourceId, dto);
     this.queue.enqueue(result.contents);
     return { stored: result.stored, queued: result.contents.length };
@@ -282,7 +309,9 @@ export class EmbeddingController {
       'Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)',
   })
   @ApiAcceptedResponse({ type: EmbeddingRecalibrateResponseDto })
+  @ApiConflictResponse({ description: 'Embeddings are turned off' })
   async recalibrate(): Promise<EmbeddingRecalibrateResponseDto> {
+    await this.assertEnabled();
     return { scheduled: await this.queue.scheduleRecalibration() };
   }
 

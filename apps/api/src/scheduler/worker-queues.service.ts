@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -13,6 +14,11 @@ import {
   type WorkerQueueRow,
   type WorkerQueueStatus,
 } from './worker-queue-registry.service';
+import {
+  isWorkspaceFeatureKey,
+  WORKSPACE_FEATURE_LABELS,
+  WORKSPACE_FEATURES_LOCATION,
+} from '../maintenance/workspace-features.constants';
 
 /** One worker process serving a queue. */
 export interface WorkerQueueInstanceView {
@@ -36,6 +42,12 @@ export interface WorkerQueueView {
   queue: string;
   status: WorkerQueueStatus;
   paused: boolean;
+  /**
+   * The workspace feature holding this queue paused (e.g. `duplicates` while
+   * duplicate detection is off), or null. A held queue cannot be resumed from
+   * the Workers tab; turning the feature back on releases it.
+   */
+  heldBy: string | null;
   activeJobs: number;
   queuedCount: number;
   deferredCount: number;
@@ -87,10 +99,10 @@ export class WorkerQueuesService {
 
   async overview(): Promise<WorkerOverview> {
     const namespaceId = this.requireNamespaceId();
-    const [rows, depths, paused] = await Promise.all([
+    const [rows, depths, holds] = await Promise.all([
       this.registry.listRows(namespaceId),
       this.depths(),
-      this.registry.listPaused(namespaceId),
+      this.registry.listPauseHolds(namespaceId),
     ]);
 
     const byQueue = new Map<string, WorkerQueueRow[]>();
@@ -104,6 +116,12 @@ export class WorkerQueuesService {
     for (const depth of depths) {
       if (!byQueue.has(depth.queue)) byQueue.set(depth.queue, []);
     }
+    // Same for a queue a switched-off feature holds: a worker that never
+    // registered it (it booted with the feature already off) reports nothing,
+    // and the hold is exactly what the operator needs to see.
+    for (const [queue, feature] of holds) {
+      if (feature && !byQueue.has(queue)) byQueue.set(queue, []);
+    }
 
     const depthByQueue = new Map(depths.map((d) => [d.queue, d]));
     const queues = [...byQueue.entries()]
@@ -112,7 +130,8 @@ export class WorkerQueuesService {
           queue,
           queueRows,
           depthByQueue.get(queue),
-          paused.has(queue),
+          holds.has(queue),
+          holds.get(queue) ?? null,
         ),
       )
       .sort((a, b) => a.queue.localeCompare(b.queue));
@@ -129,13 +148,27 @@ export class WorkerQueuesService {
   async setPaused(queue: string, paused: boolean): Promise<WorkerQueueView> {
     const namespaceId = this.requireNamespaceId();
     if (!queue.trim()) throw new BadRequestException('queue is required');
-    await this.registry.setPaused({ namespaceId, queue }, paused);
+    const { heldBy } = await this.registry.setPaused(
+      { namespaceId, queue },
+      paused,
+    );
+    if (heldBy) {
+      const feature = isWorkspaceFeatureKey(heldBy)
+        ? WORKSPACE_FEATURE_LABELS[heldBy]
+        : heldBy;
+      throw new ConflictException(
+        `Queue '${queue}' is paused because ${feature} is turned off for this ` +
+          `workspace. It resumes when you turn ${feature} back on in ` +
+          `${WORKSPACE_FEATURES_LOCATION}.`,
+      );
+    }
     const view = (await this.overview()).queues.find((q) => q.queue === queue);
     return (
       view ?? {
         queue,
         status: 'idle',
         paused,
+        heldBy: null,
         activeJobs: 0,
         queuedCount: 0,
         deferredCount: 0,
@@ -192,6 +225,7 @@ export class WorkerQueuesService {
     rows: WorkerQueueRow[],
     depth: QueueDepth | undefined,
     paused: boolean,
+    heldBy: string | null,
   ): WorkerQueueView {
     const now = Date.now();
     const instances = rows.map((row) => ({
@@ -229,6 +263,7 @@ export class WorkerQueuesService {
       queue,
       status,
       paused,
+      heldBy,
       activeJobs: sum(instances.map((i) => i.activeJobs)),
       queuedCount: depth?.queuedCount ?? 0,
       deferredCount: depth?.deferredCount ?? 0,

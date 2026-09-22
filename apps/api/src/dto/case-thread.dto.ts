@@ -97,7 +97,11 @@ export class UpdateThreadDto {
 }
 
 export class AddThreadEntryDto {
-  @ApiProperty({ enum: CaseThreadEntryType })
+  @ApiProperty({
+    enum: CaseThreadEntryType,
+    description:
+      'STATEMENT replaces the thread title with the first 200 characters of `body`; NOTE leaves it unchanged.',
+  })
   @IsEnum(CaseThreadEntryType)
   entryType!: CaseThreadEntryType;
 

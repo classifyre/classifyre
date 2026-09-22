@@ -104,6 +104,12 @@ export interface GraphNodeDto {
      */
     matchedContent?: string;
     /**
+     * For finding nodes on a CASE graph: how the latest run of the finding's source changed it, relative to the case's driving inquiries. NEW means that run created it; GONE means that run retired it, so the case still cites evidence the scan no longer finds. Absent when neither applies, and absent entirely outside a case graph.
+     * @type {string}
+     * @memberof GraphNodeDto
+     */
+    matchState?: GraphNodeDtoMatchStateEnum;
+    /**
      * For finding nodes: name of the parent asset
      * @type {string}
      * @memberof GraphNodeDto
@@ -133,7 +139,24 @@ export interface GraphNodeDto {
      * @memberof GraphNodeDto
      */
     missing?: boolean;
+    /**
+     * Total edges on this node, present only when it exceeded the lineage hub threshold. The node is drawn but the walk did not continue through it — open it on its own page to see what it connects.
+     * @type {number}
+     * @memberof GraphNodeDto
+     */
+    fanOut?: number;
 }
+
+
+/**
+ * @export
+ */
+export const GraphNodeDtoMatchStateEnum = {
+    New: 'NEW',
+    Gone: 'GONE'
+} as const;
+export type GraphNodeDtoMatchStateEnum = typeof GraphNodeDtoMatchStateEnum[keyof typeof GraphNodeDtoMatchStateEnum];
+
 
 /**
  * Check if a given object implements the GraphNodeDto interface.
@@ -170,11 +193,13 @@ export function GraphNodeDtoFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'customDetectorName': json['customDetectorName'] == null ? undefined : json['customDetectorName'],
         'status': json['status'] == null ? undefined : json['status'],
         'matchedContent': json['matchedContent'] == null ? undefined : json['matchedContent'],
+        'matchState': json['matchState'] == null ? undefined : json['matchState'],
         'assetName': json['assetName'] == null ? undefined : json['assetName'],
         'assetId': json['assetId'] == null ? undefined : json['assetId'],
         'hypothesisIds': json['hypothesisIds'] == null ? undefined : json['hypothesisIds'],
         'caseFindingId': json['caseFindingId'] == null ? undefined : json['caseFindingId'],
         'missing': json['missing'] == null ? undefined : json['missing'],
+        'fanOut': json['fanOut'] == null ? undefined : json['fanOut'],
     };
 }
 
@@ -203,11 +228,13 @@ export function GraphNodeDtoToJSONTyped(value?: GraphNodeDto | null, ignoreDiscr
         'customDetectorName': value['customDetectorName'],
         'status': value['status'],
         'matchedContent': value['matchedContent'],
+        'matchState': value['matchState'],
         'assetName': value['assetName'],
         'assetId': value['assetId'],
         'hypothesisIds': value['hypothesisIds'],
         'caseFindingId': value['caseFindingId'],
         'missing': value['missing'],
+        'fanOut': value['fanOut'],
     };
 }
 

@@ -77,6 +77,10 @@ export class CorrelationReviewController {
       'Derived from edges, clusters and correlation values that are already stored — this does not re-scan or re-fingerprint anything. Use it when a namespace was scanned before the review queue existed and its queue reads empty.',
   })
   @ApiResponse({ status: 200, type: RebuildIndexResponseDto })
+  @ApiResponse({
+    status: 409,
+    description: 'Duplicate detection is turned off for this workspace',
+  })
   async rebuild(): Promise<RebuildIndexResponseDto> {
     return this.review.rebuild();
   }

@@ -16,12 +16,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  ToneBadge,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components";
 import { getSourceIcon } from "../lib/source-type-icon";
 import { formatRelative, formatDate } from "@/lib/date";
+import { useTranslation } from "@/hooks/use-translation";
 
 const CHECKBOX_CLASS =
   "border-2 border-foreground/25 rounded-[2px] data-[state=checked]:bg-accent data-[state=checked]:border-accent data-[state=checked]:text-accent-foreground data-[state=indeterminate]:bg-accent data-[state=indeterminate]:border-accent data-[state=indeterminate]:text-accent-foreground";
@@ -55,6 +57,7 @@ export function InquiryMatchesTable({
   onSelectedChange,
 }: InquiryMatchesTableProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const selectable = selected !== undefined && onSelectedChange !== undefined;
 
   const selectableMatches = React.useMemo(
@@ -144,12 +147,12 @@ export function InquiryMatchesTable({
               <TableRow
                 key={m.findingId}
                 className={
-                  inCase
+                  inCase || m.state === "GONE"
                     ? "opacity-55"
                     : isSelected
                       ? "bg-accent/5"
-                      : m.isNew
-                        ? "bg-[color:var(--color-amber-600,#d97706)]/5"
+                      : m.state === "NEW"
+                        ? "bg-accent/[0.04]"
                         : undefined
                 }
               >
@@ -221,13 +224,40 @@ export function InquiryMatchesTable({
                     >
                       {m.label}
                     </button>
-                    {m.isNew && !inCase && (
-                      <Badge
-                        variant="outline"
-                        className="shrink-0 border-[color:var(--color-amber-600,#d97706)]/50 text-[10px] uppercase tracking-wide text-[color:var(--color-amber-600,#d97706)]"
-                      >
-                        new
-                      </Badge>
+                    {/* The shared status scale rather than hand-mixed amber:
+                        "fresh" is already documented as newly-arrived, and the
+                        accent is a surface, not ink. */}
+                    {m.state === "NEW" && !inCase && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="shrink-0">
+                            <ToneBadge tone="fresh">
+                              {t("investigations.matchState.new")}
+                            </ToneBadge>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {t("investigations.matchState.newTooltip")}
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {m.state === "GONE" && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="shrink-0">
+                            <ToneBadge tone="error">
+                              {t("investigations.matchState.gone")}
+                            </ToneBadge>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {m.goneReason
+                            ? t("investigations.matchState.goneReason", {
+                                reason: m.goneReason,
+                              })
+                            : t("investigations.matchState.goneTooltip")}
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                     {inCase && (
                       <Badge variant="outline" className="shrink-0 text-[10px] uppercase tracking-wide">

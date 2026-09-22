@@ -55,6 +55,7 @@ import { SearchFindingsChartsRequestDto } from '../dto/search-findings-charts-re
 import { SearchFindingsChartsResponseDto } from '../dto/search-findings-charts-response.dto';
 import { SearchFindingsCustomDetectorOptionDto } from '../dto/search-findings-custom-detectors.dto';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
+import { ReferencingFindingsResponseDto } from '../dto/referencing-findings.dto';
 
 @Controller('assets')
 @ApiTags('Assets')
@@ -90,6 +91,30 @@ export class AssetsController {
       throw new NotFoundException(`Asset with ID ${id} not found`);
     }
     return assetDetails;
+  }
+
+  @Get(':id/referencing-findings')
+  @ApiOperation({
+    summary: 'Findings recorded on assets that point at this one',
+    description:
+      "An integrity check or a derived profile is its own asset that references the thing it is about, so the subject's own Findings tab can be empty while a finding points straight at it. Incoming asset-to-asset edges only, worst severity first, unresolved only.",
+  })
+  @ApiParam({ name: 'id', description: 'Asset unique identifier' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Findings to return, 1–200. Defaults to 50.',
+  })
+  @ApiResponse({ status: 404, description: 'Asset not found' })
+  @ApiResponse({ status: 200, type: ReferencingFindingsResponseDto })
+  async getReferencingFindings(
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ): Promise<ReferencingFindingsResponseDto> {
+    return this.assetService.listFindingsOnReferencingAssets(id, {
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 }
 

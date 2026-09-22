@@ -214,6 +214,94 @@ describe('KubernetesCliJobService', () => {
     expect(onLogChunk).toHaveBeenNthCalledWith(2, 'line 2\n');
   });
 
+  it('does not re-emit the whole log when a poll reads the pod log as empty', async () => {
+    // `readJobLogs` returns '' when findJobPod finds no pod (the Job is between
+    // attempts) or when the response carries no Content-Type. Treating that as
+    // "the log is now empty" reset the delta cursor, so the next good read
+    // looked like a whole new log and every line already stored was appended a
+    // second time.
+    process.env.K8S_JOBS_ENABLED = '1';
+    process.env.K8S_CLI_JOB_POLL_INTERVAL_MS = '1';
+
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    ) as any;
+    const batchApi = {
+      readNamespacedJob: jest
+        .fn()
+        .mockResolvedValueOnce({ body: { status: {} } })
+        .mockResolvedValueOnce({ body: { status: {} } })
+        .mockResolvedValueOnce({ body: { status: { succeeded: 1 } } }),
+    };
+    Object.defineProperty(service, 'batchApi', {
+      value: batchApi,
+      configurable: true,
+    });
+
+    jest
+      .spyOn(service, 'readJobLogs')
+      .mockResolvedValueOnce('line 1\n')
+      .mockResolvedValueOnce('')
+      .mockResolvedValueOnce('line 1\nline 2\n')
+      .mockResolvedValueOnce('line 1\nline 2\n');
+
+    const onLogChunk = jest.fn().mockResolvedValue(undefined);
+
+    const result = await service.waitForJobCompletion(
+      'classifyre',
+      'job-1',
+      onLogChunk,
+    );
+
+    expect(result).toEqual({
+      succeeded: true,
+      exitCode: 0,
+      output: 'line 1\nline 2\n',
+    });
+    // Each line exactly once, and the empty read contributed nothing.
+    expect(onLogChunk.mock.calls.map((call: string[]) => call[0])).toEqual([
+      'line 1\n',
+      'line 2\n',
+    ]);
+  });
+
+  it('keeps the delta cursor when a poll reads only part of the log back', async () => {
+    // Same failure with a non-empty short read: a truncated response is a prefix
+    // of what we already hold, so it must not rewind the cursor either.
+    process.env.K8S_JOBS_ENABLED = '1';
+    process.env.K8S_CLI_JOB_POLL_INTERVAL_MS = '1';
+
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    ) as any;
+    Object.defineProperty(service, 'batchApi', {
+      value: {
+        readNamespacedJob: jest
+          .fn()
+          .mockResolvedValueOnce({ body: { status: {} } })
+          .mockResolvedValueOnce({ body: { status: { succeeded: 1 } } }),
+      },
+      configurable: true,
+    });
+
+    jest
+      .spyOn(service, 'readJobLogs')
+      .mockResolvedValueOnce('line 1\nline 2\n')
+      .mockResolvedValueOnce('line 1\n')
+      .mockResolvedValueOnce('line 1\nline 2\nline 3\n');
+
+    const onLogChunk = jest.fn().mockResolvedValue(undefined);
+
+    await service.waitForJobCompletion('classifyre', 'job-1', onLogChunk);
+
+    expect(onLogChunk.mock.calls.map((call: string[]) => call[0])).toEqual([
+      'line 1\nline 2\n',
+      'line 3\n',
+    ]);
+  });
+
   it('ignores transient pod log 400 errors while sandbox container is not yet available', async () => {
     process.env.K8S_JOBS_ENABLED = '1';
     process.env.K8S_CLI_JOB_POLL_INTERVAL_MS = '1';
@@ -327,6 +415,60 @@ describe('KubernetesCliJobService', () => {
         (item: { name: string }) => item.name === 'CLASSIFYRE_OUTPUT_REST_URL',
       )?.value,
     ).toBe('http://api.svc/prefix/namespace-id');
+  });
+
+  // GENESIS field report P2: a 3-second connection test waited 6.5 minutes
+  // Pending for the 7 GiB an extract requests.
+  it('gives connection tests a small resource profile, and extracts the template', async () => {
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
+    const template = () => ({
+      apiVersion: 'batch/v1',
+      kind: 'Job',
+      spec: {
+        template: {
+          spec: {
+            containers: [
+              {
+                name: 'cli',
+                image: 'cli:latest',
+                resources: {
+                  requests: { memory: '7Gi', cpu: '500m' },
+                  limits: { memory: '7Gi', cpu: '4' },
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+    const build = (mode: string, recipe: Record<string, unknown> = {}) =>
+      (service as any).buildJobFromTemplate(template(), {
+        sourceId: 'source-1',
+        runnerId: 'runner-1',
+        mode,
+        recipe: { type: 'CUSTOM', ...recipe },
+        outputRestUrl: 'http://api.svc/ns',
+      });
+
+    const test = await build('test');
+    expect(test.spec.template.spec.containers[0].resources).toEqual({
+      requests: { memory: '2Gi', cpu: '250m' },
+      limits: { memory: '2Gi', cpu: '1' },
+    });
+    const extract = await build('extract');
+    expect(
+      extract.spec.template.spec.containers[0].resources.limits.memory,
+    ).toBe('7Gi');
+    // A source that needs more for its test can still say so.
+    const raised = await build('test', {
+      resources: { requests: { memory: '4Gi' }, limits: { memory: '4Gi' } },
+    });
+    expect(
+      raised.spec.template.spec.containers[0].resources.limits.memory,
+    ).toBe('4Gi');
   });
 
   it('builds file-evaluation command reading input from the mounted volume', () => {

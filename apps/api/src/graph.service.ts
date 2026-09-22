@@ -3,10 +3,13 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { SourceGraphScheduler } from './stats/source-graph-scheduler.service';
+// Value import, not `import type` — see the constructor.
+import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { resolveEdgeClass } from './graph/edge-class';
 import { tryNormalizeUrn } from './graph/urn';
 import {
@@ -32,6 +35,14 @@ import {
 
 /** Upper bound on nodes returned by a single traversal to keep the graph curated. */
 const NODE_CAP = 200;
+
+/**
+ * Edges above which a lineage walk draws a node but does not expand through it.
+ *
+ * 40 is well above an ordinary table's neighbourhood and well below a hub's:
+ * the GENESIS table that broke this fed ~900 assets (field report P13).
+ */
+const DEFAULT_LINEAGE_HUB_FAN_OUT = 40;
 const MAX_DEPTH = 3;
 
 /**
@@ -253,6 +264,9 @@ export class GraphService {
     // Value import, not `import type` — a type-only import of an injected class
     // leaves Nest with no metadata to resolve and injects undefined silently.
     private readonly sourceGraphScheduler: SourceGraphScheduler,
+    // Optional so the graph specs can construct this service without the whole
+    // matching stack; a case graph simply goes unbadged without it.
+    @Optional() private readonly matching?: InquiryMatchingService,
   ) {}
 
   // ─── Edge inference ──────────────────────────────────────────────
@@ -584,11 +598,26 @@ export class GraphService {
     const direction: GraphDirection =
       dto.direction === 'up' ? 'in' : dto.direction === 'down' ? 'out' : 'both';
 
+    // A hub feeding hundreds of assets is what makes depth 2 return the whole
+    // namespace. Above this many edges a node is drawn but not expanded
+    // through; `fanOut` on the node says how many it really has, so the UI can
+    // show "collapsed hub" instead of silently losing the rest of the graph.
+    const fanOutCap =
+      dto.hubFanOut === undefined
+        ? DEFAULT_LINEAGE_HUB_FAN_OUT
+        : Math.max(0, Number(dto.hubFanOut));
+
     let graph = await this.traverse(
       [{ type: 'asset', id: dto.assetId }],
       depth,
       direction,
+      undefined,
+      undefined,
+      fanOutCap,
     );
+    if (fanOutCap > 0) {
+      graph = await this.markHubNodes(graph, dto.assetId, fanOutCap);
+    }
 
     if (dto.mergeIdentity === true) {
       graph = await this.mergeIdentityNodes(graph, dto.assetId);
@@ -597,6 +626,59 @@ export class GraphService {
       graph = await this.collapseIntoContainers(graph, dto.assetId);
     }
     return graph;
+  }
+
+  /**
+   * Stamp `fanOut` on the nodes the walk refused to expand through.
+   *
+   * Without it a collapsed hub is indistinguishable from a leaf: the graph
+   * simply stops there, which is a quieter version of the bug it fixes. With
+   * it the UI can say "this feeds 900 more" and offer to open that node on its
+   * own page.
+   */
+  private async markHubNodes(
+    graph: GraphResponseDto,
+    seedId: string,
+    fanOutCap: number,
+  ): Promise<GraphResponseDto> {
+    const candidates = graph.nodes.filter((n) => n.id !== seedId);
+    if (candidates.length === 0) return graph;
+
+    // The VALUES list is not compared against a typed column here, so the
+    // parameters carry their own casts — without them Postgres cannot
+    // determine the type and the statement fails at runtime.
+    const tuples = Prisma.join(
+      candidates.map((n) => Prisma.sql`(${n.type}::text, ${n.id}::text)`),
+    );
+    const degrees = await this.prisma.$queryRaw<
+      { node_type: string; node_id: string; degree: bigint }[]
+    >(Prisma.sql`
+      SELECT node_type, node_id, degree FROM (
+        SELECT n.node_type, n.node_id,
+               (SELECT count(*) FROM edges e
+                 WHERE e.from_type = n.node_type AND e.from_id = n.node_id)
+             + (SELECT count(*) FROM edges e
+                 WHERE e.to_type = n.node_type AND e.to_id = n.node_id)
+               AS degree
+        FROM (VALUES ${tuples}) AS n(node_type, node_id)
+      ) d
+      WHERE degree > ${fanOutCap}
+    `);
+    if (degrees.length === 0) return graph;
+
+    const byKey = new Map(
+      degrees.map((row) => [
+        nodeKey(row.node_type, row.node_id),
+        Number(row.degree),
+      ]),
+    );
+    return {
+      ...graph,
+      nodes: graph.nodes.map((node) => {
+        const fanOut = byKey.get(nodeKey(node.type, node.id));
+        return fanOut === undefined ? node : { ...node, fanOut };
+      }),
+    };
   }
 
   /**
@@ -1155,7 +1237,57 @@ export class GraphService {
           )
         : { nodes: [], edges: [], truncated: false };
 
-    return this.mergeCaseGraph(caseId, evidence, base);
+    const merged = await this.mergeCaseGraph(caseId, evidence, base);
+    return this.badgeInquiryStates(caseId, merged);
+  }
+
+  /**
+   * Mark which of a case's finding nodes the latest scan brought in or took
+   * away, according to the inquiries driving that case.
+   *
+   * Scoped to the nodes already on the graph rather than to every match of
+   * every linked inquiry: this is a question about one screenful, and answering
+   * it by walking the corpus would cost the same as the inquiry page itself.
+   *
+   * A failure here badges nothing. The graph is the case's main entrance, and
+   * it must still open when the matching stack cannot answer.
+   */
+  private async badgeInquiryStates(
+    caseId: string,
+    graph: GraphResponseDto,
+  ): Promise<GraphResponseDto> {
+    if (!this.matching) return graph;
+    const findingIds = graph.nodes
+      .filter((n) => n.type === 'finding')
+      .map((n) => n.id);
+    if (findingIds.length === 0) return graph;
+
+    try {
+      const links = await this.prisma.caseInquiry.findMany({
+        where: { caseId },
+        select: { inquiryId: true },
+      });
+      if (links.length === 0) return graph;
+
+      const states = await this.matching.matchStatesForFindings(
+        links.map((l) => l.inquiryId),
+        findingIds,
+      );
+      if (states.size === 0) return graph;
+
+      for (const node of graph.nodes) {
+        if (node.type !== 'finding') continue;
+        const state = states.get(node.id);
+        // ONGOING is the unremarkable case and is left off the wire entirely,
+        // so the canvas decorator only sees what it should draw.
+        if (state === 'NEW' || state === 'GONE') node.matchState = state;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Inquiry states not applied to case ${caseId} graph: ${String(error)}`,
+      );
+    }
+    return graph;
   }
 
   /**
@@ -1316,6 +1448,7 @@ export class GraphService {
     direction: GraphDirection,
     relationTypes?: string[],
     relationClass?: string,
+    fanOutCap?: number,
   ): Promise<GraphResponseDto> {
     if (seeds.length === 0) {
       return { nodes: [], edges: [], truncated: false };
@@ -1350,6 +1483,27 @@ export class GraphService {
           ? inward
           : Prisma.sql`${outward} UNION ${inward}`;
 
+    // Hub guard. A hub is drawn but not walked *through*: one GENESIS table
+    // fed ~900 assets, so at depth 2 the walk left the seed, reached that
+    // table and came back with the whole namespace — 200 nodes, `truncated:
+    // true`, and nothing about the asset the user asked about (field report
+    // P13). The seed is exempt: refusing to expand it would return it alone.
+    const hubGuard =
+      fanOutCap && fanOutCap > 0
+        ? // Two index probes summed, not one OR: an OR over from/to cannot use
+          // either of the (type, id) indexes and degrades to a scan of `edges`
+          // for every node the walk visits.
+          Prisma.sql`AND (
+            t.depth = 0
+            OR (
+              (SELECT count(*) FROM edges d
+                WHERE d.from_type = t.node_type AND d.from_id = t.node_id)
+              + (SELECT count(*) FROM edges d
+                  WHERE d.to_type = t.node_type AND d.to_id = t.node_id)
+            ) <= ${fanOutCap}
+          )`
+        : Prisma.empty;
+
     const nodeRows = await this.prisma.$queryRaw<TraversalRow[]>(Prisma.sql`
       WITH RECURSIVE traversal(node_type, node_id, depth) AS (
         SELECT seed.node_type::text, seed.node_id::text, 0
@@ -1360,7 +1514,7 @@ export class GraphService {
         JOIN LATERAL (
           ${neighbor}
         ) nb ON true
-        WHERE t.depth < ${depth}
+        WHERE t.depth < ${depth} ${hubGuard}
       )
       SELECT node_type, node_id, MIN(depth) AS depth
       FROM traversal

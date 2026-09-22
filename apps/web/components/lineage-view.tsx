@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Globe,
   Layers,
+  Network,
   Waypoints,
 } from "lucide-react";
 import {
@@ -14,6 +15,7 @@ import {
   type GraphEdgeDto,
   type GraphNodeDto,
 } from "@workspace/api-client";
+import type { AssetFindingStats } from "./graph-explorer/explorer-types";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { EmptyState } from "@workspace/ui/components/empty-state";
@@ -55,6 +57,16 @@ export function LineageView({ assetId }: { assetId: string }) {
   const [truncated, setTruncated] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  /**
+   * Findings per asset in this graph, fetched rather than derived.
+   *
+   * A lineage graph contains no finding nodes, so the clustering code — which
+   * sums finding nodes — reported "0 findings" on every hotspot while every
+   * asset in it carried one (field report P13).
+   */
+  const [assetStats, setAssetStats] = React.useState<Map<string, AssetFindingStats>>(
+    () => new Map(),
+  );
 
   const load = React.useCallback(() => {
     let active = true;
@@ -73,11 +85,41 @@ export function LineageView({ assetId }: { assetId: string }) {
           mergeIdentity: false,
         },
       })
-      .then((g) => {
+      .then(async (g) => {
         if (!active) return;
-        setNodes(g.nodes ?? []);
+        const graphNodes = g.nodes ?? [];
+        setNodes(graphNodes);
         setEdges(g.edges ?? []);
         setTruncated(Boolean(g.truncated));
+
+        const assetIds = graphNodes
+          .filter((n) => n.type === "asset")
+          .map((n) => n.id);
+        if (assetIds.length === 0) {
+          setAssetStats(new Map());
+          return;
+        }
+        try {
+          const counts = await api.findings.findingsControllerAssetSeverityCounts({
+            assetSeverityCountsRequestDto: { assetIds },
+          });
+          if (!active) return;
+          setAssetStats(
+            new Map(
+              (counts.items ?? []).map((item) => [
+                item.assetId,
+                {
+                  total: item.total,
+                  severityCounts: (item.severityCounts ?? {}) as Record<string, number>,
+                },
+              ]),
+            ),
+          );
+        } catch {
+          // The graph is the point; counts are an annotation on it. Showing
+          // the lineage without them beats failing the whole view.
+          if (active) setAssetStats(new Map());
+        }
       })
       .catch((e: unknown) => {
         if (active) {
@@ -96,6 +138,12 @@ export function LineageView({ assetId }: { assetId: string }) {
 
   const externalCount = React.useMemo(
     () => nodes.filter((n) => n.type === "external").length,
+    [nodes],
+  );
+
+  /** Nodes the walk drew but refused to expand through — see `fanOut`. */
+  const hubCount = React.useMemo(
+    () => nodes.filter((n) => typeof n.fanOut === "number").length,
     [nodes],
   );
 
@@ -146,6 +194,7 @@ export function LineageView({ assetId }: { assetId: string }) {
       onReload={load}
       nodeDecorator={nodeDecorator}
       edgeStyle={edgeStyle}
+      clustering={{ assetStats }}
       header={
         <>
           <Waypoints className="h-4 w-4 text-muted-foreground" />
@@ -185,6 +234,16 @@ export function LineageView({ assetId }: { assetId: string }) {
             <Badge variant="outline" className="gap-1 text-[10px]">
               <Globe className="h-3 w-3" />
               {externalCount} not yet scanned
+            </Badge>
+          )}
+          {hubCount > 0 && (
+            <Badge
+              variant="outline"
+              className="gap-1 text-[10px]"
+              title="A node feeding hundreds of others is drawn but not walked through — otherwise depth 2 returns the whole namespace. Open it on its own page to follow it."
+            >
+              <Network className="h-3 w-3" />
+              {hubCount} hub{hubCount === 1 ? "" : "s"} not expanded
             </Badge>
           )}
         </>
@@ -229,6 +288,13 @@ export function LineageView({ assetId }: { assetId: string }) {
             {selectedNode.sourceName && (
               <p className="text-xs text-muted-foreground">
                 in {selectedNode.sourceName}
+              </p>
+            )}
+            {typeof selectedNode.fanOut === "number" && (
+              <p className="text-xs text-muted-foreground">
+                A hub: {selectedNode.fanOut} connections. The walk stops here so
+                one table feeding hundreds of assets does not pull in the whole
+                namespace — open it to follow them.
               </p>
             )}
             {selectedNode.urn && (

@@ -52,6 +52,14 @@ CREATE TABLE IF NOT EXISTS public.worker_queue_pauses (
   paused_at    timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (namespace_id, queue)
 );
+-- Two independent reasons a queue can be paused, kept apart so neither undoes
+-- the other: \`manual\` is the operator's pause from the Workers tab, \`feature\`
+-- names the workspace feature switch holding it (e.g. 'duplicates' while
+-- duplicate detection is off). A held queue cannot be resumed by hand; turning
+-- the feature back on releases the hold and leaves a manual pause in place.
+-- Rows written before these columns existed are manual pauses.
+ALTER TABLE public.worker_queue_pauses ADD COLUMN IF NOT EXISTS manual boolean NOT NULL DEFAULT true;
+ALTER TABLE public.worker_queue_pauses ADD COLUMN IF NOT EXISTS feature text;
 `;
 
 /**

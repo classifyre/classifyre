@@ -48,6 +48,12 @@ kubectl config use-context k3d-classifyre
 # These directories live in the k3d node, not in the host checkout. They keep
 # Bun dependencies and framework caches warm across pod restarts while source
 # remains a read-only mount in the application containers.
+#
+# runner-logs is shared by the api and worker pods (values-dev.yaml mounts it in
+# both): either process can drive a scan, while the logs endpoint is served by
+# the API, so a per-pod directory means the API serves only half of each run's
+# log. Created here because a hostPath the kubelet creates is owned by root,
+# and the containers run as 10001.
 docker exec k3d-classifyre-server-0 sh -ec '
   mkdir -p \
     /var/lib/classifyre/cache/api/root-node-modules \
@@ -55,8 +61,9 @@ docker exec k3d-classifyre-server-0 sh -ec '
     /var/lib/classifyre/cache/api/schemas-node-modules \
     /var/lib/classifyre/cache/api/eslint-node-modules \
     /var/lib/classifyre/cache/api/typescript-config-node-modules \
-    /var/lib/classifyre/cache/api/bun
-  chown -R 10001:10001 /var/lib/classifyre/cache
+    /var/lib/classifyre/cache/api/bun \
+    /var/lib/classifyre/runner-logs
+  chown -R 10001:10001 /var/lib/classifyre/cache /var/lib/classifyre/runner-logs
 '
 
 # Keep the local ingress implementation aligned with the chart's existing

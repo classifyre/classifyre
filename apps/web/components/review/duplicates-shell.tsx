@@ -17,8 +17,10 @@ import {
 } from "@workspace/ui/components/tabs";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { PanelCard } from "@/components/panel-card";
+import { FeatureOffNotice } from "@/components/feature-off-notice";
 import { useNsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { ReviewBandStrip } from "./review-band-strip";
 import { ScoreHistogram } from "./score-histogram";
 import { SourceBreakdown } from "./source-breakdown";
@@ -66,6 +68,9 @@ export function DuplicatesShell({
   const router = useRouter();
   const nsPath = useNsPath();
   const { namespaceSlug } = useParams<{ namespaceSlug: string }>();
+  // Off means no new pairs and no rebuild (the API refuses it with 409), so
+  // the empty state must not offer one.
+  const duplicatesOff = useWorkspaceFeatures().isOff("duplicates");
 
   const [portfolio, setPortfolio] =
     React.useState<ReviewPortfolioResponseDto | null>(null);
@@ -205,19 +210,21 @@ export function DuplicatesShell({
           <p className="mx-auto max-w-[46ch] text-[13px] text-muted-foreground">
             {t("review.emptyHint")}
           </p>
-          <div className="space-y-1.5 pt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={rebuild}
-              disabled={rebuilding}
-            >
-              {rebuilding ? t("review.rebuilding") : t("review.rebuild")}
-            </Button>
-            <p className="mx-auto max-w-[46ch] text-[11px] text-muted-foreground">
-              {t("review.rebuildHint")}
-            </p>
-          </div>
+          {duplicatesOff ? null : (
+            <div className="space-y-1.5 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={rebuild}
+                disabled={rebuilding}
+              >
+                {rebuilding ? t("review.rebuilding") : t("review.rebuild")}
+              </Button>
+              <p className="mx-auto max-w-[46ch] text-[11px] text-muted-foreground">
+                {t("review.rebuildHint")}
+              </p>
+            </div>
+          )}
         </PanelCard>
       </Chrome>
     );
@@ -292,6 +299,7 @@ function Chrome({
   const { t } = useTranslation();
   const router = useRouter();
   const nsPath = useNsPath();
+  const duplicates = useWorkspaceFeatures().feature("duplicates");
 
   return (
     <div className="min-w-0 space-y-5 overflow-x-hidden">
@@ -322,6 +330,20 @@ function Chrome({
           ))}
         </TabsList>
       </Tabs>
+
+      {/* Every section of the page reads what these two engines produced,
+          so say it once, above all of them, when either is switched off. */}
+      <FeatureOffNotice
+        feature="duplicates"
+        context={
+          duplicates?.disabledMode === "deleted" ? "reviewDeleted" : "review"
+        }
+      />
+      <FeatureOffNotice
+        feature="embeddings"
+        context="duplicates"
+        variant="inline"
+      />
 
       {children}
     </div>
