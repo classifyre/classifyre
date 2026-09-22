@@ -197,17 +197,29 @@ export function WorkspaceCard({
 
         <div className="mt-auto pt-4">
           {stats && hasStatusBadges && (
+            // Deep links into the workspace: failing sources are a sources
+            // table filtered by ERROR, running/queued are scans filtered by
+            // status. Each stops propagation so it does not also open the
+            // workspace like the rest of the card does.
             <div className="mb-3 flex flex-wrap items-center gap-1.5">
               {failingCount > 0 && (
-                <span className="flex items-center gap-1 rounded-sm border border-destructive/40 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-destructive">
+                <Link
+                  href={localePath(`/${ns.slug}/sources?status=ERROR`)}
+                  onClick={(event) => event.stopPropagation()}
+                  className="flex items-center gap-1 rounded-sm border border-destructive/40 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-destructive transition-opacity hover:opacity-70"
+                >
                   <TriangleAlert className="size-3 shrink-0" />
                   {t("workspaces.failingCount", {
                     count: failingCount,
                   })}
-                </span>
+                </Link>
               )}
               {runningCount > 0 && (
-                <span className="flex items-center gap-1 rounded-sm border border-sky-600/35 bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-sky-700 dark:border-sky-400/30 dark:bg-sky-950/40 dark:text-sky-300">
+                <Link
+                  href={localePath(`/${ns.slug}/scans?status=RUNNING`)}
+                  onClick={(event) => event.stopPropagation()}
+                  className="flex items-center gap-1 rounded-sm border border-sky-600/35 bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-sky-700 transition-opacity hover:opacity-70 dark:border-sky-400/30 dark:bg-sky-950/40 dark:text-sky-300"
+                >
                   <Loader2
                     aria-hidden="true"
                     className="size-3 shrink-0 animate-spin"
@@ -215,15 +227,19 @@ export function WorkspaceCard({
                   {t("workspaces.runningCount", {
                     count: runningCount,
                   })}
-                </span>
+                </Link>
               )}
               {pendingCount > 0 && (
-                <span className="flex items-center gap-1 rounded-sm border border-border/60 bg-muted px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                <Link
+                  href={localePath(`/${ns.slug}/scans?status=PENDING`)}
+                  onClick={(event) => event.stopPropagation()}
+                  className="flex items-center gap-1 rounded-sm border border-border/60 bg-muted px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground transition-opacity hover:opacity-70"
+                >
                   <Clock aria-hidden="true" className="size-3 shrink-0" />
                   {t("workspaces.pendingCount", {
                     count: pendingCount,
                   })}
-                </span>
+                </Link>
               )}
             </div>
           )}

@@ -567,6 +567,7 @@ export {
   SearchFindingsFiltersInputDtoDetectorTypeEnum,
   SearchFindingsFiltersInputDtoSeverityEnum,
   SearchFindingsFiltersInputDtoStatusEnum,
+  SearchRunnersFiltersInputDtoStatusEnum,
 } from "./generated/src/models";
 
 export const SearchAssetsSortByEnum = {
