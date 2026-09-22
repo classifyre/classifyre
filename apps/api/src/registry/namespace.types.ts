@@ -117,6 +117,10 @@ export interface NamespaceStats {
   id: string;
   totalSources: number;
   failingSources: number;
+  /** Sources with RUNNING runner status (a scan was requested and is in flight or queued). PENDING is excluded: it is also the default for sources that never ran. */
+  runningSources: number;
+  /** Sources with PENDING runner status (mostly never scanned yet). */
+  pendingSources: number;
 }
 
 /** Lightweight context emitted on namespace lifecycle events. */

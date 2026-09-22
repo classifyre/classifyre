@@ -1470,6 +1470,10 @@ export interface NamespaceStats {
   id: string;
   totalSources: number;
   failingSources: number;
+  /** Sources with RUNNING runner status. Optional for back-compat; treat missing as 0. */
+  runningSources?: number;
+  /** Sources with PENDING runner status. Optional for back-compat; treat missing as 0. */
+  pendingSources?: number;
 }
 
 class NamespacesApi {

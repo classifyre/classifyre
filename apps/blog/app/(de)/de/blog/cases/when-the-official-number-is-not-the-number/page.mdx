@@ -1,0 +1,355 @@
+---
+title: "Köln schrumpft nicht: Wenn die amtliche Zahl nicht die Zahl ist"
+description: Die amtliche Statistik sagt, 44 deutsche Kreise haben im letzten Jahrzehnt Einwohner verloren. Rechnet man die Zensuskorrektur 2022 heraus, sind genau diese Kreise gewachsen. Der Namespace, der beides auseinanderhält — und was er sonst noch gefunden hat.
+date: 2026-09-22T00:00:00.000Z
+tags:
+  - investigations
+  - public-data
+  - data-quality
+  - detector-design
+categories:
+  - Field Notes
+author: Banandre
+image: /blog/assets/images/when-the-official-number-is-not-the-number.jpg
+keywords:
+  - amtliche Statistik
+  - Zensus 2022
+  - Zensusrevision
+  - GENESIS-Online
+  - Datenqualität
+  - Regionalstatistik
+  - Pro-Kopf-Kennzahlen
+  - Classifyre
+alternates:
+  canonical: /de/blog/cases/when-the-official-number-is-not-the-number
+  languages:
+    en: /blog/cases/when-the-official-number-is-not-the-number/
+    de: /de/blog/cases/when-the-official-number-is-not-the-number/
+    x-default: /blog/cases/when-the-official-number-is-not-the-number/
+openGraph:
+  type: article
+  title: "Köln schrumpft nicht: Wenn die amtliche Zahl nicht die Zahl ist"
+  description: 44 deutsche Kreise gelten als schrumpfend. Ohne die Zensuskorrektur 2022 sind sie gewachsen. Der Namespace, der beides auseinanderhält.
+  url: /de/blog/cases/when-the-official-number-is-not-the-number
+  siteName: Classifyre
+  publishedTime: 2026-09-22T00:00:00.000Z
+  modifiedTime: 2026-09-22T00:00:00.000Z
+  authors:
+    - Banandre
+  section: Field Notes
+  tags:
+    - amtliche Statistik
+    - Datenqualität
+    - Zensus
+    - offene Daten
+  images:
+    - /blog/assets/images/when-the-official-number-is-not-the-number.jpg
+twitter:
+  card: summary
+  title: "Köln schrumpft nicht: Wenn die amtliche Zahl nicht die Zahl ist"
+  description: 44 Kreise gelten als schrumpfend. Ohne die Zensuskorrektur 2022 sind sie gewachsen.
+  images:
+    - /blog/assets/images/when-the-official-number-is-not-the-number.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/when-the-official-number-is-not-the-number.jpg"
+  eyebrow="Field notes"
+  title="Köln schrumpft nicht"
+  description="Die amtliche Statistik sagt, 44 deutsche Kreise haben im letzten Jahrzehnt Einwohner verloren. Rechnet man die Zensuskorrektur 2022 heraus, sind genau diese Kreise gewachsen. Der Namespace, der beides auseinanderhält."
+/>
+
+<ArticleJsonLd
+  headline="Köln schrumpft nicht: Wenn die amtliche Zahl nicht die Zahl ist"
+  description="44 deutsche Kreise gelten als schrumpfend. Ohne die Zensusrevision 2022 sind sie gewachsen. Wie ein Classifyre-Namespace echte Veränderung von statistischer Korrektur trennt."
+  path="/de/blog/cases/when-the-official-number-is-not-the-number"
+  datePublished="2026-09-22T00:00:00.000Z"
+  dateModified="2026-09-22T00:00:00.000Z"
+  authorName="Banandre"
+  articleSection="Field Notes"
+  about={[
+    "Qualität amtlicher Statistik",
+    "Zensus 2022",
+    "Regionale Bevölkerungsdaten",
+    "Pro-Kopf-Kennzahlen",
+  ]}
+  mentions={[
+    {
+      "@type": "Dataset",
+      name: "GENESIS-Online (Statistisches Bundesamt)",
+      url: "https://www-genesis.destatis.de/",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://showcase.classifyre.com/de-statistik-integritaet",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://showcase.classifyre.com/de-statistik-integritaet"
+  liveCaseName="Namespace DE Statistik-Integrität"
+/>
+
+<LiveCaseLink
+  href="https://showcase.classifyre.com/de-statistik-integritaet"
+  caseName="Namespace DE Statistik-Integrität"
+  locale="de"
+/>
+
+<ArticleSideRail
+  title="Köln schrumpft nicht"
+  path="/de/blog/cases/when-the-official-number-is-not-the-number/"
+  tags={["investigations", "public-data", "data-quality", "detector-design"]}
+  backHref="/de/blog/cases"
+  backLabel="Alle Fallakten"
+  locale="de"
+/>
+
+Öffnen Sie GENESIS-Online, rufen Sie die Bevölkerung von Köln für 2015 und für
+2025 ab — die Stadt hat 3,3 % ihrer Einwohner verloren.
+
+Dasselbe für Trier: −8,6 %. Cottbus: −4,6 %. Halle an der Saale: −4,6 %.
+
+Wer einen Standort auswählt, einen Regionalmarkt dimensioniert, Vertriebsziele
+setzt oder einen Förderantrag schreibt, arbeitet mit genau diesen Zahlen. Es
+sind die amtlichen. Und sie sind, in einem Sinn, der zählt, falsch.
+
+Nimmt man eine einzige Sache heraus — die Korrektur, mit der der Zensus 2022 ein
+seit 2011 fortgeschriebenes Melderegister ersetzt hat —, dann ist Köln um 3,7 %
+gewachsen. Trier um 0,1 %. Cottbus um 2,6 %. Halle um 2,1 %.
+
+> **Kurz gefasst:** Wir haben einen Namespace gebaut, dessen einzige Aufgabe die
+> Frage ist: *„Ist diese amtliche Zahl das, wonach sie aussieht?"* — 7 Quellen,
+> 25 Detektoren, 1.244 Befunde, 8 Untersuchungen. Ergebnis: 158 von 400 Kreisen
+> tragen eine Zensuskorrektur von mindestens 2 % ihrer Bevölkerung, in 44 davon
+> kippt das Vorzeichen des Jahrzehnts, neun Kreise melden exakt null Ausländer,
+> weil eine andere Behörde ihre Akten führt — und der dokumentierte Weg, die
+> Statistik-API nach einer Summe zu fragen, liefert bei täglich genutzten
+> Tabellen stillschweigend nichts.
+
+Nichts davon ist ein Fehler des Statistischen Bundesamts. Jeder einzelne Punkt
+ist dokumentiertes, korrekt veröffentlichtes Verhalten. Das Problem ist, dass
+die Dokumentation nicht an der Zahl hängt — und die Zahl ist das, was in der
+Tabellenkalkulation landet.
+
+{/* SCREENSHOT: Namespace-Übersicht — die sieben Quellen mit Laufstatus und
+    Objektzahlen sowie die Befundkacheln nach Schweregrad. Das Bild, das zeigt,
+    worauf man hier eigentlich schaut. */}
+
+## Warum ein Zensus von 2022 Ihre Zahl für 2025 verschiebt
+
+Deutschland zählt seine Bevölkerung auf zwei Wegen gleichzeitig. Zwischen zwei
+Zensus­erhebungen wird sie *fortgeschrieben*: letzter Zählstand, plus Geburten,
+minus Sterbefälle, plus Wanderungssaldo. Register driften, Menschen ziehen um,
+ohne sich abzumelden, und der Fehler wächst ein Jahrzehnt lang leise an.
+
+Dann kommt ein Zensus und setzt den Bestand neu. Der Zensus 2022 hat Deutschlands
+Bevölkerung gegenüber der Fortschreibung um rund 1,6 Millionen nach unten
+korrigiert. Diese Korrektur wird nicht über das Jahrzehnt verteilt, in dem sie
+entstanden ist. Sie erscheint als einzelner Sprung zwischen 2021 und 2022.
+
+Jeder Vergleich, der 2022 überschreitet — *„wie hat sich dieser Kreis in zehn
+Jahren entwickelt?"* — enthält sie deshalb unsichtbar.
+
+### Die Korrektur von den Menschen trennen
+
+Der Ansatz nutzt aus, dass Deutschland eine zweite Bevölkerungsreihe hat, die
+**nicht** revidiert wurde: Ausländer stammen aus dem Ausländerzentralregister,
+das der Zensus nicht zurückgesetzt hat.
+
+Das ist der Hebel. Man nimmt den Bevölkerungssprung 2021→2022 jedes Kreises,
+entfernt den Teil, den die ausländische Bevölkerung erklärt, und vergleicht den
+Rest mit dem Median der Nachbarkreise. Was übrig bleibt, ist die Korrektur.
+
+Der Detektor schlägt an, wenn diese Korrektur mindestens 2 % der
+Kreisbevölkerung ausmacht. Er schlägt in **158 von 400 Kreisen** an. In 44 kippt
+das Vorzeichen des Jahrzehnts.
+
+| Kreis | Ausgewiesen 2015→2025 | Korrektur | Bereinigt |
+|---|---|---|---|
+| Köln | −3,3 % | −74.346 (−6,9 %) | **+3,7 %** |
+| Trier | −8,6 % | −9.950 | **+0,1 %** |
+| Cottbus | −4,6 % | — | **+2,6 %** |
+| Halle (Saale) | −4,6 % | — | **+2,1 %** |
+| Ansbach | −1,5 % | — | **+5,8 %** |
+
+Die größten negativen Korrekturen häufen sich in Universitätsstädten — genau
+das, was man erwartet, wenn die Drift von Studierenden stammt, die weggezogen
+sind, ohne sich abzumelden.
+
+{/* SCREENSHOT: Der Fall „Zensus 2022: Wer ist wirklich geschrumpft?" mit seinen
+    fünf Hypothesen und deren Status, inklusive der Belege an „Raw declines in
+    44 Kreise are statistical, not real". */}
+
+### Woher wir wissen, dass die Methode stimmt
+
+Eine selbst geschätzte Korrektur ist eine Behauptung, keine Tatsache. Der
+Namespace prüft sie deshalb gegen etwas, das er nicht selbst konstruiert hat:
+Das Statistische Bundesamt hat seine eigene bundesweite Korrektur
+veröffentlicht. Die Summe der 400 kreisweise hergeleiteten Korrekturen muss
+darauf landen.
+
+Sie tut es. Diese Prüfung ist ein eigener Detektor, ein eigener Befund und eine
+eigene Hypothese im Fall — *„Die Kreiskorrekturen ergeben die amtliche
+Bundeskorrektur"*, belegt.
+
+Genau das unterscheidet eine Analyse von einem Ergebnis, auf das sich jemand
+anderes stützen kann: Die Methode ist sichtbar, die Validierung hängt daran, und
+jeder kann den Weg zurück bis zu den veröffentlichten Zellen gehen.
+
+## Neun Kreise, die exakt null Ausländer melden
+
+Ein eigener Befund — und derjenige, der am häufigsten eine nachgelagerte
+Kennzahl zerstört.
+
+Für Kreise, deren Melderegister von einer Behörde in einem *anderen* Kreis
+geführt werden, weist GENESIS Ausländer und Schutzsuchende als `-` aus. Die
+Dokumentation sagt ausdrücklich: das bedeutet *exakt null*. Für einen Kreis mit
+200.000 Einwohnern ist das offensichtlich nicht gemeint.
+
+Der Namespace hat neun gefunden, in drei Ausprägungen:
+
+- **Ein ganzes Land auf einem Kreis gebucht.** Das Saarland bucht alle seine
+  Ausländer auf den Landkreis Saarlouis.
+- **Ein Landkreis auf seiner Stadt.** Die Akten des Landkreises Kassel liegen
+  bei der Stadt Kassel.
+- **Eine Null, deren Halter die Daten nicht nennen.** Spree-Neiße, dessen Akten
+  bei Cottbus liegen — was die veröffentlichte Tabelle nicht sagt.
+
+Die Landessummen stimmen durchgehend. Falsch sind die Kreisaufteilung, jeder
+Ausländeranteil und jede Pro-Kopf-Kennzahl auf diesen neun Kreisen.
+
+Genau dieser Fehler ist für eine Tabellenkalkulation unsichtbar: Die Zahl ist da,
+sie ist numerisch, sie ist null — und nichts daran sieht nach fehlendem Wert aus.
+
+{/* SCREENSHOT: Der Fall „Ausländer im falschen Kreis gezählt" mit den drei
+    belegten Hypothesen und den Befunden zu Saarlouis, Kassel und Spree-Neiße. */}
+
+## Pro-Kopf-Zahlen, die die Falschen zählen
+
+Zwei weitere gemessene Ausprägungen derselben Fehlerklasse — beide lassen einen
+Kreis extrem aussehen aus Gründen, die mit seinen Einwohnern nichts zu tun
+haben:
+
+**Über 900 Pkw je 1.000 Einwohner.** Das ist ein Leasing- oder Flottensitz, kein
+Kreis, in dem jeder zwei Autos fährt. Fahrzeuge werden dort gezählt, wo sie
+zugelassen sind.
+
+**Kriminalitätsraten in Grenz- und Flughafenkreisen.** Ausländerrechtliche
+Verstöße werden dort erfasst, *wo sie festgestellt werden*. Ein Kreis mit
+internationalem Flughafen oder Landesgrenze trägt daher Feststellungen von
+Menschen, die ihn nur passieren.
+
+Rechnet man diese Delikte heraus, ändert sich das Bild: Registrierte Kriminalität
+folgt Urbanität und sozialer Belastung. Der Namespace ist ausdrücklich darin,
+was er hier *nicht* behauptet — kein Detektor setzt Kriminalität zu Migration in
+Beziehung, und der Fall schreibt das hin.
+
+## Die API-Falle: nach der Summe fragen und nichts bekommen
+
+Dieser Punkt zählt für alle, die deutsche Statistik programmatisch abrufen.
+
+Der dokumentierte Weg, aus einer GENESIS-Tabelle eine Summe zu holen, ist ein
+Filter auf den Leercode `''`. Bei mehreren täglich genutzten Tabellen liefert das
+nichts — weil ihre Summe unter einem gewöhnlichen Code sitzt oder gar nicht
+existiert.
+
+Beide Fehlermodi sind stumm:
+
+- Eine exakt nach Dokumentation geschriebene Abfrage liefert leer und sieht aus
+  wie „keine Daten für diese Auswahl".
+- Eine Summe über alle Codes zählt doppelt, weil einer dieser Codes *die Summe
+  ist*.
+
+Der Namespace hat jeden Fall arithmetisch an den veröffentlichten Zellen
+geprüft. Tabelle 31111-0100 hat in zwei Dimensionen keine Leercode-Summe: Die
+Summe lautet `GBD-W-NW = GBD-NW + GBD-W`. Tabelle 52311-0100 nutzt dieselben
+Codes für Anzahlen und Veränderungsraten. Tabelle 52411-0112 hat überhaupt keine
+Summenzeile und muss aus ihren Teilen aufaddiert werden.
+
+Eine verwandte Prüfung fand veröffentlichte Zellen, die in etwa jeder zehnten
+Gruppe um ±1 abweichen — Geheimhaltungsrundung, je Zelle unabhängig angewandt.
+Korrektes Verhalten, und trotzdem geht die Zeile nicht auf.
+
+{/* SCREENSHOT: Befunddetail zu einer der Tabellen mit versteckter Summe — der
+    Trefferinhalt mit der Arithmetik und die Lineage-Kante zurück zur Tabelle. */}
+
+## Was Classifyre konkret beigetragen hat
+
+Jede dieser Beobachtungen kann eine gute Analystin einzeln finden. Zum System
+wird es durch drei Dinge.
+
+**Jeder Vorbehalt ist ein Objekt, keine Fußnote.** „Kölns Rückgang ist eine
+Zensuskorrektur" ist ein *Befund* am Objekt Köln, mit der Arithmetik darin und
+einer Lineage-Kante zurück zur veröffentlichten Tabelle. Kreis aufrufen, sehen,
+was über ihn bekannt ist. In einer Kommentarspalte geht das verloren.
+
+**Stehende Fragen laufen weiter.** Eine *Inquiry* ist eine gespeicherte Frage,
+die gegen neue Daten weiterläuft. Wenn der Datenstand 2026 kommt, greift
+*„Rohrückgang, der bereinigt Wachstum ist"* von selbst und sagt, was sich
+geändert hat. Niemand muss daran denken, eine Analyse erneut zu starten.
+
+**Untersuchungen tragen ihre Belege selbst.** Ein *Fall* enthält Hypothesen, jede
+mit prüfbarem Prädikat und den Befunden, die sie stützen oder ihr
+widersprechen. Von den 62 Hypothesen dieses Namespaces und seiner beiden
+Geschwister sind vier **widerlegt** — darunter eine hier: *„ein nennenswerter
+Anteil der Downloadlinks auf Kreisebene ist tot"*, tatsächlich 2,0 % gegen eine
+Schwelle von 5 %.
+
+Auf diese Zahl würden wir zeigen. Ein System, das nur bestätigt, was man ohnehin
+vermutet hat, betreibt keine Analyse. Eine Vorhersage aufschreiben, sie prüfen
+und festhalten, dass sie gescheitert ist — das ist der Unterschied.
+
+{/* SCREENSHOT: Die Liste der stehenden Fragen mit Trefferzahlen und den
+    Befunden, die eine davon aktuell matcht. */}
+
+## Was er ausdrücklich nicht behauptet
+
+Der Namespace benennt seine Grenzen, und zwar neben den Befunden statt in einem
+Methodenanhang:
+
+- Die Zensuskorrektur ist eine **Schätzung** aus einem modellierten
+  Nachbarschaftsmedian. Validiert ist sie gegen die amtliche Bundeszahl, nicht
+  gegen eine Wahrheit auf Kreisebene — die wurde nicht veröffentlicht.
+- Kreise, deren Ausländer anderswo gebucht sind, sind von der Korrektur
+  **ausgeschlossen**, weil die Methode auf einer für diesen Kreis echten
+  Ausländerreihe beruht.
+- Einbürgerungen verschieben Menschen von „ausländisch" zu „deutsch", ohne dass
+  jemand umzieht. Jede Nicht-Ausländer-Zahl ist daher eine Untergrenze.
+
+Ein offener Fall ist hier eine Frage mit angehängten Belegen — keine
+Schlussfolgerung, an die nachträglich ein Fragezeichen gehängt wurde.
+
+## Für wen das relevant ist
+
+Wenn Ihre Arbeit amtliche Regionalstatistik berührt, lautet die praktische
+Konsequenz knapp und konkret: **Jeder deutsche Kreisvergleich über 2022 hinweg
+braucht die herausgerechnete Zensuskorrektur, bevor er etwas bedeutet** — und bei
+neun Kreisen sind die Ausländerzahlen komplett zu verwerfen.
+
+Betroffen sind Standortwahl, Einzugsgebiete und Marktdimensionierung, regionale
+Vertriebsziele, Förderanträge, ESG- und Sozialberichterstattung sowie jede
+Pro-Kopf-Kennzahl auf Kreisdaten.
+
+Der allgemeinere Punkt betrifft die Form, nicht das Thema. Dieselbe Mechanik —
+Quellen im Zeitplan, Detektoren, die festhalten, was sie gefunden haben, stehende
+Fragen, Fälle mit prüfbaren Hypothesen — funktioniert bei jedem Bestand, bei dem
+Zahl und Vorbehalt an verschiedenen Orten liegen. Das sind die meisten.
+
+## Selbst ansehen
+
+Der Namespace ist live, mit allen oben beschriebenen Quellen, Detektoren,
+stehenden Fragen, Fällen und Lineage-Kanten:
+
+**[showcase.classifyre.com/de-statistik-integritaet](https://showcase.classifyre.com/de-statistik-integritaet)**
+
+Beginnen Sie mit *Zensus 2022: Wer ist wirklich geschrumpft?* und verfolgen Sie
+einen der 44 Kreise über seine Befunde zurück bis zur veröffentlichten Tabelle,
+aus der die Arithmetik stammt.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/de/blog/cases/when-the-official-number-is-not-the-number"
+  heading="Weitere Fallakten"
+  locale="de"
+/>

@@ -1,0 +1,354 @@
+---
+title: "Köln Is Not Shrinking: When the Official Number Is Not the Number"
+description: Germany's official population figures say 44 districts shrank over the last decade. Once the 2022 census correction is removed, those same districts grew. Here is the namespace that tells the two apart — and what else it found hiding in plain sight.
+date: 2026-09-22T00:00:00.000Z
+tags:
+  - investigations
+  - public-data
+  - data-quality
+  - detector-design
+categories:
+  - Field Notes
+author: Banandre
+image: /blog/assets/images/when-the-official-number-is-not-the-number.jpg
+keywords:
+  - official statistics
+  - census 2022 rebasing
+  - Zensus 2022
+  - GENESIS-Online
+  - data quality
+  - regional statistics Germany
+  - per-capita metrics
+  - Classifyre
+alternates:
+  canonical: /blog/cases/when-the-official-number-is-not-the-number
+  languages:
+    en: /blog/cases/when-the-official-number-is-not-the-number/
+    de: /de/blog/cases/when-the-official-number-is-not-the-number/
+    x-default: /blog/cases/when-the-official-number-is-not-the-number/
+openGraph:
+  type: article
+  title: "Köln Is Not Shrinking: When the Official Number Is Not the Number"
+  description: Germany's official figures say 44 districts shrank over the last decade. Remove the 2022 census correction and those same districts grew. Here is the namespace that tells the two apart.
+  url: /blog/cases/when-the-official-number-is-not-the-number
+  siteName: Classifyre
+  publishedTime: 2026-09-22T00:00:00.000Z
+  modifiedTime: 2026-09-22T00:00:00.000Z
+  authors:
+    - Banandre
+  section: Field Notes
+  tags:
+    - official statistics
+    - data quality
+    - census rebasing
+    - public data
+  images:
+    - /blog/assets/images/when-the-official-number-is-not-the-number.jpg
+twitter:
+  card: summary
+  title: "Köln Is Not Shrinking: When the Official Number Is Not the Number"
+  description: 44 German districts "shrank" over a decade. Remove the 2022 census correction and they grew. The namespace that tells the two apart.
+  images:
+    - /blog/assets/images/when-the-official-number-is-not-the-number.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/when-the-official-number-is-not-the-number.jpg"
+  eyebrow="Field notes"
+  title="Köln Is Not Shrinking"
+  description="Germany's official population figures say 44 districts lost people over the last decade. Once the 2022 census correction is taken out, those same districts grew. Here is the namespace that tells the two apart."
+/>
+
+<ArticleJsonLd
+  headline="Köln Is Not Shrinking: When the Official Number Is Not the Number"
+  description="44 German districts appear to have shrunk over a decade. Remove the 2022 census rebasing and they grew. How a Classifyre namespace separates real change from statistical correction."
+  path="/blog/cases/when-the-official-number-is-not-the-number"
+  datePublished="2026-09-22T00:00:00.000Z"
+  dateModified="2026-09-22T00:00:00.000Z"
+  authorName="Banandre"
+  articleSection="Field Notes"
+  about={[
+    "Official statistics quality",
+    "Census 2022 rebasing",
+    "Regional population data",
+    "Per-capita metrics",
+  ]}
+  mentions={[
+    {
+      "@type": "Dataset",
+      name: "GENESIS-Online (Statistisches Bundesamt)",
+      url: "https://www-genesis.destatis.de/",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://showcase.classifyre.com/de-statistik-integritaet",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://showcase.classifyre.com/de-statistik-integritaet"
+  liveCaseName="DE Statistik-Integrität namespace"
+/>
+
+<LiveCaseLink
+  href="https://showcase.classifyre.com/de-statistik-integritaet"
+  caseName="DE Statistik-Integrität namespace"
+/>
+
+<ArticleSideRail
+  title="Köln Is Not Shrinking"
+  path="/blog/cases/when-the-official-number-is-not-the-number/"
+  tags={["investigations", "public-data", "data-quality", "detector-design"]}
+  backHref="/blog/cases"
+  backLabel="All case files"
+/>
+
+Open Germany's official statistics portal, pull population for Köln in 2015 and
+again in 2025, and the city has lost 3.3% of its people.
+
+Do the same for Trier and it has lost 8.6%. For Cottbus, 4.6%. Halle an der
+Saale, 4.6%.
+
+If you are choosing where to open a branch, sizing a regional market, setting a
+sales quota or writing a funding application, those are the numbers you would
+use. They are the official ones. They are also, in a sense that matters, wrong.
+
+Take out one thing — the correction applied when the 2022 census replaced a
+population register that had drifted since 2011 — and Köln grew 3.7%. Trier
+grew 0.1%. Cottbus grew 2.6%. Halle grew 2.1%.
+
+> **The short version:** we built a namespace whose only job is to answer *"is
+> this official German number what it looks like?"* — 7 sources, 25 detectors,
+> 1,244 findings and 8 investigations. It found that 158 of 400 districts carry
+> a census correction of at least 2% of their population, that 44 of them are
+> reported as shrinking when they grew, that nine districts report exactly zero
+> foreigners because someone else files their paperwork, and that the documented
+> way to ask the statistics API for a total silently returns nothing for tables
+> people use every day.
+
+Nothing here is a mistake by the statistical office. Every one of these is
+documented behaviour, correctly published. The problem is that the
+documentation is not attached to the number, and the number is what ends up in
+the spreadsheet.
+
+{/* SCREENSHOT: the namespace overview — the seven sources with their last-run
+    status and asset counts, and the findings-by-severity tiles. This is the
+    "what am I looking at" image for the whole article. */}
+
+## Why a 2022 census still moves your 2025 number
+
+Germany counts its population two ways at once. Between censuses the figure is
+*carried forward*: start from the last count, add births, subtract deaths, add
+net migration. Registers drift, people move without deregistering, and the
+error compounds quietly for a decade.
+
+Then a census lands and the stock is reset. The 2022 census cut Germany's
+population by roughly 1.6 million against the carried-forward figure. That
+correction is not spread over the decade it accumulated in. It appears as a
+single step between 2021 and 2022.
+
+So any comparison that crosses 2022 — *"how has this district done over ten
+years?"* — silently contains it.
+
+### Separating the correction from the people
+
+The trick the namespace uses is that Germany has a second population series
+that was **not** rebased. Foreign nationals come from the central register of
+foreigners (*Ausländerzentralregister*), which the census did not reset.
+
+That gives a way in. Take each district's 2021→2022 population step, remove the
+part explained by its foreign population, and compare what is left against the
+median step of its neighbours. What stands out is the correction.
+
+The detector fires when that correction is at least 2% of the district's
+population. It fires in **158 of 400 districts**. In 44, the sign of the decade
+flips.
+
+| District | Reported 2015→2025 | Correction | Adjusted |
+|---|---|---|---|
+| Köln | −3.3% | −74,346 (−6.9%) | **+3.7%** |
+| Trier | −8.6% | −9,950 | **+0.1%** |
+| Cottbus | −4.6% | — | **+2.6%** |
+| Halle (Saale) | −4.6% | — | **+2.1%** |
+| Ansbach | −1.5% | — | **+5.8%** |
+
+The largest negative corrections cluster in university towns — which is what
+you would expect if the drift came from students who moved away without
+deregistering.
+
+{/* SCREENSHOT: the "Zensus 2022: Wer ist wirklich geschrumpft?" case with its
+    five hypotheses and their statuses, showing the evidence attached to
+    "Raw declines in 44 Kreise are statistical, not real". */}
+
+### How we know the method is right
+
+A correction you estimate yourself is a claim, not a fact. So the namespace
+tests it against something it did not construct: the statistical office
+published its own national correction figure. Sum the 400 district-level
+corrections the detector derived, and they have to land on it.
+
+They do. That check is its own detector, its own finding, and its own
+hypothesis in the case — *"The Kreis corrections add up to the official
+national correction"*, supported.
+
+This is the part that makes the difference between an analysis and a result
+someone else can rely on. The method is visible, the validation is attached to
+it, and anyone can follow it back to the published cells it was computed from.
+
+## Nine districts that report exactly zero foreigners
+
+A separate finding, and the one that most often breaks a downstream metric.
+
+For districts whose residence records are administered by an authority sitting
+in a *different* district, GENESIS reports foreigners and protection seekers as
+`-`. The documentation is explicit that this means *exactly zero*. For a
+district of 200,000 people, that is obviously not what it means.
+
+The namespace found nine, in three distinct shapes:
+
+- **A whole state booked on one district.** Saarland files all of its
+  foreigners on Landkreis Saarlouis.
+- **A county booked on its city.** Landkreis Kassel's records sit with Kassel
+  city.
+- **A zero whose holder the data does not name.** Spree-Neiße, whose records
+  turn out to be with Cottbus — which the published table does not say.
+
+State totals are correct throughout. What is wrong is every district-level
+split, every foreign-population share, and every per-capita ratio computed on
+those nine districts.
+
+This is exactly the failure that is invisible to a spreadsheet. The number is
+present, it is numeric, it is zero, and nothing about it looks like missing
+data.
+
+{/* SCREENSHOT: the "Ausländer im falschen Kreis gezählt" case, with the three
+    supported hypotheses and the findings that name Saarlouis, Kassel and
+    Spree-Neiße. */}
+
+## Per-capita numbers that count the wrong people
+
+Two more measured shapes of the same class of problem, both of which make a
+district look extreme for reasons that have nothing to do with the people who
+live there:
+
+**Cars per 1,000 inhabitants above 900.** That is a leasing or fleet
+registration seat, not a district where everyone owns two cars. Vehicles are
+counted where they are registered.
+
+**Crime rates in border and airport districts.** Immigration-law offences are
+recorded *where they are detected*. A district with an international airport or
+a national border therefore carries detections generated by people passing
+through it.
+
+Remove those offences and the picture changes: recorded crime follows urbanity
+and social strain. The namespace is deliberate about what it does *not* claim
+here — no detector in it relates crime to migration, and the case says so in
+writing.
+
+## The API trap: asking for a total and getting nothing
+
+This one matters if you pull German statistics programmatically.
+
+The documented way to request a total from a GENESIS table is to filter a
+dimension on the empty code `''`. For several tables in daily use, that returns
+nothing — because their total sits under an ordinary code instead, or does not
+exist at all.
+
+Both failure modes are silent:
+
+- A query written exactly as documented returns an empty result and looks like
+  "no data for this selection".
+- A sum over all codes double-counts, because one of those codes *is* the
+  total.
+
+The namespace verified each case arithmetically on the published cells. Table
+31111-0100 has no empty-code total in two of its dimensions: the total is
+`GBD-W-NW = GBD-NW + GBD-W`. Table 52311-0100 reuses the same codes for counts
+and percentage changes. Table 52411-0112 has no total row at all and has to be
+summed from its parts.
+
+A related check found published cells that are off by ±1 in roughly one group
+in ten — secrecy rounding, applied independently per cell, which is correct
+behaviour and still means a row does not add up.
+
+{/* SCREENSHOT: a finding detail for one of the hidden-total tables, showing
+    the matched content with the arithmetic and the lineage edge back to the
+    source table. */}
+
+## What Classifyre actually contributed
+
+Any competent analyst could find one of these. What makes it a system rather
+than a one-off is three things.
+
+**Each caveat is an object, not a footnote.** "Köln's decline is a census
+correction" is a *finding* attached to the Köln asset, with the arithmetic in
+it and a lineage edge back to the published table the numbers came from. Open
+the district, see what is known about it. It cannot be lost in a comment column.
+
+**Standing questions keep matching.** An *inquiry* is a saved question that
+keeps running against new data. When the 2026 release lands, *"raw decline that
+is really growth"* re-matches on its own and says what changed. Nobody has to
+remember to re-run an analysis.
+
+**Investigations carry their own evidence.** A *case* holds hypotheses, each
+with a testable predicate and the findings that support or contradict it. Of
+the 62 hypotheses across this namespace and its two siblings, four are marked
+**refuted** — including one in this namespace, *"a material share of
+district-level download links is dead"*, which turned out to be 2.0% against a
+5% threshold.
+
+That last number is the one we would point at. A system that only ever confirms
+what you suspected is not doing analysis. Being able to write down a prediction,
+test it and record that it failed is the difference.
+
+{/* SCREENSHOT: the inquiry list with match counts, showing a standing question
+    and the findings it currently matches. */}
+
+## What it is careful not to claim
+
+The namespace is explicit about its limits, and they are published alongside
+the findings rather than in a methods appendix:
+
+- The census correction is an **estimate**, derived from a modelled
+  neighbour-median. It is validated against the published national figure, not
+  against district-level truth, because no district-level truth was published.
+- Districts whose foreigners are booked elsewhere are **excluded** from the
+  correction, because the method depends on a foreign series that is real for
+  that district.
+- Naturalisations move people from "foreign" to "German" without anyone
+  physically moving, so any non-foreign figure is a lower bound.
+
+An open case here is a question with evidence attached — not a conclusion with
+a question mark added afterwards.
+
+## Who this is for
+
+If your work touches official regional statistics, the practical takeaway is
+narrow and concrete: **any German district comparison spanning 2022 needs the
+census correction removed before it means anything**, and nine districts need
+their foreign-population figures thrown out entirely.
+
+That affects site selection, catchment and market sizing, regional sales
+targets, public funding applications, ESG and social reporting, and any
+per-capita KPI computed on district data.
+
+The broader point is about shape rather than subject. The same machinery —
+sources on a schedule, detectors that assert what they found, standing
+questions, cases with testable hypotheses — works on any corpus where the
+number and the caveat live in different places. Which is most of them.
+
+## See it yourself
+
+The namespace is live, with every source, detector, inquiry, case and lineage
+edge described above:
+
+**[showcase.classifyre.com/de-statistik-integritaet](https://showcase.classifyre.com/de-statistik-integritaet)**
+
+Start with *Zensus 2022: Wer ist wirklich geschrumpft?* and follow one of the 44
+districts back through its findings to the published table the arithmetic came
+from.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/blog/cases/when-the-official-number-is-not-the-number"
+/>
