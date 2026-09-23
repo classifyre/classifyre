@@ -88,16 +88,18 @@ export interface SourceFormHandle extends JsonSchemaFormHandle {
    * Runs the notebook. The caller is expected to have validated and saved
    * first — running an unsaved notebook would execute the stored revision.
    * The augmentation scope addresses the per-asset enrichment notebook any
-   * source type may carry.
+   * source type may carry. Resolves with the terminal execution, or null when
+   * there is no notebook to run — so a preview caller can show the result
+   * instead of leaving the author to find it half a page below.
    */
   runNotebook: (
-    mode: "cell" | "all" | "test_connection" | "preview_extract" | "preview_augment",
+    mode: "cell" | "all" | "test_connection" | "preview_extract",
     targetCellId?: string,
     scope?: "connector" | "augmentation",
-  ) => Promise<void>;
+  ) => Promise<import("./notebook/use-notebook-execution").ExecutionRecord | null>;
   /** The same run, rendered as text the assistant can read and act on. */
   runNotebookAndSummarize: (
-    mode: "cell" | "all" | "test_connection" | "preview_extract" | "preview_augment",
+    mode: "cell" | "all" | "test_connection" | "preview_extract",
     targetCellId?: string,
     scope?: "connector" | "augmentation",
   ) => Promise<string>;
@@ -331,7 +333,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
             scope === "augmentation"
               ? augmentationNotebookRef.current
               : notebookRef.current;
-          await handle?.run(mode, targetCellId);
+          return (await handle?.run(mode, targetCellId)) ?? null;
         },
         runNotebookAndSummarize: async (mode, targetCellId, scope) =>
           (await (scope === "augmentation"

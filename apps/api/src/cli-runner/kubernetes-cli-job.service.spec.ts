@@ -418,8 +418,10 @@ describe('KubernetesCliJobService', () => {
   });
 
   // GENESIS field report P2: a 3-second connection test waited 6.5 minutes
-  // Pending for the 7 GiB an extract requests.
-  it('gives connection tests a small resource profile, and extracts the template', async () => {
+  // Pending for the 7 GiB an extract requests. Notebook executions are the
+  // same shape — short-lived, no corpus — and inherit the same 7 GiB until
+  // given their own profile.
+  it('gives connection tests and notebook runs a small resource profile, and extracts the template', async () => {
     const service = new KubernetesCliJobService(
       mockInstanceSettings(),
       new InternalApiKeyService(),
@@ -455,6 +457,11 @@ describe('KubernetesCliJobService', () => {
 
     const test = await build('test');
     expect(test.spec.template.spec.containers[0].resources).toEqual({
+      requests: { memory: '2Gi', cpu: '250m' },
+      limits: { memory: '2Gi', cpu: '1' },
+    });
+    const notebook = await build('notebook');
+    expect(notebook.spec.template.spec.containers[0].resources).toEqual({
       requests: { memory: '2Gi', cpu: '250m' },
       limits: { memory: '2Gi', cpu: '1' },
     });

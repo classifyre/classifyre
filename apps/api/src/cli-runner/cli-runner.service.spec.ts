@@ -39,6 +39,7 @@ describe('CliRunnerService', () => {
     prismaSource?: any;
     kubernetesCliJobService?: any;
     customDetectorsService?: Record<string, unknown>;
+    pgBossService?: any;
   }) {
     const prisma = {
       source: {
@@ -123,7 +124,7 @@ describe('CliRunnerService', () => {
       runnerLogStorage as any,
       options?.kubernetesCliJobService,
       undefined,
-      undefined,
+      options?.pgBossService,
       cls as any,
     );
 
@@ -894,6 +895,105 @@ describe('CliRunnerService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  describe('bulk runner operations', () => {
+    it('requires either ids or filters, but not both', async () => {
+      const { service } = createService();
+
+      await expect(service.bulkStopRunners({})).rejects.toThrow(
+        'Provide either runner ids or filters, but not both.',
+      );
+      await expect(
+        service.bulkStopRunners({ ids: ['r1'], filters: {} }),
+      ).rejects.toThrow('Provide either runner ids or filters, but not both.');
+      await expect(service.bulkDeleteRunners({})).rejects.toThrow(
+        'Provide either runner ids or filters, but not both.',
+      );
+      await expect(service.bulkRerunScans({})).rejects.toThrow(
+        'Provide either runner ids or filters, but not both.',
+      );
+    });
+
+    it('stops each selected run and reports the rest as skipped', async () => {
+      const { service, prisma } = createService();
+      prisma.runner.findMany.mockResolvedValue([
+        { id: 'r1', sourceId: 's1', source: { name: 'One' } },
+        { id: 'r2', sourceId: 's2', source: { name: 'Two' } },
+      ]);
+      const stopRunner = jest
+        .spyOn(service, 'stopRunner')
+        .mockResolvedValueOnce({ message: 'Runner stopped' })
+        .mockRejectedValueOnce(new Error('already terminal'));
+
+      const result = await service.bulkStopRunners({ ids: ['r1', 'r2'] });
+
+      expect(result).toEqual({
+        stoppedCount: 1,
+        ids: ['r1'],
+        skipped: [{ id: 'r2', name: 'Two', reason: 'already terminal' }],
+      });
+      expect(stopRunner).toHaveBeenCalledTimes(2);
+      stopRunner.mockRestore();
+    });
+
+    it('deletes each selected run and skips the ones still in flight', async () => {
+      const { service, prisma } = createService();
+      prisma.runner.findMany.mockResolvedValue([
+        { id: 'r1', sourceId: 's1', source: { name: 'One' } },
+        { id: 'r2', sourceId: 's2', source: { name: 'Two' } },
+      ]);
+      const deleteRunner = jest
+        .spyOn(service, 'deleteRunner')
+        .mockResolvedValueOnce({ message: 'Runner deleted' })
+        .mockRejectedValueOnce(
+          new Error('is running. Stop it before deleting.'),
+        );
+
+      const result = await service.bulkDeleteRunners({
+        filters: { status: ['COMPLETED', 'RUNNING'] as any },
+      });
+
+      expect(result).toEqual({
+        deletedCount: 1,
+        ids: ['r1'],
+        skipped: [
+          {
+            id: 'r2',
+            name: 'Two',
+            reason: 'is running. Stop it before deleting.',
+          },
+        ],
+      });
+      deleteRunner.mockRestore();
+    });
+
+    it('reruns start a fresh run per selected scan under one actor', async () => {
+      const { service, prisma } = createService();
+      prisma.runner.findMany.mockResolvedValue([
+        { id: 'r1', sourceId: 's1', source: { name: 'One' } },
+        { id: 'r2', sourceId: 's2', source: null },
+      ]);
+      const startRun = jest
+        .spyOn(service, 'startRun')
+        .mockResolvedValueOnce({ id: 'new-1' } as any)
+        .mockRejectedValueOnce(new Error('already has a running scan'));
+
+      const result = await service.bulkRerunScans(
+        { ids: ['r1', 'r2'] },
+        { triggeredBy: 'operator' },
+      );
+
+      expect(result).toEqual({
+        startedCount: 1,
+        ids: ['new-1'],
+        skipped: [
+          { id: 'r2', name: 's2', reason: 'already has a running scan' },
+        ],
+      });
+      expect(startRun).toHaveBeenCalledWith('s1', 'MANUAL', 'operator', false);
+      startRun.mockRestore();
+    });
+  });
+
   it('creates external runner without launching CLI process', async () => {
     const { service, prisma, runnerLogStorage } = createService();
     prisma.source.findUnique.mockResolvedValue({
@@ -1368,7 +1468,12 @@ describe('CliRunnerService', () => {
   });
 
   it('updates source runnerStatus when stopping a running runner', async () => {
-    const { service, prisma, runnerLogStorage } = createService();
+    const bossSend = jest.fn().mockResolvedValue(undefined);
+    const { service, prisma, runnerLogStorage } = createService({
+      pgBossService: {
+        getBossAsync: jest.fn().mockResolvedValue({ send: bossSend }),
+      },
+    });
     prisma.runner.findUnique
       .mockResolvedValueOnce({
         id: 'runner-1',
@@ -1419,6 +1524,158 @@ describe('CliRunnerService', () => {
       where: { id: 'source-1', currentRunnerId: 'runner-1' },
       data: { runnerStatus: 'STOPPED', currentRunnerId: null },
     });
+    // A run that started consumed its window: the last-run clock advances and
+    // the scheduler is kicked via pg-boss like every other terminal outcome.
+    expect(prisma.source.update).toHaveBeenCalledWith({
+      where: { id: 'source-1' },
+      data: expect.objectContaining({
+        lastRunStatus: 'STOPPED',
+        lastErrorMessage: 'Manually stopped',
+        lastRunAt: expect.any(Date),
+      }),
+    });
+    expect(bossSend).toHaveBeenCalledWith(
+      expect.stringContaining('auto-schedule'),
+      { sourceId: 'source-1', runnerId: 'runner-1' },
+      expect.anything(),
+    );
+  });
+
+  it('cancels a queued PENDING runner without advancing its last-run clock', async () => {
+    const bossSend = jest.fn().mockResolvedValue(undefined);
+    const { service, prisma, runnerLogStorage } = createService({
+      pgBossService: {
+        getBossAsync: jest.fn().mockResolvedValue({ send: bossSend }),
+      },
+    });
+    prisma.runner.findUnique
+      .mockResolvedValueOnce({
+        id: 'runner-1',
+        sourceId: 'source-1',
+        status: 'PENDING',
+        executionMode: RunnerExecutionMode.LOCAL,
+        jobName: null,
+        jobNamespace: null,
+      })
+      .mockResolvedValueOnce({
+        id: 'runner-1',
+        sourceId: 'source-1',
+        status: 'STOPPED',
+      });
+
+    const tx = {
+      runner: {
+        update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      source: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      runnerAsset: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    prisma.$transaction.mockImplementation((callback: any) => callback(tx));
+
+    await expect(service.stopRunner('runner-1')).resolves.toEqual({
+      message: 'Runner stopped',
+    });
+
+    // Conditional on still being queued: the queue may promote the row first.
+    expect(tx.runner.updateMany).toHaveBeenCalledWith({
+      where: { id: 'runner-1', status: 'PENDING' },
+      data: expect.objectContaining({
+        status: 'STOPPED',
+        errorMessage: 'Manually stopped',
+      }),
+    });
+    expect(tx.runner.update).not.toHaveBeenCalled();
+    expect(tx.source.updateMany).toHaveBeenCalledWith({
+      where: { id: 'source-1', currentRunnerId: 'runner-1' },
+      data: { runnerStatus: 'STOPPED', currentRunnerId: null },
+    });
+    expect(runnerLogStorage.finalizeRunner).toHaveBeenCalledWith(
+      'source-1',
+      'runner-1',
+    );
+    // A queued run never started, so its window stays unserved: lastRunAt is
+    // left alone while the decision itself is still recorded.
+    expect(prisma.source.update).toHaveBeenCalledWith({
+      where: { id: 'source-1' },
+      data: {
+        lastRunStatus: 'STOPPED',
+        lastErrorMessage: 'Manually stopped',
+      },
+    });
+    // Same internal updates as a manual stop of a running scan: scheduler
+    // kick via pg-boss plus queue drain.
+    expect(bossSend).toHaveBeenCalledWith(
+      expect.stringContaining('auto-schedule'),
+      { sourceId: 'source-1', runnerId: 'runner-1' },
+      expect.anything(),
+    );
+  });
+
+  it('stops the launched execution when a queued runner promotes mid-stop', async () => {
+    const { service, prisma } = createService();
+    prisma.runner.findUnique
+      .mockResolvedValueOnce({
+        id: 'runner-1',
+        sourceId: 'source-1',
+        status: 'PENDING',
+        executionMode: RunnerExecutionMode.LOCAL,
+        jobName: null,
+        jobNamespace: null,
+      })
+      // The queue claimed the row between the stop's read and its write.
+      .mockResolvedValueOnce({
+        id: 'runner-1',
+        sourceId: 'source-1',
+        status: 'RUNNING',
+        executionMode: RunnerExecutionMode.LOCAL,
+        jobName: null,
+        jobNamespace: null,
+      })
+      .mockResolvedValue({
+        id: 'runner-1',
+        sourceId: 'source-1',
+        status: 'STOPPED',
+      });
+
+    const tx = {
+      runner: {
+        update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      source: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      runnerAsset: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    prisma.$transaction.mockImplementation((callback: any) => callback(tx));
+
+    await expect(service.stopRunner('runner-1')).resolves.toEqual({
+      message: 'Runner stopped',
+    });
+
+    // The queued claim lost, so the run stops through the RUNNING path: the
+    // launched execution is torn down and the row transitions unconditionally.
+    expect(tx.runner.update).toHaveBeenCalledWith({
+      where: { id: 'runner-1' },
+      data: expect.objectContaining({
+        status: 'STOPPED',
+        errorMessage: 'Manually stopped',
+      }),
+    });
+    expect(prisma.source.update).toHaveBeenCalledWith({
+      where: { id: 'source-1' },
+      data: expect.objectContaining({
+        lastRunStatus: 'STOPPED',
+        lastRunAt: expect.any(Date),
+      }),
+    });
   });
 
   it('drains the queue after a stop, so a PENDING runner cannot block on itself', async () => {
@@ -1447,7 +1704,10 @@ describe('CliRunnerService', () => {
       });
 
     const tx = {
-      runner: { update: jest.fn().mockResolvedValue({}) },
+      runner: {
+        update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       source: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       runnerAsset: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     };

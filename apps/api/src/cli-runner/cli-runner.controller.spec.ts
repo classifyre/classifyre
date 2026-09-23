@@ -35,7 +35,14 @@ describe('CliRunnerController endpoint access metadata', () => {
   });
 
   it('keeps operator-triggered runner endpoints blocked in demo mode', () => {
-    for (const name of ['startRunner', 'stopRunner', 'deleteRunner']) {
+    for (const name of [
+      'startRunner',
+      'stopRunner',
+      'deleteRunner',
+      'bulkStopRunners',
+      'bulkDeleteRunners',
+      'bulkRerunScans',
+    ]) {
       expect(
         Reflect.getMetadata(ALLOW_IN_DEMO_MODE_KEY, handler(name)),
       ).toBeUndefined();

@@ -15,6 +15,12 @@
 
 import * as runtime from '../runtime';
 import type {
+  BulkDeleteRunnersDto,
+  BulkDeleteRunnersResponseDto,
+  BulkRerunScansDto,
+  BulkRerunScansResponseDto,
+  BulkStopRunnersDto,
+  BulkStopRunnersResponseDto,
   CliRunnerControllerUpdateRunnerStatusRequest,
   CreateExternalRunnerDto,
   DeleteRunnerResponseDto,
@@ -40,6 +46,18 @@ import type {
   UpdateRunnerAssetStatusDto,
 } from '../models/index';
 import {
+    BulkDeleteRunnersDtoFromJSON,
+    BulkDeleteRunnersDtoToJSON,
+    BulkDeleteRunnersResponseDtoFromJSON,
+    BulkDeleteRunnersResponseDtoToJSON,
+    BulkRerunScansDtoFromJSON,
+    BulkRerunScansDtoToJSON,
+    BulkRerunScansResponseDtoFromJSON,
+    BulkRerunScansResponseDtoToJSON,
+    BulkStopRunnersDtoFromJSON,
+    BulkStopRunnersDtoToJSON,
+    BulkStopRunnersResponseDtoFromJSON,
+    BulkStopRunnersResponseDtoToJSON,
     CliRunnerControllerUpdateRunnerStatusRequestFromJSON,
     CliRunnerControllerUpdateRunnerStatusRequestToJSON,
     CreateExternalRunnerDtoFromJSON,
@@ -87,6 +105,18 @@ import {
     UpdateRunnerAssetStatusDtoFromJSON,
     UpdateRunnerAssetStatusDtoToJSON,
 } from '../models/index';
+
+export interface CliRunnerControllerBulkDeleteRunnersRequest {
+    bulkDeleteRunnersDto: BulkDeleteRunnersDto;
+}
+
+export interface CliRunnerControllerBulkRerunScansRequest {
+    bulkRerunScansDto: BulkRerunScansDto;
+}
+
+export interface CliRunnerControllerBulkStopRunnersRequest {
+    bulkStopRunnersDto: BulkStopRunnersDto;
+}
 
 export interface CliRunnerControllerCreateExternalRunnerRequest {
     sourceId: string;
@@ -188,6 +218,129 @@ export interface SearchRunnersControllerSearchRunnersChartsRequest {
  * 
  */
 export class RunnersApi extends runtime.BaseAPI {
+
+    /**
+     * Deletes explicit runner IDs or every runner matching a search filter snapshot, including their stored logs. Runs still in flight are never deleted and are reported as skipped.
+     * Delete many scan records at once
+     */
+    async cliRunnerControllerBulkDeleteRunnersRaw(requestParameters: CliRunnerControllerBulkDeleteRunnersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkDeleteRunnersResponseDto>> {
+        if (requestParameters['bulkDeleteRunnersDto'] == null) {
+            throw new runtime.RequiredError(
+                'bulkDeleteRunnersDto',
+                'Required parameter "bulkDeleteRunnersDto" was null or undefined when calling cliRunnerControllerBulkDeleteRunners().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/bulk-delete`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: BulkDeleteRunnersDtoToJSON(requestParameters['bulkDeleteRunnersDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BulkDeleteRunnersResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Deletes explicit runner IDs or every runner matching a search filter snapshot, including their stored logs. Runs still in flight are never deleted and are reported as skipped.
+     * Delete many scan records at once
+     */
+    async cliRunnerControllerBulkDeleteRunners(requestParameters: CliRunnerControllerBulkDeleteRunnersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkDeleteRunnersResponseDto> {
+        const response = await this.cliRunnerControllerBulkDeleteRunnersRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Starts a new MANUAL run for the source of each selected runner — explicit IDs or every runner matching a search filter snapshot. The old runs are history; the new ones queue as PENDING when the concurrency limit is reached. Sources already in flight are reported as skipped.
+     * Start a fresh scan for many runs at once
+     */
+    async cliRunnerControllerBulkRerunScansRaw(requestParameters: CliRunnerControllerBulkRerunScansRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkRerunScansResponseDto>> {
+        if (requestParameters['bulkRerunScansDto'] == null) {
+            throw new runtime.RequiredError(
+                'bulkRerunScansDto',
+                'Required parameter "bulkRerunScansDto" was null or undefined when calling cliRunnerControllerBulkRerunScans().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/bulk-rerun`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: BulkRerunScansDtoToJSON(requestParameters['bulkRerunScansDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BulkRerunScansResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Starts a new MANUAL run for the source of each selected runner — explicit IDs or every runner matching a search filter snapshot. The old runs are history; the new ones queue as PENDING when the concurrency limit is reached. Sources already in flight are reported as skipped.
+     * Start a fresh scan for many runs at once
+     */
+    async cliRunnerControllerBulkRerunScans(requestParameters: CliRunnerControllerBulkRerunScansRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkRerunScansResponseDto> {
+        const response = await this.cliRunnerControllerBulkRerunScansRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Stops explicit runner IDs or every runner matching a search filter snapshot. PENDING runs are cancelled outright, RUNNING ones are torn down; all end STOPPED. Runs that cannot be stopped (already terminal, managed externally) are reported as skipped.
+     * Stop many scans at once
+     */
+    async cliRunnerControllerBulkStopRunnersRaw(requestParameters: CliRunnerControllerBulkStopRunnersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkStopRunnersResponseDto>> {
+        if (requestParameters['bulkStopRunnersDto'] == null) {
+            throw new runtime.RequiredError(
+                'bulkStopRunnersDto',
+                'Required parameter "bulkStopRunnersDto" was null or undefined when calling cliRunnerControllerBulkStopRunners().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/bulk-stop`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: BulkStopRunnersDtoToJSON(requestParameters['bulkStopRunnersDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BulkStopRunnersResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Stops explicit runner IDs or every runner matching a search filter snapshot. PENDING runs are cancelled outright, RUNNING ones are torn down; all end STOPPED. Runs that cannot be stopped (already terminal, managed externally) are reported as skipped.
+     * Stop many scans at once
+     */
+    async cliRunnerControllerBulkStopRunners(requestParameters: CliRunnerControllerBulkStopRunnersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkStopRunnersResponseDto> {
+        const response = await this.cliRunnerControllerBulkStopRunnersRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Create runner record for external CLI REST ingestion
@@ -661,7 +814,8 @@ export class RunnersApi extends runtime.BaseAPI {
     }
 
     /**
-     * Stop running CLI process
+     * A RUNNING scan is torn down and a PENDING (queued) one is cancelled outright. Both end STOPPED with \"Manually stopped\": the source is released, its last-run bookkeeping records the decision (a queued run never consumed its window, so its last-run clock is left alone), the adaptive scheduler is kicked via pg-boss, and the next queued scan is promoted.
+     * Stop a running scan or cancel a queued one
      */
     async cliRunnerControllerStopRunnerRaw(requestParameters: CliRunnerControllerStopRunnerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<StopRunnerResponseDto>> {
         if (requestParameters['runnerId'] == null) {
@@ -690,7 +844,8 @@ export class RunnersApi extends runtime.BaseAPI {
     }
 
     /**
-     * Stop running CLI process
+     * A RUNNING scan is torn down and a PENDING (queued) one is cancelled outright. Both end STOPPED with \"Manually stopped\": the source is released, its last-run bookkeeping records the decision (a queued run never consumed its window, so its last-run clock is left alone), the adaptive scheduler is kicked via pg-boss, and the next queued scan is promoted.
+     * Stop a running scan or cancel a queued one
      */
     async cliRunnerControllerStopRunner(requestParameters: CliRunnerControllerStopRunnerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<StopRunnerResponseDto> {
         const response = await this.cliRunnerControllerStopRunnerRaw(requestParameters, initOverrides);
