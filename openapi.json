@@ -8047,6 +8047,7 @@
     },
     "/runners/{runnerId}/stop": {
       "patch": {
+        "description": "A RUNNING scan is torn down and a PENDING (queued) one is cancelled outright. Both end STOPPED with \"Manually stopped\": the source is released, its last-run bookkeeping records the decision (a queued run never consumed its window, so its last-run clock is left alone), the adaptive scheduler is kicked via pg-boss, and the next queued scan is promoted.",
         "operationId": "CliRunnerController_stopRunner",
         "parameters": [
           {
@@ -8070,7 +8071,7 @@
             }
           }
         },
-        "summary": "Stop running CLI process",
+        "summary": "Stop a running scan or cancel a queued one",
         "tags": [
           "Runners"
         ]
@@ -8131,6 +8132,105 @@
           }
         },
         "summary": "Get runner status and details",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/bulk-stop": {
+      "post": {
+        "description": "Stops explicit runner IDs or every runner matching a search filter snapshot. PENDING runs are cancelled outright, RUNNING ones are torn down; all end STOPPED. Runs that cannot be stopped (already terminal, managed externally) are reported as skipped.",
+        "operationId": "CliRunnerController_bulkStopRunners",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkStopRunnersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Runs stopped",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkStopRunnersResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stop many scans at once",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/bulk-delete": {
+      "post": {
+        "description": "Deletes explicit runner IDs or every runner matching a search filter snapshot, including their stored logs. Runs still in flight are never deleted and are reported as skipped.",
+        "operationId": "CliRunnerController_bulkDeleteRunners",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDeleteRunnersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Runs deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkDeleteRunnersResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete many scan records at once",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/bulk-rerun": {
+      "post": {
+        "description": "Starts a new MANUAL run for the source of each selected runner — explicit IDs or every runner matching a search filter snapshot. The old runs are history; the new ones queue as PENDING when the concurrency limit is reached. Sources already in flight are reported as skipped.",
+        "operationId": "CliRunnerController_bulkRerunScans",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkRerunScansDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Runs queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkRerunScansResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start a fresh scan for many runs at once",
         "tags": [
           "Runners"
         ]
@@ -23234,6 +23334,289 @@
           "message"
         ]
       },
+      "SearchRunnersFiltersInputDto": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Case-insensitive text search across runner id, source name/type, triggeredBy, and error message",
+            "maxLength": 200
+          },
+          "sourceId": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sourceType": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "JIRA",
+                "CONFLUENCE",
+                "CROWD",
+                "BITBUCKET",
+                "SERVICEDESK",
+                "XRAY",
+                "GOOGLE_DRIVE",
+                "GOOGLE_SHEETS",
+                "GOOGLE_DOCS",
+                "GOOGLE_SLIDES",
+                "WORDPRESS",
+                "SLACK",
+                "S3_COMPATIBLE_STORAGE",
+                "AZURE_BLOB_STORAGE",
+                "GOOGLE_CLOUD_STORAGE",
+                "POSTGRESQL",
+                "MYSQL",
+                "MSSQL",
+                "ORACLE",
+                "HIVE",
+                "DATABRICKS",
+                "SNOWFLAKE",
+                "MONGODB",
+                "NEO4J",
+                "SQLITE",
+                "NOTION",
+                "POWERBI",
+                "TABLEAU",
+                "EMAIL",
+                "YOUTUBE",
+                "REDDIT",
+                "DELTA_LAKE",
+                "ICEBERG",
+                "KAFKA",
+                "ELASTICSEARCH",
+                "OPENSEARCH",
+                "MEILISEARCH",
+                "LOCAL_FOLDER",
+                "MICROSOFT_365",
+                "GOOGLE_WORKSPACE",
+                "DROPBOX",
+                "HUGGING_FACE",
+                "GIT",
+                "SANDBOX",
+                "CUSTOM"
+              ]
+            }
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "RUNNING",
+                "COMPLETED",
+                "WARNING",
+                "ERROR",
+                "STOPPED"
+              ]
+            }
+          },
+          "triggerType": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "MANUAL",
+                "SCHEDULED",
+                "WEBHOOK",
+                "API",
+                "AUTOPILOT"
+              ]
+            }
+          },
+          "triggeredBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "triggeredAfter": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "triggeredBefore": {
+            "format": "date-time",
+            "type": "string"
+          }
+        }
+      },
+      "BulkStopRunnersDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "Explicit runner IDs. Use either ids or filters.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "description": "Every runner matching this search filter snapshot. Use either ids or filters.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SearchRunnersFiltersInputDto"
+              }
+            ]
+          }
+        }
+      },
+      "BulkRunnersSkippedDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why this runner was not processed"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "reason"
+        ]
+      },
+      "BulkStopRunnersResponseDto": {
+        "type": "object",
+        "properties": {
+          "stoppedCount": {
+            "type": "number",
+            "description": "Number of runs stopped. PENDING runs are cancelled outright, RUNNING ones are torn down; all end STOPPED."
+          },
+          "ids": {
+            "description": "IDs of the stopped runs",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped": {
+            "description": "Runs that could not be stopped, with the reason",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkRunnersSkippedDto"
+            }
+          }
+        },
+        "required": [
+          "stoppedCount",
+          "ids",
+          "skipped"
+        ]
+      },
+      "BulkDeleteRunnersDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "Explicit runner IDs. Use either ids or filters.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "description": "Every runner matching this search filter snapshot. Use either ids or filters.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SearchRunnersFiltersInputDto"
+              }
+            ]
+          }
+        }
+      },
+      "BulkDeleteRunnersResponseDto": {
+        "type": "object",
+        "properties": {
+          "deletedCount": {
+            "type": "number",
+            "description": "Number of scan records deleted."
+          },
+          "ids": {
+            "description": "IDs of the deleted runs",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped": {
+            "description": "Runs that could not be deleted (e.g. still in flight), with the reason",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkRunnersSkippedDto"
+            }
+          }
+        },
+        "required": [
+          "deletedCount",
+          "ids",
+          "skipped"
+        ]
+      },
+      "BulkRerunScansDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "Explicit runner IDs. Use either ids or filters.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "description": "Every runner matching this search filter snapshot. Use either ids or filters.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SearchRunnersFiltersInputDto"
+              }
+            ]
+          },
+          "forceFullRescan": {
+            "type": "boolean",
+            "description": "Ignore the scan cache for every run started by this call.",
+            "default": false
+          },
+          "triggeredBy": {
+            "type": "string",
+            "description": "Who started these runs, recorded as each run's triggeredBy. Defaults to 'bulk-rerun' so a run started this way is never anonymous."
+          }
+        }
+      },
+      "BulkRerunScansResponseDto": {
+        "type": "object",
+        "properties": {
+          "startedCount": {
+            "type": "number",
+            "description": "Number of runs queued. Runs beyond the concurrency limit stay PENDING until a slot frees up."
+          },
+          "ids": {
+            "description": "IDs of the newly started runs",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped": {
+            "description": "Runs whose source could not be started, with the reason",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkRunnersSkippedDto"
+            }
+          }
+        },
+        "required": [
+          "startedCount",
+          "ids",
+          "skipped"
+        ]
+      },
       "RegisterDiscoveredAssetsDto": {
         "type": "object",
         "properties": {
@@ -23794,116 +24177,6 @@
           "skip",
           "take"
         ]
-      },
-      "SearchRunnersFiltersInputDto": {
-        "type": "object",
-        "properties": {
-          "search": {
-            "type": "string",
-            "description": "Case-insensitive text search across runner id, source name/type, triggeredBy, and error message",
-            "maxLength": 200
-          },
-          "sourceId": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "sourceType": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "JIRA",
-                "CONFLUENCE",
-                "CROWD",
-                "BITBUCKET",
-                "SERVICEDESK",
-                "XRAY",
-                "GOOGLE_DRIVE",
-                "GOOGLE_SHEETS",
-                "GOOGLE_DOCS",
-                "GOOGLE_SLIDES",
-                "WORDPRESS",
-                "SLACK",
-                "S3_COMPATIBLE_STORAGE",
-                "AZURE_BLOB_STORAGE",
-                "GOOGLE_CLOUD_STORAGE",
-                "POSTGRESQL",
-                "MYSQL",
-                "MSSQL",
-                "ORACLE",
-                "HIVE",
-                "DATABRICKS",
-                "SNOWFLAKE",
-                "MONGODB",
-                "NEO4J",
-                "SQLITE",
-                "NOTION",
-                "POWERBI",
-                "TABLEAU",
-                "EMAIL",
-                "YOUTUBE",
-                "REDDIT",
-                "DELTA_LAKE",
-                "ICEBERG",
-                "KAFKA",
-                "ELASTICSEARCH",
-                "OPENSEARCH",
-                "MEILISEARCH",
-                "LOCAL_FOLDER",
-                "MICROSOFT_365",
-                "GOOGLE_WORKSPACE",
-                "DROPBOX",
-                "HUGGING_FACE",
-                "GIT",
-                "SANDBOX",
-                "CUSTOM"
-              ]
-            }
-          },
-          "status": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "PENDING",
-                "RUNNING",
-                "COMPLETED",
-                "WARNING",
-                "ERROR",
-                "STOPPED"
-              ]
-            }
-          },
-          "triggerType": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "MANUAL",
-                "SCHEDULED",
-                "WEBHOOK",
-                "API",
-                "AUTOPILOT"
-              ]
-            }
-          },
-          "triggeredBy": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "triggeredAfter": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "triggeredBefore": {
-            "format": "date-time",
-            "type": "string"
-          }
-        }
       },
       "SearchRunnersPageDto": {
         "type": "object",

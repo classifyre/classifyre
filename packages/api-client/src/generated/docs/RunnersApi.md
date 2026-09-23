@@ -4,6 +4,9 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**cliRunnerControllerBulkDeleteRunners**](RunnersApi.md#clirunnercontrollerbulkdeleterunners) | **POST** /runners/bulk-delete | Delete many scan records at once |
+| [**cliRunnerControllerBulkRerunScans**](RunnersApi.md#clirunnercontrollerbulkrerunscans) | **POST** /runners/bulk-rerun | Start a fresh scan for many runs at once |
+| [**cliRunnerControllerBulkStopRunners**](RunnersApi.md#clirunnercontrollerbulkstoprunners) | **POST** /runners/bulk-stop | Stop many scans at once |
 | [**cliRunnerControllerCreateExternalRunner**](RunnersApi.md#clirunnercontrollercreateexternalrunner) | **POST** /sources/{sourceId}/runners/external | Create runner record for external CLI REST ingestion |
 | [**cliRunnerControllerDeleteRunner**](RunnersApi.md#clirunnercontrollerdeleterunner) | **DELETE** /runners/{runnerId} | Delete runner metadata and cleanup filesystem logs for this runner |
 | [**cliRunnerControllerGetRunner**](RunnersApi.md#clirunnercontrollergetrunner) | **GET** /runners/{runnerId} | Get runner status and details |
@@ -15,7 +18,7 @@ All URIs are relative to *http://localhost*
 | [**cliRunnerControllerRegisterDiscoveredAssets**](RunnersApi.md#clirunnercontrollerregisterdiscoveredassets) | **POST** /runners/{runnerId}/assets/discover | Register discovered asset hashes for a runner |
 | [**cliRunnerControllerSearchRunnerLogs**](RunnersApi.md#clirunnercontrollersearchrunnerlogs) | **POST** /runners/{runnerId}/logs | Search runner logs with server-side filtering, full-text search, and sort |
 | [**cliRunnerControllerStartRunner**](RunnersApi.md#clirunnercontrollerstartrunner) | **POST** /sources/{sourceId}/run | Start CLI runner for source |
-| [**cliRunnerControllerStopRunner**](RunnersApi.md#clirunnercontrollerstoprunner) | **PATCH** /runners/{runnerId}/stop | Stop running CLI process |
+| [**cliRunnerControllerStopRunner**](RunnersApi.md#clirunnercontrollerstoprunner) | **PATCH** /runners/{runnerId}/stop | Stop a running scan or cancel a queued one |
 | [**cliRunnerControllerUpdateRunnerAssetStatuses**](RunnersApi.md#clirunnercontrollerupdaterunnerassetstatuses) | **PATCH** /runners/{runnerId}/assets/status | Update processing status of runner assets |
 | [**cliRunnerControllerUpdateRunnerStatus**](RunnersApi.md#clirunnercontrollerupdaterunnerstatusoperation) | **PATCH** /runners/{runnerId}/status | Update runner status |
 | [**searchRunnersControllerExportRunnerAssets**](RunnersApi.md#searchrunnerscontrollerexportrunnerassets) | **GET** /search/runner-assets/export | Export runner assets as CSV |
@@ -24,6 +27,207 @@ All URIs are relative to *http://localhost*
 | [**searchRunnersControllerSearchRunners**](RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners |
 | [**searchRunnersControllerSearchRunnersCharts**](RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview |
 
+
+
+## cliRunnerControllerBulkDeleteRunners
+
+> BulkDeleteRunnersResponseDto cliRunnerControllerBulkDeleteRunners(bulkDeleteRunnersDto)
+
+Delete many scan records at once
+
+Deletes explicit runner IDs or every runner matching a search filter snapshot, including their stored logs. Runs still in flight are never deleted and are reported as skipped.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerBulkDeleteRunnersRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // BulkDeleteRunnersDto
+    bulkDeleteRunnersDto: ...,
+  } satisfies CliRunnerControllerBulkDeleteRunnersRequest;
+
+  try {
+    const data = await api.cliRunnerControllerBulkDeleteRunners(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **bulkDeleteRunnersDto** | [BulkDeleteRunnersDto](BulkDeleteRunnersDto.md) |  | |
+
+### Return type
+
+[**BulkDeleteRunnersResponseDto**](BulkDeleteRunnersResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Runs deleted |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## cliRunnerControllerBulkRerunScans
+
+> BulkRerunScansResponseDto cliRunnerControllerBulkRerunScans(bulkRerunScansDto)
+
+Start a fresh scan for many runs at once
+
+Starts a new MANUAL run for the source of each selected runner — explicit IDs or every runner matching a search filter snapshot. The old runs are history; the new ones queue as PENDING when the concurrency limit is reached. Sources already in flight are reported as skipped.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerBulkRerunScansRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // BulkRerunScansDto
+    bulkRerunScansDto: ...,
+  } satisfies CliRunnerControllerBulkRerunScansRequest;
+
+  try {
+    const data = await api.cliRunnerControllerBulkRerunScans(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **bulkRerunScansDto** | [BulkRerunScansDto](BulkRerunScansDto.md) |  | |
+
+### Return type
+
+[**BulkRerunScansResponseDto**](BulkRerunScansResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Runs queued |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## cliRunnerControllerBulkStopRunners
+
+> BulkStopRunnersResponseDto cliRunnerControllerBulkStopRunners(bulkStopRunnersDto)
+
+Stop many scans at once
+
+Stops explicit runner IDs or every runner matching a search filter snapshot. PENDING runs are cancelled outright, RUNNING ones are torn down; all end STOPPED. Runs that cannot be stopped (already terminal, managed externally) are reported as skipped.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerBulkStopRunnersRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // BulkStopRunnersDto
+    bulkStopRunnersDto: ...,
+  } satisfies CliRunnerControllerBulkStopRunnersRequest;
+
+  try {
+    const data = await api.cliRunnerControllerBulkStopRunners(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **bulkStopRunnersDto** | [BulkStopRunnersDto](BulkStopRunnersDto.md) |  | |
+
+### Return type
+
+[**BulkStopRunnersResponseDto**](BulkStopRunnersResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Runs stopped |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## cliRunnerControllerCreateExternalRunner
@@ -785,7 +989,9 @@ No authorization required
 
 > StopRunnerResponseDto cliRunnerControllerStopRunner(runnerId)
 
-Stop running CLI process
+Stop a running scan or cancel a queued one
+
+A RUNNING scan is torn down and a PENDING (queued) one is cancelled outright. Both end STOPPED with \&quot;Manually stopped\&quot;: the source is released, its last-run bookkeeping records the decision (a queued run never consumed its window, so its last-run clock is left alone), the adaptive scheduler is kicked via pg-boss, and the next queued scan is promoted.
 
 ### Example
 

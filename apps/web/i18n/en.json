@@ -2238,7 +2238,49 @@
       "trigger": "Trigger",
       "duration": "Duration",
       "assets": "Assets",
-      "findings": "Findings"
+      "findings": "Findings",
+      "actions": "Actions"
+    },
+    "bulk": {
+      "selected": "{{count}} scan selected",
+      "selectedPlural": "{{count}} scans selected",
+      "allSelected": "All {{count}} matching scans selected",
+      "selectAll": "Select all {{count}} scans matching the current filters",
+      "deselectAll": "Deselect all scans",
+      "selectAllAria": "Select all scans matching the current filters",
+      "selectRowAria": "Select scan {{id}}",
+      "stopSelected": "Stop selected",
+      "rerunSelected": "Re-run selected",
+      "deleteSelected": "Delete selected",
+      "skipped": "{{count}} scan(s) could not be processed"
+    },
+    "bulkStop": {
+      "stopped": "Stopped {{count}} scan(s)",
+      "failed": "Failed to stop scans"
+    },
+    "bulkRerun": {
+      "started": "Queued {{count}} new scan(s)",
+      "failed": "Failed to re-run scans"
+    },
+    "bulkDelete": {
+      "title": "Delete scans?",
+      "deleteScans": "Delete scans",
+      "cannotUndo": "This action cannot be undone.",
+      "matchingFilters": "This deletes all {{count}} scans matching the current filters.",
+      "permanentTitle": "Permanent removal",
+      "permanentBody": "Deleting scans removes their run records and stored logs. Assets and findings they produced stay untouched.",
+      "deleted": "Deleted {{count}} scan(s)",
+      "failed": "Failed to delete scans"
+    },
+    "rowActions": {
+      "open": "Scan {{id}} actions",
+      "stop": "Stop scan",
+      "rerun": "Re-run scan",
+      "delete": "Delete scan",
+      "runningNoDelete": "Stop the scan before deleting it",
+      "rerunFailed": "Failed to start a new scan",
+      "deleted": "Scan deleted",
+      "deleteFailed": "Failed to delete scan"
     },
     "searchSources": "Search sources...",
     "noSourcesFound": "No sources found",

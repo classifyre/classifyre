@@ -1,7 +1,14 @@
 "use client";
 
 import { nsPath } from "@/lib/ns-path";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
@@ -11,12 +18,21 @@ import {
   Clock,
   Filter,
   Loader2,
+  MoreVertical,
+  Play,
   Search,
+  ShieldAlert,
+  Square,
+  Trash2,
 } from "lucide-react";
 import {
   api,
   SearchRunnersSortByEnum,
   SearchRunnersSortOrderEnum,
+  type BulkDeleteRunnersDto,
+  type BulkRerunScansDto,
+  type BulkRunnersSkippedDto,
+  type BulkStopRunnersDto,
   type SearchRunnersFiltersInputDto,
   type SearchRunnersResponseDto,
   type SearchRunnersSortBy,
@@ -24,9 +40,27 @@ import {
   type SearchRunnersStatus,
   type SearchRunnersTriggerType,
   type SourceListItem,
+  type StartRunnerDto,
 } from "@workspace/api-client";
 import {
+  Alert,
+  AlertDescription,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertTitle,
   Button,
+  Checkbox,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
   EmptyState,
   Input,
   MultiSelect,
@@ -53,14 +87,19 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@workspace/ui/components";
 import { RunnerStatusBadge } from "./runner-status-badge";
+import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
 import {
   mergeRunnerWsIntoRow,
   runnerMatchesRunnersListFilters,
 } from "@/lib/runner-ws-merge";
 import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { useTranslation } from "@/hooks/use-translation";
+import { toast } from "sonner";
 
 type RunnerStatusFilterValue = SearchRunnersStatus;
 
@@ -68,6 +107,45 @@ type RunnersTableProps = {
   statuses?: RunnerStatusFilterValue[];
   onFiltersChange?: (filters: SearchRunnersFiltersInputDto | undefined) => void;
 };
+
+type RunnerRow = SearchRunnersResponseDto["items"][number];
+
+export type RunnerSelectionIds = {
+  type: "ids";
+  runners: RunnerRow[];
+  total: number;
+};
+
+export type RunnerSelectionAll = {
+  type: "all";
+  filters: SearchRunnersFiltersInputDto;
+  total: number;
+};
+
+export type RunnerSelection = RunnerSelectionIds | RunnerSelectionAll;
+
+/**
+ * The table's filter draft only ever sets search/source/trigger/status, so it
+ * is carried as the client's friendly filter type and narrowed to the
+ * generated bulk-selection shape at the call sites.
+ */
+function toBulkRunnerFilters(
+  filters: SearchRunnersFiltersInputDto,
+): NonNullable<BulkStopRunnersDto["filters"]> {
+  // The table never sets a triggered-at window (friendly type allows strings
+  // there; the wire type wants Dates), so only the settable fields cross.
+  return {
+    search: filters.search,
+    sourceId: filters.sourceId,
+    status: filters.status as
+      | NonNullable<NonNullable<BulkStopRunnersDto["filters"]>["status"]>
+      | undefined,
+    triggerType: filters.triggerType as
+      | NonNullable<NonNullable<BulkStopRunnersDto["filters"]>["triggerType"]>
+      | undefined,
+    triggeredBy: filters.triggeredBy,
+  };
+}
 
 type FilterDraft = {
   sourceIds: string[];
@@ -96,6 +174,9 @@ const TRIGGER_TYPE_OPTIONS: SearchRunnersTriggerType[] = [
   "WEBHOOK",
   "API",
 ];
+
+const CHECKBOX_CLASS =
+  "border-2 border-foreground/25 rounded-[2px] data-[state=checked]:bg-accent data-[state=checked]:border-accent data-[state=checked]:text-accent-foreground data-[state=indeterminate]:bg-accent data-[state=indeterminate]:border-accent data-[state=indeterminate]:text-accent-foreground";
 
 function getPageItems(current: number, total: number) {
   if (total <= 7) {
@@ -190,6 +271,29 @@ export function RunnersTable({
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wsBump, setWsBump] = useState(0);
+  const [busyRunner, setBusyRunner] = useState<{
+    runnerId: string;
+    action: "stop" | "rerun" | "delete";
+  } | null>(null);
+  const [isBulkBusy, setIsBulkBusy] = useState<
+    null | "stop" | "rerun" | "delete"
+  >(null);
+  // A delete is always confirmed first — a single scan from its row menu or
+  // the whole bulk selection (explicit IDs or a filter snapshot).
+  const [pendingDelete, setPendingDelete] = useState<
+    | { kind: "ids"; ids: string[] }
+    | { kind: "filters"; filters: SearchRunnersFiltersInputDto; total: number }
+    | null
+  >(null);
+
+  // ── Selection (mirrors sources-table) ──────────────────────────────────
+  // Row checkboxes collect explicit IDs; the header checkbox means "every run
+  // matching the current filters", which the bulk endpoints accept as a
+  // filter snapshot.
+  const [selectionMap, setSelectionMap] = useState<Map<string, RunnerRow>>(
+    new Map(),
+  );
+  const [isAllSelected, setIsAllSelected] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -389,6 +493,271 @@ export function RunnersTable({
   const showInitialLoading = isLoading && data === null;
   const hasRows = rows.length > 0;
 
+  const currentFilters = effectiveFilters;
+
+  const clearSelection = useCallback(() => {
+    setIsAllSelected(false);
+    setSelectionMap(new Map());
+  }, []);
+
+  // A new search/sort/filter changes what "all" means, so the selection goes.
+  useEffect(() => {
+    setSelectionMap(new Map());
+    setIsAllSelected(false);
+  }, [
+    debouncedSearch,
+    draft.sourceIds,
+    draft.triggerTypes,
+    statuses,
+    pageSize,
+  ]);
+
+  const currentPageSelectedCount = isAllSelected
+    ? rows.length
+    : rows.filter((runner) => selectionMap.has(runner.id)).length;
+  const headerChecked =
+    isAllSelected ||
+    (rows.length > 0 && currentPageSelectedCount === rows.length);
+  const headerIndeterminate =
+    !isAllSelected && currentPageSelectedCount > 0 && !headerChecked;
+  const selectionCount = isAllSelected ? total : selectionMap.size;
+  // "Select all" means every run matching the current filters — an empty
+  // filter object still selects everything, exactly like sources-table.
+  const selection: RunnerSelection | null =
+    selectionCount === 0
+      ? null
+      : isAllSelected
+        ? {
+            type: "all",
+            filters: currentFilters ?? {},
+            total,
+          }
+        : {
+            type: "ids",
+            runners: Array.from(selectionMap.values()),
+            total: selectionMap.size,
+          };
+
+  function handleHeaderCheckbox() {
+    if (headerChecked || headerIndeterminate) clearSelection();
+    else {
+      setIsAllSelected(true);
+      setSelectionMap(new Map());
+    }
+  }
+
+  const toggleRow = useCallback((runner: RunnerRow) => {
+    setIsAllSelected(false);
+    setSelectionMap((previous) => {
+      const next = new Map(previous);
+      if (next.has(runner.id)) next.delete(runner.id);
+      else next.set(runner.id, runner);
+      return next;
+    });
+  }, []);
+
+  const refresh = useCallback(() => {
+    // Refetch so rows settle even if a websocket update arrives before the
+    // write it announces is readable. Creation events also prepend live.
+    setWsBump((n) => n + 1);
+  }, []);
+
+  function reportBulkResult(
+    action: "stop" | "rerun" | "delete",
+    done: number,
+    skipped: BulkRunnersSkippedDto[],
+  ) {
+    const keys = {
+      stop: {
+        done: "runners.bulkStop.stopped",
+        failed: "runners.bulkStop.failed",
+      },
+      rerun: {
+        done: "runners.bulkRerun.started",
+        failed: "runners.bulkRerun.failed",
+      },
+      delete: {
+        done: "runners.bulkDelete.deleted",
+        failed: "runners.bulkDelete.failed",
+      },
+    } as const;
+    if (done > 0) {
+      toast.success(t(keys[action].done, { count: done.toLocaleString() }));
+    }
+    if (skipped.length > 0) {
+      toast.warning(
+        t("runners.bulk.skipped", {
+          count: skipped.length.toLocaleString(),
+        }),
+        { description: skipped[0]?.reason },
+      );
+    }
+    if (done === 0 && skipped.length === 0) {
+      toast.error(t(keys[action].failed));
+    }
+  }
+
+  // ── Row actions ─────────────────────────────────────────────────────────
+
+  const handleStopRunner = async (runnerId: string) => {
+    try {
+      setBusyRunner({ runnerId, action: "stop" });
+      await api.runners.cliRunnerControllerStopRunner({ runnerId });
+      toast.success(t("scans.stopSuccess"));
+      refresh();
+    } catch (stopError) {
+      console.error("Failed to stop runner:", stopError);
+      toast.error(
+        stopError instanceof Error
+          ? stopError.message
+          : t("scans.failedToStop"),
+      );
+    } finally {
+      setBusyRunner((current) =>
+        current?.runnerId === runnerId ? null : current,
+      );
+    }
+  };
+
+  const handleRerunScan = async (runner: RunnerRow) => {
+    try {
+      setBusyRunner({ runnerId: runner.id, action: "rerun" });
+      const startRunnerDto: StartRunnerDto = { triggerType: "MANUAL" };
+      await api.runners.cliRunnerControllerStartRunner({
+        sourceId: runner.sourceId,
+        startRunnerDto,
+      });
+      toast.success(t("scans.newRunStarted"));
+      refresh();
+    } catch (rerunError) {
+      console.error("Failed to re-run scan:", rerunError);
+      toast.error(
+        rerunError instanceof Error
+          ? rerunError.message
+          : t("runners.rowActions.rerunFailed"),
+      );
+    } finally {
+      setBusyRunner((current) =>
+        current?.runnerId === runner.id ? null : current,
+      );
+    }
+  };
+
+  const handleDeleteRunner = async (runnerId: string) => {
+    try {
+      setBusyRunner({ runnerId, action: "delete" });
+      await api.runners.cliRunnerControllerDeleteRunner({ runnerId });
+      toast.success(t("runners.rowActions.deleted"));
+      setSelectionMap((previous) => {
+        if (!previous.has(runnerId)) return previous;
+        const next = new Map(previous);
+        next.delete(runnerId);
+        return next;
+      });
+      refresh();
+    } catch (deleteError) {
+      console.error("Failed to delete scan:", deleteError);
+      toast.error(
+        deleteError instanceof Error
+          ? deleteError.message
+          : t("runners.rowActions.deleteFailed"),
+      );
+    } finally {
+      setBusyRunner((current) =>
+        current?.runnerId === runnerId ? null : current,
+      );
+    }
+  };
+
+  // ── Bulk actions ────────────────────────────────────────────────────────
+
+  const handleBulkStop = async () => {
+    if (!selection) return;
+    try {
+      setIsBulkBusy("stop");
+      setError(null);
+      const response = await api.runners.cliRunnerControllerBulkStopRunners({
+        bulkStopRunnersDto:
+          selection.type === "ids"
+            ? { ids: selection.runners.map((runner) => runner.id) }
+            : { filters: toBulkRunnerFilters(selection.filters) },
+      });
+      reportBulkResult("stop", response.stoppedCount, response.skipped);
+      clearSelection();
+      refresh();
+    } catch (bulkError) {
+      console.error("Failed to stop scans:", bulkError);
+      setError(
+        bulkError instanceof Error
+          ? bulkError.message
+          : t("runners.bulkStop.failed"),
+      );
+    } finally {
+      setIsBulkBusy(null);
+    }
+  };
+
+  const handleBulkRerun = async () => {
+    if (!selection) return;
+    try {
+      setIsBulkBusy("rerun");
+      setError(null);
+      const response = await api.runners.cliRunnerControllerBulkRerunScans({
+        bulkRerunScansDto:
+          selection.type === "ids"
+            ? { ids: selection.runners.map((runner) => runner.id) }
+            : {
+                filters: toBulkRunnerFilters(
+                  selection.filters,
+                ) as BulkRerunScansDto["filters"],
+              },
+      });
+      reportBulkResult("rerun", response.startedCount, response.skipped);
+      clearSelection();
+      refresh();
+    } catch (bulkError) {
+      console.error("Failed to re-run scans:", bulkError);
+      setError(
+        bulkError instanceof Error
+          ? bulkError.message
+          : t("runners.bulkRerun.failed"),
+      );
+    } finally {
+      setIsBulkBusy(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!pendingDelete) return;
+    try {
+      setIsBulkBusy("delete");
+      setError(null);
+      const response = await api.runners.cliRunnerControllerBulkDeleteRunners({
+        bulkDeleteRunnersDto:
+          pendingDelete.kind === "ids"
+            ? { ids: pendingDelete.ids }
+            : {
+                filters: toBulkRunnerFilters(
+                  pendingDelete.filters,
+                ) as BulkDeleteRunnersDto["filters"],
+              },
+      });
+      reportBulkResult("delete", response.deletedCount, response.skipped);
+      setPendingDelete(null);
+      clearSelection();
+      refresh();
+    } catch (bulkError) {
+      console.error("Failed to delete scans:", bulkError);
+      setError(
+        bulkError instanceof Error
+          ? bulkError.message
+          : t("runners.bulkDelete.failed"),
+      );
+    } finally {
+      setIsBulkBusy(null);
+    }
+  };
+
   const renderSortableHead = (label: string, field: SearchRunnersSortBy) => {
     const active = sort.by === field;
     return (
@@ -490,6 +859,74 @@ export function RunnersTable({
         ) : null}
       </div>
 
+      {selection && (
+        <div className="flex flex-wrap items-center gap-3 rounded-[4px] border-2 border-border bg-muted/40 px-3 py-2">
+          <span className="text-xs text-muted-foreground">
+            {selection.type === "all"
+              ? t("runners.bulk.allSelected", {
+                  count: selectionCount.toLocaleString(),
+                })
+              : selectionCount === 1
+                ? t("runners.bulk.selected", {
+                    count: selectionCount.toLocaleString(),
+                  })
+                : t("runners.bulk.selectedPlural", {
+                    count: selectionCount.toLocaleString(),
+                  })}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isBulkBusy !== null}
+            onClick={handleBulkStop}
+            className="ml-auto rounded-[4px] border-2 border-destructive font-mono text-xs font-bold uppercase tracking-[0.08em] text-destructive hover:bg-destructive/10"
+          >
+            {isBulkBusy === "stop" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Square className="h-3.5 w-3.5" />
+            )}
+            {t("runners.bulk.stopSelected")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isBulkBusy !== null}
+            onClick={handleBulkRerun}
+            className="rounded-[4px] border-2 border-border font-mono text-xs font-bold uppercase tracking-[0.08em]"
+          >
+            {isBulkBusy === "rerun" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5" />
+            )}
+            {t("runners.bulk.rerunSelected")}
+          </Button>
+          <Button
+            size="sm"
+            disabled={isBulkBusy !== null}
+            onClick={() =>
+              setPendingDelete(
+                selection.type === "ids"
+                  ? {
+                      kind: "ids",
+                      ids: selection.runners.map((runner) => runner.id),
+                    }
+                  : {
+                      kind: "filters",
+                      filters: selection.filters,
+                      total: selection.total,
+                    },
+              )
+            }
+            className="rounded-[4px] border-2 border-border bg-destructive font-mono text-xs font-bold uppercase tracking-[0.08em] text-white hover:bg-destructive/90"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {t("runners.bulk.deleteSelected")}
+          </Button>
+        </div>
+      )}
+
       {error && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
           {error}
@@ -513,6 +950,31 @@ export function RunnersTable({
             <Table>
               <TableHeader className="sticky top-0 z-20 bg-white/95 dark:bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-card/80">
                 <TableRow>
+                  <TableHead className="w-10 bg-white/95 dark:bg-card/95">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex items-center justify-center">
+                          <Checkbox
+                            checked={
+                              headerIndeterminate
+                                ? "indeterminate"
+                                : headerChecked
+                            }
+                            onCheckedChange={handleHeaderCheckbox}
+                            aria-label={t("runners.bulk.selectAllAria")}
+                            className={CHECKBOX_CLASS}
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {headerChecked || headerIndeterminate
+                          ? t("runners.bulk.deselectAll")
+                          : t("runners.bulk.selectAll", {
+                              count: total.toLocaleString(),
+                            })}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
                       t("runners.columns.triggered"),
@@ -553,6 +1015,11 @@ export function RunnersTable({
                       SearchRunnersSortByEnum.TotalFindings,
                     )}
                   </TableHead>
+                  <TableHead className="bg-white/95 text-right dark:bg-card/95">
+                    <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      {t("runners.columns.actions")}
+                    </span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -566,6 +1033,15 @@ export function RunnersTable({
                     (runner.assetsCreated ?? 0) +
                     (runner.assetsUpdated ?? 0) +
                     (runner.assetsUnchanged ?? 0);
+                  // A queued scan has no process yet, but stopping it is the
+                  // same operator decision: the API cancels it outright.
+                  const isStoppable =
+                    isRunnerStatusRunning(runner.status) ||
+                    runner.status === "PENDING";
+                  const isRunningRow = isRunnerStatusRunning(runner.status);
+                  const isChecked =
+                    isAllSelected || selectionMap.has(runner.id);
+                  const rowBusy = busyRunner?.runnerId === runner.id;
 
                   return (
                     <TableRow
@@ -573,6 +1049,21 @@ export function RunnersTable({
                       className="align-top cursor-pointer hover:bg-muted/40"
                       onClick={() => router.push(nsPath(`/scans/${runner.id}`))}
                     >
+                      <TableCell
+                        className="w-10 py-2"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <span className="flex items-center justify-center">
+                          <Checkbox
+                            checked={isChecked}
+                            onCheckedChange={() => toggleRow(runner)}
+                            aria-label={t("runners.bulk.selectRowAria", {
+                              id: runner.id.slice(0, 8),
+                            })}
+                            className={CHECKBOX_CLASS}
+                          />
+                        </span>
+                      </TableCell>
                       <TableCell className="py-2">
                         <div className="text-sm">
                           {formatDate(runner.triggeredAt)}
@@ -698,6 +1189,72 @@ export function RunnersTable({
                           </div>
                         </div>
                       </TableCell>
+                      <TableCell
+                        className="py-2 text-right"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-[4px] border-2 border-border"
+                              aria-label={t("runners.rowActions.open", {
+                                id: runner.id.slice(0, 8),
+                              })}
+                            >
+                              {rowBusy ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {isStoppable && (
+                              <DropdownMenuItem
+                                disabled={rowBusy}
+                                onSelect={() => {
+                                  void handleStopRunner(runner.id);
+                                }}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Square className="h-3.5 w-3.5" />
+                                {t("runners.rowActions.stop")}
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              disabled={rowBusy}
+                              onSelect={() => {
+                                void handleRerunScan(runner);
+                              }}
+                            >
+                              <Play className="h-3.5 w-3.5" />
+                              {t("runners.rowActions.rerun")}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              disabled={rowBusy || isRunningRow}
+                              title={
+                                isRunningRow
+                                  ? t("runners.rowActions.runningNoDelete")
+                                  : undefined
+                              }
+                              onSelect={() => {
+                                setPendingDelete({
+                                  kind: "ids",
+                                  ids: [runner.id],
+                                });
+                              }}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              {t("runners.rowActions.delete")}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -718,9 +1275,9 @@ export function RunnersTable({
             </SelectTrigger>
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((size) => (
-                  <SelectItem key={size} value={String(size)}>
-                    {t("common.rows", { size })}
-                  </SelectItem>
+                <SelectItem key={size} value={String(size)}>
+                  {t("common.rows", { size })}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -786,6 +1343,60 @@ export function RunnersTable({
           </Pagination>
         )}
       </div>
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent className="rounded-[6px] border-2 border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("runners.bulkDelete.title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.kind === "filters"
+                ? t("runners.bulkDelete.matchingFilters", {
+                    count: pendingDelete.total.toLocaleString(),
+                  })
+                : t("runners.bulkDelete.cannotUndo")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Alert variant="destructive" className="border-destructive/40">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>{t("runners.bulkDelete.permanentTitle")}</AlertTitle>
+            <AlertDescription>
+              {t("runners.bulkDelete.permanentBody")}
+            </AlertDescription>
+          </Alert>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkBusy !== null}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isBulkBusy !== null}
+              onClick={() => {
+                if (
+                  pendingDelete?.kind === "ids" &&
+                  pendingDelete.ids.length === 1
+                ) {
+                  const runnerId = pendingDelete.ids[0];
+                  if (!runnerId) return;
+                  setPendingDelete(null);
+                  void handleDeleteRunner(runnerId);
+                } else {
+                  void handleBulkDelete();
+                }
+              }}
+              className="rounded-[4px] border-2 border-border"
+            >
+              {isBulkBusy === "delete"
+                ? t("common.deleting")
+                : t("runners.bulkDelete.deleteScans")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

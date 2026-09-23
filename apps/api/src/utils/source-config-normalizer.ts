@@ -197,7 +197,7 @@ function normalizeLegacyShape(type: string, config: JsonRecord) {
   }
 }
 
-function normalizeSampling(config: JsonRecord) {
+function normalizeSampling(config: JsonRecord, sourceType: string) {
   const optional = asObject(config.optional);
   const optionalSampling = optional ? asObject(optional.sampling) : undefined;
   const optionalContent = optional ? asObject(optional.content) : undefined;
@@ -208,11 +208,20 @@ function normalizeSampling(config: JsonRecord) {
     ...(asObject(config.sampling) ?? {}),
   };
 
+  // A notebook connector yields whatever its extract() yields: a notebook that
+  // produces its whole universe every run (the common case) is silently cut to
+  // a 100-asset window per run under AUTOMATIC, so the namespace holds a
+  // partial universe for several AUTO cycles -- and a downstream notebook that
+  // reads it via ctx.query_assets() fails its completeness guard in the
+  // meantime (GENESIS Kreisprofile/Länderwirtschaft field report). ALL is the
+  // sound default here; a notebook that pages at its origin opts into
+  // AUTOMATIC explicitly by reading ctx.strategy/ctx.offset.
+  const defaultStrategy = sourceType === 'CUSTOM' ? 'ALL' : 'AUTOMATIC';
   const strategy =
     normalizeSamplingStrategy(sampling.strategy) ??
     normalizeSamplingStrategy(optionalSampling?.strategy) ??
     normalizeSamplingStrategy(optionalSampling?.mode) ??
-    'AUTOMATIC';
+    defaultStrategy;
 
   sampling.strategy = strategy;
   delete sampling.limit;
@@ -317,7 +326,7 @@ export function normalizeSourceConfig(
   };
 
   normalizeLegacyShape(type, normalized);
-  normalizeSampling(normalized);
+  normalizeSampling(normalized, type);
   normalizeRequiredBlock(normalized);
   removeNullValues(normalized);
 
