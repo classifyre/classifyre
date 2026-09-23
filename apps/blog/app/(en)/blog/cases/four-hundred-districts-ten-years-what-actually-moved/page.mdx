@@ -1,0 +1,312 @@
+---
+title: "Four Hundred Districts, Ten Years: Telling Real Growth From the Kind That Isn't"
+description: Three districts around Berlin grow far faster than their structure predicts. Nine look like they are under housing pressure — seven of them are not. A regional picture of Germany where every number comes with what it can and cannot support.
+date: 2026-09-22T00:00:00.000Z
+tags:
+  - investigations
+  - public-data
+  - regional-analysis
+  - detector-design
+categories:
+  - Field Notes
+author: Banandre
+image: /blog/assets/images/four-hundred-districts-ten-years-what-actually-moved.jpg
+keywords:
+  - regional analysis Germany
+  - district data
+  - suburbanisation Berlin
+  - demographic change
+  - site selection
+  - shrinking and ageing
+  - GENESIS-Online
+  - Classifyre
+alternates:
+  canonical: /blog/cases/four-hundred-districts-ten-years-what-actually-moved
+  languages:
+    en: /blog/cases/four-hundred-districts-ten-years-what-actually-moved/
+    de: /de/blog/cases/four-hundred-districts-ten-years-what-actually-moved/
+    x-default: /blog/cases/four-hundred-districts-ten-years-what-actually-moved/
+openGraph:
+  type: article
+  title: "Four Hundred Districts, Ten Years: Telling Real Growth From the Kind That Isn't"
+  description: Three districts around Berlin grow far faster than their structure predicts. Nine look like they are under housing pressure — seven of them are not. A regional picture where every number carries what it can support.
+  url: /blog/cases/four-hundred-districts-ten-years-what-actually-moved
+  siteName: Classifyre
+  publishedTime: 2026-09-22T00:00:00.000Z
+  modifiedTime: 2026-09-22T00:00:00.000Z
+  authors:
+    - Banandre
+  section: Field Notes
+  tags:
+    - regional analysis
+    - demographic change
+    - site selection
+    - public data
+  images:
+    - /blog/assets/images/four-hundred-districts-ten-years-what-actually-moved.jpg
+twitter:
+  card: summary
+  title: "Four Hundred Districts, Ten Years: What Actually Moved"
+  description: Nine districts look like they are under housing pressure. Seven of them are not. A regional picture of Germany that says what it cannot support.
+  images:
+    - /blog/assets/images/four-hundred-districts-ten-years-what-actually-moved.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/four-hundred-districts-ten-years-what-actually-moved.jpg"
+  eyebrow="Field notes"
+  title="Four Hundred Districts, Ten Years"
+  description="Three districts around Berlin grow far faster than their structure predicts. Nine look like they are under housing pressure — seven of them are not. A regional picture of Germany where every number comes with what it can and cannot support."
+/>
+
+<ArticleJsonLd
+  headline="Four Hundred Districts, Ten Years: Telling Real Growth From the Kind That Isn't"
+  description="A Classifyre namespace covering Germany's 400 districts over a decade: which grew, which aged, which are under real housing pressure, and which signals dissolve on inspection."
+  path="/blog/cases/four-hundred-districts-ten-years-what-actually-moved"
+  datePublished="2026-09-22T00:00:00.000Z"
+  dateModified="2026-09-22T00:00:00.000Z"
+  authorName="Banandre"
+  articleSection="Field Notes"
+  about={[
+    "Regional analysis",
+    "Demographic change",
+    "Suburbanisation",
+    "Site selection",
+  ]}
+  mentions={[
+    {
+      "@type": "Dataset",
+      name: "GENESIS-Online (Statistisches Bundesamt)",
+      url: "https://www-genesis.destatis.de/",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://showcase.classifyre.com/de-regionen",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://showcase.classifyre.com/de-regionen"
+  liveCaseName="DE Regionen namespace"
+/>
+
+<LiveCaseLink
+  href="https://showcase.classifyre.com/de-regionen"
+  caseName="DE Regionen namespace"
+/>
+
+<ArticleSideRail
+  title="Four Hundred Districts, Ten Years"
+  path="/blog/cases/four-hundred-districts-ten-years-what-actually-moved/"
+  tags={["investigations", "public-data", "regional-analysis", "detector-design"]}
+  backHref="/blog/cases"
+  backLabel="All case files"
+/>
+
+Somebody asks where the next site should go, or which regions the sales plan
+should weight, or where demand for a service will be in five years. The answer
+is supposed to come out of regional data.
+
+The problem is not getting the data. Germany publishes it, openly, in
+extraordinary detail. The problem is that a district-level table will happily
+tell you nine districts are under housing pressure, and seven of them are not —
+and nothing in the table distinguishes the two.
+
+> **The short version:** a namespace covering all 400 German districts over a
+> decade — 8 sources, 27 detectors, 1,775 findings, 8 investigations. It says
+> which districts grew and which only appear to, which are shrinking and ageing
+> at once, where crime statistics measure something other than crime, and where
+> the strongest-looking signal in the data dissolves on inspection.
+
+What follows is four of those investigations and, more usefully, what made each
+one survivable.
+
+{/* SCREENSHOT: the namespace overview — eight sources with last-run status and
+    asset counts, plus the findings-by-severity tiles. */}
+
+## Berlin's commuter belt, and how to be sure
+
+Three Brandenburg districts ringing Berlin grow far faster than anything about
+them in 2015 predicts.
+
+The model is an ordinary least squares fit on 2015 age structure, density, East
+or West, city status and foreign share — it explains about half the variance
+across the 400 districts (R² 0.48). The three belt districts sit well above it.
+
+The obvious explanation is suburbanisation out of Berlin, and the namespace can
+check it rather than assert it: Berlin → Brandenburg is Germany's largest net
+migration corridor, as its own finding on its own asset.
+
+The more interesting part is the hypothesis that **failed**. *"The belt grows
+mainly through foreign population"* is recorded in the case as **refuted** — the
+growth is domestic, not migration-driven. A second hypothesis, that
+Dahme-Spreewald's growth is partly the airport, remains *proposed*: plausible,
+not yet tested.
+
+Three states — supported, refuted, proposed — on three claims about the same
+districts. That is what a defensible regional finding looks like.
+
+{/* SCREENSHOT: the "Berlins Speckgürtel" case showing the three hypotheses with
+    their SUPPORTED / REFUTED / PROPOSED statuses side by side. */}
+
+## Nine districts under housing pressure. Seven are not.
+
+A reasonable detector: flag districts whose population grew more than 3% faster
+than their housing stock. Both sides census-adjusted. Nine districts fire.
+
+Then the namespace checked the detector against the raw, unadjusted figures —
+and most of the signal turned out to be the census adjustment itself, not a
+divergence between people and dwellings.
+
+**Two of the nine survive**: Leipzig and Ludwigshafen are under real housing
+pressure. For the other seven, the signal was the correction.
+
+We are telling you about this one because it is the outcome most analyses never
+report. The detector was not deleted; the finding was not quietly dropped. The
+case holds both hypotheses — *"Leipzig and Ludwigshafen are under real housing
+pressure"* and *"for seven of nine, the signal is the census correction"* — and
+both are supported, because both are true.
+
+If you are deciding where to build, the difference between nine districts and
+two is the whole decision.
+
+## Where services come under pressure first
+
+The sharpest forward-looking finding in the namespace is also the least
+surprising, which is how you know the machinery is working.
+
+Districts that shrink and age simultaneously are overwhelmingly East German.
+That much anyone could guess. What makes it actionable is the second condition:
+in some of them, *Grundsicherung im Alter* — basic income support in old age —
+is already growing faster than in the rest of their state.
+
+Shrinking, ageing, and a rising share of pensioners who cannot cover their own
+costs is a different proposition from shrinking alone. It tells a regional
+planner, an insurer or a care operator which districts move first.
+
+A third hypothesis — that care capacity is the binding constraint — sits at
+*proposed*, with the test written down and not yet run.
+
+{/* SCREENSHOT: the "Schrumpfen und Altern" case with its findings mapped across
+    districts, and the supporting evidence attached to the two supported
+    hypotheses. */}
+
+## What crime statistics actually measure
+
+Police crime figures per district look like an obvious input to a location
+decision. Read naively, they are close to useless.
+
+Immigration-law offences are recorded **where they are detected**. A district
+with an international airport or a national border therefore accumulates
+offences generated by people who are passing through, not living there. Those
+districts top the ranking.
+
+Remove them and recorded crime follows urbanity and social strain — the
+structural factors you would expect.
+
+The namespace is deliberate about what it does not do here. No detector in it
+relates crime to migration, and the case states that in writing. It also states
+the larger caveat: recorded crime is not all crime, and a ranking of recorded
+crime is partly a ranking of how thoroughly each force records.
+
+Two corrections, both published next to the number, neither hidden in a
+methods note.
+
+## The composite score we demoted
+
+One investigation is closed, and it closed by concluding that its own subject
+was not worth much.
+
+A composite state ranking — economy 30%, demography 20%, employment 20%,
+housing 15%, business 15% — is the kind of index that ends up on a slide. The
+namespace ships it only with a *rank band*: the range the state occupies across
+2,000 random reweightings of those five components.
+
+The result: only the ends survive. Bayern lands between 1st and 3rd whatever the
+weights. Thüringen between 15th and 16th. Berlin is anywhere from 2nd to 10th —
+its rank is a statement about the weights, not about Berlin.
+
+The case is closed with the conclusion *"answered, and demoted"*. The band stays
+on every state record, and the standing question keeps matching, so the next
+data release re-tests it automatically.
+
+Publishing an index with the range that survives reweighting is a small change
+that makes the difference between a number and a decision input.
+
+{/* SCREENSHOT: the Region Score finding on a Land asset, showing the p10–p90
+    rank band next to the headline rank. */}
+
+## Districts that only grow through migration
+
+162 of the 400 districts hold their population or grow only because their
+foreign population grew while the rest shrank. Almost all are in the West.
+
+The investigation is careful in a way worth copying. Naturalisations move people
+from "foreign" to "German" without anyone moving house, so the non-foreign
+figure is a **lower bound** on the German-national side — stated in the case, not
+discovered later by a reader.
+
+One hypothesis about benefit take-up is marked **inconclusive**, and the related
+claim that the 2022 change of eligibility for refugees from Ukraine drives the
+pattern is *supported at state level and explicitly not testable at district
+level*, because the table that would split it does not exist.
+
+"We can show this nationally and not locally, and here is the table that would
+have to exist" is a more useful output than a confident district map.
+
+## What Classifyre contributed
+
+The analysis is ordinary regional statistics. What makes it hold up is
+structural.
+
+**Every caveat travels with its number.** A district that carries a census
+correction, a central-booking artefact or a registration-seat effect has that
+recorded as a finding on the district itself. Open the district page and it is
+there — including findings recorded on *other* assets that point at it, such as
+an integrity check that is its own object.
+
+**Questions outlive the analysis.** A standing question — *"which districts grow
+only through migration?"* — keeps matching as new releases land, and says what
+changed. The alternative is a notebook somebody has to remember to re-run.
+
+**Hypotheses can fail in public.** Across this namespace and its two siblings
+there are 62 hypotheses, every one with a written testable predicate. Four are
+refuted, two inconclusive. One of the refuted ones is in this namespace — the
+Berlin belt's foreign-population explanation — and killing it is what made the
+suburbanisation reading credible.
+
+**Sources stay current on their own schedule.** Regional boundaries change
+rarely and run quarterly; crime statistics arrive annually; the catalogue is
+walked weekly. Nobody schedules a refresh by hand.
+
+{/* SCREENSHOT: a district page — the profile with its findings, the integrity
+    notes recorded elsewhere that point at it, and the lineage back to the
+    source tables. */}
+
+## Who this is for
+
+If you make decisions on German regional data — site and catchment selection,
+regional sales planning, service and care capacity, insurance and credit
+exposure by region, public funding applications, ESG and social reporting —
+this namespace is a worked example of the same decisions made with the caveats
+attached.
+
+Two things transfer directly regardless of subject: **test a detector against
+the raw figures before believing it**, which is what turned nine housing-pressure
+districts into two; and **publish the range that survives reweighting** next to
+any composite score.
+
+## See it yourself
+
+The namespace is live, with every source, detector, standing question, case and
+lineage edge described above:
+
+**[showcase.classifyre.com/de-regionen](https://showcase.classifyre.com/de-regionen)**
+
+Start with *Berlins Speckgürtel* and look at the refuted hypothesis first — then
+follow one belt district back through its findings to the tables underneath.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/blog/cases/four-hundred-districts-ten-years-what-actually-moved"
+/>

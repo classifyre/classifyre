@@ -60,6 +60,8 @@
     "thumbnailReadError": "Couldn't read that image.",
     "sourcesCount": "sources",
     "failingCount": "{{count}} failing",
+    "runningCount": "{{count}} running",
+    "pendingCount": "{{count}} pending",
     "settingsLoadFailed": "Failed to load workspace settings",
     "settingsSaved": "Workspace settings saved",
     "settingsSaveFailed": "Failed to save workspace settings",

@@ -1,0 +1,330 @@
+---
+title: "400 Kreise, zehn Jahre: echtes Wachstum von scheinbarem unterscheiden"
+description: Drei Kreise rund um Berlin wachsen weit stärker, als ihre Struktur erwarten lässt. Neun sehen nach Wohnungsdruck aus — sieben davon sind es nicht. Ein Regionalbild Deutschlands, bei dem jede Zahl mitbringt, was sie trägt und was nicht.
+date: 2026-09-22T00:00:00.000Z
+tags:
+  - investigations
+  - public-data
+  - regional-analysis
+  - detector-design
+categories:
+  - Field Notes
+author: Banandre
+image: /blog/assets/images/four-hundred-districts-ten-years-what-actually-moved.jpg
+keywords:
+  - Regionalanalyse Deutschland
+  - Kreisdaten
+  - Suburbanisierung Berlin
+  - demografischer Wandel
+  - Standortwahl
+  - Schrumpfung und Alterung
+  - GENESIS-Online
+  - Classifyre
+alternates:
+  canonical: /de/blog/cases/four-hundred-districts-ten-years-what-actually-moved
+  languages:
+    en: /blog/cases/four-hundred-districts-ten-years-what-actually-moved/
+    de: /de/blog/cases/four-hundred-districts-ten-years-what-actually-moved/
+    x-default: /blog/cases/four-hundred-districts-ten-years-what-actually-moved/
+openGraph:
+  type: article
+  title: "400 Kreise, zehn Jahre: echtes Wachstum von scheinbarem unterscheiden"
+  description: Drei Kreise um Berlin wachsen weit über ihrer Struktur. Neun sehen nach Wohnungsdruck aus — sieben sind es nicht. Ein Regionalbild, das sagt, was es nicht trägt.
+  url: /de/blog/cases/four-hundred-districts-ten-years-what-actually-moved
+  siteName: Classifyre
+  publishedTime: 2026-09-22T00:00:00.000Z
+  modifiedTime: 2026-09-22T00:00:00.000Z
+  authors:
+    - Banandre
+  section: Field Notes
+  tags:
+    - Regionalanalyse
+    - demografischer Wandel
+    - Standortwahl
+    - offene Daten
+  images:
+    - /blog/assets/images/four-hundred-districts-ten-years-what-actually-moved.jpg
+twitter:
+  card: summary
+  title: "400 Kreise, zehn Jahre: was sich wirklich bewegt hat"
+  description: Neun Kreise sehen nach Wohnungsdruck aus. Sieben davon sind es nicht.
+  images:
+    - /blog/assets/images/four-hundred-districts-ten-years-what-actually-moved.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/four-hundred-districts-ten-years-what-actually-moved.jpg"
+  eyebrow="Field notes"
+  title="400 Kreise, zehn Jahre"
+  description="Drei Kreise rund um Berlin wachsen weit stärker, als ihre Struktur erwarten lässt. Neun sehen nach Wohnungsdruck aus — sieben davon sind es nicht. Ein Regionalbild Deutschlands, bei dem jede Zahl mitbringt, was sie trägt und was nicht."
+/>
+
+<ArticleJsonLd
+  headline="400 Kreise, zehn Jahre: echtes Wachstum von scheinbarem unterscheiden"
+  description="Ein Classifyre-Namespace über Deutschlands 400 Kreise in einem Jahrzehnt: wer gewachsen ist, wer altert, wo echter Wohnungsdruck herrscht und welche Signale bei näherem Hinsehen verschwinden."
+  path="/de/blog/cases/four-hundred-districts-ten-years-what-actually-moved"
+  datePublished="2026-09-22T00:00:00.000Z"
+  dateModified="2026-09-22T00:00:00.000Z"
+  authorName="Banandre"
+  articleSection="Field Notes"
+  about={[
+    "Regionalanalyse",
+    "Demografischer Wandel",
+    "Suburbanisierung",
+    "Standortwahl",
+  ]}
+  mentions={[
+    {
+      "@type": "Dataset",
+      name: "GENESIS-Online (Statistisches Bundesamt)",
+      url: "https://www-genesis.destatis.de/",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://showcase.classifyre.com/de-regionen",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://showcase.classifyre.com/de-regionen"
+  liveCaseName="Namespace DE Regionen"
+/>
+
+<LiveCaseLink
+  href="https://showcase.classifyre.com/de-regionen"
+  caseName="Namespace DE Regionen"
+  locale="de"
+/>
+
+<ArticleSideRail
+  title="400 Kreise, zehn Jahre"
+  path="/de/blog/cases/four-hundred-districts-ten-years-what-actually-moved/"
+  tags={["investigations", "public-data", "regional-analysis", "detector-design"]}
+  backHref="/de/blog/cases"
+  backLabel="Alle Fallakten"
+  locale="de"
+/>
+
+Jemand fragt, wo der nächste Standort hin soll, welche Regionen die
+Vertriebsplanung stärker gewichten muss oder wo in fünf Jahren die Nachfrage
+nach einer Leistung liegt. Die Antwort soll aus Regionaldaten kommen.
+
+Das Problem ist nicht, an die Daten zu kommen. Deutschland veröffentlicht sie,
+offen und in außergewöhnlicher Tiefe. Das Problem ist, dass eine Kreistabelle
+Ihnen bereitwillig erzählt, neun Kreise stünden unter Wohnungsdruck — und sieben
+davon tun es nicht. Nichts in der Tabelle unterscheidet die beiden.
+
+> **Kurz gefasst:** ein Namespace über alle 400 deutschen Kreise über ein
+> Jahrzehnt — 8 Quellen, 27 Detektoren, 1.775 Befunde, 8 Untersuchungen. Er sagt,
+> welche Kreise gewachsen sind und welche nur so aussehen, welche gleichzeitig
+> schrumpfen und altern, wo Kriminalstatistik etwas anderes misst als
+> Kriminalität, und wo das stärkste Signal im Datensatz bei näherem Hinsehen
+> zerfällt.
+
+Es folgen vier dieser Untersuchungen — und, nützlicher, was jede einzelne
+belastbar gemacht hat.
+
+{/* SCREENSHOT: Namespace-Übersicht — acht Quellen mit Laufstatus und
+    Objektzahlen, dazu die Befundkacheln nach Schweregrad. */}
+
+## Berlins Speckgürtel, und wie man sich sicher wird
+
+Drei brandenburgische Kreise rund um Berlin wachsen weit stärker, als irgendetwas
+an ihnen im Jahr 2015 erwarten ließ.
+
+Das Modell ist eine gewöhnliche Kleinste-Quadrate-Schätzung auf Altersstruktur
+2015, Dichte, Ost/West, Stadtstatus und Ausländeranteil — sie erklärt über die
+400 Kreise hinweg rund die Hälfte der Varianz (R² 0,48). Die drei Gürtelkreise
+liegen deutlich darüber.
+
+Die naheliegende Erklärung ist Suburbanisierung aus Berlin, und der Namespace
+kann sie prüfen statt behaupten: Berlin → Brandenburg ist Deutschlands größter
+Netto-Wanderungskorridor — als eigener Befund an einem eigenen Objekt.
+
+Interessanter ist die Hypothese, die **gescheitert** ist. *„Der Gürtel wächst
+vor allem über die ausländische Bevölkerung"* steht im Fall als **widerlegt** —
+das Wachstum ist inländisch, nicht migrationsgetrieben. Eine zweite Hypothese,
+dass Dahme-Spreewalds Wachstum teils der Flughafen ist, bleibt *vorgeschlagen*:
+plausibel, noch nicht geprüft.
+
+Drei Zustände — belegt, widerlegt, vorgeschlagen — für drei Aussagen über
+dieselben Kreise. So sieht ein belastbarer Regionalbefund aus.
+
+{/* SCREENSHOT: Der Fall „Berlins Speckgürtel" mit den drei Hypothesen und ihren
+    Status SUPPORTED / REFUTED / PROPOSED nebeneinander. */}
+
+## Neun Kreise unter Wohnungsdruck. Sieben sind es nicht.
+
+Ein vernünftiger Detektor: markiere Kreise, deren Bevölkerung um mehr als 3 %
+stärker gewachsen ist als ihr Wohnungsbestand. Beide Seiten zensusbereinigt.
+Neun Kreise schlagen an.
+
+Dann hat der Namespace den Detektor gegen die unbereinigten Rohwerte geprüft —
+und der größte Teil des Signals erwies sich als die Zensusbereinigung selbst,
+nicht als Auseinanderlaufen von Menschen und Wohnungen.
+
+**Zwei der neun bleiben übrig**: Leipzig und Ludwigshafen stehen unter echtem
+Wohnungsdruck. Bei den anderen sieben war das Signal die Korrektur.
+
+Wir erzählen das, weil es das Ergebnis ist, das in den meisten Analysen nie
+auftaucht. Der Detektor wurde nicht gelöscht, der Befund nicht stillschweigend
+kassiert. Der Fall hält beide Hypothesen — *„Leipzig und Ludwigshafen stehen
+unter echtem Wohnungsdruck"* und *„bei sieben von neun ist das Signal die
+Zensuskorrektur"* — und beide sind belegt, weil beide stimmen.
+
+Wer über einen Neubau entscheidet, für den ist der Unterschied zwischen neun und
+zwei Kreisen die ganze Entscheidung.
+
+## Wo die Daseinsvorsorge zuerst unter Druck gerät
+
+Der schärfste vorausschauende Befund des Namespaces ist auch der am wenigsten
+überraschende — woran man erkennt, dass die Mechanik funktioniert.
+
+Kreise, die gleichzeitig schrumpfen und altern, liegen ganz überwiegend in
+Ostdeutschland. So weit könnte das jeder raten. Handlungsrelevant wird es durch
+die zweite Bedingung: In einigen von ihnen wächst die *Grundsicherung im Alter*
+bereits schneller als im Rest ihres Landes.
+
+Schrumpfend, alternd und mit steigendem Anteil an Rentnerinnen und Rentnern, die
+ihre Kosten nicht decken können — das ist etwas anderes als bloßes Schrumpfen.
+Es sagt Regionalplanung, Versicherern und Pflegeanbietern, welche Kreise zuerst
+kippen.
+
+Eine dritte Hypothese — dass die Pflegekapazität die bindende Nebenbedingung ist
+— steht auf *vorgeschlagen*, mit aufgeschriebenem und noch nicht durchgeführtem
+Test.
+
+{/* SCREENSHOT: Der Fall „Schrumpfen und Altern" mit den Befunden über die Kreise
+    und den Belegen an den beiden belegten Hypothesen. */}
+
+## Was Kriminalstatistik tatsächlich misst
+
+Polizeiliche Kriminalitätszahlen je Kreis sehen nach einer offensichtlichen
+Eingangsgröße für Standortentscheidungen aus. Naiv gelesen sind sie nahezu
+wertlos.
+
+Ausländerrechtliche Verstöße werden dort erfasst, **wo sie festgestellt werden**.
+Ein Kreis mit internationalem Flughafen oder Landesgrenze sammelt daher Delikte
+von Menschen, die ihn passieren, nicht dort leben. Diese Kreise führen das
+Ranking an.
+
+Nimmt man sie heraus, folgt registrierte Kriminalität Urbanität und sozialer
+Belastung — den strukturellen Faktoren, die man erwarten würde.
+
+Der Namespace ist ausdrücklich darin, was er hier nicht tut. Kein Detektor setzt
+Kriminalität zu Migration in Beziehung, und der Fall schreibt das hin. Er nennt
+auch den größeren Vorbehalt: Registrierte Kriminalität ist nicht alle
+Kriminalität, und ein Ranking registrierter Kriminalität ist zum Teil ein Ranking
+der Erfassungsintensität.
+
+Zwei Korrekturen, beide neben der Zahl veröffentlicht, keine in einer
+Methodennotiz versteckt.
+
+## Der Index, den wir zurückgestuft haben
+
+Eine Untersuchung ist geschlossen — mit dem Ergebnis, dass ihr eigener Gegenstand
+nicht viel wert ist.
+
+Ein zusammengesetztes Länderranking — Wirtschaft 30 %, Demografie 20 %,
+Beschäftigung 20 %, Wohnen 15 %, Unternehmen 15 % — ist genau die Art Index, die
+auf einer Folie landet. Der Namespace liefert ihn nur mit *Rangband*: der
+Spanne, die das Land über 2.000 zufällige Neugewichtungen dieser fünf
+Komponenten einnimmt.
+
+Das Ergebnis: Nur die Enden halten. Bayern liegt zwischen Rang 1 und 3,
+unabhängig von den Gewichten. Thüringen zwischen 15 und 16. Berlin irgendwo
+zwischen 2 und 10 — sein Rang ist eine Aussage über die Gewichte, nicht über
+Berlin.
+
+Der Fall ist geschlossen mit dem Fazit *„beantwortet und zurückgestuft"*. Das Band
+bleibt an jedem Länderobjekt, und die stehende Frage matcht weiter, sodass der
+nächste Datenstand sie automatisch erneut prüft.
+
+Einen Index mit der Spanne zu veröffentlichen, die eine Neugewichtung übersteht,
+ist eine kleine Änderung — und der Unterschied zwischen einer Zahl und einer
+Entscheidungsgrundlage.
+
+{/* SCREENSHOT: Der Region-Score-Befund an einem Länderobjekt, mit dem
+    p10–p90-Rangband neben dem Rang selbst. */}
+
+## Kreise, die nur über Zuwanderung wachsen
+
+162 der 400 Kreise halten ihre Bevölkerung oder wachsen nur, weil ihre
+ausländische Bevölkerung gewachsen ist, während der Rest geschrumpft ist. Fast
+alle liegen im Westen.
+
+Die Untersuchung ist auf eine Weise vorsichtig, die man übernehmen sollte:
+Einbürgerungen verschieben Menschen von „ausländisch" zu „deutsch", ohne dass
+jemand umzieht. Die Nicht-Ausländer-Zahl ist deshalb eine **Untergrenze** für die
+deutsche Seite — im Fall festgehalten, nicht später von einer Leserin entdeckt.
+
+Eine Hypothese zum Leistungsbezug steht auf **unschlüssig**, und die verwandte
+Aussage, dass die Änderung der Leistungsberechtigung für Geflüchtete aus der
+Ukraine 2022 das Muster trägt, ist *auf Bundesebene belegt und auf Kreisebene
+ausdrücklich nicht prüfbar* — weil die Tabelle, die das aufschlüsseln würde,
+nicht existiert.
+
+„Wir können das bundesweit zeigen und lokal nicht, und hier ist die Tabelle, die
+es dafür bräuchte" ist ein nützlicheres Ergebnis als eine selbstsichere
+Kreiskarte.
+
+## Was Classifyre beigetragen hat
+
+Die Analyse ist gewöhnliche Regionalstatistik. Belastbar wird sie durch die
+Struktur.
+
+**Jeder Vorbehalt reist mit seiner Zahl.** Ein Kreis mit Zensuskorrektur,
+Zentralbuchungs-Artefakt oder Registersitz-Effekt trägt das als Befund an sich
+selbst. Kreisseite öffnen, und es steht da — einschließlich Befunde, die an
+*anderen* Objekten erfasst sind und auf ihn zeigen, etwa eine Integritätsprüfung,
+die ein eigenes Objekt ist.
+
+**Fragen überleben die Analyse.** Eine stehende Frage — *„welche Kreise wachsen
+nur über Zuwanderung?"* — matcht mit jedem neuen Datenstand weiter und sagt, was
+sich geändert hat. Die Alternative ist ein Notebook, an dessen erneuten Lauf
+jemand denken muss.
+
+**Hypothesen dürfen öffentlich scheitern.** Über diesen Namespace und seine beiden
+Geschwister hinweg gibt es 62 Hypothesen, jede mit aufgeschriebenem prüfbarem
+Prädikat. Vier sind widerlegt, zwei unschlüssig. Eine der widerlegten steht hier
+— die Ausländer-Erklärung für den Berliner Speckgürtel —, und sie zu töten ist
+das, was die Suburbanisierungs-Lesart glaubwürdig gemacht hat.
+
+**Quellen bleiben von selbst aktuell.** Kreisgrenzen ändern sich selten und laufen
+quartalsweise, Kriminalstatistik kommt jährlich, der Katalog wird wöchentlich
+durchlaufen. Niemand plant eine Aktualisierung von Hand.
+
+{/* SCREENSHOT: Eine Kreisseite — das Profil mit seinen Befunden, die andernorts
+    erfassten Integritätsnotizen, die auf ihn zeigen, und die Lineage zurück zu
+    den Quelltabellen. */}
+
+## Für wen das relevant ist
+
+Wer auf Basis deutscher Regionaldaten entscheidet — Standort- und
+Einzugsgebietswahl, regionale Vertriebsplanung, Kapazitäten in Daseinsvorsorge
+und Pflege, Versicherungs- und Kreditexponierung nach Region, Förderanträge,
+ESG- und Sozialberichterstattung —, findet hier dieselben Entscheidungen mit
+angehängten Vorbehalten.
+
+Zwei Dinge übertragen sich unabhängig vom Gegenstand: **einen Detektor gegen die
+Rohwerte prüfen, bevor man ihm glaubt** — das machte aus neun
+Wohnungsdruck-Kreisen zwei; und **die Spanne veröffentlichen, die eine
+Neugewichtung übersteht**, neben jedem zusammengesetzten Index.
+
+## Selbst ansehen
+
+Der Namespace ist live, mit allen oben beschriebenen Quellen, Detektoren,
+stehenden Fragen, Fällen und Lineage-Kanten:
+
+**[showcase.classifyre.com/de-regionen](https://showcase.classifyre.com/de-regionen)**
+
+Beginnen Sie mit *Berlins Speckgürtel* und sehen Sie sich zuerst die widerlegte
+Hypothese an — dann verfolgen Sie einen Gürtelkreis über seine Befunde zurück
+bis zu den Tabellen darunter.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/de/blog/cases/four-hundred-districts-ten-years-what-actually-moved"
+  heading="Weitere Fallakten"
+  locale="de"
+/>

@@ -265,7 +265,7 @@ export class NamespacesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Per-namespace source rollups (total + failing)
+     * Per-namespace source rollups (total + failing + running + pending)
      */
     async namespacesControllerStatsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
         const queryParameters: any = {};
@@ -286,7 +286,7 @@ export class NamespacesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Per-namespace source rollups (total + failing)
+     * Per-namespace source rollups (total + failing + running + pending)
      */
     async namespacesControllerStats(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.namespacesControllerStatsRaw(initOverrides);
