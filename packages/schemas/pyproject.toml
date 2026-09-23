@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-schemas"
-version = "0.5.11"
+version = "0.5.12.dev0"
 description = "Shared JSON schemas for Classifyre monorepo"
 # Kept in sync with apps/cli: both ship in the same images on the same
 # interpreter, and an unbounded range breaks `uv lock` / Dependabot updates
