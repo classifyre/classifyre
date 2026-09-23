@@ -41,6 +41,29 @@ import type {
   UpdateNamespaceInput,
 } from './namespace.types';
 
+/** One source's contribution to the directory-card rollup, with its latest run. */
+export interface NamespaceStatsSourceRow {
+  runnerStatus: string;
+  latestRunnerStatus: string | null;
+}
+
+/**
+ * Directory-card bucket for one source — the same mapping the sources table
+ * shows per row: a claimed source whose latest run still waits PENDING for a
+ * free slot reads as pending, never as running. Terminal/quiet statuses
+ * (COMPLETED, WARNING, STOPPED, …) land in no badge bucket.
+ */
+export function classifyStatsSource(
+  row: NamespaceStatsSourceRow,
+): 'failing' | 'running' | 'pending' | null {
+  if (row.runnerStatus === 'ERROR') return 'failing';
+  if (row.runnerStatus === 'RUNNING') {
+    return row.latestRunnerStatus === 'PENDING' ? 'pending' : 'running';
+  }
+  if (row.runnerStatus === 'PENDING') return 'pending';
+  return null;
+}
+
 interface NamespaceRow {
   id: string;
   name: string;
@@ -369,42 +392,44 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Per-namespace source rollups for the workspace directory cards. One
-   * schema-qualified aggregate per active local namespace (few namespaces on the
+   * schema-qualified query per active local namespace (few namespaces on the
    * landing page); a provisioning/missing schema degrades to zeroes.
+   *
+   * Buckets mirror the per-row mapping the sources table shows (see
+   * source.service): requesting a run claims the source as RUNNING while the
+   * run itself still waits PENDING for a free slot, and that queued scan must
+   * read as pending, never as running.
    */
   async stats(): Promise<NamespaceStats[]> {
     const namespaces = await this.list();
     return Promise.all(
       namespaces.map(async (ns) => {
+        const zero = {
+          id: ns.id,
+          totalSources: 0,
+          failingSources: 0,
+          runningSources: 0,
+          pendingSources: 0,
+        };
         try {
-          const { rows } = await this.pool.query<{
-            total: number;
-            failing: number;
-            running: number;
-            pending: number;
-          }>(
-            `SELECT
-               count(*)::int AS total,
-               count(*) FILTER (WHERE runner_status = 'ERROR')::int AS failing,
-               count(*) FILTER (WHERE runner_status = 'RUNNING')::int AS running,
-               count(*) FILTER (WHERE runner_status = 'PENDING')::int AS pending
-             FROM "${ns.schemaName}".sources`,
+          const { rows } = await this.pool.query<NamespaceStatsSourceRow>(
+            `SELECT s.runner_status AS "runnerStatus",
+                    (SELECT r.status FROM "${ns.schemaName}".runners r
+                     WHERE r.source_id = s.id
+                     ORDER BY r.triggered_at DESC LIMIT 1) AS "latestRunnerStatus"
+             FROM "${ns.schemaName}".sources s`,
           );
-          return {
-            id: ns.id,
-            totalSources: rows[0]?.total ?? 0,
-            failingSources: rows[0]?.failing ?? 0,
-            runningSources: rows[0]?.running ?? 0,
-            pendingSources: rows[0]?.pending ?? 0,
-          };
+          const counts = { ...zero };
+          counts.totalSources = rows.length;
+          for (const row of rows) {
+            const bucket = classifyStatsSource(row);
+            if (bucket === 'failing') counts.failingSources += 1;
+            else if (bucket === 'running') counts.runningSources += 1;
+            else if (bucket === 'pending') counts.pendingSources += 1;
+          }
+          return counts;
         } catch {
-          return {
-            id: ns.id,
-            totalSources: 0,
-            failingSources: 0,
-            runningSources: 0,
-            pendingSources: 0,
-          };
+          return zero;
         }
       }),
     );

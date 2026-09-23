@@ -2238,7 +2238,49 @@
       "trigger": "Auslöser",
       "duration": "Dauer",
       "assets": "Assets",
-      "findings": "Befunde"
+      "findings": "Befunde",
+      "actions": "Aktionen"
+    },
+    "bulk": {
+      "selected": "{{count}} Ausführung ausgewählt",
+      "selectedPlural": "{{count}} Ausführungen ausgewählt",
+      "allSelected": "Alle {{count}} passenden Ausführungen ausgewählt",
+      "selectAll": "Alle {{count}} Ausführungen auswählen, die den aktuellen Filtern entsprechen",
+      "deselectAll": "Alle Ausführungen abwählen",
+      "selectAllAria": "Alle Ausführungen auswählen, die den aktuellen Filtern entsprechen",
+      "selectRowAria": "Ausführung {{id}} auswählen",
+      "stopSelected": "Ausgewählte stoppen",
+      "rerunSelected": "Ausgewählte erneut starten",
+      "deleteSelected": "Ausgewählte löschen",
+      "skipped": "{{count}} Ausführung(en) konnten nicht verarbeitet werden"
+    },
+    "bulkStop": {
+      "stopped": "{{count}} Ausführung(en) gestoppt",
+      "failed": "Ausführungen konnten nicht gestoppt werden"
+    },
+    "bulkRerun": {
+      "started": "{{count}} neue Ausführung(en) eingereiht",
+      "failed": "Ausführungen konnten nicht erneut gestartet werden"
+    },
+    "bulkDelete": {
+      "title": "Ausführungen löschen?",
+      "deleteScans": "Ausführungen löschen",
+      "cannotUndo": "Diese Aktion kann nicht rückgängig gemacht werden.",
+      "matchingFilters": "Dies löscht alle {{count}} Ausführungen, die den aktuellen Filtern entsprechen.",
+      "permanentTitle": "Dauerhafte Entfernung",
+      "permanentBody": "Durch das Löschen werden Ausführungsdatensätze und gespeicherte Logs entfernt. Erzeugte Assets und Befunde bleiben erhalten.",
+      "deleted": "{{count}} Ausführung(en) gelöscht",
+      "failed": "Ausführungen konnten nicht gelöscht werden"
+    },
+    "rowActions": {
+      "open": "Aktionen für Ausführung {{id}}",
+      "stop": "Ausführung stoppen",
+      "rerun": "Ausführung erneut starten",
+      "delete": "Ausführung löschen",
+      "runningNoDelete": "Stoppen Sie die Ausführung vor dem Löschen",
+      "rerunFailed": "Neue Ausführung konnte nicht gestartet werden",
+      "deleted": "Ausführung gelöscht",
+      "deleteFailed": "Ausführung konnte nicht gelöscht werden"
     },
     "searchSources": "Quellen suchen...",
     "noSourcesFound": "Keine Quellen gefunden",
