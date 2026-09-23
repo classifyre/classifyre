@@ -43,6 +43,8 @@ export interface CellListProps {
   /** Absent while drafting: there is no stored revision to execute yet. */
   onRunCell?: (cellId: string) => void;
   runState?: (cellId: string) => CellRunState;
+  /** Which template library the footer's Templates button reads. */
+  scope?: "connector" | "augmentation";
 }
 
 const IDLE: CellRunState = { status: "idle", outputs: [] };
@@ -65,6 +67,7 @@ export function CellList({
   onSave,
   onRunCell,
   runState,
+  scope = "connector",
 }: CellListProps) {
   const { t } = useTranslation();
   const locked = React.useMemo(() => protectedCellIds(cells), [cells]);
@@ -151,6 +154,7 @@ export function CellList({
         </Button>
         <TemplatePicker
           disabled={disabled}
+          scope={scope}
           onInsert={(incoming) => onChange(appendCells(cells, incoming))}
         />
       </div>

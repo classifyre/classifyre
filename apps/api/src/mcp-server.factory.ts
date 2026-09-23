@@ -2515,7 +2515,8 @@ export class McpServerFactoryService {
       'stop_run',
       {
         title: 'Stop Run',
-        description: 'Stop a currently running job.',
+        description:
+          'Stop a running scan or cancel a queued (PENDING) one. Both end STOPPED.',
         inputSchema: z.strictObject({
           runnerId: z.string().uuid(),
         }),

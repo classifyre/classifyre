@@ -94,3 +94,140 @@ test("toggling augmentation writes the form value", async ({ mount }) => {
     .poll(() => (submitted as Record<string, unknown> | null)?.augmentation)
     .toBeDefined();
 });
+
+test("enabling augmentation on an empty notebook shows template cards", async ({
+  mount,
+  page,
+}) => {
+  // The cards read the augmentation template library; the failing branch is
+  // covered by the sibling test below.
+  await page.route("**/notebooks/templates**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          name: "Starter notebook",
+          description: "The minimum an augmentation needs.",
+          cells: [
+            {
+              id: "augment",
+              type: "code",
+              source: "def augment(asset):\n    pass\n",
+            },
+          ],
+        },
+        {
+          name: "Tag from what you already know",
+          description: "Assert a fact as a tag.",
+          cells: [
+            {
+              id: "tag",
+              type: "code",
+              source: "def augment(asset):\n    asset.tag('k', 'v')\n",
+            },
+          ],
+        },
+      ]),
+    });
+  });
+
+  const component = await mount(
+    <JsonSchemaForm
+      schema={schemaWithAugmentation}
+      defaultValues={{}}
+      onSubmit={() => {}}
+      showCancel={false}
+    />,
+  );
+
+  await component.getByRole("button", { name: /augmentation/i }).click();
+  await component.getByTestId("augmentation-enabled").click();
+
+  // Source-creation style: one Starter card plus one per template, not the
+  // Templates dropdown.
+  await expect(
+    component.getByTestId("augmentation-template-cards"),
+  ).toBeVisible();
+  await expect(
+    component.getByTestId("augmentation-start-blank"),
+  ).toBeVisible();
+  await expect(
+    component.getByTestId("augmentation-template-Starter notebook"),
+  ).toBeVisible();
+});
+
+test("picking an augmentation template fills the notebook once", async ({
+  mount,
+  page,
+}) => {
+  await page.route("**/notebooks/templates**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          name: "Starter notebook",
+          description: "The minimum an augmentation needs.",
+          cells: [
+            {
+              id: "augment",
+              type: "code",
+              source: "def augment(asset):\n    pass\n",
+            },
+          ],
+        },
+      ]),
+    });
+  });
+
+  const component = await mount(
+    <JsonSchemaForm
+      schema={schemaWithAugmentation}
+      defaultValues={{}}
+      onSubmit={() => {}}
+      showCancel={false}
+    />,
+  );
+
+  await component.getByRole("button", { name: /augmentation/i }).click();
+  await component.getByTestId("augmentation-enabled").click();
+  await component
+    .getByTestId("augmentation-template-Starter notebook")
+    .click();
+
+  // The pick lands in the draft cells, and the cards step aside so they can
+  // never replace work already on the page.
+  await expect(component.getByTestId("notebook-cells")).toBeVisible();
+  await expect(
+    component.getByTestId("augmentation-template-cards"),
+  ).toHaveCount(0);
+});
+
+test("augmentation template cards fall back to start-blank when loading fails", async ({
+  mount,
+  page,
+}) => {
+  await page.route("**/notebooks/templates**", async (route) => {
+    await route.fulfill({ status: 500, body: "unavailable" });
+  });
+
+  const component = await mount(
+    <JsonSchemaForm
+      schema={schemaWithAugmentation}
+      defaultValues={{}}
+      onSubmit={() => {}}
+      showCancel={false}
+    />,
+  );
+
+  await component.getByRole("button", { name: /augmentation/i }).click();
+  await component.getByTestId("augmentation-enabled").click();
+
+  await expect(
+    component.getByTestId("augmentation-start-blank"),
+  ).toBeVisible();
+  await expect(
+    component.getByTestId("augmentation-template-cards"),
+  ).toHaveCount(0);
+});
