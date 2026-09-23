@@ -4110,29 +4110,59 @@ export class CliRunnerService {
       jobNamespace: string | null;
     },
   ) {
-    // A PENDING runner is still waiting in the queue: there is no process or
-    // Kubernetes Job to tear down, so cancelling it is only the terminal
-    // transition below.
-    if (runner.status === RunnerStatus.RUNNING) {
-      switch (runner.executionMode) {
-        case RunnerExecutionMode.KUBERNETES:
-          await this.stopKubernetesJobSafely(runnerId, runner);
-          break;
-        case RunnerExecutionMode.EXTERNAL:
-          throw new BadRequestException(
-            `Runner ${runnerId} is managed externally and cannot be stopped from the API`,
-          );
-        case RunnerExecutionMode.LOCAL:
-        default: {
-          const environment = process.env.ENVIRONMENT || 'development';
-          if (this.isKubernetesExecutionEnabled(environment)) {
-            await this.stopKubernetesJobSafely(runnerId, runner);
-            break;
-          }
-
-          this.stopLocalRunnerProcess(runnerId);
-          break;
+    // Whether the run ever started an execution. A queued run never consumed
+    // its window, so stopping it must not advance the source's last-run clock
+    // (the cron catch-up would otherwise read the window as served).
+    let started = runner.status === RunnerStatus.RUNNING;
+    if (started) {
+      await this.tearDownRunnerExecution(runnerId, runner);
+      await this.transitionRunnerToTerminalState({
+        runnerId,
+        sourceId: runner.sourceId,
+        sourceStatus: RunnerStatus.STOPPED,
+        runnerData: {
+          status: RunnerStatus.STOPPED,
+          completedAt: new Date(),
+          errorMessage: MANUAL_STOP_MESSAGE,
+        },
+      });
+    } else {
+      // A PENDING runner is still waiting in the queue: there is no process or
+      // Kubernetes Job to tear down, so cancelling it is only the terminal
+      // transition below — guarded, because the queue can promote the row
+      // between the stop's read and this write.
+      const claimed = await this.stopQueuedRunner(runnerId, runner.sourceId);
+      if (!claimed) {
+        const current = await this.prisma.runner.findUnique({
+          where: { id: runnerId },
+          select: {
+            id: true,
+            sourceId: true,
+            status: true,
+            executionMode: true,
+            jobName: true,
+            jobNamespace: true,
+          },
+        });
+        if (current && current.status === RunnerStatus.RUNNING) {
+          // Lost the race: the queued run launched after all, so stop the
+          // execution it actually started.
+          started = true;
+          await this.tearDownRunnerExecution(runnerId, current);
+          await this.transitionRunnerToTerminalState({
+            runnerId,
+            sourceId: runner.sourceId,
+            sourceStatus: RunnerStatus.STOPPED,
+            runnerData: {
+              status: RunnerStatus.STOPPED,
+              completedAt: new Date(),
+              errorMessage: MANUAL_STOP_MESSAGE,
+            },
+          });
         }
+        // Otherwise the run already reached a terminal state on its own (or
+        // vanished): the bookkeeping, scheduler kick and queue drain below
+        // are idempotent, so fall through rather than failing the stop.
       }
     }
 
@@ -4143,27 +4173,40 @@ export class CliRunnerService {
           `Failed to finalize logs for runner ${runnerId}: ${String(err)}`,
         );
       });
+
     // STOPPED, not ERROR: an operator's decision is not a failed scan. As
     // ERROR it backed the source off, counted against its failure streak and
     // showed up on every dashboard that counts errors — one namespace had a
     // source paused "after 11 consecutive failed scans" partly this way
-    // (GENESIS field report P8).
-    await this.transitionRunnerToTerminalState({
-      runnerId,
-      sourceId: runner.sourceId,
-      sourceStatus: RunnerStatus.STOPPED,
-      runnerData: {
-        status: RunnerStatus.STOPPED,
-        completedAt: new Date(),
-        errorMessage: MANUAL_STOP_MESSAGE,
-      },
-    });
+    // (GENESIS field report P8). consecutiveFailures is therefore deliberately
+    // left untouched; lastRunStatus records the decision so the source row
+    // does not keep advertising an older outcome.
+    try {
+      await this.prisma.source.update({
+        where: { id: runner.sourceId },
+        data: {
+          lastRunStatus: RunnerStatus.STOPPED,
+          lastErrorMessage: MANUAL_STOP_MESSAGE,
+          ...(started ? { lastRunAt: new Date() } : {}),
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record stop bookkeeping for runner ${runnerId}: ${String(error)}`,
+      );
+    }
 
     // Emit WebSocket event for runner stopped
     const runnerDto = await this.getRunnerStatus(runnerId);
     if (runnerDto && this.runnerEventsGateway) {
       this.runnerEventsGateway.emitRunnerUpdate(runnerDto as any);
     }
+
+    // A stop is a terminal outcome like any other: the adaptive scheduler
+    // folds it in (STOPPED reads as "no progress", never as a failure) and
+    // re-arms the source's cadence via pg-boss, instead of waiting for the
+    // one-minute tick to notice the source went idle.
+    await this.enqueueAutoScheduleKick(runner.sourceId, runnerId);
 
     // Stopping a run frees its concurrency slot, so the queue has to be
     // drained here exactly as `completeRunner` and `failRunner` do it.
@@ -4184,6 +4227,95 @@ export class CliRunnerService {
     void this.dequeueNextPendingRunner();
 
     return { message: 'Runner stopped' };
+  }
+
+  /**
+   * Terminal transition for a run that never started, conditional on it still
+   * being queued.
+   *
+   * The queue promotes PENDING rows to RUNNING concurrently
+   * (`dequeuePendingRunnerInCurrentNamespace` claims with
+   * `updateMany where status = PENDING`), so an unconditional update here
+   * could mark STOPPED a run whose execution launched a moment earlier —
+   * which would then run to completion and overwrite the stop. Resolves
+   * whether this call won the claim; the caller stops the launched execution
+   * when it did not.
+   */
+  private async stopQueuedRunner(
+    runnerId: string,
+    sourceId: string,
+  ): Promise<boolean> {
+    let claimed = false;
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.runner.updateMany({
+        where: { id: runnerId, status: RunnerStatus.PENDING },
+        data: {
+          status: RunnerStatus.STOPPED,
+          completedAt: new Date(),
+          errorMessage: MANUAL_STOP_MESSAGE,
+        },
+      });
+      if (updated.count !== 1) return;
+      claimed = true;
+
+      await tx.runnerAsset.updateMany({
+        where: {
+          runnerId,
+          status: {
+            in: [RunnerAssetStatus.PENDING, RunnerAssetStatus.PROCESSING],
+          },
+        },
+        data: {
+          status: RunnerAssetStatus.ERROR,
+          completedAt: new Date(),
+          errorMessage: 'Runner terminated before asset processing completed',
+        },
+      });
+
+      await this.transitionSourceToTerminalState(
+        tx,
+        sourceId,
+        runnerId,
+        RunnerStatus.STOPPED,
+      );
+    });
+    return claimed;
+  }
+
+  /**
+   * Tear down a RUNNING execution without touching any database state.
+   *
+   * Split out of `performStop` so a queued run that lost the promotion race
+   * stops the execution it actually started through the same path.
+   */
+  private async tearDownRunnerExecution(
+    runnerId: string,
+    runner: {
+      executionMode: RunnerExecutionMode | null;
+      jobName: string | null;
+      jobNamespace: string | null;
+    },
+  ): Promise<void> {
+    switch (runner.executionMode) {
+      case RunnerExecutionMode.KUBERNETES:
+        await this.stopKubernetesJobSafely(runnerId, runner);
+        break;
+      case RunnerExecutionMode.EXTERNAL:
+        throw new BadRequestException(
+          `Runner ${runnerId} is managed externally and cannot be stopped from the API`,
+        );
+      case RunnerExecutionMode.LOCAL:
+      default: {
+        const environment = process.env.ENVIRONMENT || 'development';
+        if (this.isKubernetesExecutionEnabled(environment)) {
+          await this.stopKubernetesJobSafely(runnerId, runner);
+          break;
+        }
+
+        this.stopLocalRunnerProcess(runnerId);
+        break;
+      }
+    }
   }
 
   async deleteRunner(runnerId: string) {
@@ -4224,6 +4356,150 @@ export class CliRunnerService {
     });
 
     return { message: 'Runner deleted' };
+  }
+
+  /**
+   * Stop many runs at once, by explicit IDs or a search filter snapshot.
+   *
+   * Sequential on purpose: each stop tears down an execution, writes the
+   * terminal transition and drains the queue, and per-run failures are
+   * reported as skipped rather than failing the whole call.
+   */
+  async bulkStopRunners(selection: {
+    ids?: string[];
+    filters?: SearchRunnersRequestDto['filters'];
+  }): Promise<{
+    stoppedCount: number;
+    ids: string[];
+    skipped: Array<{ id: string; name: string; reason: string }>;
+  }> {
+    const runners = await this.resolveRunnerSelection(selection);
+
+    const ids: string[] = [];
+    const skipped: Array<{ id: string; name: string; reason: string }> = [];
+    for (const runner of runners) {
+      try {
+        await this.stopRunner(runner.id);
+        ids.push(runner.id);
+      } catch (error) {
+        skipped.push({
+          id: runner.id,
+          name: runner.sourceName,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return { stoppedCount: ids.length, ids, skipped };
+  }
+
+  /**
+   * Delete many scan records at once. In-flight (RUNNING) runs are never
+   * deleted — stop them first — and are reported as skipped.
+   */
+  async bulkDeleteRunners(selection: {
+    ids?: string[];
+    filters?: SearchRunnersRequestDto['filters'];
+  }): Promise<{
+    deletedCount: number;
+    ids: string[];
+    skipped: Array<{ id: string; name: string; reason: string }>;
+  }> {
+    const runners = await this.resolveRunnerSelection(selection);
+
+    const ids: string[] = [];
+    const skipped: Array<{ id: string; name: string; reason: string }> = [];
+    for (const runner of runners) {
+      try {
+        await this.deleteRunner(runner.id);
+        ids.push(runner.id);
+      } catch (error) {
+        skipped.push({
+          id: runner.id,
+          name: runner.sourceName,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return { deletedCount: ids.length, ids, skipped };
+  }
+
+  /**
+   * Start a fresh run for the source of each selected scan. The old run is
+   * history — a rerun never resumes it — so the new runs simply appear as
+   * PENDING/RUNNING rows on the next table refresh.
+   */
+  async bulkRerunScans(
+    selection: {
+      ids?: string[];
+      filters?: SearchRunnersRequestDto['filters'];
+    },
+    options?: { forceFullRescan?: boolean; triggeredBy?: string },
+  ): Promise<{
+    startedCount: number;
+    ids: string[];
+    skipped: Array<{ id: string; name: string; reason: string }>;
+  }> {
+    const runners = await this.resolveRunnerSelection(selection);
+
+    const ids: string[] = [];
+    const skipped: Array<{ id: string; name: string; reason: string }> = [];
+    // Sequential on purpose, mirroring bulkRunSources: startRun claims the
+    // source and initialises log storage, and the queue absorbs the backlog.
+    for (const runner of runners) {
+      try {
+        const started = await this.startRun(
+          runner.sourceId,
+          TriggerType.MANUAL,
+          options?.triggeredBy?.trim() || 'bulk-rerun',
+          options?.forceFullRescan === true,
+        );
+        ids.push(started.id);
+      } catch (error) {
+        skipped.push({
+          id: runner.id,
+          name: runner.sourceName,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return { startedCount: ids.length, ids, skipped };
+  }
+
+  /**
+   * Resolve a bulk selection to the runs it names. Exactly one of `ids` or
+   * `filters` must be given, mirroring the sources bulk endpoints.
+   */
+  private async resolveRunnerSelection(selection: {
+    ids?: string[];
+    filters?: SearchRunnersRequestDto['filters'];
+  }): Promise<Array<{ id: string; sourceId: string; sourceName: string }>> {
+    const hasIds = Boolean(selection.ids?.length);
+    const hasFilters = selection.filters !== undefined;
+    if (hasIds === hasFilters) {
+      throw new BadRequestException(
+        'Provide either runner ids or filters, but not both.',
+      );
+    }
+
+    const runners = await this.prisma.runner.findMany({
+      where: hasIds
+        ? { id: { in: selection.ids } }
+        : this.buildSearchRunnersWhere(selection.filters),
+      select: {
+        id: true,
+        sourceId: true,
+        source: { select: { name: true } },
+      },
+    });
+
+    return runners.map((runner) => ({
+      id: runner.id,
+      sourceId: runner.sourceId,
+      sourceName: runner.source?.name ?? runner.sourceId,
+    }));
   }
 
   /**

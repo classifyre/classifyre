@@ -153,4 +153,28 @@ describe('normalizeSourceConfig sampling', () => {
       (normalized.sampling as Record<string, unknown>)?.rows_per_page,
     ).toBe(500);
   });
+
+  it('defaults CUSTOM sources to ALL so whole-universe notebooks are not windowed', () => {
+    const normalized = normalizeSourceConfig('CUSTOM', {
+      type: 'CUSTOM',
+      required: { notebook: { cells: [] } },
+      sampling: {},
+    });
+
+    expect((normalized.sampling as Record<string, unknown>)?.strategy).toBe(
+      'ALL',
+    );
+  });
+
+  it('keeps an explicit CUSTOM strategy instead of forcing ALL', () => {
+    const normalized = normalizeSourceConfig('CUSTOM', {
+      type: 'CUSTOM',
+      required: { notebook: { cells: [] } },
+      sampling: { strategy: 'AUTOMATIC' },
+    });
+
+    expect((normalized.sampling as Record<string, unknown>)?.strategy).toBe(
+      'AUTOMATIC',
+    );
+  });
 });

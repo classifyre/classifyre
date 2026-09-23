@@ -2238,7 +2238,49 @@
       "trigger": "Trigger",
       "duration": "Duration",
       "assets": "Assets",
-      "findings": "Findings"
+      "findings": "Findings",
+      "actions": "Actions"
+    },
+    "bulk": {
+      "selected": "{{count}} scan selected",
+      "selectedPlural": "{{count}} scans selected",
+      "allSelected": "All {{count}} matching scans selected",
+      "selectAll": "Select all {{count}} scans matching the current filters",
+      "deselectAll": "Deselect all scans",
+      "selectAllAria": "Select all scans matching the current filters",
+      "selectRowAria": "Select scan {{id}}",
+      "stopSelected": "Stop selected",
+      "rerunSelected": "Re-run selected",
+      "deleteSelected": "Delete selected",
+      "skipped": "{{count}} scan(s) could not be processed"
+    },
+    "bulkStop": {
+      "stopped": "Stopped {{count}} scan(s)",
+      "failed": "Failed to stop scans"
+    },
+    "bulkRerun": {
+      "started": "Queued {{count}} new scan(s)",
+      "failed": "Failed to re-run scans"
+    },
+    "bulkDelete": {
+      "title": "Delete scans?",
+      "deleteScans": "Delete scans",
+      "cannotUndo": "This action cannot be undone.",
+      "matchingFilters": "This deletes all {{count}} scans matching the current filters.",
+      "permanentTitle": "Permanent removal",
+      "permanentBody": "Deleting scans removes their run records and stored logs. Assets and findings they produced stay untouched.",
+      "deleted": "Deleted {{count}} scan(s)",
+      "failed": "Failed to delete scans"
+    },
+    "rowActions": {
+      "open": "Scan {{id}} actions",
+      "stop": "Stop scan",
+      "rerun": "Re-run scan",
+      "delete": "Delete scan",
+      "runningNoDelete": "Stop the scan before deleting it",
+      "rerunFailed": "Failed to start a new scan",
+      "deleted": "Scan deleted",
+      "deleteFailed": "Failed to delete scan"
     },
     "searchSources": "Search sources...",
     "noSourcesFound": "No sources found",
@@ -4367,6 +4409,17 @@
     "previewExtract": "Preview assets",
     "previewTitle": "First {{count}} asset(s) from extract()",
     "previewEmpty": "extract() produced no assets.",
+    "previewOpen": "Show assets",
+    "previewDialogHint": "A bounded sample of what extract() yields — the shape a scan will ingest, not persisted assets.",
+    "previewDialogEmptyHint": "The sample came back with no rows to show.",
+    "previewChars": "{{count}} chars",
+    "previewEnrichment": "{{metadata}} metadata · {{links}} links",
+    "previewColumns": {
+      "asset": "Asset",
+      "kind": "Kind",
+      "content": "Content",
+      "enrichment": "Enrichment"
+    },
     "exportPython": "Download workflow.py",
     "replayNote": "Running a cell re-runs every cell above it, because there is no persistent kernel.",
     "sideEffectWarning": "Cells above the one you run are re-executed. Keep anything that sends, writes or deletes out of a notebook.",
@@ -4453,7 +4506,9 @@
     "intro": "A Python notebook that enriches every asset this source extracts — extra metadata, tags, links and lineage edges. Additive only: it cannot change what the connector extracted, drop an asset, or fail a scan.",
     "runSample": "Run sample",
     "saveSourceFirst": "Save this source once to start writing its augmentation notebook.",
-    "sectionTitle": "Augmentation"
+    "sectionTitle": "Augmentation",
+    "startBlankDescription": "Begin with an empty notebook and write augment() from scratch.",
+    "templateFallbackDescription": "A worked augmentation notebook."
   },
   "review": {
     "title": "Duplicate review",

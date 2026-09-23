@@ -19,6 +19,10 @@ import type { CellStatus } from "./code-cell";
 import type { CellOutputValue } from "./cell-output";
 import type { NotebookCell } from "@/lib/notebook-cells";
 import {
+  PreviewAssetsDialog,
+  type PreviewAsset,
+} from "./preview-assets-dialog";
+import {
   awaitExecution,
   summarizeExecution,
   useNotebookExecution,
@@ -34,6 +38,24 @@ export type NotebookRunMode =
   | "test_connection"
   | "preview_extract"
   | "preview_augment";
+
+/**
+ * What a run produced, for callers that need to react to the result — the
+ * edit page opens the preview dialog from this instead of leaving the author
+ * to find the sample half a page below the toolbar that started it.
+ */
+export interface NotebookRunResult {
+  status: string;
+  mode: string;
+  assets?: unknown[] | null;
+  failedCellId?: string | null;
+  error?: {
+    type?: string;
+    message?: string;
+    traceback?: string[];
+    cellId?: string | null;
+  } | null;
+}
 
 export interface NotebookEditorProps {
   sourceId: string;
@@ -81,7 +103,7 @@ const AUTOSAVE_DELAY_MS = 1500;
 export interface NotebookEditorHandle {
   getCells: () => NotebookCell[];
   setCells: (cells: NotebookCell[]) => void;
-  /** Resolves once the execution reaches a terminal state. */
+  /** Resolves with the terminal execution, or null when the run never started. */
   run: (
     mode: NotebookRunMode,
     targetCellId?: string,
@@ -307,7 +329,12 @@ export function NotebookEditor({
 
   const contract = execution?.outputs?.contract;
   const verdict = execution?.outputs?.result;
-  const preview = execution?.outputs?.assets;
+  const preview = (execution?.outputs?.assets ?? null) as PreviewAsset[] | null;
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  // A new execution replaces the preview — opening the dialog is the author's
+  // explicit act, so only a fresh SUCCESS with assets arms the button.
+  const previewReady =
+    execution?.status === "SUCCESS" && (preview?.length ?? 0) > 0;
 
   return (
     <div className="space-y-4" data-testid="notebook-editor">
@@ -467,25 +494,30 @@ export function NotebookEditor({
         </Card>
       )}
 
-      {preview && (
+      {previewReady && (
         <Card>
-          <CardContent className="space-y-2 pt-6">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
             <p className="text-sm font-medium">
-              {t("notebook.previewTitle", { count: preview.length })}
+              {t("notebook.previewTitle", { count: preview!.length })}
             </p>
-            {preview.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {t("notebook.previewEmpty")}
-              </p>
-            ) : (
-              <div className="max-h-72 overflow-auto rounded-md border">
-                <pre className="p-3 font-mono text-xs">
-                  {JSON.stringify(preview, null, 2)}
-                </pre>
-              </div>
-            )}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setPreviewOpen(true)}
+              data-testid="notebook-preview-open"
+            >
+              {t("notebook.previewOpen")}
+            </Button>
           </CardContent>
         </Card>
+      )}
+      {previewReady && (
+        <PreviewAssetsDialog
+          open={previewOpen}
+          assets={preview!}
+          onOpenChange={setPreviewOpen}
+        />
       )}
 
       <CellList

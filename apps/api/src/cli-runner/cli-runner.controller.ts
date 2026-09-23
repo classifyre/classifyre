@@ -55,6 +55,14 @@ import {
   RunnerAssetQueryResponseDto,
 } from './dto';
 import { RunnerAssetQueryService } from './runner-asset-query.service';
+import {
+  BulkStopRunnersDto,
+  BulkDeleteRunnersDto,
+  BulkRerunScansDto,
+  BulkStopRunnersResponseDto,
+  BulkDeleteRunnersResponseDto,
+  BulkRerunScansResponseDto,
+} from '../dto/bulk-runners.dto';
 import { SearchRunnersRequestDto } from '../dto/search-runners-request.dto';
 import { SearchRunnersResponseDto } from '../dto/search-runners-response.dto';
 import { SearchRunnersChartsRequestDto } from '../dto/search-runners-charts-request.dto';
@@ -119,7 +127,15 @@ export class CliRunnerController {
 
   @AllowWhenPaused()
   @Patch('runners/:runnerId/stop')
-  @ApiOperation({ summary: 'Stop running CLI process' })
+  @ApiOperation({
+    summary: 'Stop a running scan or cancel a queued one',
+    description:
+      'A RUNNING scan is torn down and a PENDING (queued) one is cancelled outright. ' +
+      'Both end STOPPED with "Manually stopped": the source is released, its ' +
+      'last-run bookkeeping records the decision (a queued run never consumed ' +
+      'its window, so its last-run clock is left alone), the adaptive ' +
+      'scheduler is kicked via pg-boss, and the next queued scan is promoted.',
+  })
   @ApiResponse({ status: 200, type: StopRunnerResponseDto })
   async stopRunner(@Param('runnerId') runnerId: string) {
     return this.cliRunnerService.stopRunner(runnerId);
@@ -134,6 +150,74 @@ export class CliRunnerController {
   @ApiResponse({ status: 200, type: DeleteRunnerResponseDto })
   async deleteRunner(@Param('runnerId') runnerId: string) {
     return this.cliRunnerService.deleteRunner(runnerId);
+  }
+
+  @AllowWhenPaused()
+  @Post('runners/bulk-stop')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Stop many scans at once',
+    description:
+      'Stops explicit runner IDs or every runner matching a search filter snapshot. ' +
+      'PENDING runs are cancelled outright, RUNNING ones are torn down; all end STOPPED. ' +
+      'Runs that cannot be stopped (already terminal, managed externally) are reported as skipped.',
+  })
+  @ApiBody({ type: BulkStopRunnersDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Runs stopped',
+    type: BulkStopRunnersResponseDto,
+  })
+  async bulkStopRunners(
+    @Body() dto: BulkStopRunnersDto,
+  ): Promise<BulkStopRunnersResponseDto> {
+    return this.cliRunnerService.bulkStopRunners(dto);
+  }
+
+  @AllowWhenPaused()
+  @Post('runners/bulk-delete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Delete many scan records at once',
+    description:
+      'Deletes explicit runner IDs or every runner matching a search filter snapshot, ' +
+      'including their stored logs. Runs still in flight are never deleted and are reported as skipped.',
+  })
+  @ApiBody({ type: BulkDeleteRunnersDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Runs deleted',
+    type: BulkDeleteRunnersResponseDto,
+  })
+  async bulkDeleteRunners(
+    @Body() dto: BulkDeleteRunnersDto,
+  ): Promise<BulkDeleteRunnersResponseDto> {
+    return this.cliRunnerService.bulkDeleteRunners(dto);
+  }
+
+  @BlockWhenPaused()
+  @Post('runners/bulk-rerun')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Start a fresh scan for many runs at once',
+    description:
+      'Starts a new MANUAL run for the source of each selected runner — explicit IDs or every ' +
+      'runner matching a search filter snapshot. The old runs are history; the new ones queue ' +
+      'as PENDING when the concurrency limit is reached. Sources already in flight are reported as skipped.',
+  })
+  @ApiBody({ type: BulkRerunScansDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Runs queued',
+    type: BulkRerunScansResponseDto,
+  })
+  async bulkRerunScans(
+    @Body() dto: BulkRerunScansDto,
+  ): Promise<BulkRerunScansResponseDto> {
+    return this.cliRunnerService.bulkRerunScans(dto, {
+      forceFullRescan: dto.forceFullRescan,
+      triggeredBy: dto.triggeredBy,
+    });
   }
 
   @UseGuards(CliBackpressureGuard)
