@@ -13,7 +13,7 @@
     },
     {
       "name": "azure-storage-blob",
-      "version": "12.30.2",
+      "version": "12.30.3",
       "modules": [
         "azure.storage.blob"
       ],
@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.99",
+      "version": "1.43.100",
       "modules": [
         "boto3"
       ],
@@ -84,7 +84,7 @@
     },
     {
       "name": "dropbox",
-      "version": "12.2.1",
+      "version": "12.2.2",
       "modules": [
         "dropbox"
       ],
@@ -181,7 +181,7 @@
     },
     {
       "name": "litellm",
-      "version": "1.102.0",
+      "version": "1.102.1",
       "modules": [
         "litellm"
       ],
@@ -252,7 +252,7 @@
     },
     {
       "name": "pillow-heif",
-      "version": "1.7.0",
+      "version": "1.8.0",
       "modules": [
         "pillow_heif"
       ],
@@ -412,7 +412,7 @@
     },
     {
       "name": "sqlglot",
-      "version": "30.18.0",
+      "version": "30.19.0",
       "modules": [
         "sqlglot"
       ],
