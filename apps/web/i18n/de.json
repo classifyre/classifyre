@@ -4409,6 +4409,17 @@
     "previewExtract": "Assets vorschauen",
     "previewTitle": "Erste {{count}} Asset(s) aus extract()",
     "previewEmpty": "extract() hat keine Assets erzeugt.",
+    "previewOpen": "Assets anzeigen",
+    "previewDialogHint": "Eine begrenzte Stichprobe dessen, was extract() liefert — die Form, die ein Scan übernehmen wird, keine gespeicherten Assets.",
+    "previewDialogEmptyHint": "Die Stichprobe enthielt keine anzeigbaren Zeilen.",
+    "previewChars": "{{count}} Zeichen",
+    "previewEnrichment": "{{metadata}} Metadaten · {{links}} Links",
+    "previewColumns": {
+      "asset": "Asset",
+      "kind": "Art",
+      "content": "Inhalt",
+      "enrichment": "Anreicherung"
+    },
     "exportPython": "workflow.py herunterladen",
     "replayNote": "Beim Ausführen einer Zelle werden alle darüberliegenden Zellen erneut ausgeführt, da es keinen dauerhaften Kernel gibt.",
     "sideEffectWarning": "Zellen oberhalb der ausgeführten Zelle werden erneut ausgeführt. Alles, was sendet, schreibt oder löscht, gehört nicht in ein Notebook.",
@@ -4495,7 +4506,9 @@
     "intro": "Ein Python-Notebook, das jedes Asset dieser Quelle anreichert — zusätzliche Metadaten, Tags, Links und Herkunftskanten. Nur hinzufügend: Es kann weder ändern, was der Konnektor extrahiert hat, noch ein Asset verwerfen oder einen Scan fehlschlagen lassen.",
     "runSample": "Stichprobe ausführen",
     "saveSourceFirst": "Speichern Sie diese Quelle einmal, um mit dem Augmentation-Notebook zu beginnen.",
-    "sectionTitle": "Augmentierung"
+    "sectionTitle": "Augmentierung",
+    "startBlankDescription": "Mit einem leeren Notebook beginnen und augment() von Grund auf schreiben.",
+    "templateFallbackDescription": "Ein ausgearbeitetes Augmentation-Notebook."
   },
   "review": {
     "title": "Dublettenprüfung",
