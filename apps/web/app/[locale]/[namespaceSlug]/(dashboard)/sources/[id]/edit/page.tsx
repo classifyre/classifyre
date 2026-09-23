@@ -62,13 +62,13 @@ import {
   UploadedFiles,
   type UploadedFileMetadata,
 } from "@/components/uploaded-files";
-import {
-  deleteSourceFile,
-  listSourceFiles,
-  uploadSourceFile,
-} from "@/lib/source-files-api";
-import { Eye, FlaskConical, Play } from "lucide-react";
+import { deleteSourceFile, listSourceFiles, uploadSourceFile } from "@/lib/source-files-api";
+import { Eye, Play } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
+import {
+  PreviewAssetsDialog,
+  type PreviewAsset,
+} from "@/components/notebook/preview-assets-dialog";
 
 const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
   detectors
@@ -733,6 +733,7 @@ export default function EditSourcePage() {
           if (!didPersist) return;
           toast.success(t("sources.updated", { name: source.name }));
         }}
+        onSilentSave={(data) => persistSource(data)}
         onTestConfig={handleTestConfig}
         onSaveAndRun={handleSaveAndRun}
         onDetectorsChange={setDetectors}
@@ -774,6 +775,9 @@ function SourceEditStepperContent({
   isSavingConfig,
   isTestingConfig,
   onSave,
+  /** Persist without the success toast — runs save first, but the author asked
+   * for a run, not a save, and a "saved" toast on every cell run is noise. */
+  onSilentSave,
   onTestConfig,
   onSaveAndRun,
   onDetectorsChange,
@@ -798,6 +802,7 @@ function SourceEditStepperContent({
   isSavingConfig: boolean;
   isTestingConfig: boolean;
   onSave: (data: Record<string, unknown>) => void | Promise<void>;
+  onSilentSave: (data: Record<string, unknown>) => Promise<boolean | undefined>;
   onTestConfig: (data: Record<string, unknown>) => void;
   onSaveAndRun: (data: Record<string, unknown>) => void;
   onDetectorsChange: (detectors: DetectorConfigInput[]) => void;
@@ -823,6 +828,13 @@ function SourceEditStepperContent({
   const customSectionsRef = useRef(new Map<SourceStepId, HTMLElement>());
   const [activeStepId, setActiveStepId] = useState<SourceStepId>("config");
   const [notebookBusy, setNotebookBusy] = useState(false);
+  // The last extract() sample, shown in a dialog rather than inline: the
+  // toolbar that starts a preview sits at the bottom of a long page, and a
+  // result rendered under the notebook scrolled past unseen.
+  const [previewAssets, setPreviewAssets] = useState<PreviewAsset[] | null>(
+    null,
+  );
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [scanSummary, setScanSummary] = useState({
     visibleCount: 0,
     enabledCount: 0,
@@ -903,16 +915,33 @@ function SourceEditStepperContent({
    * Every way of running goes through here — the toolbar's Run all and Preview,
    * and a cell's own play button — because an execution names a stored revision
    * of a stored source. Running before saving would execute the previous
-   * version, which is worse than refusing.
+   * version, which is worse than refusing. The save is silent on purpose: the
+   * author asked for a run, not a save, and a "saved" toast on every cell run
+   * is how the toolbar trained everyone to ignore toasts.
    */
   const saveThenRun = (
-    mode: "cell" | "all" | "test_connection" | "preview_extract" | "preview_augment",
+    mode: "cell" | "all" | "test_connection" | "preview_extract",
     targetCellId?: string,
     scope?: "connector" | "augmentation",
   ) =>
     withValidFormData(async (data) => {
-      await onSave(data);
-      await sourceFormRef.current?.runNotebook(mode, targetCellId, scope);
+      const didPersist = await onSilentSave(data);
+      if (!didPersist) return;
+      const result = await sourceFormRef.current?.runNotebook(
+        mode,
+        targetCellId,
+        scope,
+      );
+      if (mode === "preview_extract" && result) {
+        if (result.status === "SUCCESS" && Array.isArray(result.outputs?.assets)) {
+          setPreviewAssets(result.outputs.assets as PreviewAsset[]);
+          setPreviewOpen(true);
+        } else if (result.error) {
+          toast.error(
+            `${result.error.type ?? "Error"}: ${result.error.message ?? t("notebook.failed")}`,
+          );
+        }
+      }
     });
 
   return (
@@ -1026,46 +1055,44 @@ function SourceEditStepperContent({
             disabled={!hasRequiredFiles}
             className="mt-0"
             extraActions={
-              <>
-                {isCustom ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void saveThenRun("all")}
-                      disabled={isSavingConfig || isTestingConfig || notebookBusy}
-                      data-testid="notebook-run-all"
-                    >
-                      <Play className="mr-2 h-4 w-4" />
-                      {t("notebook.runAll")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void saveThenRun("preview_extract")}
-                      disabled={isSavingConfig || isTestingConfig || notebookBusy}
-                      data-testid="notebook-preview"
-                    >
-                      <Eye className="mr-2 h-4 w-4" />
-                      {t("notebook.previewExtract")}
-                    </Button>
-                  </>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    void saveThenRun("preview_augment", undefined, "augmentation")
-                  }
-                  disabled={isSavingConfig || isTestingConfig || notebookBusy}
-                  data-testid="augmentation-run-sample"
-                >
-                  <FlaskConical className="mr-2 h-4 w-4" />
-                  {t("augmentation.runSample")}
-                </Button>
-              </>
+              // CUSTOM only: Run all replays every cell; Preview assets replays
+              // extract() over a bounded sample and shows it as a dialog.
+              // Augmentation has no toolbar action — it runs as part of a scan,
+              // and a sample run over random assets answered nothing its author
+              // could act on.
+              isCustom ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void saveThenRun("all")}
+                    disabled={isSavingConfig || isTestingConfig || notebookBusy}
+                    data-testid="notebook-run-all"
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    {t("notebook.runAll")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void saveThenRun("preview_extract")}
+                    disabled={isSavingConfig || isTestingConfig || notebookBusy}
+                    data-testid="notebook-preview"
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    {t("notebook.previewExtract")}
+                  </Button>
+                </>
+              ) : null
             }
           />
+          {isCustom && previewAssets && (
+            <PreviewAssetsDialog
+              open={previewOpen}
+              assets={previewAssets}
+              onOpenChange={setPreviewOpen}
+            />
+          )}
         </div>
 
         {/* Right sticky sidebar — desktop only */}
