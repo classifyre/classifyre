@@ -58,7 +58,25 @@ async function suggestionsFor(
         { timeout: READY },
       )
       .toBe(true);
-    await page.keyboard.type(text, { delay: 40 });
+    // Under load Monaco can drop a keystroke even with focus taken (CI saw
+    // "ctx.strat" land as "cx.strat"), and the drop lands mid-string -- so
+    // retype the whole text until it reads back, rather than failing the test
+    // on a lost key.
+    await expect
+      .poll(
+        async () => {
+          const current = await component
+            .getByTestId("cell-sources")
+            .textContent();
+          if (!current?.includes(text)) {
+            await page.keyboard.press("ControlOrMeta+a");
+            await page.keyboard.type(text, { delay: 40 });
+          }
+          return current;
+        },
+        { timeout: READY },
+      )
+      .toContain(text);
     // Auto-closing brackets mean the cell holds `Asset()` once `Asset(` is
     // typed, so this is what was typed being present, not the whole line.
     await expect(component.getByTestId("cell-sources")).toContainText(text, {

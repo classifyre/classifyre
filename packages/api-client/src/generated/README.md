@@ -297,6 +297,9 @@ All URIs are relative to *http://localhost*
 *NotificationsApi* | [**notificationsControllerMarkAllRead**](docs/NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all notifications as read
 *NotificationsApi* | [**notificationsControllerMarkRead**](docs/NotificationsApi.md#notificationscontrollermarkread) | **PATCH** /notifications/{id}/read | Mark a notification as read
 *NotificationsApi* | [**notificationsControllerSetImportant**](docs/NotificationsApi.md#notificationscontrollersetimportant) | **PATCH** /notifications/{id}/important | Set notification importance
+*RunnersApi* | [**cliRunnerControllerBulkDeleteRunners**](docs/RunnersApi.md#clirunnercontrollerbulkdeleterunners) | **POST** /runners/bulk-delete | Delete many scan records at once
+*RunnersApi* | [**cliRunnerControllerBulkRerunScans**](docs/RunnersApi.md#clirunnercontrollerbulkrerunscans) | **POST** /runners/bulk-rerun | Start a fresh scan for many runs at once
+*RunnersApi* | [**cliRunnerControllerBulkStopRunners**](docs/RunnersApi.md#clirunnercontrollerbulkstoprunners) | **POST** /runners/bulk-stop | Stop many scans at once
 *RunnersApi* | [**cliRunnerControllerCreateExternalRunner**](docs/RunnersApi.md#clirunnercontrollercreateexternalrunner) | **POST** /sources/{sourceId}/runners/external | Create runner record for external CLI REST ingestion
 *RunnersApi* | [**cliRunnerControllerDeleteRunner**](docs/RunnersApi.md#clirunnercontrollerdeleterunner) | **DELETE** /runners/{runnerId} | Delete runner metadata and cleanup filesystem logs for this runner
 *RunnersApi* | [**cliRunnerControllerGetRunner**](docs/RunnersApi.md#clirunnercontrollergetrunner) | **GET** /runners/{runnerId} | Get runner status and details
@@ -308,7 +311,7 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**cliRunnerControllerRegisterDiscoveredAssets**](docs/RunnersApi.md#clirunnercontrollerregisterdiscoveredassets) | **POST** /runners/{runnerId}/assets/discover | Register discovered asset hashes for a runner
 *RunnersApi* | [**cliRunnerControllerSearchRunnerLogs**](docs/RunnersApi.md#clirunnercontrollersearchrunnerlogs) | **POST** /runners/{runnerId}/logs | Search runner logs with server-side filtering, full-text search, and sort
 *RunnersApi* | [**cliRunnerControllerStartRunner**](docs/RunnersApi.md#clirunnercontrollerstartrunner) | **POST** /sources/{sourceId}/run | Start CLI runner for source
-*RunnersApi* | [**cliRunnerControllerStopRunner**](docs/RunnersApi.md#clirunnercontrollerstoprunner) | **PATCH** /runners/{runnerId}/stop | Stop running CLI process
+*RunnersApi* | [**cliRunnerControllerStopRunner**](docs/RunnersApi.md#clirunnercontrollerstoprunner) | **PATCH** /runners/{runnerId}/stop | Stop a running scan or cancel a queued one
 *RunnersApi* | [**cliRunnerControllerUpdateRunnerAssetStatuses**](docs/RunnersApi.md#clirunnercontrollerupdaterunnerassetstatuses) | **PATCH** /runners/{runnerId}/assets/status | Update processing status of runner assets
 *RunnersApi* | [**cliRunnerControllerUpdateRunnerStatus**](docs/RunnersApi.md#clirunnercontrollerupdaterunnerstatusoperation) | **PATCH** /runners/{runnerId}/status | Update runner status
 *RunnersApi* | [**searchRunnersControllerExportRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollerexportrunnerassets) | **GET** /search/runner-assets/export | Export runner assets as CSV
@@ -412,12 +415,19 @@ All URIs are relative to *http://localhost*
 - [BoilerplateClusterDto](docs/BoilerplateClusterDto.md)
 - [BriefMemoryEntryDto](docs/BriefMemoryEntryDto.md)
 - [BriefSetupItemDto](docs/BriefSetupItemDto.md)
+- [BulkDeleteRunnersDto](docs/BulkDeleteRunnersDto.md)
+- [BulkDeleteRunnersResponseDto](docs/BulkDeleteRunnersResponseDto.md)
 - [BulkIngestAssetsDto](docs/BulkIngestAssetsDto.md)
 - [BulkIngestEdgesDto](docs/BulkIngestEdgesDto.md)
 - [BulkIngestEdgesResponseDto](docs/BulkIngestEdgesResponseDto.md)
+- [BulkRerunScansDto](docs/BulkRerunScansDto.md)
+- [BulkRerunScansResponseDto](docs/BulkRerunScansResponseDto.md)
 - [BulkRunSourcesDto](docs/BulkRunSourcesDto.md)
 - [BulkRunSourcesResponseDto](docs/BulkRunSourcesResponseDto.md)
 - [BulkRunSourcesSkippedDto](docs/BulkRunSourcesSkippedDto.md)
+- [BulkRunnersSkippedDto](docs/BulkRunnersSkippedDto.md)
+- [BulkStopRunnersDto](docs/BulkStopRunnersDto.md)
+- [BulkStopRunnersResponseDto](docs/BulkStopRunnersResponseDto.md)
 - [BulkUpdateFindingsDto](docs/BulkUpdateFindingsDto.md)
 - [BulkUpdateFindingsResponseDto](docs/BulkUpdateFindingsResponseDto.md)
 - [BulkUpdateGlossaryFiltersDto](docs/BulkUpdateGlossaryFiltersDto.md)

@@ -31,6 +31,8 @@ import { PackageTable } from "./package-table";
 import { AvailablePackages } from "./available-packages";
 import { LocalFolders } from "./local-folders";
 import { TemplatePicker } from "./template-picker";
+import { AugmentationTemplateCards } from "./augmentation-template-cards";
+import { appendCells } from "@/lib/notebook-cells";
 
 /**
  * The augmentation section of a source form: an optional Python notebook that
@@ -145,12 +147,46 @@ export function AugmentationConfig({
   const { t } = useTranslation();
   const draft = React.useMemo(() => configToDraft(value), [value]);
   const editorHandleRef = React.useRef<NotebookEditorHandle | null>(null);
+  // Dismissed once per enable: picking a template (or Start blank) fills the
+  // notebook, and the cards must not come back on the next keystroke. Kept
+  // outside the form value — it is UI state, not something a save should
+  // persist, and re-enabling later shows the cards again.
+  const [templatesDismissed, setTemplatesDismissed] = React.useState(false);
+  const showTemplateCards =
+    draft.enabled && !templatesDismissed && draft.cells.length === 0;
 
   const update = React.useCallback(
     (patch: Partial<AugmentationDraft>) => {
       onChange(draftToConfig({ ...draft, ...patch }));
     },
     [draft, onChange],
+  );
+
+  // A toggle-off is a fresh start next time: an author who disables and
+  // re-enables gets the template cards again rather than a stale dismissal.
+  const wasEnabledRef = React.useRef(draft.enabled);
+  React.useEffect(() => {
+    if (wasEnabledRef.current && !draft.enabled) setTemplatesDismissed(false);
+    wasEnabledRef.current = draft.enabled;
+  }, [draft.enabled]);
+
+  // The editor owns the cells once mounted (autosave, revisions) and does not
+  // re-read its initial cells — so a template insert goes through its handle
+  // when it exists (the live path, which also autosaves), and only falls back
+  // to the form value before the editor mounts. Appended via appendCells for
+  // the id-collision renames the picker path relies on.
+  const pickTemplate = React.useCallback(
+    (cells: NotebookCell[]) => {
+      if (editorHandleRef.current) {
+        editorHandleRef.current.setCells(
+          appendCells(editorHandleRef.current.getCells(), cells),
+        );
+      } else {
+        update({ cells: appendCells(draft.cells, cells) });
+      }
+      setTemplatesDismissed(true);
+    },
+    [draft.cells, update],
   );
 
   React.useImperativeHandle(
@@ -202,6 +238,13 @@ export function AugmentationConfig({
 
       {draft.enabled && (
         <div className="space-y-4">
+          {showTemplateCards ? (
+            <AugmentationTemplateCards
+              disabled={disabled}
+              onStartBlank={() => setTemplatesDismissed(true)}
+              onPick={pickTemplate}
+            />
+          ) : null}
           {sourceId ? (
             <NotebookEditor
               sourceId={sourceId}
@@ -225,6 +268,7 @@ export function AugmentationConfig({
                 cells={draft.cells}
                 onChange={(cells) => update({ cells })}
                 disabled={disabled}
+                scope="augmentation"
               />
             </div>
           )}
@@ -277,7 +321,7 @@ export function AugmentationConfig({
           <TemplatePicker
             scope="augmentation"
             disabled={disabled}
-            onInsert={(cells) => update({ cells: [...draft.cells, ...cells] })}
+            onInsert={pickTemplate}
           />
         </div>
       )}

@@ -464,7 +464,11 @@ export default function RunnerDetailPage() {
                 ? t("scans.runningLabel")
                 : t("scans.runAgain")}
           </Button>
-          {isRunnerStatusRunning(runner.status) && (
+          {/* A queued scan has no process yet, but stopping it is the same
+              operator decision: the API cancels it outright, releases the
+              source and re-arms the scheduler. */}
+          {(isRunnerStatusRunning(runner.status) ||
+            runner.status === "PENDING") && (
             <Button
               variant="destructive"
               size="sm"
