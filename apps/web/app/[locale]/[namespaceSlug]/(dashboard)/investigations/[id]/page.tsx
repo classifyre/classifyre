@@ -3,7 +3,8 @@
 import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { useRouteId } from "@/lib/use-route-id";
 import {
   ArrowRight,
@@ -11,7 +12,7 @@ import {
   CheckCircle2,
   Compass,
   DownloadCloud,
-  Lightbulb,
+  FlaskConical,
   Link2,
   Loader2,
   Paperclip,
@@ -88,6 +89,13 @@ const CaseGraphView = dynamic(
   { ssr: false },
 );
 
+// The case board (docs/architecture/CASE_BOARD_PRD.md): client-only, like the
+// graph it replaces — React Flow measures the DOM and ELK runs in a worker.
+const CaseBoard = dynamic(
+  () => import("@/components/case-board/case-board").then((m) => m.CaseBoard),
+  { ssr: false },
+);
+
 // The graph is the case's front door — every other view is a drill-down.
 type TabValue =
   | "graph"
@@ -109,12 +117,35 @@ const HYP_PALETTE = [
 export default function CaseWorkspacePage() {
   return (
     <React.Suspense>
-      <CaseWorkspaceInner />
+      <CaseWorkspaceSwitch />
     </React.Suspense>
   );
 }
 
-function CaseWorkspaceInner() {
+/**
+ * Board or legacy workspace, per the workspace's `caseBoardEnabled` switch
+ * (Settings → General). `?board=1` / `?board=0` overrides it for one visit, so
+ * the board can be tried without flipping it for everyone.
+ */
+function CaseWorkspaceSwitch() {
+  const caseId = useRouteId();
+  const searchParams = useSearchParams();
+  const { settings, loading } = useInstanceSettings();
+  const override = searchParams?.get("board");
+  const useBoard = override === "1" ? true : override === "0" ? false : settings.caseBoardEnabled;
+  if (loading && override === null) {
+    return (
+      <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
+        <Loader2 className="h-4 w-4 animate-spin" />
+      </div>
+    );
+  }
+  if (useBoard) return <CaseBoard caseId={caseId} />;
+  return <LegacyCaseWorkspace />;
+}
+
+/** The pre-board case workspace (graph + tabs). Removed once the board is the default (PRD Phase 7). */
+function LegacyCaseWorkspace() {
   const router = useRouter();
   const { t } = useTranslation();
   const caseId = useRouteId();
@@ -590,7 +621,7 @@ function CaseWorkspaceInner() {
               )}
             </TabsTrigger>
             <TabsTrigger value="threads">
-              <Lightbulb className="h-3.5 w-3.5" /> {t("investigations.caseDetail.tabThreads")} ({threads.length})
+              <FlaskConical className="h-3.5 w-3.5" /> {t("investigations.caseDetail.tabThreads")} ({threads.length})
             </TabsTrigger>
             <TabsTrigger value="timeline">{t("investigations.caseDetail.tabTimeline")}</TabsTrigger>
             <TabsTrigger value="overview">{t("investigations.caseDetail.tabCaseFile")}</TabsTrigger>

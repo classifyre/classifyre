@@ -42,6 +42,7 @@ import { CleanupCard } from "@/components/maintenance/cleanup-card";
 import { FeatureSwitchesCard } from "@/components/maintenance/feature-switches-card";
 import { PauseWorkspaceCard } from "@/components/namespace/pause-workspace-card";
 import { WorkerQueuesCard } from "@/components/worker-queues-card";
+import { CaseBoardSettingsCard } from "@/components/case-board/case-board-settings-card";
 
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -378,6 +379,8 @@ export default function SettingsPage() {
               </section>
             </CardContent>
           </Card>
+
+          <CaseBoardSettingsCard />
 
           <HuggingFaceSettingsCard />
         </TabsContent>

@@ -27,13 +27,16 @@
     "@workspace/api-client": "workspace:*",
     "@workspace/schemas": "workspace:*",
     "@workspace/ui": "workspace:*",
+    "@xyflow/react": "^12.12.0",
     "ajv": "^8.18.0",
     "d3-force": "^3.0.0",
     "date-fns": "^4.1.0",
     "dompurify": "^3.4.14",
     "echarts": "^6.0.0",
+    "elkjs": "^0.12.0",
     "graphology": "^0.26.0",
     "graphology-communities-louvain": "^2.0.2",
+    "html-to-image": "^1.11.13",
     "lucide-react": "^1.7.0",
     "monaco-editor": "^0.56.0",
     "next": "16.2.10",
@@ -48,7 +51,8 @@
     "simple-icons": "^16.28.0",
     "socket.io-client": "^4.8.3",
     "sonner": "^2.0.7",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@playwright/experimental-ct-react": "^1.60.0",

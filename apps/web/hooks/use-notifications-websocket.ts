@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { useNamespace } from "@/components/namespace-provider";
 
-const getWebSocketUrl = () => {
+export const getWebSocketUrl = () => {
   if (process.env.NEXT_PUBLIC_WS_URL) {
     return process.env.NEXT_PUBLIC_WS_URL;
   }

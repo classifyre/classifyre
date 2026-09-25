@@ -541,6 +541,49 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
     keys: ['id'],
     idRefs: ['id', 'caseId'],
   },
+  // Case board: view state and board-native objects. After every table whose
+  // ids they reference (evidence, threads), so import remaps `refId` onto
+  // rows that already landed. `refId` points at case_evidence or case_threads
+  // depending on `kind`; both are remapped by the same deterministic function.
+  {
+    model: 'caseBoard',
+    scope: 'investigations',
+    order: 620,
+    keys: ['id'],
+    idRefs: ['id', 'caseId'],
+  },
+  {
+    model: 'caseBoardItem',
+    scope: 'investigations',
+    order: 630,
+    keys: ['id'],
+    // `content` may hold undo tombstones with nested case row ids. They are
+    // server-private undo state; a stale one only means an undo that no
+    // longer applies after import, never a dangling reference in the data.
+    idRefs: ['id', 'boardId', 'refId', 'parentId'],
+  },
+  {
+    model: 'caseBoardLink',
+    scope: 'investigations',
+    order: 640,
+    keys: ['id'],
+    idRefs: [
+      'id',
+      'boardId',
+      'sourceItemId',
+      'targetItemId',
+      'sourceFindingId',
+      'targetFindingId',
+      'promotedEdgeId',
+    ],
+  },
+  {
+    model: 'caseBoardSnapshot',
+    scope: 'investigations',
+    order: 650,
+    keys: ['id'],
+    idRefs: ['id', 'boardId'],
+  },
 
   // ── AI harness ────────────────────────────────────────────────────────────
   {

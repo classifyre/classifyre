@@ -182,6 +182,12 @@ export interface InstanceSettingsResponseDto {
      */
     autoScheduleEnabled: boolean;
     /**
+     * When true, cases open on the case board (the investigation canvas); when false, on the legacy case graph.
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    caseBoardEnabled: boolean;
+    /**
      * Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
@@ -266,6 +272,7 @@ export function instanceOfInstanceSettingsResponseDto(value: object): value is I
     if (!('harnessMaxRecalledMemories' in value) || value['harnessMaxRecalledMemories'] === undefined) return false;
     if (!('harnessDreamIntervalDays' in value) || value['harnessDreamIntervalDays'] === undefined) return false;
     if (!('autoScheduleEnabled' in value) || value['autoScheduleEnabled'] === undefined) return false;
+    if (!('caseBoardEnabled' in value) || value['caseBoardEnabled'] === undefined) return false;
     if (!('demoMode' in value) || value['demoMode'] === undefined) return false;
     if (!('hfTokenSet' in value) || value['hfTokenSet'] === undefined) return false;
     if (!('hfTokenInstanceSet' in value) || value['hfTokenInstanceSet'] === undefined) return false;
@@ -311,6 +318,7 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'harnessMaxRecalledMemories': json['harnessMaxRecalledMemories'],
         'harnessDreamIntervalDays': json['harnessDreamIntervalDays'],
         'autoScheduleEnabled': json['autoScheduleEnabled'],
+        'caseBoardEnabled': json['caseBoardEnabled'],
         'demoMode': json['demoMode'],
         'hfTokenSet': json['hfTokenSet'],
         'hfTokenInstanceSet': json['hfTokenInstanceSet'],
@@ -357,6 +365,7 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         'harnessMaxRecalledMemories': value['harnessMaxRecalledMemories'],
         'harnessDreamIntervalDays': value['harnessDreamIntervalDays'],
         'autoScheduleEnabled': value['autoScheduleEnabled'],
+        'caseBoardEnabled': value['caseBoardEnabled'],
         'demoMode': value['demoMode'],
         'hfTokenSet': value['hfTokenSet'],
         'hfTokenInstanceSet': value['hfTokenInstanceSet'],

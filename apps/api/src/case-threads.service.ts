@@ -30,6 +30,8 @@ type ThreadRow = Prisma.CaseThreadGetPayload<{
   include: { support: true; entries: true };
 }>;
 
+type Db = Prisma.TransactionClient;
+
 @Injectable()
 export class CaseThreadsService {
   constructor(
@@ -51,12 +53,18 @@ export class CaseThreadsService {
     return this.mapMany(rows);
   }
 
+  /**
+   * Create a thread. With `tx` the write joins the caller's transaction (the
+   * case board creates a hypothesis card and its thread atomically) and the
+   * returned DTO is read through the same transaction.
+   */
   async create(
     caseId: string,
     dto: CreateThreadDto,
+    tx?: Db,
   ): Promise<ThreadResponseDto> {
-    await this.ensureCaseExists(caseId);
-    const thread = await this.prisma.$transaction(async (tx) => {
+    await this.ensureCaseExists(caseId, tx);
+    const thread = await this.inTx(tx, async (tx) => {
       const created = await tx.caseThread.create({
         data: {
           caseId,
@@ -68,6 +76,7 @@ export class CaseThreadsService {
               : (dto.status ?? HypothesisStatus.PROPOSED),
           confidence: dto.confidence,
           testablePredicate: dto.testablePredicate,
+          color: dto.color,
           createdBy: dto.createdBy,
         },
         include: this.include,
@@ -95,7 +104,7 @@ export class CaseThreadsService {
       );
       return created;
     });
-    return await this.getOne(thread.id);
+    return await this.getOne(thread.id, tx);
   }
 
   async update(id: string, dto: UpdateThreadDto): Promise<ThreadResponseDto> {
@@ -210,8 +219,9 @@ export class CaseThreadsService {
   async addEntry(
     threadId: string,
     dto: AddThreadEntryDto,
+    tx?: Db,
   ): Promise<ThreadResponseDto> {
-    const thread = await this.prisma.caseThread.findUnique({
+    const thread = await (tx ?? this.prisma).caseThread.findUnique({
       where: { id: threadId },
       select: { id: true, caseId: true, title: true },
     });
@@ -227,7 +237,7 @@ export class CaseThreadsService {
       );
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.inTx(tx, async (tx) => {
       const entry = await tx.caseThreadEntry.create({
         data: {
           threadId,
@@ -266,7 +276,7 @@ export class CaseThreadsService {
       }
     });
 
-    return this.getOne(threadId);
+    return this.getOne(threadId, tx);
   }
 
   async getEntries(
@@ -301,8 +311,11 @@ export class CaseThreadsService {
   async linkSupport(
     threadId: string,
     dto: LinkThreadSupportDto,
+    actor?: string,
+    tx?: Db,
   ): Promise<ThreadResponseDto> {
-    const thread = await this.prisma.caseThread.findUnique({
+    const db = tx ?? this.prisma;
+    const thread = await db.caseThread.findUnique({
       where: { id: threadId },
       select: { caseId: true, title: true },
     });
@@ -312,9 +325,10 @@ export class CaseThreadsService {
       dto.targetType,
       dto.targetId,
       thread.caseId,
+      db,
     );
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.inTx(tx, async (tx) => {
       await tx.caseThreadSupport.upsert({
         where: {
           threadId_targetType_targetId: {
@@ -348,19 +362,22 @@ export class CaseThreadsService {
           targetLabel,
           stance: dto.stance ?? EvidenceStance.SUPPORTS,
         },
-        undefined,
+        actor,
         tx,
       );
     });
 
-    return this.getOne(threadId);
+    return this.getOne(threadId, tx);
   }
 
   async unlinkSupport(
     threadId: string,
     linkId: string,
+    actor?: string,
+    tx?: Db,
   ): Promise<ThreadResponseDto> {
-    const link = await this.prisma.caseThreadSupport.findUnique({
+    const db = tx ?? this.prisma;
+    const link = await db.caseThreadSupport.findUnique({
       where: { id: linkId },
       select: { threadId: true, targetType: true, targetId: true },
     });
@@ -369,16 +386,17 @@ export class CaseThreadsService {
         `Support link ${linkId} not found on thread ${threadId}`,
       );
     }
-    const thread = await this.prisma.caseThread.findUnique({
+    const thread = await db.caseThread.findUnique({
       where: { id: threadId },
       select: { caseId: true, title: true },
     });
     const targetLabel = await this.lookupTargetLabel(
       link.targetType,
       link.targetId,
+      db,
     );
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.inTx(tx, async (tx) => {
       await tx.caseThreadSupport.delete({ where: { id: linkId } });
       if (thread) {
         await this.activity.record(
@@ -391,28 +409,67 @@ export class CaseThreadsService {
             targetType: link.targetType,
             targetLabel,
           },
-          undefined,
+          actor,
           tx,
         );
       }
     });
 
-    return this.getOne(threadId);
+    return this.getOne(threadId, tx);
+  }
+
+  /**
+   * Resolve or reopen a DISCUSSION thread (a board comment). Nothing is
+   * deleted: a resolved comment keeps its entries and shows greyed out.
+   */
+  async setResolved(
+    threadId: string,
+    resolved: boolean,
+    actor?: string,
+    tx?: Db,
+  ): Promise<{ changed: boolean; caseId: string; title: string }> {
+    const db = tx ?? this.prisma;
+    const thread = await db.caseThread.findUnique({
+      where: { id: threadId },
+      select: { caseId: true, title: true, kind: true, resolvedAt: true },
+    });
+    if (!thread) throw new NotFoundException(`Thread ${threadId} not found`);
+    if (thread.kind !== CaseThreadKind.DISCUSSION) {
+      throw new BadRequestException(
+        'Only discussion threads can be resolved; a hypothesis changes status through its entries.',
+      );
+    }
+    if ((thread.resolvedAt !== null) === resolved) {
+      return { changed: false, caseId: thread.caseId, title: thread.title };
+    }
+    await db.caseThread.update({
+      where: { id: threadId },
+      data: resolved
+        ? { resolvedAt: new Date(), resolvedBy: actor ?? null }
+        : { resolvedAt: null, resolvedBy: null },
+    });
+    return { changed: true, caseId: thread.caseId, title: thread.title };
   }
 
   // ─── Private ─────────────────────────────────────────────────────
 
-  private async getOne(id: string): Promise<ThreadResponseDto> {
-    const row = await this.prisma.caseThread.findUnique({
+  /** Run `fn` in the caller's transaction, or in a fresh one. */
+  private inTx<T>(tx: Db | undefined, fn: (tx: Db) => Promise<T>): Promise<T> {
+    return tx ? fn(tx) : this.prisma.$transaction(fn);
+  }
+
+  private async getOne(id: string, tx?: Db): Promise<ThreadResponseDto> {
+    const db = tx ?? this.prisma;
+    const row = await db.caseThread.findUnique({
       where: { id },
       include: this.include,
     });
     if (!row) throw new NotFoundException(`Thread ${id} not found`);
-    return (await this.mapMany([row]))[0];
+    return (await this.mapMany([row], db))[0];
   }
 
-  private async ensureCaseExists(caseId: string): Promise<void> {
-    const found = await this.prisma.case.findUnique({
+  private async ensureCaseExists(caseId: string, tx?: Db): Promise<void> {
+    const found = await (tx ?? this.prisma).case.findUnique({
       where: { id: caseId },
       select: { id: true },
     });
@@ -429,14 +486,15 @@ export class CaseThreadsService {
     targetType: 'evidence' | 'finding',
     targetId: string,
     caseId: string,
+    db: Db = this.prisma,
   ): Promise<{ label: string; canonicalId: string }> {
     if (targetType === 'evidence') {
       const ev =
-        (await this.prisma.caseEvidence.findUnique({
+        (await db.caseEvidence.findUnique({
           where: { id: targetId },
           select: { id: true, caseId: true, label: true, entityId: true },
         })) ??
-        (await this.prisma.caseEvidence.findFirst({
+        (await db.caseEvidence.findFirst({
           where: { caseId, entityId: targetId },
           select: { id: true, caseId: true, label: true, entityId: true },
         }));
@@ -447,11 +505,11 @@ export class CaseThreadsService {
       return { label: ev.label ?? ev.entityId, canonicalId: ev.id };
     }
     const cf =
-      (await this.prisma.caseFinding.findUnique({
+      (await db.caseFinding.findUnique({
         where: { id: targetId },
         select: { id: true, caseId: true, label: true },
       })) ??
-      (await this.prisma.caseFinding.findFirst({
+      (await db.caseFinding.findFirst({
         where: { caseId, findingId: targetId },
         select: { id: true, caseId: true, label: true },
       }));
@@ -466,22 +524,26 @@ export class CaseThreadsService {
   private async lookupTargetLabel(
     targetType: string,
     targetId: string,
+    db: Db = this.prisma,
   ): Promise<string | null> {
     if (targetType === 'evidence') {
-      const ev = await this.prisma.caseEvidence.findUnique({
+      const ev = await db.caseEvidence.findUnique({
         where: { id: targetId },
         select: { label: true, entityId: true },
       });
       return ev ? (ev.label ?? ev.entityId) : null;
     }
-    const cf = await this.prisma.caseFinding.findUnique({
+    const cf = await db.caseFinding.findUnique({
       where: { id: targetId },
       select: { label: true },
     });
     return cf?.label ?? null;
   }
 
-  private async mapMany(rows: ThreadRow[]): Promise<ThreadResponseDto[]> {
+  private async mapMany(
+    rows: ThreadRow[],
+    db: Db = this.prisma,
+  ): Promise<ThreadResponseDto[]> {
     const evidenceIds = rows
       .flatMap((r) => r.support)
       .filter((s) => s.targetType === 'evidence')
@@ -493,13 +555,13 @@ export class CaseThreadsService {
 
     const [evidenceRows, findingRows] = await Promise.all([
       evidenceIds.length > 0
-        ? this.prisma.caseEvidence.findMany({
+        ? db.caseEvidence.findMany({
             where: { id: { in: evidenceIds } },
             select: { id: true, label: true, entityId: true },
           })
         : Promise.resolve([]),
       findingIds.length > 0
-        ? this.prisma.caseFinding.findMany({
+        ? db.caseFinding.findMany({
             where: { id: { in: findingIds } },
             select: { id: true, label: true },
           })

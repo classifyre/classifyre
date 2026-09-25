@@ -1028,6 +1028,11 @@ model InstanceSettings {
   // exactly where each source was. The kill switch for "stop scanning now".
   autoScheduleEnabled Boolean @default(true) @map("auto_schedule_enabled")
 
+  // Rollout switch for the case board (docs/architecture/CASE_BOARD_PRD.md).
+  // Off: cases open on the legacy graph workspace. Ships off until the board
+  // reaches parity; per workspace so one team can try it first.
+  caseBoardEnabled Boolean @default(false) @map("case_board_enabled")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1373,6 +1378,24 @@ enum CaseActivityType {
   EVENT_ADDED
   EVENT_UPDATED
   EVENT_REMOVED
+  // Case board (docs/architecture/CASE_BOARD_PRD.md §7.4). Every payload
+  // carries the board itemId (and linkId where relevant) so the timeline can
+  // offer "Show on board".
+  BOARD_NOTE_ADDED
+  BOARD_NOTE_UPDATED
+  BOARD_NOTE_REMOVED
+  BOARD_FRAME_ADDED
+  BOARD_FRAME_UPDATED
+  BOARD_FRAME_REMOVED
+  BOARD_LINK_ADDED
+  BOARD_LINK_UPDATED
+  BOARD_LINK_REMOVED
+  BOARD_LINK_PROMOTED
+  BOARD_ITEM_HIGHLIGHTED
+  // Moves/resizes, coalesced to at most one row per actor per five minutes.
+  BOARD_ARRANGED
+  BOARD_SNAPSHOT_TAKEN
+  COMMENT_RESOLVED
 }
 
 enum EvidenceStance {
@@ -1881,6 +1904,7 @@ model Case {
   activities   CaseActivity[]
   leads        CaseLead[]
   events       CaseEvent[]
+  board        CaseBoard?
 
   @@index([status])
   @@index([severity])
@@ -2158,6 +2182,10 @@ model CaseThread {
   testablePredicate String?           @map("testable_predicate") @db.Text
   color             String?
   createdBy         String?           @map("created_by")
+  // DISCUSSION threads double as board comments; resolving one greys its pin
+  // rather than deleting anything (the thread stays on the timeline).
+  resolvedAt        DateTime?         @map("resolved_at")
+  resolvedBy        String?           @map("resolved_by")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
@@ -2221,6 +2249,136 @@ model CaseActivity {
 
   @@index([caseId, createdAt(sort: Desc)])
   @@map("case_activities")
+}
+
+// ── Case board ───────────────────────────────────────────────────────────────
+// The investigation canvas (docs/architecture/CASE_BOARD_PRD.md). The domain
+// stays where it is — case_evidence, case_findings, case_threads and
+// case_thread_support remain the truth MCP, autopilot, leads and inquiries use.
+// The board stores only view state (position, size, colour, grouping) plus the
+// objects that exist nowhere else: notes, frames and the links a person drew.
+
+enum CaseBoardItemKind {
+  EVIDENCE   // ref_id → case_evidence.id
+  HYPOTHESIS // ref_id → case_threads.id (kind HYPOTHESIS)
+  COMMENT    // ref_id → case_threads.id (kind DISCUSSION)
+  NOTE       // board-native; content.text
+  FRAME      // board-native; content.title
+}
+
+enum BoardLinkCertainty {
+  CONFIRMED
+  SUSPECTED
+}
+
+// One board per case. `version` bumps once per applied ops batch, so a client
+// can tell "someone else wrote since I loaded" without diffing.
+model CaseBoard {
+  id        String   @id @default(uuid())
+  caseId    String   @unique @map("case_id")
+  version   Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  investigation Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  items         CaseBoardItem[]
+  links         CaseBoardLink[]
+  snapshots     CaseBoardSnapshot[]
+
+  @@map("case_boards")
+}
+
+// Everything with a position. Evidence, hypotheses and comments are projections
+// of domain rows (ref_id); notes and frames are board-native. Ids are generated
+// by the client, so an op can address an item before the server has seen it.
+// Soft-deleted: undo restores the old position/style, and the audit trail keeps
+// what was on the board.
+model CaseBoardItem {
+  id        String            @id
+  boardId   String            @map("board_id")
+  kind      CaseBoardItemKind
+  refId     String?           @map("ref_id")
+  // Null until placed; the client auto-places unplaced items and writes back.
+  x         Float?
+  y         Float?
+  width     Float?
+  height    Float?
+  z         Int               @default(0)
+  // FRAME membership for regular items; the anchor item for COMMENT pins.
+  parentId  String?           @map("parent_id")
+  collapsed Boolean           @default(false)
+  // { color?, highlight?, rowHighlights?: { [findingId]: color }, anchorFindingId? }
+  style     Json?             @db.JsonB
+  // NOTE: { text }  FRAME: { title }
+  content   Json?             @db.JsonB
+  createdBy String?           @map("created_by")
+  updatedBy String?           @map("updated_by")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  deletedAt DateTime?         @map("deleted_at")
+
+  board    CaseBoard       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  parent   CaseBoardItem?  @relation("BoardItemParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children CaseBoardItem[] @relation("BoardItemParent")
+
+  // One board item per domain row. Notes and frames have no ref_id, and NULLs
+  // are distinct in a Postgres unique index, so they never collide.
+  @@unique([boardId, kind, refId])
+  @@index([boardId, deletedAt])
+  @@index([parentId])
+  @@map("case_board_items")
+}
+
+// Links a person drew on THIS board. Never read by lineage or by other cases —
+// the global `edges` table is only written when a link is explicitly promoted.
+// Endpoints are items, optionally narrowed to one finding row inside a bubble.
+model CaseBoardLink {
+  id              String             @id
+  boardId         String             @map("board_id")
+  sourceItemId    String             @map("source_item_id")
+  sourceFindingId String?            @map("source_finding_id")
+  targetItemId    String             @map("target_item_id")
+  targetFindingId String?            @map("target_finding_id")
+  // Free-form vocabulary, like edges.relation_type.
+  kind            String
+  label           String?
+  certainty       BoardLinkCertainty @default(CONFIRMED)
+  confidence      Decimal?           @db.Decimal(3, 2)
+  note            String?            @db.Text
+  // Set by link.promote: the global MANUAL edge this link was copied to.
+  promotedEdgeId  String?            @map("promoted_edge_id")
+  createdBy       String?            @map("created_by")
+  updatedBy       String?            @map("updated_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  deletedAt       DateTime?          @map("deleted_at")
+
+  board CaseBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@index([boardId, deletedAt])
+  @@index([sourceItemId])
+  @@index([targetItemId])
+  @@map("case_board_links")
+}
+
+// Immutable board state, captured when a case closes (and on demand), so the
+// arrangement a conclusion was drawn from survives later edits.
+model CaseBoardSnapshot {
+  id        String   @id @default(uuid())
+  boardId   String   @map("board_id")
+  // CASE_CLOSED | MANUAL
+  reason    String
+  // board.version at capture time
+  version   Int
+  // The full CaseBoardResponseDto as it was served.
+  payload   Json     @db.JsonB
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  board CaseBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@index([boardId, createdAt(sort: Desc)])
+  @@map("case_board_snapshots")
 }
 
 // ── Investigation autopilot ──────────────────────────────────────────────────

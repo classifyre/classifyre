@@ -19,6 +19,7 @@ Name | Type
 `autopilotEscalationEnabled` | boolean
 `autopilotMcpEnabled` | boolean
 `autoScheduleEnabled` | boolean
+`caseBoardEnabled` | boolean
 `hfToken` | string
 `harnessRunBudgetMinutes` | number
 `harnessRunStaleAfterMinutes` | number
@@ -54,6 +55,7 @@ const example = {
   "autopilotEscalationEnabled": true,
   "autopilotMcpEnabled": true,
   "autoScheduleEnabled": true,
+  "caseBoardEnabled": false,
   "hfToken": null,
   "harnessRunBudgetMinutes": 20,
   "harnessRunStaleAfterMinutes": 60,
