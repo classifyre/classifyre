@@ -5,7 +5,7 @@ import {
   Eye,
   EyeOff,
   GitBranch,
-  Lightbulb,
+  FlaskConical,
   Maximize2,
   MousePointer2,
   Plus,
@@ -149,7 +149,7 @@ export function GraphToolbar({
       />
       <ActionButton
         onClick={onNewHypothesis}
-        icon={<Lightbulb className="h-3 w-3" />}
+        icon={<FlaskConical className="h-3 w-3" />}
         label={t("caseGraph.toolbar.hypothesisLabel")}
         title={t("caseGraph.toolbar.hypothesisTitle")}
       />

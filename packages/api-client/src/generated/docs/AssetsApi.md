@@ -10,6 +10,7 @@ All URIs are relative to *http://localhost*
 | [**searchAssetsControllerExportFindings**](AssetsApi.md#searchassetscontrollerexportfindings) | **GET** /search/findings/export | Export findings as CSV |
 | [**searchAssetsControllerQueryAssets**](AssetsApi.md#searchassetscontrollerqueryassets) | **GET** /search/assets/query | Query assets with findings (cursor-paginated JSON) |
 | [**searchAssetsControllerQueryFindings**](AssetsApi.md#searchassetscontrollerqueryfindings) | **GET** /search/findings/query | Query findings (cursor-paginated JSON) |
+| [**searchAssetsControllerQuickSearch**](AssetsApi.md#searchassetscontrollerquicksearch) | **POST** /search/quick | Search as you type |
 | [**searchAssetsControllerSearchAssets**](AssetsApi.md#searchassetscontrollersearchassets) | **POST** /search/assets | Search assets with findings |
 | [**searchAssetsControllerSearchAssetsCharts**](AssetsApi.md#searchassetscontrollersearchassetscharts) | **POST** /search/assets/charts | Search assets charts overview |
 | [**searchAssetsControllerSearchFindings**](AssetsApi.md#searchassetscontrollersearchfindings) | **POST** /search/findings | Search findings |
@@ -531,6 +532,73 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## searchAssetsControllerQuickSearch
+
+> QuickSearchResponseDto searchAssetsControllerQuickSearch(quickSearchRequestDto)
+
+Search as you type
+
+A few assets (by name) and findings (by content, whole words and their prefixes) for pickers and palettes. Bounded and cheap on large workspaces: no totals, a per-query time budget, and &#x60;truncated&#x60; when that budget ran out.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AssetsApi,
+} from '@workspace/api-client';
+import type { SearchAssetsControllerQuickSearchRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AssetsApi();
+
+  const body = {
+    // QuickSearchRequestDto
+    quickSearchRequestDto: ...,
+  } satisfies SearchAssetsControllerQuickSearchRequest;
+
+  try {
+    const data = await api.searchAssetsControllerQuickSearch(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **quickSearchRequestDto** | [QuickSearchRequestDto](QuickSearchRequestDto.md) |  | |
+
+### Return type
+
+[**QuickSearchResponseDto**](QuickSearchResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
 - **Accept**: `application/json`
 
 

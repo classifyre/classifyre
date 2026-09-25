@@ -89,6 +89,7 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   harnessMaxRecalledMemories: 30,
   harnessDreamIntervalDays: 2,
   autoScheduleEnabled: true,
+  caseBoardEnabled: false,
   hfTokenSet: false,
   hfTokenInstanceSet: false,
   createdAt: new Date(0),

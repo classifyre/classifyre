@@ -49,6 +49,7 @@ export class InstanceSettingsService {
       harnessMaxRecalledMemories: settings.harnessMaxRecalledMemories,
       harnessDreamIntervalDays: settings.harnessDreamIntervalDays,
       autoScheduleEnabled: settings.autoScheduleEnabled,
+      caseBoardEnabled: settings.caseBoardEnabled,
       hfTokenSet: !!settings.hfTokenEnc,
       hfTokenInstanceSet: isInstanceTokenSet,
       demoMode: this.demoMode.isDemoMode,
@@ -218,6 +219,14 @@ export class InstanceSettingsService {
         : {}),
       ...(updateDto.autoScheduleEnabled !== undefined
         ? { autoScheduleEnabled: updateDto.autoScheduleEnabled }
+        : {}),
+      // No global ValidationPipe: a form or script may send the string form.
+      ...(updateDto.caseBoardEnabled !== undefined
+        ? {
+            caseBoardEnabled:
+              (updateDto.caseBoardEnabled as unknown) === true ||
+              (updateDto.caseBoardEnabled as unknown) === 'true',
+          }
         : {}),
       ...(aiProviderConfigUpdate ?? {}),
       ...(harnessAiProviderConfigUpdate ?? {}),

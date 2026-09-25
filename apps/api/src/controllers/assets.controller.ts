@@ -56,6 +56,11 @@ import { SearchFindingsChartsResponseDto } from '../dto/search-findings-charts-r
 import { SearchFindingsCustomDetectorOptionDto } from '../dto/search-findings-custom-detectors.dto';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import { ReferencingFindingsResponseDto } from '../dto/referencing-findings.dto';
+import {
+  QuickSearchRequestDto,
+  QuickSearchResponseDto,
+} from '../dto/quick-search.dto';
+import { QuickSearchService } from '../search/quick-search.service';
 
 @Controller('assets')
 @ApiTags('Assets')
@@ -129,7 +134,25 @@ export class SearchAssetsController {
     private readonly pgStreamService: PgStreamService,
     private readonly exportQueryService: ExportQueryService,
     private readonly liveQueryService: LiveQueryService,
+    private readonly quickSearchService: QuickSearchService,
   ) {}
+
+  @Post('quick')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Search as you type',
+    description:
+      'A few assets (by name) and findings (by content, whole words and their prefixes) for pickers and ' +
+      'palettes. Bounded and cheap on large workspaces: no totals, a per-query time budget, and ' +
+      '`truncated` when that budget ran out.',
+  })
+  @ApiBody({ type: QuickSearchRequestDto })
+  @ApiResponse({ status: 200, type: QuickSearchResponseDto })
+  async quickSearch(
+    @Body() request: QuickSearchRequestDto,
+  ): Promise<QuickSearchResponseDto> {
+    return this.quickSearchService.search(request);
+  }
 
   @Get('findings/query')
   @ApiOperation({

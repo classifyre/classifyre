@@ -9,7 +9,7 @@ import {
   ChevronsUpDown,
   ExternalLink,
   GitBranch,
-  Lightbulb,
+  FlaskConical,
   Network,
   Paperclip,
   Pin,
@@ -158,7 +158,7 @@ export function NodeDetailPanel({
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={onLinkHypothesis}>
-            <Lightbulb className="h-3.5 w-3.5" /> {t("caseGraph.nodeDetail.linkToHypothesis")}
+            <FlaskConical className="h-3.5 w-3.5" /> {t("caseGraph.nodeDetail.linkToHypothesis")}
           </Button>
           <Button size="sm" variant="outline" onClick={onConnectFrom}>
             <GitBranch className="h-3.5 w-3.5" /> {t("caseGraph.nodeDetail.connectFromHere")}

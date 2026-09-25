@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { CaseActivityType, CaseThreadKind, Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
@@ -11,6 +13,9 @@ import { CaseActivityService } from './case-activity.service';
 import { InquiryActivityService } from './inquiry-activity.service';
 import { AUTO_PULL_ACTOR } from './cases/case-pull.port';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
+// Value import, not `import type`: Nest resolves @Optional() injections from
+// emitted metadata, and a type-only import silently injects undefined.
+import { CaseBoardReadService } from './case-board/case-board-read.service';
 import {
   AddEvidenceDto,
   AddFindingDto,
@@ -63,6 +68,8 @@ const countSelect = {
 /** The investigation workspace: owns evidence, findings, hypotheses (via services) and the graph. */
 @Injectable()
 export class CasesService {
+  private readonly logger = new Logger(CasesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly graph: GraphService,
@@ -70,6 +77,7 @@ export class CasesService {
     private readonly activity: CaseActivityService,
     private readonly inquiryActivity: InquiryActivityService,
     private readonly agentMemory: AgentMemoryService,
+    @Optional() private readonly boardRead?: CaseBoardReadService,
   ) {}
 
   async create(dto: CreateCaseDto): Promise<CaseResponseDto> {
@@ -305,10 +313,31 @@ export class CasesService {
       id,
       linkedInquiryIds.map((link) => link.inquiryId),
     );
+    await this.snapshotBoardOnClose(id, dto.closedBy);
     return {
       case: (await this.findOne(id))!,
       archivedInquiries: archived.count,
     };
+  }
+
+  /**
+   * Freeze the case board as it stood when the case closed, so the
+   * arrangement a conclusion was drawn from survives later edits (evidence
+   * preservation). A failed snapshot is logged, never allowed to undo the
+   * close: an unclosable case is the worse outcome.
+   */
+  private async snapshotBoardOnClose(
+    caseId: string,
+    actor?: string,
+  ): Promise<void> {
+    if (!this.boardRead) return;
+    try {
+      await this.boardRead.takeSnapshot(caseId, 'CASE_CLOSED', actor);
+    } catch (error) {
+      this.logger.warn(
+        `Board snapshot on close failed for case ${caseId}: ${String(error)}`,
+      );
+    }
   }
 
   /**
@@ -470,17 +499,29 @@ export class CasesService {
     );
   }
 
+  /**
+   * Put an asset on the case as evidence.
+   *
+   * With `tx` the whole write joins the caller's transaction (the case board
+   * applies a batch of ops atomically). The inferred-edge refresh is then left
+   * to the caller: it writes `edges` through the pool, and holding the
+   * transaction's connection while waiting for a second one is how a small
+   * pool deadlocks. The board reads the graph through `caseGraph`, which
+   * refreshes those edges anyway.
+   */
   async addEvidence(
     caseId: string,
     dto: AddEvidenceDto,
+    tx?: Prisma.TransactionClient,
   ): Promise<CaseEvidenceDto> {
-    await this.ensureExists(caseId);
+    const db = tx ?? this.prisma;
+    await this.ensureExists(caseId, db);
     if (dto.entityType !== 'asset') {
       throw new BadRequestException(
         'Evidence must be an asset. Use POST /cases/:id/evidence/:evidenceId/findings to attach findings.',
       );
     }
-    const asset = await this.prisma.asset.findUnique({
+    const asset = await db.asset.findUnique({
       where: { id: dto.entityId },
       select: { name: true, assetType: true, sourceType: true },
     });
@@ -489,7 +530,7 @@ export class CasesService {
       assetType: asset?.assetType ?? null,
       sourceType: asset ? String(asset.sourceType) : null,
     };
-    const evidence = await this.prisma.caseEvidence.upsert({
+    const evidence = await db.caseEvidence.upsert({
       where: {
         caseId_entityType_entityId: {
           caseId,
@@ -508,7 +549,7 @@ export class CasesService {
       update: { note: dto.note ?? undefined, ...snapshot },
       include: { findings: true },
     });
-    await this.graph.inferEdgesForAsset(dto.entityId);
+    if (!tx) await this.graph.inferEdgesForAsset(dto.entityId);
     await this.activity.record(
       caseId,
       CaseActivityType.EVIDENCE_ADDED,
@@ -518,9 +559,10 @@ export class CasesService {
         label: snapshot.label,
       },
       dto.addedBy,
+      tx,
     );
 
-    const updated = await this.prisma.caseEvidence.findUniqueOrThrow({
+    const updated = await db.caseEvidence.findUniqueOrThrow({
       where: { id: evidence.id },
       include: { findings: true },
     });
@@ -585,16 +627,21 @@ export class CasesService {
     return this.mapCaseFinding(cf);
   }
 
-  /** Batch-attach findings; asset evidence rows are created automatically. */
+  /**
+   * Batch-attach findings; asset evidence rows are created automatically.
+   * `tx` joins the caller's transaction (see {@link addEvidence}).
+   */
   async attachFindings(
     caseId: string,
     dto: AttachFindingsDto,
+    tx?: Prisma.TransactionClient,
   ): Promise<AttachFindingsResponseDto> {
-    await this.ensureExists(caseId);
+    const db = tx ?? this.prisma;
+    await this.ensureExists(caseId, db);
     const findingIds = [...new Set(dto.findingIds ?? [])];
     if (findingIds.length === 0) return { attached: 0 };
 
-    const findings = await this.prisma.finding.findMany({
+    const findings = await db.finding.findMany({
       where: { id: { in: findingIds } },
       select: {
         id: true,
@@ -619,11 +666,12 @@ export class CasesService {
             f.assetId,
             f.asset,
             dto.addedBy,
+            db,
           ),
         );
       }
     }
-    const created = await this.prisma.caseFinding.createMany({
+    const created = await db.caseFinding.createMany({
       data: findings.map((f) => ({
         caseId,
         caseEvidenceId: evidenceByAsset.get(f.assetId)!,
@@ -636,8 +684,10 @@ export class CasesService {
       })),
       skipDuplicates: true,
     });
-    for (const assetId of evidenceByAsset.keys())
-      await this.graph.inferEdgesForAsset(assetId);
+    if (!tx) {
+      for (const assetId of evidenceByAsset.keys())
+        await this.graph.inferEdgesForAsset(assetId);
+    }
     await this.activity.record(
       caseId,
       CaseActivityType.FINDING_ADDED,
@@ -650,12 +700,19 @@ export class CasesService {
         ].slice(0, 10),
       },
       dto.addedBy,
+      tx,
     );
     return { attached: created.count };
   }
 
-  async removeFinding(caseId: string, caseFindingId: string): Promise<void> {
-    const cf = await this.prisma.caseFinding.findUnique({
+  async removeFinding(
+    caseId: string,
+    caseFindingId: string,
+    actor?: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const db = tx ?? this.prisma;
+    const cf = await db.caseFinding.findUnique({
       where: { id: caseFindingId },
     });
     if (!cf || cf.caseId !== caseId) {
@@ -663,12 +720,18 @@ export class CasesService {
         `Finding ${caseFindingId} not found in case ${caseId}`,
       );
     }
-    await this.prisma.caseFinding.delete({ where: { id: caseFindingId } });
-    await this.activity.record(caseId, CaseActivityType.FINDING_REMOVED, {
-      caseFindingId,
-      findingId: cf.findingId,
-      label: cf.label,
-    });
+    await db.caseFinding.delete({ where: { id: caseFindingId } });
+    await this.activity.record(
+      caseId,
+      CaseActivityType.FINDING_REMOVED,
+      {
+        caseFindingId,
+        findingId: cf.findingId,
+        label: cf.label,
+      },
+      actor,
+      tx,
+    );
   }
 
   async patchEvidenceNote(
@@ -722,8 +785,14 @@ export class CasesService {
     return this.mapCaseFinding(updated);
   }
 
-  async removeEvidence(caseId: string, evidenceId: string): Promise<void> {
-    const evidence = await this.prisma.caseEvidence.findUnique({
+  async removeEvidence(
+    caseId: string,
+    evidenceId: string,
+    actor?: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const db = tx ?? this.prisma;
+    const evidence = await db.caseEvidence.findUnique({
       where: { id: evidenceId },
     });
     if (!evidence || evidence.caseId !== caseId) {
@@ -731,12 +800,18 @@ export class CasesService {
         `Evidence ${evidenceId} not found in case ${caseId}`,
       );
     }
-    await this.prisma.caseEvidence.delete({ where: { id: evidenceId } });
-    await this.activity.record(caseId, CaseActivityType.EVIDENCE_REMOVED, {
-      evidenceId,
-      entityId: evidence.entityId,
-      label: evidence.label,
-    });
+    await db.caseEvidence.delete({ where: { id: evidenceId } });
+    await this.activity.record(
+      caseId,
+      CaseActivityType.EVIDENCE_REMOVED,
+      {
+        evidenceId,
+        entityId: evidence.entityId,
+        label: evidence.label,
+      },
+      actor,
+      tx,
+    );
   }
 
   /** Pull a linked question's current matches into the case as evidence + findings. */
@@ -841,8 +916,11 @@ export class CasesService {
     return [];
   }
 
-  private async ensureExists(id: string): Promise<void> {
-    const found = await this.prisma.case.findUnique({
+  private async ensureExists(
+    id: string,
+    db: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    const found = await db.case.findUnique({
       where: { id },
       select: { id: true },
     });
@@ -859,8 +937,9 @@ export class CasesService {
       sourceType: { toString(): string };
     } | null,
     addedBy?: string,
+    db: Prisma.TransactionClient = this.prisma,
   ): Promise<string> {
-    const ev = await this.prisma.caseEvidence.upsert({
+    const ev = await db.caseEvidence.upsert({
       where: {
         caseId_entityType_entityId: {
           caseId,

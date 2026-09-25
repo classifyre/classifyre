@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   GitCommit,
-  Lightbulb,
+  FlaskConical,
   Link2,
   Loader2,
   MessageSquare,
@@ -163,7 +163,7 @@ function ThreadListItem({
           style={{ backgroundColor: thread.color ?? "#6b7280" }}
         />
         {isHypothesis ? (
-          <Lightbulb className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <FlaskConical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         ) : (
           <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         )}
@@ -212,7 +212,8 @@ function ThreadListItem({
 
 // ─── Thread detail pane ──────────────────────────────────────────────────────
 
-function ThreadDetail({
+/** One thread's history and controls; the case board's hypothesis drawer reuses it. */
+export function ThreadDetail({
   thread,
   evidence,
   onChanged,
@@ -736,7 +737,7 @@ export function CaseThreads({
           <SelectContent>
             <SelectItem value="HYPOTHESIS">
               <span className="inline-flex items-center gap-1.5">
-                <Lightbulb className="h-3.5 w-3.5" /> Hypothesis
+                <FlaskConical className="h-3.5 w-3.5" /> Hypothesis
               </span>
             </SelectItem>
             <SelectItem value="DISCUSSION">
@@ -781,7 +782,7 @@ export function CaseThreads({
 
       {loaded && threads.length === 0 ? (
         <EmptyState
-          icon={Lightbulb}
+          icon={FlaskConical}
           title="No threads yet"
           description="State a hypothesis to test against the evidence, or open a discussion thread for open questions."
         />

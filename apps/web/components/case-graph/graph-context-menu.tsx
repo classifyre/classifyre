@@ -9,7 +9,7 @@ import {
   ChevronsUpDown,
   ExternalLink,
   GitBranch,
-  Lightbulb,
+  FlaskConical,
   Network,
   Paperclip,
   Pin,
@@ -196,7 +196,7 @@ export function GraphContextMenu(props: GraphContextMenuProps) {
         className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-muted"
         onClick={() => setHypsOpen((v) => !v)}
       >
-        <Lightbulb className="h-3.5 w-3.5 text-muted-foreground" />
+        <FlaskConical className="h-3.5 w-3.5 text-muted-foreground" />
         {t("caseGraph.contextMenu.linkToHypothesis")}
         <ChevronRight className={`ml-auto h-3.5 w-3.5 transition-transform ${hypsOpen ? "rotate-90" : ""}`} />
       </button>
