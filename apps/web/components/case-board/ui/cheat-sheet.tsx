@@ -12,7 +12,7 @@ import {
 import type { TranslationKey } from "@/i18n";
 import { useTranslation } from "@/hooks/use-translation";
 import { useUi, useUiStore } from "../store/board-context";
-import { AssetCircle, FindingCircle, type FindingLook } from "../nodes/relation-glyphs";
+import { AssetCircle, FindingCircle, type FindingLook } from "@workspace/case-board/components/glyphs";
 import type { SeverityKey } from "../store/types";
 
 const SHORTCUTS: Array<[string, TranslationKey]> = [
@@ -35,7 +35,8 @@ const SHORTCUTS: Array<[string, TranslationKey]> = [
   ["Esc", "caseBoard.cheatSheet.items.escape"],
   ["⌘A", "caseBoard.cheatSheet.items.selectAll"],
   ["⌘D", "caseBoard.cheatSheet.items.duplicate"],
-  ["⇧ + click", "caseBoard.cheatSheet.items.path"],
+  ["2× click", "caseBoard.cheatSheet.items.open"],
+  ["Scroll", "caseBoard.cheatSheet.items.zoom"],
 ];
 
 /** A small copy of what the board draws, from the same components. */

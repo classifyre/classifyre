@@ -33,7 +33,6 @@ Name | Type
 `harnessMaxRecalledMemories` | number
 `harnessDreamIntervalDays` | number
 `autoScheduleEnabled` | boolean
-`caseBoardEnabled` | boolean
 `demoMode` | boolean
 `hfTokenSet` | boolean
 `hfTokenInstanceSet` | boolean
@@ -74,7 +73,6 @@ const example = {
   "harnessMaxRecalledMemories": 30,
   "harnessDreamIntervalDays": 2,
   "autoScheduleEnabled": true,
-  "caseBoardEnabled": false,
   "demoMode": false,
   "hfTokenSet": false,
   "hfTokenInstanceSet": false,

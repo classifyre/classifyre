@@ -1,16 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { BaseEdge, type EdgeProps } from "@xyflow/react";
+import type { EdgeProps } from "@xyflow/react";
 import { Lock } from "lucide-react";
+import { ContainsLine, SystemLine } from "@workspace/case-board/components/lines";
+import { useEdgeGeometry } from "@workspace/case-board/hooks/use-edge-geometry";
+import { useLabelsVisible } from "@workspace/case-board/hooks/use-lod";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useUi } from "../store/board-context";
 import { edgeDrawClass, type BoardEdge } from "../store/projection";
 import { parseFindingNodeId } from "../store/relations";
 import type { BoardState } from "../store/board-store";
-import { useLabelsVisible } from "../hooks/use-lod";
-import { EdgeLabel, EdgeText } from "./edge-label";
-import { useEdgeGeometry } from "./use-edge-geometry";
 
 /** Label of whatever a node shows: an asset, a finding, a neighbour, a note. */
 export function nodeLabel(s: BoardState, nodeId: string): string {
@@ -58,35 +58,27 @@ export const SystemEdge = React.memo(function SystemEdge({ id, source, target, s
           : t("caseBoard.edges.reference");
 
   return (
-    <>
-      <BaseEdge
-        id={id}
-        path={g.path}
-        interactionWidth={14}
-        markerEnd={identity ? undefined : selected ? "url(#cb-arrow-select)" : "url(#cb-arrow-system)"}
-        style={{
-          stroke: selected ? "var(--cb-select)" : "var(--cb-edge)",
-          strokeWidth: selected ? 2.5 : 1.5,
-          strokeDasharray: identity ? "5 4" : undefined,
-        }}
-      />
-      {(labelsVisible || hovered || selected) && g.length > 70 && (
-        <EdgeText x={g.labelX} y={g.labelY} angle={g.angle} className={selected ? "text-foreground" : undefined}>
-          {edge.relationType}
-          {count > 1 && <span>×{count}</span>}
-        </EdgeText>
-      )}
-      {hovered && (
-        <EdgeLabel x={g.labelX} y={g.labelY + 20} className="max-w-[260px] shadow-none">
-          <span className="flex items-center gap-1">
-            <Lock className="size-3 shrink-0" aria-label={t("caseBoard.edges.locked")} />
-            <span className="truncate">{describe}</span>
-            {count > 1 && <span className="font-mono">{t("caseBoard.edges.folded", { count })}</span>}
-          </span>
-          <span className="block text-[10px] text-muted-foreground">{t("caseBoard.edges.system")}</span>
-        </EdgeLabel>
-      )}
-    </>
+    <SystemLine
+      id={id}
+      g={g}
+      relationType={edge.relationType}
+      showText={labelsVisible || hovered || !!selected}
+      identity={identity}
+      count={count}
+      selected={selected}
+      card={
+        hovered ? (
+          <>
+            <span className="flex items-center gap-1">
+              <Lock className="size-3 shrink-0" aria-label={t("caseBoard.edges.locked")} />
+              <span className="truncate">{describe}</span>
+              {count > 1 && <span className="font-mono">{t("caseBoard.edges.folded", { count })}</span>}
+            </span>
+            <span className="block text-[10px] text-muted-foreground">{t("caseBoard.edges.system")}</span>
+          </>
+        ) : null
+      }
+    />
   );
 });
 
@@ -97,24 +89,12 @@ export const ContainsEdge = React.memo(function ContainsEdge({ id, source, targe
   const g = useEdgeGeometry(source, target, data?.bend);
   if (!g) return null;
   return (
-    <>
-      <BaseEdge
-        id={id}
-        path={g.path}
-        interactionWidth={0}
-        markerEnd="url(#cb-arrow-system)"
-        style={{
-          stroke: "var(--cb-edge)",
-          strokeWidth: 1.25,
-          strokeDasharray: data?.ghost ? "3 3" : undefined,
-          opacity: data?.ghost ? 0.7 : 1,
-        }}
-      />
-      {labelsVisible && g.length > 60 && (
-        <EdgeText x={g.labelX} y={g.labelY} angle={g.angle}>
-          {t("caseBoard.edges.containsLabel")}
-        </EdgeText>
-      )}
-    </>
+    <ContainsLine
+      id={id}
+      g={g}
+      text={t("caseBoard.edges.containsLabel")}
+      showText={labelsVisible}
+      ghost={data?.ghost}
+    />
   );
 });

@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ActorName } from '../actor-name.decorator';
+import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { CaseBoardService } from '../case-board/case-board.service';
 import { CaseBoardReadService } from '../case-board/case-board-read.service';
 import {
@@ -61,6 +63,10 @@ export class CaseBoardController {
     return this.board.applyOps(id, dto, actor);
   }
 
+  // Reads that carry a body: open on a demo instance like POST /graph/expand,
+  // and retried after a transient database error like any read.
+  @AllowInDemoMode()
+  @ReadOnlyEndpoint()
   @Post('neighbours')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -75,6 +81,8 @@ export class CaseBoardController {
     return this.board.neighbours(id, dto?.itemId);
   }
 
+  @AllowInDemoMode()
+  @ReadOnlyEndpoint()
   @Post('trace')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -89,7 +97,7 @@ export class CaseBoardController {
     return this.board.trace(id, dto);
   }
 
-    @Get('snapshots')
+  @Get('snapshots')
   @ApiOperation({ summary: 'Board snapshots, newest first' })
   @ApiResponse({ status: 200, type: [CaseBoardSnapshotSummaryDto] })
   listSnapshots(

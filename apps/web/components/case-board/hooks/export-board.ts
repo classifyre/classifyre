@@ -1,4 +1,26 @@
-import { getNodesBounds, getViewportForBounds, type Node } from "@xyflow/react";
+import { getNodesBounds, getViewportForBounds, type Node, type ReactFlowInstance } from "@xyflow/react";
+
+const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+/**
+ * Wait until React Flow has measured every visible node, so nodes that were
+ * just brought into the DOM (the canvas only renders what is in view) are
+ * drawn, their edges included. Gives up after `timeoutMs`: an image with a
+ * node missing beats no image.
+ */
+export async function untilMeasured(
+  rf: Pick<ReactFlowInstance, "getNodes" | "getInternalNode">,
+  timeoutMs = 2000,
+): Promise<void> {
+  const start = performance.now();
+  for (;;) {
+    await nextFrame();
+    const unmeasured = rf.getNodes().some((n) => !n.hidden && !rf.getInternalNode(n.id)?.measured.width);
+    if (!unmeasured || performance.now() - start > timeoutMs) break;
+  }
+  // One more frame for the edges of the nodes measured last.
+  await nextFrame();
+}
 
 /**
  * Export the whole board as a PNG — the React Flow "download image" pattern:

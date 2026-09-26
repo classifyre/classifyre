@@ -28,7 +28,6 @@ import type { BoardEndpoint } from "@workspace/schemas/case-board";
 import { ContextMenu, ContextMenuTrigger } from "@workspace/ui/components/context-menu";
 import { cn } from "@workspace/ui/lib/utils";
 import { api } from "@workspace/api-client";
-import { shortestPath } from "@/components/graph-explorer/graph-utils";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore, useUi, useUiStore } from "./store/board-context";
 import { addEvidence, addNote, attachFinding, combine, moveFindings, moveItems, type FindingMove, type Move } from "./store/commands";
@@ -44,6 +43,8 @@ import {
   type ProjectionView,
 } from "./store/projection";
 import { SUGGESTED_AUTO_LIMIT, type DrawerKind, type UiState } from "./store/ui-store";
+import { isTraceData, layoutTrace, type TraceKind } from "./store/trace";
+import { takenRects } from "./store/geometry";
 import { parseFindingNodeId } from "./store/relations";
 import type { BoardDomain, ItemKind } from "./store/types";
 import { EvidenceBubble } from "./nodes/evidence-bubble";
@@ -53,10 +54,12 @@ import { FrameNode } from "./nodes/frame-node";
 import { CommentPin } from "./nodes/comment-pin";
 import { SuggestedNode } from "./nodes/suggested-node";
 import { FindingNode } from "./nodes/finding-node";
+import { TraceNode } from "./nodes/trace-node";
 import { ContainsEdge, SystemEdge } from "./edges/system-edge";
 import { LinkEdge } from "./edges/link-edge";
 import { StanceEdge } from "./edges/stance-edge";
-import { EdgeMarkers } from "./edges/markers";
+import { TraceEdge } from "./edges/trace-edge";
+import { EdgeMarkers } from "@workspace/case-board/components/markers";
 import { BoardContextMenuContent, targetFromNodeEvent, type MenuTarget } from "./ui/board-context-menu";
 import { FrameDrawOverlay } from "./ui/frame-draw-overlay";
 import { LinkPopover } from "./ui/link-popover";
@@ -76,6 +79,7 @@ const nodeTypes = {
   frame: FrameNode,
   comment: CommentPin,
   suggested: SuggestedNode,
+  trace: TraceNode,
 } satisfies NodeTypes;
 
 const edgeTypes = {
@@ -85,6 +89,7 @@ const edgeTypes = {
   // Relations to suggested neighbours read like any other system edge.
   suggested: SystemEdge,
   contains: ContainsEdge,
+  trace: TraceEdge,
 } satisfies EdgeTypes;
 
 export const BOARD_DRAG_MIME = "application/x-classifyre-board-evidence";
@@ -94,7 +99,9 @@ const dataKey = (n: BoardNode) =>
     ? n.data.itemId
     : isFindingData(n.data)
       ? `${n.data.findingOf}|${n.data.findingId}|${n.data.attached}`
-      : (n.data as { suggestedKey: string }).suggestedKey;
+      : isTraceData(n.data)
+        ? `${n.data.traceNodeId}|${n.data.label}|${n.data.side}|${n.data.depth}`
+        : (n.data as { suggestedKey: string }).suggestedKey;
 
 /**
  * Fold a fresh projection into React Flow's node state without losing what
@@ -239,7 +246,14 @@ export function useFlyTo() {
   );
 }
 
-export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
+export function BoardCanvas({
+  onTidyUp,
+  rememberViewport = true,
+}: {
+  onTidyUp: () => void;
+  /** Off for a snapshot: it must neither open at nor overwrite the live board's view. */
+  rememberViewport?: boolean;
+}) {
   const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
   const rf = useReactFlow<BoardNode, BoardEdge>();
@@ -270,8 +284,10 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
   const hiddenSuggestions = useUi((s) => s.hiddenSuggestions);
   const focusHypothesisItemId = useUi((s) => s.focusHypothesisItemId);
   const spotlight = useUi((s) => s.spotlight);
-  const path = useUi((s) => s.path);
+  const trace = useUi((s) => s.trace);
+  const traceResult = useUi((s) => s.traceResult);
   const connecting = useUi((s) => s.connecting);
+  const exporting = useUi((s) => s.exporting);
 
   const domain: BoardDomain = React.useMemo(
     () => ({
@@ -290,30 +306,61 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
     [items, links, bubbles, threads, supports, systemEdges, suggested, itemByAsset, itemByFinding, graveyard, truncated],
   );
 
-  const showSuggested =
-    view.suggested === "show" || (view.suggested === "auto" && suggested.size <= SUGGESTED_AUTO_LIMIT);
+  // Until the viewer picks the hops, a crowded first hop stays hidden (D5).
+  const neighbourHops =
+    !view.neighboursChosen && view.neighbourHops === 1 && suggested.size > SUGGESTED_AUTO_LIMIT ? 0 : view.neighbourHops;
   const projView: ProjectionView = React.useMemo(
     () => ({
       lod,
       readOnly,
-      showSuggested,
+      neighbourHops,
       hiddenSuggestions,
       showResolvedComments: view.showResolvedComments,
       showAllRows,
       expandedUnattached,
-      edgeClasses: new Set(
-        [view.lineage && "FLOW", view.duplicates && "IDENTITY", view.references && "REFERENCE"].filter(
-          (c): c is string => !!c,
+      kinds: new Set(
+        [view.lineage && "lineage", view.references && "links", view.duplicates && "duplicates", view.similar && "similar"].filter(
+          (k): k is TraceKind => !!k,
         ),
       ),
     }),
-    [lod, readOnly, showSuggested, hiddenSuggestions, view, showAllRows, expandedUnattached],
+    [lod, readOnly, neighbourHops, hiddenSuggestions, view, showAllRows, expandedUnattached],
   );
 
-  const projectedNodes = React.useMemo(() => projectNodes(domain, projView), [domain, projView]);
+  const boardNodes = React.useMemo(() => projectNodes(domain, projView), [domain, projView]);
+  const boardEdges = React.useMemo(() => projectEdges(domain, projView, boardNodes), [domain, projView, boardNodes]);
+  // "Show connections": the trace joins the board — what is on it in place,
+  // the rest as ghosts in columns around the node it starts from.
+  const traceLayout = React.useMemo(() => {
+    if (!trace || !traceResult) return null;
+    return layoutTrace<BoardNode>({
+      result: traceResult,
+      seedNodeId: trace.seedNodeId,
+      seedPosition: trace.seedPosition,
+      domain,
+      projected: boardNodes,
+      projectedEdgeIds: new Set(boardEdges.map((e) => e.id)),
+      taken: takenRects(domain),
+      makeNode: (id, position, data) => ({
+        id,
+        type: "trace",
+        position,
+        data,
+        zIndex: -0.4,
+        deletable: false,
+        draggable: false,
+        connectable: false,
+        selectable: true,
+      }),
+    });
+  }, [trace, traceResult, domain, boardNodes, boardEdges]);
+  const projectedNodes = React.useMemo(
+    () => (traceLayout ? [...boardNodes, ...traceLayout.nodes] : boardNodes),
+    [boardNodes, traceLayout],
+  );
   const projectedEdges = React.useMemo(
-    () => projectEdges(domain, projView, projectedNodes),
-    [domain, projView, projectedNodes],
+    () => (traceLayout ? [...boardEdges, ...(traceLayout.edges as BoardEdge[])] : boardEdges),
+    [boardEdges, traceLayout],
   );
 
   const [rfNodes, setRfNodes] = React.useState<BoardNode[]>([]);
@@ -331,7 +378,7 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
   const paneSized = useFlowStore((s) => s.width > 0 && s.height > 0);
   React.useEffect(() => {
     if (fitted.current || !loaded || !paneSized) return;
-    const saved = readViewport(caseId);
+    const saved = rememberViewport ? readViewport(caseId) : null;
     if (saved) {
       fitted.current = true;
       void rf.setViewport(saved);
@@ -342,12 +389,13 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
     if (!measured) return;
     fitted.current = true;
     requestAnimationFrame(() => void rf.fitView({ padding: 0.15, maxZoom: 1 }));
-  }, [loaded, paneSized, rfNodes, rf, caseId]);
+  }, [loaded, paneSized, rfNodes, rf, caseId, rememberViewport]);
 
   // Remember the viewport after every change, fits and tidy-ups included, not
   // only after a user pan. A store subscription, so panning re-renders nothing.
   const flowStore = useStoreApi<BoardNode, BoardEdge>();
   React.useEffect(() => {
+    if (!rememberViewport) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unsubscribe = flowStore.subscribe((state, prev) => {
       if (state.transform === prev.transform || !fitted.current) return;
@@ -361,9 +409,9 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
       unsubscribe();
       if (timer) clearTimeout(timer);
     };
-  }, [flowStore, caseId]);
+  }, [flowStore, caseId, rememberViewport]);
 
-  // ── Dimming: hypothesis focus, path, selection focus, highlight filters ────
+  // ── Dimming: a trace, a spotlight, hypothesis focus, selection, highlight ──
   const selectedKey = rfNodes.filter((n) => n.selected).map((n) => n.id).join(",");
   // A focused card that left the board (removed, undone) takes its focus with it.
   React.useEffect(() => {
@@ -382,7 +430,9 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
         if (!kept) edges.add(e.id);
       }
     };
-    if (spotlight) {
+    if (traceLayout) {
+      keepOnly(traceLayout.keep);
+    } else if (spotlight) {
       // Everything of one kind, lit; frames stay as context.
       const keep = new Set<string>();
       for (const n of projectedNodes) {
@@ -394,8 +444,6 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
         if (lit) keep.add(n.id);
       }
       keepOnly(keep);
-    } else if (path) {
-      keepOnly(path.nodeIds, path.edgeIds);
     } else if (focusHypothesisItemId && allIds.includes(focusHypothesisItemId)) {
       const keep = new Set([focusHypothesisItemId]);
       for (const e of projectedEdges) {
@@ -445,7 +493,7 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
       for (const e of projectedEdges) if (nodes.has(e.source) || nodes.has(e.target)) edges.add(e.id);
     }
     return { nodes, edges };
-  }, [spotlight, path, focusHypothesisItemId, selectedKey, projectedNodes, projectedEdges, view, items, bubbles, threads, supports]);
+  }, [traceLayout, spotlight, focusHypothesisItemId, selectedKey, projectedNodes, projectedEdges, view, items, bubbles, threads, supports]);
 
   const displayNodes = React.useMemo(
     () =>
@@ -619,33 +667,6 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
     [ui, readOnly, kindOf, t],
   );
 
-  const computePath = React.useCallback(
-    (from: string, to: string) => {
-      const edges = projectedEdges.map((e) => ({
-        id: e.id,
-        fromType: "n",
-        fromId: e.source,
-        toType: "n",
-        toId: e.target,
-        relationType: "",
-        confidence: 1,
-        origin: "INFERRED" as const,
-      }));
-      const res = shortestPath(`n:${from}`, `n:${to}`, edges);
-      if (!res) {
-        toast.message(t("caseBoard.path.none"));
-        ui.getState().set({ path: null, pathFrom: null });
-        return;
-      }
-      const nodeIds = new Set([...res.nodeKeys].map((k) => k.slice(2)));
-      ui.getState().set({
-        path: { from, to, nodeIds, edgeIds: res.edgeIds, hops: res.edgeIds.size },
-        pathFrom: null,
-      });
-    },
-    [projectedEdges, ui, t],
-  );
-
   /** The side panel that shows a node: details for assets and findings, the thread of a card or pin. */
   const inspectorFor = React.useCallback(
     (node: BoardNode): { drawer: DrawerKind; opts: Parameters<UiState["openDrawer"]>[1] } | null => {
@@ -666,17 +687,6 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
   const onNodeClick = React.useCallback(
     (event: React.MouseEvent, node: BoardNode) => {
       const u = ui.getState();
-      if (u.pathFrom && u.pathFrom !== node.id) {
-        computePath(u.pathFrom, node.id);
-        return;
-      }
-      if (event.shiftKey) {
-        const other = rfNodes.find((n) => n.selected && n.id !== node.id);
-        if (other) {
-          computePath(other.id, node.id);
-          return;
-        }
-      }
       if (isFindingData(node.data)) {
         const { findingOf, findingId } = node.data;
         if (u.tool === "comment" && !readOnly) {
@@ -718,7 +728,7 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
         if (inspect) u.openDrawer(inspect.drawer, inspect.opts);
       }
     },
-    [ui, computePath, rfNodes, readOnly, store, rf, inspectorFor],
+    [ui, readOnly, store, rf, inspectorFor],
   );
 
   /** A double click opens what the node is about in the side panel. */
@@ -737,7 +747,6 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
       if (readOnly || u.tool === "select" || u.tool === "hand" || u.tool === "link") {
         if (!u.focusLock) u.set({ focusHypothesisItemId: null });
         if (u.spotlight) u.set({ spotlight: null });
-        if (u.path || u.pathFrom) u.set({ path: null, pathFrom: null });
         return;
       }
       const at = rf.screenToFlowPosition({ x: event.clientX, y: event.clientY });
@@ -763,7 +772,10 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
           boardNeighboursDto: { itemId },
         });
         store.getState().mergeNeighbours(itemId, graph);
-        if (ui.getState().view.suggested === "hide") ui.getState().setView({ suggested: "show" });
+        // Asked for them: make sure neighbours are drawn.
+        if (ui.getState().view.neighbourHops === 0 || !ui.getState().view.neighboursChosen) {
+          ui.getState().setView({ neighbourHops: Math.max(1, ui.getState().view.neighbourHops) as 1 | 2 | 3 | 6, neighboursChosen: true });
+        }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : String(error));
       }
@@ -923,7 +935,7 @@ export function BoardCanvas({ onTidyUp }: { onTidyUp: () => void }) {
             zoomOnPinch
             zoomOnDoubleClick={false}
             onNodeDoubleClick={onNodeDoubleClick}
-            onlyRenderVisibleElements
+            onlyRenderVisibleElements={!exporting}
             minZoom={0.05}
             maxZoom={2}
             colorMode={resolvedTheme === "dark" ? "dark" : "light"}

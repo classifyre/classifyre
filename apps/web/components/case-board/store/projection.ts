@@ -1,4 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
+import { bendParallel } from "@workspace/case-board/lib/edges";
+import type { Lod } from "@workspace/case-board/lib/geometry";
 import { absolutePosition } from "./ops";
 import {
   ASSET_ROUND,
@@ -13,6 +15,7 @@ import {
   type RoundShape,
   type ShownFinding,
 } from "./relations";
+import { edgeKind, type TraceKind, type TraceNodeData } from "./trace";
 import {
   DEFAULT_FRAME,
   DEFAULT_NOTE,
@@ -34,8 +37,9 @@ import type { BoardDomain, BoardItem, Bubble, SystemEdge } from "./types";
  * asset (collapsed assets, far-zoom chips, findings folded into "▸n").
  */
 
-export type Lod = "full" | "compact" | "chip";
 
+export { bendParallel } from "@workspace/case-board/lib/edges";
+export { lodOf, type Lod } from "@workspace/case-board/lib/geometry";
 export { HYPOTHESIS_WIDTH, DEFAULT_NOTE, DEFAULT_FRAME } from "./geometry";
 export { MAX_FINDING_NODES } from "./relations";
 export { FRAME_TITLE_HEIGHT } from "./geometry";
@@ -47,16 +51,17 @@ export type BoardNodeType =
   | "note"
   | "frame"
   | "comment"
-  | "suggested";
+  | "suggested"
+  | "trace";
 
 /** Round nodes (assets) carry the circle their edges attach to. */
 export type ItemNodeData = { itemId: string; round?: RoundShape };
 /** A finding shown as its own node, a child of its asset's node. */
 export type FindingNodeData = { findingOf: string; findingId: string; attached: boolean; round: RoundShape };
 export type SuggestedNodeData = { suggestedKey: string; round: RoundShape };
-export type BoardNode = Node<ItemNodeData | FindingNodeData | SuggestedNodeData, BoardNodeType>;
+export type BoardNode = Node<ItemNodeData | FindingNodeData | SuggestedNodeData | TraceNodeData, BoardNodeType>;
 
-export type BoardEdgeType = "system" | "link" | "stance" | "suggested" | "contains";
+export type BoardEdgeType = "system" | "link" | "stance" | "suggested" | "contains" | "trace";
 export interface BoardEdgeData extends Record<string, unknown> {
   systemEdgeId?: string;
   linkId?: string;
@@ -67,23 +72,23 @@ export interface BoardEdgeData extends Record<string, unknown> {
   ghost?: boolean;
   /** Parallel edges between one pair bow apart: 0 straight, ±1, ±2… */
   bend?: number;
+  /** A relation "Show connections" found beyond the board. */
+  trace?: { relationType: string; kind: TraceKind };
 }
 export type BoardEdge = Edge<BoardEdgeData, BoardEdgeType>;
 
 export interface ProjectionView {
   lod: Lod;
   readOnly: boolean;
-  showSuggested: boolean;
+  /** Suggested neighbours drawn up to this many hops from the evidence; 0 draws none. */
+  neighbourHops: number;
   hiddenSuggestions: ReadonlySet<string>;
   showResolvedComments: boolean;
   showAllRows: ReadonlySet<string>;
   expandedUnattached: ReadonlySet<string>;
-  /** Edge classes drawn: FLOW, IDENTITY, REFERENCE (REFERENCE + USAGE). */
-  edgeClasses: ReadonlySet<string>;
+  /** Kinds of relation drawn (and followed to neighbours). */
+  kinds: ReadonlySet<TraceKind>;
 }
-
-export const lodOf = (zoom: number): Lod =>
-  zoom >= 0.6 ? "full" : zoom >= 0.3 ? "compact" : "chip";
 
 export const isItemData = (data: unknown): data is ItemNodeData =>
   !!data && typeof (data as ItemNodeData).itemId === "string";
@@ -203,26 +208,40 @@ export function projectNodes(d: BoardDomain, view: ProjectionView): BoardNode[] 
     }
   }
 
-  if (view.showSuggested) {
-    // Ghosts go into free space beside the bubble they hang off, never on top
-    // of the board's own items: estimated sizes, since ghosts are laid out
-    // before React Flow has measured anything.
+  if (view.neighbourHops > 0 && d.suggested.size > 0) {
+    // Ghosts go into free space beside what they hang off — the bubble for
+    // the first hop, the ghost before for the next — never on top of the
+    // board's own items: estimated sizes, since ghosts are laid out before
+    // React Flow has measured anything.
     const taken = takenRects(d, (item) => hiddenByFrame(d, item));
-    for (const s of d.suggested.values()) {
-      if (view.hiddenSuggestions.has(s.key)) continue;
+    const kindsOf = suggestionKinds(d);
+    const placed = new Map<string, { x: number; y: number }>();
+    const ordered = [...d.suggested.values()].sort((a, b) => (a.hop ?? 1) - (b.hop ?? 1));
+    for (const s of ordered) {
+      if (view.hiddenSuggestions.has(s.key) || (s.hop ?? 1) > view.neighbourHops) continue;
+      const kinds = kindsOf.get(`asset:${s.assetId}`);
+      if (kinds && ![...kinds].some((k) => view.kinds.has(k))) continue;
+      let from: { x: number; y: number; right: number } | null = null;
       const anchorId = s.neighbourOf.find((id) => itemPlaced(d.items.get(id)));
-      if (!anchorId) continue;
-      const anchor = d.items.get(anchorId)!;
-      const abs = absolutePosition(d.items, anchorId);
-      const ext = itemExtent(d, anchor);
+      if (anchorId) {
+        const anchor = d.items.get(anchorId)!;
+        const abs = absolutePosition(d.items, anchorId);
+        const ext = itemExtent(d, anchor);
+        from = { x: abs.x, y: abs.y, right: abs.x + ext.dx + ext.width };
+      } else if (s.via && placed.has(s.via)) {
+        const p = placed.get(s.via)!;
+        from = { x: p.x, y: p.y, right: p.x + SUGGESTED_SIZE.width };
+      }
+      if (!from) continue;
       const spot = freeSpotNear(
-        { x: abs.x + ext.dx + ext.width + 40, y: abs.y },
+        { x: from.right + 40, y: from.y },
         SUGGESTED_SIZE,
         taken,
         24,
         SUGGESTED_SIZE.height / 2,
       );
       taken.push({ x: spot.x, y: spot.y, w: SUGGESTED_SIZE.width, h: SUGGESTED_SIZE.height });
+      placed.set(s.key, spot);
       nodes.push({
         id: s.key,
         type: "suggested",
@@ -237,6 +256,21 @@ export function projectNodes(d: BoardDomain, view: ProjectionView): BoardNode[] 
     }
   }
   return sortParentsFirst(nodes);
+}
+
+/** The kinds of relation that tie each suggested asset (`asset:<id>`) to the board. */
+function suggestionKinds(d: BoardDomain): Map<string, Set<TraceKind>> {
+  const out = new Map<string, Set<TraceKind>>();
+  for (const e of d.systemEdges.values()) {
+    const kind = edgeKind(e);
+    for (const key of [e.from, e.to]) {
+      if (!key.startsWith("asset:") || d.itemByAsset.has(key.slice(6))) continue;
+      const set = out.get(key);
+      if (set) set.add(kind);
+      else out.set(key, new Set([kind]));
+    }
+  }
+  return out;
 }
 
 /** React Flow requires every parent to come before its children. */
@@ -336,7 +370,7 @@ export function projectEdges(
     if (promoted.has(e.id)) continue;
     const cls = edgeDrawClass(e);
     const manual = e.origin === "MANUAL";
-    if (!manual && !view.edgeClasses.has(cls)) continue;
+    if (!manual && !view.kinds.has(edgeKind(e))) continue;
     const s = graphEnd(e.from);
     const t = graphEnd(e.to);
     if (!s || !t) continue;
@@ -422,31 +456,6 @@ export function projectEdges(
     });
   }
   return bendParallel(edges);
-}
-
-/**
- * Edges sharing a pair of nodes bow apart instead of drawing over each other:
- * the first stays straight, the rest alternate sides. The sign is taken
- * against one fixed direction per pair, so A→B and B→A separate too.
- */
-export function bendParallel(edges: BoardEdge[]): BoardEdge[] {
-  const byPair = new Map<string, BoardEdge[]>();
-  for (const e of edges) {
-    const key = e.source < e.target ? `${e.source}|${e.target}` : `${e.target}|${e.source}`;
-    const group = byPair.get(key);
-    if (group) group.push(e);
-    else byPair.set(key, [e]);
-  }
-  for (const group of byPair.values()) {
-    if (group.length < 2) continue;
-    group.forEach((e, i) => {
-      const magnitude = Math.ceil(i / 2);
-      const step = magnitude === 0 ? 0 : i % 2 === 1 ? magnitude : -magnitude;
-      const forward = e.source < e.target;
-      e.data = { ...e.data, bend: step === 0 || forward ? step : -step };
-    });
-  }
-  return edges;
 }
 
 /** Edge ids by domain id, for selection and the context menu. */

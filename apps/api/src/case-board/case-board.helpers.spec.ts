@@ -3,7 +3,7 @@ import {
   BoardOpSchema,
 } from '@workspace/schemas/case-board';
 import { parseActorName } from '../actor-name.decorator';
-import { mergeStyle, toRelationType } from './case-board.service';
+import { claimHolds, mergeStyle, toRelationType } from './case-board.service';
 import { summarizeOps } from './case-board.events';
 
 const id = () => crypto.randomUUID();
@@ -190,6 +190,30 @@ describe('mergeStyle', () => {
         { rowHighlights: { a: null } },
       ),
     ).toBeNull();
+  });
+});
+
+describe('claimHolds', () => {
+  const t0 = new Date('2026-09-26T10:00:00.000Z');
+  const t1 = new Date('2026-09-26T10:00:05.000Z');
+
+  it('holds while nobody wrote the row since the claimed version', () => {
+    expect(claimHolds(t0, t0.toISOString(), t0.getTime())).toBe(true);
+  });
+
+  it("holds when only this batch's earlier ops wrote the row (redo after undo, two edits of one note)", () => {
+    // The row was at t0 when the batch took the board lock; an earlier op of
+    // the batch moved it to t1; the edit still claims t0.
+    expect(claimHolds(t1, t0.toISOString(), t0.getTime())).toBe(true);
+  });
+
+  it('holds for a row this batch created itself (a new note and its first text)', () => {
+    expect(claimHolds(t1, t0.toISOString(), null)).toBe(true);
+  });
+
+  it('refuses a claim someone else overtook before the batch began', () => {
+    expect(claimHolds(t1, t0.toISOString(), t1.getTime())).toBe(false);
+    expect(claimHolds(t1, t0.toISOString(), undefined)).toBe(false);
   });
 });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, Crosshair, ExternalLink, GripVertical, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, ArrowRight, Crosshair, ExternalLink, GripVertical, ListChecks, Loader2, Plus } from "lucide-react";
 import {
   QuickSearchRequestDtoKindsEnum,
   type QuickSearchAssetDto,
@@ -77,6 +77,7 @@ export function AddEvidencePanel({ onFlyTo }: { onFlyTo: (nodeId: string) => voi
   const { t } = useTranslation();
   const ui = useUiStore();
   const readOnly = useBoard((s) => s.readOnly);
+  const caseId = useBoard((s) => s.caseId);
   const itemByAsset = useBoard((s) => s.itemByAsset);
   const bubbles = useBoard((s) => s.bubbles);
   const prefill = useUi((s) => s.addEvidenceQuery);
@@ -207,6 +208,17 @@ export function AddEvidencePanel({ onFlyTo }: { onFlyTo: (nodeId: string) => voi
           })}
         </ResultSection>
       )}
+      {!readOnly && (
+        <a
+          href={nsPath(`/investigations/${caseId}/evidence/add`)}
+          className="flex items-center gap-2 rounded-[4px] border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:border-foreground/50 hover:text-foreground"
+          data-testid="add-evidence-bulk"
+        >
+          <ListChecks className="size-3.5 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1">{t("caseBoard.addEvidence.bulk")}</span>
+          <ArrowRight className="size-3.5 shrink-0" aria-hidden />
+        </a>
+      )}
     </div>
   );
 }
@@ -295,7 +307,11 @@ function AssetResult({
         <p className="flex items-center gap-2 truncate font-mono text-[10px] text-muted-foreground">
           <span className="truncate">{asset.sourceName ?? asset.sourceType}</span>
           {asset.openFindings > 0 ? (
-            <span className="inline-flex shrink-0 items-center gap-1" title={t("caseBoard.addEvidence.openFindings", { count: asset.openFindings })}>
+            <span className="inline-flex shrink-0 items-center gap-1" title={
+                asset.openFindings === 1
+                  ? t("caseBoard.addEvidence.openFindingsOne")
+                  : t("caseBoard.addEvidence.openFindings", { count: asset.openFindings })
+              }>
               {SEVERITIES.map((sev) => {
                 const n = counts[sev.toLowerCase() as keyof typeof counts];
                 return n > 0 ? (

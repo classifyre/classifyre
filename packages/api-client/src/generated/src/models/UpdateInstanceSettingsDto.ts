@@ -98,12 +98,6 @@ export interface UpdateInstanceSettingsDto {
      */
     autoScheduleEnabled?: boolean;
     /**
-     * Open cases on the case board (the new investigation canvas) instead of the legacy case graph.
-     * @type {boolean}
-     * @memberof UpdateInstanceSettingsDto
-     */
-    caseBoardEnabled?: boolean;
-    /**
      * Hugging Face token to set. Pass a token value to store (encrypted at rest). Pass null or an empty string to clear the stored token. Ignored when an instance-level HF_TOKEN is configured.
      * @type {string}
      * @memberof UpdateInstanceSettingsDto
@@ -241,7 +235,6 @@ export function UpdateInstanceSettingsDtoFromJSONTyped(json: any, ignoreDiscrimi
         'autopilotEscalationEnabled': json['autopilotEscalationEnabled'] == null ? undefined : json['autopilotEscalationEnabled'],
         'autopilotMcpEnabled': json['autopilotMcpEnabled'] == null ? undefined : json['autopilotMcpEnabled'],
         'autoScheduleEnabled': json['autoScheduleEnabled'] == null ? undefined : json['autoScheduleEnabled'],
-        'caseBoardEnabled': json['caseBoardEnabled'] == null ? undefined : json['caseBoardEnabled'],
         'hfToken': json['hfToken'] == null ? undefined : json['hfToken'],
         'harnessRunBudgetMinutes': json['harnessRunBudgetMinutes'] == null ? undefined : json['harnessRunBudgetMinutes'],
         'harnessRunStaleAfterMinutes': json['harnessRunStaleAfterMinutes'] == null ? undefined : json['harnessRunStaleAfterMinutes'],
@@ -283,7 +276,6 @@ export function UpdateInstanceSettingsDtoToJSONTyped(value?: UpdateInstanceSetti
         'autopilotEscalationEnabled': value['autopilotEscalationEnabled'],
         'autopilotMcpEnabled': value['autopilotMcpEnabled'],
         'autoScheduleEnabled': value['autoScheduleEnabled'],
-        'caseBoardEnabled': value['caseBoardEnabled'],
         'hfToken': value['hfToken'],
         'harnessRunBudgetMinutes': value['harnessRunBudgetMinutes'],
         'harnessRunStaleAfterMinutes': value['harnessRunStaleAfterMinutes'],

@@ -1028,11 +1028,6 @@ model InstanceSettings {
   // exactly where each source was. The kill switch for "stop scanning now".
   autoScheduleEnabled Boolean @default(true) @map("auto_schedule_enabled")
 
-  // Rollout switch for the case board (docs/architecture/CASE_BOARD_PRD.md).
-  // Off: cases open on the legacy graph workspace. Ships off until the board
-  // reaches parity; per workspace so one team can try it first.
-  caseBoardEnabled Boolean @default(false) @map("case_board_enabled")
-
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

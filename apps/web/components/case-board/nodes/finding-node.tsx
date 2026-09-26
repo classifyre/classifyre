@@ -2,18 +2,16 @@
 
 import * as React from "react";
 import type { NodeProps } from "@xyflow/react";
-import { Check } from "lucide-react";
-import { cn } from "@workspace/ui/lib/utils";
+import { FindingNodeView } from "@workspace/case-board/components/finding-node";
+import type { FindingLook } from "@workspace/case-board/components/glyphs";
+import { useLod } from "@workspace/case-board/hooks/use-lod";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useUi } from "../store/board-context";
 import { dismissedLabel } from "../store/finding-state";
 import { isFindingData, type BoardNode } from "../store/projection";
-import { FINDING_NODE, findingCode } from "../store/relations";
+import { findingCode } from "../store/relations";
 import type { BubbleRow, FindingVisualState } from "../store/types";
 import type { ViewPrefs } from "../store/ui-store";
-import { useLod } from "../hooks/use-lod";
-import { codeInk, FindingCircle, type FindingLook } from "./relation-glyphs";
-import { Ports } from "./ports";
 
 /** Findings the View popover asked to fade (never hide — evidence preservation). */
 function faded(state: FindingVisualState, view: ViewPrefs): boolean {
@@ -46,57 +44,24 @@ export const FindingNode = React.memo(function FindingNode({ data, selected }: N
 
   const look: FindingLook = finding.attached ? row.state : "ghost";
   const severity = row.severity ?? "info";
-  const { cx, cy, r, width, height } = FINDING_NODE;
-
   return (
-    <div
-      className={cn("relative", faded(row.state, view) && "opacity-25")}
-      style={{ width, height }}
+    <FindingNodeView
+      findingId={findingId}
+      attached={finding.attached}
+      severity={severity}
+      look={look}
+      code={findingCode(row.detector, row.typeLabel)}
+      label={`${row.typeLabel}${row.value ? `: ${row.value}` : ""}`}
       title={describe(row, finding.attached, t)}
-      data-finding-id={findingId}
-      data-row-attached={finding.attached ? "true" : "false"}
-      data-testid="finding-node"
-    >
-      <svg width={width} height={height} className="absolute inset-0 overflow-visible" aria-hidden>
-        <FindingCircle severity={severity} look={look} selected={selected} highlight={highlight} />
-      </svg>
-      <span
-        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 font-mono text-[9.5px] font-bold leading-none"
-        style={{ left: cx, top: cy + 0.5, color: codeInk(severity, look) }}
-      >
-        {findingCode(row.detector, row.typeLabel)}
-      </span>
-      {row.state === "new" && finding.attached && (
-        <span
-          className="pointer-events-none absolute rounded-[2px] border border-[#0a0a0a] bg-accent px-[3px] font-mono text-[7.5px] font-bold leading-[10px] text-accent-foreground"
-          style={{ left: cx + 7, top: cy - r - 7 }}
-        >
-          {t("caseBoard.bubble.newBadge")}
-        </span>
-      )}
-      {row.state === "resolved" && (
-        <span
-          className="pointer-events-none absolute flex size-3 items-center justify-center rounded-full bg-[var(--cb-supports)] text-white"
-          style={{ left: cx + 6, top: cy + 5 }}
-        >
-          <Check className="size-2" strokeWidth={3.5} aria-hidden />
-        </span>
-      )}
-      {lod === "full" && (
-        <span
-          className={cn(
-            "cb-halo pointer-events-none absolute inset-x-0 truncate px-0.5 text-center font-mono text-[9.5px] leading-tight text-muted-foreground",
-            row.state === "dismissed" && "line-through",
-            !finding.attached && "italic",
-          )}
-          style={{ top: cy + r + 5 }}
-        >
-          {row.typeLabel}
-          {row.value ? `: ${row.value}` : ""}
-        </span>
-      )}
-      <Ports connectable={!readOnly} round={{ cx, cy, r }} core={{ cx, cy, d: 2 * r + 8 }} />
-    </div>
+      lod={lod}
+      readOnly={readOnly}
+      selected={selected}
+      highlight={highlight}
+      newBadge={row.state === "new" && finding.attached ? t("caseBoard.bubble.newBadge") : null}
+      resolved={row.state === "resolved"}
+      struck={row.state === "dismissed"}
+      faded={faded(row.state, view)}
+    />
   );
 });
 

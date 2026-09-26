@@ -222,15 +222,18 @@ Open any asset and choose the **Lineage** tab.
 Below the graph, the **column lineage** panel traces a single column.
 
 Relationships also appear throughout [investigations](/investigations/) and in
-[duplicate review](/duplicates/) — in the case graph, relationship types are
-grouped by class, so lineage is visually distinct from containment, duplicates,
-and references. Selecting any
-relationship shows its class, how it was derived, whether it carries column
-detail, and the SQL behind it where there is any.
+[duplicate review](/duplicates/). On the
+[case board](/investigations/cases/links/), lineage is drawn with an arrow the
+way the data flowed, visually distinct from containment, duplicates and
+references, and **Show connections** walks lineage upstream and downstream from
+any piece of evidence. In the lineage view, selecting any relationship shows
+its class, how it was derived, whether it carries column detail, and the SQL
+behind it where there is any.
 
-You can also **draw a relationship by hand** in a case graph when you know
-something the systems don't. Manual edges are marked as such, so they're never
-mistaken for something a platform reported.
+You can also **draw a link by hand** on a case board when you know something
+the systems don't. Links people drew are amber, so they're never mistaken for
+something a platform reported, and a link can be promoted to a global
+relationship that the lineage view shows too.
 
 ---
 

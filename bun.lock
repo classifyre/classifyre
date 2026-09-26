@@ -141,9 +141,12 @@
       "version": "0.5.12-SNAPSHOT",
       "dependencies": {
         "@theguild/remark-mermaid": "^0.3.0",
+        "@workspace/case-board": "workspace:*",
         "@workspace/schemas": "workspace:*",
         "@workspace/ui": "workspace:*",
+        "@xyflow/react": "^12.12.0",
         "gray-matter": "^4.0.3",
+        "lucide-react": "^1.7.0",
         "next": "16.1.7",
         "next-sitemap": "^4.2.3",
         "nextra": "^4.6.1",
@@ -184,6 +187,7 @@
         "@stepperize/react": "^7.0.0",
         "@vercel/otel": "^2.1.2",
         "@workspace/api-client": "workspace:*",
+        "@workspace/case-board": "workspace:*",
         "@workspace/schemas": "workspace:*",
         "@workspace/ui": "workspace:*",
         "@xyflow/react": "^12.12.0",
@@ -244,6 +248,26 @@
         "@types/node": "^26.1.1",
         "jest": "^30.3.0",
         "ts-jest": "^29.4.9",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/case-board": {
+      "name": "@workspace/case-board",
+      "version": "0.0.0",
+      "dependencies": {
+        "@workspace/schemas": "workspace:*",
+        "@workspace/ui": "workspace:*",
+        "@xyflow/react": "^12.12.0",
+        "lucide-react": "^1.7.0",
+        "react": "^19.2.4",
+        "react-dom": "^19.2.4",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.14",
+        "@types/react-dom": "^19.2.3",
+        "@workspace/eslint-config": "workspace:*",
+        "@workspace/typescript-config": "workspace:*",
+        "eslint": "^9.39.4",
         "typescript": "^5.9.3",
       },
     },
@@ -1850,6 +1874,8 @@
     "@workflow/serde": ["@workflow/serde@4.1.0", "", {}, "sha512-pav4F2BoirECWR7Nf1TKt+2eETcBj7jj4cBefQ8VXQCA6NPkaKeLfj/zMgi+3zYV5ZIBT4GuUiphsj0/b9hPQQ=="],
 
     "@workspace/api-client": ["@workspace/api-client@workspace:packages/api-client"],
+
+    "@workspace/case-board": ["@workspace/case-board@workspace:packages/case-board"],
 
     "@workspace/devops": ["@workspace/devops@workspace:packages/devops"],
 

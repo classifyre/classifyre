@@ -1,0 +1,156 @@
+---
+title: Lines & links
+description: Every line on the case board says how two things relate. This page covers the relations the platform found, the links you draw, and the stance of a hypothesis, plus how to draw, edit and remove them.
+---
+
+import { Callout, Steps } from "nextra/components"
+import { CaseBoardDemo } from "@/components/case-board/board-demo"
+import { LineKey } from "@/components/case-board/board-key"
+
+# Lines & links
+
+Every line on the board answers one question: **how are these two things
+related?** The answer is written along the line, and its colour tells you who
+said so:
+
+| Colour | Who said so | Can you change it? |
+|---|---|---|
+| **Grey** | The platform found it in your data: lineage, references, duplicates | No: it is a fact about the data |
+| **Amber** (or red) | Someone drew it on this board | Yes: edit, promote or delete it |
+| **Green, red or grey** with a glyph | A hypothesis's stance on a piece of evidence | Yes: change or remove the stance |
+
+Dashed ghost lines in other colours belong to **Show connections**; they are
+covered in [Connections & neighbours](/investigations/cases/connections/).
+
+<CaseBoardDemo
+  scene="relations"
+  height={500}
+  caption="Top: relations the platform found (lineage, a reference, a duplicate). Bottom: links people drew (a contradiction, a confident one-way link shared with every case, and a suspected link). Point at an asset and drag from one of its small ports to another asset to draw a link yourself."
+/>
+
+---
+
+## Relations the platform found
+
+When sources are scanned, Classifyre works out how assets relate: a file was
+produced from a database table, a document refers to a spreadsheet, two files
+hold the same content. On the board these are thin grey lines with their type
+written along them:
+
+<LineKey only="found" />
+
+The words along the line are the relation's own name, for example:
+
+| You may read | Kind | Meaning |
+|---|---|---|
+| `TRANSFORM`, `COPY` | Lineage | The data flowed from one asset into the other; the arrow shows the direction |
+| `REFERENCES`, `ATTACHED_TO`, `links_to` | Link | One asset mentions, attaches or links to the other |
+| `identical_content`, `likely_duplicate` | Duplicate | The same content, found in two places |
+| `related` | Similar | The contents overlap a lot: near neighbours |
+| `contains` | | From an asset to each of its findings |
+
+Several relations between the same two assets are folded into one line marked
+**×n**.
+
+**Point at a relation** to read it in plain words, such as *Lineage · data
+flows payroll.xlsx → export.csv* or *Duplicate · 97% similar*, with a lock: the
+platform's relations cannot be deleted from a board, because they are facts
+about your data rather than opinions about the case. **Right-click** one for
+**Why is this here?** (how it was found, and how sure the platform is) and
+**Open both** (both assets, each in a new tab).
+
+<Callout type="info">
+Which kinds of relation the board draws is up to you: **View → Connections**
+turns **Lineage**, **Links**, **Duplicates** and **Similar** on and off. The
+same switches decide which relations lead to
+[suggested neighbours](/investigations/cases/connections/#suggested-neighbours).
+</Callout>
+
+---
+
+## Links you draw
+
+A link is your own statement that two things belong together: two invoices that
+contradict each other, a document that came before a payment, an email address
+that is the same person as a vendor record. Links are amber, with their kind
+written along them:
+
+<LineKey only="drawn" />
+
+### Drawing a link
+
+<Steps>
+
+### Point at the first thing
+
+Four small **ports** appear around it, one on each side, a little away from
+the node. Every asset, finding, hypothesis and note has them.
+
+### Drag from any port to the other thing
+
+The port under the pointer where the link would land lights up. Drop anywhere
+on the other node, not only on a port. Lines always attach to the nearest side,
+so it does not matter which port you started from.
+
+### Say what the link means
+
+A small menu opens where you dropped. Pick a kind: **Related to**, **Same
+entity**, **Communicates with**, **Derived from**, **Contradicts**,
+**Precedes**, or type your own with **Custom…**. The kinds you used recently
+come first. Choose **Confirmed** or **Suspected**, add a label if you like, and press
+**Link**. `Enter` takes the first kind; `Esc` cancels, and nothing is saved.
+
+</Steps>
+
+For many links in a row, switch on the **Link** tool (`L`). Every node then
+becomes one big handle: drag from anywhere on it. You can link **a single
+finding**, not only its asset: drag from the finding's own ports.
+
+### Editing, promoting and deleting
+
+Right-click a link:
+
+| Action | What it does |
+|---|---|
+| **Edit link** | Change its kind or label, switch between **Confirmed** and **Suspected**, set its **confidence** (the line gets thicker the more confident it is) |
+| **Promote to global relationship** | Copies the link into the shared graph of your data, where every case and the lineage view can see it. It gets a globe |
+| **Delete link** | Removes it from this board. **Undo** brings it back |
+| **Delete everywhere…** | For a global relationship: removes it for every case and the lineage view, after asking you to confirm |
+
+Point at a link to see who drew it. You can also select a link, or a stance,
+and press `Delete`; **Undo** brings it back.
+
+---
+
+## A hypothesis's stance
+
+A stance says how a piece of evidence bears on a hypothesis: it **supports**
+it, **contradicts** it, or is relevant without taking a side (**neutral**). The
+glyph sits at the hypothesis end, so you can read the direction without a
+legend:
+
+<LineKey only="stances" />
+
+Setting a stance:
+
+- **Drag** from a hypothesis card to an asset or a finding (or the other way
+  round). Instead of the kinds menu, three buttons ask **How does this bear on
+  the hypothesis?** Click one and you are done.
+- **Right-click** evidence → **Add to hypothesis** → pick the hypothesis and
+  the stance. This works on several selected items at once.
+- In the hypothesis's **thread**, link evidence from the **Evidence** tab. See
+  [Hypotheses & threads](/investigations/cases/hypothesis/).
+
+Right-click a stance line to **change the stance** or **remove** it. Point at it
+to read the stance in words, with its confidence and note when it has them.
+
+---
+
+## When lines crowd
+
+- Two lines between the same pair of things **bow apart** instead of drawing
+  over each other.
+- Zoomed out, the words along the lines are hidden so the picture stays
+  readable; point at a line to read it anyway.
+- Selecting something fades every line that does not touch it. Focusing a
+  hypothesis (click its card) leaves only its stances.

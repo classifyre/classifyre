@@ -44,7 +44,8 @@ export function PanelRail({ pendingLeads, newMatches }: { pendingLeads: number; 
   const readOnly = useBoard((s) => s.readOnly);
   const last = React.useRef<DrawerKind>("details");
   React.useEffect(() => {
-    if (drawer) last.current = drawer === "thread" ? "hypotheses" : drawer;
+    // Connections only mean something with a trace running: not one to come back to.
+    if (drawer && drawer !== "connections") last.current = drawer === "thread" ? "hypotheses" : drawer;
   }, [drawer]);
 
   const work: RailEntry[] = [

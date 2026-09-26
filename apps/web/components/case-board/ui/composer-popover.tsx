@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { BOARD_HYPOTHESIS_TITLE_MAX_CHARS, BOARD_NOTE_MAX_CHARS } from "@workspace/schemas/case-board";
 import { Popover, PopoverAnchor, PopoverContent } from "@workspace/ui/components/popover";
 import { Button } from "@workspace/ui/components/button";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -61,6 +62,7 @@ export function ComposerPopover() {
           autoFocus
           rows={3}
           value={text}
+          maxLength={isComment ? BOARD_NOTE_MAX_CHARS : BOARD_HYPOTHESIS_TITLE_MAX_CHARS}
           placeholder={isComment ? t("caseBoard.comment.placeholder") : t("caseBoard.hypothesis.placeholder")}
           className="resize-none text-sm"
           onChange={(e) => setText(e.target.value)}

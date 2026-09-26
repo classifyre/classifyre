@@ -8,6 +8,7 @@ module.exports = {
   },
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    "^@workspace/case-board/(.*)$": "<rootDir>/../../packages/case-board/src/$1",
   },
   moduleFileExtensions: ["ts", "js", "json"],
 }

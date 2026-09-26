@@ -1,12 +1,11 @@
 "use client";
 
 import "@xyflow/react/dist/base.css";
-import "./case-board.css";
+import "@workspace/case-board/board.css";
 
 import * as React from "react";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
-import { useShallow } from "zustand/react/shallow";
-import { Loader2, Lock, RotateCcw, Route, StickyNote, X } from "lucide-react";
+import { Loader2, Lock, RotateCcw, StickyNote, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, type CaseLeadDto, type CaseResponseDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
@@ -22,6 +21,9 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
+import { useEntityDocumentTitle } from "@/components/document-title-updater";
+import { useServerConfig } from "@/components/server-config-provider";
+import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
 import { useTranslation } from "@/hooks/use-translation";
 import { BoardProviders, useBoard, useBoardStore, useUi, useUiStore } from "./store/board-context";
 import { createBoardStore } from "./store/board-store";
@@ -38,8 +40,9 @@ import { useVisibleCentre } from "./hooks/use-visible-centre";
 import { primeActorName } from "./hooks/use-actor-name";
 import { elkLayout } from "./hooks/elk-layout";
 import { layoutBox } from "./hooks/use-auto-place";
-import { boardFileName, exportBoardPng } from "./hooks/export-board";
+import { boardFileName, exportBoardPng, untilMeasured } from "./hooks/export-board";
 import { useBoardSocket } from "./hooks/use-board-socket";
+import { useNeighbourhoodLoader, useTraceLoader } from "./hooks/use-trace";
 
 /** Refetch while visible: worker-side changes (auto-pull) do not push over the socket. */
 const POLL_MS = 60_000;
@@ -51,9 +54,10 @@ const POLL_MS = 60_000;
  * right edge), so the canvas shrinks instead of being covered.
  */
 export function CaseBoard({ caseId }: { caseId: string }) {
+  const { demoMode } = useServerConfig();
   const [stores] = React.useState(() => {
     primeActorName();
-    return { board: createBoardStore(caseId), ui: createUiStore() };
+    return { board: createBoardStore(caseId, { demo: demoMode }), ui: createUiStore() };
   });
   React.useEffect(() => stores.board.getState().connect(), [stores]);
 
@@ -93,7 +97,9 @@ function BoardShell({ caseId }: { caseId: string }) {
   const flyTo = useFlyTo();
   const loaded = useBoard((s) => s.loaded);
   const loadError = useBoard((s) => s.loadError);
-  const readOnly = useBoard((s) => s.readOnly);
+  // Read-only because the case is closed (a demo instance is read-only too,
+  // and says so in its own banner).
+  const closed = useBoard((s) => s.caseStatus === "CLOSED" || s.caseStatus === "ARCHIVED");
   const notice = useBoard((s) => s.notice);
   const isEmpty = useBoard((s) => s.items.size === 0);
   const drawer = useUi((s) => s.drawer);
@@ -147,6 +153,10 @@ function BoardShell({ caseId }: { caseId: string }) {
   }, [refreshAll, store]);
 
   useBoardSocket(caseId);
+  // The tab title and the header's breadcrumb name the case, not its id.
+  useEntityDocumentTitle(caseData?.title);
+  useTraceLoader(caseId);
+  useNeighbourhoodLoader(caseId);
 
   React.useEffect(() => {
     if (!notice) return;
@@ -241,13 +251,21 @@ function BoardShell({ caseId }: { caseId: string }) {
   }, [caseId]);
 
   const exportPng = React.useCallback(async () => {
+    // The canvas only renders what is in view; the image needs every node.
+    ui.getState().set({ exporting: true });
     try {
-      await exportBoardPng(rf.getNodes(), boardFileName(caseData?.title, "png"));
+      await untilMeasured(rf);
+      await exportBoardPng(
+        rf.getNodes().filter((n) => !n.hidden),
+        boardFileName(caseData?.title, "png"),
+      );
       toast.success(t("caseBoard.toasts.exported"));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      ui.getState().set({ exporting: false });
     }
-  }, [rf, caseData, t]);
+  }, [rf, ui, caseData, t]);
 
   return (
     <div
@@ -261,7 +279,7 @@ function BoardShell({ caseId }: { caseId: string }) {
         onTakeSnapshot={() => void takeSnapshot()}
         onExportPng={() => void exportPng()}
       />
-      {readOnly && (
+      {closed && (
         <div className="flex items-center gap-2 border-b-2 border-border bg-muted px-3 py-1.5 text-xs" role="status">
           <Lock className="size-3.5" aria-hidden />
           <span>{t("caseBoard.readOnly")}</span>
@@ -309,7 +327,7 @@ function BoardShell({ caseId }: { caseId: string }) {
                 <>
                   <BoardCanvas onTidyUp={() => void tidyUp()} />
                   {isEmpty && <EmptyBoard />}
-                  <PathBanner />
+                  <FocusBanner />
                 </>
               )}
             </div>
@@ -338,6 +356,7 @@ function BoardShell({ caseId }: { caseId: string }) {
         />
       </div>
       <CommandPalette onFlyTo={flyTo} onTidyUp={() => void tidyUp()} />
+      <AutopilotDialog caseId={caseId} caseTitle={caseData?.title} onTriggered={refreshAll} />
       <CheatSheet />
       <ConfirmDialog />
     </div>
@@ -382,39 +401,50 @@ function EmptyBoard() {
   );
 }
 
-function PathBanner() {
+/** A hypothesis's focus that stays while you work: say so, and how to leave it. */
+function FocusBanner() {
   const { t } = useTranslation();
-  const { path, pathFrom, focusLock } = useUi(
-    useShallow((s) => ({ path: s.path, pathFrom: s.pathFrom, focusLock: s.focusLock })),
-  );
+  const focusLock = useUi((s) => s.focusLock);
   const ui = useUiStore();
-  if (!path && !pathFrom && !focusLock) return null;
+  if (!focusLock) return null;
   return (
     <div className="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-[6px] border-2 border-foreground bg-card px-3 py-1.5 text-xs">
-      {path ? (
-        <>
-          <Route className="size-3.5" aria-hidden />
-          {t("caseBoard.path.hops", { count: path.hops })}
-        </>
-      ) : pathFrom ? (
-        <>
-          <Route className="size-3.5" aria-hidden />
-          {t("caseBoard.path.pickTarget")}
-        </>
-      ) : (
-        <>
-          <Lock className="size-3.5" aria-hidden />
-          {t("caseBoard.focus.locked")}
-        </>
-      )}
+      <Lock className="size-3.5" aria-hidden />
+      {t("caseBoard.focus.locked")}
       <button
         type="button"
         className="ml-1 inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-        onClick={() => ui.getState().set({ path: null, pathFrom: null, focusLock: false })}
+        onClick={() => ui.getState().set({ focusLock: false })}
       >
-        <X className="size-3" /> {path || pathFrom ? t("caseBoard.path.clear") : t("caseBoard.focus.unlock")}
+        <X className="size-3" /> {t("caseBoard.focus.unlock")}
       </button>
     </div>
+  );
+}
+
+/** "Run Autopilot" on this case, opened from the ⋯ menu or the Case file panel. */
+function AutopilotDialog({
+  caseId,
+  caseTitle,
+  onTriggered,
+}: {
+  caseId: string;
+  caseTitle: string | undefined;
+  onTriggered: () => void;
+}) {
+  const open = useUi((s) => s.autopilotOpen);
+  const ui = useUiStore();
+  return (
+    <RunAutopilotDialog
+      open={open}
+      onOpenChange={(next) => ui.getState().set({ autopilotOpen: next })}
+      caseId={caseId}
+      caseTitle={caseTitle}
+      onTriggered={() => {
+        ui.getState().set({ autopilotRefresh: ui.getState().autopilotRefresh + 1 });
+        onTriggered();
+      }}
+    />
   );
 }
 

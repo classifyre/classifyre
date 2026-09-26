@@ -3,13 +3,14 @@
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { NodeResizer, type NodeProps } from "@xyflow/react";
-import { cn } from "@workspace/ui/lib/utils";
+import { BOARD_NOTE_MAX_CHARS } from "@workspace/schemas/case-board";
+import { NoteView } from "@workspace/case-board/components/note-node";
+import { useLod } from "@workspace/case-board/hooks/use-lod";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
+import { textClaim } from "../store/claims";
 import { editText, resizeItem } from "../store/commands";
 import type { BoardNode } from "../store/projection";
-import { useLod } from "../hooks/use-lod";
-import { Ports } from "./ports";
 
 const NOTE_MIN = { width: 160, height: 100 };
 
@@ -29,11 +30,15 @@ export const NoteNode = React.memo(function NoteNode({ id, selected }: NodeProps
   const store = useBoardStore();
   const ui = useUiStore();
   const [draft, setDraft] = React.useState("");
+  // The text and version editing began from, to tell a save on top of
+  // someone else's edit (refused) from an ordinary one.
+  const editedFrom = React.useRef<{ text: string; updatedAt: string } | null>(null);
   const areaRef = React.useRef<HTMLTextAreaElement>(null);
 
   React.useEffect(() => {
     if (editing && item) {
       setDraft(item.content.text ?? "");
+      editedFrom.current = { text: item.content.text ?? "", updatedAt: item.updatedAt };
       requestAnimationFrame(() => areaRef.current?.focus());
     }
     // Only when editing starts: typing must not be reset by a refetch.
@@ -48,7 +53,7 @@ export const NoteNode = React.memo(function NoteNode({ id, selected }: NodeProps
     ui.getState().set({ editingItemId: null });
     const current = store.getState().items.get(id);
     if (current && (current.content.text ?? "") !== draft) {
-      store.getState().run(editText(current, draft));
+      store.getState().run(editText(current, draft, textClaim(current, current.content.text, editedFrom.current)));
     }
   };
 
@@ -73,47 +78,41 @@ export const NoteNode = React.memo(function NoteNode({ id, selected }: NodeProps
           );
         }}
       />
-      <div
-        className={cn(
-          `cb-note-${color}`,
-          "flex h-full w-full flex-col overflow-hidden rounded-[4px] border-2 p-3 text-sm text-foreground",
-          selected ? "border-foreground" : "border-border/70",
-          item.style.highlight && `cb-ring-${item.style.highlight}`,
-          pulse && "cb-pulse",
-        )}
-        aria-label={text ? text.slice(0, 80) : t("caseBoard.note.empty")}
-        data-testid="note-node"
+      <NoteView
+        color={color}
+        text={text}
+        emptyLabel={t("caseBoard.note.empty")}
+        placeholder={t("caseBoard.note.placeholder")}
+        lod={lod}
+        readOnly={readOnly}
+        selected={selected}
+        highlight={item.style.highlight ?? null}
+        pulse={pulse}
+        renderText={(markdown) => <ReactMarkdown>{markdown}</ReactMarkdown>}
         onDoubleClick={() => {
           if (!readOnly) ui.getState().set({ editingItemId: id });
         }}
-      >
-        {editing ? (
-          <textarea
-            ref={areaRef}
-            className="nodrag nowheel nopan h-full w-full resize-none bg-transparent font-sans text-sm leading-snug outline-none"
-            value={draft}
-            placeholder={t("caseBoard.note.placeholder")}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault();
-                commit();
-              }
-              e.stopPropagation();
-            }}
-          />
-        ) : lod === "chip" ? (
-          <p className="line-clamp-3 text-lg font-semibold">{text || t("caseBoard.note.empty")}</p>
-        ) : text ? (
-          <div className="cb-markdown nowheel min-h-0 flex-1 overflow-hidden leading-snug break-words">
-            <ReactMarkdown>{text}</ReactMarkdown>
-          </div>
-        ) : (
-          <p className="text-muted-foreground italic">{t("caseBoard.note.placeholder")}</p>
-        )}
-      </div>
-      <Ports connectable={!readOnly} />
+        editor={
+          editing ? (
+            <textarea
+              ref={areaRef}
+              className="nodrag nowheel nopan h-full w-full resize-none bg-transparent font-sans text-sm leading-snug outline-none"
+              value={draft}
+              maxLength={BOARD_NOTE_MAX_CHARS}
+              placeholder={t("caseBoard.note.placeholder")}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  commit();
+                }
+                e.stopPropagation();
+              }}
+            />
+          ) : null
+        }
+      />
     </>
   );
 });

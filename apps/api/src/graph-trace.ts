@@ -10,7 +10,12 @@ import { Prisma } from '@prisma/client';
  * without a database; `GraphService.trace` supplies the bounded SQL.
  */
 
-export const TRACE_KINDS = ['lineage', 'links', 'duplicates', 'similar'] as const;
+export const TRACE_KINDS = [
+  'lineage',
+  'links',
+  'duplicates',
+  'similar',
+] as const;
 export type TraceKind = (typeof TRACE_KINDS)[number];
 export type TraceSide = 'seed' | 'up' | 'down' | 'side';
 export type TraceDirection = 'up' | 'down' | 'both';

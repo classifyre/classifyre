@@ -2,12 +2,12 @@
 
 | | |
 |---|---|
-| **Status** | In implementation: Phases 0–6 landed behind the flag; Phase 7 in progress (see §9) |
-| **Date** | 2026-09-24 |
+| **Status** | Main case view: Phases 0–6 landed; Phase 7 cut-over done (flag and legacy canvas removed, user docs written). Open: the performance pass and Playwright e2e (see §9) |
+| **Date** | 2026-09-26 |
 | **Owner** | Product: Andrii Fedorenko |
 | **Replaces** | `apps/web/components/case-graph/*` (the custom Canvas2D + d3-force case graph) |
 | **Main library** | `@xyflow/react` 12.x (React Flow) |
-| **Touches** | `apps/web`, `apps/api` (Prisma, REST, WebSocket, MCP), `packages/ui` |
+| **Touches** | `apps/web`, `apps/api` (Prisma, REST, WebSocket, MCP), `apps/docs`, `packages/ui`, `packages/case-board` |
 
 ---
 
@@ -146,8 +146,9 @@ Nothing that works today may be lost. Every feature is mapped here.
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Top bar (48 px, one line):** back; title (inline edit); status select; severity; a *driving watches* chip (clicking it opens the Watches panel, and "3 new" flies to the NEW findings); ⌘K; presence avatars (§5.12); an overflow menu with *Tidy up board*, *Export PNG*, *Close case*, *Board snapshots*.
-- **Right rail (44 px):** one icon per side panel — Details, Hypotheses, Add evidence | Evidence, Leads *with pending count*, Watches *with new matches*, Timeline, Case file, Snapshots — and at the bottom a toggle that folds the panel away or brings back the last one. The open panel's icon is filled; clicking it again closes the panel.
+- **Top bar (56 px, one line; revised 2026-09-25):** the case — title, status, severity (the app's breadcrumb is the way back, so there is no back button) — then a **ledger** of what is on the board: *n evidence · n findings · n hypotheses*, each with the mark its nodes wear. Pressing a counter **spotlights** that kind (everything else dims) and brings all of it into view; pressing it again, `Esc` or a click on the empty canvas lets the rest back. Then a wide search field (⌘K), presence avatars (§5.12) and the overflow menu (*Tidy up board*, *Export PNG*, *Board snapshots*, *Close case*). Watches live on the rail; the save state is a small mark at the rail's foot.
+- **Right rail (44 px):** one icon per side panel — Details, Hypotheses, Add evidence | Evidence, Leads *with pending count*, Watches *with new matches*, Timeline, Case file, Snapshots — and at the bottom the save state (saved ✓ / saving / failed) and a toggle that folds the panel away or brings back the last one. The open panel's icon is filled; clicking it again closes the panel.
+- **Clicks:** a single click selects; if Details or a thread is already open in the side panel, it follows the click. A **double click opens** what the node is about there: details for an asset, a finding or a neighbour, the thread for a hypothesis card or a comment pin. The mouse wheel zooms (Space + drag or the middle button pans); with the Select tool a drag on the canvas draws a selection box, with the Hand tool every drag pans and nothing is picked up.
 - **Side panel:** docked between the canvas and the rail, resizable by its edge (min 300 px, max 70 %), width remembered per viewer. Its header has the title, a back arrow in a single hypothesis (to the list), and a close button. `Esc` closes it once the canvas has nothing left to clear (selection, tool, path).
 - **Canvas:** full remaining height, endless, dotted `Background`.
 - **Bottom-left:** `View` popover (filters and highlight, §5.10).
@@ -237,8 +238,8 @@ Notes, hypothesis cards and frames follow the same three buckets.
 
 ### 5.4 Connecting (the "natural and easy" requirement)
 
-1. **Ports** (revised 2026-09-25): every linkable node — asset, finding, hypothesis, note — has four. **Left and top take links in** (hollow ○); **right and bottom send them out** (filled ●). They show on hover, on a selected node's outputs, and, while a link is being pulled, on every input it could land on (the one under the pointer lights up). Drag from an output, **or** hold `L` (Link tool) and drag from anywhere on the item (the right output grows over the node).
-2. Drop on an input, or anywhere on a node's body. `ConnectionMode.Strict`: a drag starts only on an output and snaps only to an input, so a link always reads source → target the way it was pulled. Ports are only where a drag starts and lands: edges still float to the nearest side of each node (§8.6), and a link stores no port. Suggested neighbours keep their ports hidden and inert (add them first).
+1. **Ports** (revised again 2026-09-25): every linkable node — asset, finding, hypothesis, note — has one port per side, a little off the node (clear of an asset's name and hypothesis dots). Each is both a place to pull from and to drop on; they show on the node under the pointer only (never because a node is selected), and the port a drop would land on lights up. Drag from any port, **or** hold `L` (Link tool) and drag from anywhere on the item (the right port grows over the node). *Separate input and output ports were tried and dropped: which side to pull from is not a decision people should have to make.*
+2. Drop on a port, or anywhere on a node's body. `ConnectionMode.Loose`. The link reads source → target the way it was pulled. Ports are only where a drag starts and lands: edges still float to the nearest side of each node (§8.6), and a link stores no port. Suggested neighbours and trace ghosts keep their ports hidden and inert (add them first).
 3. A **link popover** opens at the drop point. Its content depends on the endpoints:
    - **Either end is a hypothesis:** `✓ Supports` `✗ Contradicts` `○ Neutral` (+ optional note). One click.
    - **Otherwise:** a list of kinds (recent first): `Related to`, `Same entity`, `Communicates with`, `Derived from`, `Contradicts`, `Precedes`, `Custom…`, plus a *Confirmed / Suspected* toggle and an optional label. `Enter` accepts the top item.
@@ -260,8 +261,8 @@ Notes, hypothesis cards and frames follow the same three buckets.
  └───────────────────────────────── Open thread ▸┘
 ```
 - Created with the Hypothesis tool (`T`): click the canvas, type a statement, `Enter`. Creating one from a selection (context menu → *New hypothesis from selection*) also creates `SUPPORTS` stance edges to every selected evidence item.
-- Clicking the card enters **focus mode** for that hypothesis: everything that isn't linked to it dims.
-- *Open thread* opens the **hypothesis drawer**, which reuses `CaseThreads` for entries, status changes and confidence.
+- Clicking the card enters **focus mode** for that hypothesis: everything that isn't linked to it dims. A double click (or *Open thread*) opens it in the side panel; *Edit statement* (context menu) edits it in place.
+- **The hypothesis panel** (revised 2026-09-25, built for a narrow sidebar): the statement with its mark and colour (click to restate); the **verdict** as a four-way switch (Proposed / Supported / Refuted / Inconclusive) with confidence beneath; the **balance of evidence** as one stacked bar; then tabs — *Evidence* (each link's stance is a chip that changes it, the row flies to its node; a stance switch and a searchable picker link more), *Log* (the record, oldest first) and *Test* (the testable predicate) — and a composer pinned to the foot. Place/show on board, focus, colour and delete sit in its ⋯ menu. A comment pin's discussion gets the log and the composer alone.
 - Status and confidence change **only** through thread entries, which keeps the evolution log intact.
 
 ### 5.6 Notes, comments, frames
@@ -312,16 +313,16 @@ Notes, hypothesis cards and frames follow the same three buckets.
 
 ### 5.10 View popover (replaces the sidebar filters)
 
-- Suggested neighbours: *Auto* (hidden when > 30) / *Show* / *Hide*
+- **Neighbours not in the case** (revised 2026-09-25): a hop ladder — *Off · 1 · 2 · 3 · ∞* — instead of the Auto/Show/Hide selector. One hop comes with the board read; more hops walk the global graph from every piece of evidence (`POST …/board/trace`, §5.11) and lay each hop out beyond the one before. Until the viewer picks, a first hop crowded past 30 stays hidden, with a note saying so.
+- **Connections**: four kind chips — *Lineage · Links · Duplicates · Similar* — that choose which relations are drawn and which neighbours are followed. They replace the Lineage / Duplicates / References checkboxes.
 - Findings: *Show resolved*, *Show dismissed*, *Show gone/deleted* (all **on** by default to preserve evidence; turning one off dims rather than hides)
-- System links: Lineage / Duplicates / References checkboxes
 - Highlight by: Source ▸, Detector ▸, Hypothesis ▸, *Only highlighted*
 - Comments: *Show resolved comments*
 - Findings in bubbles: *Expand all / Collapse all*
 
 State is kept per user in `localStorage` (try/catch). It is **not** persisted on the board.
 
-### 5.11 Navigation, search, focus, path
+### 5.11 Navigation, search, focus, connections
 
 - **⌘K palette** (`packages/ui` `Command`):
   - *On this board*: items, finding rows (label, matched content, detector), notes, hypotheses. Selecting one calls `fitView({ nodes:[{id}], duration: 400 })` and pulses it.
@@ -330,7 +331,8 @@ State is kept per user in `localStorage` (try/catch). It is **not** persisted on
 - **`POST /search/quick`** (search as you type, meant for reuse elsewhere): never counts; asset names and finding content match by word prefix through GIN full-text indexes (`assets_name_fts_idx`, `findings_matched_content_fts_idx`), so a query that matches nothing costs an index lookup; asset names containing the query mid-word are looked for only when the words left room, under a 1.5 s cap; each step runs in its own transaction under a statement timeout and returns what it has with `truncated` rather than holding a connection. The client debounces and aborts the previous request on every keystroke. (The general searches count every match and OR a dozen substring matches across joins; a burst of them from the palette saturated the dev database.)
   - *Actions*: New note / hypothesis / frame, Tidy up, Open timeline, Open leads, Close case…
 - **Focus mode:** selecting items dims everything that isn't a direct neighbour (via any visible edge). `.` toggles focus lock.
-- **Path:** select A, then Shift+click B. `shortestPath()` highlights the path and a small banner shows "3 hops · clear (Esc)".
+- **Show connections** (replaces *Find path*, 2026-09-25): from an asset's context menu or its details. The side panel shows what the asset is connected to beyond the board — **upstream** (what feeds it), **downstream** (what it feeds) and **alongside** (duplicates and look-alikes) — hop by hop, with a direction switch, a hop ladder (1–5, ∞) and the kind chips. The canvas draws the same trace: what is on the board joins it in place, suggested neighbours too, and the rest are dashed **ghosts** in columns (upstream left, downstream right, one per hop) joined by dashed relations; everything else dims. *Add all*, *Add upstream/downstream*, one asset (＋ on the ghost or the row) or **the route to one asset** (every ghost between it and the seed) brings it into the case where its ghost stands, in one undoable step. A ghost can be traced from in turn. Closing the panel ends the trace.
+- **`POST /cases/:id/board/trace`** (`GraphService.trace`, `graph-trace.ts`): a walk over the global edge table from one or more assets. Edges group into four kinds (lineage = FLOW; duplicates = IDENTITY, `likely_duplicate`, `identical_content`; similar = `related`; links = the rest). Upstream keeps going up and downstream keeps going down, so a trace never doubles back into siblings; a duplicate or similar asset joins the side of the node it hangs off. Each hop is one query reading at most 25 edges per node and direction under a 5 s statement timeout; the walk stops at 6 hops or its node limit (150 by default, 300 at most) and says so with `truncated`.
 - **Timeline ⇄ board:** every timeline entry that references an item has *Show on board*.
 
 ### 5.12 Collaboration (async, v1)
@@ -367,7 +369,7 @@ State is kept per user in `localStorage` (try/catch). It is **not** persisted on
 
 - **Empty board:** a centred card on the canvas reads "Nothing on this board yet", with buttons [Link a watch] [Add evidence ⌘K] [Add a note].
 - **Loading:** a skeleton of 3 bubble outlines. Target p95 open time is under 1.5 s at 300 bubbles.
-- **Graph truncated** (`truncated=true`): a top bar warning chip reads "Showing a partial neighbourhood".
+- **Large neighbourhoods** (revised 2026-09-25): the case itself is never cut. Every evidence item and every attached finding is drawn, even past the graph's node cap. Findings of the evidence that are *not* in the case get their own budget (2,000, most severe and most recent first) instead of sharing the 200 graph slots with suggested neighbours. When neighbours are left out, **View → Neighbours** says so and points to *Show connections*, whose panel offers "Show up to 300". The old top bar chip ("Showing a partial neighbourhood") is gone.
 - **Inquiry stack failure:** the board still opens without NEW/GONE (the existing `badgeInquiryStates` contract).
 - **Case CLOSED/ARCHIVED:** the board is **read-only** (`nodesDraggable=false`, `nodesConnectable=false`, tools disabled) with a banner: "Closed on … · snapshot #3 · Reopen to edit".
 
@@ -1497,11 +1499,9 @@ export function useBoardSocket(caseId: string, clientId: string, refetch: () => 
 // apps/web/app/[locale]/[namespaceSlug]/(dashboard)/investigations/[id]/page.tsx
 const CaseBoard = dynamic(() => import("@/components/case-board/case-board").then((m) => m.CaseBoard), { ssr: false });
 
-function CaseWorkspaceInner() {
+export default function CaseWorkspacePage() {
   const caseId = useRouteId();
-  const { caseBoard: boardV2 } = useWorkspaceFeatures(); // new switch added in Phase 0 (hooks/use-workspace-features.ts)
-  if (boardV2) return <CaseBoard caseId={caseId} />;  // full-bleed, owns top bar + drawers
-  return <LegacyCaseWorkspace caseId={caseId} />;     // current file, renamed; deleted in Phase 7
+  return <CaseBoard caseId={caseId} />; // full-bleed, owns top bar + side panels
 }
 ```
 
@@ -1532,17 +1532,24 @@ The dashboard layout needs a **full-bleed variant** for this route: no page padd
 
 ## 9. Implementation phases
 
-> **Status, 2026-09-25.** Phases 0–6 are implemented behind the flag. From
-> Phase 7: the en/de i18n, the unit tests (store, commands, relations geometry), the API
-> e2e suite (`test/case-board.e2e-spec.ts`) and the MCP tools are done. Still
-> open: the performance pass at 300 bubbles, Playwright e2e, the flag
-> default and the legacy deletions. Where the build differs from the text below:
-> - **Flag:** `InstanceSettings.caseBoardEnabled` (Settings, default off) plus a `?board=1|0` URL override. It is not a workspace feature switch.
+> **Status, 2026-09-26.** Phases 0–6 are implemented and the board is the only
+> case view. From Phase 7: the en/de i18n, the unit tests (store, commands,
+> relations geometry), the API e2e suite (`test/case-board.e2e-spec.ts`), the
+> MCP tools, Export PNG, the cut-over and the user docs are done. Still open: the
+> performance pass at 300 bubbles and Playwright e2e. Where the build differs
+> from the text below:
+> - **Flag (removed):** the build used `InstanceSettings.caseBoardEnabled` plus a `?board=1|0` override. At cut-over both went, with the legacy canvas (`components/case-graph/*`, `case-threads.tsx`, the settings card, the `caseGraph.*` keys and 35 unused `investigations.caseDetail.*` keys); migration `20260925130000_drop_case_board_switch` drops the column.
+> - **Shared package:** `packages/case-board` (`@workspace/case-board`) holds the board's look: geometry, glyphs, ports, the asset/finding/hypothesis/note/frame views, the edge lines, labels and markers, `board.css`, and a read-only demo canvas (`/demo`). The web's store-bound nodes and edges are thin containers over those views, and `apps/docs` renders live demos from the same components, so the two cannot drift.
+> - **User docs:** `apps/docs/app/investigations/cases/` covers the board (tour, evidence & findings, lines & links, hypotheses, connections & neighbours, notes/frames/comments, navigating & shortcuts, use cases) with live demos; the old *Graph* page is a redirect stub.
+> - **Breadcrumbs:** the app header reads *Investigations › case name* (the name truncated, the section translated) and stays on one line at phone width; the board's top bar has no back button.
+> - **Data transfer:** `case_evidence` imports before `case_finding` (a case finding requires its evidence), board items restore their frame (`parentId`) after the whole table lands (`selfRefs`), and a spec derives the order from the schema's foreign keys.
 > - **Items:** the lazy reconcile on read and the ops create board items. There are no `ensureItem` hooks in the case services.
 > - **Ops:** `thread.place` puts an existing thread on the board. `stance.remove` is addressed by `(hypothesisItemId, target)`, and `item.delete` on a hypothesis card only takes it off the board (the thread stays).
 > - **Evidence:** assets and findings are separate nodes in the old graph's language (D8, §5.2). The full finding list lives in the details panel.
 > - **Panels:** a docked, resizable side panel with a rail replaced the overlay drawers (D4 revised); a Hypotheses panel lists every hypothesis with *Place on board*, so a card taken off the board is one click from coming back.
-> - **Ports and frames:** links are pulled from an output port to an input port (§5.4). *Move to frame* puts the item in a free spot inside the frame, growing the frame when it is full (it used to keep the item where it was and only re-parent it).
+> - **Ports and frames:** one port per side, each a start and a drop target (§5.4). *Move to frame* puts the item in a free spot inside the frame, growing the frame when it is full (it used to keep the item where it was and only re-parent it).
+> - **Header, clicks, search:** the top bar is a ledger that spotlights (§5.1); a double click opens the side panel; ⌘K is scoped (All / Board / Corpus / Actions, Tab cycles) and peeks at each kind instead of listing the whole board.
+> - **Connections:** *Find path* became *Show connections* (§5.11), and neighbours reach any number of hops (§5.10), over `POST …/board/trace`. Hypotheses use the flask icon everywhere.
 > - **Persistence:** the queue starts and stops with the board's mount (`connect()`), not with the store, because StrictMode and Fast Refresh remount the same store. A 4xx batch is dropped and the board refetches, rather than retrying forever.
 
 Sizes: **S** ≤ 2 dev-days, **M** 3–5, **L** 6–10. Each phase ships behind the `caseBoard` workspace feature switch and must pass `bun lint` (API lint is a CI gate: `require-await` and similar are errors), `bun check-types`, and its own tests.
@@ -1658,11 +1665,11 @@ describe('CaseBoardService.getBoard reconcile (integration, real schema)', () =>
 
 - [ ] Performance pass at 300 bubbles / 2k rows (§11 targets). Profile re-renders with React DevTools: no node should re-render on unrelated store changes.
 - [ ] Accessibility: every node has an `aria-label`, keyboard selection (Tab through nodes, `Enter` opens details), focus rings, `prefers-reduced-motion` disables fly-to animation.
-- [ ] i18n en/de complete.
-- [ ] *Export PNG* of the viewport or the whole board (the React Flow "download image" pattern with `html-to-image`). Optional, see Q4.
+- [x] i18n en/de complete.
+- [x] *Export PNG* of the viewport or the whole board (the React Flow "download image" pattern with `html-to-image`). Optional, see Q4.
 - [ ] Playwright e2e: create case → add evidence via ⌘K → link two findings → add note → reload → all present → timeline shows 4 entries.
-- [ ] Turn the flag on by default. After one release, **delete** `components/case-graph/*`, the case-specific paths of `graph-explorer` (`useClusterFocus` usage in cases), `AttachFindingsDialog`, `ManualEdgeDialog` usage from cases, the `caseGraph.*` i18n keys and `LegacyCaseWorkspace`.
-- [ ] Docs: update `docs/` (user guide section "Case board") and this PRD's status.
+- [x] Cut over: the flag and the `?board=` override are removed and the board is the only case view; `components/case-graph/*`, `case-threads.tsx`, the legacy workspace page, the `caseGraph.*` i18n keys and the settings card are deleted.
+- [x] Docs: the user guide in `apps/docs` (section *Cases*) with live demos from `@workspace/case-board`, and this PRD's status.
 
 ### Phase 8 (future): Real-time with Yjs + Hocuspocus
 

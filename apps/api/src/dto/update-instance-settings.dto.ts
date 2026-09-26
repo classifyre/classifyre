@@ -137,15 +137,6 @@ export class UpdateInstanceSettingsDto {
 
   @ApiPropertyOptional({
     description:
-      'Open cases on the case board (the new investigation canvas) instead of the legacy case graph.',
-    example: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  caseBoardEnabled?: boolean;
-
-  @ApiPropertyOptional({
-    description:
       'Hugging Face token to set. Pass a token value to store (encrypted at rest). ' +
       'Pass null or an empty string to clear the stored token. ' +
       'Ignored when an instance-level HF_TOKEN is configured.',

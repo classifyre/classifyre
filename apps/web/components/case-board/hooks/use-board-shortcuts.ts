@@ -107,8 +107,6 @@ export function useBoardShortcuts({
         const busy =
           u.tool !== "select" ||
           !!u.spotlight ||
-          !!u.path ||
-          !!u.pathFrom ||
           !!u.editingItemId ||
           (!!u.focusHypothesisItemId && !u.focusLock) ||
           rf.getNodes().some((n) => n.selected);
@@ -121,8 +119,6 @@ export function useBoardShortcuts({
         u.set({
           tool: "select",
           spotlight: null,
-          path: null,
-          pathFrom: null,
           focusHypothesisItemId: u.focusLock ? u.focusHypothesisItemId : null,
           editingItemId: null,
         });
