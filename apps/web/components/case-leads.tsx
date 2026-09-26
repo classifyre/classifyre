@@ -48,10 +48,12 @@ function LeadRow({
   lead,
   reviewing,
   onReview,
+  onDragStart,
 }: {
   lead: CaseLeadDto;
   reviewing: ReviewAction | null;
   onReview: (leadId: string, action: ReviewAction, reason?: string) => void;
+  onDragStart?: (lead: CaseLeadDto, event: React.DragEvent) => void;
 }) {
   const importancePct = lead.importance != null ? Math.round(lead.importance * 100) : null;
   const similarityPct = lead.similarity != null ? Math.round(lead.similarity * 100) : null;
@@ -61,7 +63,13 @@ function LeadRow({
   const busy = reviewing !== null;
 
   return (
-    <div className="flex flex-wrap items-start gap-4 rounded-[4px] border-2 border-border bg-card p-3">
+    <div
+      className={`flex flex-wrap items-start gap-4 rounded-[4px] border-2 border-border bg-card p-3 ${
+        onDragStart ? "cursor-grab active:cursor-grabbing" : ""
+      }`}
+      draggable={onDragStart ? !busy : undefined}
+      onDragStart={onDragStart ? (event) => onDragStart(lead, event) : undefined}
+    >
       <div className="w-[110px] shrink-0 space-y-1.5">
         {importancePct != null ? (
           <>
@@ -154,12 +162,15 @@ export function CaseLeads({
   loading,
   onReviewed,
   onGenerated,
+  onLeadDragStart,
 }: {
   caseId: string;
   leads: CaseLeadDto[];
   loading: boolean;
   onReviewed: () => void;
   onGenerated: () => void;
+  /** Makes proposed leads draggable (the case board accepts drops). */
+  onLeadDragStart?: (lead: CaseLeadDto, event: React.DragEvent) => void;
 }) {
   const [generating, setGenerating] = React.useState(false);
   const [generateNote, setGenerateNote] = React.useState<string | null>(null);
@@ -265,6 +276,7 @@ export function CaseLeads({
               lead={lead}
               reviewing={reviewing?.id === lead.id ? reviewing.action : null}
               onReview={(id, action, reason) => void review(id, action, reason)}
+              onDragStart={onLeadDragStart}
             />
           ))}
         </div>

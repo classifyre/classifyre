@@ -32,11 +32,9 @@ import {
   type SearchAssetsSortOrder,
   type SourceListItem,
 } from "@workspace/api-client";
-import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severity";
 import {
   Button,
   EmptyState,
-  Input,
   Pagination,
   PaginationContent,
   PaginationEllipsis,
@@ -80,6 +78,7 @@ import {
 import { useTranslation } from "../hooks/use-translation";
 import type { TranslationKey } from "../i18n";
 import { FeatureOffNotice } from "@/components/feature-off-notice";
+import { AssetFilterBar } from "@/components/asset-filter-bar";
 
 type AssetsTableScope = {
   sourceId?: string;
@@ -681,16 +680,6 @@ export function AssetsTable({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [sources]);
 
-  const detectorOptions = useMemo(
-    () => Object.values(SearchFindingsFiltersDtoDetectorTypeEnum),
-    [],
-  );
-
-  const findingSeverityOptions = useMemo(
-    () => Object.values(SearchFindingsFiltersDtoSeverityEnum),
-    [],
-  );
-
   const assetStatusOptions = useMemo(
     () => Object.values(SearchAssetsFiltersDtoStatusEnum),
     [],
@@ -717,141 +706,68 @@ export function AssetsTable({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[240px] flex-[1.6]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder={t("assets.search")}
-            className="h-9 pl-9 border-2 border-border rounded-[4px]"
-          />
-        </div>
-
-        <div className="flex h-9 overflow-hidden rounded-[4px] border-2 border-border">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant={searchMode === "hybrid" ? "default" : "ghost"}
-                size="sm"
-                className="h-full rounded-none px-2.5"
-                onClick={() => setSearchMode("hybrid")}
-              >
-                <BrainCircuit className="h-3.5 w-3.5" />
-                Semantic
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              Hybrid extracted-text and filename ranking
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant={searchMode === "off" ? "default" : "ghost"}
-                size="sm"
-                className="h-full rounded-none border-l border-border px-2.5"
-                onClick={() => setSearchMode("off")}
-              >
-                <Search className="h-3.5 w-3.5" />
-                Exact
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Exact asset-name matching</TooltipContent>
-          </Tooltip>
-        </div>
-
-        {!scopedSourceId && (
-          <Select
-            value={draft.sourceId}
-            onValueChange={(value) =>
-              setDraft((previous) => ({
-                ...previous,
-                sourceId: value,
-              }))
-            }
-          >
-            <SelectTrigger className="h-9 w-[200px] border-2 border-border rounded-[4px]">
-              <SelectValue placeholder={t("assets.allSources")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>{t("assets.allSources")}</SelectItem>
-              {sourceOptions.map((source) => (
-                <SelectItem key={source.id} value={source.id}>
-                  {source.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        <MultiSelect
-          values={draft.findingSeverities}
-          onValuesChange={(values) =>
-            setDraft((previous) => ({
-              ...previous,
-              findingSeverities: values as FilterDraft["findingSeverities"],
-            }))
-          }
-        >
-          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
-            <MultiSelectValue placeholder={t("common.severity")} />
-          </MultiSelectTrigger>
-          <MultiSelectContent
-            search={{
-              placeholder: t("assets.searchSeverity"),
-              emptyMessage: t("assets.noSeveritiesFound"),
-            }}
-          >
-            <MultiSelectGroup>
-              {findingSeverityOptions.map((severity) => (
-                <MultiSelectItem key={severity} value={severity}>
-                  <span className="inline-flex items-center gap-2">
-                    <span
-                      className="h-2.5 w-2.5 rounded-[2px] border border-border/20"
-                      style={{
-                        backgroundColor:
-                          FINDING_SEVERITY_COLOR_BY_ENUM[severity],
-                      }}
-                    />
-                    {formatEnumLabel(severity)}
-                  </span>
-                </MultiSelectItem>
-              ))}
-            </MultiSelectGroup>
-          </MultiSelectContent>
-        </MultiSelect>
-
-        <MultiSelect
-          values={draft.detectorTypes}
-          onValuesChange={(values) =>
-            setDraft((previous) => ({
-              ...previous,
-              detectorTypes: values as FilterDraft["detectorTypes"],
-            }))
-          }
-        >
-          <MultiSelectTrigger className="h-9 w-[220px] border-2 border-border rounded-[4px]">
-            <MultiSelectValue placeholder={t("assets.detectorTypes")} />
-          </MultiSelectTrigger>
-          <MultiSelectContent
-            search={{
-              placeholder: t("assets.searchDetectorTypes"),
-              emptyMessage: t("assets.noDetectorTypesFound"),
-            }}
-          >
-            <MultiSelectGroup>
-              {detectorOptions.map((detector) => (
-                <MultiSelectItem key={detector} value={detector}>
-                  {formatEnumLabel(detector)}
-                </MultiSelectItem>
-              ))}
-            </MultiSelectGroup>
-          </MultiSelectContent>
-        </MultiSelect>
-
+      <AssetFilterBar
+        search={searchInput}
+        onSearchChange={setSearchInput}
+        sources={scopedSourceId ? undefined : sourceOptions}
+        sourceId={draft.sourceId}
+        onSourceChange={(value) =>
+          setDraft((previous) => ({
+            ...previous,
+            sourceId: value,
+          }))
+        }
+        severities={draft.findingSeverities}
+        onSeveritiesChange={(values) =>
+          setDraft((previous) => ({
+            ...previous,
+            findingSeverities: values as FilterDraft["findingSeverities"],
+          }))
+        }
+        detectorTypes={draft.detectorTypes}
+        onDetectorTypesChange={(values) =>
+          setDraft((previous) => ({
+            ...previous,
+            detectorTypes: values as FilterDraft["detectorTypes"],
+          }))
+        }
+        afterSearch={
+          <div className="flex h-9 overflow-hidden rounded-[4px] border-2 border-border">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant={searchMode === "hybrid" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-full rounded-none px-2.5"
+                  onClick={() => setSearchMode("hybrid")}
+                >
+                  <BrainCircuit className="h-3.5 w-3.5" />
+                  Semantic
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                Hybrid extracted-text and filename ranking
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant={searchMode === "off" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-full rounded-none border-l border-border px-2.5"
+                  onClick={() => setSearchMode("off")}
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  Exact
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Exact asset-name matching</TooltipContent>
+            </Tooltip>
+          </div>
+        }
+      >
         <MultiSelect
           values={assetStatuses}
           onValuesChange={(values) =>
@@ -920,7 +836,7 @@ export function AssetsTable({
             }}
           />
         </div>
-      </div>
+      </AssetFilterBar>
 
       {searchMode === "hybrid" && draft.search.trim() ? (
         <FeatureOffNotice feature="embeddings" context="search" variant="inline" />

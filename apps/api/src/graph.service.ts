@@ -11,6 +11,16 @@ import { SourceGraphScheduler } from './stats/source-graph-scheduler.service';
 // Value import, not `import type` — see the constructor.
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { resolveEdgeClass } from './graph/edge-class';
+import {
+  TRACE_KIND_SQL,
+  TRACE_PER_NODE,
+  walkTrace,
+  type TraceDirection,
+  type TraceEdgeRow,
+  type TraceKind,
+  type TraceNodeRef,
+  type TraceSide,
+} from './graph-trace';
 import { tryNormalizeUrn } from './graph/urn';
 import {
   BulkIngestEdgesDto,
@@ -54,6 +64,36 @@ const MAX_DEPTH = 3;
  * an opaque string.
  */
 const EXTERNAL_NODE = 'external';
+
+/** A trace's nodes and edges, as the board draws them (see `trace`). */
+export interface GraphTraceResult {
+  nodes: Array<{
+    id: string;
+    type: string;
+    label: string;
+    assetType: string | null;
+    sourceType: string | null;
+    sourceName: string | null;
+    status: string | null;
+    missing: boolean;
+    depth: number;
+    side: TraceSide;
+    via: string | null;
+    viaKind: TraceKind | null;
+  }>;
+  edges: Array<{
+    id: string;
+    fromType: string;
+    fromId: string;
+    toType: string;
+    toId: string;
+    relationType: string;
+    relationClass: string | null;
+    kind: TraceKind;
+    confidence: number | null;
+  }>;
+  truncated: boolean;
+}
 
 const EDGE_METHODS = new Set([
   'RUNTIME_OBSERVED',
@@ -289,6 +329,40 @@ export class GraphService {
     const edgeCount = await this.prisma.edge.count();
     await this.sourceGraphScheduler.scheduleRebuild('edges rebuilt');
     return { edgeCount };
+  }
+
+  /**
+   * {@link inferEdgesForAsset} for many assets in three statements instead of
+   * three per asset. Opening a case refreshes every evidence asset, and a board
+   * with a few hundred bubbles would otherwise spend its whole open budget on
+   * round trips.
+   *
+   * `contains: false` refreshes only the asset-to-asset references. The
+   * CONTAINS upsert touches every finding of every asset, so a caller that
+   * reads findings some other way should not pay for it.
+   */
+  async inferEdgesForAssets(
+    assetIds: string[],
+    opts: { contains?: boolean } = {},
+  ): Promise<void> {
+    const ids = [...new Set(assetIds)];
+    if (ids.length === 0) return;
+    const contains = opts.contains ?? true;
+    if (contains && ids.length === 1) return this.inferEdgesForAsset(ids[0]);
+    if (contains) {
+      await this.prisma.$executeRaw`
+        INSERT INTO edges (id, from_type, from_id, to_type, to_id, relation_type, confidence, origin, created_at)
+        SELECT gen_random_uuid(), 'asset', f.asset_id, 'finding', f.id, 'CONTAINS', f.confidence, 'INFERRED'::"EdgeOrigin", now()
+        FROM findings f
+        WHERE f.asset_id = ANY(${ids}::text[])
+        ON CONFLICT (from_type, from_id, to_type, to_id, relation_type) DO NOTHING
+      `;
+    }
+    const assets = await this.prisma.asset.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, links: true },
+    });
+    if (assets.length > 0) await this.createReferenceEdges(assets);
   }
 
   /** Ensure inferred edges exist for a single asset (used when opening a case). */
@@ -1106,11 +1180,14 @@ export class GraphService {
     return { inUse, suggestions, classified };
   }
 
-  async createManualEdge(dto: CreateManualEdgeDto): Promise<EdgeDetailDto> {
+  async createManualEdge(
+    dto: CreateManualEdgeDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<EdgeDetailDto> {
     // Use raw SQL so the MANUAL enum value works regardless of the Prisma client
     // version loaded in the running server process (the enum was added post-startup).
     const confidence = dto.confidence ?? 1;
-    const rows = await this.prisma.$queryRaw<RawEdgeRow[]>`
+    const rows = await (tx ?? this.prisma).$queryRaw<RawEdgeRow[]>`
       INSERT INTO edges (id, from_type, from_id, to_type, to_id, relation_type, confidence, origin, created_at)
       VALUES (gen_random_uuid(), ${dto.fromType}, ${dto.fromId}, ${dto.toType}, ${dto.toId},
               ${dto.relationType}, ${confidence}, 'MANUAL'::"EdgeOrigin", now())
@@ -1177,6 +1254,108 @@ export class GraphService {
 
   // ─── Traversal ───────────────────────────────────────────────────
 
+  /**
+   * Trace assets' connections hop by hop (see graph-trace.ts): upstream,
+   * downstream and sideways, over the chosen kinds of edge. Every hop is one
+   * query that reads a bounded number of edges per node under a statement
+   * timeout; a hop that runs out of time ends the walk with what it has and
+   * marks it truncated, rather than holding a connection.
+   */
+  async trace(input: {
+    seeds: TraceNodeRef[];
+    depth: number;
+    direction: TraceDirection;
+    kinds: TraceKind[];
+    limit: number;
+  }): Promise<GraphTraceResult> {
+    let timedOut = false;
+    const walk = await walkTrace(input.seeds, input, async (frontier) => {
+      if (timedOut || frontier.length === 0) return [];
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            await tx.$executeRaw`SET LOCAL statement_timeout = '5s'`;
+            return tx.$queryRaw<TraceEdgeRow[]>(
+              this.traceLevelSql(frontier, input.kinds),
+            );
+          },
+          { timeout: 10_000, maxWait: 3_000 },
+        );
+      } catch (error) {
+        const text = error instanceof Error ? error.message : String(error);
+        if (!text.includes('57014') && !/statement timeout/i.test(text)) {
+          throw error;
+        }
+        timedOut = true;
+        return [];
+      }
+    });
+    const found = [...walk.found.values()];
+    const hydrated = await this.hydrateNodes(
+      found.map((f) => ({ node_type: f.type, node_id: f.id, depth: f.depth })),
+    );
+    const byKey = new Map(hydrated.map((n) => [`${n.type}:${n.id}`, n]));
+    return {
+      nodes: found.map((f) => {
+        const n = byKey.get(`${f.type}:${f.id}`);
+        return {
+          id: f.id,
+          type: f.type,
+          label: n?.label ?? f.id,
+          assetType: n?.assetType ?? null,
+          sourceType: n?.sourceType ?? null,
+          sourceName: n?.sourceName ?? null,
+          status: n?.status ?? null,
+          missing: n?.missing ?? false,
+          depth: f.depth,
+          side: f.side,
+          via: f.via ? f.via.slice(f.via.indexOf(':') + 1) : null,
+          viaKind: f.viaKind,
+        };
+      }),
+      edges: [...walk.edges.values()].map((e) => ({
+        id: e.id,
+        fromType: e.from_type,
+        fromId: e.from_id,
+        toType: e.to_type,
+        toId: e.to_id,
+        relationType: e.relation_type,
+        relationClass: e.relation_class,
+        kind: e.kind,
+        confidence: e.confidence === null ? null : Number(e.confidence),
+      })),
+      truncated: walk.truncated || timedOut,
+    };
+  }
+
+  /** One hop of a trace: each frontier node's edges out and in, capped per node. */
+  private traceLevelSql(frontier: TraceNodeRef[], kinds: TraceKind[]) {
+    const types = frontier.map((f) => f.type);
+    const ids = frontier.map((f) => f.id);
+    const columns = Prisma.sql`e.id, e.from_type, e.from_id, e.to_type, e.to_id,
+      e.relation_type, e.relation_class::text AS relation_class,
+      e.confidence::float8 AS confidence, ${TRACE_KIND_SQL} AS kind`;
+    return Prisma.sql`
+      SELECT f.node_type AS src_type, f.node_id AS src_id, x.*
+      FROM unnest(${types}::text[], ${ids}::text[]) AS f(node_type, node_id)
+      CROSS JOIN LATERAL (
+        (SELECT 'out'::text AS dir, ${columns}
+           FROM edges e
+          WHERE e.from_type = f.node_type AND e.from_id = f.node_id
+            AND e.to_type IN ('asset', ${EXTERNAL_NODE})
+            AND ${TRACE_KIND_SQL} = ANY(${kinds}::text[])
+          LIMIT ${TRACE_PER_NODE})
+        UNION ALL
+        (SELECT 'in'::text AS dir, ${columns}
+           FROM edges e
+          WHERE e.to_type = f.node_type AND e.to_id = f.node_id
+            AND e.from_type IN ('asset', ${EXTERNAL_NODE})
+            AND ${TRACE_KIND_SQL} = ANY(${kinds}::text[])
+          LIMIT ${TRACE_PER_NODE})
+      ) x
+    `;
+  }
+
   async expand(dto: ExpandGraphDto): Promise<GraphResponseDto> {
     const depth = Math.min(dto.depth ?? 1, MAX_DEPTH);
     return this.traverse(
@@ -1194,7 +1373,19 @@ export class GraphService {
    * live edge neighbourhood of real assets is layered on top for
    * relationships and unlinked findings.
    */
-  async caseGraph(caseId: string, depth = 1): Promise<GraphResponseDto> {
+  async caseGraph(
+    caseId: string,
+    depth = 1,
+    opts: {
+      /**
+       * Give the evidence's own findings their own budget instead of a share
+       * of the neighbourhood's node cap. Without it, an asset with many
+       * findings crowds the neighbouring assets out of the cap (the case
+       * board passes this; see `findingsOfEvidence`).
+       */
+      findingBudget?: number;
+    } = {},
+  ): Promise<GraphResponseDto> {
     const evidence = await this.prisma.caseEvidence.findMany({
       where: { caseId },
       select: {
@@ -1222,23 +1413,97 @@ export class GraphService {
     }
 
     // Refresh inferred edges for real assets so the live neighbourhood is current.
+    // With a finding budget (the case board, which re-reads on focus and every
+    // minute) findings come straight from `findings` and the walk never enters
+    // them, so the CONTAINS upsert over every finding of the evidence is skipped.
     const assetEvidence = evidence.filter((e) => e.entityType === 'asset');
-    for (const e of assetEvidence) {
-      await this.inferEdgesForAsset(e.entityId);
-    }
+    await this.inferEdgesForAssets(
+      assetEvidence.map((e) => e.entityId),
+      { contains: !opts.findingBudget },
+    );
 
     // Live neighbourhood of the real assets (relationships + unlinked findings).
-    const base =
-      assetEvidence.length > 0
-        ? await this.traverse(
-            assetEvidence.map((e) => ({ type: 'asset', id: e.entityId })),
-            Math.min(depth, MAX_DEPTH),
-            'both',
-          )
-        : { nodes: [], edges: [], truncated: false };
+    const seeds = assetEvidence.map((e) => ({ type: 'asset', id: e.entityId }));
+    let base: GraphResponseDto = { nodes: [], edges: [], truncated: false };
+    if (seeds.length > 0 && opts.findingBudget) {
+      // Neighbours and findings on separate budgets: the walk over assets
+      // alone (so `truncated` means "more neighbours"), the findings read
+      // directly, most severe and most recent first.
+      const [neighbourhood, findings] = await Promise.all([
+        this.traverse(
+          seeds,
+          Math.min(depth, MAX_DEPTH),
+          'both',
+          undefined,
+          undefined,
+          undefined,
+          ['asset', EXTERNAL_NODE],
+        ),
+        this.findingsOfEvidence(
+          seeds.map((s) => s.id),
+          opts.findingBudget,
+        ),
+      ]);
+      const known = new Set([
+        ...neighbourhood.nodes.map((n) => `${n.type}:${n.id}`),
+        ...findings.nodes.map((n) => `${n.type}:${n.id}`),
+      ]);
+      base = {
+        nodes: [...neighbourhood.nodes, ...findings.nodes],
+        edges: [
+          ...neighbourhood.edges,
+          ...findings.edges.filter(
+            (e) =>
+              known.has(`${e.fromType}:${e.fromId}`) &&
+              known.has(`${e.toType}:${e.toId}`),
+          ),
+        ],
+        truncated: neighbourhood.truncated,
+      };
+    } else if (seeds.length > 0) {
+      base = await this.traverse(seeds, Math.min(depth, MAX_DEPTH), 'both');
+    }
 
     const merged = await this.mergeCaseGraph(caseId, evidence, base);
     return this.badgeInquiryStates(caseId, merged);
+  }
+
+  /**
+   * Every finding of the given assets, up to `budget` (most severe, then
+   * most recent, first), as graph nodes, with the relations that touch them.
+   * CONTAINS edges are left out: a finding's asset is on the node itself.
+   */
+  private async findingsOfEvidence(
+    assetIds: string[],
+    budget: number,
+  ): Promise<GraphResponseDto> {
+    const rows = await this.prisma.finding.findMany({
+      where: { assetId: { in: assetIds } },
+      select: { id: true },
+      orderBy: [{ severity: 'asc' }, { lastDetectedAt: 'desc' }],
+      take: budget,
+    });
+    if (rows.length === 0) return { nodes: [], edges: [], truncated: false };
+    const ids = rows.map((r) => r.id);
+    const [nodes, edgeRows] = await Promise.all([
+      this.hydrateNodes(
+        ids.map((id) => ({ node_type: 'finding', node_id: id, depth: 1 })),
+      ),
+      this.prisma.$queryRaw<EdgeRow[]>(Prisma.sql`
+        SELECT id, from_type, from_id, to_type, to_id, relation_type, confidence, origin,
+               relation_class, granularity, method, field_mappings, evidence, last_seen_at
+        FROM edges e
+        WHERE ((e.from_type = 'finding' AND e.from_id = ANY(${ids}::text[]))
+            OR (e.to_type = 'finding' AND e.to_id = ANY(${ids}::text[])))
+          AND e.relation_type <> 'CONTAINS'
+        LIMIT 5000
+      `),
+    ]);
+    return {
+      nodes,
+      edges: edgeRows.map(toGraphEdge),
+      truncated: rows.length >= budget,
+    };
   }
 
   /**
@@ -1304,11 +1569,50 @@ export class GraphService {
     const nodes = new Map(base.nodes.map((n) => [key(n.type, n.id), n]));
     const edges = [...base.edges];
 
+    // A snapshot node stands in for a row the traversal did not return, which
+    // is either a deleted row or a live one past the node cap. Only a lookup
+    // tells them apart, and the board draws the two very differently (a ghost
+    // versus an ordinary row), so ask instead of guessing.
+    const unseenAssetIds = evidence
+      .filter(
+        (e) => e.entityType === 'asset' && !nodes.has(key('asset', e.entityId)),
+      )
+      .map((e) => e.entityId);
+    const unseenFindingIds = evidence.flatMap((e) =>
+      e.findings
+        .filter((cf) => !nodes.has(key('finding', cf.findingId)))
+        .map((cf) => cf.findingId),
+    );
+    const [liveAssets, liveFindings] = await Promise.all([
+      unseenAssetIds.length > 0
+        ? this.prisma.asset.findMany({
+            where: { id: { in: unseenAssetIds } },
+            select: { id: true, status: true },
+          })
+        : Promise.resolve([] as Array<{ id: string; status: unknown }>),
+      unseenFindingIds.length > 0
+        ? this.prisma.finding.findMany({
+            where: { id: { in: unseenFindingIds } },
+            select: { id: true, status: true, severity: true },
+          })
+        : Promise.resolve(
+            [] as Array<{ id: string; status: unknown; severity: unknown }>,
+          ),
+    ]);
+    const liveAssetById = new Map<string, { status: unknown }>(
+      liveAssets.map((a) => [a.id, a]),
+    );
+    const liveFindingById = new Map<
+      string,
+      { status: unknown; severity: unknown }
+    >(liveFindings.map((f) => [f.id, f]));
+
     // Evidence nodes — add missing/deleted nodes, refresh labels from snapshots.
     for (const e of evidence) {
       const k = key(e.entityType, e.entityId);
       const existing = nodes.get(k);
       if (existing && !existing.missing) continue;
+      const live = liveAssetById.get(e.entityId);
       nodes.set(k, {
         id: e.entityId,
         type: e.entityType,
@@ -1316,6 +1620,10 @@ export class GraphService {
         label: e.label ?? e.entityId,
         assetType: e.assetType ?? undefined,
         sourceType: e.sourceType ?? undefined,
+        status: live ? String(live.status) : existing?.status,
+        // The traversal already knows a seed it hydrated is gone; for one it
+        // never reached, the lookup above decides.
+        missing: existing ? true : e.entityType === 'asset' ? !live : false,
       });
     }
 
@@ -1326,17 +1634,22 @@ export class GraphService {
         const k = key('finding', cf.findingId);
         const existing = nodes.get(k);
         if (!existing || existing.missing) {
+          const live = liveFindingById.get(cf.findingId);
           nodes.set(k, {
             id: cf.findingId,
             type: 'finding',
             depth: 1,
             label: findingLabel(cf.label, cf.matchedContent),
-            severity: cf.severity ?? undefined,
+            severity: live ? String(live.severity) : (cf.severity ?? undefined),
             detectorType: cf.detectorType ?? undefined,
             customDetectorName: cf.customDetectorName ?? undefined,
             matchedContent: cf.matchedContent ?? undefined,
+            status: live ? String(live.status) : undefined,
             assetId: e.entityId,
             assetName: e.label ?? undefined,
+            // Without this a finding whose row was deleted is drawn exactly
+            // like a live one; the case board renders it as a ghost instead.
+            missing: existing ? true : !live,
           });
           edges.push({
             id: `synthetic:contains:${e.entityId}:${cf.findingId}`,
@@ -1449,6 +1762,8 @@ export class GraphService {
     relationTypes?: string[],
     relationClass?: string,
     fanOutCap?: number,
+    /** Only walk into nodes of these types (the seeds are exempt). */
+    nodeTypes?: string[],
   ): Promise<GraphResponseDto> {
     if (seeds.length === 0) {
       return { nodes: [], edges: [], truncated: false };
@@ -1468,14 +1783,22 @@ export class GraphService {
         ? Prisma.sql`AND e.relation_type IN (${Prisma.join(relationTypes)}) ${classFilter}`
         : classFilter;
 
+    const toTypes =
+      nodeTypes && nodeTypes.length > 0
+        ? Prisma.sql`AND e.to_type IN (${Prisma.join(nodeTypes)})`
+        : Prisma.empty;
+    const fromTypes =
+      nodeTypes && nodeTypes.length > 0
+        ? Prisma.sql`AND e.from_type IN (${Prisma.join(nodeTypes)})`
+        : Prisma.empty;
     const outward = Prisma.sql`
       SELECT e.to_type AS node_type, e.to_id AS node_id
       FROM edges e
-      WHERE e.from_type = t.node_type AND e.from_id = t.node_id ${relFilter}`;
+      WHERE e.from_type = t.node_type AND e.from_id = t.node_id ${relFilter} ${toTypes}`;
     const inward = Prisma.sql`
       SELECT e.from_type AS node_type, e.from_id AS node_id
       FROM edges e
-      WHERE e.to_type = t.node_type AND e.to_id = t.node_id ${relFilter}`;
+      WHERE e.to_type = t.node_type AND e.to_id = t.node_id ${relFilter} ${fromTypes}`;
     const neighbor =
       direction === 'out'
         ? outward

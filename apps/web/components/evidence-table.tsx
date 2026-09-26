@@ -448,6 +448,11 @@ type EvidenceTableProps = {
    * evidence row — the case page navigates to the dedicated add-evidence page.
    */
   onAddFindings?: (assetId: string) => void;
+  /**
+   * Opens an evidence row somewhere other than the asset page — the case
+   * board flies to the row's bubble instead of navigating away.
+   */
+  onOpenEvidence?: (evidenceId: string) => void;
 };
 
 export function EvidenceTable({
@@ -458,6 +463,7 @@ export function EvidenceTable({
   onNoteChange,
   onFindingNoteChange,
   onAddFindings,
+  onOpenEvidence,
 }: EvidenceTableProps) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -749,7 +755,11 @@ export function EvidenceTable({
                               {isAsset ? (
                                 <button
                                   className="block max-w-[260px] truncate text-left text-sm font-medium hover:underline"
-                                  onClick={() => router.push(nsPath(`/assets/${e.entityId}`))}
+                                  onClick={() =>
+                                    onOpenEvidence
+                                      ? onOpenEvidence(e.id)
+                                      : router.push(nsPath(`/assets/${e.entityId}`))
+                                  }
                                 >
                                   {label}
                                 </button>

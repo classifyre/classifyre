@@ -16,7 +16,7 @@ const nextConfig = {
   output: "standalone",
   trailingSlash: true,
   outputFileTracingRoot: path.join(__dirname, "../../"),
-  transpilePackages: ["@workspace/ui"],
+  transpilePackages: ["@workspace/ui", "@workspace/case-board"],
   typescript: {
     ignoreBuildErrors: process.env.NEXT_IGNORE_BUILD_ERRORS === "1",
   },

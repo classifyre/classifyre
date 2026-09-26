@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { XIcon } from "lucide-react";
 import { Drawer as DrawerPrimitive } from "vaul";
 
 import { cn } from "@workspace/ui/lib/utils";
@@ -50,6 +51,8 @@ type DrawerContentProps = React.ComponentProps<
 > & {
   overlayClassName?: string;
   hideOverlay?: boolean;
+  /** A visible close button in the top-right corner, as `SheetContent` has. */
+  showCloseButton?: boolean;
 };
 
 function DrawerContent({
@@ -57,6 +60,7 @@ function DrawerContent({
   children,
   overlayClassName,
   hideOverlay,
+  showCloseButton = true,
   ...props
 }: DrawerContentProps) {
   return (
@@ -76,6 +80,15 @@ function DrawerContent({
       >
         <div className="bg-muted mx-auto mt-4 hidden h-2 w-[100px] shrink-0 rounded-full group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
         {children}
+        {showCloseButton && (
+          <DrawerPrimitive.Close
+            data-slot="drawer-close-button"
+            className="ring-offset-background focus:ring-ring absolute top-4 right-4 z-10 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none"
+          >
+            <XIcon className="size-4" />
+            <span className="sr-only">Close</span>
+          </DrawerPrimitive.Close>
+        )}
       </DrawerPrimitive.Content>
     </DrawerPortal>
   );

@@ -1,0 +1,163 @@
+---
+title: Connections & neighbours
+description: The case board can show what is connected to your evidence without being in the case yet. Suggested neighbours show the nearby assets; Show connections traces the whole trail upstream, downstream and alongside.
+---
+
+import { Callout, Steps } from "nextra/components"
+import { CaseBoardDemo } from "@/components/case-board/board-demo"
+import { LineKey } from "@/components/case-board/board-key"
+
+# Connections & neighbours
+
+Your evidence rarely stands alone. The spreadsheet in the case was exported
+from a database; the export was attached to an email; a copy sits on a backup
+share. The board knows these connections, so it can show you **what else is
+out there** before you go looking for it.
+
+There are two ways, for two different questions:
+
+| | **Suggested neighbours** | **Show connections** |
+|---|---|---|
+| **Question** | *What is right next to my evidence?* | *Where did this come from, and where did it go?* |
+| **Starts from** | All the evidence at once | One asset you pick |
+| **How far** | 1, 2 or 3 hops, or all | 1 to 5 hops, or all |
+| **Looks like** | Ordinary assets without the lime ring | Dashed ghosts laid out upstream, downstream and alongside |
+| **Stays** | Always, while switched on in **View** | Until you close the trace |
+
+Either way, nothing joins the case until you say so: press **+** and it becomes
+evidence.
+
+---
+
+## Suggested neighbours
+
+Suggested neighbours are assets **connected to your evidence that are not in
+the case**. They look like any other asset, only without the lime ring, and the
+relation that connects them is drawn and labelled like any other.
+
+<CaseBoardDemo
+  scene="neighbours"
+  height={400}
+  caption="Two pieces of evidence (with the lime ring) and three suggested neighbours: the spreadsheet the export came from, a reply to the email, and a backup copy. Point at a neighbour to see its + button."
+/>
+
+### Choosing how far to look
+
+Open **View** (bottom left) → **Neighbours not in the case**:
+
+- **Off** hides them.
+- **1** shows assets directly connected to a piece of evidence.
+- **2** and **3** go further: neighbours of neighbours.
+- **∞** follows the connections as far as they go.
+
+The menu tells you how many neighbours are drawn. Under **Connections**, choose
+which kinds of relation count: **Lineage**, **Links**, **Duplicates** and
+**Similar**. With only *Lineage* on, for example, the board suggests only where
+data came from and went, and ignores mentions and look-alikes.
+
+You can also right-click a piece of evidence → **Show neighbours**, which turns
+neighbours on if they were off.
+
+### Adding or hiding a neighbour
+
+- Point at a neighbour and press **+** to add it to the case right where it
+  stands. Or right-click it → **Add to case**.
+- Right-click → **Hide this suggestion** if it is not relevant. It disappears
+  from your view of the board until you reload it.
+- Click it to see it in the **Details** panel, with **Add to case** and **Show
+  connections**.
+
+<Callout type="info">
+**Why the board sometimes shows only some neighbours.** A single shared
+spreadsheet, mailbox or folder can be connected to thousands of assets. Drawing
+all of them would bury your evidence. So the board draws the **nearest
+neighbours first**, keeps the number readable, and tells you in **View** when
+there are more than it drew. Nothing in the case itself is ever hidden: the
+limit applies only to assets that are *not* in the case. To see everything
+around one asset, use **Show connections** on it, below.
+</Callout>
+
+---
+
+## Show connections
+
+**Show connections** traces the full trail around **one** asset: everything
+upstream (where its data came from), everything downstream (where it went) and
+everything alongside (duplicates and look-alikes), as many hops out as you ask
+for. It is the tool for questions like *"where did this file end up?"* or
+*"which system is the real source of this data?"*.
+
+<CaseBoardDemo
+  scene="connections"
+  height={400}
+  caption="Tracing the payroll export. Upstream, to the left: the spreadsheet it was transformed from (1 hop) and the database that was copied into it (2 hops). Downstream, to the right: the email it was attached to. Alongside, below: a duplicate and a look-alike."
+/>
+
+### Starting a trace
+
+Right-click an asset or a suggested neighbour → **Show connections**, or use
+**Show connections** in the **Details** panel. The **Connections** panel
+opens on the right, and the trail appears on the board.
+
+### Reading the trail
+
+- The asset you started from stays where it is.
+- **Upstream** assets sit in columns to its **left**, one column per hop.
+  **Downstream** ones sit to its **right**. **Duplicates and look-alikes** sit
+  above and below it.
+- Assets that are already on the board stay in place and join the trail there.
+  The rest appear as **dashed ghosts**, with a badge saying how far away they
+  are: **↑2** is two hops upstream, **↓1** one hop downstream, **≈1** alongside.
+- The lines are dashed too, tinted by kind:
+
+<LineKey only="trace" />
+
+### Steering the trace
+
+The **Connections** panel controls what is traced and lists what was found:
+
+| Control | What it does |
+|---|---|
+| **Direction** | **Upstream**, **Both** or **Downstream** |
+| **How far** | **1** to **5** hops, or **∞** for as far as the trail goes |
+| **Follow** | Which kinds of relation to follow: **Lineage**, **Links**, **Duplicates**, **Similar** |
+| **The list** | What was found, grouped into **Upstream**, **Downstream** and **Alongside**, hop by hop. Items already in the case are marked **In case** |
+
+### Adding what you found
+
+| Action | Adds |
+|---|---|
+| **+** on a ghost, or **Add to case** in the list | That one asset, where it stands |
+| **Add the route to it** | That asset and every asset between it and where you started |
+| **Add *n* connections** on a group | Everything upstream, downstream or alongside |
+| **Add *n*** at the top | Everything the trace found that is not in the case |
+
+Every addition is one step, so **Undo** takes it back. To keep exploring from a
+ghost, right-click it → **Trace from here**.
+
+Some endpoints are known only by name. An email address, for example, may have
+no scanned asset behind it. They are shown on the trail so the picture is
+complete, but they cannot be added to the case.
+
+### When the trail is long
+
+A trace returns up to **150** connections at first. If there are more, the
+panel says **Showing the first 150 connections: there are more** and offers
+**Show up to 300**. Past that, narrow the trace: fewer hops, one direction, or
+fewer kinds.
+
+Close the trace with `Esc` or by closing the panel. The ghosts go away; whatever
+you added stays as evidence.
+
+---
+
+## Which one should I use?
+
+| You want to… | Use |
+|---|---|
+| Keep an eye on what is next to the evidence while you work | **Suggested neighbours**, 1 hop |
+| Check whether the case is missing something obvious | **Suggested neighbours**, 2 hops, all kinds |
+| Follow a leak from the source system to the last place the data went | **Show connections**, *Both*, *Lineage* and *Links*, ∞ hops |
+| Find every copy of a file | **Show connections**, *Duplicates* (and *Similar* for near-copies) |
+| Understand where a figure in a report really comes from | **Show connections**, *Upstream*, *Lineage* |
+| Bring a whole chain into the case in one go | **Show connections**, then **Add the route to it** |

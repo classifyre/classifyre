@@ -16,9 +16,12 @@
   },
   "dependencies": {
     "@theguild/remark-mermaid": "^0.3.0",
+    "@workspace/case-board": "workspace:*",
     "@workspace/schemas": "workspace:*",
     "@workspace/ui": "workspace:*",
+    "@xyflow/react": "^12.12.0",
     "gray-matter": "^4.0.3",
+    "lucide-react": "^1.7.0",
     "next": "16.1.7",
     "next-sitemap": "^4.2.3",
     "nextra": "^4.6.1",

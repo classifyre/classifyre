@@ -7,6 +7,7 @@ import {
   McpServer,
   ResourceTemplate,
 } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 
 import * as z from 'zod';
@@ -52,6 +53,12 @@ import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
 import { AutopilotService } from './autopilot/autopilot.service';
 import { GraphService } from './graph.service';
+import { CaseBoardService } from './case-board/case-board.service';
+import { CaseBoardReadService } from './case-board/case-board-read.service';
+import {
+  BOARD_MAX_OPS_PER_BATCH,
+  BoardOpSchema,
+} from '@workspace/schemas/case-board';
 import { summarizeNotebook } from './utils/notebook-summary';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
@@ -258,7 +265,9 @@ resource explains how they compose.
    findings (attach_case_findings), add evidence and hypotheses as threads
    (create_case_thread), and link support/contradiction per thread entry
    (link_case_thread_support). The case graph (get_case_graph) and timeline
-   (get_case_timeline) show structure and history.
+   (get_case_timeline) show structure and history; the board
+   (get_case_board / apply_case_board_ops) is where analysts arrange it —
+   notes, frames, links between findings, stances drawn on hypothesis cards.
 6. **Conclude honestly** — close_case with a conclusion the evidence actually
    supports. An empty or speculative case should be closed as such, not
    escalated.
@@ -293,6 +302,8 @@ export class McpServerFactoryService {
     private readonly graphService: GraphService,
     private readonly findingBulkOperations: FindingBulkOperationService,
     private readonly retireOutOfScope: RetireOutOfScopeService,
+    private readonly caseBoardService: CaseBoardService,
+    private readonly caseBoardRead: CaseBoardReadService,
   ) {}
 
   /**
@@ -3796,6 +3807,94 @@ export class McpServerFactoryService {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseThreadsService.linkSupport(threadId, rest),
+        );
+      },
+    );
+
+    server.registerTool(
+      'get_case_board',
+      {
+        title: 'Get Case Board',
+        description:
+          "Read a case's board, the canvas analysts arrange the case on: items " +
+          '(EVIDENCE bubbles — one per asset, its attached findings as sides — ' +
+          'HYPOTHESIS cards, NOTE, FRAME and COMMENT pins) with positions, links ' +
+          'drawn between items or single findings, hypothesis stances, thread ' +
+          'summaries and the case evidence. board.version is the baseVersion for ' +
+          'apply_case_board_ops. The lineage/duplicate neighbourhood graph is ' +
+          'left out unless includeGraph is true (it can be large).',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          includeGraph: z.boolean().optional(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ caseId, includeGraph }) => {
+        const board = await this.caseBoardRead.getBoard(caseId);
+        if (includeGraph) return jsonResult(board);
+        const { graph, ...rest } = board;
+        return jsonResult({
+          ...rest,
+          graph: {
+            omitted: true,
+            nodes: graph.nodes.length,
+            edges: graph.edges.length,
+            truncated: graph.truncated,
+          },
+        });
+      },
+    );
+
+    server.registerTool(
+      'apply_case_board_ops',
+      {
+        title: 'Apply Case Board Ops',
+        description: [
+          "Change a case's board with a batch of ops, applied in order in one",
+          'transaction; each op succeeds or is rejected on its own (see `rejected`).',
+          'Ids are yours: every op needs a fresh UUID opId and every new item or',
+          'link a UUID id, so resending a batch is harmless. An endpoint is',
+          '{itemId, findingId?}: an item id from get_case_board, optionally one',
+          'finding of an EVIDENCE item. Ops: item.create (NOTE, FRAME), item.update',
+          '(x, y, width, height, z, parentId, collapsed, style, content), item.delete',
+          'and item.restore (notes, frames, pins and hypothesis cards, never',
+          'evidence), link.create/update/delete/restore, link.promote (copies a',
+          'board link into the global graph), evidence.add/remove,',
+          'finding.attach/detach, hypothesis.create, stance.set/remove (SUPPORTS,',
+          'CONTRADICTS, NEUTRAL), comment.create/resolve and thread.place. Every',
+          'delete can be undone with the matching restore. Closed cases are read-only.',
+        ].join(' '),
+        inputSchema: z.strictObject({
+          caseId: z.string().uuid(),
+          baseVersion: z
+            .number()
+            .int()
+            .min(0)
+            .optional()
+            .describe(
+              'board.version you read; defaults to the current version',
+            ),
+          ops: z.array(BoardOpSchema).min(1).max(BOARD_MAX_OPS_PER_BATCH),
+        }),
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ caseId, baseVersion, ops }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        const version =
+          baseVersion ?? (await this.caseBoardRead.currentVersion(caseId));
+        return jsonResult(
+          await this.caseBoardService.applyOps(
+            caseId,
+            { clientId: randomUUID(), baseVersion: version, ops },
+            'mcp',
+          ),
         );
       },
     );

@@ -21,6 +21,7 @@ export { AssistantController } from './assistant.controller';
 export { CustomDetectorExtractionsController } from './custom-detector-extractions.controller';
 export { CustomDetectorTestsController } from './custom-detector-tests.controller';
 export { CasesController } from './cases.controller';
+export { CaseBoardController } from './case-board.controller';
 export { CaseworkController } from './casework.controller';
 export { InquiriesController } from './inquiries.controller';
 export {
