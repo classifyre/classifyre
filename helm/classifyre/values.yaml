@@ -189,6 +189,10 @@ api:
     port: 8000
     # -- Fixed nodePort when `type` is `NodePort` or `LoadBalancer`.
     nodePort: null
+    # -- Fixed cluster IP, for a reverse proxy outside the cluster that must
+    # reach the API (e.g. its socket.io path) without a public nodePort.
+    # Immutable once the Service exists: set it to the current IP, or recreate.
+    clusterIP: ""
     # -- Additional API service annotations.
     annotations: {}
 

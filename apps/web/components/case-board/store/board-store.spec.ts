@@ -102,6 +102,25 @@ describe("board store", () => {
     expect(store.getState().items.size).toBe(1);
   });
 
+  it("places a read-only board's unplaced items on screen only, and keeps them across refetches", async () => {
+    const unplaced = { ...noteDto(0, T0), x: null, y: null } as unknown as ReturnType<typeof noteDto>;
+    mockGet.mockResolvedValue(board(1, [unplaced]));
+    const store = createBoardStore("C", { demo: true });
+    await store.getState().load();
+    const stop = store.getState().connect();
+
+    store.getState().placeLocally(new Map([["N", { x: 40, y: 80 }]]));
+    expect(store.getState().items.get("N")).toMatchObject({ x: 40, y: 80 });
+
+    store.getState().refetch();
+    await jest.advanceTimersByTimeAsync(300);
+    expect(mockGet).toHaveBeenCalledTimes(2);
+    expect(store.getState().items.get("N")).toMatchObject({ x: 40, y: 80 });
+    await store.getState().flush();
+    expect(mockApplyOps).not.toHaveBeenCalled();
+    stop();
+  });
+
   it("does not put back a board read that raced one of its own batches, and reads again", async () => {
     mockGet.mockResolvedValueOnce(board(1, [noteDto(0, T0)]));
     const store = createBoardStore("C");

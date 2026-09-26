@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.5.13"
+version = "0.6.0"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 # Upper bound is load-bearing: onnxruntime publishes no cp315 wheels (notably
