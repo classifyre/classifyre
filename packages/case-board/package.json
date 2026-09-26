@@ -1,0 +1,36 @@
+{
+  "name": "@workspace/case-board",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "check-types": "tsc --noEmit",
+    "test": "echo 'No tests configured for case-board package'",
+    "test:e2e": "echo 'No e2e tests configured for case-board package'"
+  },
+  "dependencies": {
+    "@workspace/schemas": "workspace:*",
+    "@workspace/ui": "workspace:*",
+    "@xyflow/react": "^12.12.0",
+    "lucide-react": "^1.7.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
+  },
+  "exports": {
+    "./board.css": "./src/board.css",
+    "./lib/*": "./src/lib/*.ts",
+    "./hooks/*": "./src/hooks/*.ts",
+    "./components/*": "./src/components/*.tsx",
+    "./demo": "./src/demo/index.ts"
+  }
+}

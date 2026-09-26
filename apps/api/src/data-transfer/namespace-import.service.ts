@@ -73,6 +73,14 @@ function isExternalEndpoint(
   return false;
 }
 
+/** A same-table reference held back until its table has fully landed. */
+interface DeferredRef {
+  table: TransferTableSpec;
+  key: Record<string, unknown>;
+  column: string;
+  value: unknown;
+}
+
 @Injectable()
 export class NamespaceImportService {
   private readonly logger = new Logger(NamespaceImportService.name);
@@ -122,6 +130,8 @@ export class NamespaceImportService {
     // table, so this flushes on every table boundary and whenever it fills.
     let pending: Record<string, unknown>[] = [];
     let pendingTable: TransferTableSpec | null = null;
+    // Same-table references written empty, restored when the table is done.
+    let deferred: DeferredRef[] = [];
     let estimated = false;
     const skippedTables = new Set<string>();
 
@@ -136,13 +146,15 @@ export class NamespaceImportService {
       const rows = pending;
       pending = [];
       try {
-        await this.writeBatch(
-          table,
-          rows,
-          job.conflictMode,
-          selected,
-          remapId,
-          progress,
+        deferred.push(
+          ...(await this.writeBatch(
+            table,
+            rows,
+            job.conflictMode,
+            selected,
+            remapId,
+            progress,
+          )),
         );
       } catch (error) {
         progress.skip(rows.length);
@@ -155,6 +167,14 @@ export class NamespaceImportService {
       }
       await progress.flush();
       await sleep(BATCH_PAUSE_MS);
+    };
+
+    /** Put back the same-table references of the table that just finished. */
+    const restore = async (): Promise<void> => {
+      if (deferred.length === 0) return;
+      const refs = deferred;
+      deferred = [];
+      await this.restoreSelfRefs(refs, progress);
     };
 
     try {
@@ -182,7 +202,10 @@ export class NamespaceImportService {
           }
           if (!selected.has(spec.scope)) continue;
 
-          if (pendingTable && pendingTable.model !== spec.model) await flush();
+          if (pendingTable && pendingTable.model !== spec.model) {
+            await flush();
+            await restore();
+          }
           pendingTable = spec;
           progress.setTable(spec.model);
           pending.push(row);
@@ -206,6 +229,7 @@ export class NamespaceImportService {
       }
 
       await flush();
+      await restore();
 
       if (progress.cancelled) {
         await this.finish(job.id, DataTransferStatus.CANCELLED, progress);
@@ -311,11 +335,23 @@ export class NamespaceImportService {
     selected: Set<string>,
     remapId: IdRemapper,
     progress: TransferProgress,
-  ): Promise<void> {
+  ): Promise<DeferredRef[]> {
     const prepared = rows.map((row) =>
       this.prepare(table, row, selected, remapId, progress),
     );
     const delegate = modelDelegate(this.prisma, table.model);
+
+    // A reference to another row of this table may point at a row that comes
+    // later in the archive; write it empty now and put it back at the end.
+    const deferred: DeferredRef[] = [];
+    for (const column of table.selfRefs ?? []) {
+      for (const row of prepared) {
+        const value = row[column];
+        if (value === null || value === undefined) continue;
+        deferred.push({ table, key: keyOf(table, row), column, value });
+        row[column] = null;
+      }
+    }
 
     // Singletons (instance settings, correlation config, per-agent config) have
     // a fixed key that already exists in a provisioned schema, so an insert
@@ -325,14 +361,14 @@ export class NamespaceImportService {
       for (const row of prepared) {
         await this.upsertRow(table, row, progress);
       }
-      return;
+      return deferred;
     }
 
     if (conflictMode === DataTransferConflict.OVERWRITE) {
       for (const row of prepared) {
         await this.upsertRow(table, row, progress);
       }
-      return;
+      return deferred;
     }
 
     const failures = await this.insertBisecting(
@@ -348,6 +384,37 @@ export class NamespaceImportService {
         `${count.toLocaleString()} '${table.model}' rows could not be imported — ` +
         'they already exist here, or they reference data in a scope that was not included.',
     );
+    return deferred;
+  }
+
+  /**
+   * Put back references between rows of one table once all of its rows are
+   * in. A reference whose target never landed (it failed on its own) stays
+   * empty and is reported rather than failing the row that holds it.
+   */
+  private async restoreSelfRefs(
+    refs: DeferredRef[],
+    progress: TransferProgress,
+  ): Promise<void> {
+    for (const ref of refs) {
+      const delegate = modelDelegate(this.prisma, ref.table.model);
+      try {
+        await delegate.update({
+          where: cursorArg(ref.table, ref.key),
+          data: { [ref.column]: ref.value },
+        });
+      } catch (error) {
+        this.logger.debug(
+          `Could not restore ${ref.table.model}.${ref.column}: ${describe(error)}`,
+        );
+        progress.tally(
+          `selfRef:${ref.table.model}.${ref.column}`,
+          1,
+          (count) =>
+            `${count.toLocaleString()} '${ref.table.model}' rows were imported without their '${ref.column}' — the row it pointed at was not imported.`,
+        );
+      }
+    }
   }
 
   /**
@@ -474,6 +541,11 @@ export class NamespaceImportService {
       // Remapping it would destroy the only thing that can ever resolve it.
       if (isExternalEndpoint(table.model, column, prepared)) continue;
       prepared[column] = remapId(prepared[column]);
+    }
+    // Ids held inside JSON columns follow the same rewrite.
+    for (const [column, rewrite] of Object.entries(table.jsonIdRefs ?? {})) {
+      if (prepared[column] === undefined || prepared[column] === null) continue;
+      prepared[column] = rewrite(prepared[column], remapId);
     }
 
     // An optional reference into an excluded scope is dropped, not fatal:

@@ -42,7 +42,7 @@ const nextConfig = {
   reactStrictMode: true,
   output: "export",
   outputFileTracingRoot: path.join(__dirname, "../../"),
-  transpilePackages: ["@workspace/ui", "@workspace/schemas"],
+  transpilePackages: ["@workspace/ui", "@workspace/schemas", "@workspace/case-board"],
   basePath: normalizedDocsBasePath || undefined,
   trailingSlash: true,
   images: {

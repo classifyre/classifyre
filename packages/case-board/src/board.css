@@ -1,0 +1,379 @@
+/*
+ * Case board styling (docs/architecture/CASE_BOARD_PRD.md §8.12), shared by
+ * the app's board and the documentation's demos: wrap the canvas in
+ * `.case-board`.
+ *
+ * React Flow's base.css provides the mechanics; everything visible here maps
+ * onto the app's tokens so the board follows light/dark mode with the rest of
+ * the product. Hover and selection use borders only — no shadows, blur or
+ * animation on nodes (performance rules).
+ */
+
+/* On :root, not .case-board: menus, dialogs and popovers render in portals
+   outside the board and still need the swatches. All names are cb-prefixed. */
+:root {
+  /* Marker, note and highlight colours. The soft variants are note fills;
+     the strong ones are highlight rings and chips. */
+  --cb-yellow: #eab308;
+  --cb-yellow-soft: #fef9c3;
+  --cb-blue: #2563eb;
+  --cb-blue-soft: #dbeafe;
+  --cb-green: #16a34a;
+  --cb-green-soft: #dcfce7;
+  --cb-pink: #db2777;
+  --cb-pink-soft: #fce7f3;
+  --cb-gray: #737373;
+  --cb-gray-soft: #f0f0f0;
+  --cb-red: #dc2626;
+  --cb-red-soft: #fee2e2;
+  --cb-amber: #d97706;
+  --cb-amber-soft: #fef3c7;
+  --cb-violet: #7c3aed;
+  --cb-violet-soft: #ede9fe;
+
+  /* Stances and system links. */
+  --cb-supports: #15803d;
+  --cb-contradicts: #dc2626;
+  --cb-neutral: #737373;
+  --cb-system: #8a8a8a;
+  --cb-lineage: #737373;
+  /* The relations view, after the old case graph: muted edges, amber for
+     links people drew, lime for "in the case" and for what is selected
+     (darker lime on light, where #b7ff00 is unreadable as a line). */
+  --cb-edge: #78716c;
+  --cb-manual: #b45309;
+  --cb-evidence: #65a30d;
+  --cb-select: #4d7c0f;
+}
+
+.dark {
+  --cb-yellow: #facc15;
+  --cb-yellow-soft: #3a3000;
+  --cb-blue: #60a5fa;
+  --cb-blue-soft: #0f2340;
+  --cb-green: #4ade80;
+  --cb-green-soft: #0d2a17;
+  --cb-pink: #f472b6;
+  --cb-pink-soft: #3b1027;
+  --cb-gray: #a3a3a3;
+  --cb-gray-soft: #232323;
+  --cb-red: #f87171;
+  --cb-red-soft: #3b1010;
+  --cb-amber: #fbbf24;
+  --cb-amber-soft: #3a2600;
+  --cb-violet: #a78bfa;
+  --cb-violet-soft: #251a40;
+
+  --cb-supports: #4ade80;
+  --cb-contradicts: #f87171;
+  --cb-neutral: #a3a3a3;
+  --cb-system: #7a7a7a;
+  --cb-lineage: #a3a3a3;
+  --cb-edge: #8a8a8a;
+  --cb-manual: #d97706;
+  --cb-evidence: #b7ff00;
+  --cb-select: #b7ff00;
+}
+
+.case-board .react-flow {
+  --xy-background-color: var(--background);
+  --xy-background-pattern-color: color-mix(in oklab, var(--foreground) 22%, transparent);
+  --xy-edge-stroke: var(--cb-system);
+  --xy-edge-stroke-selected: var(--foreground);
+  --xy-connectionline-stroke: var(--foreground);
+  --xy-connectionline-stroke-width: 2;
+  --xy-selection-background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
+  --xy-selection-border: 1px dashed var(--foreground);
+  --xy-minimap-background-color: var(--card);
+  --xy-minimap-mask-background-color: color-mix(in oklab, var(--background) 70%, transparent);
+  --xy-attribution-background-color: transparent;
+  --xy-resize-background-color: var(--foreground);
+  --xy-handle-background-color: var(--background);
+}
+
+.case-board .react-flow__attribution {
+  font-size: 10px;
+  opacity: 0.55;
+}
+
+.case-board .react-flow__attribution a {
+  color: var(--muted-foreground);
+}
+
+/* Nodes carry their own chrome; React Flow's default node box stays empty. */
+.case-board .react-flow__node {
+  border-radius: var(--radius);
+}
+
+.case-board .react-flow__node.cb-dim,
+.case-board .react-flow__edge.cb-dim {
+  opacity: 0.18;
+  transition: opacity 0.15s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .case-board .react-flow__node.cb-dim,
+  .case-board .react-flow__edge.cb-dim {
+    transition: none;
+  }
+}
+
+/* ── Ports ───────────────────────────────────────────────────────────────── */
+
+/* One port per side, a little off the node, each both a start and a drop
+   target. They show on the node under the pointer only (a selected node keeps
+   them hidden), and the one a drop would land on lights up. */
+.case-board .board-port {
+  width: 10px;
+  height: 10px;
+  min-width: 10px;
+  min-height: 10px;
+  border: 2px solid var(--foreground);
+  border-radius: 9999px;
+  background: var(--background);
+  opacity: 0;
+  z-index: 4;
+  cursor: crosshair;
+  transition:
+    opacity 0.12s,
+    transform 0.12s,
+    background-color 0.12s;
+}
+
+/* Boxes: beside the middle of each edge, clear of it. */
+.case-board .react-flow__node .board-port-box.react-flow__handle-top {
+  top: -9px;
+}
+.case-board .react-flow__node .board-port-box.react-flow__handle-bottom {
+  bottom: -9px;
+}
+.case-board .react-flow__node .board-port-box.react-flow__handle-left {
+  left: -9px;
+}
+.case-board .react-flow__node .board-port-box.react-flow__handle-right {
+  right: -9px;
+}
+
+/* Round nodes: around the circle's compass points. */
+.case-board .react-flow__node .board-port-round {
+  left: var(--px);
+  top: var(--py);
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+
+.case-board .react-flow__node:hover .board-port,
+.case-board .board-port.connectingfrom {
+  opacity: 1;
+}
+
+.case-board .board-port:hover {
+  background: var(--foreground);
+}
+
+/* The port a drop would land on. */
+.case-board .board-port.connectingto {
+  opacity: 1;
+  border-color: var(--cb-contradicts);
+}
+.case-board .board-port.connectingto.valid {
+  background: var(--cb-evidence);
+  border-color: var(--foreground);
+}
+.case-board .react-flow__node .board-port-box.connectingto.valid {
+  transform: translate(0, 0) scale(1.35);
+}
+.case-board .react-flow__node .board-port-round.connectingto.valid {
+  transform: translate(-50%, -50%) scale(1.35);
+}
+
+.case-board .is-readonly .board-port,
+.case-board .board-port-hidden {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+/* Link tool: the right port grows over the whole node (or its circle), so the
+   node itself is where a link starts. */
+.case-board .tool-link .board-port:not(.board-port-main) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.case-board .tool-link .react-flow__node .board-port-main {
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: none;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  cursor: crosshair;
+  z-index: 5;
+}
+
+.case-board .tool-link .react-flow__node .board-port-main.board-port-round {
+  inset: auto;
+  left: var(--core-x);
+  top: var(--core-y);
+  width: var(--core-d);
+  height: var(--core-d);
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+}
+
+.case-board .tool-link .react-flow__node:hover {
+  outline: 2px dashed var(--foreground);
+  outline-offset: 2px;
+}
+
+/* ── Tools ───────────────────────────────────────────────────────────────── */
+
+/* Hand: the canvas and everything on it is a surface to drag. */
+.case-board .tool-hand .react-flow__pane,
+.case-board .tool-hand .react-flow__node {
+  cursor: grab;
+}
+.case-board .tool-hand .react-flow__pane.dragging {
+  cursor: grabbing;
+}
+
+/* A trace's ghosts: what "Show connections" reached beyond the board. */
+.case-board .cb-ghost {
+  opacity: 0.88;
+}
+.case-board .cb-ghost .cb-halo {
+  color: var(--muted-foreground);
+}
+
+/* ── Relations view (assets, findings, edges) ────────────────────────────── */
+
+/* Canvas text carries a halo of the background, as the old graph's did, so
+   names and edge types stay legible where lines cross them. */
+.case-board .cb-halo,
+.case-board .cb-edge-text {
+  text-shadow:
+    0 0 2px var(--background),
+    0 0 2px var(--background),
+    0 0 4px var(--background);
+}
+
+.case-board .cb-glow {
+  filter: drop-shadow(0 0 4px var(--cb-select));
+}
+
+/* A suggested neighbour offers "+" when you point at it. */
+.case-board .react-flow__node-suggested .cb-add {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.case-board .react-flow__node-suggested:hover .cb-add,
+.case-board .react-flow__node-suggested:focus-within .cb-add,
+.case-board .react-flow__node-suggested.selected .cb-add {
+  opacity: 1;
+}
+
+.case-board .react-flow__node-evidence:focus-visible,
+.case-board .react-flow__node-finding:focus-visible,
+.case-board .react-flow__node-suggested:focus-visible {
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.cb-pulse-ring {
+  animation: cb-pulse-ring 1.4s ease-out 1;
+}
+
+@keyframes cb-pulse-ring {
+  from {
+    stroke-opacity: 1;
+    stroke-width: 6;
+  }
+  to {
+    stroke-opacity: 0;
+    stroke-width: 20;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-pulse-ring {
+    animation: none;
+  }
+}
+
+/* ── Highlights ──────────────────────────────────────────────────────────── */
+
+.cb-ring-yellow { box-shadow: 0 0 0 3px var(--cb-yellow); }
+.cb-ring-blue { box-shadow: 0 0 0 3px var(--cb-blue); }
+.cb-ring-green { box-shadow: 0 0 0 3px var(--cb-green); }
+.cb-ring-pink { box-shadow: 0 0 0 3px var(--cb-pink); }
+.cb-ring-red { box-shadow: 0 0 0 3px var(--cb-red); }
+.cb-ring-gray { box-shadow: 0 0 0 3px var(--cb-gray); }
+.cb-ring-amber { box-shadow: 0 0 0 3px var(--cb-amber); }
+.cb-ring-violet { box-shadow: 0 0 0 3px var(--cb-violet); }
+
+.cb-row-yellow { background: color-mix(in oklab, var(--cb-yellow) 22%, transparent); }
+.cb-row-blue { background: color-mix(in oklab, var(--cb-blue) 18%, transparent); }
+.cb-row-green { background: color-mix(in oklab, var(--cb-green) 18%, transparent); }
+.cb-row-pink { background: color-mix(in oklab, var(--cb-pink) 18%, transparent); }
+.cb-row-red { background: color-mix(in oklab, var(--cb-red) 18%, transparent); }
+.cb-row-gray { background: color-mix(in oklab, var(--cb-gray) 18%, transparent); }
+.cb-row-amber { background: color-mix(in oklab, var(--cb-amber) 20%, transparent); }
+.cb-row-violet { background: color-mix(in oklab, var(--cb-violet) 18%, transparent); }
+
+.cb-note-yellow { background: var(--cb-yellow-soft); }
+.cb-note-blue { background: var(--cb-blue-soft); }
+.cb-note-green { background: var(--cb-green-soft); }
+.cb-note-pink { background: var(--cb-pink-soft); }
+.cb-note-gray { background: var(--cb-gray-soft); }
+
+.cb-frame-gray { background: color-mix(in oklab, var(--cb-gray) 7%, transparent); }
+.cb-frame-yellow { background: color-mix(in oklab, var(--cb-yellow) 9%, transparent); }
+.cb-frame-blue { background: color-mix(in oklab, var(--cb-blue) 7%, transparent); }
+.cb-frame-green { background: color-mix(in oklab, var(--cb-green) 7%, transparent); }
+.cb-frame-pink { background: color-mix(in oklab, var(--cb-pink) 7%, transparent); }
+.cb-frame-violet { background: color-mix(in oklab, var(--cb-violet) 7%, transparent); }
+
+/* ── Finding row states ──────────────────────────────────────────────────── */
+
+.cb-row-deleted {
+  opacity: 0.45;
+  font-style: italic;
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    color-mix(in oklab, var(--foreground) 9%, transparent) 6px 7px
+  );
+}
+
+.cb-row-gone {
+  opacity: 0.75;
+  border-left: 2px dashed var(--destructive);
+}
+
+/* After fly-to: a brief outline, skipped under reduced motion. */
+.cb-pulse {
+  animation: cb-pulse 1.2s ease-out 1;
+}
+
+@keyframes cb-pulse {
+  0% { outline: 3px solid var(--foreground); outline-offset: 6px; }
+  100% { outline: 3px solid transparent; outline-offset: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-pulse { animation: none; outline: 3px solid var(--foreground); }
+}
+
+/* Markdown inside sticky notes. */
+.cb-markdown p { margin: 0 0 0.4em; }
+.cb-markdown ul, .cb-markdown ol { margin: 0 0 0.4em 1.1em; padding: 0; }
+.cb-markdown ul { list-style: disc; }
+.cb-markdown ol { list-style: decimal; }
+.cb-markdown h1, .cb-markdown h2, .cb-markdown h3 { font-weight: 700; margin: 0 0 0.3em; }
+.cb-markdown code { font-family: var(--font-mono); font-size: 0.9em; }
+.cb-markdown a { text-decoration: underline; }

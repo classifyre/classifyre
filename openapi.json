@@ -1441,6 +1441,39 @@
         ]
       }
     },
+    "/search/quick": {
+      "post": {
+        "description": "A few assets (by name) and findings (by content, whole words and their prefixes) for pickers and palettes. Bounded and cheap on large workspaces: no totals, a per-query time budget, and `truncated` when that budget ran out.",
+        "operationId": "SearchAssetsController_quickSearch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuickSearchRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickSearchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search as you type",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
     "/search/findings/query": {
       "get": {
         "description": "Returns a page of findings as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set. Order is stable for incremental refresh; sort/filter in the client.",
@@ -5618,6 +5651,262 @@
         "summary": "Get the evidence neighbourhood graph for a case",
         "tags": [
           "cases"
+        ]
+      }
+    },
+    "/cases/{id}/board": {
+      "get": {
+        "operationId": "CaseBoardController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseBoardResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The case board: items, links, evidence, the live graph layer, stances and thread summaries",
+        "tags": [
+          "case-board"
+        ]
+      }
+    },
+    "/cases/{id}/board/ops": {
+      "post": {
+        "operationId": "CaseBoardController_applyOps",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyBoardOpsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyBoardOpsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Apply a batch of board ops in one transaction; refused ops are reported per op",
+        "tags": [
+          "case-board"
+        ]
+      }
+    },
+    "/cases/{id}/board/neighbours": {
+      "post": {
+        "operationId": "CaseBoardController_neighbours",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardNeighboursDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Live depth-1 neighbourhood of one evidence bubble (drawn as suggested items)",
+        "tags": [
+          "case-board"
+        ]
+      }
+    },
+    "/cases/{id}/board/trace": {
+      "post": {
+        "operationId": "CaseBoardController_trace",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardTraceRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardTraceResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Trace assets' connections: upstream, downstream and sideways through lineage, links, duplicates and similarity",
+        "tags": [
+          "case-board"
+        ]
+      }
+    },
+    "/cases/{id}/board/snapshots": {
+      "get": {
+        "operationId": "CaseBoardController_listSnapshots",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseBoardSnapshotSummaryDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Board snapshots, newest first",
+        "tags": [
+          "case-board"
+        ]
+      },
+      "post": {
+        "operationId": "CaseBoardController_takeSnapshot",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseBoardSnapshotSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Capture the board as it is now",
+        "tags": [
+          "case-board"
+        ]
+      }
+    },
+    "/cases/{id}/board/snapshots/{snapshotId}": {
+      "get": {
+        "operationId": "CaseBoardController_getSnapshot",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "snapshotId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseBoardSnapshotDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One board snapshot, exactly as it was captured",
+        "tags": [
+          "case-board"
         ]
       }
     },
@@ -13739,6 +14028,228 @@
           "items"
         ]
       },
+      "QuickSearchRequestDto": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "What to look for; at least 2 characters",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "assets",
+                "findings"
+              ]
+            }
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "Only this source"
+          },
+          "severity": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "INFO"
+              ]
+            }
+          },
+          "detectorType": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            }
+          },
+          "limit": {
+            "type": "number",
+            "description": "Results per kind (default 8, at most 25)",
+            "minimum": 1,
+            "maximum": 25
+          }
+        },
+        "required": [
+          "q"
+        ]
+      },
+      "QuickSearchSeverityCountsDto": {
+        "type": "object",
+        "properties": {
+          "critical": {
+            "type": "number"
+          },
+          "high": {
+            "type": "number"
+          },
+          "medium": {
+            "type": "number"
+          },
+          "low": {
+            "type": "number"
+          },
+          "info": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "critical",
+          "high",
+          "medium",
+          "low",
+          "info"
+        ]
+      },
+      "QuickSearchAssetDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "externalUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "assetType": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "openFindings": {
+            "type": "number",
+            "description": "Findings on the asset that are not resolved or dismissed"
+          },
+          "severityCounts": {
+            "$ref": "#/components/schemas/QuickSearchSeverityCountsDto"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "assetType",
+          "sourceType",
+          "sourceId",
+          "openFindings",
+          "severityCounts"
+        ]
+      },
+      "QuickSearchFindingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "assetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "findingType": {
+            "type": "string"
+          },
+          "matchedContent": {
+            "type": "string",
+            "nullable": true
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ]
+          },
+          "detectorType": {
+            "type": "string",
+            "enum": [
+              "SECRETS",
+              "PII",
+              "YARA",
+              "BROKEN_LINKS",
+              "CODE_SECURITY",
+              "CUSTOM"
+            ]
+          },
+          "customDetectorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "FALSE_POSITIVE",
+              "RESOLVED",
+              "IGNORED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "assetId",
+          "findingType",
+          "severity",
+          "detectorType",
+          "status"
+        ]
+      },
+      "QuickSearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuickSearchAssetDto"
+            }
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuickSearchFindingDto"
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when a query ran out of its time budget and the lists may be short"
+          }
+        },
+        "required": [
+          "assets",
+          "findings",
+          "truncated"
+        ]
+      },
       "LiveQueryResponseDto": {
         "type": "object",
         "properties": {
@@ -19318,6 +19829,857 @@
           "truncated"
         ]
       },
+      "CaseBoardMetaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "number",
+            "description": "Bumped once per applied ops batch. A client compares it with the version it loaded to tell whether someone else wrote meanwhile."
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "True when the case is CLOSED or ARCHIVED: the board can be viewed but not changed."
+          },
+          "caseStatus": {
+            "type": "string",
+            "description": "Case status at read time"
+          }
+        },
+        "required": [
+          "id",
+          "caseId",
+          "version",
+          "readOnly",
+          "caseStatus"
+        ]
+      },
+      "CaseBoardItemKind": {
+        "type": "string",
+        "enum": [
+          "EVIDENCE",
+          "HYPOTHESIS",
+          "COMMENT",
+          "NOTE",
+          "FRAME"
+        ]
+      },
+      "BoardItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CaseBoardItemKind"
+              }
+            ]
+          },
+          "refId": {
+            "type": "string",
+            "nullable": true,
+            "description": "EVIDENCE → case_evidence.id; HYPOTHESIS/COMMENT → case_threads.id; null for notes and frames"
+          },
+          "x": {
+            "type": "number",
+            "nullable": true,
+            "description": "Null until placed; the client auto-places and writes back."
+          },
+          "y": {
+            "type": "number",
+            "nullable": true
+          },
+          "width": {
+            "type": "number",
+            "nullable": true
+          },
+          "height": {
+            "type": "number",
+            "nullable": true
+          },
+          "z": {
+            "type": "number"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The frame an item sits in, or the item a comment pin is anchored to"
+          },
+          "collapsed": {
+            "type": "boolean"
+          },
+          "style": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "{ color?, highlight?, rowHighlights?: { [findingId]: color }, anchorFindingId? }"
+          },
+          "content": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "NOTE: { text }, FRAME: { title }"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Send back as expectedUpdatedAt when editing note/frame text."
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "z",
+          "collapsed",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "BoardLinkCertainty": {
+        "type": "string",
+        "enum": [
+          "CONFIRMED",
+          "SUSPECTED"
+        ]
+      },
+      "BoardLinkDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sourceItemId": {
+            "type": "string"
+          },
+          "sourceFindingId": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetItemId": {
+            "type": "string"
+          },
+          "targetFindingId": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "description": "Free-form link kind, e.g. \"related_to\""
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "certainty": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BoardLinkCertainty"
+              }
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "promotedEdgeId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The global MANUAL edge this link was promoted to, if any"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sourceItemId",
+          "targetItemId",
+          "kind",
+          "certainty",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "EvidenceStance": {
+        "type": "string",
+        "enum": [
+          "SUPPORTS",
+          "CONTRADICTS",
+          "NEUTRAL"
+        ]
+      },
+      "BoardEndpointDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "findingId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "itemId"
+        ]
+      },
+      "BoardSupportDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string",
+            "description": "The hypothesis thread"
+          },
+          "targetType": {
+            "type": "string",
+            "description": "\"evidence\" | \"finding\""
+          },
+          "targetId": {
+            "type": "string",
+            "description": "case_evidence.id or case_findings.id"
+          },
+          "stance": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceStance"
+              }
+            ]
+          },
+          "weight": {
+            "type": "number",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "endpoint": {
+            "nullable": true,
+            "description": "The evidence item (and finding row) the stance points at; null when its target is no longer on the board",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BoardEndpointDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "threadId",
+          "targetType",
+          "targetId",
+          "stance",
+          "createdAt"
+        ]
+      },
+      "CaseThreadKind": {
+        "type": "string",
+        "enum": [
+          "HYPOTHESIS",
+          "DISCUSSION"
+        ]
+      },
+      "HypothesisStatus": {
+        "type": "string",
+        "enum": [
+          "PROPOSED",
+          "SUPPORTED",
+          "REFUTED",
+          "INCONCLUSIVE"
+        ]
+      },
+      "BoardThreadSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CaseThreadKind"
+              }
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HypothesisStatus"
+              }
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "entryCount": {
+            "type": "number"
+          },
+          "lastEntryAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "lastAuthor": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastExcerpt": {
+            "type": "string",
+            "nullable": true,
+            "description": "The first 280 characters of the newest entry"
+          },
+          "supportingCount": {
+            "type": "number"
+          },
+          "contradictingCount": {
+            "type": "number"
+          },
+          "neutralCount": {
+            "type": "number"
+          },
+          "resolvedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The board item showing this thread (live or removed from the board); null when it was never placed"
+          },
+          "onBoard": {
+            "type": "boolean",
+            "description": "Whether that item is currently on the board"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "entryCount",
+          "supportingCount",
+          "contradictingCount",
+          "neutralCount",
+          "onBoard",
+          "createdAt"
+        ]
+      },
+      "CaseBoardResponseDto": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "$ref": "#/components/schemas/CaseBoardMetaDto"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardItemDto"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardLinkDto"
+            }
+          },
+          "evidence": {
+            "description": "Case evidence with attached-finding snapshots (the bubbles)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseEvidenceDto"
+            }
+          },
+          "graph": {
+            "description": "The live layer: GraphService.caseGraph — nodes with live status, NEW/GONE, missing flags, and system edges",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GraphResponseDto"
+              }
+            ]
+          },
+          "supports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardSupportDto"
+            }
+          },
+          "threads": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardThreadSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "board",
+          "items",
+          "links",
+          "evidence",
+          "graph",
+          "supports",
+          "threads"
+        ]
+      },
+      "ApplyBoardOpsDto": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "description": "Identifies the writing tab so it can ignore its own echo",
+            "maxLength": 64
+          },
+          "baseVersion": {
+            "type": "number",
+            "description": "The board version the client last saw"
+          },
+          "ops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Board ops (1–200), discriminated by `type`: item.create/update/delete/restore, link.create/update/delete/restore/promote, evidence.add/remove, finding.attach/detach, hypothesis.create, stance.set/remove, comment.create/resolve, thread.place."
+          }
+        },
+        "required": [
+          "clientId",
+          "baseVersion",
+          "ops"
+        ]
+      },
+      "AppliedBoardOpDto": {
+        "type": "object",
+        "properties": {
+          "opId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "description": "The row the op wrote (item, link or stance). Differs from the requested id when the op merged into an existing item."
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "New updatedAt of that row, for the next expectedUpdatedAt"
+          },
+          "note": {
+            "type": "string",
+            "description": "A note about what the server did"
+          }
+        },
+        "required": [
+          "opId"
+        ]
+      },
+      "RejectedBoardOpDto": {
+        "type": "object",
+        "properties": {
+          "opId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the op was refused, in words for a person"
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable reason: NOT_FOUND, STALE, INVALID, ALREADY_ON_BOARD, READ_ONLY_KIND, CONFLICT"
+          },
+          "current": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Current server state of the row, when the op lost a race"
+          }
+        },
+        "required": [
+          "opId",
+          "reason",
+          "code"
+        ]
+      },
+      "ApplyBoardOpsResponseDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number"
+          },
+          "applied": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppliedBoardOpDto"
+            }
+          },
+          "rejected": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RejectedBoardOpDto"
+            }
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "True when someone else wrote after baseVersion: refetch and merge."
+          }
+        },
+        "required": [
+          "version",
+          "applied",
+          "rejected",
+          "stale"
+        ]
+      },
+      "BoardNeighboursDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "description": "The evidence item to expand"
+          }
+        },
+        "required": [
+          "itemId"
+        ]
+      },
+      "BoardTraceDirection": {
+        "type": "string",
+        "enum": [
+          "up",
+          "down",
+          "both"
+        ]
+      },
+      "BoardTraceKind": {
+        "type": "string",
+        "enum": [
+          "lineage",
+          "links",
+          "duplicates",
+          "similar"
+        ],
+        "description": "Kinds of connection to follow (default: all)"
+      },
+      "BoardTraceRequestDto": {
+        "type": "object",
+        "properties": {
+          "assetIds": {
+            "description": "Assets to trace from (1–500)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "direction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BoardTraceDirection"
+              }
+            ]
+          },
+          "depth": {
+            "type": "number",
+            "description": "Hops to walk (1–6; 6 stands for \"all\")",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "kinds": {
+            "type": "array",
+            "description": "Kinds of connection to follow (default: all)",
+            "items": {
+              "$ref": "#/components/schemas/BoardTraceKind"
+            }
+          },
+          "limit": {
+            "type": "number",
+            "description": "Most nodes to return (default 150, at most 300)",
+            "minimum": 1,
+            "maximum": 300
+          }
+        },
+        "required": [
+          "assetIds"
+        ]
+      },
+      "BoardTraceSide": {
+        "type": "string",
+        "enum": [
+          "seed",
+          "up",
+          "down",
+          "side"
+        ]
+      },
+      "BoardTraceNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "'asset' or 'external'"
+          },
+          "label": {
+            "type": "string"
+          },
+          "assetType": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "missing": {
+            "type": "boolean"
+          },
+          "depth": {
+            "type": "number",
+            "description": "Hops from the nearest seed"
+          },
+          "side": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BoardTraceSide"
+              }
+            ]
+          },
+          "via": {
+            "type": "string",
+            "nullable": true,
+            "description": "The node this one was first reached from"
+          },
+          "viaKind": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BoardTraceKind"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "label",
+          "missing",
+          "depth",
+          "side"
+        ]
+      },
+      "BoardTraceEdgeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fromType": {
+            "type": "string"
+          },
+          "fromId": {
+            "type": "string"
+          },
+          "toType": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "relationType": {
+            "type": "string"
+          },
+          "relationClass": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BoardTraceKind"
+              }
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "fromType",
+          "fromId",
+          "toType",
+          "toId",
+          "relationType",
+          "kind"
+        ]
+      },
+      "BoardTraceResponseDto": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardTraceNodeDto"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardTraceEdgeDto"
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the walk hit its node limit or ran out of time"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "truncated"
+        ]
+      },
+      "CaseBoardSnapshotSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "CASE_CLOSED | MANUAL"
+          },
+          "version": {
+            "type": "number",
+            "description": "Board version captured"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reason",
+          "version",
+          "createdAt"
+        ]
+      },
+      "CaseBoardSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "CASE_CLOSED | MANUAL"
+          },
+          "version": {
+            "type": "number",
+            "description": "Board version captured"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "payload": {
+            "description": "The board exactly as it was served when captured",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CaseBoardResponseDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "reason",
+          "version",
+          "createdAt",
+          "payload"
+        ]
+      },
       "CaseworkCaseStatusBreakdownDto": {
         "type": "object",
         "properties": {
@@ -20308,7 +21670,21 @@
               "LEAD_DISMISSED",
               "EVENT_ADDED",
               "EVENT_UPDATED",
-              "EVENT_REMOVED"
+              "EVENT_REMOVED",
+              "BOARD_NOTE_ADDED",
+              "BOARD_NOTE_UPDATED",
+              "BOARD_NOTE_REMOVED",
+              "BOARD_FRAME_ADDED",
+              "BOARD_FRAME_UPDATED",
+              "BOARD_FRAME_REMOVED",
+              "BOARD_LINK_ADDED",
+              "BOARD_LINK_UPDATED",
+              "BOARD_LINK_REMOVED",
+              "BOARD_LINK_PROMOTED",
+              "BOARD_ITEM_HIGHLIGHTED",
+              "BOARD_ARRANGED",
+              "BOARD_SNAPSHOT_TAKEN",
+              "COMMENT_RESOLVED"
             ]
           },
           "actor": {
@@ -20558,6 +21934,11 @@
             "type": "string",
             "nullable": true,
             "maxLength": 2000
+          },
+          "color": {
+            "type": "string",
+            "description": "Display colour (hypothesis cards and chips on the case board)",
+            "maxLength": 32
           },
           "createdBy": {
             "type": "string"

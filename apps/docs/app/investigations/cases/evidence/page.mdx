@@ -1,0 +1,162 @@
+---
+title: Evidence & findings
+description: How evidence and its findings look on the case board, what every colour, ring and badge means, and how to add, attach, settle and remove them.
+---
+
+import { Callout } from "nextra/components"
+import { CaseBoardDemo } from "@/components/case-board/board-demo"
+import { AssetKey, FindingKey, SeverityScale } from "@/components/case-board/board-key"
+
+# Evidence & findings
+
+**Evidence** is an asset you added to the case: a document, a spreadsheet, an
+email, a page, a table. **Findings** are what the detectors found in it: an
+IBAN, a name, a salary, a social security number. On the board, every piece of
+evidence is a circle, and each of its findings is a small circle of its own,
+joined to it by a thin **contains** line.
+
+<CaseBoardDemo
+  scene="evidence"
+  height={440}
+  caption="One contract with a finding in every state, an archive with its findings folded away, a spreadsheet with more findings than the case holds, and an asset deleted at its source. Point at anything for its full description."
+/>
+
+---
+
+## Reading an asset
+
+Each asset shows its **kind** (file, email, table, page…) as an icon in the
+circle and its **name** underneath. Everything else is a ring, a colour or a
+small badge:
+
+<AssetKey />
+
+---
+
+## Reading a finding
+
+A finding's **colour is its severity**:
+
+<SeverityScale />
+
+The **letters** inside name the detector that raised it: the first letters of a
+one-word detector (IBAN, SSN) or the initials of a longer name (a custom
+detector called *Austrian company ID* shows **ACI**). Under the circle, at full
+zoom, you read the finding itself: its type and the value found.
+
+A finding's **look** tells you where it stands:
+
+<FindingKey />
+
+<Callout type="info">
+Settled findings never disappear from the board on their own. A resolved,
+dismissed, gone or deleted finding keeps its place, because it is part of the
+record of the case. If they get in the way, switch them off in **View →
+Findings** and they fade instead.
+</Callout>
+
+---
+
+## How findings are arranged
+
+- **A few findings** fan out to the right of their asset. **Four or more** go all
+  the way round it, starting at twelve o'clock.
+- **Drag a finding** anywhere. It keeps that spot, and it travels with its asset
+  when the asset moves.
+- An asset shows up to **twelve findings**. The rest wait behind **▸n**: click it
+  to show them all, and **◂** to show fewer again.
+- **Fold an asset's findings away** (select it and press `E`, or right-click →
+  **Collapse findings**) and the asset wears a ring of severity colours instead,
+  with **▸n** to unfold them. Zoomed far out, every asset shows its ring.
+- **+n** on an asset means it has *n* more findings that are not in the case.
+  Click it to see them around the asset as dashed grey ghosts, and **−** to hide
+  them again.
+
+---
+
+## Adding evidence
+
+There are several ways in. Use whichever matches where you are:
+
+| Way | When to use it |
+|---|---|
+| **Add evidence panel** | You know what you are looking for. Search assets, findings or both by name or text, narrow with filters, then click a result to drop it in the middle of your view, or drag it exactly where you want it |
+| **Search (`⌘K`)** | You are already on the board and want one thing fast. The *Corpus* scope searches all your data; press `Enter` to add |
+| **Many findings at once** | You are triaging a long list. The Add evidence panel links to the findings table, where you can pick many findings at once and add them to the case |
+| **Watches** | You want the case to keep itself up to date. New matches of a linked inquiry arrive on their own, marked **NEW** |
+| **Leads** | Autopilot, the watches or look-alike content suggested something. Accept a lead, or drag it onto the board |
+| **Neighbours and connections** | The board shows you something connected to your evidence. Press **+** on it and it joins the case where it stands. See [Connections & neighbours](/investigations/cases/connections/) |
+
+Adding something that is already on the board does not add it twice: the board
+says so. A finding whose asset is already on the board simply joins that asset.
+
+---
+
+## Attaching and detaching findings
+
+Evidence brings its asset into the case; the findings on it are attached one by
+one, so the case holds exactly the findings that matter.
+
+- **Attach** a finding that is not in the case: click **+n** to see the ghosts,
+  then right-click one → **Attach to case**, or use **Attach** next to it in the
+  **Details** panel.
+- **Detach** a finding: right-click it → **Detach from case…**. The finding stays
+  in its source; only its place in this case goes. The timeline records it, and
+  **Undo** brings it back.
+
+---
+
+## Settling findings from the board
+
+Right-click a finding to change its status without leaving the case:
+
+| Action | Result |
+|---|---|
+| **Mark resolved** | The finding goes hollow, ringed in its colour, with a green tick |
+| **Mark false positive** | The finding goes hollow, grey and dashed, and its label is struck through |
+| **Reopen finding** | Back to open |
+
+The change is made to the finding itself, so it shows everywhere the finding
+appears, not only in this case.
+
+---
+
+## Everything you can do with evidence
+
+Right-click an asset or a finding for its menu:
+
+| On an asset | On a finding |
+|---|---|
+| **Open asset**: its full page, in a new tab | **Open finding**: its full page, in a new tab |
+| **Open details** in the side panel | **Explain finding**: its details in the side panel |
+| **Link from here** | **Link from this finding** |
+| **New hypothesis from selection**, or **Add to hypothesis** as supporting, contradicting or neutral | **Comment** |
+| **Comment** | **Highlight** in a marker colour |
+| **Show neighbours** and **Show connections** | **Mark resolved**, **Mark false positive**, **Reopen finding** |
+| **Collapse** or **Expand findings** | **Detach from case…** |
+| **Highlight** in a marker colour | |
+| **Move to frame**, **Bring to front**, **Send to back** | |
+| **Remove from case…** | |
+
+A finding that is not in the case (a dashed ghost) offers **Open finding** and
+**Attach to case**.
+
+**Removing evidence** takes its attached findings out of the case too. The
+timeline records it, and **Undo** restores everything, including notes and
+hypothesis stances.
+
+---
+
+## The Details panel
+
+Click an asset or a finding and the **Details** panel follows your selection
+(double-click opens it if it is closed). It shows where the asset came from, its
+findings with their severity and state, **Attach** for those not in the case,
+and buttons to open the asset or finding in full or to **Show connections**.
+
+<Callout type="info">
+**Evidence is a record.** When a later scan changes the source (a finding is no
+longer found, a file is deleted), the case keeps what it knew and marks what
+changed: *gone from its source*, *deleted*. You never lose what the
+investigation was based on.
+</Callout>

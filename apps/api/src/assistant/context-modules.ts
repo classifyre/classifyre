@@ -199,6 +199,7 @@ const CASE_KNOWLEDGE = [
   '  Create a hypothesis → create_case_thread (kind HYPOTHESIS), then link the evidence that supports or contradicts it.',
   '  Summarize a thread or the whole case → read list_case_threads / add_case_thread_entry entries and get_case_timeline, then write the summary in your reply (offer to post it as a thread entry via add_case_thread_entry — that is a mutation, so propose it).',
   '  Pull matches from an inquiry into the case → pull_case_from_inquiry.',
+  'The case board (get_case_board) is the canvas the analysts arrange: evidence bubbles, hypothesis cards, notes, frames, links between findings. Change it with apply_case_board_ops (a mutation, so propose it); read the board first and send its board.version as baseVersion.',
   'Closing or reopening a case is a significant action — always explain why before proposing it.',
 ].join('\n');
 
@@ -352,6 +353,8 @@ export const assistantContextModules: Record<
       'create_case_thread',
       'add_case_thread_entry',
       'link_case_thread_support',
+      'get_case_board',
+      'apply_case_board_ops',
       'search_findings',
       'get_finding',
       'search_assets',

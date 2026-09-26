@@ -16,7 +16,7 @@ import { localeSwitchHref } from "@/lib/app-path";
 import type { ResolvedLanguage } from "@/lib/locale-detection";
 import type { TranslationKey } from "@/i18n";
 
-const LANGUAGE_OPTIONS: {
+export const LANGUAGE_OPTIONS: {
   value: ResolvedLanguage;
   labelKey: TranslationKey;
 }[] = [
@@ -24,9 +24,9 @@ const LANGUAGE_OPTIONS: {
   { value: "GERMAN", labelKey: "settings.languages.GERMAN" },
 ];
 
-export function LanguageSwitcher() {
+/** The current language and the navigation that switches it (shared with the header's mobile menu). */
+export function useSwitchLanguage() {
   const { resolvedLanguage, setLanguageOverride } = useInstanceSettings();
-  const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -49,6 +49,13 @@ export function LanguageSwitcher() {
         : window.location.search + window.location.hash;
     router.replace(localeSwitchHref(pathname ?? "/", language, suffix));
   };
+
+  return { resolvedLanguage, switchLanguage };
+}
+
+export function LanguageSwitcher() {
+  const { t } = useTranslation();
+  const { resolvedLanguage, switchLanguage } = useSwitchLanguage();
 
   return (
     <DropdownMenu>

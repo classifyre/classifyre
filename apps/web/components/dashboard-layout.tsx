@@ -8,36 +8,12 @@ import {
   SidebarTrigger,
 } from "@workspace/ui/components/sidebar";
 import { Separator } from "@workspace/ui/components/separator";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@workspace/ui/components/breadcrumb";
-import { NotificationCenter } from "./notification-center";
-import { Button } from "@workspace/ui/components/button";
-import { BookOpen, Settings } from "lucide-react";
-import { usePathname } from "next/navigation";
-import Link from "next/link";
-import { useNamespace } from "@/components/namespace-provider";
-import { api } from "@workspace/api-client";
-import { ThemeToggle } from "./theme-toggle";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@workspace/ui/components/tooltip";
 import { AssistantFab } from "./assistant-workflow-provider";
-import { DemoModeBanner, DemoModeHeaderBadge } from "./demo-mode-badge";
+import { DemoModeBanner } from "./demo-mode-badge";
 import { PausedWorkspaceBanner } from "./namespace/paused-workspace-banner";
 import { DocumentTitleUpdater } from "./document-title-updater";
-import { stripLocalePrefix } from "@/lib/locale-detection";
 import { AiHealthProvider } from "./ai-health";
-import { LanguageSwitcher } from "./language-switcher";
-import { useTranslation } from "@/hooks/use-translation";
-import type { TranslationKey } from "@/i18n";
+import { AppBreadcrumbs, HeaderActions } from "./app-header";
 import type { ServerConfig } from "@/lib/server-config";
 import {
   DEFAULT_SERVER_CONFIG,
@@ -45,52 +21,6 @@ import {
   useServerConfig,
 } from "./server-config-provider";
 import { ActiveNamespaceTabs } from "./namespace/active-namespace-tabs";
-
-function formatSegmentLabel(
-  segment: string,
-  segmentLabelMap: Record<string, string>,
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
-  previousSegment?: string,
-) {
-  if (segmentLabelMap[segment]) {
-    return segmentLabelMap[segment];
-  }
-
-  const looksLikeId = segment.length >= 8 && /^[a-zA-Z0-9-]+$/.test(segment);
-  if (looksLikeId) {
-    const id = segment.slice(0, 8);
-    if (previousSegment === "scans") return t("breadcrumb.run", { id });
-    if (previousSegment === "sources") return t("breadcrumb.source", { id });
-    if (previousSegment === "assets") return t("breadcrumb.asset", { id });
-    if (previousSegment === "findings") return t("breadcrumb.finding", { id });
-    return id;
-  }
-
-  return decodeURIComponent(segment)
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function isDynamicSegment(segment: string) {
-  return segment.length >= 8 && /^[a-zA-Z0-9-]+$/.test(segment);
-}
-
-function shouldUseTooltip(label: string) {
-  return label.length > 24;
-}
-
-type BreadcrumbEntry = {
-  href: string;
-  label: string;
-  isCurrent: boolean;
-  alwaysVisible?: boolean;
-};
-
-type FindingAssetCrumb = {
-  href: string;
-  label: string;
-};
 
 // The server config context lives in ./server-config-provider so components
 // rendered by this layout can consume it without importing back into here.
@@ -104,201 +34,7 @@ export function DashboardLayout({
   children: React.ReactNode;
   serverConfig?: ServerConfig;
 }) {
-  const pathname = usePathname();
-  const { t } = useTranslation();
-  const { nsHref } = useNamespace();
   const { demoMode } = serverConfig;
-
-  const segmentLabelMap = React.useMemo<Record<string, string>>(
-    () => ({
-      dashboard: t("breadcrumb.dashboard"),
-      discovery: t("breadcrumb.discovery"),
-      findings: t("breadcrumb.findings"),
-      scans: t("breadcrumb.scans"),
-      sources: t("breadcrumb.sources"),
-      assets: t("breadcrumb.assets"),
-      notifications: t("breadcrumb.notifications"),
-      settings: t("breadcrumb.settings"),
-      detectors: t("breadcrumb.detectors"),
-      harness: t("nav.harness"),
-      providers: t("breadcrumb.aiProviders"),
-      new: t("breadcrumb.newProvider"),
-      edit: t("breadcrumb.edit"),
-    }),
-    [t],
-  );
-
-  const [resolvedDynamicLabels, setResolvedDynamicLabels] = React.useState<
-    Record<string, string>
-  >({});
-  const [findingAssetCrumbs, setFindingAssetCrumbs] = React.useState<
-    Record<string, FindingAssetCrumb>
-  >({});
-  // Route segments AFTER the optional `[locale]` and the `[namespaceSlug]`
-  // segment, so breadcrumbs and dynamic-label resolution operate on the real
-  // app path (e.g. sources, assets/:id) and never treat the locale or the
-  // namespace slug as a route.
-  const segments = React.useMemo(
-    () => stripLocalePrefix(pathname).rest.split("/").filter(Boolean).slice(1),
-    [pathname],
-  );
-
-  React.useEffect(() => {
-    let isMounted = true;
-
-    const resolveDynamicLabels = async () => {
-      const labelUpdates: Record<string, string> = {};
-      const findingAssetUpdates: Record<string, FindingAssetCrumb> = {};
-
-      await Promise.all(
-        segments.map(async (segment, index) => {
-          const previousSegment = segments[index - 1];
-          if (!previousSegment || !isDynamicSegment(segment)) {
-            return;
-          }
-
-          const cacheKey = `${previousSegment}:${segment}`;
-          const hasCachedLabel = Boolean(resolvedDynamicLabels[cacheKey]);
-          const hasCachedFindingAsset =
-            previousSegment !== "findings" ||
-            Boolean(findingAssetCrumbs[segment]);
-          if (hasCachedLabel && hasCachedFindingAsset) {
-            return;
-          }
-
-          try {
-            if (previousSegment === "assets") {
-              const response = await api.assets.assetsControllerGetAsset({
-                id: segment,
-              });
-              const label =
-                response.name?.trim() || response.externalUrl?.trim();
-              if (label) {
-                labelUpdates[cacheKey] = label;
-              }
-              return;
-            }
-
-            if (previousSegment === "sources") {
-              const response = await api.sources.sourcesControllerGetSource({
-                id: segment,
-              });
-              const label = response.name?.trim();
-              if (label) {
-                labelUpdates[cacheKey] = label;
-              }
-              return;
-            }
-
-            if (previousSegment === "providers") {
-              const response =
-                await api.aiProviderConfigs.aiProviderConfigControllerGet({
-                  id: segment,
-                });
-              const label = response.name?.trim();
-              if (label) {
-                labelUpdates[cacheKey] = label;
-              }
-              return;
-            }
-
-            if (previousSegment === "findings") {
-              const response = await api.findings.findingsControllerFindOne({
-                id: segment,
-              });
-              const label =
-                response.findingType?.trim() ||
-                `Finding ${segment.slice(0, 8)}`;
-              labelUpdates[cacheKey] = label;
-
-              const assetId = response.asset?.id || response.assetId;
-              if (assetId) {
-                const assetLabel =
-                  response.asset?.name?.trim() ||
-                  response.asset?.externalUrl?.trim() ||
-                  `Asset ${assetId.slice(0, 8)}`;
-                findingAssetUpdates[segment] = {
-                  href: nsHref(`/assets/${assetId}`),
-                  label: assetLabel,
-                };
-              }
-            }
-          } catch {
-            // Keep fallback URL-derived labels for unresolved entities.
-          }
-        }),
-      );
-
-      if (!isMounted) {
-        return;
-      }
-
-      if (Object.keys(labelUpdates).length > 0) {
-        setResolvedDynamicLabels((current) => ({
-          ...current,
-          ...labelUpdates,
-        }));
-      }
-
-      if (Object.keys(findingAssetUpdates).length > 0) {
-        setFindingAssetCrumbs((current) => ({
-          ...current,
-          ...findingAssetUpdates,
-        }));
-      }
-    };
-
-    resolveDynamicLabels();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [findingAssetCrumbs, nsHref, resolvedDynamicLabels, segments]);
-
-  const breadcrumbs = React.useMemo<BreadcrumbEntry[]>(() => {
-    const baseCrumbs = segments.map((segment, index) => ({
-      href: nsHref(`/${segments.slice(0, index + 1).join("/")}`),
-      label:
-        resolvedDynamicLabels[`${segments[index - 1]}:${segment}`] ||
-        formatSegmentLabel(segment, segmentLabelMap, t, segments[index - 1]),
-      isCurrent: index === segments.length - 1,
-    }));
-
-    const findingId =
-      segments[0] === "findings" && isDynamicSegment(segments[1] || "")
-        ? segments[1]
-        : null;
-
-    if (!findingId) {
-      return baseCrumbs;
-    }
-
-    const assetCrumb = findingAssetCrumbs[findingId];
-    if (!assetCrumb) {
-      return baseCrumbs;
-    }
-
-    return baseCrumbs.flatMap((crumb, index) =>
-      index === 1
-        ? [
-            {
-              href: assetCrumb.href,
-              label: assetCrumb.label,
-              isCurrent: false,
-              alwaysVisible: true,
-            },
-            crumb,
-          ]
-        : [crumb],
-    );
-  }, [
-    findingAssetCrumbs,
-    nsHref,
-    resolvedDynamicLabels,
-    segmentLabelMap,
-    segments,
-    t,
-  ]);
 
   return (
     <ServerConfigContext.Provider value={serverConfig}>
@@ -311,113 +47,13 @@ export function DashboardLayout({
             <AppSidebar />
             <SidebarInset className="min-w-0 overflow-x-clip">
               <ActiveNamespaceTabs />
-              <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+              <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-3 sm:px-4">
                 <div className="flex min-w-0 items-center gap-2">
-                  <SidebarTrigger className="-ml-1 size-7" />
-                  <Separator orientation="vertical" className="mr-2 h-4" />
-                  <Breadcrumb className="min-w-0">
-                    {/* Nowrap so a squeezed header truncates the trail instead
-                      of stacking it into a second row and overflowing h-16. */}
-                    <BreadcrumbList className="flex-nowrap">
-                      <BreadcrumbItem>
-                        <BreadcrumbLink asChild>
-                          <Link href={nsHref("/")}>{t("breadcrumb.home")}</Link>
-                        </BreadcrumbLink>
-                      </BreadcrumbItem>
-                      {breadcrumbs.map((crumb) => (
-                        <React.Fragment key={crumb.href}>
-                          <BreadcrumbSeparator
-                            className={
-                              crumb.alwaysVisible || crumb.isCurrent
-                                ? ""
-                                : "hidden sm:block"
-                            }
-                          />
-                          <BreadcrumbItem
-                            className={
-                              crumb.isCurrent || crumb.alwaysVisible
-                                ? ""
-                                : "hidden sm:inline-flex"
-                            }
-                          >
-                            {crumb.isCurrent ? (
-                              shouldUseTooltip(crumb.label) ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <BreadcrumbPage className="max-w-[220px] truncate">
-                                      {crumb.label}
-                                    </BreadcrumbPage>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="bottom" sideOffset={6}>
-                                    {crumb.label}
-                                  </TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                <BreadcrumbPage className="max-w-[220px] truncate">
-                                  {crumb.label}
-                                </BreadcrumbPage>
-                              )
-                            ) : shouldUseTooltip(crumb.label) ? (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <BreadcrumbLink asChild>
-                                    <Link
-                                      href={crumb.href}
-                                      className="inline-block max-w-[180px] truncate"
-                                    >
-                                      {crumb.label}
-                                    </Link>
-                                  </BreadcrumbLink>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom" sideOffset={6}>
-                                  {crumb.label}
-                                </TooltipContent>
-                              </Tooltip>
-                            ) : (
-                              <BreadcrumbLink asChild>
-                                <Link href={crumb.href}>{crumb.label}</Link>
-                              </BreadcrumbLink>
-                            )}
-                          </BreadcrumbItem>
-                        </React.Fragment>
-                      ))}
-                    </BreadcrumbList>
-                  </Breadcrumb>
+                  <SidebarTrigger className="-ml-1 size-7 shrink-0" />
+                  <Separator orientation="vertical" className="mr-1 h-4 shrink-0 sm:mr-2" />
+                  <AppBreadcrumbs />
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {demoMode && <DemoModeHeaderBadge />}
-                  <LanguageSwitcher />
-                  <ThemeToggle />
-                  <NotificationCenter />
-                  {/*
-                  A plain <a>, not next/link: the documentation is a separate
-                  Next app (apps/docs) exported into apps/web/public/docs, so
-                  /docs is static files rather than a route in this router — a
-                  client-side navigation there would not resolve.
-                */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    asChild
-                    className="relative rounded-[4px] border-2 border-transparent hover:border-border"
-                  >
-                    <a href="/docs/" target="_blank" rel="noopener noreferrer">
-                      <BookOpen className="h-5 w-5" />
-                      <span className="sr-only">{t("nav.documentation")}</span>
-                    </a>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    asChild
-                    className="relative rounded-[4px] border-2 border-transparent hover:border-border"
-                  >
-                    <Link href={nsHref("/settings")}>
-                      <Settings className="h-5 w-5" />
-                      <span className="sr-only">Settings</span>
-                    </Link>
-                  </Button>
-                </div>
+                <HeaderActions demoMode={demoMode} />
               </header>
               {demoMode && <DemoModeBanner />}
               <PausedWorkspaceBanner />
