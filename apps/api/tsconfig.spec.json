@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Unit specs run under CommonJS Jest. With `nodenext`, TypeScript emits
+    // ESM for any file inside a `"type": "module"` package, which is every
+    // workspace package (`@workspace/schemas` holds the shared zod contracts),
+    // and Jest then refuses the `import` statement. The e2e suite compiles the
+    // same way (test/tsconfig.e2e.json); API sources are CommonJS either way.
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "resolvePackageJsonExports": false
+  }
+}

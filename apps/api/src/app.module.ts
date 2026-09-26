@@ -50,6 +50,9 @@ import { ConstellationService } from './constellation.service';
 import { InquiriesService } from './inquiries.service';
 import { CaseThreadsService } from './case-threads.service';
 import { CaseActivityService } from './case-activity.service';
+import { CaseBoardService } from './case-board/case-board.service';
+import { QuickSearchService } from './search/quick-search.service';
+import { CaseBoardReadService } from './case-board/case-board-read.service';
 import { InquiryActivityService } from './inquiry-activity.service';
 import { CASE_PULL } from './cases/case-pull.port';
 import { GraphService } from './graph.service';
@@ -93,6 +96,7 @@ import {
   CustomDetectorExtractionsController,
   CustomDetectorTestsController,
   CasesController,
+  CaseBoardController,
   CaseworkController,
   InquiriesController,
   CaseThreadsController,
@@ -143,6 +147,7 @@ import {
     AiController,
     AssistantController,
     CasesController,
+    CaseBoardController,
     CaseworkController,
     InquiriesController,
     CaseTimelineController,
@@ -199,6 +204,9 @@ import {
     ConstellationService,
     InquiriesService,
     CaseThreadsService,
+    CaseBoardReadService,
+    CaseBoardService,
+    QuickSearchService,
     GraphService,
     AgentMemoryService,
     // Chat gateway (Telegram/Slack bots → chat agent over the harness tools).

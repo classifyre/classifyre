@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/api",
-  "version": "0.5.12",
+  "version": "0.5.13",
   "description": "",
   "author": "",
   "private": true,
@@ -122,7 +122,12 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.spec.json"
+        }
+      ]
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

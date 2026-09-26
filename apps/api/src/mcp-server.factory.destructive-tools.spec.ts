@@ -34,6 +34,10 @@ describe('McpServerFactoryService destructive tools reject unknown keys', () => 
     purge_source_findings: { source_id: 'src-1', confirm: true },
     purge_source_assets: { source_id: 'src-1', confirm: true },
     delete_inquiry: { id: uuid },
+    apply_case_board_ops: {
+      caseId: uuid,
+      ops: [{ type: 'item.delete', opId: uuid, id: uuid }],
+    },
   };
 
   let registered: Record<string, RegisteredTool>;

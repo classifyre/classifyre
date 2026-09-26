@@ -179,6 +179,10 @@ api:
       subPath: packages/api-client/package.json
       readOnly: true
     - name: development-source
+      mountPath: /workspace/packages/case-board/package.json
+      subPath: packages/case-board/package.json
+      readOnly: true
+    - name: development-source
       mountPath: /workspace/packages/devops/package.json
       subPath: packages/devops/package.json
       readOnly: true

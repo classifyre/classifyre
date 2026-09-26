@@ -4,17 +4,25 @@ import * as React from "react";
 import {
   Activity,
   Bot,
+  Camera,
+  CheckCircle2,
   ChevronDown,
+  Crosshair,
   Download,
   FileText,
   Fingerprint,
   FolderOpen,
+  Frame,
   GitCommit,
+  Globe,
+  Highlighter,
+  LayoutGrid,
   Link2,
   Loader2,
   MessageSquare,
   Pencil,
   Search,
+  StickyNote,
   Trash2,
 } from "lucide-react";
 import { api, type CaseActivityDto } from "@workspace/api-client";
@@ -23,7 +31,7 @@ import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 
 // ─── Event metadata ───────────────────────────────────────────────────────────
 
-type EventGroup = "case" | "inquiry" | "evidence" | "thread" | "ai";
+type EventGroup = "case" | "inquiry" | "evidence" | "thread" | "board" | "ai";
 
 /** Synthetic activityType for autopilot runs blended into the timeline. */
 const AUTOPILOT_RUN = "AUTOPILOT_RUN";
@@ -52,6 +60,21 @@ const TYPE_META: Record<
   SUPPORT_LINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Evidence linked to thread", color: "text-blue-600 dark:text-blue-400", group: "thread" },
   SUPPORT_UNLINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Evidence unlinked from thread", color: "text-muted-foreground", group: "thread" },
   SUPPORT_UPDATED: { icon: <Pencil className="h-3.5 w-3.5" />, label: "Support updated", color: "text-muted-foreground", group: "thread" },
+  // Case board (every payload carries the board itemId → "Show on board").
+  BOARD_NOTE_ADDED: { icon: <StickyNote className="h-3.5 w-3.5" />, label: "Note added to the board", color: "text-amber-600 dark:text-amber-400", group: "board" },
+  BOARD_NOTE_UPDATED: { icon: <StickyNote className="h-3.5 w-3.5" />, label: "Note edited", color: "text-muted-foreground", group: "board" },
+  BOARD_NOTE_REMOVED: { icon: <Trash2 className="h-3.5 w-3.5" />, label: "Note removed", color: "text-muted-foreground", group: "board" },
+  BOARD_FRAME_ADDED: { icon: <Frame className="h-3.5 w-3.5" />, label: "Frame added", color: "text-muted-foreground", group: "board" },
+  BOARD_FRAME_UPDATED: { icon: <Frame className="h-3.5 w-3.5" />, label: "Frame renamed", color: "text-muted-foreground", group: "board" },
+  BOARD_FRAME_REMOVED: { icon: <Trash2 className="h-3.5 w-3.5" />, label: "Frame removed", color: "text-muted-foreground", group: "board" },
+  BOARD_LINK_ADDED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Link drawn", color: "text-blue-600 dark:text-blue-400", group: "board" },
+  BOARD_LINK_UPDATED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Link edited", color: "text-muted-foreground", group: "board" },
+  BOARD_LINK_REMOVED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Link removed", color: "text-muted-foreground", group: "board" },
+  BOARD_LINK_PROMOTED: { icon: <Globe className="h-3.5 w-3.5" />, label: "Link made a global relationship", color: "text-blue-600 dark:text-blue-400", group: "board" },
+  BOARD_ITEM_HIGHLIGHTED: { icon: <Highlighter className="h-3.5 w-3.5" />, label: "Highlighted on the board", color: "text-amber-600 dark:text-amber-400", group: "board" },
+  BOARD_ARRANGED: { icon: <LayoutGrid className="h-3.5 w-3.5" />, label: "Board rearranged", color: "text-muted-foreground", group: "board" },
+  BOARD_SNAPSHOT_TAKEN: { icon: <Camera className="h-3.5 w-3.5" />, label: "Board snapshot taken", color: "text-muted-foreground", group: "board" },
+  COMMENT_RESOLVED: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Comment resolved", color: "text-green-600 dark:text-green-400", group: "board" },
   [AUTOPILOT_RUN]: { icon: <Bot className="h-3.5 w-3.5" />, label: "AI autopilot run", color: "text-amber-600 dark:text-amber-400", group: "ai" },
 };
 
@@ -61,6 +84,7 @@ const GROUP_FILTERS: Array<{ key: "ALL" | EventGroup; label: string }> = [
   { key: "inquiry", label: "Inquiries" },
   { key: "evidence", label: "Evidence" },
   { key: "thread", label: "Threads" },
+  { key: "board", label: "Board" },
   { key: "ai", label: "AI" },
 ];
 
@@ -100,6 +124,17 @@ function eventSubject(item: CaseActivityDto): string | null {
       return str(p.label);
     case "CASE_CREATED":
       return str(p.title);
+    case "BOARD_NOTE_ADDED":
+    case "BOARD_NOTE_REMOVED":
+    case "BOARD_FRAME_ADDED":
+    case "BOARD_FRAME_REMOVED":
+      return str(p.excerpt);
+    case "BOARD_LINK_ADDED":
+    case "BOARD_LINK_REMOVED":
+    case "BOARD_LINK_PROMOTED":
+      return str(p.label) ?? str(p.kind)?.replace(/_/g, " ") ?? str(p.relationType);
+    case "COMMENT_RESOLVED":
+      return str(p.threadTitle);
     default:
       return null;
   }
@@ -195,6 +230,48 @@ function EventDetail({ item }: { item: CaseActivityDto }) {
     case "CASE_UPDATED":
       if (str(p.status)) lines.push(<span key="status">status → {String(p.status)}</span>);
       break;
+    case "BOARD_NOTE_UPDATED":
+    case "BOARD_FRAME_UPDATED": {
+      const after = str(p.after);
+      lines.push(
+        after ? (
+          <span key="after" className="block whitespace-pre-wrap">
+            “{after.slice(0, 200)}{after.length > 200 ? "…" : ""}”
+          </span>
+        ) : (
+          <span key="after" className="italic">text cleared</span>
+        ),
+      );
+      break;
+    }
+    case "BOARD_LINK_UPDATED": {
+      const changes = (p.changes ?? {}) as Record<string, { before?: unknown; after?: unknown }>;
+      for (const [field, change] of Object.entries(changes).slice(0, 4)) {
+        lines.push(
+          <span key={field} className="block">
+            {field}: {String(change?.before ?? "—")} → <span className="font-medium text-foreground">{String(change?.after ?? "—")}</span>
+          </span>,
+        );
+      }
+      break;
+    }
+    case "BOARD_ITEM_HIGHLIGHTED":
+      lines.push(<span key="color">{str(p.color) ? `marked ${String(p.color)}` : "highlight cleared"}</span>);
+      break;
+    case "BOARD_ARRANGED":
+      lines.push(<span key="count">items moved or resized</span>);
+      break;
+    case "BOARD_SNAPSHOT_TAKEN":
+      lines.push(
+        <span key="reason">
+          {p.reason === "CASE_CLOSED" ? "captured when the case closed" : "taken by hand"}
+          {p.version !== undefined ? ` · version ${String(p.version)}` : ""}
+        </span>,
+      );
+      break;
+    case "COMMENT_RESOLVED":
+      if (p.resolved === false) lines.push(<span key="reopened">reopened</span>);
+      break;
     default:
       break;
   }
@@ -249,7 +326,17 @@ function timeLabel(date: Date): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function CaseTimeline({ caseId }: { caseId: string }) {
+export function CaseTimeline({
+  caseId,
+  compact = false,
+  onShowOnBoard,
+}: {
+  caseId: string;
+  /** Narrow container (the case board's drawer): no day index column. */
+  compact?: boolean;
+  /** Board events carry an itemId; when given, they offer "Show on board". */
+  onShowOnBoard?: (itemId: string) => void;
+}) {
   const [items, setItems] = React.useState<CaseActivityDto[]>([]);
   const [aiRuns, setAiRuns] = React.useState<CaseActivityDto[]>([]);
   const [cursor, setCursor] = React.useState<string | null>(null);
@@ -346,7 +433,7 @@ export function CaseTimeline({ caseId }: { caseId: string }) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_200px]">
+    <div className={compact ? "space-y-4" : "grid gap-6 lg:grid-cols-[1fr_200px]"}>
       <div className="min-w-0 space-y-4">
         {/* ── Filters ── */}
         <div className="flex flex-wrap items-center gap-1.5">
@@ -417,6 +504,15 @@ export function CaseTimeline({ caseId }: { caseId: string }) {
                         </span>
                       </div>
                       <EventDetail item={item} />
+                      {onShowOnBoard && str((item.payload as Record<string, unknown> | null)?.itemId) && (
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground mt-0.5 inline-flex items-center gap-1 text-[11px] underline"
+                          onClick={() => onShowOnBoard(String((item.payload as Record<string, unknown>).itemId))}
+                        >
+                          <Crosshair className="h-3 w-3" /> Show on board
+                        </button>
+                      )}
                       {item.actor &&
                         (isAiActor(item.actor) ? (
                           <p className="text-muted-foreground/70 mt-0.5 text-[11px]">
@@ -448,7 +544,7 @@ export function CaseTimeline({ caseId }: { caseId: string }) {
       </div>
 
       {/* ── Jump navigation ── */}
-      {days.length > 1 && (
+      {days.length > 1 && !compact && (
         <nav className="sticky top-4 hidden self-start lg:block">
           <p className="text-muted-foreground mb-2 font-mono text-[10px] uppercase tracking-[0.14em]">
             Jump to

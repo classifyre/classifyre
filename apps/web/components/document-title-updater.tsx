@@ -18,6 +18,8 @@ const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/notifications": "notifications.title",
   "/settings": "settings.title",
   "/investigations": "nav.investigations",
+  "/investigations/cases/new": "investigations.page.newCase",
+  "/investigations/inquiries/new": "investigations.page.newInquiry",
   "/duplicates": "nav.fingerprints",
   "/glossary": "glossary.title",
   "/harness": "nav.harness",
@@ -55,6 +57,9 @@ function getTitleKey(pathname: string): string | null {
   if (pathname.startsWith("/harness/")) {
     return "nav.harness";
   }
+  if (pathname.startsWith("/investigations/")) {
+    return "nav.investigations";
+  }
 
   return null;
 }
@@ -62,6 +67,18 @@ function getTitleKey(pathname: string): string | null {
 const EntityTitleContext = React.createContext<
   ((name: string | null) => void) | null
 >(null);
+
+/** The name the current detail page announced, for the breadcrumb's last crumb. */
+const EntityNameContext = React.createContext<string | null>(null);
+
+/**
+ * The display name the current detail page announced through
+ * {@link useEntityDocumentTitle} (null until it has one): the app header's
+ * breadcrumb names its last crumb with it instead of a truncated id.
+ */
+export function useEntityName(): string | null {
+  return React.useContext(EntityNameContext);
+}
 
 /**
  * Announce the display name of the entity a detail page is showing, so the tab
@@ -132,7 +149,9 @@ export function DocumentTitleUpdater({
 
   return (
     <EntityTitleContext.Provider value={setEntityName}>
-      {children}
+      <EntityNameContext.Provider value={entityName}>
+        {children}
+      </EntityNameContext.Provider>
     </EntityTitleContext.Provider>
   );
 }

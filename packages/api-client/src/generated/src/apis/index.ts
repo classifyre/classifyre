@@ -5,6 +5,7 @@ export { AIProviderConfigsApi } from './AIProviderConfigsApi';
 export { AssetsApi } from './AssetsApi';
 export { AssistantApi } from './AssistantApi';
 export { AutopilotApi } from './AutopilotApi';
+export { CaseBoardApi } from './CaseBoardApi';
 export { CasesApi } from './CasesApi';
 export { ChatBotsApi } from './ChatBotsApi';
 export { CorrelationApi } from './CorrelationApi';

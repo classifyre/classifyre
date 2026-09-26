@@ -109,7 +109,7 @@ export interface FingerprintsFocus {
 const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 /**
- * The correlation ("evidence fingerprints") graph. Reuses the case-graph canvas
+ * The correlation ("evidence fingerprints") graph. Reuses the graph-explorer canvas
  * to render the bipartite Asset ↔ shared-value ↔ Asset structure from
  * GET /correlation/graph. Pure-UI conveniences on top: source/label filtering,
  * a tuning dialog, case actions, and bundling of dense shared-value groups into

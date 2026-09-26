@@ -26,6 +26,8 @@
  *   DataTransferJob — the transfer history itself; exporting it would nest.
  */
 
+import type { IdRemapper } from './id-remap';
+
 export const TRANSFER_SCOPE_IDS = [
   'sources',
   'sourceFiles',
@@ -213,6 +215,21 @@ export interface TransferTableSpec {
    * the operator so before they start.
    */
   optionalRefs?: Record<string, TransferScopeId>;
+  /**
+   * JSON columns that hold row ids inside them, rewritten on import with the
+   * same function as {@link idRefs}. A board item's style is keyed by finding
+   * id (moved findings, row highlights) and names the finding a comment pin is
+   * anchored to; left alone, all of that would point at the old identities.
+   */
+  jsonIdRefs?: Record<string, (value: unknown, remapId: IdRemapper) => unknown>;
+  /**
+   * Columns referencing another row of the same table (a board item's frame).
+   * `order` cannot sequence a table against itself, and the archive holds rows
+   * in key order, which says nothing about which row another needs first — so
+   * import writes these columns empty and restores them once the whole table
+   * has landed.
+   */
+  selfRefs?: readonly string[];
 }
 
 /**
@@ -479,18 +496,19 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
     idRefs: ['id', 'caseId', 'inquiryId'],
   },
   {
-    model: 'caseFinding',
+    model: 'caseEvidence',
     scope: 'investigations',
     order: 530,
     keys: ['id'],
-    idRefs: ['id', 'caseId', 'caseEvidenceId', 'findingId'],
+    idRefs: ['id', 'caseId', 'entityId'],
   },
+  // After case_evidence: a case finding requires the evidence it hangs off.
   {
-    model: 'caseEvidence',
+    model: 'caseFinding',
     scope: 'investigations',
     order: 540,
     keys: ['id'],
-    idRefs: ['id', 'caseId', 'entityId'],
+    idRefs: ['id', 'caseId', 'caseEvidenceId', 'findingId'],
   },
   {
     model: 'caseLead',
@@ -540,6 +558,54 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
     order: 610,
     keys: ['id'],
     idRefs: ['id', 'caseId'],
+  },
+  // Case board: view state and board-native objects. After every table whose
+  // ids they reference (evidence, threads), so import remaps `refId` onto
+  // rows that already landed. `refId` points at case_evidence or case_threads
+  // depending on `kind`; both are remapped by the same deterministic function.
+  {
+    model: 'caseBoard',
+    scope: 'investigations',
+    order: 620,
+    keys: ['id'],
+    idRefs: ['id', 'caseId'],
+  },
+  {
+    model: 'caseBoardItem',
+    scope: 'investigations',
+    order: 630,
+    keys: ['id'],
+    // `content` may hold undo tombstones with nested case row ids. They are
+    // server-private undo state; a stale one only means an undo that no
+    // longer applies after import, never a dangling reference in the data.
+    idRefs: ['id', 'boardId', 'refId', 'parentId'],
+    // Moved findings, row highlights and a pin's finding are keyed by finding
+    // id inside `style`.
+    jsonIdRefs: { style: remapBoardStyle },
+    // An item's frame is another item, and an item can predate its frame.
+    selfRefs: ['parentId'],
+  },
+  {
+    model: 'caseBoardLink',
+    scope: 'investigations',
+    order: 640,
+    keys: ['id'],
+    idRefs: [
+      'id',
+      'boardId',
+      'sourceItemId',
+      'targetItemId',
+      'sourceFindingId',
+      'targetFindingId',
+      'promotedEdgeId',
+    ],
+  },
+  {
+    model: 'caseBoardSnapshot',
+    scope: 'investigations',
+    order: 650,
+    keys: ['id'],
+    idRefs: ['id', 'boardId'],
   },
 
   // ── AI harness ────────────────────────────────────────────────────────────
@@ -681,4 +747,32 @@ export function missingDependencies(
     if (missing.length > 0) gaps.push({ scope: scope.id, missing });
   }
   return gaps;
+}
+
+/** Style keys of a board item holding one entry per finding id. */
+const PER_FINDING_STYLE_KEYS = ['rowHighlights', 'findingPositions'] as const;
+
+/**
+ * Rewrite the finding ids inside a board item's `style` (see
+ * `case_board_items.style`): the keys of its per-finding maps and the finding a
+ * comment pin is anchored to.
+ */
+export function remapBoardStyle(value: unknown, remapId: IdRemapper): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const style: Record<string, unknown> = {
+    ...(value as Record<string, unknown>),
+  };
+  for (const key of PER_FINDING_STYLE_KEYS) {
+    const rows = style[key];
+    if (!rows || typeof rows !== 'object' || Array.isArray(rows)) continue;
+    style[key] = Object.fromEntries(
+      Object.entries(rows as Record<string, unknown>).map(
+        ([findingId, entry]) => [String(remapId(findingId)), entry],
+      ),
+    );
+  }
+  if (typeof style['anchorFindingId'] === 'string') {
+    style['anchorFindingId'] = remapId(style['anchorFindingId']);
+  }
+  return style;
 }

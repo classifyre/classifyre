@@ -229,6 +229,87 @@ describe('GraphService', () => {
       expect(finding?.label).toBe('Contains PII');
       expect(finding?.caseFindingId).toBe('cf1');
     });
+
+    it('with a finding budget, reads the evidence findings directly so they never crowd neighbours out', async () => {
+      mockPrisma.caseEvidence.findMany.mockResolvedValue([
+        {
+          id: 'ev1',
+          entityType: 'asset',
+          entityId: 'a1',
+          label: 'customer.csv',
+          assetType: 'file',
+          sourceType: 'S3_COMPATIBLE_STORAGE',
+          findings: [],
+        },
+      ]);
+      mockPrisma.$executeRaw.mockResolvedValue(1);
+      mockPrisma.asset.findUnique.mockResolvedValue(null);
+      const sqlOf = (sql: { strings?: readonly string[] }) =>
+        (sql.strings ?? []).join(' ');
+      mockPrisma.$queryRaw.mockImplementation(
+        (sql: { strings?: readonly string[] }) => {
+          const text = sqlOf(sql);
+          if (text.includes('WITH RECURSIVE')) {
+            return Promise.resolve([
+              { node_type: 'asset', node_id: 'a1', depth: 0 },
+              { node_type: 'asset', node_id: 'n1', depth: 1 },
+            ]);
+          }
+          return Promise.resolve([]);
+        },
+      );
+      mockPrisma.asset.findMany.mockResolvedValue([
+        {
+          id: 'a1',
+          name: 'customer.csv',
+          assetType: 'file',
+          sourceType: 'S3_COMPATIBLE_STORAGE',
+          status: 'NEW',
+        },
+        {
+          id: 'n1',
+          name: 'neighbour.csv',
+          assetType: 'file',
+          sourceType: 'S3_COMPATIBLE_STORAGE',
+          status: 'NEW',
+        },
+      ]);
+      mockPrisma.finding.findMany
+        .mockResolvedValueOnce([{ id: 'f9' }])
+        .mockResolvedValue([
+          {
+            id: 'f9',
+            findingType: 'email',
+            matchedContent: 'a@b.c',
+            severity: 'LOW',
+            detectorType: 'PII',
+            status: 'OPEN',
+            assetId: 'a1',
+          },
+        ]);
+      mockPrisma.caseThreadSupport.findMany.mockResolvedValue([]);
+
+      const result = await service.caseGraph('case-1', 1, {
+        findingBudget: 50,
+      });
+
+      // The neighbourhood walk only steps onto assets and external endpoints…
+      const walk = mockPrisma.$queryRaw.mock.calls
+        .map((c) => sqlOf(c[0] as { strings?: readonly string[] }))
+        .find((text) => text.includes('WITH RECURSIVE'));
+      expect(walk).toContain('e.to_type IN (');
+      // …and the findings come from their own read, capped by the budget.
+      expect(mockPrisma.finding.findMany.mock.calls[0][0]).toMatchObject({
+        where: { assetId: { in: ['a1'] } },
+        take: 50,
+      });
+      expect(result.nodes.map((n) => `${n.type}:${n.id}`).sort()).toEqual([
+        'asset:a1',
+        'asset:n1',
+        'finding:f9',
+      ]);
+      expect(result.truncated).toBe(false);
+    });
   });
 
   describe('upsertEdges', () => {
