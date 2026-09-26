@@ -28,6 +28,8 @@ export interface Persistence {
   enqueue(ops: BoardOp[], exact: boolean): void;
   /** Ops not yet confirmed by the server: queued and in flight. */
   pending(): BoardOp[];
+  /** Rewrite the queued (not yet sent) ops, e.g. to move their claims forward. */
+  rebase(rewrite: (queued: BoardOp[]) => BoardOp[]): void;
   flushNow(): Promise<void>;
   /**
    * The board mounted: start sending. Mounting is not creation. StrictMode
@@ -149,6 +151,9 @@ export function createPersistence(caseId: string, hooks: PersistenceHooks): Pers
       if (active) schedule();
     },
     pending: () => [...inFlight, ...queue],
+    rebase(rewrite) {
+      if (queue.length > 0) queue = rewrite(queue);
+    },
     async flushNow() {
       if (timer) {
         clearTimeout(timer);

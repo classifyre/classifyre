@@ -1,0 +1,219 @@
+---
+title: Use cases
+description: Which case board tools to reach for, and in what order, for common investigations. Covers tracing a data leak, testing competing explanations, finding every copy, triage, scoping and hand-over.
+---
+
+import { Callout, Steps } from "nextra/components"
+import { CaseBoardDemo } from "@/components/case-board/board-demo"
+
+# Use cases
+
+The case board has many tools. Most investigations need only a few of them,
+in a particular order. Here are the common ones, each with the tools to use
+and why.
+
+## Quick chooser
+
+| I want to… | Reach for |
+|---|---|
+| Find out where some data came from, or where it went | [**Show connections**](/investigations/cases/connections/#show-connections) |
+| Decide between two or more explanations | [**Hypotheses**](/investigations/cases/hypothesis/) with stances, then **focus** each one |
+| Find every copy of a file | **Show connections** following **Duplicates** and **Similar** |
+| Work through many findings | **Watches**, the **Findings** spotlight, and settling findings from the board |
+| Make sure nothing obvious is missing | **Suggested neighbours** at 2 hops |
+| Hand the case over or report on it | **Frames**, **notes**, **highlights**, **snapshots** and **Export PNG** |
+| Review what Autopilot did | **Leads**, the **Timeline**, and *Chronology* events to verify |
+
+---
+
+## Tracing a data leak
+
+**The situation.** A monthly payroll file turned up attached to an email sent
+to a private address. You need to know where the data came from, how it got
+out, and whether other copies exist.
+
+<Steps>
+
+### Start from what you know
+
+Press `⌘K`, switch to **Corpus**, find the email and press `Enter` to put it
+on the board.
+
+### Trace the trail
+
+Right-click the email → **Show connections**. Set **Direction** to **Both**,
+**Follow** to **Lineage** and **Links**, and **How far** to **∞**. Upstream, to
+the left, you see the export that was attached and the spreadsheet it was
+transformed from. Further upstream you reach the HR database.
+
+### Bring the chain into the case
+
+Right-click the source spreadsheet's ghost → **Add the route to it**. Every
+asset between the email and the source joins the case in one step.
+
+### Look alongside
+
+Switch **Follow** to **Duplicates** and **Similar**. Any copy of the export,
+such as one on a backup share, shows up alongside with ≈. Add the ones that
+matter.
+
+### Say what you think happened
+
+Press `T`, click near the evidence and type *"Payroll data was forwarded to a
+private mailbox"*. Drag from the card to the private email-address finding and
+choose **Supports**. In the hypothesis's thread, note why: *sent at 23:40,
+outside working hours*.
+
+### Frame the path, note the next step
+
+Press `F` and draw a frame around the export and the email; name it
+*Exfiltration path*. Add a sticky note: *Ask IT for the mail gateway logs*.
+
+</Steps>
+
+<CaseBoardDemo scene="connections" height={380} caption="The trace from step 2: upstream to the left, downstream to the right, copies and look-alikes below." />
+
+---
+
+## Testing competing explanations
+
+**The situation.** A supplier's bank account changed just before a large
+payment. Was it fraud, or a legitimate change?
+
+<Steps>
+
+### Put the evidence on the board
+
+Add the invoice, the vendor master record and the email announcing the change.
+
+### Write both explanations down
+
+Create **H1** *"The bank details were changed by a fraudster"* and **H2** *"The
+supplier changed banks legitimately"*. Writing down the explanation you do not
+believe yet is the point: it stops the case from only collecting evidence for
+the first idea.
+
+### Link the evidence with a stance
+
+The look-alike sender domain **supports** H1 and **contradicts** H2. The old
+account in the vendor master is **neutral** to H2. Write down why in each
+hypothesis's thread.
+
+### Focus each hypothesis in turn
+
+Click H1's card: only its evidence stays lit. Then click H2's. How strong is
+each one, really? Contested evidence carries both hypotheses' dots.
+
+### Record the verdict
+
+In each thread, set the **verdict** and your **confidence**, and write why in
+the note box. On the **Test** tab, write what you would expect to find if the
+hypothesis were true. For example: *every invoice since the change carries
+the new IBAN*. Then go and check.
+
+</Steps>
+
+<CaseBoardDemo scene="hypotheses" height={440} caption="The two hypotheses from this example. Click either card to focus it." />
+
+---
+
+## Finding every copy
+
+**The situation.** A customer export must be deleted everywhere, but people
+have copied it around.
+
+1. Put the export on the board and right-click it → **Show connections**.
+2. Set **Follow** to **Duplicates** (identical content) and **Similar** (near
+   copies), and **How far** to **2** or more. Copies of copies show up too.
+3. **Add *n* connections** on the *Alongside* group puts every copy in the
+   case.
+4. As copies are deleted and sources are rescanned, their findings get the red
+   dashed **gone from its source** ring. The case keeps the record, and you can
+   see at a glance what is still out there.
+5. Mark findings **resolved** from the board as each copy is dealt with.
+
+---
+
+## Working through many findings
+
+**The situation.** An inquiry matches new findings every day, and the case
+should keep up without drowning you.
+
+1. Link the inquiry in the **Watches** panel. New matches arrive on the board
+   on their own, marked **NEW**, and the panel's badge counts them.
+2. Click the **Findings** counter in the top bar to spotlight every finding in
+   the case, wherever it sits.
+3. Settle findings where they are: right-click → **Mark resolved** or **Mark
+   false positive**. The change applies to the finding everywhere.
+4. Switch settled findings off in **View → Findings**, so they fade and the
+   open ones stand out.
+5. Fold busy assets with `E`. The severity ring still shows what is inside.
+6. Check the **Leads** panel for findings Autopilot and the watches suggest, and
+   accept or dismiss them.
+
+<CaseBoardDemo scene="spotlight" height={400} caption="The Findings spotlight: the findings stay lit, everything else fades." />
+
+---
+
+## Making sure nothing is missing
+
+**The situation.** Before you conclude, you want to know whether the case
+overlooks something obvious.
+
+1. Open **View → Neighbours not in the case** and choose **2** hops, with every
+   kind of connection on.
+2. Suggested neighbours appear around the evidence without the lime ring,
+   joined to it by the relation that connects them.
+3. Add what belongs with **+**. **Hide** what does not, so you can see what is
+   left.
+4. If the board says there are more neighbours than it drew, use **Show
+   connections** on the evidence that matters most, to see everything around it.
+
+<CaseBoardDemo scene="neighbours" height={380} caption="Three suggested neighbours around two pieces of evidence." />
+
+---
+
+## Handing over a case
+
+**The situation.** The case goes to legal, to management, or to a colleague
+taking over, and they need to understand it quickly.
+
+1. **Frame the story.** One frame per chapter: *Background*, *12 March: what
+   happened*, *Open questions*. Collapse the background frame so it doesn't
+   distract.
+2. **Write the facts on notes.** Use a team colour code, such as green for
+   confirmed and pink for risks.
+3. **Highlight** the key evidence, and check **View → Highlight by → Only
+   highlighted** reads as a summary.
+4. **Tidy up** if the layout has grown messy. **Undo** if you prefer your own.
+5. **Take a snapshot** (**More → Take snapshot**), so the hand-over state is kept
+   exactly.
+6. **Export PNG** for the report.
+7. Write the **conclusion** in the **Case file** panel. When the work is done,
+   **close** the case: the board becomes read-only and a final snapshot is
+   taken.
+
+<CaseBoardDemo scene="organise" height={440} caption="A hand-over layout: a frame for the day's events, notes for questions, facts and warnings, and a collapsed background frame." />
+
+---
+
+## Working alongside Autopilot
+
+**The situation.** [Autopilot](/investigations/autopilot/) works on your cases
+too, and you want to stay in control of what it does.
+
+- **Leads** holds what it proposes. Nothing it suggests joins the case until
+  someone accepts it or drags it onto the board.
+- In the **Timeline**, *Activity* shows every action on the case with an AI
+  badge on Autopilot's. *Chronology* events it proposed are marked, and you
+  **verify** them before they count as established.
+- The **Case file** panel sets the case's **AI mode**. Freeze a sensitive case
+  to observe-only, or run Autopilot on it now.
+- Hypothesis threads show which entries Autopilot wrote, so its reasoning can
+  be checked like anyone else's.
+
+<Callout type="info">
+Whatever the case, two habits pay off: **write hypotheses down early**, even
+tentative ones, and **write your reasons in the threads**.
+The board shows *what* is connected; the notes say *why* it matters.
+</Callout>

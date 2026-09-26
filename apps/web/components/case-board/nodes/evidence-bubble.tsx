@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import type { NodeProps } from "@xyflow/react";
+import { AssetNode, type HypothesisDot, type NodeBadge } from "@workspace/case-board/components/asset-node";
+import { useLod } from "@workspace/case-board/hooks/use-lod";
 import { getAssetKindIcon } from "@/lib/asset-kind";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
@@ -9,8 +11,6 @@ import { setCollapsed } from "../store/commands";
 import type { BoardNode } from "../store/projection";
 import { MAX_FINDING_NODES, severityMix } from "../store/relations";
 import { hypothesisMeta, stanceThreadKey } from "../store/selectors";
-import { useLod } from "../hooks/use-lod";
-import { AssetNode, type HypothesisDot, type NodeBadge } from "./asset-node";
 
 /**
  * Evidence: an asset in the case, as the old case graph drew it (PRD §5.2).

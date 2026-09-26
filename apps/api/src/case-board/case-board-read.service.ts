@@ -87,6 +87,9 @@ export function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+/** Findings of the evidence the board loads (the Details panel lists them all). */
+const FINDING_BUDGET = 2000;
+
 /**
  * The read side of the case board: the lazy reconcile that keeps board items
  * in step with the case's evidence and threads, the board payload, and
@@ -253,7 +256,8 @@ export class CaseBoardReadService {
             },
           },
         }),
-        this.graph.caseGraph(caseId, 1),
+        // Findings on their own budget, so they never crowd neighbours out.
+        this.graph.caseGraph(caseId, 1, { findingBudget: FINDING_BUDGET }),
       ]);
 
     const evidence = evidenceRows.map(toEvidenceDto);

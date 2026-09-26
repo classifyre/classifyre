@@ -229,12 +229,12 @@ describe("projection: assets and their findings as nodes", () => {
   const view = (patch: Partial<ProjectionView> = {}): ProjectionView => ({
     lod: "full",
     readOnly: false,
-    showSuggested: false,
+    neighbourHops: 0,
     hiddenSuggestions: new Set(),
     showResolvedComments: false,
     showAllRows: new Set(),
     expandedUnattached: new Set(),
-    edgeClasses: new Set(["FLOW", "IDENTITY", "REFERENCE"]),
+    kinds: new Set(["lineage", "links", "duplicates", "similar"]),
     ...patch,
   });
   const projected = (d: BoardDomain, v: ProjectionView) => new Set(projectNodes(d, v).map((n) => n.id));
@@ -408,12 +408,12 @@ describe("ports", () => {
     const v: ProjectionView = {
       lod: "full",
       readOnly: false,
-      showSuggested: false,
+      neighbourHops: 0,
       hiddenSuggestions: new Set(),
       showResolvedComments: false,
       showAllRows: new Set(),
       expandedUnattached: new Set(),
-      edgeClasses: new Set(["FLOW", "IDENTITY", "REFERENCE"]),
+      kinds: new Set(["lineage", "links", "duplicates", "similar"]),
     };
     const edges = projectEdges(d, v, projectNodes(d, v));
     expect(edges.length).toBeGreaterThan(0);

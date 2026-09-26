@@ -1,20 +1,8 @@
+import { HYPOTHESIS_PALETTE } from "@workspace/case-board/lib/geometry";
 import type { BoardState } from "./board-store";
 import type { BoardDomain, BoardThread } from "./types";
 
-/**
- * Hypothesis colours when a thread has none of its own. The same eight hues
- * the legacy graph used, so a hypothesis keeps its colour across the switch.
- */
-export const HYPOTHESIS_PALETTE = [
-  "#ef4444",
-  "#3b82f6",
-  "#22c55e",
-  "#f59e0b",
-  "#a855f7",
-  "#ec4899",
-  "#06b6d4",
-  "#84cc16",
-];
+export { HYPOTHESIS_PALETTE };
 
 export interface HypothesisMeta {
   index: number;

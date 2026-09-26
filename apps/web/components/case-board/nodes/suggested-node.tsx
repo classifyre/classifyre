@@ -2,15 +2,13 @@
 
 import * as React from "react";
 import { useReactFlow, type NodeProps } from "@xyflow/react";
-import { Plus } from "lucide-react";
+import { AddButton, AssetNode } from "@workspace/case-board/components/asset-node";
+import { useLod } from "@workspace/case-board/hooks/use-lod";
 import { getAssetKindIcon } from "@/lib/asset-kind";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore } from "../store/board-context";
 import { addEvidence } from "../store/commands";
 import type { BoardNode, SuggestedNodeData } from "../store/projection";
-import { ASSET_NODE } from "../store/relations";
-import { useLod } from "../hooks/use-lod";
-import { AssetNode } from "./asset-node";
 
 /**
  * A neighbour of the evidence that is not in the case (D5), drawn like any
@@ -51,18 +49,7 @@ export const SuggestedNode = React.memo(function SuggestedNode({ id, data, selec
       readOnly={readOnly}
       linkable={false}
       action={
-        !readOnly && lod !== "chip" ? (
-          <button
-            type="button"
-            className="cb-add nodrag nopan absolute flex size-[18px] items-center justify-center rounded-full border-[1.5px] border-[#0a0a0a] bg-accent text-accent-foreground"
-            style={{ left: ASSET_NODE.cx + 12, top: ASSET_NODE.cy - ASSET_NODE.ring - 2 }}
-            onClick={add}
-            title={t("caseBoard.suggested.add")}
-            aria-label={t("caseBoard.suggested.add")}
-          >
-            <Plus className="size-3" strokeWidth={3} aria-hidden />
-          </button>
-        ) : null
+        !readOnly && lod !== "chip" ? <AddButton placement="top" title={t("caseBoard.suggested.add")} onClick={add} /> : null
       }
     />
   );

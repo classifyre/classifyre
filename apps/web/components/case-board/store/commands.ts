@@ -1,8 +1,11 @@
-import type {
-  BoardEndpoint,
-  BoardLinkCertainty,
-  BoardStance,
-  BoardStyle,
+import {
+  BOARD_FRAME_TITLE_MAX_CHARS,
+  BOARD_HYPOTHESIS_TITLE_MAX_CHARS,
+  BOARD_NOTE_MAX_CHARS,
+  type BoardEndpoint,
+  type BoardLinkCertainty,
+  type BoardStance,
+  type BoardStyle,
 } from "@workspace/schemas/case-board";
 import { absolutePosition, opId, type BoardOp } from "./ops";
 import type {
@@ -219,8 +222,17 @@ export function bringToFront(items: BoardItem[], topZ: number, back = false): Co
 
 // ─── Text & style ────────────────────────────────────────────────────────────
 
-export function editText(item: BoardItem, value: string): Command {
+/**
+ * Replace a note's text or a frame's title. `claim` is the `updatedAt` the
+ * editor started from (the item's current one by default): a stale edit is
+ * refused per op, so two people typing into one note cannot silently
+ * overwrite each other (PRD §5.12). The undo claims the same version, moved
+ * forward over this edit when it is replayed (claims.ts), so it cannot wipe
+ * out an edit someone made after this one either.
+ */
+export function editText(item: BoardItem, value: string, claim: string = item.updatedAt): Command {
   const field = item.kind === "NOTE" ? "text" : "title";
+  const max = item.kind === "NOTE" ? BOARD_NOTE_MAX_CHARS : BOARD_FRAME_TITLE_MAX_CHARS;
   return {
     label: item.kind === "NOTE" ? "Edit note" : "Rename frame",
     forward: [
@@ -228,10 +240,8 @@ export function editText(item: BoardItem, value: string): Command {
         type: "item.update",
         opId: opId(),
         id: item.id,
-        patch: { content: { [field]: value } },
-        // A stale edit is refused per op, so two people typing into one note
-        // cannot silently overwrite each other (PRD §5.12).
-        expectedUpdatedAt: item.updatedAt,
+        patch: { content: { [field]: value.slice(0, max) } },
+        expectedUpdatedAt: claim,
       },
     ],
     inverse: [
@@ -240,6 +250,7 @@ export function editText(item: BoardItem, value: string): Command {
         opId: opId(),
         id: item.id,
         patch: { content: { [field]: item.content[field] ?? "" } },
+        expectedUpdatedAt: claim,
       },
     ],
   };
@@ -399,7 +410,15 @@ export function updateLink(
         ...(withExpected ? { expectedUpdatedAt: link.updatedAt } : {}),
       },
     ],
-    inverse: [{ type: "link.update", opId: opId(), id: link.id, patch: prev }],
+    inverse: [
+      {
+        type: "link.update",
+        opId: opId(),
+        id: link.id,
+        patch: prev,
+        ...(withExpected ? { expectedUpdatedAt: link.updatedAt } : {}),
+      },
+    ],
   };
 }
 
@@ -504,7 +523,8 @@ export function createHypothesis(
         type: "hypothesis.create",
         opId: opId(),
         itemId,
-        title,
+        // Longer is refused by the op schema, and a refused batch is dropped whole.
+        title: title.slice(0, BOARD_HYPOTHESIS_TITLE_MAX_CHARS),
         ...(at ? { x: Math.round(at.x), y: Math.round(at.y) } : {}),
         ...(color ? { color } : {}),
         ...(supports.length > 0 ? { supports } : {}),
@@ -577,7 +597,7 @@ export function addComment(body: string, anchor: BoardEndpoint | null, at: XY): 
         type: "comment.create",
         opId: opId(),
         itemId,
-        body,
+        body: body.slice(0, BOARD_NOTE_MAX_CHARS),
         anchor,
         x: Math.round(at.x),
         y: Math.round(at.y),

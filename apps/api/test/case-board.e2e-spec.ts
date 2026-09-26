@@ -642,6 +642,57 @@ describe('Case board (e2e)', () => {
         text: 'v2',
       });
     });
+
+    it("lets one batch build on its own writes to a note, never on someone else's", async () => {
+      const caseId = await seedCase();
+      const n = randomUUID();
+      const edit = (
+        text: string,
+        expectedUpdatedAt: string,
+        id: string = opId(),
+      ) => ({
+        type: 'item.update',
+        opId: id,
+        id: n,
+        patch: { content: { text } },
+        expectedUpdatedAt,
+      });
+      // A note and its first text in one batch: the claim names the client's
+      // placeholder version, which never existed on the server.
+      const created = await ops(caseId, [
+        {
+          type: 'item.create',
+          opId: opId(),
+          id: n,
+          kind: 'NOTE',
+          x: 0,
+          y: 0,
+          content: { text: '' },
+        },
+        edit('v1', new Date(0).toISOString()),
+      ]).expect(200);
+      expect(created.body.rejected).toEqual([]);
+      const v1 = created.body.applied[1].updatedAt as string;
+
+      // An edit, its undo and its redo sent together all claim v1.
+      const replayed = await ops(caseId, [
+        edit('v2', v1),
+        edit('v1', v1),
+        edit('v2', v1),
+      ]).expect(200);
+      expect(replayed.body.rejected).toEqual([]);
+
+      // A later batch still claiming v1 was overtaken: refused.
+      const late = await ops(caseId, [edit('v3', v1, 'late')]).expect(200);
+      expect(late.body.rejected[0]).toMatchObject({
+        opId: 'late',
+        code: 'STALE',
+      });
+      const row = await prisma.caseBoardItem.findUniqueOrThrow({
+        where: { id: n },
+      });
+      expect(row.content).toEqual({ text: 'v2' });
+    });
   });
 
   describe('domain ops', () => {

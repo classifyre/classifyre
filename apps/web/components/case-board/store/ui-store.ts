@@ -1,5 +1,7 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { BoardEndpoint } from "@workspace/schemas/case-board";
+import type { BoardTraceResponseDto } from "@workspace/api-client";
+import type { TraceRequest } from "./trace";
 
 /**
  * Per-viewer UI state: the active tool, open drawers, the View popover's
@@ -9,7 +11,8 @@ import type { BoardEndpoint } from "@workspace/schemas/case-board";
 
 export type Tool = "select" | "hand" | "note" | "frame" | "hypothesis" | "comment" | "link";
 
-export type SuggestedMode = "auto" | "show" | "hide";
+/** How far suggested neighbours reach from the evidence: 0 is none, 6 is as far as the walk goes. */
+export type NeighbourHops = 0 | 1 | 2 | 3 | 6;
 
 /** What the side panel shows (the rail on the right of the board opens it). */
 export type DrawerKind =
@@ -22,6 +25,7 @@ export type DrawerKind =
   | "thread"
   | "details"
   | "addEvidence"
+  | "connections"
   | "snapshots";
 
 /** A kind of board object the top bar's counters can spotlight. */
@@ -31,15 +35,19 @@ export type Spotlight = "evidence" | "findings" | "hypotheses";
 export type DetailsTarget = { itemId: string; findingId?: string | null } | { suggestedKey: string };
 
 export interface ViewPrefs {
-  suggested: SuggestedMode;
+  /** Suggested neighbours, by hops from the evidence. */
+  neighbourHops: NeighbourHops;
+  /** The viewer picked the hops; until then a crowded first hop stays hidden. */
+  neighboursChosen: boolean;
   /** Findings: off dims rather than hides (evidence preservation). */
   showResolved: boolean;
   showDismissed: boolean;
   showGone: boolean;
-  /** System link classes drawn. */
+  /** Kinds of relation drawn, and followed to neighbours ("references" is links). */
   lineage: boolean;
   duplicates: boolean;
   references: boolean;
+  similar: boolean;
   onlyHighlighted: boolean;
   showResolvedComments: boolean;
   minimap: boolean;
@@ -49,13 +57,15 @@ export interface ViewPrefs {
 }
 
 export const DEFAULT_VIEW: ViewPrefs = {
-  suggested: "auto",
+  neighbourHops: 1,
+  neighboursChosen: false,
   showResolved: true,
   showDismissed: true,
   showGone: true,
   lineage: true,
   duplicates: true,
   references: true,
+  similar: true,
   onlyHighlighted: false,
   showResolvedComments: true,
   minimap: false,
@@ -64,7 +74,7 @@ export const DEFAULT_VIEW: ViewPrefs = {
   highlightHypothesis: null,
 };
 
-/** Past this many suggestions, "auto" hides them (D5). */
+/** Until the viewer picks the hops, a first hop crowded past this many stays hidden (D5). */
 export const SUGGESTED_AUTO_LIMIT = 30;
 
 export interface PendingLink {
@@ -74,14 +84,6 @@ export interface PendingLink {
   screen: { x: number; y: number };
   /** Either end is a hypothesis: the popover offers stances. */
   stance: boolean;
-}
-
-export interface PathState {
-  from: string;
-  to: string;
-  nodeIds: Set<string>;
-  edgeIds: Set<string>;
-  hops: number;
 }
 
 export interface Composer {
@@ -124,7 +126,15 @@ export interface UiState {
   /** Every object of one kind lit up, the rest dimmed (a top-bar counter clicked). */
   spotlight: Spotlight | null;
   focusLock: boolean;
-  path: PathState | null;
+  /** "Show connections": what is being traced, and what the walk found. */
+  trace: TraceRequest | null;
+  traceResult: BoardTraceResponseDto | null;
+  traceLoading: boolean;
+  traceError: string | null;
+  /** A multi-hop neighbour walk is in flight (View popover shows it). */
+  neighbourhoodLoading: boolean;
+  /** The last multi-hop walk stopped at its limit: more neighbours exist. */
+  neighbourhoodTruncated: boolean;
   /** Bubbles showing all rows / their "+n more" list. */
   showAllRows: Set<string>;
   expandedUnattached: Set<string>;
@@ -142,8 +152,12 @@ export interface UiState {
   connecting: boolean;
   /** A destructive action waiting for "Confirm". */
   confirm: ConfirmRequest | null;
-  /** "Find path to…" was chosen: the next item clicked ends the path. */
-  pathFrom: string | null;
+  /** The "Run Autopilot" dialog for this case is open. */
+  autopilotOpen: boolean;
+  /** Bumped when a run starts, so the autopilot status reloads. */
+  autopilotRefresh: number;
+  /** A PNG export is being drawn: every node renders, not only those in view. */
+  exporting: boolean;
   /**
    * Where an item added outside the board (an accepted lead dropped on the
    * canvas) should appear, keyed `asset:<id>` or `finding:<id>`.
@@ -184,8 +198,17 @@ function readView(): ViewPrefs {
   try {
     const raw = window.localStorage.getItem(VIEW_KEY);
     if (!raw) return DEFAULT_VIEW;
-    const parsed = JSON.parse(raw) as Partial<ViewPrefs>;
-    return { ...DEFAULT_VIEW, ...parsed };
+    const parsed = JSON.parse(raw) as Partial<ViewPrefs> & { suggested?: "auto" | "show" | "hide" };
+    const { suggested, ...rest } = parsed;
+    // The old Auto / Show / Hide choice, as hops.
+    const legacy: Partial<ViewPrefs> =
+      suggested && parsed.neighbourHops === undefined
+        ? suggested === "hide"
+          ? { neighbourHops: 0, neighboursChosen: true }
+          : { neighbourHops: 1, neighboursChosen: suggested === "show" }
+        : {};
+    const view = { ...DEFAULT_VIEW, ...rest, ...legacy };
+    return [0, 1, 2, 3, 6].includes(view.neighbourHops) ? view : { ...view, neighbourHops: 1 };
   } catch {
     return DEFAULT_VIEW;
   }
@@ -216,7 +239,12 @@ export function createUiStore(): UiStore {
     focusHypothesisItemId: null,
     spotlight: null,
     focusLock: false,
-    path: null,
+    trace: null,
+    traceResult: null,
+    traceLoading: false,
+    traceError: null,
+    neighbourhoodLoading: false,
+    neighbourhoodTruncated: false,
     showAllRows: new Set(),
     expandedUnattached: new Set(),
     incoming: new Set(),
@@ -227,7 +255,9 @@ export function createUiStore(): UiStore {
     hoveredEdgeId: null,
     connecting: false,
     confirm: null,
-    pathFrom: null,
+    autopilotOpen: false,
+    autopilotRefresh: 0,
+    exporting: false,
     placementHints: new Map(),
 
     setTool: (tool) => set({ tool, pendingLink: null }),
@@ -240,6 +270,8 @@ export function createUiStore(): UiStore {
     openDrawer: (kind, opts) =>
       set({
         drawer: kind,
+        // The trace belongs to its panel: leaving the panel ends it.
+        ...(kind !== "connections" ? { trace: null } : {}),
         ...(opts?.threadId !== undefined ? { drawerThreadId: opts.threadId } : {}),
         ...(opts?.details !== undefined ? { detailsTarget: opts.details } : {}),
       }),

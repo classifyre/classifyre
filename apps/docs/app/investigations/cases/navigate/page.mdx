@@ -1,0 +1,140 @@
+---
+title: Navigating & shortcuts
+description: Move around the case board quickly. Covers the mouse, the three zoom levels, fitting and focusing, the search and every keyboard shortcut.
+---
+
+import { Callout } from "nextra/components"
+import { CaseBoardDemo } from "@/components/case-board/board-demo"
+
+# Navigating & shortcuts
+
+## The mouse
+
+| Do this | And the board… |
+|---|---|
+| **Scroll** (or **pinch** on a trackpad) | Zooms in and out around the pointer |
+| **Drag the empty canvas** | Draws a selection box: everything it touches is selected |
+| **Hold `Space` and drag**, or drag with the **middle button** | Pans around the board |
+| **Click** | Selects: a glowing ring, and everything unconnected fades |
+| **`⌘`-click** (`Ctrl`-click on Windows) | Adds to the selection, or takes away from it |
+| **Double-click** | Opens it in the side panel: details for an asset or finding, the thread for a hypothesis |
+| **Right-click** | Everything you can do with it, or on the empty canvas at that spot |
+| **Drag** a node | Moves it; a finding keeps the spot you give it |
+| **Drag from a port** | Draws a link; see [Lines & links](/investigations/cases/links/#drawing-a-link) |
+
+With the **Pan** tool (`H`), every drag pans and nothing can be picked up by
+accident. That's handy on a crowded board.
+
+---
+
+## Zoom levels
+
+The board changes what it draws as you zoom, so it stays readable at every
+distance:
+
+| Level | Zoom | What you see |
+|---|---|---|
+| **Full detail** | 60% and more | Everything: finding labels, the words along lines, whole hypothesis cards with their tally |
+| **Shapes and names** | 30% to 60% | Assets and findings with bigger names; finding labels and the words along lines are hidden (point at a line to read it); cards show their statement |
+| **Overview** | under 30% | Compact chips with large names; every asset folds its findings into a ring of severity colours; badges are hidden |
+
+The same corner of a board at each level:
+
+<CaseBoardDemo scene="zoomLevels" height={300} zoom={1} caption="Full detail: everything, including the words along the lines." />
+
+<CaseBoardDemo scene="zoomLevels" height={210} zoom={0.45} caption="Shapes and names: finding labels and line words are hidden; the card shows its statement." />
+
+<CaseBoardDemo scene="zoomLevels" height={180} zoom={0.28} caption="Overview: the asset folds its findings into a ring of severity colours; the card becomes a chip." />
+
+Every demo on these pages shows its level in the bottom-left corner. Use the
+**−** and **+** buttons to watch it change.
+
+### Fitting and jumping
+
+| Control | Key | What it does |
+|---|---|---|
+| **Fit board** | `⇧1` | Zooms to show the whole board |
+| **Zoom to selection** | `⇧2` | Zooms to what you selected |
+| **Mini-map** | | A small overview of the whole board; drag its frame to jump |
+| **Show on board** | | In panels and search results, flies to the item and makes it pulse briefly |
+
+---
+
+## Search and actions (`⌘K`)
+
+The search box in the top bar (or `⌘K`, `Ctrl K` on Windows) does three jobs at
+once: find things **on the board**, find things **anywhere in your data** and
+add them, and run **actions**.
+
+| Scope | Finds |
+|---|---|
+| **All** | The best few of each kind, from the board and from your data, plus matching actions |
+| **Board** | Evidence, findings, hypotheses, notes, frames and comments on this board; choose one to fly to it |
+| **Corpus** | Assets and findings anywhere in your data; choose one to add it to the board. Things already on the board are tagged **on board** |
+| **Actions** | New note, new hypothesis, new frame; open the timeline, leads, case file, evidence table or hypotheses; tidy up; add evidence with filters |
+
+Press `Tab` to switch scope, `↑` `↓` to move, `Enter` to open or add, and
+`Esc` to close. If what you need calls for filters, **Search "…" with
+filters…** opens the **Add evidence** panel with your words already typed.
+
+---
+
+## Selecting, spotlighting and focusing
+
+Four ways to cut a busy board down to what matters. Only one is active at a
+time:
+
+| | How | What stays lit |
+|---|---|---|
+| **Selection** | Click something, or drag a box | It and everything directly connected to it (frames stay, as context) |
+| **Spotlight** | Click a counter in the top bar: evidence, findings, hypotheses | Everything of that kind |
+| **Hypothesis focus** | Click a hypothesis card | The hypothesis, its stance lines and the evidence they point to |
+| **Highlight by** | **View → Highlight by** | One source, one detector, one hypothesis, or only highlighted items |
+
+`Esc` unwinds one step at a time: it cancels a tool, a spotlight, an edit, a
+focus or a selection first. When nothing is left on the canvas, it closes the
+side panel. Press `.` to lock a hypothesis focus so that clicks elsewhere leave
+it alone.
+
+---
+
+## Keyboard shortcuts
+
+| Key | Does |
+|---|---|
+| `V` | Select tool |
+| `H`, or hold `Space` | Pan |
+| `N` | Note tool |
+| `F` | Frame tool |
+| `T` | Hypothesis tool |
+| `C` | Comment tool |
+| `L` | Link tool |
+| `E` | Fold or unfold the findings of the selected assets |
+| `⌘K` | Search, add and act |
+| `⌘Z` | Undo |
+| `⇧⌘Z` or `⌘Y` | Redo |
+| `⌫` or `Delete` | Delete the selected notes, frames, comments, hypothesis cards, links and stances (evidence leaves the case only through **Remove from case…**) |
+| `⌘A` | Select everything |
+| `⌘D` | Duplicate the selected notes or frames |
+| `⇧1` | Fit the board |
+| `⇧2` | Zoom to the selection |
+| `.` | Lock or unlock the hypothesis focus |
+| `Esc` | Clear the tool, selection or focus, then close the side panel |
+| `?` | Shortcuts and visual key |
+
+On Windows and Linux, read `Ctrl` for `⌘`.
+
+<Callout type="info">
+Press `?` on the board at any time for the **shortcuts and visual key**: every
+shortcut, and a key to every line, ring and badge. It is also in the **More**
+menu.
+</Callout>
+
+---
+
+## Undo and redo
+
+Every change you make on the board is one step you can take back: moving
+things, adding and removing evidence, links, stances, notes, tidy-up, and more.
+The **Undo** button's tooltip names the step (*Undo: Move 3 items*). Undo only
+takes back your own changes, never a teammate's.

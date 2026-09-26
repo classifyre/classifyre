@@ -2,19 +2,19 @@
 
 import * as React from "react";
 import { NodeResizer, type NodeProps } from "@xyflow/react";
-import { ChevronDown } from "lucide-react";
-import { cn } from "@workspace/ui/lib/utils";
+import { BOARD_FRAME_TITLE_MAX_CHARS } from "@workspace/schemas/case-board";
+import { FrameView } from "@workspace/case-board/components/frame-node";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
+import { textClaim } from "../store/claims";
 import { editText, resizeItem, setCollapsed } from "../store/commands";
-import { FRAME_TITLE_HEIGHT, type BoardNode } from "../store/projection";
+import type { BoardNode } from "../store/projection";
 
 const FRAME_MIN = { width: 240, height: 140 };
 
 /**
- * A named, tinted group (PRD §5.6). Items dropped inside move with it. The
- * body lets pointer events through (see `.cb-frame-node` in case-board.css)
- * so a selection box can start inside a frame; only the title bar drags.
+ * A named, tinted group (PRD §5.6). Items dropped inside move with it; only
+ * the title bar drags. Double-click the title to rename it.
  */
 export const FrameNode = React.memo(function FrameNode({ id, selected }: NodeProps<BoardNode>) {
   const { t } = useTranslation();
@@ -29,9 +29,14 @@ export const FrameNode = React.memo(function FrameNode({ id, selected }: NodePro
   const store = useBoardStore();
   const ui = useUiStore();
   const [draft, setDraft] = React.useState("");
+  // The title and version renaming began from (see textClaim).
+  const editedFrom = React.useRef<{ text: string; updatedAt: string } | null>(null);
 
   React.useEffect(() => {
-    if (editing && item) setDraft(item.content.title ?? "");
+    if (editing && item) {
+      setDraft(item.content.title ?? "");
+      editedFrom.current = { text: item.content.title ?? "", updatedAt: item.updatedAt };
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
@@ -43,7 +48,7 @@ export const FrameNode = React.memo(function FrameNode({ id, selected }: NodePro
     ui.getState().set({ editingItemId: null });
     const current = store.getState().items.get(id);
     if (current && (current.content.title ?? "") !== draft.trim()) {
-      store.getState().run(editText(current, draft.trim()));
+      store.getState().run(editText(current, draft.trim(), textClaim(current, current.content.title, editedFrom.current)));
     }
   };
 
@@ -68,38 +73,27 @@ export const FrameNode = React.memo(function FrameNode({ id, selected }: NodePro
           );
         }}
       />
-      <div
-        className={cn(
-          `cb-frame-${tint}`,
-          "h-full w-full rounded-[4px] border-2 border-dashed",
-          selected ? "border-foreground" : "border-border/60",
-          item.style.highlight && `cb-ring-${item.style.highlight}`,
-        )}
-        aria-label={title || t("caseBoard.frame.untitled")}
-        data-testid="frame-node"
-      >
-        <div
-          className="frame-drag pointer-events-auto flex cursor-grab items-center gap-2 px-3 active:cursor-grabbing"
-          style={{ height: FRAME_TITLE_HEIGHT - 4 }}
-          onDoubleClick={() => {
-            if (!readOnly) ui.getState().set({ editingItemId: id });
-          }}
-        >
-          <button
-            type="button"
-            className="nodrag -ml-1 rounded-[3px] p-0.5 hover:bg-muted"
-            aria-label={item.collapsed ? t("caseBoard.frame.expand") : t("caseBoard.frame.collapse")}
-            title={item.collapsed ? t("caseBoard.frame.expand") : t("caseBoard.frame.collapse")}
-            disabled={readOnly}
-            onClick={() => store.getState().run(setCollapsed(item, !item.collapsed))}
-          >
-            <ChevronDown className={cn("size-4 transition-transform", item.collapsed && "-rotate-90")} />
-          </button>
-          {editing ? (
+      <FrameView
+        tint={tint}
+        title={title}
+        untitledLabel={t("caseBoard.frame.untitled")}
+        collapsed={item.collapsed}
+        members={item.collapsed && members > 0 ? t("caseBoard.frame.members", { count: members }) : null}
+        toggleLabel={item.collapsed ? t("caseBoard.frame.expand") : t("caseBoard.frame.collapse")}
+        readOnly={readOnly}
+        selected={selected}
+        highlight={item.style.highlight ?? null}
+        onToggle={() => store.getState().run(setCollapsed(item, !item.collapsed))}
+        onTitleDoubleClick={() => {
+          if (!readOnly) ui.getState().set({ editingItemId: id });
+        }}
+        editor={
+          editing ? (
             <input
               className="nodrag min-w-0 flex-1 rounded-[3px] border border-border bg-background px-1 font-serif text-sm font-bold uppercase tracking-[0.03em] outline-none focus:border-foreground"
               autoFocus
               value={draft}
+              maxLength={BOARD_FRAME_TITLE_MAX_CHARS}
               placeholder={t("caseBoard.frame.untitled")}
               onChange={(e) => setDraft(e.target.value)}
               onBlur={commit}
@@ -111,18 +105,9 @@ export const FrameNode = React.memo(function FrameNode({ id, selected }: NodePro
                 e.stopPropagation();
               }}
             />
-          ) : (
-            <span className="min-w-0 flex-1 truncate font-serif text-sm font-black uppercase tracking-[0.03em]">
-              {title || <span className="text-muted-foreground">{t("caseBoard.frame.untitled")}</span>}
-            </span>
-          )}
-          {item.collapsed && members > 0 && (
-            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-              {t("caseBoard.frame.members", { count: members })}
-            </span>
-          )}
-        </div>
-      </div>
+          ) : null
+        }
+      />
     </>
   );
 });

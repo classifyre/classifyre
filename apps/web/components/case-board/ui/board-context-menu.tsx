@@ -23,6 +23,7 @@ import {
   Pencil,
   Plus,
   Route,
+  Waypoints,
   Search,
   StickyNote,
   Trash2,
@@ -75,6 +76,8 @@ import {
   addEvidence,
 } from "../store/commands";
 import { absolutePosition } from "../store/ops";
+import { pathToSeed } from "../store/trace";
+import { startTrace, useAddFromTrace } from "../hooks/use-trace";
 import { spotInFrame } from "../store/geometry";
 import { parseFindingNodeId } from "../store/relations";
 import { hypothesisMeta, topZ } from "../store/selectors";
@@ -83,6 +86,7 @@ import type { BoardItem } from "../store/types";
 
 export type MenuTarget =
   | { kind: "item"; itemId: string }
+  | { kind: "trace"; nodeId: string; traceNodeId: string }
   | { kind: "finding"; itemId: string; findingId: string; attached: boolean }
   | { kind: "suggested"; key: string }
   | { kind: "link"; linkId: string }
@@ -124,6 +128,7 @@ export function BoardContextMenuContent({
   const store = useBoardStore();
   const ui = useUiStore();
   const rf = useReactFlow();
+  const addFromTrace = useAddFromTrace();
   if (!target) return <ContextMenuContent className="hidden" />;
   const s = store.getState();
   const run = s.run;
@@ -400,8 +405,54 @@ export function BoardContextMenuContent({
             <ContextMenuItem onSelect={() => openInTab(`/assets/${suggestion.assetId}`)}>
               <ExternalLink className="size-4" /> {t("caseBoard.menu.openAsset")}
             </ContextMenuItem>
+            <ContextMenuItem
+              onSelect={() =>
+                startTrace(ui, { nodeId: target.key, assetId: suggestion.assetId, label: suggestion.label })
+              }
+            >
+              <Waypoints className="size-4" /> {t("caseBoard.menu.showConnections")}
+            </ContextMenuItem>
             <ContextMenuItem onSelect={() => ui.getState().toggle("hiddenSuggestions", target.key)}>
               <Eye className="size-4" /> {t("caseBoard.menu.hideSuggestion")}
+            </ContextMenuItem>
+          </>
+        );
+      }
+
+      case "trace": {
+        const result = ui.getState().traceResult;
+        const node = result?.nodes.find((n) => n.id === target.traceNodeId);
+        if (!result || !node) return null;
+        const canAdd = !readOnly && node.type === "asset" && !node.missing;
+        return (
+          <>
+            <ContextMenuItem disabled={!canAdd} onSelect={() => addFromTrace([node], t("caseBoard.connections.add"))}>
+              <Plus className="size-4" /> {t("caseBoard.connections.add")}
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={!canAdd}
+              onSelect={() => addFromTrace(pathToSeed(result, node.id), t("caseBoard.connections.addPath"))}
+            >
+              <Route className="size-4" /> {t("caseBoard.connections.addPath")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            {node.type === "asset" && (
+              <ContextMenuItem onSelect={() => openInTab(`/assets/${node.id}`)}>
+                <ExternalLink className="size-4" /> {t("caseBoard.menu.openAsset")}
+              </ContextMenuItem>
+            )}
+            <ContextMenuItem
+              disabled={node.type !== "asset"}
+              onSelect={() =>
+                startTrace(ui, {
+                  nodeId: target.nodeId,
+                  assetId: node.id,
+                  label: node.label,
+                  position: rf.getNode(target.nodeId)?.position,
+                })
+              }
+            >
+              <Waypoints className="size-4" /> {t("caseBoard.connections.traceFromHere")}
             </ContextMenuItem>
           </>
         );
@@ -553,8 +604,11 @@ export function BoardContextMenuContent({
                 <Minus className="size-4" /> {item.collapsed ? t("caseBoard.menu.expand") : t("caseBoard.menu.collapse")}
                 <ContextMenuShortcut>E</ContextMenuShortcut>
               </ContextMenuItem>
-              <ContextMenuItem onSelect={() => ui.getState().set({ pathFrom: item.id, path: null })}>
-                <Route className="size-4" /> {t("caseBoard.menu.findPath")}
+              <ContextMenuItem
+                disabled={!bubble.assetId}
+                onSelect={() => startTrace(ui, { nodeId: item.id, assetId: bubble.assetId, label: bubble.label })}
+              >
+                <Waypoints className="size-4" /> {t("caseBoard.menu.showConnections")}
               </ContextMenuItem>
               <ContextMenuSeparator />
               {moveToFrame(item)}
@@ -708,6 +762,9 @@ export function BoardContextMenuContent({
       case "link": {
         const link = s.links.get(target.linkId);
         if (!link) return null;
+        // Only a link between evidence names two things the global graph knows.
+        const promotable =
+          s.items.get(link.sourceItemId)?.kind === "EVIDENCE" && s.items.get(link.targetItemId)?.kind === "EVIDENCE";
         return (
           <>
             <ContextMenuSub>
@@ -747,7 +804,7 @@ export function BoardContextMenuContent({
             </ContextMenuSub>
             <ContextMenuSeparator />
             <ContextMenuItem
-              disabled={readOnly || !!link.promotedEdgeId}
+              disabled={readOnly || !!link.promotedEdgeId || !promotable}
               onSelect={() => {
                 run(promoteLink(link));
                 toast.success(t("caseBoard.toasts.promoted"));
@@ -886,6 +943,7 @@ export function BoardContextMenuContent({
 /** Menu target for a right-click inside a node: the row under the pointer wins. */
 export function targetFromNodeEvent(event: React.MouseEvent, nodeId: string): MenuTarget {
   if (nodeId.startsWith("sg:")) return { kind: "suggested", key: nodeId };
+  if (nodeId.startsWith("tr:")) return { kind: "trace", nodeId, traceNodeId: nodeId.slice(3) };
   const finding = parseFindingNodeId(nodeId);
   if (finding) {
     const node = (event.target as HTMLElement).closest<HTMLElement>("[data-finding-id]");

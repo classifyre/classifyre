@@ -25,6 +25,7 @@
     "@stepperize/react": "^7.0.0",
     "@vercel/otel": "^2.1.2",
     "@workspace/api-client": "workspace:*",
+    "@workspace/case-board": "workspace:*",
     "@workspace/schemas": "workspace:*",
     "@workspace/ui": "workspace:*",
     "@xyflow/react": "^12.12.0",

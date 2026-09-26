@@ -118,6 +118,29 @@ function makeDelegate(table: FakeTable) {
       return Promise.resolve(data);
     },
 
+    update: ({
+      where,
+      data,
+    }: {
+      where: Record<string, unknown>;
+      data: Record<string, unknown>;
+    }) => {
+      const raw = Object.values(where)[0];
+      const key = (
+        typeof raw === 'object' && raw !== null ? raw : where
+      ) as Record<string, unknown>;
+      const index = table.rows.findIndex((row) =>
+        sameKey(row, key, table.keys),
+      );
+      if (index < 0) throw new Error('record to update not found');
+      const next = { ...table.rows[index], ...data };
+      if (table.fkCheck && !table.fkCheck(next)) {
+        throw new Error('foreign key constraint violated');
+      }
+      table.rows[index] = next;
+      return Promise.resolve(next);
+    },
+
     upsert: ({
       where,
       create,
@@ -814,6 +837,211 @@ describe('export → import round trip', () => {
     expect(warningsOf(state.job).join(' ')).toMatch(
       /incomplete|truncated|could not be read to the end/i,
     );
+  });
+
+  // ── Investigations: rows that reference rows of the same scope ────────────
+
+  const CASE_ID = '44444444-4444-4444-8444-000000000001';
+  const EVIDENCE_ID = '44444444-4444-4444-8444-000000000002';
+  const CASE_FINDING_ID = '44444444-4444-4444-8444-000000000003';
+  const BOARD_ID = '44444444-4444-4444-8444-000000000004';
+  // A child whose id sorts before its frame's, so the archive (keyset order)
+  // holds the child first — the order that exposes a self-reference.
+  const CHILD_ITEM_ID = '44444444-4444-4444-8444-00000000000a';
+  const FRAME_ITEM_ID = '44444444-4444-4444-8444-00000000000b';
+
+  /** Every table of the investigations scope, empty unless given rows. */
+  function investigationTables(
+    rows: Partial<Record<string, Record<string, unknown>[]>> = {},
+    fkChecks: Partial<
+      Record<string, (row: Record<string, unknown>) => boolean>
+    > = {},
+  ): Record<string, FakeTable> {
+    const tables: Record<string, FakeTable> = {};
+    for (const spec of tablesForScopes(['investigations'])) {
+      tables[spec.model] = {
+        keys: [...spec.keys],
+        rows: [...(rows[spec.model] ?? [])],
+        fkCheck: fkChecks[spec.model],
+      };
+    }
+    return tables;
+  }
+
+  it('keeps the findings attached to a case: its evidence lands first', async () => {
+    const { archiveId } = await runExport(
+      ['investigations'],
+      investigationTables({
+        case: [{ id: CASE_ID, title: 'Payroll leak' }],
+        caseEvidence: [
+          {
+            id: EVIDENCE_ID,
+            caseId: CASE_ID,
+            entityType: 'asset',
+            entityId: assetId(1),
+          },
+        ],
+        caseFinding: [
+          {
+            id: CASE_FINDING_ID,
+            caseId: CASE_ID,
+            caseEvidenceId: EVIDENCE_ID,
+            findingId: FINDING_ID,
+          },
+        ],
+      }),
+    );
+
+    // Postgres's view of the case tables: evidence needs its case, and a case
+    // finding needs both its case and the evidence it hangs off.
+    const target: Record<string, FakeTable> = investigationTables(
+      {},
+      {
+        caseEvidence: (row) =>
+          target['case'].rows.some((c) => c['id'] === row['caseId']),
+        caseFinding: (row) =>
+          target['case'].rows.some((c) => c['id'] === row['caseId']) &&
+          target['caseEvidence'].rows.some(
+            (e) => e['id'] === row['caseEvidenceId'],
+          ),
+      },
+    );
+    const job = stageImport(archiveId, {
+      ...baseJob,
+      kind: 'IMPORT' as const,
+      archived: true,
+      scopes: ['investigations'],
+    });
+    const state = makePrisma(target, job, chunkStore);
+    await importer(state.prisma).run(job);
+
+    expect(target['caseEvidence'].rows).toHaveLength(1);
+    expect(target['caseFinding'].rows).toHaveLength(1);
+    expect(target['caseFinding'].rows[0]['caseEvidenceId']).toBe(
+      target['caseEvidence'].rows[0]['id'],
+    );
+    expect(state.job.skippedRows).toBe(0);
+  });
+
+  it("restores a board item's frame even when the item comes before its frame", async () => {
+    const { archiveId } = await runExport(
+      ['investigations'],
+      investigationTables({
+        case: [{ id: CASE_ID, title: 'Payroll leak' }],
+        caseBoard: [{ id: BOARD_ID, caseId: CASE_ID }],
+        caseBoardItem: [
+          {
+            id: CHILD_ITEM_ID,
+            boardId: BOARD_ID,
+            kind: 'NOTE',
+            parentId: FRAME_ITEM_ID,
+          },
+          {
+            id: FRAME_ITEM_ID,
+            boardId: BOARD_ID,
+            kind: 'FRAME',
+            parentId: null,
+          },
+        ],
+      }),
+    );
+
+    const target: Record<string, FakeTable> = investigationTables(
+      {},
+      {
+        caseBoard: (row) =>
+          target['case'].rows.some((c) => c['id'] === row['caseId']),
+        caseBoardItem: (row) =>
+          target['caseBoard'].rows.some((b) => b['id'] === row['boardId']) &&
+          (row['parentId'] == null ||
+            target['caseBoardItem'].rows.some(
+              (i) => i['id'] === row['parentId'],
+            )),
+      },
+    );
+    const job = stageImport(archiveId, {
+      ...baseJob,
+      kind: 'IMPORT' as const,
+      archived: true,
+      scopes: ['investigations'],
+    });
+    const state = makePrisma(target, job, chunkStore);
+    await importer(state.prisma).run(job);
+
+    const items = target['caseBoardItem'].rows;
+    expect(items).toHaveLength(2);
+    const frame = items.find((i) => i['kind'] === 'FRAME')!;
+    const child = items.find((i) => i['kind'] === 'NOTE')!;
+    expect(child['parentId']).toBe(frame['id']);
+    expect(state.job.skippedRows).toBe(0);
+  });
+
+  it("moves the finding ids inside a board item's style onto the imported findings", async () => {
+    const { archiveId } = await runExport(
+      ['investigations'],
+      investigationTables({
+        case: [{ id: CASE_ID, title: 'Payroll leak' }],
+        caseEvidence: [
+          {
+            id: EVIDENCE_ID,
+            caseId: CASE_ID,
+            entityType: 'asset',
+            entityId: assetId(1),
+          },
+        ],
+        caseFinding: [
+          {
+            id: CASE_FINDING_ID,
+            caseId: CASE_ID,
+            caseEvidenceId: EVIDENCE_ID,
+            findingId: FINDING_ID,
+          },
+        ],
+        caseBoard: [{ id: BOARD_ID, caseId: CASE_ID }],
+        caseBoardItem: [
+          {
+            id: FRAME_ITEM_ID,
+            boardId: BOARD_ID,
+            kind: 'EVIDENCE',
+            refId: EVIDENCE_ID,
+            style: {
+              color: 'blue',
+              findingPositions: { [FINDING_ID]: { x: 12, y: -40 } },
+              rowHighlights: { [FINDING_ID]: 'yellow' },
+            },
+          },
+          {
+            id: CHILD_ITEM_ID,
+            boardId: BOARD_ID,
+            kind: 'COMMENT',
+            parentId: FRAME_ITEM_ID,
+            style: { anchorFindingId: FINDING_ID },
+          },
+        ],
+      }),
+    );
+
+    const target = investigationTables();
+    const job = stageImport(archiveId, {
+      ...baseJob,
+      kind: 'IMPORT' as const,
+      archived: true,
+      scopes: ['investigations'],
+    });
+    const state = makePrisma(target, job, chunkStore);
+    await importer(state.prisma).run(job);
+
+    const findingId = target['caseFinding'].rows[0]['findingId'] as string;
+    expect(findingId).not.toBe(FINDING_ID);
+    const items = target['caseBoardItem'].rows;
+    const evidence = items.find((i) => i['kind'] === 'EVIDENCE')!;
+    const pin = items.find((i) => i['kind'] === 'COMMENT')!;
+    expect(evidence['style']).toEqual({
+      color: 'blue',
+      findingPositions: { [findingId]: { x: 12, y: -40 } },
+      rowHighlights: { [findingId]: 'yellow' },
+    });
+    expect(pin['style']).toEqual({ anchorFindingId: findingId });
   });
 
   it('fails when the file is not an archive at all', async () => {

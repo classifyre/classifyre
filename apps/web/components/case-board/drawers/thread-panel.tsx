@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner";
 import {
   api,
+  getActorName,
   AddThreadEntryDtoEntryTypeEnum,
   type ThreadEntryDto,
   type ThreadResponseDto,
@@ -71,10 +72,10 @@ import { hypothesisMeta } from "../store/selectors";
 import { useFlyToEvidence } from "../hooks/use-place-evidence";
 import { useVisibleCentre } from "../hooks/use-visible-centre";
 
-type Verdict = "PROPOSED" | "SUPPORTED" | "REFUTED" | "INCONCLUSIVE";
+export type Verdict = "PROPOSED" | "SUPPORTED" | "REFUTED" | "INCONCLUSIVE";
 type Stance = "SUPPORTS" | "CONTRADICTS" | "NEUTRAL";
 
-const VERDICTS: Array<{ value: Verdict; icon: React.ElementType; tone: string }> = [
+export const VERDICTS: Array<{ value: Verdict; icon: React.ElementType; tone: string }> = [
   { value: "PROPOSED", icon: CircleDashed, tone: "var(--muted-foreground)" },
   { value: "SUPPORTED", icon: Check, tone: "var(--cb-supports)" },
   { value: "REFUTED", icon: X, tone: "var(--cb-contradicts)" },
@@ -144,7 +145,7 @@ export function ThreadPanel({ caseId, onFlyTo }: { caseId: string; onFlyTo: (nod
   return thread.kind === "HYPOTHESIS" ? (
     <HypothesisView thread={thread} itemId={boardThread?.itemId ?? null} onBoard={!!boardThread?.onBoard} changed={changed} onFlyTo={onFlyTo} />
   ) : (
-    <DiscussionView thread={thread} itemId={boardThread?.itemId ?? null} changed={changed} onFlyTo={onFlyTo} />
+    <DiscussionView thread={thread} itemId={boardThread?.itemId ?? null} onBoard={!!boardThread?.onBoard} changed={changed} onFlyTo={onFlyTo} />
   );
 }
 
@@ -173,7 +174,8 @@ function HypothesisView({
 
   const patch = async (data: Parameters<typeof api.threads.caseThreadsControllerUpdate>[0]["updateThreadDto"]) => {
     try {
-      await api.threads.caseThreadsControllerUpdate({ id: thread.id, updateThreadDto: data });
+      // The thread API does not read X-Actor-Name: say who changed it.
+      await api.threads.caseThreadsControllerUpdate({ id: thread.id, updateThreadDto: { ...data, actor: getActorName() } });
       await changed();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
@@ -301,7 +303,7 @@ function HypothesisView({
           onSend={async (body) => {
             await api.threads.caseThreadsControllerAddEntry({
               id: thread.id,
-              addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Note, body },
+              addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Note, body, author: getActorName() },
             });
             await changed();
             setTab("log");
@@ -337,7 +339,7 @@ function Statement({
     try {
       await api.threads.caseThreadsControllerAddEntry({
         id: thread.id,
-        addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Statement, body },
+        addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Statement, body, author: getActorName() },
       });
       await changed();
     } catch (error) {
@@ -684,6 +686,8 @@ function TestTab({
 function EntryLog({ entries }: { entries: ThreadEntryDto[] }) {
   const { t } = useTranslation();
   const sorted = [...entries].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  // The first statement is the hypothesis being stated; later ones restate it.
+  const firstStatement = sorted.find((e) => e.entryType === "STATEMENT")?.id;
   if (sorted.length === 0) return <p className="py-2 text-xs text-muted-foreground">{t("caseBoard.thread.noEntries")}</p>;
   return (
     <ol className="relative space-y-3 border-l-2 border-border pl-4" data-testid="thread-log">
@@ -707,7 +711,7 @@ function EntryLog({ entries }: { entries: ThreadEntryDto[] }) {
             </span>
             <div className="flex items-baseline gap-2 font-mono text-[10px] tracking-[0.06em] text-muted-foreground uppercase">
               <span className="truncate">
-                {t(`caseBoard.thread.entry.${e.entryType}` as TranslationKey)}
+                {e.id === firstStatement ? t("caseBoard.thread.entry.STATED") : t(`caseBoard.thread.entry.${e.entryType}` as TranslationKey)}
                 {e.author ? ` · ${e.author}` : ""}
               </span>
               <span className="ml-auto shrink-0 normal-case">
@@ -896,11 +900,14 @@ function ThreadMenu({
 function DiscussionView({
   thread,
   itemId,
+  onBoard,
   changed,
   onFlyTo,
 }: {
   thread: ThreadResponseDto;
   itemId: string | null;
+  /** The pin is on the board; `itemId` may name one that was removed from it. */
+  onBoard: boolean;
   changed: () => Promise<void>;
   onFlyTo: (nodeId: string) => void;
 }) {
@@ -913,7 +920,7 @@ function DiscussionView({
           <MessageSquare className="size-3.5 text-muted-foreground" aria-hidden />
           <span className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">{t("caseBoard.thread.discussion")}</span>
           <span className="flex-1" />
-          <ThreadMenu thread={thread} itemId={itemId} onBoard={!!itemId} readOnly={readOnly} onPatch={async () => undefined} onFlyTo={onFlyTo} />
+          <ThreadMenu thread={thread} itemId={itemId} onBoard={onBoard} readOnly={readOnly} onPatch={async () => undefined} onFlyTo={onFlyTo} />
         </div>
         <p className="mt-2 text-[15px] leading-snug font-semibold break-words">{thread.title}</p>
       </section>
@@ -926,7 +933,7 @@ function DiscussionView({
           onSend={async (body) => {
             await api.threads.caseThreadsControllerAddEntry({
               id: thread.id,
-              addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Note, body },
+              addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Note, body, author: getActorName() },
             });
             await changed();
           }}

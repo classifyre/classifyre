@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Eye } from "lucide-react";
+import { Eye, Loader2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
@@ -16,14 +16,28 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
 import { combine, setCollapsed } from "../store/commands";
 import { hypothesisMeta } from "../store/selectors";
-import { SUGGESTED_AUTO_LIMIT, type SuggestedMode, type ViewPrefs } from "../store/ui-store";
+import { SUGGESTED_AUTO_LIMIT, type NeighbourHops, type ViewPrefs } from "../store/ui-store";
+import type { TraceKind } from "../store/trace";
+import { viewKinds } from "../hooks/use-trace";
+import { HopLadder, KindChips } from "./trace-controls";
+
+/** Which View switch draws (and follows) each kind of relation. */
+const KIND_KEY: Record<TraceKind, "lineage" | "references" | "duplicates" | "similar"> = {
+  lineage: "lineage",
+  links: "references",
+  duplicates: "duplicates",
+  similar: "similar",
+};
 
 const ANY = "__any__";
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="space-y-1.5">
-      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{title}</p>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{title}</p>
+        {aside && <span className="font-mono text-[10px] text-muted-foreground tabular-nums">{aside}</span>}
+      </div>
       {children}
     </section>
   );
@@ -50,6 +64,15 @@ export function ViewPopover() {
   const ui = useUiStore();
   const store = useBoardStore();
   const suggestedCount = useBoard((s) => s.suggested.size);
+  const loadingNeighbours = useUi((s) => s.neighbourhoodLoading);
+  // The first hop comes with the board's read, further hops from their own
+  // walk; either stops at a limit, and then more neighbours exist than drawn.
+  const firstHopLimited = useBoard((s) => s.truncated);
+  const walkLimited = useUi((s) => s.neighbourhoodTruncated);
+  const autoHidden = !view.neighboursChosen && view.neighbourHops === 1 && suggestedCount > SUGGESTED_AUTO_LIMIT;
+  const shownNeighbours = useBoard((s) =>
+    autoHidden ? 0 : [...s.suggested.values()].filter((sg) => (sg.hop ?? 1) <= view.neighbourHops).length,
+  );
   const bubbles = useBoard((s) => s.bubbles);
   const threads = useBoard((s) => s.threads);
   const readOnly = useBoard((s) => s.readOnly);
@@ -116,32 +139,46 @@ export function ViewPopover() {
         </button>
       </PopoverTrigger>
       <PopoverContent side="top" align="start" className="w-80 max-h-[70vh] space-y-4 overflow-y-auto p-4">
-        <Section title={t("caseBoard.view.suggested")}>
-          <div className="grid grid-cols-3 gap-1 rounded-[4px] border border-border p-0.5">
-            {(["auto", "show", "hide"] as SuggestedMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={cn(
-                  "rounded-[3px] px-2 py-1 text-xs",
-                  view.suggested === mode ? "bg-foreground text-background" : "hover:bg-muted",
-                )}
-                onClick={() => set({ suggested: mode })}
-                aria-pressed={view.suggested === mode}
-              >
-                {mode === "auto"
-                  ? t("caseBoard.view.suggestedAuto")
-                  : mode === "show"
-                    ? t("caseBoard.view.suggestedShow")
-                    : t("caseBoard.view.suggestedHide")}
-              </button>
-            ))}
-          </div>
-          {view.suggested === "auto" && suggestedCount > SUGGESTED_AUTO_LIMIT && (
-            <p className="text-xs text-muted-foreground">
-              {t("caseBoard.view.suggestedAutoHidden", { count: suggestedCount })}
+        <Section
+          title={t("caseBoard.view.neighbours")}
+          aside={
+            loadingNeighbours ? (
+              <Loader2 className="size-3 animate-spin" aria-label={t("caseBoard.view.tracing")} />
+            ) : view.neighbourHops > 0 ? (
+              t("caseBoard.view.neighboursShown", { count: shownNeighbours })
+            ) : undefined
+          }
+        >
+          <HopLadder<NeighbourHops>
+            value={view.neighbourHops}
+            label={t("caseBoard.view.neighbours")}
+            options={[
+              { value: 0, label: t("caseBoard.view.hopsOff") },
+              { value: 1, label: "1" },
+              { value: 2, label: "2" },
+              { value: 3, label: "3" },
+              { value: 6, label: "∞" },
+            ]}
+            onChange={(neighbourHops) => set({ neighbourHops, neighboursChosen: true })}
+          />
+          <p className="pt-1 text-[11px] text-muted-foreground">
+            {autoHidden
+              ? t("caseBoard.view.neighboursAutoHidden", { count: suggestedCount })
+              : t("caseBoard.view.neighboursHint")}
+          </p>
+          {view.neighbourHops > 0 && !autoHidden && (firstHopLimited || (view.neighbourHops > 1 && walkLimited)) && (
+            <p className="rounded-[3px] border border-dashed border-border px-2 py-1.5 text-[11px] text-muted-foreground" data-testid="neighbours-limited">
+              {t("caseBoard.view.neighboursLimited")}
             </p>
           )}
+        </Section>
+
+        <Section title={t("caseBoard.view.connections")}>
+          <KindChips
+            value={new Set(viewKinds(view))}
+            onToggle={(kind) => set({ [KIND_KEY[kind]]: !view[KIND_KEY[kind]] } as Partial<ViewPrefs>)}
+          />
+          <p className="text-[11px] text-muted-foreground">{t("caseBoard.view.connectionsHint")}</p>
         </Section>
 
         <Section title={t("caseBoard.view.findings")}>
@@ -149,12 +186,6 @@ export function ViewPopover() {
           <Toggle label={t("caseBoard.view.showDismissed")} checked={view.showDismissed} onChange={(v) => set({ showDismissed: v })} />
           <Toggle label={t("caseBoard.view.showGone")} checked={view.showGone} onChange={(v) => set({ showGone: v })} />
           <p className="text-[11px] text-muted-foreground">{t("caseBoard.view.dimNote")}</p>
-        </Section>
-
-        <Section title={t("caseBoard.view.systemLinks")}>
-          <Toggle label={t("caseBoard.view.lineage")} checked={view.lineage} onChange={(v) => set({ lineage: v })} />
-          <Toggle label={t("caseBoard.view.duplicates")} checked={view.duplicates} onChange={(v) => set({ duplicates: v })} />
-          <Toggle label={t("caseBoard.view.references")} checked={view.references} onChange={(v) => set({ references: v })} />
         </Section>
 
         <Section title={t("caseBoard.view.highlightBy")}>

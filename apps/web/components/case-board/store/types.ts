@@ -3,6 +3,7 @@ import type {
   BoardLinkCertainty,
   BoardStance,
 } from "@workspace/schemas/case-board";
+import type { FindingVisualState, SeverityKey } from "@workspace/case-board/lib/geometry";
 
 /**
  * The client-side board domain (docs/architecture/CASE_BOARD_PRD.md §8.3).
@@ -66,16 +67,8 @@ export interface BoardLink {
   updatedAt: string;
 }
 
-export type SeverityKey = "critical" | "high" | "medium" | "low" | "info";
-
-/** Six visible states, top-down priority; see finding-state.ts. */
-export type FindingVisualState =
-  | "deleted"
-  | "gone"
-  | "resolved"
-  | "dismissed"
-  | "new"
-  | "open";
+/** Six visible finding states, top-down priority: see finding-state.ts. */
+export type { FindingVisualState, SeverityKey };
 
 export interface BubbleRow {
   findingId: string;
@@ -173,6 +166,10 @@ export interface SuggestedAsset {
   sourceName: string | null;
   /** Evidence items it connects to. */
   neighbourOf: string[];
+  /** Hops from the nearest evidence (1 unless a multi-hop walk found it). */
+  hop?: number;
+  /** What it hangs off beyond the first hop: a suggestion key or an item id. */
+  via?: string | null;
 }
 
 /** Display hints for an item the client created before the server described it. */

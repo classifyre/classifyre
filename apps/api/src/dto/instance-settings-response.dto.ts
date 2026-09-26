@@ -194,13 +194,6 @@ export class InstanceSettingsResponseDto {
 
   @ApiProperty({
     description:
-      'When true, cases open on the case board (the investigation canvas); when false, on the legacy case graph.',
-    example: false,
-  })
-  caseBoardEnabled: boolean;
-
-  @ApiProperty({
-    description:
       'Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.',
     example: false,
   })

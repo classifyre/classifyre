@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useReactFlow } from "@xyflow/react";
 import {
-  AlertTriangle,
+  Bot,
   Camera,
   CheckCircle2,
   CircleHelp,
@@ -11,6 +12,7 @@ import {
   FlaskConical,
   History,
   MoreHorizontal,
+  Pencil,
   Search,
   Wand2,
 } from "lucide-react";
@@ -27,6 +29,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
 import { CaseStatusBadge } from "@/components/case-status-badge";
+import { nsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
 import { isFindingData } from "../store/projection";
@@ -88,7 +91,7 @@ function Counter({
           <span className="font-mono text-[15px] leading-none font-bold tabular-nums">{value}</span>
           <span
             className={cn(
-              "hidden font-mono text-[10px] leading-none tracking-[0.12em] uppercase @4xl/topbar:inline",
+              "hidden font-mono text-[10px] leading-none tracking-[0.12em] uppercase @6xl/topbar:inline",
               active ? "text-background/75" : "text-muted-foreground",
             )}
           >
@@ -122,9 +125,9 @@ export function TopBar({
   const ui = useUiStore();
   const store = useBoardStore();
   const rf = useReactFlow();
+  const router = useRouter();
   const spotlight = useUi((s) => s.spotlight);
   const readOnly = useBoard((s) => s.readOnly);
-  const truncated = useBoard((s) => s.truncated);
   const counts = useBoard((s) => {
     let findings = 0;
     for (const b of s.bubbles.values()) findings += b.rows.length;
@@ -139,7 +142,7 @@ export function TopBar({
       ui.getState().set({ spotlight: null });
       return;
     }
-    ui.getState().set({ spotlight: kind, path: null, pathFrom: null });
+    ui.getState().set({ spotlight: kind });
     // Bring them all into view. A finding is only drawn near enough, so the
     // assets that carry findings stand in for them when none is on screen.
     const nodes = rf.getNodes().filter((n) => !n.hidden);
@@ -157,126 +160,142 @@ export function TopBar({
     }
     if (targets.length === 0) return;
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    void rf.fitView({ nodes: targets.map((n) => ({ id: n.id })), duration: reduced ? 0 : 450, padding: 0.25, maxZoom: 1 });
+    void rf.fitView({
+      nodes: targets.map((n) => ({ id: n.id })),
+      duration: reduced ? 0 : 450,
+      padding: 0.25,
+      maxZoom: 1,
+    });
   };
 
   return (
-    <header
-      className="@container/topbar flex h-14 shrink-0 items-center gap-3 border-b-2 border-border bg-background pr-2 pl-4"
-      data-testid="board-top-bar"
-    >
-      <div className="flex min-w-0 shrink items-center gap-2.5">
-        <h1
-          className="min-w-[4rem] truncate font-serif text-[17px] font-black tracking-[0.03em] uppercase"
-          title={caseData?.title}
-        >
-          {caseData?.title ?? "…"}
-        </h1>
-        {caseData && <CaseStatusBadge status={caseData.status} />}
-        {caseData && (
-          <SeverityBadge severity={caseData.severity.toLowerCase() as never}>{caseData.severity}</SeverityBadge>
-        )}
-        {truncated && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-[3px] border border-amber-600/40 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
-                <AlertTriangle className="size-3" aria-hidden /> {t("caseBoard.truncated")}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">{t("caseBoard.truncatedHint")}</TooltipContent>
-          </Tooltip>
-        )}
-      </div>
-
-      <div
-        role="group"
-        aria-label={t("caseBoard.topBar.ledger")}
-        className="flex h-9 shrink-0 items-stretch rounded-[4px] border-2 border-border bg-card"
-        data-testid="board-ledger"
-      >
-        <Counter
-          kind="evidence"
-          value={evidence}
-          label={t("caseBoard.topBar.evidence")}
-          hint={spotlight === "evidence" ? t("caseBoard.topBar.spotlightClear") : t("caseBoard.topBar.spotlightEvidence")}
-          active={spotlight === "evidence"}
-          onToggle={() => toggle("evidence")}
-        />
-        <Counter
-          kind="findings"
-          value={findings}
-          label={t("caseBoard.topBar.findings")}
-          hint={spotlight === "findings" ? t("caseBoard.topBar.spotlightClear") : t("caseBoard.topBar.spotlightFindings")}
-          active={spotlight === "findings"}
-          onToggle={() => toggle("findings")}
-        />
-        <Counter
-          kind="hypotheses"
-          value={hypotheses}
-          label={t("caseBoard.topBar.hypotheses")}
-          hint={
-            spotlight === "hypotheses" ? t("caseBoard.topBar.spotlightClear") : t("caseBoard.topBar.spotlightHypotheses")
-          }
-          active={spotlight === "hypotheses"}
-          onToggle={() => toggle("hypotheses")}
-        />
-      </div>
-
-      <button
-        type="button"
-        onClick={() => ui.getState().set({ paletteOpen: true })}
-        className="group ml-auto flex h-9 w-full max-w-[440px] min-w-[2.25rem] items-center gap-2.5 rounded-[4px] border-2 border-border bg-card px-3 text-left text-sm text-muted-foreground transition-colors hover:border-foreground/50 hover:text-foreground @2xl/topbar:min-w-[220px]"
-        data-testid="palette-trigger"
-        aria-label={t("caseBoard.topBar.palette")}
-      >
-        <Search className="size-4 shrink-0" aria-hidden />
-        <span className="hidden min-w-0 flex-1 truncate @2xl/topbar:inline">{t("caseBoard.topBar.searchPlaceholder")}</span>
-        <kbd className="hidden shrink-0 rounded-[3px] border border-border px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground group-hover:text-foreground @2xl/topbar:inline">
-          ⌘K
-        </kbd>
-      </button>
-
-      <Presence />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            aria-label={t("caseBoard.topBar.more")}
-            className="inline-flex size-9 shrink-0 items-center justify-center rounded-[4px] border-2 border-transparent hover:border-border"
+    <header className="@container/topbar shrink-0 border-b-2 border-border bg-background" data-testid="board-top-bar">
+      {/* One row when there is room; on a narrow screen the case takes the
+          first row and the ledger, search and tools the second. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 @4xl/topbar:h-14 @4xl/topbar:flex-nowrap @4xl/topbar:py-0 @4xl/topbar:pr-2 @4xl/topbar:pl-4">
+        <div className="flex min-w-0 basis-full items-center gap-2.5 @4xl/topbar:flex-1 @4xl/topbar:basis-auto">
+          <h1
+            className="min-w-0 truncate font-serif text-[17px] font-black tracking-[0.03em] uppercase"
+            title={caseData?.title}
           >
-            <MoreHorizontal className="size-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem disabled={readOnly} onSelect={onTidyUp}>
-            <Wand2 className="size-4" /> {t("caseBoard.topBar.tidyUp")}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={onExportPng}>
-            <Download className="size-4" /> {t("caseBoard.topBar.exportPng")}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => ui.getState().openDrawer("snapshots")}>
-            <History className="size-4" /> {t("caseBoard.topBar.snapshots")}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => {
-              onTakeSnapshot();
-              toast.success(t("caseBoard.toasts.snapshotTaken"));
-            }}
-          >
-            <Camera className="size-4" /> {t("caseBoard.topBar.takeSnapshot")}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => ui.getState().set({ cheatSheetOpen: true })}>
-            <CircleHelp className="size-4" /> {t("caseBoard.topBar.cheatSheet")}
-          </DropdownMenuItem>
-          {!readOnly && (
-            <DropdownMenuItem onSelect={() => ui.getState().openDrawer("caseFile")}>
-              <CheckCircle2 className="size-4" /> {t("caseBoard.topBar.closeCase")}
-            </DropdownMenuItem>
+            {caseData?.title ?? "…"}
+          </h1>
+          {caseData && <CaseStatusBadge status={caseData.status} />}
+          {caseData && (
+            <SeverityBadge severity={caseData.severity.toLowerCase() as never} className="shrink-0">
+              {caseData.severity}
+            </SeverityBadge>
           )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </div>
+
+        <div
+          role="group"
+          aria-label={t("caseBoard.topBar.ledger")}
+          className="flex h-9 shrink-0 items-stretch rounded-[4px] border-2 border-border bg-card"
+          data-testid="board-ledger"
+        >
+          <Counter
+            kind="evidence"
+            value={evidence}
+            label={t("caseBoard.topBar.evidence")}
+            hint={
+              spotlight === "evidence" ? t("caseBoard.topBar.spotlightClear") : t("caseBoard.topBar.spotlightEvidence")
+            }
+            active={spotlight === "evidence"}
+            onToggle={() => toggle("evidence")}
+          />
+          <Counter
+            kind="findings"
+            value={findings}
+            label={t("caseBoard.topBar.findings")}
+            hint={
+              spotlight === "findings" ? t("caseBoard.topBar.spotlightClear") : t("caseBoard.topBar.spotlightFindings")
+            }
+            active={spotlight === "findings"}
+            onToggle={() => toggle("findings")}
+          />
+          <Counter
+            kind="hypotheses"
+            value={hypotheses}
+            label={t("caseBoard.topBar.hypotheses")}
+            hint={
+              spotlight === "hypotheses"
+                ? t("caseBoard.topBar.spotlightClear")
+                : t("caseBoard.topBar.spotlightHypotheses")
+            }
+            active={spotlight === "hypotheses"}
+            onToggle={() => toggle("hypotheses")}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => ui.getState().set({ paletteOpen: true })}
+          className="group flex h-9 min-w-[2.25rem] flex-1 items-center gap-2.5 rounded-[4px] border-2 border-border bg-card px-3 text-left text-sm text-muted-foreground transition-colors hover:border-foreground/50 hover:text-foreground @4xl/topbar:w-72 @4xl/topbar:flex-none @6xl/topbar:w-[400px]"
+          data-testid="palette-trigger"
+          aria-label={t("caseBoard.topBar.palette")}
+        >
+          <Search className="size-4 shrink-0" aria-hidden />
+          <span className="hidden min-w-0 flex-1 truncate @md/topbar:inline">
+            {t("caseBoard.topBar.searchPlaceholder")}
+          </span>
+          <kbd className="hidden shrink-0 rounded-[3px] border border-border px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground group-hover:text-foreground @xl/topbar:inline">
+            ⌘K
+          </kbd>
+        </button>
+
+        <Presence />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={t("caseBoard.topBar.more")}
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-[4px] border-2 border-transparent hover:border-border"
+            >
+              <MoreHorizontal className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem
+            disabled={!caseData}
+            onSelect={() => caseData && router.push(nsPath(`/investigations/${caseData.id}/edit`))}
+          >
+            <Pencil className="size-4" /> {t("caseBoard.caseFile.edit")}
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={readOnly} onSelect={() => ui.getState().set({ autopilotOpen: true })}>
+            <Bot className="size-4" /> {t("investigations.caseDetail.runAI")}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={readOnly} onSelect={onTidyUp}>
+              <Wand2 className="size-4" /> {t("caseBoard.topBar.tidyUp")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onExportPng}>
+              <Download className="size-4" /> {t("caseBoard.topBar.exportPng")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => ui.getState().openDrawer("snapshots")}>
+              <History className="size-4" /> {t("caseBoard.topBar.snapshots")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                onTakeSnapshot();
+                toast.success(t("caseBoard.toasts.snapshotTaken"));
+              }}
+            >
+              <Camera className="size-4" /> {t("caseBoard.topBar.takeSnapshot")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => ui.getState().set({ cheatSheetOpen: true })}>
+              <CircleHelp className="size-4" /> {t("caseBoard.topBar.cheatSheet")}
+            </DropdownMenuItem>
+            {!readOnly && (
+              <DropdownMenuItem onSelect={() => ui.getState().openDrawer("caseFile")}>
+                <CheckCircle2 className="size-4" /> {t("caseBoard.topBar.closeCase")}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </header>
   );
 }

@@ -1,22 +1,27 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { formatDistanceToNowStrict } from "date-fns";
 import {
   ArrowLeft,
+  Bot,
   Check,
   CheckCircle2,
   Circle,
   Crosshair,
   ExternalLink,
   Eye,
+  FlaskConical,
   Loader2,
   MapPin,
   MessageSquare,
   PanelRightClose,
+  Pencil,
   Plus,
   Save,
+  Waypoints,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -63,16 +68,21 @@ import { nsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
 import { BoardProviders, useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
 import { createBoardStore } from "../store/board-store";
-import { createUiStore } from "../store/ui-store";
+import { createUiStore, type DrawerKind } from "../store/ui-store";
 import { addEvidence, attachFinding, placeThread } from "../store/commands";
 import { hypothesisMeta } from "../store/selectors";
 import { AddEvidencePanel } from "../ui/add-evidence-panel";
-import { ThreadPanel } from "./thread-panel";
+import { ThreadPanel, VERDICTS } from "./thread-panel";
+import { ConnectionsPanel } from "./connections-panel";
+import { startTrace } from "../hooks/use-trace";
 import { useVisibleCentre } from "../hooks/use-visible-centre";
 import { dismissedLabel } from "../store/finding-state";
 import type { Bubble, BubbleRow } from "../store/types";
 import { BoardCanvas, BOARD_DRAG_MIME } from "../board-canvas";
-import { StateChip } from "../ui/state-chip";
+import { StateChip } from "@workspace/case-board/components/state-chip";
+import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
+import { AiModeSelect, type AiMode } from "@/components/ai-mode-select";
+import { CaseAutopilotStatus } from "@/components/autopilot/case-autopilot-status";
 
 const STATUSES = ["OPEN", "IN_PROGRESS"] as const;
 
@@ -103,28 +113,20 @@ export function BoardDrawers({
   const threadKind = useBoard((s) => (drawerThreadId ? (s.threads.get(drawerThreadId)?.kind ?? null) : null));
   const ui = useUiStore();
   if (!drawer) return null;
-  const title =
-    drawer === "timeline"
-      ? t("caseBoard.drawers.timeline")
-      : drawer === "leads"
-        ? t("caseBoard.drawers.leads")
-        : drawer === "caseFile"
-          ? t("caseBoard.drawers.caseFile")
-          : drawer === "inquiries"
-            ? t("caseBoard.drawers.inquiries")
-            : drawer === "evidence"
-              ? t("caseBoard.drawers.evidence")
-              : drawer === "hypotheses"
-                ? t("caseBoard.drawers.hypotheses")
-                : drawer === "thread"
-                  ? threadKind === "DISCUSSION"
-                    ? t("caseBoard.thread.discussion")
-                    : t("caseBoard.drawers.hypothesis")
-                  : drawer === "addEvidence"
-                    ? t("caseBoard.drawers.addEvidence")
-                    : drawer === "snapshots"
-                      ? t("caseBoard.drawers.snapshots")
-                      : t("caseBoard.drawers.details");
+  const titles: Record<DrawerKind, string> = {
+    details: t("caseBoard.drawers.details"),
+    hypotheses: t("caseBoard.drawers.hypotheses"),
+    thread: threadKind === "DISCUSSION" ? t("caseBoard.thread.discussion") : t("caseBoard.drawers.hypothesis"),
+    addEvidence: t("caseBoard.drawers.addEvidence"),
+    connections: t("caseBoard.drawers.connections"),
+    evidence: t("caseBoard.drawers.evidence"),
+    leads: t("caseBoard.drawers.leads"),
+    inquiries: t("caseBoard.drawers.inquiries"),
+    timeline: t("caseBoard.drawers.timeline"),
+    caseFile: t("caseBoard.drawers.caseFile"),
+    snapshots: t("caseBoard.drawers.snapshots"),
+  };
+  const title = titles[drawer];
 
   return (
     <aside className="flex h-full min-w-0 flex-col bg-background" aria-label={title} data-testid="board-drawer">
@@ -162,6 +164,7 @@ export function BoardDrawers({
         {drawer === "thread" && <ThreadPanel caseId={caseId} onFlyTo={onFlyTo} />}
         {drawer === "details" && <DetailsDrawer onFlyTo={onFlyTo} />}
         {drawer === "addEvidence" && <AddEvidencePanel onFlyTo={onFlyTo} />}
+        {drawer === "connections" && <ConnectionsPanel onFlyTo={onFlyTo} />}
         {drawer === "snapshots" && <SnapshotsDrawer caseId={caseId} />}
       </div>
     </aside>
@@ -198,85 +201,165 @@ function HypothesesDrawer({ onFlyTo }: { onFlyTo: (itemId: string) => void }) {
       },
     });
   };
+  const ruled = hypotheses.filter((th) => th.status === "SUPPORTED" || th.status === "REFUTED").length;
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">{t("caseBoard.drawers.hypothesesHint")}</p>
-        <Button size="sm" className="h-7 shrink-0 gap-1 text-xs" disabled={readOnly} onClick={newHypothesis}>
-          <Plus className="size-3" /> {t("caseBoard.drawers.newHypothesis")}
+    <div className="space-y-5" data-testid="hypotheses-panel">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-sm font-bold tabular-nums">
+            {hypotheses.length === 1
+              ? t("caseBoard.hypothesesList.countOne")
+              : t("caseBoard.hypothesesList.count", { count: hypotheses.length })}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {hypotheses.length > 0
+              ? t("caseBoard.hypothesesList.ruled", { count: ruled })
+              : t("caseBoard.drawers.hypothesesHint")}
+          </p>
+        </div>
+        <Button size="sm" className="h-8 shrink-0 gap-1" disabled={readOnly} onClick={newHypothesis}>
+          <Plus className="size-3.5" strokeWidth={3} /> {t("caseBoard.drawers.newHypothesis")}
         </Button>
       </div>
+
       {hypotheses.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">{t("caseBoard.drawers.noHypotheses")}</p>
+        <div className="rounded-[4px] border-2 border-dashed border-border px-4 py-8 text-center">
+          <FlaskConical className="mx-auto size-6 text-muted-foreground" aria-hidden />
+          <p className="mt-2 text-sm font-medium">{t("caseBoard.drawers.noHypotheses")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("caseBoard.hypothesesList.emptyHint")}</p>
+        </div>
       ) : (
-        <ul className="space-y-1.5">
+        <ul className="space-y-2">
           {hypotheses.map((th) => {
             const m = meta.get(th.id);
+            const verdict = VERDICTS.find((v) => v.value === (th.status ?? "PROPOSED")) ?? VERDICTS[0]!;
+            const total = th.supportingCount + th.contradictingCount + th.neutralCount;
+            const onBoard = th.onBoard && !!th.itemId;
             return (
-              <li key={th.id} className="rounded-[4px] border-2 border-border bg-card px-3 py-2" data-testid="hypothesis-row">
-                <div className="flex items-start gap-2">
-                  <span className="mt-1 size-2.5 shrink-0 rounded-full" style={{ background: m?.color }} aria-hidden />
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 text-left"
-                    onClick={() => ui.getState().openDrawer("thread", { threadId: th.id })}
-                  >
-                    <span className="mr-1.5 font-mono text-[11px] font-bold">{m?.label}</span>
-                    <span className="text-sm font-medium hover:underline">{th.title}</span>
-                  </button>
-                  {th.status && <StateChip tone="neutral">{th.status}</StateChip>}
-                </div>
-                <div className="mt-1.5 flex items-center gap-3 pl-[18px] font-mono text-[11px] text-muted-foreground">
-                  <span className="inline-flex items-center gap-0.5" title={t("caseBoard.link.supports")}>
-                    <Check className="size-3 text-[var(--cb-supports)]" strokeWidth={3} aria-hidden /> {th.supportingCount}
-                  </span>
-                  <span className="inline-flex items-center gap-0.5" title={t("caseBoard.link.contradicts")}>
-                    <X className="size-3 text-[var(--cb-contradicts)]" strokeWidth={3} aria-hidden /> {th.contradictingCount}
-                  </span>
-                  <span className="inline-flex items-center gap-0.5" title={t("caseBoard.link.neutral")}>
-                    <Circle className="size-3" aria-hidden /> {th.neutralCount}
-                  </span>
-                  <span className="ml-auto flex gap-1">
-                    {th.onBoard && th.itemId ? (
-                      <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => onFlyTo(th.itemId!)}>
-                        <Crosshair className="size-3" /> {t("caseBoard.drawers.showOnBoard")}
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 gap-1 text-xs"
-                        disabled={readOnly}
-                        onClick={() => place(th.id, th.itemId)}
-                        data-testid="place-hypothesis"
-                      >
-                        <MapPin className="size-3" /> {t("caseBoard.drawers.placeOnBoard")}
-                      </Button>
+              <li
+                key={th.id}
+                className={cn(
+                  "group relative overflow-hidden rounded-[4px] border-2 bg-card transition-colors hover:border-foreground/40",
+                  onBoard ? "border-border" : "border-dashed border-border",
+                )}
+                data-testid="hypothesis-row"
+              >
+                <span className="absolute inset-y-0 left-0 w-1" style={{ background: m?.color }} aria-hidden />
+                <button
+                  type="button"
+                  className="block w-full py-2.5 pr-3 pl-4 text-left"
+                  onClick={() => ui.getState().openDrawer("thread", { threadId: th.id })}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="rounded-[3px] px-1.5 py-0.5 font-mono text-[10px] leading-none font-bold text-white"
+                      style={{ background: m?.color }}
+                    >
+                      {m?.label}
+                    </span>
+                    <span
+                      className="inline-flex items-center gap-1 font-mono text-[10px] font-bold tracking-[0.06em] uppercase"
+                      style={{ color: verdict.value === "PROPOSED" ? undefined : verdict.tone }}
+                    >
+                      <verdict.icon className="size-3" strokeWidth={3} aria-hidden />
+                      {t(`caseBoard.hypothesis.status.${verdict.value}`)}
+                    </span>
+                    <span className="flex-1" />
+                    {th.confidence !== null && (
+                      <span className="font-mono text-[11px] text-muted-foreground tabular-nums" title={t("caseBoard.hypothesis.confidence")}>
+                        {Math.round(th.confidence * 100)}%
+                      </span>
                     )}
                   </span>
+                  <span className="mt-1.5 line-clamp-2 block text-sm leading-snug font-semibold">{th.title}</span>
+                  <span className="mt-2 flex items-center gap-3">
+                    <span className="flex h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden>
+                      {total > 0 && (
+                        <>
+                          <span style={{ width: `${(th.supportingCount / total) * 100}%`, background: "var(--cb-supports)" }} />
+                          <span style={{ width: `${(th.contradictingCount / total) * 100}%`, background: "var(--cb-contradicts)" }} />
+                          <span style={{ width: `${(th.neutralCount / total) * 100}%`, background: "var(--muted-foreground)" }} />
+                        </>
+                      )}
+                    </span>
+                    <span className="flex shrink-0 gap-2 font-mono text-[11px] tabular-nums">
+                      <span className="inline-flex items-center gap-0.5" title={t("caseBoard.link.supports")}>
+                        <Check className="size-3 text-[var(--cb-supports)]" strokeWidth={3} aria-hidden /> {th.supportingCount}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5" title={t("caseBoard.link.contradicts")}>
+                        <X className="size-3 text-[var(--cb-contradicts)]" strokeWidth={3} aria-hidden /> {th.contradictingCount}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 text-muted-foreground" title={t("caseBoard.link.neutral")}>
+                        <Circle className="size-3" aria-hidden /> {th.neutralCount}
+                      </span>
+                    </span>
+                  </span>
+                </button>
+                <div className="flex items-center gap-2 border-t border-border py-1.5 pr-1.5 pl-4 text-[11px] text-muted-foreground">
+                  <MessageSquare className="size-3 shrink-0" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">
+                    {th.entryCount === 1
+                      ? t("caseBoard.hypothesesList.entriesOne")
+                      : t("caseBoard.hypothesesList.entries", { count: th.entryCount })}
+                    {th.lastEntryAt
+                      ? ` · ${formatDistanceToNowStrict(new Date(th.lastEntryAt), { addSuffix: true })}${th.lastAuthor ? ` · ${th.lastAuthor}` : ""}`
+                      : ""}
+                  </span>
+                  {onBoard ? (
+                    <Button variant="ghost" size="sm" className="h-6 gap-1 px-1.5 text-[11px]" onClick={() => onFlyTo(th.itemId!)}>
+                      <Crosshair className="size-3" /> {t("caseBoard.drawers.showOnBoard")}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 gap-1 px-1.5 text-[11px]"
+                      disabled={readOnly}
+                      onClick={() => place(th.id, th.itemId)}
+                      data-testid="place-hypothesis"
+                    >
+                      <MapPin className="size-3" /> {t("caseBoard.drawers.placeOnBoard")}
+                    </Button>
+                  )}
                 </div>
               </li>
             );
           })}
         </ul>
       )}
+
       {discussions.length > 0 && (
-        <section className="space-y-1.5">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+        <section className="space-y-2">
+          <p className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
             {t("caseBoard.drawers.discussions")} · {discussions.length}
           </p>
           <ul className="space-y-1">
             {discussions.map((th) => (
-              <li key={th.id} className="flex items-center gap-2 rounded-[4px] border border-border px-2.5 py-1.5 text-sm">
+              <li key={th.id} className="flex items-center gap-2 rounded-[4px] border-2 border-border bg-card py-1 pr-1 pl-2.5">
                 <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">{th.title}</span>
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 truncate text-left text-sm hover:underline"
+                  onClick={() => ui.getState().openDrawer("thread", { threadId: th.id })}
+                >
+                  {th.title}
+                </button>
+                {th.resolvedAt && <StateChip tone="success">{t("caseBoard.comment.resolved")}</StateChip>}
+                <span className="shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{th.entryCount}</span>
                 {th.onBoard && th.itemId ? (
-                  <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs" onClick={() => onFlyTo(th.itemId!)}>
+                  <Button variant="ghost" size="sm" className="h-6 px-1.5" onClick={() => onFlyTo(th.itemId!)} aria-label={t("caseBoard.drawers.showOnBoard")}>
                     <Crosshair className="size-3" />
                   </Button>
                 ) : (
-                  <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs" disabled={readOnly} onClick={() => place(th.id, th.itemId)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-1.5"
+                    disabled={readOnly}
+                    onClick={() => place(th.id, th.itemId)}
+                    aria-label={t("caseBoard.drawers.placeOnBoard")}
+                  >
                     <MapPin className="size-3" />
                   </Button>
                 )}
@@ -421,6 +504,9 @@ function CaseFileDrawer({
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
+  const ui = useUiStore();
+  const router = useRouter();
+  const autopilotRefresh = useUi((s) => s.autopilotRefresh);
   const [conclusion, setConclusion] = React.useState(caseData?.conclusion ?? "");
   const [saving, setSaving] = React.useState(false);
   React.useEffect(() => setConclusion(caseData?.conclusion ?? ""), [caseData?.conclusion]);
@@ -451,8 +537,18 @@ function CaseFileDrawer({
 
   return (
     <div className="space-y-5">
-      {caseData.description && <p className="text-sm text-muted-foreground">{caseData.description}</p>}
+      <div className="flex items-start gap-2">
+        {caseData.description ? (
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground">{caseData.description}</p>
+        ) : (
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground italic">{t("caseBoard.caseFile.noDescription")}</p>
+        )}
+        <Button variant="outline" size="sm" className="h-7 shrink-0 gap-1 text-xs" onClick={() => router.push(nsPath(`/investigations/${caseId}/edit`))}>
+          <Pencil className="size-3" /> {t("caseBoard.caseFile.edit")}
+        </Button>
+      </div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
+        {isAiActor(caseData.createdBy) && <AiActorBadge />}
         <SeverityBadge severity={caseData.severity.toLowerCase() as never}>{caseData.severity}</SeverityBadge>
         {!closed && (
           <Select value={caseData.status} onValueChange={(status) => void update({ status })}>
@@ -470,6 +566,30 @@ function CaseFileDrawer({
         )}
         {caseData.assignee && <span className="text-xs text-muted-foreground">{caseData.assignee}</span>}
       </div>
+      <section className="space-y-2" data-testid="case-file-autopilot">
+        <div className="flex items-center gap-2">
+          <p className="flex-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            {t("caseBoard.caseFile.autopilot")}
+          </p>
+          <AiModeSelect
+            value={(caseData.aiMode ?? "INHERIT") as AiMode}
+            disabled={saving}
+            onChange={(aiMode) => void update({ aiMode })}
+          />
+        </div>
+        <CaseAutopilotStatus caseId={caseId} refreshKey={autopilotRefresh} onFinished={onChanged} />
+        {!closed && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => ui.getState().set({ autopilotOpen: true })}
+          >
+            <Bot className="size-3.5" /> {t("investigations.caseDetail.runAI")}
+          </Button>
+        )}
+      </section>
+
       <section className="space-y-2">
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
           {t("investigations.caseDetail.conclusion")}
@@ -637,6 +757,7 @@ function SuggestedDetails({ suggestedKey }: { suggestedKey: string }) {
   const suggestion = useBoard((s) => s.suggested.get(suggestedKey));
   const readOnly = useBoard((s) => s.readOnly);
   const store = useBoardStore();
+  const ui = useUiStore();
   const rf = useReactFlow();
   if (!suggestion) return <p className="py-8 text-center text-sm text-muted-foreground">{t("caseBoard.drawers.detailsEmpty")}</p>;
   const add = () => {
@@ -665,6 +786,14 @@ function SuggestedDetails({ suggestedKey }: { suggestedKey: string }) {
         <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => openInTab(`/assets/${suggestion.assetId}`)}>
           <ExternalLink className="size-3" /> {t("caseBoard.menu.openAsset")}
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1 text-xs"
+          onClick={() => startTrace(ui, { nodeId: suggestedKey, assetId: suggestion.assetId, label: suggestion.label })}
+        >
+          <Waypoints className="size-3" /> {t("caseBoard.menu.showConnections")}
+        </Button>
       </div>
     </div>
   );
@@ -680,6 +809,7 @@ function ItemDetails({
   onFlyTo: (itemId: string) => void;
 }) {
   const { t } = useTranslation();
+  const ui = useUiStore();
   const bubble = useBoard((s) => s.bubbles.get(itemId));
   const [finding, setFinding] = React.useState<FindingResponseDto | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -714,6 +844,17 @@ function ItemDetails({
           {bubble.assetId && (
             <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => openInTab(`/assets/${bubble.assetId}`)}>
               <ExternalLink className="size-3" /> {t("caseBoard.menu.openAsset")}
+            </Button>
+          )}
+          {bubble.assetId && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 text-xs"
+              onClick={() => startTrace(ui, { nodeId: bubble.itemId, assetId: bubble.assetId, label: bubble.label })}
+              data-testid="details-show-connections"
+            >
+              <Waypoints className="size-3" /> {t("caseBoard.menu.showConnections")}
             </Button>
           )}
         </div>
@@ -933,7 +1074,7 @@ function SnapshotViewer({
         <div className="case-board relative min-h-0 flex-1">
           <BoardProviders board={stores.board} ui={stores.ui}>
             <ReactFlowProvider>
-              <BoardCanvas onTidyUp={() => undefined} />
+              <BoardCanvas onTidyUp={() => undefined} rememberViewport={false} />
             </ReactFlowProvider>
           </BoardProviders>
         </div>

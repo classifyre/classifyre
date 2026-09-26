@@ -75,6 +75,14 @@ interface OpContext {
   boardId: string;
   actor: string | undefined;
   now: Date;
+  /**
+   * `updatedAt` (ms) of every item and link a text edit in this batch makes a
+   * claim about, read under the board lock before the first op ran; `null`
+   * for one that did not exist yet. A batch comes from one writer, so an edit
+   * may build on the batch's own earlier writes to the same row (see
+   * {@link claimHolds}).
+   */
+  claimBaseline: ReadonlyMap<string, number | null>;
 }
 
 interface OpOutcome {
@@ -192,7 +200,14 @@ export class CaseBoardService {
         // batches exactly and `stale` is decided against a stable value.
         const [locked] = await tx.$queryRaw<{ version: number }[]>`
           SELECT version FROM case_boards WHERE id = ${boardId} FOR UPDATE`;
-        const ctx: OpContext = { tx, caseId, boardId, actor, now: new Date() };
+        const ctx: OpContext = {
+          tx,
+          caseId,
+          boardId,
+          actor,
+          now: new Date(),
+          claimBaseline: await this.claimBaseline(tx, boardId, input.ops),
+        };
         const applied: AppliedBoardOpDto[] = [];
         const rejected: RejectedBoardOpDto[] = [];
         let arranged = 0;
@@ -272,7 +287,8 @@ export class CaseBoardService {
       where: { id: caseId },
       select: { id: true },
     });
-    if (!exists) throw new NotFoundException(`Case with ID ${caseId} not found`);
+    if (!exists)
+      throw new NotFoundException(`Case with ID ${caseId} not found`);
     const input = parsed.data;
     const result = await this.graph.trace({
       seeds: [...new Set(input.assetIds)].map((id) => ({ type: 'asset', id })),
@@ -410,7 +426,11 @@ export class CaseBoardService {
     const item = await this.liveItem(ctx, op.id);
     if (
       op.expectedUpdatedAt &&
-      item.updatedAt.getTime() !== new Date(op.expectedUpdatedAt).getTime()
+      !claimHolds(
+        item.updatedAt,
+        op.expectedUpdatedAt,
+        ctx.claimBaseline.get(item.id),
+      )
     ) {
       throw new BoardOpRejected(
         `Changed by ${item.updatedBy ?? 'someone else'} meanwhile`,
@@ -627,7 +647,11 @@ export class CaseBoardService {
     const link = await this.liveLink(ctx, op.id);
     if (
       op.expectedUpdatedAt &&
-      link.updatedAt.getTime() !== new Date(op.expectedUpdatedAt).getTime()
+      !claimHolds(
+        link.updatedAt,
+        op.expectedUpdatedAt,
+        ctx.claimBaseline.get(link.id),
+      )
     ) {
       throw new BoardOpRejected(
         `Changed by ${link.updatedBy ?? 'someone else'} meanwhile`,
@@ -1508,6 +1532,42 @@ export class CaseBoardService {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
+  /** `updatedAt` of the rows this batch's text edits make claims about, before any op ran. */
+  private async claimBaseline(
+    tx: Db,
+    boardId: string,
+    ops: readonly BoardOp[],
+  ): Promise<Map<string, number | null>> {
+    const itemIds = new Set<string>();
+    const linkIds = new Set<string>();
+    for (const op of ops) {
+      if (op.type === 'item.update' && op.expectedUpdatedAt) itemIds.add(op.id);
+      if (op.type === 'link.update' && op.expectedUpdatedAt) linkIds.add(op.id);
+    }
+    // One connection holds the transaction: read one table after the other.
+    const items =
+      itemIds.size > 0
+        ? await tx.caseBoardItem.findMany({
+            where: { boardId, id: { in: [...itemIds] } },
+            select: { id: true, updatedAt: true },
+          })
+        : [];
+    const links =
+      linkIds.size > 0
+        ? await tx.caseBoardLink.findMany({
+            where: { boardId, id: { in: [...linkIds] } },
+            select: { id: true, updatedAt: true },
+          })
+        : [];
+    const baseline = new Map<string, number | null>(
+      [...itemIds, ...linkIds].map((claimed) => [claimed, null]),
+    );
+    for (const row of [...items, ...links]) {
+      baseline.set(row.id, row.updatedAt.getTime());
+    }
+    return baseline;
+  }
+
   /** Any item of this board by id, soft-deleted or not. */
   private async findItem(
     ctx: OpContext,
@@ -1841,6 +1901,27 @@ export class CaseBoardService {
 }
 
 // ─── Pure helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Whether a text edit's `expectedUpdatedAt` still holds: nobody wrote the row
+ * since the version the editor claims, or only earlier ops of this same batch
+ * did. Batches come from one writer and are serialised by the board lock, so
+ * a batch that edits one note twice, undoes and redoes an edit, or creates a
+ * note and then writes its text builds on its own writes rather than racing
+ * someone else's.
+ *
+ * `baseline` is the row's `updatedAt` when the batch began, `null` when the
+ * row did not exist yet (this batch created it), `undefined` when unknown.
+ */
+export function claimHolds(
+  current: Date,
+  expectedUpdatedAt: string,
+  baseline: number | null | undefined,
+): boolean {
+  if (baseline === null) return true;
+  const expected = new Date(expectedUpdatedAt).getTime();
+  return current.getTime() === expected || baseline === expected;
+}
 
 /** Map an expected failure to a per-op rejection; null means "rethrow". */
 function asRejection(error: unknown): Omit<RejectedBoardOpDto, 'opId'> | null {

@@ -1,3 +1,4 @@
+import { FRAME_TITLE_HEIGHT, HYPOTHESIS_WIDTH } from "@workspace/case-board/lib/geometry";
 import { ASSET_NODE, evidenceExtent, type Extent } from "./relations";
 import { absolutePosition } from "./ops";
 import type { BoardDomain, BoardItem } from "./types";
@@ -8,11 +9,9 @@ import type { BoardDomain, BoardItem } from "./types";
  * used by auto-placement and the suggested-neighbour layout.
  */
 
-export const HYPOTHESIS_WIDTH = 300;
+export { FRAME_TITLE_HEIGHT, HYPOTHESIS_WIDTH };
 export const DEFAULT_NOTE = { width: 220, height: 160 };
 export const DEFAULT_FRAME = { width: 640, height: 400 };
-/** A frame's title bar; its contents start below it. */
-export const FRAME_TITLE_HEIGHT = 40;
 /** Clear space kept between a frame's edge and what is inside it. */
 export const FRAME_PADDING = 24;
 /** A suggested neighbour is drawn like any asset. */

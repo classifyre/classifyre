@@ -343,7 +343,8 @@
       "next": "Next",
       "morePages": "More pages"
     },
-    "remove": "Remove"
+    "remove": "Remove",
+    "more": "More"
   },
   "settings": {
     "title": "Settings",
@@ -2828,7 +2829,11 @@
     "detectors": "Custom Detectors",
     "aiProviders": "AI Providers",
     "newProvider": "New Provider",
-    "edit": "Edit"
+    "edit": "Edit",
+    "evidence": "Evidence",
+    "add": "Add",
+    "new": "New",
+    "showPath": "Show the full path"
   },
   "investigations": {
     "page": {
@@ -2840,12 +2845,6 @@
       "tabFingerprints": "Fingerprints"
     },
     "caseDetail": {
-      "loading": "Loading case…",
-      "buildingGraph": "Building graph…",
-      "emptyGraph": "Empty graph",
-      "emptyGraphDesc": "Add evidence to seed the relationship graph — pull matches from a linked inquiry watch or attach findings directly.",
-      "addEvidence": "Add evidence",
-      "openCaseFile": "Open case file",
       "conclusion": "Conclusion",
       "caseClosed": "Case closed",
       "noConclusion": "No conclusion recorded.",
@@ -2855,7 +2854,6 @@
       "closeCaseTitle": "Close this case?",
       "closeCaseDesc": "The conclusion is recorded, the case is marked closed and its linked inquiry watch is archived (it stops surfacing new matches). You can reopen later.",
       "conclusionRequired": "a conclusion is required to close",
-      "drivingInquiries": "Driving inquiry watches",
       "noInquiryLinked": "No inquiry watch linked — evidence is added manually. Link one below to pull its matches as evidence.",
       "archived": "archived",
       "editInquiryQuery": "Edit inquiry watch query",
@@ -2864,41 +2862,18 @@
       "unlinkInquiryDesc": "The inquiry watch and the evidence already pulled from it are kept — only the link to this case is removed.",
       "unlink": "Unlink",
       "currentMatch": "current match",
-      "newMatch": "new",
       "selectMatchesToPull": "Select matches to pull",
       "pullAllMatches": "Pull all current matches",
       "all": "All",
       "linkAnotherInquiry": "Link another inquiry watch…",
       "link": "Link",
-      "recentActivity": "Recent activity",
-      "fullTimeline": "Full timeline",
-      "noActivity": "No activity yet.",
-      "evidenceTabDesc": "The persisted record of this case — snapshots survive even if the source data changes. Pull from the driving inquiry watch on the Overview tab, or attach findings directly.",
-      "aiModeUpdated": "AI mode updated",
-      "failedToChangeAiMode": "Failed to change AI mode",
-      "statusSet": "Status set to {{status}}",
-      "failedToChangeStatus": "Failed to change status",
-      "conclusionSaved": "Conclusion saved",
-      "failedToSaveConclusion": "Failed to save conclusion",
-      "caseClosedWithArchived": "Case closed — {{count}} inquir{{suffix}} archived",
-      "failedToCloseCase": "Failed to close case",
       "inquiryLinked": "Inquiry Watch linked",
       "failedToLinkInquiry": "Failed to link inquiry watch",
       "inquiryUnlinked": "Inquiry Watch unlinked",
       "failedToUnlinkInquiry": "Failed to unlink inquiry watch",
       "pulled": "Pulled {{count}} finding(s) into evidence",
       "failedToPull": "Failed to pull matches",
-      "failedToSaveNote": "Failed to save note",
-      "tabGraph": "Graph",
-      "tabEvidence": "Evidence",
-      "tabThreads": "Threads",
-      "tabTimeline": "Timeline",
-      "tabCaseFile": "Case file",
       "runAI": "Run AI",
-      "reopen": "Reopen",
-      "edit": "Edit",
-      "moreActions": "More actions",
-      "tabInquiries": "Watches",
       "autoPull": "Auto-add new answers",
       "autoPullOn": "New answers will be added to this case as scans land them.",
       "autoPullOff": "New answers wait here until you add them.",
@@ -2908,12 +2883,7 @@
       "goneWarning": "{{count}} piece(s) of evidence this case cites are no longer found by their source.",
       "inquiriesTabDesc": "The standing questions driving this case. Review what the latest scans landed without leaving the case.",
       "selectInquiry": "Select a watch to review its answers",
-      "addSelectedToCase": "Add selected to case",
-      "reviewMatches": "Review matches",
-      "newMatchesBanner": "{{count}} new match appeared in the linked inquiry watches since last review.",
-      "tabExplore": "Explore",
-      "timelineChronology": "Chronology",
-      "timelineActivity": "Activity"
+      "addSelectedToCase": "Add selected to case"
     },
     "addEvidence": {
       "backToCase": "Back to case",
@@ -3351,175 +3321,6 @@
       "noInquiries": "0 inquiry watches"
     }
   },
-  "caseGraph": {
-    "toolbar": {
-      "select": "Select",
-      "selectTitle": "Select and drag nodes",
-      "connect": "Connect",
-      "connectTitle": "Click a source node, then a target node, to create an edge",
-      "path": "Path",
-      "pathTitle": "Click two nodes to highlight the path between them (or shift-click in select mode)",
-      "evidenceLabel": "Evidence",
-      "evidenceTitle": "Add evidence to this case",
-      "hypothesisLabel": "Hypothesis",
-      "hypothesisTitle": "Create a new hypothesis",
-      "searchPlaceholder": "search graph…",
-      "clearSearch": "Clear search",
-      "findingsLabel": "Findings",
-      "collapseFindings": "Collapse all findings into their assets",
-      "expandFindings": "Show findings as separate nodes",
-      "connectingTarget": "now click the target node",
-      "connectingSource": "click the source node",
-      "connectingEsc": "esc to cancel",
-      "pathTarget": "click the destination node",
-      "pathSource": "click the start node",
-      "stats": "{{nodeCount}} nodes · {{edgeCount}} edges",
-      "zoomFit": "Zoom to fit",
-      "reloadGraph": "Reload graph"
-    },
-    "edgeDetail": {
-      "originLabel": "{{origin}} edge",
-      "from": "from",
-      "to": "to",
-      "notInView": "not in view",
-      "conf": "conf",
-      "rename": "Rename relation",
-      "delete": "Delete edge",
-      "inferredReadOnly": "Inferred edges are derived from the data and cannot be edited. Create a manual edge to record your own relationship."
-    },
-    "nodeDetail": {
-      "evidence": "evidence",
-      "attached": "attached",
-      "sourceGone": "Source record no longer exists.",
-      "detector": "detector",
-      "onAsset": "on asset",
-      "source": "source",
-      "matchedContent": "Matched content",
-      "hypotheses": "Hypotheses",
-      "addAsEvidence": "Add as evidence",
-      "attachFinding": "Attach finding to case",
-      "linkToHypothesis": "Link to hypothesis…",
-      "connectFromHere": "Connect from here",
-      "collapseFindings": "Collapse {{count}} finding(s)",
-      "expandFindings": "Expand {{count}} finding(s)",
-      "loading": "Loading…",
-      "loadRelated": "Load related entities",
-      "reviewUnattached": "Review {{count}} unattached finding(s)",
-      "openAsset": "Open asset ↗",
-      "openFinding": "Open finding ↗",
-      "releasePin": "Release pin",
-      "removeFromEvidence": "Remove from evidence",
-      "unlinkFinding": "Unlink finding"
-    },
-    "contextMenu": {
-      "renameRelation": "Rename relation…",
-      "deleteEdge": "Delete edge",
-      "inferredReadOnly": "Inferred edges are auto-generated and read-only. Create a manual edge instead.",
-      "addAsEvidence": "Add as evidence",
-      "removeFromEvidence": "Remove from evidence",
-      "attachFinding": "Attach finding to case",
-      "unlinkFinding": "Unlink finding from case",
-      "linkToHypothesis": "Link to hypothesis",
-      "noHypotheses": "No hypotheses yet.",
-      "supports": "Supports",
-      "contradicts": "Contradicts",
-      "neutral": "Neutral",
-      "linkWithNote": "Link with note…",
-      "newHypothesisFromNode": "+ New hypothesis from this node…",
-      "connectFromHere": "Connect from here",
-      "findPathFromHere": "Find path from here",
-      "collapseFindings": "Collapse {{count}} finding(s) into asset",
-      "expandFindings": "Expand {{count}} finding(s)",
-      "loadRelated": "Load related entities",
-      "reviewUnattached": "Review {{count}} unattached finding(s)…",
-      "releasePin": "Release pin",
-      "openAsset": "Open asset ↗",
-      "openFinding": "Open finding ↗"
-    },
-    "graphView": {
-      "addedToEvidence": "Added to evidence",
-      "failedToAddEvidence": "Failed to add evidence",
-      "removedFromEvidence": "Removed from evidence",
-      "failedToRemoveEvidence": "Failed to remove evidence",
-      "findingAttached": "Finding attached to case",
-      "failedToAttach": "Failed to attach finding",
-      "findingUnlinked": "Finding unlinked",
-      "failedToUnlink": "Failed to unlink finding",
-      "findingNotResolved": "Finding was attached but could not be resolved",
-      "linkedToHypothesis": "Linked ({{stance}})",
-      "failedToLink": "Failed to link to hypothesis",
-      "expanded": "Expanded — {{count}} nodes",
-      "failedToExpand": "Failed to expand",
-      "edgeDeleted": "Edge deleted",
-      "inferredCannotDelete": "Inferred edges cannot be deleted.",
-      "failedToDeleteEdge": "Failed to delete edge",
-      "noPath": "No connection between these nodes in the current view"
-    },
-    "sidebar": {
-      "hypothesesTitle": "Hypotheses",
-      "noHypotheses": "None yet. Hypotheses let you group evidence into competing explanations.",
-      "clearFocus": "Click to clear focus",
-      "focusHypothesis": "Click to focus this hypothesis",
-      "highlight": "Highlight",
-      "clear": "clear",
-      "sourcesPlaceholder": "Sources…",
-      "searchSources": "Search sources…",
-      "noSources": "No sources",
-      "categoriesPlaceholder": "Finding categories…",
-      "searchCategories": "Search categories…",
-      "noCategories": "No categories",
-      "edgeTypes": "Edge types",
-      "legendTitle": "Reading the graph",
-      "legendEvidence": "green ring = case evidence",
-      "legendHypothesis": "dashed purple = spans hypotheses",
-      "legendManual": "amber dashed edge = manual link",
-      "legendUnattached": "findings not yet attached — click to review",
-      "legendNewMatch": "Landed in the latest scan",
-      "legendGoneMatch": "Retired by the latest scan",
-      "statsAssets": "Assets",
-      "statsFindings": "Findings",
-      "statsEvidenceRecords": "Evidence records",
-      "statsManualEdges": "Manual edges",
-      "statsInferredEdges": "Inferred edges",
-      "statsUnattached": "Unattached findings"
-    },
-    "attachDialog": {
-      "title": "Unattached findings",
-      "description": "{{label}} has {{count}} finding(s) not in this case yet. Attach the relevant ones as evidence.",
-      "openFullPicker": "Open full picker",
-      "attachFindings": "Attach {{count}} finding(s)",
-      "attached": "Attached {{count}} finding(s) as evidence",
-      "failedToAttach": "Failed to attach findings"
-    },
-    "newHypothesisDialog": {
-      "title": "New hypothesis",
-      "linkedNode": "\"{{label}}\" will be linked to it as the first piece of evidence.",
-      "description": "A competing explanation you can attach supporting or contradicting evidence to.",
-      "titleLabel": "Title",
-      "titlePlaceholder": "e.g. Credentials leaked through CI logs",
-      "statementLabel": "Statement (optional)",
-      "statementPlaceholder": "What exactly does this hypothesis claim, and what would prove or refute it?",
-      "hypothesisCreated": "Hypothesis created",
-      "failedToCreate": "Failed to create hypothesis",
-      "create": "Create hypothesis"
-    },
-    "linkHypothesisDialog": {
-      "supportsLabel": "Supports — evidence for it",
-      "contradictsLabel": "Contradicts — evidence against it",
-      "neutralLabel": "Neutral — related context",
-      "title": "Link to hypothesis",
-      "recordDesc": "Record what \"{{label}}\" means for a hypothesis.",
-      "addedIfNeeded": "It will be added as evidence if it isn't yet.",
-      "hypothesisLabel": "Hypothesis",
-      "hypothesisPlaceholder": "Choose a hypothesis…",
-      "stanceLabel": "Stance",
-      "noteLabel": "Note (optional)",
-      "notePlaceholder": "Why does this evidence matter for the hypothesis?",
-      "linked": "Linked to hypothesis",
-      "failedToLink": "Failed to link to hypothesis",
-      "link": "Link"
-    }
-  },
   "caseBoard": {
     "loading": "Opening the board…",
     "loadError": "The board could not be loaded.",
@@ -3535,8 +3336,6 @@
     "readOnly": "Closed · the board is read-only. Reopen the case to edit.",
     "readOnlySnapshot": "Snapshot #{{number}} was taken when it closed.",
     "reopen": "Reopen",
-    "truncated": "Showing a partial neighbourhood",
-    "truncatedHint": "The case has more connections than the board loads at once. Evidence and attached findings are all shown; some neighbours are not.",
     "save": {
       "saving": "Saving…",
       "saved": "All changes saved",
@@ -3562,7 +3361,15 @@
       "closeCase": "Close case…",
       "alsoHere": "Also here: {{names}}",
       "summary": "{{evidence}} evidence · {{findings}} findings · {{hypotheses}} hypotheses",
-      "cheatSheet": "Shortcuts and visual key"
+      "cheatSheet": "Shortcuts and visual key",
+      "ledger": "On the board",
+      "findings": "Findings",
+      "hypotheses": "Hypotheses",
+      "spotlightEvidence": "Light up every piece of evidence",
+      "spotlightFindings": "Light up every finding in the case",
+      "spotlightHypotheses": "Light up every hypothesis",
+      "spotlightClear": "Show everything again",
+      "searchPlaceholder": "Search the board or add evidence…"
     },
     "tools": {
       "select": "Select",
@@ -3705,7 +3512,8 @@
       "removeFromBoard": "Remove card from board",
       "changeColor": "Change colour",
       "create": "Create hypothesis",
-      "removedFromBoard": "Card removed. The hypothesis is kept: place it again from the hypotheses list."
+      "removedFromBoard": "Card removed. The hypothesis is kept: place it again from the hypotheses list.",
+      "editStatement": "Edit statement"
     },
     "note": {
       "placeholder": "Write a note — markdown works",
@@ -3759,7 +3567,6 @@
       "showNeighbours": "Show neighbours",
       "collapse": "Collapse findings",
       "expand": "Expand findings",
-      "findPath": "Find path to…",
       "moveToFrame": "Move to frame",
       "noFrame": "No frame",
       "bringToFront": "Bring to front",
@@ -3790,7 +3597,8 @@
       "confirm": "Confirm",
       "cancel": "Cancel",
       "stance": "Stance",
-      "removeStance": "Remove stance"
+      "removeStance": "Remove stance",
+      "showConnections": "Show connections"
     },
     "view": {
       "title": "View",
@@ -3817,7 +3625,16 @@
       "comments": "Comments",
       "showResolvedComments": "Show resolved comments",
       "expandAll": "Expand all",
-      "collapseAll": "Collapse all"
+      "collapseAll": "Collapse all",
+      "neighbours": "Neighbours not in the case",
+      "tracing": "Tracing…",
+      "neighboursShown": "{{count}} shown",
+      "hopsOff": "Off",
+      "neighboursAutoHidden": "{{count}} neighbours are hidden to keep the board readable. Pick how far to show them.",
+      "neighboursHint": "Assets connected to the evidence, up to this many hops away.",
+      "connections": "Connections",
+      "connectionsHint": "Kinds of relation drawn on the board and followed to neighbours.",
+      "neighboursLimited": "Only the nearest neighbours are drawn: there are more. Right-click an asset and pick Show connections to follow all of its connections."
     },
     "palette": {
       "placeholder": "Search the board, add evidence, run an action…",
@@ -3839,13 +3656,29 @@
       "tidyUp": "Tidy up board",
       "addWithFilters": "Add evidence with filters…",
       "openHypotheses": "Open hypotheses",
-      "moreFilters": "Search “{{query}}” with filters…"
-    },
-    "path": {
-      "hops": "{{count}} hops",
-      "none": "No path between them on this board",
-      "clear": "Clear (Esc)",
-      "pickTarget": "Shift+click another item to find the path"
+      "moreFilters": "Search “{{query}}” with filters…",
+      "kinds": {
+        "evidence": "Evidence",
+        "finding": "Finding",
+        "hypothesis": "Hypothesis",
+        "note": "Note",
+        "frame": "Frame",
+        "comment": "Comment"
+      },
+      "scope": {
+        "all": "All",
+        "board": "Board",
+        "corpus": "Corpus",
+        "actions": "Actions"
+      },
+      "scopes": "Search in",
+      "jumpTo": "Jump to",
+      "hints": {
+        "move": "Move",
+        "open": "Open",
+        "scope": "Scope",
+        "close": "Close"
+      }
     },
     "focus": {
       "locked": "Focus locked",
@@ -3872,10 +3705,11 @@
         "fit": "Fit the board",
         "zoomSelection": "Zoom to the selection",
         "focusLock": "Focus lock",
-        "escape": "Clear selection, mode or path",
+        "escape": "Clear the selection or mode, then close the side panel",
         "selectAll": "Select all",
         "duplicate": "Duplicate note or frame",
-        "path": "Shift+click a second item: shortest path"
+        "open": "Open in the side panel",
+        "zoom": "Zoom (Space + drag pans)"
       },
       "visual": {
         "solid": "Amber line: a link someone drew on this board",
@@ -3943,14 +3777,8 @@
       "hypothesesHint": "Every hypothesis of the case, on the board or not.",
       "newHypothesis": "New hypothesis",
       "noHypotheses": "No hypotheses yet.",
-      "discussions": "Discussions"
-    },
-    "settings": {
-      "title": "Case board",
-      "description": "Open cases on the investigation board: evidence bubbles, links, hypotheses, notes and frames on one canvas. Off keeps the classic case graph.",
-      "enabled": "Case board is on for this workspace",
-      "disabled": "Cases open on the classic graph",
-      "preview": "Preview"
+      "discussions": "Discussions",
+      "connections": "Connections"
     },
     "toasts": {
       "linkCreated": "Linked",
@@ -3984,7 +3812,110 @@
       "add": "Add",
       "openFindings": "{{count}} open findings",
       "noOpenFindings": "no open findings",
-      "inAsset": "in {{name}}"
+      "inAsset": "in {{name}}",
+      "openFindingsOne": "1 open finding",
+      "bulk": "Pick many findings at once from the findings table"
+    },
+    "thread": {
+      "missing": "This thread no longer exists.",
+      "hypothesis": "Hypothesis",
+      "discussion": "Discussion",
+      "verdict": "Verdict",
+      "balance": "Balance of evidence",
+      "linkedCount": "{{count}} linked",
+      "noEvidence": "Nothing links to it yet: link evidence below.",
+      "noEvidenceHint": "No evidence linked. Pick a stance and link what bears on it.",
+      "tabs": {
+        "evidence": "Evidence",
+        "log": "Log",
+        "test": "Test"
+      },
+      "reasoningPlaceholder": "Record reasoning, a new observation, or why the verdict changed…",
+      "replyPlaceholder": "Reply to the discussion…",
+      "changeStance": "Change the stance",
+      "unlink": "Unlink",
+      "stance": "Stance",
+      "nothingToLink": "Everything on the board is linked",
+      "linkEvidence": "Link evidence or a finding…",
+      "searchEvidence": "Search the evidence on the board…",
+      "testHint": "What would you expect to find in the data if this is true, or false?",
+      "testPlaceholder": "e.g. Every invoice from this supplier carries the same IBAN.",
+      "noEntries": "No entries yet: the record starts with the first note.",
+      "entry": {
+        "NOTE": "Note",
+        "STATEMENT": "Restated",
+        "STATUS_CHANGE": "Verdict",
+        "CONFIDENCE_CHANGE": "Confidence",
+        "STATED": "Stated"
+      },
+      "send": "Send",
+      "more": "More",
+      "deleteHypothesis": "Delete hypothesis",
+      "deleteDiscussion": "Delete discussion",
+      "deleteTitle": "Delete this thread?",
+      "deleteBody": "Its notes, history and evidence links are removed. The evidence itself stays in the case.",
+      "delete": "Delete"
+    },
+    "connections": {
+      "hopsUp": "{{count}} hops upstream",
+      "hopsDown": "{{count}} hops downstream",
+      "hopsSide": "alongside, {{count}} hops away",
+      "add": "Add to case",
+      "addPath": "Add the route to it",
+      "traceFromHere": "Trace from here",
+      "empty": "Pick \"Show connections\" on an asset to trace it.",
+      "tracing": "Connections of",
+      "hops": "How far",
+      "follow": "Follow",
+      "none": "Nothing connects to it this way. Try more hops or more kinds.",
+      "count": "{{count}} connections",
+      "notInCase": "{{count}} not in the case",
+      "addAll": "Add {{count}}",
+      "addSide": "Add {{count}} connections",
+      "groups": {
+        "up": "Upstream",
+        "down": "Downstream",
+        "side": "Alongside"
+      },
+      "hopLabel": "Hop {{count}}",
+      "kinds": {
+        "lineage": "Lineage",
+        "links": "Links",
+        "duplicates": "Duplicates",
+        "similar": "Similar"
+      },
+      "kindHints": {
+        "lineage": "Where the data came from and where it went",
+        "links": "References, mentions, keys and use",
+        "duplicates": "The same content somewhere else",
+        "similar": "Content that overlaps (near neighbours)"
+      },
+      "inCase": "In case",
+      "upstream": "Upstream",
+      "both": "Both",
+      "downstream": "Downstream",
+      "direction": "Direction",
+      "limited": "Showing the first {{count}} connections: there are more.",
+      "limitedMax": "Showing {{count}} connections, the most one trace returns. Narrow it to see the rest: fewer hops, one direction, or fewer kinds.",
+      "showMore": "Show up to {{count}}",
+      "countOne": "1 connection",
+      "addSideOne": "Add 1 connection",
+      "hopsUpOne": "1 hop upstream",
+      "hopsDownOne": "1 hop downstream",
+      "hopsSideOne": "alongside, 1 hop away"
+    },
+    "hypothesesList": {
+      "count": "{{count}} hypotheses",
+      "ruled": "{{count}} with a verdict (supported or refuted)",
+      "emptyHint": "State what you think happened, then link the evidence that supports or contradicts it.",
+      "entries": "{{count}} entries",
+      "countOne": "1 hypothesis",
+      "entriesOne": "1 entry"
+    },
+    "caseFile": {
+      "noDescription": "No description yet.",
+      "edit": "Edit case…",
+      "autopilot": "Autopilot"
     }
   },
   "correlation": {

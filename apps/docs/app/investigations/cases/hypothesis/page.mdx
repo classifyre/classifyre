@@ -1,32 +1,56 @@
 ---
-title: Hypothesis & Threads
-description: Work a case like an analyst — propose competing explanations, link the evidence for and against each, and track where the truth is leaning.
+title: Hypotheses & threads
+description: Work a case like an analyst. Put competing explanations on the board, link the evidence for and against each, record your reasoning, and see where the truth is leaning.
 ---
 
-# Hypothesis & Threads
+import { Callout, Steps } from "nextra/components"
+import { CaseBoardDemo } from "@/components/case-board/board-demo"
+import { LineKey } from "@/components/case-board/board-key"
 
-Inside a case, **threads** are where the thinking happens. They come in two
-kinds: **hypotheses** — explanations you're testing — and **discussions** —
-free-form notes and debrief. A hypothesis is the heart of it: you state a theory,
-then let the evidence confirm or kill it.
+# Hypotheses & threads
 
-```mermaid
-graph TD
-    Thread["Thread<br/>Hypothesis or discussion"]
-    Entry["Entries<br/>statements & notes over time"]
-    Link["Support link<br/>supports / contradicts / neutral"]
-    Evidence["Evidence & findings"]
+A **hypothesis** is a statement of what you think happened: *"The supplier's
+bank details were changed by a fraudster."* You put it on the board, link the
+evidence that bears on it, and let that evidence confirm it or kill it. Running
+several hypotheses side by side keeps the investigation honest: you test the
+explanations against each other instead of falling for the first one.
 
-    Thread -- "records" --> Entry
-    Thread -- "weighs" --> Link
-    Link -- "points at" --> Evidence
-```
+Behind every hypothesis is a **thread**: its verdict, your confidence, the
+evidence for and against, and a running record of the reasoning.
+
+<CaseBoardDemo
+  scene="hypotheses"
+  height={460}
+  caption="Two competing hypotheses. Click a card to focus it: only its evidence stays lit. Click the empty canvas to show everything again. Point at a line to read the stance and the note that explains it."
+/>
 
 ---
 
-## How a hypothesis evolves
+## The hypothesis card
 
-A hypothesis starts as a proposal and moves as the evidence comes in:
+Each hypothesis appears on the board as a card:
+
+- **H1, H2, …** in the order they were created, with a **colour** of its own (the
+  strip on the card's left edge). The same colour marks the evidence that cites
+  it.
+- The **verdict** in the top corner: *Proposed*, *Supported*, *Refuted* or
+  *Inconclusive*.
+- The **statement** itself.
+- A **confidence** bar, once someone has set one.
+- The **tally** of linked evidence: ✓ supporting, ✗ contradicting, ○ neutral.
+- How many **entries** the thread has, and who wrote the last one and when.
+- **Open thread**, which opens the thread in the side panel. Double-clicking the
+  card does the same.
+
+On every asset a hypothesis cites, a small **dot in the hypothesis colour**
+appears above the circle. Contested evidence, cited by several hypotheses,
+carries several dots. Click a dot to focus that hypothesis.
+
+---
+
+## Verdict and confidence
+
+A hypothesis starts as *Proposed* and moves as the evidence comes in:
 
 ```mermaid
 stateDiagram-v2
@@ -43,50 +67,130 @@ stateDiagram-v2
 
 | Verdict | What it means |
 |---|---|
-| **Proposed** | Stated but not yet tested |
+| **Proposed** | Stated but not tested yet |
 | **Supported** | The evidence consistently backs it |
 | **Refuted** | The evidence consistently contradicts it |
-| **Inconclusive** | The evidence is mixed or insufficient |
+| **Inconclusive** | The evidence is mixed or not enough |
 
-Because you can run several hypotheses side by side, a case becomes a set of
-competing explanations — and the evidence shows which one is winning.
+**Confidence** is separate from the verdict, on purpose. The verdict records
+*what the evidence says*; confidence records *how sure you are*. You can have a
+supported hypothesis you are only moderately sure of, or a refuted one you are
+very sure is wrong.
 
 ---
 
 ## Linking evidence: for and against
 
-The power of a hypothesis comes from connecting it to evidence with a clear
-**stance**:
+A stance joins a hypothesis to a piece of evidence, or to a single finding:
 
-| Stance | Meaning |
+<LineKey only="stances" />
+
+Ways to set one:
+
+- **Drag** from the card to an asset or finding. When you drop, pick
+  **Supports**, **Contradicts** or **Neutral**.
+- **Right-click** evidence → **Add to hypothesis**: pick the hypothesis and the
+  stance. Select several things first to link them all at once.
+- In the thread, on the **Evidence** tab, use **Link evidence or a finding…**.
+
+A stance can also carry a **note** saying why, such as *"Look-alike domain:
+agency-ltd.co"*, and a confidence of its own; Autopilot adds them when it links
+evidence. Point at a stance line to read them. Record your own reasoning in
+the hypothesis's thread.
+
+---
+
+## Focus
+
+**Click a card** to focus it: the hypothesis, its stance lines and the evidence
+they point to stay lit, and everything else fades. It is the fastest way to ask
+"what exactly is this theory built on?"
+
+- Click the card again, click the empty canvas, or press `Esc` to show
+  everything again.
+- Press `.` to **lock the focus**. While locked, clicking around the board no
+  longer clears it. A banner says **Focus locked**; press `.` again to unlock.
+
+---
+
+## The thread
+
+Open a thread with **Open thread**, a double-click on the card, or from the
+**Hypotheses** panel. It opens in the side panel:
+
+| Part | What you do there |
 |---|---|
-| **Supports** | This evidence backs the hypothesis |
-| **Contradicts** | This evidence argues against it |
-| **Neutral** | Relevant context, but not pointing either way |
+| **Statement** | Reword the hypothesis as your understanding sharpens. The old wording stays in the log as *Restated* |
+| **Verdict** | Set *Proposed*, *Supported*, *Refuted* or *Inconclusive* with one click |
+| **Confidence** | Drag the slider to how sure you are |
+| **Balance of evidence** | A bar showing supporting against contradicting evidence, and how much is linked |
+| **Evidence** tab | Everything linked to the hypothesis, supporting evidence first. Change a stance from its chip, unlink it, or link more |
+| **Log** tab | The complete history: when it was stated, restated, when the verdict or confidence changed, and every note, each with who and when |
+| **Test** tab | Write down what you would expect to find in the data if the hypothesis is true, or false. For example: *"Every invoice from this supplier carries the same IBAN."* |
+| **Note box** | At the bottom: record reasoning, a new observation, or why the verdict changed |
 
-Each hypothesis shows a running **for / against** count, so at a glance you can
-see how strongly the evidence leans — and which theory is holding up.
+The thread's **⋯** menu can show the card on the board (or place it, if it is not
+on the board yet), focus it, change its colour, or delete the hypothesis.
+Deleting removes its notes, history and evidence links; the evidence itself
+stays in the case.
+
+<Callout type="info">
+Verdict and confidence change through entries in the thread, never silently.
+That keeps the log a complete, trustworthy line of reasoning that anyone can
+follow later. It also shows which steps a teammate took and which
+[Autopilot](/investigations/autopilot/) took.
+</Callout>
 
 ---
 
-## Confidence
+## Creating a hypothesis
 
-Alongside the verdict, you can set a **confidence** level — your own certainty in
-the hypothesis. It's deliberately separate from the verdict: you might have a
-*supported* hypothesis you're only moderately sure of, or a *refuted* one you're
-very confident is wrong. Verdict captures *what the evidence says*; confidence
-captures *how sure you are*.
+<Steps>
+
+### Place it
+
+Use any of these:
+
+- Press `T` (the **Hypothesis** tool) and click on the board.
+- Right-click the empty canvas → **Add hypothesis here**.
+- Press `⌘K` and choose **New hypothesis**.
+- In the **Hypotheses** panel, click **New hypothesis**.
+
+### State it
+
+Type the statement and press `Enter`.
+
+### Start from the evidence (optional)
+
+Select one or more pieces of evidence first, then right-click → **New
+hypothesis from selection**. The new hypothesis starts with the selection
+linked as supporting evidence.
+
+</Steps>
 
 ---
 
-## A record of the reasoning
+## The Hypotheses panel
 
-Every thread keeps a running history — the statements added, the verdict and
-confidence changes, and the notes along the way. That makes a hypothesis not just
-a conclusion but a **transparent line of reasoning** anyone can follow later,
-including which steps were taken by a teammate and which by
-[Autopilot](/investigations/autopilot/).
+The **Hypotheses** panel (the flask icon on the right) lists every hypothesis of
+the case, on the board or not. For each one it shows the verdict, the
+confidence, the balance of evidence and how many entries its thread has, and it
+counts how many already have a verdict. Click one to open its thread. A
+hypothesis that is not on the board can be placed from here.
 
-> Hypotheses and their evidence links are also drawn on the
-> [knowledge graph](/investigations/cases/graph/), so you can *see* which
-> evidence supports which theory.
+Removing a card from the board (right-click → **Remove card from board**) does
+**not** delete the hypothesis: it stays in the panel with its whole history, and
+you can place it again at any time.
+
+Right-clicking a card also offers **Edit statement**, **Focus**, **Change
+colour** and **Comment**.
+
+---
+
+## Discussions
+
+Not every thread is a hypothesis. **Discussions** are free-form conversations:
+debriefs, questions and hand-over notes. A discussion starts from a comment
+pinned on the board (see [Notes, frames & comments](/investigations/cases/organise/#comments)),
+and everyone can reply. The **Timeline** panel's *Threads* tab lists every
+thread, with **Show on board** or **Place on board**.

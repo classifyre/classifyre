@@ -423,7 +423,10 @@ export class BoardTraceRequestDto {
   })
   assetIds!: string[];
 
-  @ApiPropertyOptional({ enum: BoardTraceDirection, enumName: 'BoardTraceDirection' })
+  @ApiPropertyOptional({
+    enum: BoardTraceDirection,
+    enumName: 'BoardTraceDirection',
+  })
   direction?: BoardTraceDirection;
 
   @ApiPropertyOptional({
@@ -453,20 +456,31 @@ export class BoardTraceNodeDto {
   @ApiProperty() id!: string;
   @ApiProperty({ description: "'asset' or 'external'" }) type!: string;
   @ApiProperty() label!: string;
-  @ApiPropertyOptional({ type: String, nullable: true }) assetType!: string | null;
-  @ApiPropertyOptional({ type: String, nullable: true }) sourceType!: string | null;
-  @ApiPropertyOptional({ type: String, nullable: true }) sourceName!: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) assetType!:
+    | string
+    | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) sourceType!:
+    | string
+    | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) sourceName!:
+    | string
+    | null;
   @ApiPropertyOptional({ type: String, nullable: true }) status!: string | null;
   @ApiProperty() missing!: boolean;
   @ApiProperty({ description: 'Hops from the nearest seed' }) depth!: number;
-  @ApiProperty({ enum: BoardTraceSide, enumName: 'BoardTraceSide' }) side!: BoardTraceSide;
+  @ApiProperty({ enum: BoardTraceSide, enumName: 'BoardTraceSide' })
+  side!: BoardTraceSide;
   @ApiPropertyOptional({
     type: String,
     nullable: true,
     description: 'The node this one was first reached from',
   })
   via!: string | null;
-  @ApiPropertyOptional({ enum: BoardTraceKind, enumName: 'BoardTraceKind', nullable: true })
+  @ApiPropertyOptional({
+    enum: BoardTraceKind,
+    enumName: 'BoardTraceKind',
+    nullable: true,
+  })
   viaKind!: BoardTraceKind | null;
 }
 
@@ -477,9 +491,14 @@ export class BoardTraceEdgeDto {
   @ApiProperty() toType!: string;
   @ApiProperty() toId!: string;
   @ApiProperty() relationType!: string;
-  @ApiPropertyOptional({ type: String, nullable: true }) relationClass!: string | null;
-  @ApiProperty({ enum: BoardTraceKind, enumName: 'BoardTraceKind' }) kind!: BoardTraceKind;
-  @ApiPropertyOptional({ type: Number, nullable: true }) confidence!: number | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) relationClass!:
+    | string
+    | null;
+  @ApiProperty({ enum: BoardTraceKind, enumName: 'BoardTraceKind' })
+  kind!: BoardTraceKind;
+  @ApiPropertyOptional({ type: Number, nullable: true }) confidence!:
+    | number
+    | null;
 }
 
 export class BoardTraceResponseDto {

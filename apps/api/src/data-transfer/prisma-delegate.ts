@@ -15,6 +15,7 @@ export interface TransferDelegate {
   createMany(args: unknown): Promise<{ count: number }>;
   create(args: unknown): Promise<unknown>;
   upsert(args: unknown): Promise<unknown>;
+  update(args: unknown): Promise<unknown>;
 }
 
 export function modelDelegate(
