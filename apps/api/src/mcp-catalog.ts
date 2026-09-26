@@ -163,12 +163,15 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'create_case_thread',
       'add_case_thread_entry',
       'link_case_thread_support',
+      'get_case_board',
+      'apply_case_board_ops',
     ],
     operations: [
       'Attach evidence and findings to a case',
       "Pull a saved question's current matches into a case",
       'Track hypotheses and discussion threads with supporting/contradicting links',
       'Close and reopen cases, archiving or reactivating linked questions',
+      'Read and arrange the case board: notes, frames, links between findings, stances',
     ],
   },
   {

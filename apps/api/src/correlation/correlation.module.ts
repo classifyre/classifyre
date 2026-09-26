@@ -5,6 +5,7 @@ import { GraphService } from '../graph.service';
 import { CaseActivityService } from '../case-activity.service';
 import { InquiryActivityService } from '../inquiry-activity.service';
 import { CasesService } from '../cases.service';
+import { CaseBoardReadService } from '../case-board/case-board-read.service';
 import { InquiriesService } from '../inquiries.service';
 import { AgentMemoryService } from '../autopilot/memory/agent-memory.service';
 import { AgentAuditService } from '../autopilot/audit/agent-audit.service';
@@ -37,6 +38,8 @@ import { SourceGraphModule } from '../stats/source-graph.module';
     CaseActivityService,
     InquiryActivityService,
     AgentMemoryService,
+    // A case closed by an agent is snapshotted like one closed by a person.
+    CaseBoardReadService,
     CasesService,
     InquiriesService,
     AgentAuditService,

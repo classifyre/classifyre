@@ -78,7 +78,7 @@ graph TD
     Evidence["Evidence<br/>Snapshotted assets attached to a case"]
     CaseFinding["Case Finding<br/>A finding pulled into evidence"]
     Thread["Thread<br/>Hypothesis or discussion"]
-    Graph["Graph<br/>Entity-relationship knowledge graph"]
+    Board["Case board<br/>Evidence, hypotheses & relations on one canvas"]
 
     Findings -- "matched by" --> Inquiry
     Findings -- "correlated by" --> FP
@@ -87,7 +87,7 @@ graph TD
     Case -- "contains" --> Evidence
     Evidence -- "has" --> CaseFinding
     CaseFinding -- "linked to" --> Thread
-    Case -- "explored via" --> Graph
+    Case -- "worked on" --> Board
     Thread -- "linked to" --> CaseFinding
 ```
 
@@ -121,8 +121,9 @@ stateDiagram-v2
   inquiries keep it fed with fresh matches.
 - **Evidence & threads** — Snapshotted assets with their findings, and
   hypothesis threads that link to the evidence supporting or contradicting them.
-- **Graph** — A knowledge graph visualising entities, relationships, and evidence
-  across the whole investigation.
+- **[Case board](/investigations/cases/board/)** — The canvas every case opens
+  on: evidence, findings, hypotheses and notes, the relations between them, and
+  what else is connected but not in the case yet.
 
 ---
 

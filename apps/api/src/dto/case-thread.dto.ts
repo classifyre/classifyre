@@ -55,6 +55,16 @@ export class CreateThreadDto {
   @MaxLength(2000)
   testablePredicate?: string | null;
 
+  @ApiPropertyOptional({
+    description:
+      'Display colour (hypothesis cards and chips on the case board)',
+    maxLength: 32,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  color?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

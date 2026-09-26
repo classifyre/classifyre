@@ -20,6 +20,8 @@ import type {
   BulkIngestAssetsDto,
   FinalizeIngestRunDto,
   LiveQueryResponseDto,
+  QuickSearchRequestDto,
+  QuickSearchResponseDto,
   ReferencingFindingsResponseDto,
   SearchAssetsChartsRequestDto,
   SearchAssetsChartsResponseDto,
@@ -43,6 +45,10 @@ import {
     FinalizeIngestRunDtoToJSON,
     LiveQueryResponseDtoFromJSON,
     LiveQueryResponseDtoToJSON,
+    QuickSearchRequestDtoFromJSON,
+    QuickSearchRequestDtoToJSON,
+    QuickSearchResponseDtoFromJSON,
+    QuickSearchResponseDtoToJSON,
     ReferencingFindingsResponseDtoFromJSON,
     ReferencingFindingsResponseDtoToJSON,
     SearchAssetsChartsRequestDtoFromJSON,
@@ -128,6 +134,10 @@ export interface SearchAssetsControllerQueryFindingsRequest {
     includeResolved?: boolean;
     limit?: string;
     cursor?: string;
+}
+
+export interface SearchAssetsControllerQuickSearchRequest {
+    quickSearchRequestDto: QuickSearchRequestDto;
 }
 
 export interface SearchAssetsControllerSearchAssetsRequest {
@@ -546,6 +556,47 @@ export class AssetsApi extends runtime.BaseAPI {
      */
     async searchAssetsControllerQueryFindings(requestParameters: SearchAssetsControllerQueryFindingsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LiveQueryResponseDto> {
         const response = await this.searchAssetsControllerQueryFindingsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * A few assets (by name) and findings (by content, whole words and their prefixes) for pickers and palettes. Bounded and cheap on large workspaces: no totals, a per-query time budget, and `truncated` when that budget ran out.
+     * Search as you type
+     */
+    async searchAssetsControllerQuickSearchRaw(requestParameters: SearchAssetsControllerQuickSearchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<QuickSearchResponseDto>> {
+        if (requestParameters['quickSearchRequestDto'] == null) {
+            throw new runtime.RequiredError(
+                'quickSearchRequestDto',
+                'Required parameter "quickSearchRequestDto" was null or undefined when calling searchAssetsControllerQuickSearch().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/search/quick`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: QuickSearchRequestDtoToJSON(requestParameters['quickSearchRequestDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => QuickSearchResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * A few assets (by name) and findings (by content, whole words and their prefixes) for pickers and palettes. Bounded and cheap on large workspaces: no totals, a per-query time budget, and `truncated` when that budget ran out.
+     * Search as you type
+     */
+    async searchAssetsControllerQuickSearch(requestParameters: SearchAssetsControllerQuickSearchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<QuickSearchResponseDto> {
+        const response = await this.searchAssetsControllerQuickSearchRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

@@ -65,6 +65,7 @@ All URIs are relative to *http://localhost*
 *AssetsApi* | [**searchAssetsControllerExportFindings**](docs/AssetsApi.md#searchassetscontrollerexportfindings) | **GET** /search/findings/export | Export findings as CSV
 *AssetsApi* | [**searchAssetsControllerQueryAssets**](docs/AssetsApi.md#searchassetscontrollerqueryassets) | **GET** /search/assets/query | Query assets with findings (cursor-paginated JSON)
 *AssetsApi* | [**searchAssetsControllerQueryFindings**](docs/AssetsApi.md#searchassetscontrollerqueryfindings) | **GET** /search/findings/query | Query findings (cursor-paginated JSON)
+*AssetsApi* | [**searchAssetsControllerQuickSearch**](docs/AssetsApi.md#searchassetscontrollerquicksearch) | **POST** /search/quick | Search as you type
 *AssetsApi* | [**searchAssetsControllerSearchAssets**](docs/AssetsApi.md#searchassetscontrollersearchassets) | **POST** /search/assets | Search assets with findings
 *AssetsApi* | [**searchAssetsControllerSearchAssetsCharts**](docs/AssetsApi.md#searchassetscontrollersearchassetscharts) | **POST** /search/assets/charts | Search assets charts overview
 *AssetsApi* | [**searchAssetsControllerSearchFindings**](docs/AssetsApi.md#searchassetscontrollersearchfindings) | **POST** /search/findings | Search findings
@@ -113,6 +114,13 @@ All URIs are relative to *http://localhost*
 *AutopilotApi* | [**supervisorControllerUpdate**](docs/AutopilotApi.md#supervisorcontrollerupdate) | **PATCH** /autopilot/supervisor | Enable, pause, or re-budget the supervisor
 *AutopilotApi* | [**supervisorControllerUpdateGoal**](docs/AutopilotApi.md#supervisorcontrollerupdategoal) | **PATCH** /autopilot/supervisor/goals/{id} | Edit a goal
 *AutopilotApi* | [**supervisorControllerWake**](docs/AutopilotApi.md#supervisorcontrollerwake) | **POST** /autopilot/supervisor/wake | Wake the supervisor now
+*CaseBoardApi* | [**caseBoardControllerApplyOps**](docs/CaseBoardApi.md#caseboardcontrollerapplyops) | **POST** /cases/{id}/board/ops | Apply a batch of board ops in one transaction; refused ops are reported per op
+*CaseBoardApi* | [**caseBoardControllerGet**](docs/CaseBoardApi.md#caseboardcontrollerget) | **GET** /cases/{id}/board | The case board: items, links, evidence, the live graph layer, stances and thread summaries
+*CaseBoardApi* | [**caseBoardControllerGetSnapshot**](docs/CaseBoardApi.md#caseboardcontrollergetsnapshot) | **GET** /cases/{id}/board/snapshots/{snapshotId} | One board snapshot, exactly as it was captured
+*CaseBoardApi* | [**caseBoardControllerListSnapshots**](docs/CaseBoardApi.md#caseboardcontrollerlistsnapshots) | **GET** /cases/{id}/board/snapshots | Board snapshots, newest first
+*CaseBoardApi* | [**caseBoardControllerNeighbours**](docs/CaseBoardApi.md#caseboardcontrollerneighbours) | **POST** /cases/{id}/board/neighbours | Live depth-1 neighbourhood of one evidence bubble (drawn as suggested items)
+*CaseBoardApi* | [**caseBoardControllerTakeSnapshot**](docs/CaseBoardApi.md#caseboardcontrollertakesnapshot) | **POST** /cases/{id}/board/snapshots | Capture the board as it is now
+*CaseBoardApi* | [**caseBoardControllerTrace**](docs/CaseBoardApi.md#caseboardcontrollertrace) | **POST** /cases/{id}/board/trace | Trace assets\&#39; connections: upstream, downstream and sideways through lineage, links, duplicates and similarity
 *CasesApi* | [**caseEventsControllerCreate**](docs/CasesApi.md#caseeventscontrollercreate) | **POST** /cases/{caseId}/events | Add a dated event to the case chronology
 *CasesApi* | [**caseEventsControllerList**](docs/CasesApi.md#caseeventscontrollerlist) | **GET** /cases/{caseId}/events | List the case chronology (real-world events, ordered by date)
 *CasesApi* | [**caseEventsControllerRemove**](docs/CasesApi.md#caseeventscontrollerremove) | **DELETE** /cases/{caseId}/events/{eventId} | Remove a chronology event
@@ -390,6 +398,9 @@ All URIs are relative to *http://localhost*
 - [AiProviderConfigResponseDto](docs/AiProviderConfigResponseDto.md)
 - [AiProviderConfigTestResultDto](docs/AiProviderConfigTestResultDto.md)
 - [AnnotateJournalDto](docs/AnnotateJournalDto.md)
+- [AppliedBoardOpDto](docs/AppliedBoardOpDto.md)
+- [ApplyBoardOpsDto](docs/ApplyBoardOpsDto.md)
+- [ApplyBoardOpsResponseDto](docs/ApplyBoardOpsResponseDto.md)
 - [ArchivePreviewDto](docs/ArchivePreviewDto.md)
 - [AssetChunkDto](docs/AssetChunkDto.md)
 - [AssetFindingDetectorCountDto](docs/AssetFindingDetectorCountDto.md)
@@ -412,6 +423,20 @@ All URIs are relative to *http://localhost*
 - [AttachFindingsDto](docs/AttachFindingsDto.md)
 - [AttachFindingsResponseDto](docs/AttachFindingsResponseDto.md)
 - [AutopilotStatsDto](docs/AutopilotStatsDto.md)
+- [BoardEndpointDto](docs/BoardEndpointDto.md)
+- [BoardItemDto](docs/BoardItemDto.md)
+- [BoardLinkCertainty](docs/BoardLinkCertainty.md)
+- [BoardLinkDto](docs/BoardLinkDto.md)
+- [BoardNeighboursDto](docs/BoardNeighboursDto.md)
+- [BoardSupportDto](docs/BoardSupportDto.md)
+- [BoardThreadSummaryDto](docs/BoardThreadSummaryDto.md)
+- [BoardTraceDirection](docs/BoardTraceDirection.md)
+- [BoardTraceEdgeDto](docs/BoardTraceEdgeDto.md)
+- [BoardTraceKind](docs/BoardTraceKind.md)
+- [BoardTraceNodeDto](docs/BoardTraceNodeDto.md)
+- [BoardTraceRequestDto](docs/BoardTraceRequestDto.md)
+- [BoardTraceResponseDto](docs/BoardTraceResponseDto.md)
+- [BoardTraceSide](docs/BoardTraceSide.md)
 - [BoilerplateClusterDto](docs/BoilerplateClusterDto.md)
 - [BriefMemoryEntryDto](docs/BriefMemoryEntryDto.md)
 - [BriefSetupItemDto](docs/BriefSetupItemDto.md)
@@ -442,6 +467,11 @@ All URIs are relative to *http://localhost*
 - [CaseActionRequestDto](docs/CaseActionRequestDto.md)
 - [CaseActionResponseDto](docs/CaseActionResponseDto.md)
 - [CaseActivityDto](docs/CaseActivityDto.md)
+- [CaseBoardItemKind](docs/CaseBoardItemKind.md)
+- [CaseBoardMetaDto](docs/CaseBoardMetaDto.md)
+- [CaseBoardResponseDto](docs/CaseBoardResponseDto.md)
+- [CaseBoardSnapshotDto](docs/CaseBoardSnapshotDto.md)
+- [CaseBoardSnapshotSummaryDto](docs/CaseBoardSnapshotSummaryDto.md)
 - [CaseEventDto](docs/CaseEventDto.md)
 - [CaseEvidenceDto](docs/CaseEvidenceDto.md)
 - [CaseFindingDto](docs/CaseFindingDto.md)
@@ -449,6 +479,7 @@ All URIs are relative to *http://localhost*
 - [CaseLinkedInquiryDto](docs/CaseLinkedInquiryDto.md)
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
 - [CaseResponseDto](docs/CaseResponseDto.md)
+- [CaseThreadKind](docs/CaseThreadKind.md)
 - [CaseTimelineResponseDto](docs/CaseTimelineResponseDto.md)
 - [CaseworkCaseDto](docs/CaseworkCaseDto.md)
 - [CaseworkCaseStatusBreakdownDto](docs/CaseworkCaseStatusBreakdownDto.md)
@@ -531,6 +562,7 @@ All URIs are relative to *http://localhost*
 - [EmbeddingStatsDto](docs/EmbeddingStatsDto.md)
 - [EmbeddingStatusResponseDto](docs/EmbeddingStatusResponseDto.md)
 - [EvidenceEntityDto](docs/EvidenceEntityDto.md)
+- [EvidenceStance](docs/EvidenceStance.md)
 - [ExclusionRuleDto](docs/ExclusionRuleDto.md)
 - [ExpandGraphDto](docs/ExpandGraphDto.md)
 - [FieldMappingDto](docs/FieldMappingDto.md)
@@ -567,6 +599,7 @@ All URIs are relative to *http://localhost*
 - [HarnessToolDto](docs/HarnessToolDto.md)
 - [HarnessToolsResponseDto](docs/HarnessToolsResponseDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
+- [HypothesisStatus](docs/HypothesisStatus.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
 - [InquiryActivityDto](docs/InquiryActivityDto.md)
 - [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
@@ -626,6 +659,11 @@ All URIs are relative to *http://localhost*
 - [PurgeQueuedJobsResponseDto](docs/PurgeQueuedJobsResponseDto.md)
 - [PurgeSourceAssetsResponseDto](docs/PurgeSourceAssetsResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
+- [QuickSearchAssetDto](docs/QuickSearchAssetDto.md)
+- [QuickSearchFindingDto](docs/QuickSearchFindingDto.md)
+- [QuickSearchRequestDto](docs/QuickSearchRequestDto.md)
+- [QuickSearchResponseDto](docs/QuickSearchResponseDto.md)
+- [QuickSearchSeverityCountsDto](docs/QuickSearchSeverityCountsDto.md)
 - [RebuildEdgesResponseDto](docs/RebuildEdgesResponseDto.md)
 - [RebuildIndexResponseDto](docs/RebuildIndexResponseDto.md)
 - [RecomputeCorrelationResponseDto](docs/RecomputeCorrelationResponseDto.md)
@@ -637,6 +675,7 @@ All URIs are relative to *http://localhost*
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
 - [RejectCauseDto](docs/RejectCauseDto.md)
 - [RejectCauseLabelDto](docs/RejectCauseLabelDto.md)
+- [RejectedBoardOpDto](docs/RejectedBoardOpDto.md)
 - [RelationTypeDto](docs/RelationTypeDto.md)
 - [RelationTypesResponseDto](docs/RelationTypesResponseDto.md)
 - [RematchResponseDto](docs/RematchResponseDto.md)

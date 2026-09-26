@@ -1,0 +1,206 @@
+---
+title: The case board
+description: A tour of the case board, the screen where you work a case. It covers the top bar, the canvas, the tool dock, the zoom controls and the side panels.
+---
+
+import { Callout, Steps } from "nextra/components"
+import { CaseBoardDemo } from "@/components/case-board/board-demo"
+import { PanelRail, ToolDock } from "@/components/case-board/board-key"
+
+# The case board
+
+The case board is the screen every case opens on. Think of it as the wall of an
+incident room: you pin up the evidence, write your theories next to it, draw
+lines between the things that belong together, and step back to see the
+picture. Unlike a wall, the board also knows how your data is connected, so it
+can show you what you have not pinned up yet.
+
+The screen has six parts:
+
+| Part | Where | What it is for |
+|---|---|---|
+| **Top bar** | Along the top | The case's name, status and severity; counters that light things up; search |
+| **Canvas** | The middle | The board itself: evidence, findings, hypotheses, notes and the lines between them |
+| **View** | Bottom left | What the board shows: neighbours, kinds of relation, settled findings, highlights |
+| **Tool dock** | Bottom centre | The tools you work with: select, pan, note, frame, hypothesis, comment, link |
+| **Zoom controls** | Bottom right | Zoom, fit, zoom to the selection, and the mini-map |
+| **Side panels** | The right edge | Details, hypotheses, adding evidence, the timeline, the case file and more |
+
+---
+
+## The top bar
+
+From left to right:
+
+- **The case's name**, with its **status** (open, in progress, closed) and its
+  **severity**. Rename or edit the case from the **More** menu (**Edit case…**).
+- **What's on the board**: three counters for **evidence**, **findings** and
+  **hypotheses**. Click one to **spotlight** everything of that kind: it lights
+  up and the rest fades, and the view zooms to fit it. Click it again, or press
+  `Esc`, to show everything again.
+- **Search**: the wide box in the middle. Click it or press `⌘K` (`Ctrl K` on
+  Windows) to search the board, find assets and findings anywhere in your data
+  and add them, or run an action. See [the search](/investigations/cases/navigate/#search-and-actions-k).
+- **Who else is here**: the initials of anyone else with the board open. Click
+  your own to set the name your notes, links and timeline entries carry.
+- **More**: edit the case, run Autopilot, **tidy up** the board, **export** it
+  as an image, open or take **board snapshots**, open the **shortcuts and visual
+  key**, and **close the case**.
+
+<Callout type="info">
+The counters are the quickest way to check the case at a glance. Lighting up
+**Findings**, for example, shows every finding in the case at once, however
+spread out the board is.
+</Callout>
+
+<CaseBoardDemo
+  scene="spotlight"
+  height={420}
+  caption="The Findings spotlight: every finding in the case is lit and everything else fades. Frames stay visible as context."
+/>
+
+---
+
+## The canvas
+
+The canvas is where the case lives. Everything on it keeps the place you gave
+it, for everyone who opens the case. What you will see there:
+
+- **Evidence**: circles with a kind icon and a lime ring. The name is written
+  underneath. See [Evidence & findings](/investigations/cases/evidence/).
+- **Findings**: small coloured circles around their asset, joined to it by a
+  thin "contains" line.
+- **Lines** between things, with what they mean written along them. See
+  [Lines & links](/investigations/cases/links/).
+- **Hypothesis cards**: your theories, with their verdict and the evidence for
+  and against. See [Hypotheses & threads](/investigations/cases/hypothesis/).
+- **Notes, frames and comment pins**. See
+  [Notes, frames & comments](/investigations/cases/organise/).
+- **Suggested neighbours** and **connections**: assets connected to your
+  evidence that are not in the case yet. See
+  [Connections & neighbours](/investigations/cases/connections/).
+
+Clicking something **selects** it: it gets a glowing ring, and everything that
+is not connected to it fades, so you see its neighbourhood at once.
+**Double-clicking** opens it in the side panel: an asset or a finding opens its
+details, a hypothesis opens its thread.
+
+**Right-click** anything, or the empty canvas, for everything you can do with it
+in that spot. That covers opening it, linking from it, showing its connections,
+highlighting it, moving it into a frame, and removing it from the case.
+
+---
+
+## The tool dock
+
+<ToolDock />
+
+| Tool | Key | What it does |
+|---|---|---|
+| **Select** | `V` | Click to select, drag to move, drag on empty canvas to select everything in a box |
+| **Pan** | `H`, or hold `Space` | Drag anywhere to move around the board without selecting or moving anything |
+| **Note** | `N` | Click on the board to place a sticky note |
+| **Frame** | `F` | Drag to draw a frame: a named, coloured group |
+| **Hypothesis** | `T` | Click on the board to place a new hypothesis card |
+| **Comment** | `C` | Click to pin a comment and start a conversation on that spot |
+| **Link** | `L` | Drag from one thing to another to link them. Every node becomes a place to start a link |
+| **Undo / Redo** | `⌘Z` / `⇧⌘Z` | Step back and forward through your changes. The tooltip names the change |
+
+When a case is closed, the tools that change the board are switched off; select
+and pan still work.
+
+---
+
+## The View menu
+
+**View**, at the bottom left, decides what the board draws. Nothing you switch
+off here is deleted: it only stops being drawn, or fades.
+
+| Section | What it controls |
+|---|---|
+| **Neighbours not in the case** | How far out to draw [suggested neighbours](/investigations/cases/connections/#suggested-neighbours): **Off**, **1**, **2** or **3** hops, or **∞** for as far as the connections go. Shows how many are drawn |
+| **Connections** | Which kinds of relation are drawn and followed to neighbours: **Lineage**, **Links**, **Duplicates**, **Similar** |
+| **Findings** | **Show resolved**, **Show dismissed** and **Show gone / deleted**. Turned off, those findings fade rather than disappear |
+| **Highlight by** | Light up everything from one **source**, one **detector** or one **hypothesis**, or show **only highlighted** items |
+| **Comments** | **Show resolved comments** too |
+| **Expand all / Collapse all** | Unfold or fold the findings of every asset at once |
+
+---
+
+## Zoom controls and the mini-map
+
+At the bottom right sit **zoom out**, **zoom in**, **fit the board** (`⇧1`),
+**zoom to the selection** (`⇧2`) and the **mini-map**. The mini-map is a small
+overview of the whole board with a frame showing where you are; drag the frame
+to jump. How much the board shows at each zoom is explained in
+[Navigating & shortcuts](/investigations/cases/navigate/#zoom-levels).
+
+---
+
+## The side panels
+
+<PanelRail />
+
+The rail on the right opens one panel at a time next to the board. Click an icon
+to open its panel and click it again to close it. The last icon hides or shows
+the panel you had open. `Esc` closes it too.
+
+| Panel | What you find there |
+|---|---|
+| **Details** | The asset or finding you selected: its source, its findings (with **Attach** for those not in the case), **Open asset**, **Open finding** and **Show connections** |
+| **Hypotheses** | Every hypothesis of the case, on the board or not, with its verdict, confidence and balance of evidence. Click one to open its thread |
+| **Add evidence** | Search for assets and findings to add. Click one to drop it in the middle of your view, or drag it onto the board |
+| **Evidence** | The case's evidence as a table, with notes on each asset and finding. Click a row to fly to it on the board |
+| **Leads** | Findings suggested for this case, from [Autopilot](/investigations/autopilot/), the linked inquiries and look-alike content. **Accept** one to add it as evidence, **dismiss** it, or drag it onto the board where you want it. **Generate leads** asks for fresh ones. A badge counts the ones waiting |
+| **Watches** | The inquiries that feed this case with new matches. Link or unlink them here. A badge counts new matches |
+| **Timeline** | Three tabs. *Activity* is everything done on the case. *Chronology* is the story you reconstruct: real-world events in the order they happened, which you add, date and mark as verified. *Threads* lists every discussion, with **Show on board** or **Place on board** |
+| **Case file** | The description (**Edit case…**), the AI mode and Autopilot, the **conclusion** (save a draft any time), and **Close case** |
+| **Board snapshots** | Saved pictures of the board: one is taken when the case closes, and you can take one any time. Open one to see the board exactly as it was, read-only |
+
+Hypothesis threads and **Show connections** open in the same place, from the
+board itself.
+
+At the foot of the rail, a small mark says whether your changes are saved: a
+tick once everything is saved, a spinner while saving, and a warning if a save
+failed. The board retries on its own.
+
+---
+
+## Working together
+
+The board is shared. Several people can work on it at once:
+
+- Changes from others appear as they happen, and something new that arrives
+  from a watch is marked **NEW**.
+- The initials in the top bar show who else is looking at the board.
+- If two people edit the same note at the same moment, the second save is
+  refused rather than overwriting the first. The board says who changed it and
+  copies your text to the clipboard, so nothing is lost.
+- Every change is recorded in the [timeline](/investigations/cases/timeline/)
+  under the name of whoever made it, a teammate or Autopilot.
+
+---
+
+## Tidy up, export and snapshots
+
+<Steps>
+
+### Tidy up
+
+**More → Tidy up board** arranges the board for you. Things that are joined are
+laid out from left to right along their lines, groups that are not connected
+sit side by side, and findings you dragged away go back around their asset. It
+is one step, so **Undo** puts everything back where it was.
+
+### Export
+
+**More → Export PNG** saves the board as an image, ready for a report or a
+hand-over.
+
+### Snapshots
+
+**More → Take snapshot** keeps the board exactly as it is now. Open old
+snapshots from the **Board snapshots** panel. A snapshot is read-only; **Back to
+the live board** returns to the current one.
+
+</Steps>

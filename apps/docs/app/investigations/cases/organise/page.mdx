@@ -1,0 +1,122 @@
+---
+title: Notes, frames & comments
+description: Keep a case board readable and talk about it. Sticky notes, frames that group things, comment conversations, highlight colours and tidy-up.
+---
+
+import { Callout } from "nextra/components"
+import { CaseBoardDemo } from "@/components/case-board/board-demo"
+
+# Notes, frames & comments
+
+Evidence and hypotheses are the substance of a case. Notes, frames, comments and
+highlights are how you **organise** it: what to do next, which things belong
+together, what a colleague should look at, and the story in the order it
+happened.
+
+<CaseBoardDemo
+  scene="organise"
+  height={460}
+  caption="A blue frame groups the events of one day in order (drag the frame by its title: everything inside moves with it). Three sticky notes hold questions, facts and a warning, the first piece of evidence is highlighted in yellow, and a collapsed frame keeps background material out of the way."
+/>
+
+---
+
+## Sticky notes
+
+A note is free text on the board: a question, a fact you confirmed by phone, a
+to-do, a warning.
+
+- **Place one**: press `N` and click on the board, right-click the canvas →
+  **Add note here**, or press `⌘K` → **New note**.
+- **Write**: double-click the note. **Markdown works**: `**bold**`, lists,
+  headings and links. Press `Esc` or click outside to save.
+- **Colour**: right-click → **Colour**: yellow, blue, green, pink or grey. A
+  colour code shared by the team (say, green for confirmed facts and pink for
+  risks) makes a busy board easy to read.
+- **Resize**: select the note and drag its edges.
+- **Link it** like anything else: pull a line from one of its ports to the
+  evidence it is about.
+- **Duplicate**: `⌘D`, or right-click → **Duplicate**.
+
+<Callout type="info">
+Two people editing the same note at the same moment never overwrite each other.
+The second save is refused, the board says who changed the note in the
+meantime, and your text is copied to the clipboard so you can merge it.
+</Callout>
+
+---
+
+## Frames
+
+A frame is a named, tinted area that **groups** things: a timeline of one day,
+everything about one person, the exfiltration path, the evidence still to
+review.
+
+- **Draw one**: press `F` and drag a rectangle on the board. Or `⌘K` → **New
+  frame**.
+- **Name it**: double-click the title bar.
+- **Put things in**: drag them into the frame, or right-click them → **Move to
+  frame**. Whatever is in a frame **moves with it**. Drag the frame by its title
+  bar.
+- **Take things out**: drag them out, or **Move to frame → No frame**.
+- **Tint**: right-click → **Tint**: grey, yellow, blue, green, pink or violet.
+- **Collapse**: the arrow in the title bar folds the frame down to its title and
+  shows how many items it holds. Expand it again the same way.
+- **Resize**: select it and drag its edges.
+
+Deleting a frame keeps what was inside it: the items stay on the board where
+they were.
+
+---
+
+## Comments
+
+Comments are conversations **pinned** to a spot: an asset, a single finding, or
+a point on the board. They are how a team talks about the case without leaving
+it.
+
+- **Start one**: press `C` and click where the comment belongs. Or right-click
+  something → **Comment**.
+- **Reply**: click the pin to open the conversation and type a reply.
+- **Resolve**: when the question is answered, **Resolve** greys the pin. It is
+  never deleted, so the conversation stays on record. **Reopen** brings it back.
+- Resolved comments are hidden unless you switch on **View → Comments → Show
+  resolved comments**.
+
+A pin moves with whatever it is pinned to. Every comment conversation is also a
+*discussion* thread: the **Timeline** panel's *Threads* tab lists them all.
+
+---
+
+## Highlights
+
+Right-click anything → **Highlight** and pick a marker colour: yellow, green,
+blue, pink or red. **None** takes it off. A highlighted asset or card gets a
+coloured ring; a highlighted finding gets a coloured halo.
+
+Highlights are for your eyes and your team's: mark what is confirmed, what is
+disputed, what belongs to one person. Then **View → Highlight by → Only
+highlighted** shows just those and fades the rest.
+
+**Highlight by** can also light up everything from one **source**, one
+**detector** or one **hypothesis**, without you marking anything by hand.
+
+---
+
+## Keeping the board tidy
+
+| Tool | What it does |
+|---|---|
+| **Tidy up** (**More** menu, or right-click the canvas) | Lays everything out automatically, left to right along the lines. One step, so **Undo** restores your layout |
+| **Collapse findings** (`E`) | Folds a busy asset's findings into a ring of severity colours |
+| **Collapse all** (**View**) | Folds every asset at once; **Expand all** unfolds them |
+| **Bring to front / Send to back** | Decides what sits on top where things overlap |
+| **Remove card from board** | Takes a hypothesis card off the board without deleting the hypothesis |
+| **Snapshots** | Keep the board as it is now before a big reorganisation |
+
+<Callout type="info">
+Selecting something fades everything that is not connected to it, so even a
+large board reads well one piece at a time. For a clean overview, zoom out: the
+board switches to shapes and names, then to compact chips. See
+[Navigating & shortcuts](/investigations/cases/navigate/#zoom-levels).
+</Callout>
