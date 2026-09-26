@@ -11,6 +11,9 @@ metadata:
   {{- end }}
 spec:
   type: {{ .Values.api.service.type }}
+  {{- with .Values.api.service.clusterIP }}
+  clusterIP: {{ . }}
+  {{- end }}
   selector:
     {{- include "classifyre.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: api
