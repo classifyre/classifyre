@@ -11,7 +11,7 @@ import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import { buildDomain, emptyDomain, mergeNeighbourGraph } from "./domain";
 import { mergeTraceNeighbourhood } from "./trace";
 import { applyAll, type BoardOp, type LocalContext } from "./ops";
-import type { Command } from "./commands";
+import { placeItems, type Command, type XY } from "./commands";
 import { advanceClaims, recordOwnWrite, type OwnWrites } from "./claims";
 import { createPersistence, type Persistence } from "./persistence";
 import type { BoardDomain, ItemPreview } from "./types";
@@ -48,6 +48,12 @@ export interface BoardState extends BoardDomain {
   hydrate(res: CaseBoardResponseDto): void;
   /** Apply a user intent: optimistic local apply → queue → undo stack. */
   run(cmd: Command): void;
+  /**
+   * Show unplaced items at these positions without saving them. A read-only
+   * board (closed case, demo instance) cannot place what the server created
+   * unplaced, and unplaced items are not rendered.
+   */
+  placeLocally(positions: ReadonlyMap<string, XY>): void;
   undo(): void;
   redo(): void;
   refetch(): void;
@@ -121,6 +127,9 @@ export function createBoardStore(
   // without it, so a new walk (or none) replaces the last one cleanly.
   let neighbourhood: BoardTraceResponseDto | null = null;
   let beforeNeighbourhood: Pick<BoardDomain, "systemEdges" | "suggested"> | null = null;
+  // Positions placeLocally gave, re-applied after every refetch while the
+  // server still has the item unplaced, so a read-only layout does not jump.
+  const localPlacements = new Map<string, XY>();
 
   const store = createStore<BoardState>()((set, get) => {
     const applyCommandOps = (commandOps: BoardOp[], previews?: Record<string, ItemPreview>) => {
@@ -257,7 +266,16 @@ export function createBoardStore(
         }
         beforeNeighbourhood = { systemEdges: withNeighbours.systemEdges, suggested: withNeighbours.suggested };
         if (neighbourhood) withNeighbours = mergeTraceNeighbourhood(withNeighbours, neighbourhood);
-        const pending = persistence.pending();
+        const readOnly = res.board.readOnly || demo;
+        // A board that became writable places (and saves) them for real.
+        if (!readOnly) localPlacements.clear();
+        const stillUnplaced = new Map(
+          [...localPlacements].filter(([id]) => {
+            const item = base.items.get(id);
+            return item !== undefined && (item.x === null || item.y === null);
+          }),
+        );
+        const pending = [...placeItems(stillUnplaced).forward, ...persistence.pending()];
         const { domain } = applyAll(withNeighbours, pending, localContext(state.previews));
         // Previews are only needed until the server describes the row.
         const previews = new Map(
@@ -267,7 +285,7 @@ export function createBoardStore(
           ...domain,
           previews,
           version: Math.max(state.version, res.board.version),
-          readOnly: res.board.readOnly || demo,
+          readOnly,
           caseStatus: res.board.caseStatus,
           loaded: true,
           loadError: null,
@@ -279,6 +297,13 @@ export function createBoardStore(
         applyCommandOps(cmd.forward, cmd.previews);
         if (cmd.undoable === false) return;
         set((s) => ({ undoStack: [...s.undoStack, cmd].slice(-UNDO_LIMIT), redoStack: [] }));
+      },
+
+      placeLocally(positions) {
+        if (positions.size === 0) return;
+        for (const [id, p] of positions) localPlacements.set(id, p);
+        const { domain } = applyAll(domainOf(get()), placeItems(positions).forward, localContext(get().previews));
+        set(domain);
       },
 
       undo() {

@@ -322,6 +322,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.resources.limits | object | `{"cpu":"1","memory":"2Gi"}` | leaves ~512 MB for native memory before the kernel OOM-kills the pod. |
 | api.resources.requests | object | `{"cpu":"250m","memory":"768Mi"}` | API resource requests. |
 | api.service.annotations | object | `{}` | Additional API service annotations. |
+| api.service.clusterIP | string | `""` | Fixed cluster IP, for a reverse proxy outside the cluster that must reach the API (e.g. its socket.io path) without a public nodePort. Immutable once the Service exists: set it to the current IP, or recreate. |
 | api.service.nodePort | string | `nil` | Fixed nodePort when `type` is `NodePort` or `LoadBalancer`. |
 | api.service.port | int | `8000` | API service port. |
 | api.service.type | string | `"ClusterIP"` | API service type. |

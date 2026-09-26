@@ -1,6 +1,9 @@
 # VPS showcase values
 # Single-node K3s, no ingress, NodePort access for web only.
-# API remains ClusterIP — Next.js proxies /api calls server-side.
+# API remains ClusterIP — Next.js proxies /api calls server-side. WebSockets
+# cannot go through that proxy, so the host's Traefik routes
+# showcase.classifyre.com/socket.io straight to the API's pinned cluster IP
+# (router `showcase-classifyre-socket` in /srv/wordpress/host-services.yml).
 # Access: https://showcase.classifyre.com
 
 api:
@@ -8,6 +11,10 @@ api:
     repository: classifyre/api
     tag: "main"
     pullPolicy: Always
+
+  service:
+    # Pinned: the host Traefik's socket.io route targets this IP.
+    clusterIP: "10.43.228.117"
 
   env:
     # Public instance: read-only for visitors. Scheduled scans, the CLI's

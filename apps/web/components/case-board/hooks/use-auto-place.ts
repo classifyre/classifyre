@@ -8,7 +8,8 @@ import { placeItems, type XY } from "../store/commands";
 import { ownerItem } from "../store/domain";
 import { absolutePosition } from "../store/ops";
 import { ASSET_NODE } from "../store/relations";
-import { estimateItemSize, freeSpotNear, HYPOTHESIS_WIDTH, itemExtent, type Rect } from "../store/geometry";
+import { estimateItemSize, HYPOTHESIS_WIDTH, itemExtent, type Rect } from "../store/geometry";
+import { placeNearNeighbours } from "../store/placement";
 import type { BoardItem } from "../store/types";
 import { elkLayout, type LayoutEdge } from "./elk-layout";
 
@@ -75,8 +76,10 @@ export function neighboursOf(s: BoardState, item: BoardItem): string[] {
 /**
  * Places items the server created unplaced (PRD §8.9): the first open of an
  * existing case gets one full ELK layout; after that, new items go next to
- * what they connect to, or into an "Incoming" column right of the board.
- * Placement is a system action, so it is not on the undo stack.
+ * what they connect to (`placeNearNeighbours`, so a new chain grows off the
+ * board), and the rest as one ELK block, marked Incoming, right of the board.
+ * Placement is a system action, so it is not on the undo stack. A read-only
+ * board (closed case, demo instance) places on screen only, never saving.
  */
 export function useAutoPlace(): void {
   const store = useBoardStore();
@@ -94,7 +97,7 @@ export function useAutoPlace(): void {
   const running = React.useRef(false);
 
   React.useEffect(() => {
-    if (!loaded || readOnly || !unplacedKey || running.current) return;
+    if (!loaded || !unplacedKey || running.current) return;
     running.current = true;
     void (async () => {
       const s = store.getState();
@@ -166,33 +169,53 @@ export function useAutoPlace(): void {
         }
       } else {
         const taken = placed.filter((i) => !i.parentId).map(rectOf);
-        const right = Math.max(...taken.map((r) => r.x + r.w));
-        const top = Math.min(...taken.map((r) => r.y));
-        let incomingY = top;
-        for (const item of floating) {
-          const box = layoutBox(s, item);
-          const size = { width: box.width, height: box.height };
-          const anchors = neighboursOf(s, item)
-            .map((id) => s.items.get(id))
-            .filter((i): i is BoardItem => !!i && i.x !== null && i.y !== null)
-            .map(rectOf);
-          let pos: XY;
-          if (anchors.length > 0) {
-            const cx = anchors.reduce((sum, r) => sum + r.x + r.w / 2, 0) / anchors.length;
-            const cy = anchors.reduce((sum, r) => sum + r.y + r.h / 2, 0) / anchors.length;
-            pos = freeSpotNear({ x: cx + 60, y: cy - size.height / 2 }, size, taken, GAP);
-          } else {
-            pos = { x: right + 240, y: incomingY };
-            incomingY += size.height + GAP;
-            incoming.push(item.id);
+        const onBoard = (id: string): Rect | undefined => {
+          const other = s.items.get(id);
+          return other && other.x !== null && other.y !== null ? rectOf(other) : undefined;
+        };
+        const neighbours = new Map(floating.map((i) => [i.id, neighboursOf(s, i)]));
+        const { positions: near, orphans } = placeNearNeighbours({
+          items: floating.map((i) => ({ id: i.id, box: layoutBox(s, i) })),
+          rectOf: onBoard,
+          neighbours: (id) => neighbours.get(id) ?? [],
+          taken,
+          gap: GAP,
+        });
+        for (const [id, pos] of near) {
+          positions.set(id, pos);
+          const box = layoutBox(s, s.items.get(id)!);
+          taken.push({ x: pos.x + box.dx, y: pos.y + box.dy, w: box.width, h: box.height });
+        }
+        if (orphans.length > 0) {
+          // Nothing on the board to sit next to: one compact block (ELK packs
+          // disconnected items into rows) right of everything, top-aligned,
+          // rather than a column that grows with every item.
+          const right = Math.max(...taken.map((r) => r.x + r.w));
+          const top = Math.min(...taken.map((r) => r.y));
+          const ids = new Set(orphans.map((o) => o.id));
+          const edges: LayoutEdge[] = [];
+          for (const o of orphans) {
+            for (const other of neighbours.get(o.id) ?? []) {
+              if (ids.has(other)) edges.push({ id: `${o.id}->${other}`, source: o.id, target: other });
+            }
           }
-          taken.push({ x: pos.x, y: pos.y, w: size.width, h: size.height });
-          positions.set(item.id, { x: pos.x - box.dx, y: pos.y - box.dy });
+          const laid = await elkLayout(
+            orphans.map((o) => ({ id: o.id, width: o.box.width, height: o.box.height })),
+            edges,
+            { x: right + 240, y: top },
+          );
+          for (const o of orphans) {
+            const pos = laid.get(o.id);
+            if (!pos) continue;
+            positions.set(o.id, { x: pos.x - o.box.dx, y: pos.y - o.box.dy });
+            incoming.push(o.id);
+          }
         }
       }
 
       if (hintsUsed) ui.getState().set({ placementHints: hints });
-      if (positions.size > 0) store.getState().run(placeItems(positions));
+      if (store.getState().readOnly) store.getState().placeLocally(positions);
+      else if (positions.size > 0) store.getState().run(placeItems(positions));
       if (incoming.length > 0) {
         const next = new Set(ui.getState().incoming);
         for (const id of incoming) next.add(id);
