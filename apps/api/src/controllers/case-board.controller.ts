@@ -13,6 +13,7 @@ import { AllowInDemoMode } from '../demo-mode.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { CaseBoardService } from '../case-board/case-board.service';
 import { CaseBoardReadService } from '../case-board/case-board-read.service';
+import { CaseCleanupService } from '../cases/case-cleanup.service';
 import {
   ApplyBoardOpsDto,
   ApplyBoardOpsResponseDto,
@@ -36,6 +37,7 @@ export class CaseBoardController {
   constructor(
     private readonly board: CaseBoardService,
     private readonly boardRead: CaseBoardReadService,
+    private readonly cleanup: CaseCleanupService,
   ) {}
 
   @Get()
@@ -44,7 +46,11 @@ export class CaseBoardController {
       'The case board: items, links, evidence, the live graph layer, stances and thread summaries',
   })
   @ApiResponse({ status: 200, type: CaseBoardResponseDto })
-  get(@Param('id') id: string): Promise<CaseBoardResponseDto> {
+  async get(@Param('id') id: string): Promise<CaseBoardResponseDto> {
+    // The clean-up rules' safety net: whatever took a cited finding or asset
+    // away without a scan (a purge, a deleted source) is applied the next time
+    // the board is read. Throttled per case, and it never fails the read.
+    await this.cleanup.checkIfDue(id);
     return this.boardRead.getBoard(id);
   }
 

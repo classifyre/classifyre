@@ -10,6 +10,7 @@ import {
   Copy,
   ExternalLink,
   Eye,
+  Filter,
   Focus,
   Frame as FrameIcon,
   Globe,
@@ -51,6 +52,8 @@ import {
   ContextMenuSubTrigger,
 } from "@workspace/ui/components/context-menu";
 import { nsPath } from "@/lib/ns-path";
+import { exactValuePattern } from "@/components/case-cleanup/cleanup-rules";
+import { EscalationFlag } from "@workspace/case-board/components/finding-node";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoardStore, useUiStore } from "../store/board-context";
 import {
@@ -463,6 +466,43 @@ export function BoardContextMenuContent({
         const bubble = s.bubbles.get(target.itemId);
         if (!item || !bubble) return null;
         const row = [...bubble.rows, ...bubble.unattached].find((r) => r.findingId === target.findingId);
+        // "Filter out…": the finding's type, or exactly its value, in the
+        // filter dialog (which says how many findings it would detach).
+        const filterType = () =>
+          row && ui.getState().set({ filterRequest: { kind: "FINDING_TYPE", types: [row.typeLabel] } });
+        const filterValue = () =>
+          row?.value &&
+          ui.getState().set({ filterRequest: { kind: "VALUE_PATTERN", pattern: exactValuePattern(row.value) } });
+        const escalateType = () =>
+          row &&
+          ui.getState().set({ filterRequest: { action: "ESCALATE", kind: "FINDING_TYPE", types: [row.typeLabel] } });
+        const escalateValue = () =>
+          row?.value &&
+          ui.getState().set({
+            filterRequest: { action: "ESCALATE", kind: "VALUE_PATTERN", pattern: exactValuePattern(row.value) },
+          });
+        const clearEscalation = async () => {
+          try {
+            await api.cases.caseCleanupControllerClearEscalations({
+              id: s.caseId,
+              clearCaseEscalationsDto: { findingIds: [target.findingId] },
+            });
+            toast.success(t("caseEscalation.cleared"));
+            store.getState().refetch();
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : t("caseEscalation.failedToClear"));
+          }
+        };
+        const escalationItems = (
+          <>
+            <ContextMenuItem disabled={readOnly || !row} onSelect={escalateType} data-testid="menu-escalate-type">
+              <EscalationFlag size={16} /> {t("caseEscalation.menu.escalateType")}
+            </ContextMenuItem>
+            <ContextMenuItem disabled={readOnly || !row?.value} onSelect={escalateValue} data-testid="menu-escalate-value">
+              <EscalationFlag size={16} /> {t("caseEscalation.menu.escalateValue")}
+            </ContextMenuItem>
+          </>
+        );
         if (!target.attached) {
           return (
             <>
@@ -474,6 +514,14 @@ export function BoardContextMenuContent({
               </ContextMenuItem>
               <ContextMenuItem onSelect={() => openInTab(`/findings/${target.findingId}`)}>
                 <ExternalLink className="size-4" /> {t("caseBoard.menu.openFinding")}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              {escalationItems}
+              <ContextMenuItem disabled={readOnly || !row} onSelect={filterType}>
+                <Filter className="size-4" /> {t("caseFilters.menu.filterType")}
+              </ContextMenuItem>
+              <ContextMenuItem disabled={readOnly || !row?.value} onSelect={filterValue}>
+                <Filter className="size-4" /> {t("caseFilters.menu.filterValue")}
               </ContextMenuItem>
             </>
           );
@@ -535,6 +583,13 @@ export function BoardContextMenuContent({
               </>
             )}
             <ContextMenuSeparator />
+            {escalationItems}
+            {row?.escalated && (
+              <ContextMenuItem disabled={readOnly} onSelect={() => void clearEscalation()} data-testid="menu-clear-escalation">
+                <X className="size-4" /> {t("caseEscalation.clear")}
+              </ContextMenuItem>
+            )}
+            <ContextMenuSeparator />
             <ContextMenuItem
               disabled={readOnly}
               variant="destructive"
@@ -548,6 +603,22 @@ export function BoardContextMenuContent({
               }
             >
               <Unlink className="size-4" /> {t("caseBoard.menu.detach")}
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={readOnly || !row}
+              variant="destructive"
+              onSelect={filterType}
+              data-testid="menu-detach-filter-type"
+            >
+              <Filter className="size-4" /> {t("caseFilters.menu.detachType")}
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={readOnly || !row?.value}
+              variant="destructive"
+              onSelect={filterValue}
+              data-testid="menu-detach-filter-value"
+            >
+              <Filter className="size-4" /> {t("caseFilters.menu.detachValue")}
             </ContextMenuItem>
           </>
         );

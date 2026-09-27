@@ -41,5 +41,17 @@ export interface CasePullPort {
     caseId: string,
     dto: { inquiryId: string; findingIds?: string[] },
     actor?: string,
+    /**
+     * The scan that landed the findings, for the case timeline; `available`
+     * is how many new answers there were when the pull was capped, and
+     * `onlyEscalating` pulls just the answers an escalation rule matches (the
+     * watch's auto-add is off).
+     */
+    run?: {
+      sourceId?: string | null;
+      runnerId?: string | null;
+      available?: number;
+      onlyEscalating?: boolean;
+    },
   ): Promise<CasePullResult>;
 }

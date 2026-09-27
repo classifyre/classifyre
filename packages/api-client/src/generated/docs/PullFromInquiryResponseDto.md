@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `pulled` | number
+`filtered` | number
 
 ## Example
 
@@ -16,6 +17,7 @@ import type { PullFromInquiryResponseDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "pulled": null,
+  "filtered": null,
 } satisfies PullFromInquiryResponseDto
 
 console.log(example)

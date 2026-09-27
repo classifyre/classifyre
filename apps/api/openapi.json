@@ -4989,6 +4989,15 @@
             }
           },
           {
+            "name": "escalated",
+            "required": false,
+            "in": "query",
+            "description": "Only cases holding escalated findings",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "skip",
             "required": false,
             "in": "query",
@@ -5907,6 +5916,330 @@
         "summary": "One board snapshot, exactly as it was captured",
         "tags": [
           "case-board"
+        ]
+      }
+    },
+    "/cases/{id}/cleanup/preview": {
+      "post": {
+        "operationId": "CaseCleanupController_previewCleanup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseCleanupRulesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseCleanupPreviewDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What the given clean-up switches would take out of the case right now (writes nothing)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/finding-filters": {
+      "get": {
+        "operationId": "CaseCleanupController_listFilters",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseFindingFilterDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "The case's finding filters, case-wide and per watch",
+        "tags": [
+          "cases"
+        ]
+      },
+      "post": {
+        "operationId": "CaseCleanupController_addFilters",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCaseFindingFiltersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseFindingFiltersChangeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add finding filters (case-wide or for one watch); matching findings leave the case now and are not pulled again",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/finding-filters/options": {
+      "get": {
+        "operationId": "CaseCleanupController_filterOptions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inquiryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseFindingFilterOptionsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Finding types a filter can pick from: what the case holds and what its watches (or one watch) answer",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/finding-filters/preview": {
+      "post": {
+        "operationId": "CaseCleanupController_previewFilters",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewCaseFindingFiltersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseFindingFiltersPreviewDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "How many findings in the case unsaved filter rules would take out now (writes nothing)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/finding-filters/{filterId}": {
+      "patch": {
+        "operationId": "CaseCleanupController_updateFilter",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCaseFindingFilterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseFindingFiltersChangeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change a filter's pattern or description; a new pattern takes out what it now matches",
+        "tags": [
+          "cases"
+        ]
+      },
+      "delete": {
+        "operationId": "CaseCleanupController_removeFilter",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filterId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseFindingFilterDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Remove a filter. Findings it took out stay out; the watch just stops skipping them",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/escalations/clear": {
+      "post": {
+        "operationId": "CaseCleanupController_clearEscalations",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClearCaseEscalationsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClearCaseEscalationsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Take the escalation mark off findings of the case (all of them when findingIds is omitted); the findings stay",
+        "tags": [
+          "cases"
         ]
       }
     },
@@ -19091,6 +19424,18 @@
             "items": {
               "type": "string"
             }
+          },
+          "removeGoneFindings": {
+            "type": "boolean",
+            "description": "Clean-up: take out findings the scans no longer see (retired by a run, or deleted). Off by default."
+          },
+          "removeResolvedFindings": {
+            "type": "boolean",
+            "description": "Clean-up: take out findings someone resolved. Off by default."
+          },
+          "removeGoneAssets": {
+            "type": "boolean",
+            "description": "Clean-up: take out assets deleted from their source, with their findings. Off by default."
           }
         },
         "required": [
@@ -19154,6 +19499,21 @@
           "createdAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "escalatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When an escalation rule marked this finding"
+          },
+          "escalationRuleId": {
+            "type": "string",
+            "nullable": true
+          },
+          "escalationLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "What the escalation rule matched, in words"
           }
         },
         "required": [
@@ -19252,6 +19612,86 @@
           "autoPull"
         ]
       },
+      "CaseFindingFilterDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FINDING_TYPE",
+              "VALUE_PATTERN"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "EXCLUDE",
+              "ESCALATE"
+            ],
+            "description": "EXCLUDE: a filter (matches leave the case and are not pulled again). ESCALATE: matches are marked escalated and highlighted, and a watch brings them in even with auto-add off."
+          },
+          "pattern": {
+            "type": "string",
+            "description": "FINDING_TYPE: the finding type, exactly. VALUE_PATTERN: a regular expression over the matched value."
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "inquiryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null: case-wide (every watch, and the case's own findings). Otherwise the one watch it applies to."
+          },
+          "inquiryTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "action",
+          "pattern",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CaseCleanupResultDto": {
+        "type": "object",
+        "properties": {
+          "findingsRemoved": {
+            "type": "number"
+          },
+          "evidenceRemoved": {
+            "type": "number"
+          },
+          "findingsWithEvidence": {
+            "type": "number",
+            "description": "Findings that left with the removed evidence"
+          }
+        },
+        "required": [
+          "findingsRemoved",
+          "evidenceRemoved",
+          "findingsWithEvidence"
+        ]
+      },
       "CaseResponseDto": {
         "type": "object",
         "properties": {
@@ -19309,6 +19749,28 @@
           "inquiryCount": {
             "type": "number"
           },
+          "removeGoneFindings": {
+            "type": "boolean",
+            "description": "Clean-up: findings the scans no longer see leave the case by themselves"
+          },
+          "removeResolvedFindings": {
+            "type": "boolean",
+            "description": "Clean-up: findings someone resolved leave the case"
+          },
+          "removeGoneAssets": {
+            "type": "boolean",
+            "description": "Clean-up: assets deleted from their source leave the case, with their findings"
+          },
+          "escalatedCount": {
+            "type": "number",
+            "description": "Findings of the case an escalation rule marked"
+          },
+          "lastEscalatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When an escalation rule last marked a finding of the case"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -19328,6 +19790,21 @@
             "items": {
               "$ref": "#/components/schemas/CaseLinkedInquiryDto"
             }
+          },
+          "findingFilters": {
+            "description": "Finding filters, case-wide and per watch",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseFindingFilterDto"
+            }
+          },
+          "cleanup": {
+            "description": "On an update that switched a clean-up rule on: what it took out right away",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CaseCleanupResultDto"
+              }
+            ]
           }
         },
         "required": [
@@ -19339,6 +19816,10 @@
           "evidenceCount",
           "hypothesisCount",
           "inquiryCount",
+          "removeGoneFindings",
+          "removeResolvedFindings",
+          "removeGoneAssets",
+          "escalatedCount",
           "createdAt",
           "updatedAt"
         ]
@@ -19411,6 +19892,18 @@
               "OBSERVE_ONLY"
             ],
             "description": "AI autopilot mode for this case. INHERIT follows the instance setting; OBSERVE_ONLY blocks autopilot mutations."
+          },
+          "removeGoneFindings": {
+            "type": "boolean",
+            "description": "Clean-up: take out findings the scans no longer see (retired by a run, or deleted). Switching one on applies it right away."
+          },
+          "removeResolvedFindings": {
+            "type": "boolean",
+            "description": "Clean-up: take out findings someone resolved. Switching one on applies it right away."
+          },
+          "removeGoneAssets": {
+            "type": "boolean",
+            "description": "Clean-up: take out assets deleted from their source, with their findings. Switching one on applies it right away."
           }
         }
       },
@@ -19595,6 +20088,10 @@
           "pulled": {
             "type": "number",
             "description": "Number of findings pulled into the case"
+          },
+          "filtered": {
+            "type": "number",
+            "description": "Matches the case's finding filters kept out (case-wide, or this watch's own)"
           }
         },
         "required": [
@@ -20680,6 +21177,331 @@
           "payload"
         ]
       },
+      "CaseCleanupRulesDto": {
+        "type": "object",
+        "properties": {
+          "removeGoneFindings": {
+            "type": "boolean",
+            "description": "Take out findings the scans no longer see (retired by a run, or deleted)."
+          },
+          "removeResolvedFindings": {
+            "type": "boolean",
+            "description": "Take out findings someone resolved."
+          },
+          "removeGoneAssets": {
+            "type": "boolean",
+            "description": "Take out assets deleted from their source, with their findings."
+          }
+        }
+      },
+      "CaseCleanupItemDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "FINDING_GONE",
+              "FINDING_RESOLVED",
+              "FILTER",
+              "ASSET_GONE"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "RETIRED",
+              "DELETED"
+            ],
+            "description": "For something gone: retired by a scan, or its row deleted outright."
+          },
+          "label": {
+            "type": "string",
+            "description": "Finding type, or the asset name"
+          },
+          "value": {
+            "type": "string",
+            "nullable": true,
+            "description": "Matched value"
+          },
+          "assetLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "filterId": {
+            "type": "string",
+            "description": "The filter that matched (FILTER)"
+          }
+        },
+        "required": [
+          "reason",
+          "label"
+        ]
+      },
+      "CaseCleanupPreviewDto": {
+        "type": "object",
+        "properties": {
+          "goneFindings": {
+            "type": "number",
+            "description": "Findings the scans no longer see that would leave the case"
+          },
+          "resolvedFindings": {
+            "type": "number",
+            "description": "Resolved findings that would leave the case"
+          },
+          "goneAssets": {
+            "type": "number",
+            "description": "Assets gone from their source that would leave"
+          },
+          "findingsWithAssets": {
+            "type": "number",
+            "description": "Findings that would leave with those assets"
+          },
+          "sample": {
+            "description": "A few of them",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseCleanupItemDto"
+            }
+          }
+        },
+        "required": [
+          "goneFindings",
+          "resolvedFindings",
+          "goneAssets",
+          "findingsWithAssets",
+          "sample"
+        ]
+      },
+      "CaseFindingTypeOptionDto": {
+        "type": "object",
+        "properties": {
+          "findingType": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string",
+            "nullable": true
+          },
+          "detectorName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Custom detector name, when the type comes from one"
+          },
+          "inCase": {
+            "type": "number",
+            "description": "Findings of this type in the case now"
+          },
+          "answers": {
+            "type": "number",
+            "description": "Open findings of this type the scope’s watches answer"
+          }
+        },
+        "required": [
+          "findingType",
+          "inCase",
+          "answers"
+        ]
+      },
+      "CaseFindingFilterOptionsDto": {
+        "type": "object",
+        "properties": {
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseFindingTypeOptionDto"
+            }
+          },
+          "approximate": {
+            "type": "boolean",
+            "description": "The watch answer counts are an estimate (a value pattern could not be applied to every row)"
+          }
+        },
+        "required": [
+          "types",
+          "approximate"
+        ]
+      },
+      "CaseFindingFilterRuleDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FINDING_TYPE",
+              "VALUE_PATTERN"
+            ]
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Finding type, or a regular expression"
+          },
+          "description": {
+            "type": "string",
+            "description": "Why the filter exists"
+          }
+        },
+        "required": [
+          "kind",
+          "pattern"
+        ]
+      },
+      "PreviewCaseFindingFiltersDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "EXCLUDE",
+              "ESCALATE"
+            ],
+            "default": "EXCLUDE"
+          },
+          "inquiryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseFindingFilterRuleDto"
+            }
+          }
+        },
+        "required": [
+          "rules"
+        ]
+      },
+      "CaseFindingFiltersPreviewDto": {
+        "type": "object",
+        "properties": {
+          "matched": {
+            "type": "number",
+            "description": "Findings in the case these rules would take out (filters) or mark escalated (escalations) now"
+          },
+          "perRule": {
+            "description": "Per rule, in request order: findings it alone would match",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "problems": {
+            "description": "Per rule, in request order: why it cannot be saved, or an empty string",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sample": {
+            "description": "A few of them",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseCleanupItemDto"
+            }
+          }
+        },
+        "required": [
+          "matched",
+          "perRule",
+          "problems",
+          "sample"
+        ]
+      },
+      "AddCaseFindingFiltersDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "EXCLUDE",
+              "ESCALATE"
+            ],
+            "default": "EXCLUDE",
+            "description": "What the rules do: filter out (default) or escalate"
+          },
+          "inquiryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Scope: omit or null for the whole case, or a linked inquiry id to filter only that watch"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseFindingFilterRuleDto"
+            }
+          },
+          "clientId": {
+            "type": "string",
+            "description": "The board tab asking, so it can ignore the echo of its own change"
+          }
+        },
+        "required": [
+          "rules"
+        ]
+      },
+      "CaseFindingFiltersChangeResponseDto": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseFindingFilterDto"
+            }
+          },
+          "detached": {
+            "type": "number",
+            "description": "Findings the change took out of the case (filters)"
+          },
+          "escalated": {
+            "type": "number",
+            "description": "Findings already in the case the change marked escalated (escalations)"
+          }
+        },
+        "required": [
+          "filters",
+          "detached",
+          "escalated"
+        ]
+      },
+      "UpdateCaseFindingFilterDto": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "clientId": {
+            "type": "string"
+          }
+        }
+      },
+      "ClearCaseEscalationsDto": {
+        "type": "object",
+        "properties": {
+          "findingIds": {
+            "description": "Finding ids (not case-finding ids) to clear; omit to clear every escalation of the case",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ClearCaseEscalationsResponseDto": {
+        "type": "object",
+        "properties": {
+          "cleared": {
+            "type": "number",
+            "description": "Findings whose escalation mark was cleared"
+          }
+        },
+        "required": [
+          "cleared"
+        ]
+      },
       "CaseworkCaseStatusBreakdownDto": {
         "type": "object",
         "properties": {
@@ -21684,7 +22506,16 @@
               "BOARD_ITEM_HIGHLIGHTED",
               "BOARD_ARRANGED",
               "BOARD_SNAPSHOT_TAKEN",
-              "COMMENT_RESOLVED"
+              "COMMENT_RESOLVED",
+              "CLEANUP_SETTINGS_UPDATED",
+              "FINDING_FILTER_ADDED",
+              "FINDING_FILTER_UPDATED",
+              "FINDING_FILTER_REMOVED",
+              "FINDINGS_AUTO_REMOVED",
+              "EVIDENCE_AUTO_REMOVED",
+              "INQUIRY_SETTINGS_UPDATED",
+              "FINDINGS_ESCALATED",
+              "ESCALATION_CLEARED"
             ]
           },
           "actor": {

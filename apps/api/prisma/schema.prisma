@@ -1391,6 +1391,20 @@ enum CaseActivityType {
   BOARD_ARRANGED
   BOARD_SNAPSHOT_TAKEN
   COMMENT_RESOLVED
+  // Automatic clean-up and finding filters. Removal payloads name every
+  // finding or asset taken out (up to a cap) and why, so the timeline says
+  // what left the case without anyone having touched it.
+  CLEANUP_SETTINGS_UPDATED
+  FINDING_FILTER_ADDED
+  FINDING_FILTER_UPDATED
+  FINDING_FILTER_REMOVED
+  FINDINGS_AUTO_REMOVED
+  EVIDENCE_AUTO_REMOVED
+  // A watch's own settings on this case (auto-add on or off).
+  INQUIRY_SETTINGS_UPDATED
+  // Findings an escalation rule marked, and a person clearing the mark.
+  FINDINGS_ESCALATED
+  ESCALATION_CLEARED
 }
 
 enum EvidenceStance {
@@ -1891,15 +1905,30 @@ model Case {
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 
-  evidence     CaseEvidence[]
-  findings     CaseFinding[]
-  notes        CaseNote[]
-  inquiryLinks CaseInquiry[]
-  threads      CaseThread[]
-  activities   CaseActivity[]
-  leads        CaseLead[]
-  events       CaseEvent[]
-  board        CaseBoard?
+  // Automatic clean-up (CaseCleanupService). Each rule is off by default: a
+  // case that loses evidence by itself is a surprise unless the investigator
+  // asked for it. A rule applies the moment it is switched on, then after
+  // every scan, finding status change and board read.
+  // A finding the scans no longer see (retired by a run, or its row deleted).
+  removeGoneFindings     Boolean @default(false) @map("remove_gone_findings")
+  // A finding someone resolved.
+  removeResolvedFindings Boolean @default(false) @map("remove_resolved_findings")
+  // An asset deleted from its source, with its findings.
+  removeGoneAssets       Boolean @default(false) @map("remove_gone_assets")
+  // When an escalation rule last marked a finding of this case. Bumps
+  // updatedAt too, so an escalated case rises to the top of the case list.
+  lastEscalatedAt        DateTime? @map("last_escalated_at")
+
+  evidence       CaseEvidence[]
+  findings       CaseFinding[]
+  notes          CaseNote[]
+  inquiryLinks   CaseInquiry[]
+  threads        CaseThread[]
+  activities     CaseActivity[]
+  leads          CaseLead[]
+  events         CaseEvent[]
+  board          CaseBoard?
+  findingFilters CaseFindingFilter[]
 
   @@index([status])
   @@index([severity])
@@ -2090,12 +2119,58 @@ model CaseInquiry {
   autoPull  Boolean  @default(false) @map("auto_pull")
   createdAt DateTime @default(now()) @map("created_at")
 
-  case    Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  inquiry Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  case    Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  inquiry Inquiry             @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  filters CaseFindingFilter[]
 
   @@unique([caseId, inquiryId])
   @@index([inquiryId])
   @@map("case_inquiries")
+}
+
+// What a case finding rule does with the findings it matches.
+enum CaseFindingRuleAction {
+  // A filter: matches leave the case and no watch brings them in again.
+  EXCLUDE
+  // An escalation: matches are marked, highlighted and flag the case, and a
+  // watch brings them in even with auto-add off.
+  ESCALATE
+}
+
+enum CaseFindingFilterKind {
+  // The finding's type, compared exactly ("IP_ADDRESS", "tag:Baugenehmigungen −20%").
+  FINDING_TYPE
+  // A JavaScript regular expression tested against the matched value.
+  VALUE_PATTERN
+}
+
+// A kind of finding a case does not want. Findings that match are taken out
+// of the case when the filter is added or changed, and a watch never adds
+// them again — neither by itself (auto-add) nor through "pull everything".
+// Attaching one by hand still works: that is a person's explicit choice.
+//
+// Case-wide when caseInquiryId is null (every finding of the case, whichever
+// watch brought it). Scoped to one watch otherwise: it only applies to that
+// watch's answers, and goes with the link when the watch is unlinked.
+model CaseFindingFilter {
+  id            String                @id @default(uuid())
+  caseId        String                @map("case_id")
+  caseInquiryId String?               @map("case_inquiry_id")
+  kind          CaseFindingFilterKind
+  action        CaseFindingRuleAction @default(EXCLUDE)
+  pattern       String
+  // Why the filter exists, in the investigator's words.
+  description   String?               @db.Text
+  createdBy     String?               @map("created_by")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+
+  investigation Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  watch         CaseInquiry? @relation(fields: [caseInquiryId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([caseInquiryId])
+  @@map("case_finding_filters")
 }
 
 // An observed node attached to a CASE. Display
@@ -2135,12 +2210,20 @@ model CaseFinding {
   matchedContent     String?  @map("matched_content") @db.Text
   note               String?  @db.Text
   createdAt          DateTime @default(now()) @map("created_at")
+  // Set when an escalation rule matched the finding; cleared by a person.
+  // The rule id is kept without a foreign key (a rule may be removed later),
+  // and the label says in words what it matched ("type IP_ADDRESS").
+  escalatedAt        DateTime? @map("escalated_at")
+  escalationRuleId   String?   @map("escalation_rule_id")
+  escalationLabel    String?   @map("escalation_label") @db.Text
 
   investigation Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
   caseEvidence  CaseEvidence @relation(fields: [caseEvidenceId], references: [id], onDelete: Cascade)
 
   @@unique([caseId, findingId])
   @@index([caseId])
+  // The case list counts each case's escalated findings.
+  @@index([caseId, escalatedAt])
   @@index([caseEvidenceId])
   // "Is this finding cited by a case?" — asked per scan, per config read and
   // per detector-value query, and answered by joining case_findings to

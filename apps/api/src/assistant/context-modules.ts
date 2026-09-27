@@ -200,6 +200,9 @@ const CASE_KNOWLEDGE = [
   '  Summarize a thread or the whole case → read list_case_threads / add_case_thread_entry entries and get_case_timeline, then write the summary in your reply (offer to post it as a thread entry via add_case_thread_entry — that is a mutation, so propose it).',
   '  Pull matches from an inquiry into the case → pull_case_from_inquiry.',
   'The case board (get_case_board) is the canvas the analysts arrange: evidence bubbles, hypothesis cards, notes, frames, links between findings. Change it with apply_case_board_ops (a mutation, so propose it); read the board first and send its board.version as baseVersion.',
+  'Noise a case does not want is kept out with finding filters (list_case_finding_filters, add_case_finding_filters): by finding type or by a regular expression over the value, case-wide or for one linked inquiry. Adding one detaches the matching findings right away, so run it with dryRun first and propose the real call with the count.',
+  'Escalation rules are the same rules with action ESCALATE: matching findings are marked escalated and highlighted, a linked inquiry brings new matching answers in even with auto-add off, and a notification goes out. Run add_case_finding_filters with dryRun first; clear_case_escalations takes the marks off once they are dealt with.',
+  'A case can also clean itself up (update_case removeGoneFindings / removeResolvedFindings / removeGoneAssets): switching one on removes what already qualifies, so say how much before proposing it.',
   'Closing or reopening a case is a significant action — always explain why before proposing it.',
 ].join('\n');
 
@@ -347,6 +350,10 @@ export const assistantContextModules: Record<
       'attach_case_findings',
       'pull_case_from_inquiry',
       'link_case_inquiries',
+      'list_case_finding_filters',
+      'add_case_finding_filters',
+      'remove_case_finding_filter',
+      'clear_case_escalations',
       'get_case_graph',
       'get_case_timeline',
       'list_case_threads',

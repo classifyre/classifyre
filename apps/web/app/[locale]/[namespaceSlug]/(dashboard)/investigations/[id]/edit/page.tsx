@@ -16,6 +16,13 @@ import {
   type CaseDetailsValues,
 } from "@/components/case-details-form";
 import { useTranslation } from "@/hooks/use-translation";
+import { CaseCleanupSettings } from "@/components/case-cleanup/case-cleanup-settings";
+import {
+  cleanupOf,
+  NO_CLEANUP,
+  type CleanupValues,
+} from "@/components/case-cleanup/cleanup-rules";
+import { primeActorName } from "@/components/case-board/hooks/use-actor-name";
 
 /**
  * Edit a case's own description of itself.
@@ -32,6 +39,10 @@ export default function EditCasePage() {
 
   const [values, setValues] =
     React.useState<CaseDetailsValues>(EMPTY_CASE_DETAILS);
+  const [cleanup, setCleanup] = React.useState<CleanupValues>(NO_CLEANUP);
+  // As stored: a switch turned on since is previewed, and applies on save.
+  const [savedCleanup, setSavedCleanup] =
+    React.useState<CleanupValues>(NO_CLEANUP);
   const [loading, setLoading] = React.useState(true);
   const [notFound, setNotFound] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -42,6 +53,8 @@ export default function EditCasePage() {
   );
 
   React.useEffect(() => {
+    // Timeline rows name whoever saves, also when this page is opened directly.
+    primeActorName();
     let cancelled = false;
     api.cases
       .casesControllerFindOne({ id: caseId })
@@ -53,6 +66,8 @@ export default function EditCasePage() {
           severity: c.severity,
           assignee: c.assignee ?? "",
         });
+        setCleanup(cleanupOf(c));
+        setSavedCleanup(cleanupOf(c));
       })
       .catch((err) => {
         if (cancelled) return;
@@ -80,9 +95,19 @@ export default function EditCasePage() {
         description: values.description.trim(),
         severity: values.severity as UpdateCaseDto["severity"],
         assignee: values.assignee.trim(),
+        ...cleanup,
       };
-      await api.cases.casesControllerUpdate({ id: caseId, updateCaseDto: dto });
-      toast.success(t("investigations.editCase.saved"));
+      const res = await api.cases.casesControllerUpdate({
+        id: caseId,
+        updateCaseDto: dto,
+      });
+      const removed =
+        (res.cleanup?.findingsRemoved ?? 0) + (res.cleanup?.evidenceRemoved ?? 0);
+      toast.success(
+        removed > 0
+          ? t("caseCleanup.savedWithRemovals", { count: removed })
+          : t("investigations.editCase.saved"),
+      );
       back();
     } catch (err) {
       console.error(err);
@@ -139,6 +164,19 @@ export default function EditCasePage() {
             values={values}
             onChange={setValues}
             idPrefix="edit-case"
+          />
+        </AiAssistedCard>
+
+        <AiAssistedCard
+          title={t("caseCleanup.title")}
+          description={t("caseCleanup.stepDesc")}
+        >
+          <CaseCleanupSettings
+            values={cleanup}
+            onChange={setCleanup}
+            caseId={caseId}
+            saved={savedCleanup}
+            idPrefix="edit-case-cleanup"
           />
         </AiAssistedCard>
 

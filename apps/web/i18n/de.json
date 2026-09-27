@@ -3918,6 +3918,159 @@
       "autopilot": "Autopilot"
     }
   },
+  "caseCleanup": {
+    "title": "Automatisches Aufräumen",
+    "stepDesc": "Was der Fall von selbst loslässt.",
+    "description": "Lässt diesen Fall Belege loswerden, die nicht mehr tragen. Standardmäßig ist alles aus: Nichts verlässt den Fall, solange Sie es hier nicht einschalten.",
+    "rules": {
+      "removeGoneFindings": {
+        "label": "Verschwundene Befunde entfernen",
+        "hint": "Ein Befund, den ein Scan nicht mehr erkennt oder der gelöscht wurde, verlässt diesen Fall."
+      },
+      "removeResolvedFindings": {
+        "label": "Erledigte Befunde entfernen",
+        "hint": "Ein Befund, den jemand als erledigt markiert, verlässt diesen Fall. Fehlalarme und ignorierte Befunde bleiben."
+      },
+      "removeGoneAssets": {
+        "label": "Verschwundene Assets entfernen",
+        "hint": "Ein Asset, das aus seiner Quelle gelöscht wurde, verlässt diesen Fall samt seinen Befunden."
+      }
+    },
+    "short": {
+      "removeGoneFindings": "Verschwundene Befunde",
+      "removeResolvedFindings": "Erledigte Befunde",
+      "removeGoneAssets": "Verschwundene Assets"
+    },
+    "timelineNote": "Was den Fall verlässt, steht in seiner Zeitleiste: welcher Befund und warum.",
+    "previewChecking": "Prüfe, was das entfernen würde…",
+    "previewNothing": "Derzeit trifft nichts in diesem Fall zu. Ab jetzt greift die Regel, sobald etwas zutrifft.",
+    "previewNow": "Beim Speichern verlassen diese den Fall sofort:",
+    "previewGone": "{{count}} Befund(e) nicht mehr erkannt",
+    "previewResolved": "{{count}} erledigte(r) Befund(e)",
+    "previewAssets": "{{count}} Asset(s) aus der Quelle verschwunden, mit {{findings}} Befund(en)",
+    "savedWithRemovals": "Gespeichert. {{count}} Eintrag/Einträge haben den Fall verlassen; die Zeitleiste listet sie auf.",
+    "off": "Aus. Nichts verlässt diesen Fall von selbst.",
+    "removes": "Entfernt:",
+    "filters": "{{count}} Befundfilter",
+    "noFilters": "Keine Befundfilter",
+    "manageFilters": "Filter…",
+    "edit": "Ändern…"
+  },
+  "caseFilters": {
+    "title": "Befundfilter",
+    "caseWide": "Filter für alle Beobachtungen",
+    "caseWideHint": "Passende Befunde kommen nie in diesen Fall, egal welche Beobachtung sie findet.",
+    "watchHint": "Nur passende Antworten dieser Beobachtung bleiben draußen.",
+    "none": "Noch keine Filter.",
+    "add": "Filter hinzufügen",
+    "addShort": "Filter",
+    "remove": "Filter entfernen",
+    "edit": "Filter bearbeiten",
+    "removed": "Filter entfernt. Was er entfernt hat, bleibt draußen; übernehmen Sie es bei Bedarf erneut.",
+    "failedToRemove": "Filter konnte nicht entfernt werden",
+    "kind": {
+      "FINDING_TYPE": "Typ",
+      "VALUE_PATTERN": "Wert"
+    },
+    "addedBy": "Hinzugefügt von {{name}}",
+    "dialog": {
+      "title": "Befunde herausfiltern",
+      "editTitle": "Wertfilter bearbeiten",
+      "description": "Passende Befunde verlassen diesen Fall jetzt, und keine Beobachtung fügt sie wieder hinzu, weder von selbst noch mit „Alle übernehmen“. Von Hand anhängen funktioniert weiterhin.",
+      "scope": "Gilt für",
+      "scopeCase": "Alle Beobachtungen dieses Falls",
+      "scopeWatch": "Nur „{{title}}“",
+      "by": "Filtern nach",
+      "byType": "Befundtyp",
+      "byValue": "Wert",
+      "typesHint": "Typen, die dieser Fall enthält oder seine Beobachtungen liefern.",
+      "typesSearch": "Typen suchen…",
+      "typesEmpty": "Keine Befundtypen zur Auswahl.",
+      "typesLoading": "Typen werden geladen…",
+      "inCase": "{{count}} im Fall",
+      "answers": "{{count}} Antworten",
+      "approximate": "Antwortzahlen sind Schätzungen: Eine Beobachtung filtert auch nach Wert.",
+      "alreadyFiltered": "bereits gefiltert",
+      "selected": "{{count}} ausgewählt",
+      "patternPlaceholder": "Regulärer Ausdruck, z. B. ^10\\.",
+      "descriptionPlaceholder": "Warum? z. B. interne Adressen, kein Beleg",
+      "patternHint": "Wird gegen den gefundenen Wert geprüft. Mit ^…$ passt nur der ganze Wert; Groß-/Kleinschreibung zählt.",
+      "addPattern": "Weiteres Muster hinzufügen",
+      "removePattern": "Dieses Muster entfernen",
+      "ruleMatches": "trifft {{count}} in diesem Fall",
+      "checking": "Prüfe…",
+      "previewNone": "Derzeit passt nichts in diesem Fall. Passende Antworten werden ab jetzt übersprungen.",
+      "previewSome": "{{count}} Befund(e) in diesem Fall passen und werden jetzt gelöst:",
+      "previewMore": "und {{count}} weitere",
+      "submit": "Herausfiltern",
+      "submitDetach": "Herausfiltern & {{count}} lösen",
+      "save": "Speichern",
+      "saveDetach": "Speichern & {{count}} lösen",
+      "applied": "Filter hinzugefügt: {{count}} Befund(e) gelöst. Die Zeitleiste listet sie auf.",
+      "appliedNone": "Filter hinzugefügt.",
+      "updated": "Filter aktualisiert: {{count}} weitere(r) Befund(e) gelöst.",
+      "updatedNone": "Filter aktualisiert.",
+      "failed": "Filter konnte nicht gespeichert werden"
+    },
+    "menu": {
+      "detachType": "Lösen & diesen Typ herausfiltern…",
+      "detachValue": "Lösen & diesen Wert herausfiltern…",
+      "filterType": "Diesen Typ herausfiltern…",
+      "filterValue": "Diesen Wert herausfiltern…"
+    },
+    "pullFiltered": "{{count}} durch Filter ausgeschlossen",
+    "rulesCaseWide": "Regeln für alle Beobachtungen",
+    "rulesWatch": "Regeln",
+    "rulesHint": "Filter halten passende Befunde aus dem Fall heraus. Eskalationen markieren sie, heben sie auf dem Board hervor und holen sie herein, auch wenn automatisches Hinzufügen aus ist. Passen beide, gewinnt der Filter.",
+    "rowFilter": "Herausfiltern",
+    "rowEscalate": "Eskalieren",
+    "addFilter": "Filter hinzufügen",
+    "addEscalation": "Eskalation hinzufügen"
+  },
+  "caseEscalation": {
+    "title": "Eskalation",
+    "counter": "Eskaliert",
+    "spotlight": "Die eskalierten Befunde hervorheben",
+    "spotlightClear": "Wieder alles zeigen",
+    "badge": "{{count}} eskalierte(r) Befund(e): hervorheben",
+    "state": "Eskaliert",
+    "matched": "Getroffen: {{rule}}",
+    "clear": "Eskalation aufheben",
+    "clearAll": "Alle Eskalationen aufheben",
+    "cleared": "Eskalation aufgehoben. Der Befund bleibt im Fall.",
+    "clearedAll": "{{count}} Eskalation(en) aufgehoben.",
+    "failedToClear": "Eskalation konnte nicht aufgehoben werden",
+    "summary": "{{count}} eskalierte(r) Befund(e)",
+    "noneEscalated": "Nichts eskaliert",
+    "rules": "{{count}} Eskalationsregel(n)",
+    "noRules": "Keine Eskalationsregeln",
+    "manage": "Regeln…",
+    "dialog": {
+      "title": "Befunde eskalieren",
+      "editTitle": "Eskalation bearbeiten",
+      "description": "Passende Befunde werden als eskaliert markiert und auf dem Board hervorgehoben. Die bereits im Fall enthaltenen werden sofort markiert; neue passende Antworten kommen von selbst herein, auch wenn automatisches Hinzufügen aus ist, und es geht eine Benachrichtigung raus.",
+      "previewSome": "{{count}} Befund(e) in diesem Fall passen und werden jetzt eskaliert:",
+      "previewNone": "Derzeit passt nichts in diesem Fall. Neue passende Antworten kommen eskaliert herein.",
+      "submit": "Eskalieren",
+      "submitCount": "{{count}} eskalieren",
+      "save": "Speichern",
+      "saveCount": "Speichern & {{count}} eskalieren",
+      "applied": "Eskalationsregel hinzugefügt: {{count}} Befund(e) eskaliert.",
+      "appliedNone": "Eskalationsregel hinzugefügt.",
+      "updated": "Eskalationsregel aktualisiert: {{count}} weitere(r) Befund(e) eskaliert.",
+      "updatedNone": "Eskalationsregel aktualisiert.",
+      "alreadyRule": "bereits eine Regel"
+    },
+    "menu": {
+      "escalateType": "Diesen Typ eskalieren…",
+      "escalateValue": "Diesen Wert eskalieren…"
+    },
+    "table": {
+      "badge": "{{count}} eskaliert",
+      "tooltip": "{{count}} Befund(e) eskaliert · zuletzt {{when}}",
+      "filter": "Nur eskalierte"
+    }
+  },
   "correlation": {
     "findingsTab": "Funde",
     "relatedTab": "Fingerabdrücke",

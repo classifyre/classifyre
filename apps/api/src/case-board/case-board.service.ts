@@ -41,6 +41,13 @@ import { TRACE_KINDS, TRACE_MAX_DEPTH } from '../graph-trace';
 import { GraphResponseDto } from '../dto/graph.dto';
 import { BoardOpRejected } from './board-op-rejected';
 import {
+  caseFindingTombstone,
+  evidenceTombstone,
+  fromCaseFindingTombstone,
+  type CaseFindingTombstone,
+  type EvidenceTombstone,
+} from './tombstones';
+import {
   CaseBoardReadService,
   asRecord,
   isReadOnlyCase,
@@ -91,38 +98,6 @@ interface OpOutcome {
   note?: string;
   /** Geometry-only change: counted into one coalesced BOARD_ARRANGED row. */
   arranged?: boolean;
-}
-
-/** Removed evidence, kept on its board item so undo can restore it exactly. */
-interface EvidenceTombstone {
-  evidence: {
-    id: string;
-    caseId: string;
-    entityType: string;
-    entityId: string;
-    label: string | null;
-    assetType: string | null;
-    sourceType: string | null;
-    note: string | null;
-    addedBy: string | null;
-    createdAt: string;
-  };
-  findings: CaseFindingTombstone[];
-}
-
-interface CaseFindingTombstone {
-  id: string;
-  caseId: string;
-  caseEvidenceId: string;
-  findingId: string;
-  label: string;
-  severity: string | null;
-  detectorType: string | null;
-  customDetectorName: string | null;
-  matchedContent: string | null;
-  note: string | null;
-  createdAt: string;
-  detachedAt?: string;
 }
 
 /** Item kinds a board link may attach to. Frames group; comments annotate. */
@@ -955,21 +930,7 @@ export class CaseBoardService {
       : null;
     let tombstone: EvidenceTombstone | null = null;
     if (evidence && evidence.caseId === ctx.caseId) {
-      tombstone = {
-        evidence: {
-          id: evidence.id,
-          caseId: evidence.caseId,
-          entityType: evidence.entityType,
-          entityId: evidence.entityId,
-          label: evidence.label,
-          assetType: evidence.assetType,
-          sourceType: evidence.sourceType,
-          note: evidence.note,
-          addedBy: evidence.addedBy,
-          createdAt: evidence.createdAt.toISOString(),
-        },
-        findings: evidence.findings.map(caseFindingTombstone),
-      };
+      tombstone = evidenceTombstone(evidence);
       await this.cases.removeEvidence(
         ctx.caseId,
         evidence.id,
@@ -2031,50 +1992,4 @@ export function toRelationType(kind: string): string {
     .toUpperCase();
   if (normalized === 'SAME_ENTITY') return 'SAME_AS';
   return normalized || 'RELATED_TO';
-}
-
-function caseFindingTombstone(cf: {
-  id: string;
-  caseId: string;
-  caseEvidenceId: string;
-  findingId: string;
-  label: string;
-  severity: string | null;
-  detectorType: string | null;
-  customDetectorName: string | null;
-  matchedContent: string | null;
-  note: string | null;
-  createdAt: Date;
-}): CaseFindingTombstone {
-  return {
-    id: cf.id,
-    caseId: cf.caseId,
-    caseEvidenceId: cf.caseEvidenceId,
-    findingId: cf.findingId,
-    label: cf.label,
-    severity: cf.severity,
-    detectorType: cf.detectorType,
-    customDetectorName: cf.customDetectorName,
-    matchedContent: cf.matchedContent,
-    note: cf.note,
-    createdAt: cf.createdAt.toISOString(),
-  };
-}
-
-function fromCaseFindingTombstone(
-  t: CaseFindingTombstone,
-): Prisma.CaseFindingCreateManyInput {
-  return {
-    id: t.id,
-    caseId: t.caseId,
-    caseEvidenceId: t.caseEvidenceId,
-    findingId: t.findingId,
-    label: t.label,
-    severity: t.severity,
-    detectorType: t.detectorType,
-    customDetectorName: t.customDetectorName,
-    matchedContent: t.matchedContent,
-    note: t.note,
-    createdAt: new Date(t.createdAt),
-  };
 }

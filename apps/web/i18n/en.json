@@ -3918,6 +3918,159 @@
       "autopilot": "Autopilot"
     }
   },
+  "caseCleanup": {
+    "title": "Automatic clean-up",
+    "stepDesc": "What the case lets go of by itself.",
+    "description": "Let this case let go of evidence that no longer holds. Everything is off by default: nothing leaves the case unless you switch it on here.",
+    "rules": {
+      "removeGoneFindings": {
+        "label": "Remove findings that disappear",
+        "hint": "A finding a scan no longer detects, or one that was deleted, leaves this case."
+      },
+      "removeResolvedFindings": {
+        "label": "Remove resolved findings",
+        "hint": "A finding someone marks resolved leaves this case. False positives and ignored findings stay."
+      },
+      "removeGoneAssets": {
+        "label": "Remove assets that disappear",
+        "hint": "An asset deleted from its source leaves this case, together with its findings."
+      }
+    },
+    "short": {
+      "removeGoneFindings": "Findings that disappear",
+      "removeResolvedFindings": "Resolved findings",
+      "removeGoneAssets": "Assets that disappear"
+    },
+    "timelineNote": "Whatever leaves the case is written on its timeline: which finding, and why.",
+    "previewChecking": "Checking what this would take out…",
+    "previewNothing": "Nothing in this case qualifies right now. From now on it applies as soon as something does.",
+    "previewNow": "Saving takes these out of the case right away:",
+    "previewGone": "{{count}} finding(s) no longer detected",
+    "previewResolved": "{{count}} resolved finding(s)",
+    "previewAssets": "{{count}} asset(s) gone from their source, with {{findings}} finding(s)",
+    "savedWithRemovals": "Saved. {{count}} item(s) left the case; the timeline lists them.",
+    "off": "Off. Nothing leaves this case by itself.",
+    "removes": "Takes out:",
+    "filters": "{{count}} finding filter(s)",
+    "noFilters": "No finding filters",
+    "manageFilters": "Filters…",
+    "edit": "Change…"
+  },
+  "caseFilters": {
+    "title": "Finding filters",
+    "caseWide": "Filters for every watch",
+    "caseWideHint": "Findings that match never come into this case, whichever watch finds them.",
+    "watchHint": "Only this watch’s answers that match are kept out.",
+    "none": "No filters yet.",
+    "add": "Add filter",
+    "addShort": "Filter",
+    "remove": "Remove filter",
+    "edit": "Edit filter",
+    "removed": "Filter removed. What it took out stays out; pull it again if you need it.",
+    "failedToRemove": "Could not remove the filter",
+    "kind": {
+      "FINDING_TYPE": "type",
+      "VALUE_PATTERN": "value"
+    },
+    "addedBy": "Added by {{name}}",
+    "dialog": {
+      "title": "Filter out findings",
+      "editTitle": "Edit value filter",
+      "description": "Findings that match leave this case now, and no watch adds them again, neither by itself nor with “pull all”. Attaching one by hand still works.",
+      "scope": "Applies to",
+      "scopeCase": "Every watch in this case",
+      "scopeWatch": "Only “{{title}}”",
+      "by": "Filter by",
+      "byType": "Finding type",
+      "byValue": "Value",
+      "typesHint": "Types this case holds or its watches answer.",
+      "typesSearch": "Search types…",
+      "typesEmpty": "No finding types to pick from.",
+      "typesLoading": "Loading types…",
+      "inCase": "{{count}} in case",
+      "answers": "{{count}} answers",
+      "approximate": "Answer counts are estimates: a watch also filters by value.",
+      "alreadyFiltered": "already filtered",
+      "selected": "{{count}} selected",
+      "patternPlaceholder": "Regular expression, e.g. ^10\\.",
+      "descriptionPlaceholder": "Why? e.g. internal addresses, not evidence",
+      "patternHint": "Tested against the matched value. Use ^…$ to match the whole value; matching is case-sensitive.",
+      "addPattern": "Add another pattern",
+      "removePattern": "Remove this pattern",
+      "ruleMatches": "matches {{count}} in this case",
+      "checking": "Checking…",
+      "previewNone": "Nothing in this case matches right now. Answers that match are skipped from now on.",
+      "previewSome": "{{count}} finding(s) in this case match and will be detached now:",
+      "previewMore": "and {{count}} more",
+      "submit": "Filter out",
+      "submitDetach": "Filter out & detach {{count}}",
+      "save": "Save",
+      "saveDetach": "Save & detach {{count}}",
+      "applied": "Filter added: {{count}} finding(s) detached. The timeline lists them.",
+      "appliedNone": "Filter added.",
+      "updated": "Filter updated: {{count}} more finding(s) detached.",
+      "updatedNone": "Filter updated.",
+      "failed": "Could not save the filter"
+    },
+    "menu": {
+      "detachType": "Detach & filter out this type…",
+      "detachValue": "Detach & filter out this value…",
+      "filterType": "Filter out this type…",
+      "filterValue": "Filter out this value…"
+    },
+    "pullFiltered": "{{count}} kept out by filters",
+    "rulesCaseWide": "Rules for every watch",
+    "rulesWatch": "Rules",
+    "rulesHint": "Filters keep matching findings out of the case. Escalations mark them, highlight them on the board and bring them in even when auto-add is off. When both match, the filter wins.",
+    "rowFilter": "Filter out",
+    "rowEscalate": "Escalate",
+    "addFilter": "Add filter",
+    "addEscalation": "Add escalation"
+  },
+  "caseEscalation": {
+    "title": "Escalation",
+    "counter": "Escalated",
+    "spotlight": "Light up the escalated findings",
+    "spotlightClear": "Show everything again",
+    "badge": "{{count}} escalated finding(s): light them up",
+    "state": "Escalated",
+    "matched": "Matched {{rule}}",
+    "clear": "Clear escalation",
+    "clearAll": "Clear all escalations",
+    "cleared": "Escalation cleared. The finding stays in the case.",
+    "clearedAll": "{{count}} escalation(s) cleared.",
+    "failedToClear": "Could not clear the escalation",
+    "summary": "{{count}} escalated finding(s)",
+    "noneEscalated": "Nothing escalated",
+    "rules": "{{count}} escalation rule(s)",
+    "noRules": "No escalation rules",
+    "manage": "Rules…",
+    "dialog": {
+      "title": "Escalate findings",
+      "editTitle": "Edit escalation",
+      "description": "Matching findings are marked escalated and highlighted on the board. The ones already in the case are marked now; new answers that match come in by themselves, even when auto-add is off, and a notification goes out.",
+      "previewSome": "{{count}} finding(s) in this case match and will be escalated now:",
+      "previewNone": "Nothing in this case matches yet. New answers that match will come in escalated.",
+      "submit": "Escalate",
+      "submitCount": "Escalate {{count}}",
+      "save": "Save",
+      "saveCount": "Save & escalate {{count}}",
+      "applied": "Escalation rule added: {{count}} finding(s) escalated.",
+      "appliedNone": "Escalation rule added.",
+      "updated": "Escalation rule updated: {{count}} more finding(s) escalated.",
+      "updatedNone": "Escalation rule updated.",
+      "alreadyRule": "already a rule"
+    },
+    "menu": {
+      "escalateType": "Escalate this type…",
+      "escalateValue": "Escalate this value…"
+    },
+    "table": {
+      "badge": "{{count}} escalated",
+      "tooltip": "{{count}} finding(s) escalated · last {{when}}",
+      "filter": "Escalated only"
+    }
+  },
   "correlation": {
     "findingsTab": "Findings",
     "relatedTab": "Fingerprints",

@@ -101,7 +101,16 @@ export const CaseActivityDtoActivityTypeEnum = {
     BoardItemHighlighted: 'BOARD_ITEM_HIGHLIGHTED',
     BoardArranged: 'BOARD_ARRANGED',
     BoardSnapshotTaken: 'BOARD_SNAPSHOT_TAKEN',
-    CommentResolved: 'COMMENT_RESOLVED'
+    CommentResolved: 'COMMENT_RESOLVED',
+    CleanupSettingsUpdated: 'CLEANUP_SETTINGS_UPDATED',
+    FindingFilterAdded: 'FINDING_FILTER_ADDED',
+    FindingFilterUpdated: 'FINDING_FILTER_UPDATED',
+    FindingFilterRemoved: 'FINDING_FILTER_REMOVED',
+    FindingsAutoRemoved: 'FINDINGS_AUTO_REMOVED',
+    EvidenceAutoRemoved: 'EVIDENCE_AUTO_REMOVED',
+    InquirySettingsUpdated: 'INQUIRY_SETTINGS_UPDATED',
+    FindingsEscalated: 'FINDINGS_ESCALATED',
+    EscalationCleared: 'ESCALATION_CLEARED'
 } as const;
 export type CaseActivityDtoActivityTypeEnum = typeof CaseActivityDtoActivityTypeEnum[keyof typeof CaseActivityDtoActivityTypeEnum];
 

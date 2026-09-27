@@ -95,7 +95,7 @@ describe('auto-pull into linked cases', () => {
   /** One open case that asked for automatic top-ups. */
   function linkedCase() {
     mockPrisma.caseInquiry.findMany.mockResolvedValue([
-      { caseId: 'c1', case: { title: 'Travel spend' } },
+      { caseId: 'c1', autoPull: true, case: { title: 'Travel spend' } },
     ]);
   }
 
@@ -109,19 +109,43 @@ describe('auto-pull into linked cases', () => {
       'c1',
       { inquiryId: 'q1', findingIds: ['f0', 'f1', 'f2'] },
       AUTO_PULL_ACTOR,
+      // The scan that landed them, for the case timeline.
+      { sourceId: 's1', runnerId: 'run-latest' },
     );
   });
 
-  it('only considers open cases that opted in', async () => {
+  it('only considers open cases that opted in, or that escalate', async () => {
     linkedCase();
     mockPrisma.finding.findMany.mockResolvedValue(newFindings(1));
 
     await service.processSourceCompletion('s1', 'run-latest');
 
     const where = mockPrisma.caseInquiry.findMany.mock.calls[0][0].where;
-    expect(where.autoPull).toBe(true);
+    expect(where.OR).toEqual(
+      expect.arrayContaining([
+        { autoPull: true },
+        { filters: { some: { action: 'ESCALATE' } } },
+      ]),
+    );
     expect(where.case.status.notIn).toEqual(
       expect.arrayContaining(['CLOSED', 'ARCHIVED']),
+    );
+  });
+
+  it('pulls only escalating answers into a case with auto-add off', async () => {
+    mockPrisma.caseInquiry.findMany.mockResolvedValue([
+      { caseId: 'c2', autoPull: false, case: { title: 'Watched quietly' } },
+    ]);
+    mockPrisma.finding.findMany.mockResolvedValue(newFindings(2));
+    mockPull.pullFromInquiry.mockResolvedValue({ pulled: 1 });
+
+    await service.processSourceCompletion('s1', 'run-latest');
+
+    expect(mockPull.pullFromInquiry).toHaveBeenCalledWith(
+      'c2',
+      { inquiryId: 'q1', findingIds: ['f0', 'f1'] },
+      AUTO_PULL_ACTOR,
+      { sourceId: 's1', runnerId: 'run-latest', onlyEscalating: true },
     );
   });
 

@@ -63,6 +63,9 @@ const row = (findingId: string, severity: SeverityKey = "medium"): BubbleRow => 
   missing: false,
   state: "open",
   note: null,
+  escalated: false,
+  escalationLabel: null,
+  escalatedAt: null,
 });
 
 const bubble = (itemId: string, rows: BubbleRow[], unattached: BubbleRow[] = []): Bubble =>
@@ -79,6 +82,7 @@ const bubble = (itemId: string, rows: BubbleRow[], unattached: BubbleRow[] = [])
     unattached,
     severityCounts: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
     newCount: 0,
+    escalatedCount: 0,
     maxSeverity: null,
   });
 
@@ -134,6 +138,14 @@ describe("findingVisualState", () => {
     expect(findingVisualState({ status: "IGNORED" })).toBe("dismissed");
     expect(findingVisualState({ matchState: "NEW", status: "OPEN" })).toBe("new");
     expect(findingVisualState({ status: "OPEN" })).toBe("open");
+  });
+});
+
+describe("tallyBubble", () => {
+  it("counts the attached findings an escalation rule marked, not the unattached ones", () => {
+    const escalated = { ...row("f1"), escalated: true, escalationLabel: "type email", escalatedAt: "2026-09-27T10:00:00.000Z" };
+    const b = bubble("i1", [escalated, row("f2")], [{ ...row("f3"), escalated: true }]);
+    expect(b.escalatedCount).toBe(1);
   });
 });
 
