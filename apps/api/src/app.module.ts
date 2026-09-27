@@ -55,6 +55,11 @@ import { QuickSearchService } from './search/quick-search.service';
 import { CaseBoardReadService } from './case-board/case-board-read.service';
 import { InquiryActivityService } from './inquiry-activity.service';
 import { CASE_PULL } from './cases/case-pull.port';
+import { CASE_CLEANUP } from './cases/case-cleanup.port';
+import { CaseCleanupService } from './cases/case-cleanup.service';
+import { CaseEscalationService } from './cases/case-escalation.service';
+import { CaseFindingFiltersService } from './cases/case-finding-filters.service';
+import { CaseCleanupController } from './controllers/case-cleanup.controller';
 import { GraphService } from './graph.service';
 import { BuiltinMcpToolsService } from './chat-gateway/builtin-mcp-tools.service';
 import { ChatAgentService } from './chat-gateway/chat-agent.service';
@@ -148,6 +153,7 @@ import {
     AssistantController,
     CasesController,
     CaseBoardController,
+    CaseCleanupController,
     CaseworkController,
     InquiriesController,
     CaseTimelineController,
@@ -200,6 +206,11 @@ import {
     // cycle, and under this runtime that hangs the boot silently instead of
     // failing. See cases/case-pull.port.ts.
     { provide: CASE_PULL, useExisting: CasesService },
+    CaseCleanupService,
+    // Same trick for the matching worker's post-scan clean-up.
+    { provide: CASE_CLEANUP, useExisting: CaseCleanupService },
+    CaseEscalationService,
+    CaseFindingFiltersService,
     CaseworkSummaryService,
     ConstellationService,
     InquiriesService,

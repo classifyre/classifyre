@@ -2,6 +2,8 @@ export default {
   index: "Overview",
   board: "The case board",
   evidence: "Evidence & findings",
+  cleanup: "Clean-up & filters",
+  escalation: "Escalation",
   links: "Lines & links",
   hypothesis: "Hypotheses & threads",
   connections: "Connections & neighbours",

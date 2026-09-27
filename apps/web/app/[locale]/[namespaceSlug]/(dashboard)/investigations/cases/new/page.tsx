@@ -40,8 +40,15 @@ import {
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { useScrollSpy } from "@/hooks/use-scroll-spy";
 import { useTranslation } from "@/hooks/use-translation";
+import { CaseCleanupSettings } from "@/components/case-cleanup/case-cleanup-settings";
+import {
+  CLEANUP_KEYS,
+  NO_CLEANUP,
+  type CleanupKey,
+  type CleanupValues,
+} from "@/components/case-cleanup/cleanup-rules";
 
-const STEP_IDS = ["details", "inquiries", "evidence"] as const;
+const STEP_IDS = ["details", "inquiries", "evidence", "cleanup"] as const;
 type StepId = (typeof STEP_IDS)[number];
 
 /**
@@ -82,6 +89,7 @@ function NewCasePageInner() {
     Map<string, InquirySelection>
   >(new Map());
   const [creating, setCreating] = React.useState(false);
+  const [cleanup, setCleanup] = React.useState<CleanupValues>(NO_CLEANUP);
 
   const { activeStep, sectionRefs, scrollTo } = useScrollSpy(STEP_IDS, [
     selectedInquiryIds.length,
@@ -103,6 +111,11 @@ function NewCasePageInner() {
       title: t("investigations.newCase.stepEvidence"),
       description: t("investigations.newCase.stepEvidenceDesc"),
       disabled: selectedInquiryIds.length === 0,
+    },
+    {
+      id: "cleanup",
+      title: t("caseCleanup.title"),
+      description: t("caseCleanup.stepDesc"),
     },
   ];
 
@@ -199,7 +212,7 @@ function NewCasePageInner() {
         route: "/investigations/cases/new",
         title: "Case Builder Assistant",
         entityId: null,
-        values: { ...details, inquiryIds: selectedInquiryIds },
+        values: { ...details, inquiryIds: selectedInquiryIds, ...cleanup },
         schema: null,
         validation: { isValid: true, missingFields: [], errors: [] },
         metadata: {},
@@ -211,6 +224,12 @@ function NewCasePageInner() {
             setSelectedInquiryIds(
               Array.isArray(patch.value) ? patch.value.map(String) : [],
             );
+          } else if ((CLEANUP_KEYS as readonly string[]).includes(patch.path)) {
+            const key = patch.path as CleanupKey;
+            setCleanup((prev) => ({
+              ...prev,
+              [key]: patch.value === true || patch.value === "true",
+            }));
           } else if (
             patch.path === "title" ||
             patch.path === "description" ||
@@ -223,7 +242,7 @@ function NewCasePageInner() {
         }
       },
     }),
-    [details, selectedInquiryIds],
+    [details, selectedInquiryIds, cleanup],
   );
 
   useRegisterAssistantBridge(assistantBridge);
@@ -249,6 +268,7 @@ function NewCasePageInner() {
           selectedInquiryIds.length > 0 ? selectedInquiryIds : undefined,
         autoPullInquiryIds:
           autoPullInquiryIds.length > 0 ? autoPullInquiryIds : undefined,
+        ...cleanup,
       };
       const created = await api.cases.casesControllerCreate({
         createCaseDto: dto,
@@ -530,6 +550,21 @@ function NewCasePageInner() {
                   </p>
                 </div>
               )}
+            </AiAssistedCard>
+          </section>
+
+          {/* ── Automatic clean-up ── */}
+          <section ref={sectionRefs.cleanup as React.RefObject<HTMLElement>}>
+            <AiAssistedCard
+              title={t("caseCleanup.title")}
+              description={t("caseCleanup.stepDesc")}
+              active={activeStep === "cleanup"}
+            >
+              <CaseCleanupSettings
+                values={cleanup}
+                onChange={setCleanup}
+                idPrefix="new-case-cleanup"
+              />
             </AiAssistedCard>
           </section>
 

@@ -61,6 +61,24 @@ export interface UpdateCaseDto {
      * @memberof UpdateCaseDto
      */
     aiMode?: UpdateCaseDtoAiModeEnum;
+    /**
+     * Clean-up: take out findings the scans no longer see (retired by a run, or deleted). Switching one on applies it right away.
+     * @type {boolean}
+     * @memberof UpdateCaseDto
+     */
+    removeGoneFindings?: boolean;
+    /**
+     * Clean-up: take out findings someone resolved. Switching one on applies it right away.
+     * @type {boolean}
+     * @memberof UpdateCaseDto
+     */
+    removeResolvedFindings?: boolean;
+    /**
+     * Clean-up: take out assets deleted from their source, with their findings. Switching one on applies it right away.
+     * @type {boolean}
+     * @memberof UpdateCaseDto
+     */
+    removeGoneAssets?: boolean;
 }
 
 
@@ -122,6 +140,9 @@ export function UpdateCaseDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'assignee': json['assignee'] == null ? undefined : json['assignee'],
         'conclusion': json['conclusion'] == null ? undefined : json['conclusion'],
         'aiMode': json['aiMode'] == null ? undefined : json['aiMode'],
+        'removeGoneFindings': json['removeGoneFindings'] == null ? undefined : json['removeGoneFindings'],
+        'removeResolvedFindings': json['removeResolvedFindings'] == null ? undefined : json['removeResolvedFindings'],
+        'removeGoneAssets': json['removeGoneAssets'] == null ? undefined : json['removeGoneAssets'],
     };
 }
 
@@ -143,6 +164,9 @@ export function UpdateCaseDtoToJSONTyped(value?: UpdateCaseDto | null, ignoreDis
         'assignee': value['assignee'],
         'conclusion': value['conclusion'],
         'aiMode': value['aiMode'],
+        'removeGoneFindings': value['removeGoneFindings'],
+        'removeResolvedFindings': value['removeResolvedFindings'],
+        'removeGoneAssets': value['removeGoneAssets'],
     };
 }
 

@@ -1,0 +1,142 @@
+---
+title: Escalation
+description: Mark the kinds of finding that need attention the moment they appear. Escalated findings are highlighted on the board, flag their case in the case list, raise a notification, and come in even when a watch's auto-add is off.
+---
+
+import { Callout } from "nextra/components"
+import { FindingKey } from "@/components/case-board/board-key"
+
+# Escalation
+
+Some findings matter more than the rest the moment they appear: an account
+number in a case about a data leak, a known suspect's name, an address on a
+sanctions list. **Escalation rules** name them. A finding that matches one is
+**escalated**:
+
+- it is **highlighted on the board**: a magenta hazard ring, a warning flag and
+  a magenta label, and its asset shows **▲** with how many of its findings
+  escalated;
+- the case shows it **in the case list**: a magenta edge on the row and a
+  **▲ 3 escalated** pill, and the **Escalated only** filter finds such cases;
+- a watch **brings it in even when its auto-add is off**, and a
+  **notification** goes out;
+- the **timeline** says which findings escalated, which rule matched them and
+  what brought them in.
+
+Escalation rules are the same rules as [finding filters](/investigations/cases/cleanup/#finding-filters),
+with the other action: a filter keeps a kind of finding out, an escalation
+marks it. They share the scope and the way of matching.
+
+---
+
+## Adding an escalation rule
+
+Open the **Watches** panel on the board. Every scope has two rows of rules:
+
+| Row | What its rules do |
+|---|---|
+| **Filter out** | Keep matching findings out of the case |
+| **Escalate** | Mark matching findings, highlight them and bring them in |
+
+The card at the top, **Rules for every watch**, holds the rules for the whole
+case. Each watch card has its own **Rules** for that watch's answers only.
+Press **+** in the **Escalate** row to open the dialog.
+
+You can also start from a finding on the board: right-click it →
+**Escalate this type…** or **Escalate this value…** (the value is filled in as
+an exact match).
+
+In the dialog:
+
+1. **Applies to**: every watch in the case, or one watch.
+2. **Filter by**: a **finding type**, picked from the types the case holds and
+   its watches answer (with how many of each), or a **value**: a regular
+   expression tested against the matched value, with a note on why. Add
+   several at once.
+3. **Check the preview**: how many findings already in the case match and will
+   be escalated now, with examples. The button carries the number:
+   **Escalate 3**.
+
+| Scope | Which findings it escalates |
+|---|---|
+| **Every watch in this case** | Every finding of the case, however it came in: from any watch, attached by hand, or added by Autopilot |
+| **One watch** | That watch's answers only |
+
+---
+
+## What happens then
+
+- **Findings already in the case** that match are escalated right away.
+- **After every scan**, a watch's new answers that match are escalated as they
+  come in. With auto-add **on**, they arrive with the rest. With auto-add
+  **off**, the watch brings in **only** the escalating answers: escalation is
+  how a quiet watch still gets your attention.
+- A **notification** tells you which case escalated and why. While it is
+  unread, further escalations of the same case within the hour do not send
+  another one.
+- **Filters win.** A finding a filter keeps out never comes in, even when it
+  would escalate.
+
+<Callout type="info">
+An escalation marks a finding once, and later scans leave the mark alone. A
+finding you cleared stays cleared through later scans. Adding a rule, or
+changing one so that it matches the finding, marks it again.
+</Callout>
+
+---
+
+## Seeing what escalated
+
+- **On the board**: escalated findings wear the hazard ring and flag. When an
+  asset's findings are folded away or you are zoomed far out, the asset's
+  **▲ n** badge still shows. Click the badge, or the **▲ Escalated** counter in
+  the top bar, to **light up every escalated finding** and dim the rest; press
+  it again (or `Esc`) to see everything.
+- **In the Details panel**: an escalated finding shows which rule it matched
+  and when, with **Clear escalation**.
+- **In the case list**: escalated cases have a magenta edge and the
+  **▲ n escalated** pill; hover it for when the last escalation happened.
+  **Escalated only** shows just those cases. An escalation also moves its case
+  to the top, since the list is ordered by last change.
+- **On the timeline**: escalation entries stand out in magenta, and the
+  **Escalations** filter shows only them and the rule changes.
+
+<FindingKey />
+
+---
+
+## Clearing escalations
+
+Once someone has dealt with an escalated finding, take the mark off:
+
+- one finding: right-click it → **Clear escalation**, or **Clear escalation**
+  in its **Details** panel;
+- all of them: **Clear all escalations** in the **Case file** panel.
+
+The findings stay in the case; only the mark goes, and the timeline records it.
+Removing an escalation rule does not clear the marks it made. It only stops
+marking new findings.
+
+---
+
+## On the timeline
+
+| Entry | What it tells you |
+|---|---|
+| **Escalation rule added / changed / removed** | The rule, its scope and its note (in the Escalations filter) |
+| **Escalated** | The findings that escalated, the rule each matched, and why now: the rule was just added, they were attached, or they came in through a watch |
+| **Escalated and brought in** | The same, for answers a watch brought in only because they escalate (its auto-add is off) |
+| **Escalation cleared** | Which findings are no longer escalated, and who cleared them |
+
+What the watches do by themselves reads as **one entry per stretch of scans**:
+*Escalated and brought in, 4 findings, "Sanctions hits" brought them in over 3
+scans of Firmenbuch between 09:10 and 10:05*.
+
+---
+
+## From MCP and the assistant
+
+`add_case_finding_filters` with `action: "ESCALATE"` adds escalation rules; run
+it with `dryRun` first, and it reports how many findings would be escalated.
+`clear_case_escalations` takes the marks off. `get_case` reports each case's
+`escalatedCount` and `lastEscalatedAt`.

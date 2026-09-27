@@ -92,6 +92,18 @@ export const EvidenceBubble = React.memo(function EvidenceBubble({ id, selected 
       topLeft={topLeft}
       dots={dots}
       readOnly={readOnly}
+      escalated={
+        bubble.escalatedCount > 0
+          ? {
+              count: bubble.escalatedCount,
+              title: t("caseEscalation.badge", { count: bubble.escalatedCount }),
+              onClick: () =>
+                ui.getState().set({
+                  spotlight: ui.getState().spotlight === "escalated" ? null : "escalated",
+                }),
+            }
+          : null
+      }
     />
   );
 });

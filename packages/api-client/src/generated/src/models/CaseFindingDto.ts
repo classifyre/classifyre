@@ -79,6 +79,24 @@ export interface CaseFindingDto {
      * @memberof CaseFindingDto
      */
     createdAt: Date;
+    /**
+     * When an escalation rule marked this finding
+     * @type {Date}
+     * @memberof CaseFindingDto
+     */
+    escalatedAt?: Date | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof CaseFindingDto
+     */
+    escalationRuleId?: string | null;
+    /**
+     * What the escalation rule matched, in words
+     * @type {string}
+     * @memberof CaseFindingDto
+     */
+    escalationLabel?: string | null;
 }
 
 /**
@@ -113,6 +131,9 @@ export function CaseFindingDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'matchedContent': json['matchedContent'] == null ? undefined : json['matchedContent'],
         'note': json['note'] == null ? undefined : json['note'],
         'createdAt': (new Date(json['createdAt'])),
+        'escalatedAt': json['escalatedAt'] == null ? undefined : (new Date(json['escalatedAt'])),
+        'escalationRuleId': json['escalationRuleId'] == null ? undefined : json['escalationRuleId'],
+        'escalationLabel': json['escalationLabel'] == null ? undefined : json['escalationLabel'],
     };
 }
 
@@ -137,6 +158,9 @@ export function CaseFindingDtoToJSONTyped(value?: CaseFindingDto | null, ignoreD
         'matchedContent': value['matchedContent'],
         'note': value['note'],
         'createdAt': value['createdAt'].toISOString(),
+        'escalatedAt': value['escalatedAt'] == null ? value['escalatedAt'] : value['escalatedAt'].toISOString(),
+        'escalationRuleId': value['escalationRuleId'],
+        'escalationLabel': value['escalationLabel'],
     };
 }
 

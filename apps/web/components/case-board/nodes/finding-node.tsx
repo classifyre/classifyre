@@ -61,6 +61,7 @@ export const FindingNode = React.memo(function FindingNode({ data, selected }: N
       resolved={row.state === "resolved"}
       struck={row.state === "dismissed"}
       faded={faded(row.state, view)}
+      escalated={finding.attached && row.escalated}
     />
   );
 });
@@ -77,6 +78,11 @@ function describe(row: BubbleRow, attached: boolean, t: ReturnType<typeof useTra
     `${row.typeLabel}${row.value ? `: ${row.value}` : ""}`,
     row.detector,
     state,
+    attached && row.escalated
+      ? [t("caseEscalation.state"), row.escalationLabel ? t("caseEscalation.matched", { rule: row.escalationLabel }) : null]
+          .filter(Boolean)
+          .join(": ")
+      : null,
     attached ? null : t("caseBoard.bubble.notInCase"),
   ]
     .filter(Boolean)

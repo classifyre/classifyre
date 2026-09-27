@@ -12,6 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ActorName } from '../actor-name.decorator';
 import { CasesService } from '../cases.service';
 import {
   AddEvidenceDto,
@@ -45,8 +46,14 @@ export class CasesController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a case (optionally linking questions)' })
   @ApiResponse({ status: 201, type: CaseResponseDto })
-  create(@Body() dto: CreateCaseDto): Promise<CaseResponseDto> {
-    return this.casesService.create(dto);
+  create(
+    @Body() dto: CreateCaseDto,
+    @ActorName() actor: string | undefined,
+  ): Promise<CaseResponseDto> {
+    return this.casesService.create({
+      ...dto,
+      createdBy: dto.createdBy ?? actor,
+    });
   }
 
   @Get()
@@ -73,8 +80,9 @@ export class CasesController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdateCaseDto,
+    @ActorName() actor: string | undefined,
   ): Promise<CaseResponseDto> {
-    return this.casesService.update(id, dto);
+    return this.casesService.update(id, dto, actor);
   }
 
   @Delete(':id')
@@ -172,8 +180,9 @@ export class CasesController {
   linkInquiries(
     @Param('id') id: string,
     @Body() dto: LinkInquiriesDto,
+    @ActorName() actor: string | undefined,
   ): Promise<CaseResponseDto> {
-    return this.casesService.linkInquiries(id, dto);
+    return this.casesService.linkInquiries(id, dto, actor);
   }
 
   @Patch(':id/inquiries/:inquiryId')
@@ -186,6 +195,7 @@ export class CasesController {
     @Param('id') id: string,
     @Param('inquiryId') inquiryId: string,
     @Body() dto: SetInquiryAutoPullDto,
+    @ActorName() actor: string | undefined,
   ): Promise<CaseResponseDto> {
     // No global ValidationPipe runs here, so the boolean arrives as whatever
     // the client sent — including the string "true" from an older MCP session.
@@ -193,6 +203,7 @@ export class CasesController {
       id,
       inquiryId,
       dto.autoPull === true || String(dto.autoPull) === 'true',
+      actor,
     );
   }
 
@@ -205,8 +216,9 @@ export class CasesController {
   unlinkInquiry(
     @Param('id') id: string,
     @Param('inquiryId') inquiryId: string,
+    @ActorName() actor: string | undefined,
   ): Promise<CaseResponseDto> {
-    return this.casesService.unlinkInquiry(id, inquiryId);
+    return this.casesService.unlinkInquiry(id, inquiryId, actor);
   }
 
   @Post(':id/close')
@@ -231,8 +243,9 @@ export class CasesController {
   pull(
     @Param('id') id: string,
     @Body() dto: PullFromInquiryDto,
+    @ActorName() actor: string | undefined,
   ): Promise<PullFromInquiryResponseDto> {
-    return this.casesService.pullFromInquiry(id, dto);
+    return this.casesService.pullFromInquiry(id, dto, actor);
   }
 
   @Get(':id/graph')

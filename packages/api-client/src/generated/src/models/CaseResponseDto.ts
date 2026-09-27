@@ -27,6 +27,20 @@ import {
     CaseLinkedInquiryDtoToJSON,
     CaseLinkedInquiryDtoToJSONTyped,
 } from './CaseLinkedInquiryDto';
+import type { CaseFindingFilterDto } from './CaseFindingFilterDto';
+import {
+    CaseFindingFilterDtoFromJSON,
+    CaseFindingFilterDtoFromJSONTyped,
+    CaseFindingFilterDtoToJSON,
+    CaseFindingFilterDtoToJSONTyped,
+} from './CaseFindingFilterDto';
+import type { CaseCleanupResultDto } from './CaseCleanupResultDto';
+import {
+    CaseCleanupResultDtoFromJSON,
+    CaseCleanupResultDtoFromJSONTyped,
+    CaseCleanupResultDtoToJSON,
+    CaseCleanupResultDtoToJSONTyped,
+} from './CaseCleanupResultDto';
 
 /**
  * 
@@ -107,6 +121,36 @@ export interface CaseResponseDto {
      */
     inquiryCount: number;
     /**
+     * Clean-up: findings the scans no longer see leave the case by themselves
+     * @type {boolean}
+     * @memberof CaseResponseDto
+     */
+    removeGoneFindings: boolean;
+    /**
+     * Clean-up: findings someone resolved leave the case
+     * @type {boolean}
+     * @memberof CaseResponseDto
+     */
+    removeResolvedFindings: boolean;
+    /**
+     * Clean-up: assets deleted from their source leave the case, with their findings
+     * @type {boolean}
+     * @memberof CaseResponseDto
+     */
+    removeGoneAssets: boolean;
+    /**
+     * Findings of the case an escalation rule marked
+     * @type {number}
+     * @memberof CaseResponseDto
+     */
+    escalatedCount: number;
+    /**
+     * When an escalation rule last marked a finding of the case
+     * @type {Date}
+     * @memberof CaseResponseDto
+     */
+    lastEscalatedAt?: Date | null;
+    /**
      * 
      * @type {Date}
      * @memberof CaseResponseDto
@@ -130,6 +174,18 @@ export interface CaseResponseDto {
      * @memberof CaseResponseDto
      */
     inquiries?: Array<CaseLinkedInquiryDto>;
+    /**
+     * Finding filters, case-wide and per watch
+     * @type {Array<CaseFindingFilterDto>}
+     * @memberof CaseResponseDto
+     */
+    findingFilters?: Array<CaseFindingFilterDto>;
+    /**
+     * On an update that switched a clean-up rule on: what it took out right away
+     * @type {CaseCleanupResultDto}
+     * @memberof CaseResponseDto
+     */
+    cleanup?: CaseCleanupResultDto;
 }
 
 
@@ -179,6 +235,10 @@ export function instanceOfCaseResponseDto(value: object): value is CaseResponseD
     if (!('evidenceCount' in value) || value['evidenceCount'] === undefined) return false;
     if (!('hypothesisCount' in value) || value['hypothesisCount'] === undefined) return false;
     if (!('inquiryCount' in value) || value['inquiryCount'] === undefined) return false;
+    if (!('removeGoneFindings' in value) || value['removeGoneFindings'] === undefined) return false;
+    if (!('removeResolvedFindings' in value) || value['removeResolvedFindings'] === undefined) return false;
+    if (!('removeGoneAssets' in value) || value['removeGoneAssets'] === undefined) return false;
+    if (!('escalatedCount' in value) || value['escalatedCount'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
@@ -206,10 +266,17 @@ export function CaseResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'evidenceCount': json['evidenceCount'],
         'hypothesisCount': json['hypothesisCount'],
         'inquiryCount': json['inquiryCount'],
+        'removeGoneFindings': json['removeGoneFindings'],
+        'removeResolvedFindings': json['removeResolvedFindings'],
+        'removeGoneAssets': json['removeGoneAssets'],
+        'escalatedCount': json['escalatedCount'],
+        'lastEscalatedAt': json['lastEscalatedAt'] == null ? undefined : (new Date(json['lastEscalatedAt'])),
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
         'evidence': json['evidence'] == null ? undefined : ((json['evidence'] as Array<any>).map(CaseEvidenceDtoFromJSON)),
         'inquiries': json['inquiries'] == null ? undefined : ((json['inquiries'] as Array<any>).map(CaseLinkedInquiryDtoFromJSON)),
+        'findingFilters': json['findingFilters'] == null ? undefined : ((json['findingFilters'] as Array<any>).map(CaseFindingFilterDtoFromJSON)),
+        'cleanup': json['cleanup'] == null ? undefined : CaseCleanupResultDtoFromJSON(json['cleanup']),
     };
 }
 
@@ -236,10 +303,17 @@ export function CaseResponseDtoToJSONTyped(value?: CaseResponseDto | null, ignor
         'evidenceCount': value['evidenceCount'],
         'hypothesisCount': value['hypothesisCount'],
         'inquiryCount': value['inquiryCount'],
+        'removeGoneFindings': value['removeGoneFindings'],
+        'removeResolvedFindings': value['removeResolvedFindings'],
+        'removeGoneAssets': value['removeGoneAssets'],
+        'escalatedCount': value['escalatedCount'],
+        'lastEscalatedAt': value['lastEscalatedAt'] == null ? value['lastEscalatedAt'] : value['lastEscalatedAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
         'evidence': value['evidence'] == null ? undefined : ((value['evidence'] as Array<any>).map(CaseEvidenceDtoToJSON)),
         'inquiries': value['inquiries'] == null ? undefined : ((value['inquiries'] as Array<any>).map(CaseLinkedInquiryDtoToJSON)),
+        'findingFilters': value['findingFilters'] == null ? undefined : ((value['findingFilters'] as Array<any>).map(CaseFindingFilterDtoToJSON)),
+        'cleanup': CaseCleanupResultDtoToJSON(value['cleanup']),
     };
 }
 

@@ -38,6 +38,11 @@ describe('McpServerFactoryService destructive tools reject unknown keys', () => 
       caseId: uuid,
       ops: [{ type: 'item.delete', opId: uuid, id: uuid }],
     },
+    add_case_finding_filters: {
+      id: uuid,
+      rules: [{ kind: 'FINDING_TYPE', pattern: 'IP_ADDRESS' }],
+      dryRun: true,
+    },
   };
 
   let registered: Record<string, RegisteredTool>;

@@ -83,6 +83,11 @@ export interface BubbleRow {
   missing: boolean;
   state: FindingVisualState;
   note: string | null;
+  /** An escalation rule marked it (attached rows only). */
+  escalated: boolean;
+  /** What the rule matched, in words ("type IP_ADDRESS — money trail"). */
+  escalationLabel: string | null;
+  escalatedAt: string | null;
 }
 
 export interface Bubble {
@@ -101,6 +106,8 @@ export interface Bubble {
   unattached: BubbleRow[];
   severityCounts: Record<SeverityKey, number>;
   newCount: number;
+  /** Attached findings an escalation rule marked. */
+  escalatedCount: number;
   maxSeverity: SeverityKey | null;
   /** Placeholder until the server confirms (evidence just added). */
   pending?: boolean;

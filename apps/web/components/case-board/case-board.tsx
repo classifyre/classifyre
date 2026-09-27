@@ -24,6 +24,7 @@ import { useRegisterAssistantBridge } from "@/components/assistant-workflow-prov
 import { useEntityDocumentTitle } from "@/components/document-title-updater";
 import { useServerConfig } from "@/components/server-config-provider";
 import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
+import { FindingFilterDialog } from "@/components/case-cleanup/finding-filter-dialog";
 import { useTranslation } from "@/hooks/use-translation";
 import { BoardProviders, useBoard, useBoardStore, useUi, useUiStore } from "./store/board-context";
 import { createBoardStore } from "./store/board-store";
@@ -357,6 +358,7 @@ function BoardShell({ caseId }: { caseId: string }) {
       </div>
       <CommandPalette onFlyTo={flyTo} onTidyUp={() => void tidyUp()} />
       <AutopilotDialog caseId={caseId} caseTitle={caseData?.title} onTriggered={refreshAll} />
+      <FilterDialogHost caseId={caseId} caseData={caseData} onApplied={refreshAll} />
       <CheatSheet />
       <ConfirmDialog />
     </div>
@@ -444,6 +446,32 @@ function AutopilotDialog({
         ui.getState().set({ autopilotRefresh: ui.getState().autopilotRefresh + 1 });
         onTriggered();
       }}
+    />
+  );
+}
+
+/** "Detach & filter out…" from a finding's menu: the same dialog as the Watches panel's. */
+function FilterDialogHost({
+  caseId,
+  caseData,
+  onApplied,
+}: {
+  caseId: string;
+  caseData: CaseResponseDto | null;
+  onApplied: () => void;
+}) {
+  const request = useUi((s) => s.filterRequest);
+  const ui = useUiStore();
+  const store = useBoardStore();
+  return (
+    <FindingFilterDialog
+      caseId={caseId}
+      watches={(caseData?.inquiries ?? []).map((q) => ({ id: q.id, title: q.title }))}
+      filters={caseData?.findingFilters ?? []}
+      request={request}
+      onClose={() => ui.getState().set({ filterRequest: null })}
+      onApplied={onApplied}
+      clientId={store.getState().clientId}
     />
   );
 }

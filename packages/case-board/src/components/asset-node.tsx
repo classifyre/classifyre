@@ -49,6 +49,7 @@ export function AssetNode({
   readOnly,
   linkable = true,
   ghost = false,
+  escalated = null,
   testId,
 }: {
   label: string;
@@ -72,6 +73,11 @@ export function AssetNode({
   linkable?: boolean;
   /** Found by a trace beyond the board: dashed and faint. */
   ghost?: boolean;
+  /**
+   * Findings of this asset an escalation rule marked. Shown at every zoom —
+   * at far zoom, when findings fold into the donut, it is the only sign.
+   */
+  escalated?: { count: number; title: string; onClick?: () => void } | null;
   testId: string;
 }) {
   const { cx, cy, ring, width, height } = ASSET_NODE;
@@ -114,6 +120,7 @@ export function AssetNode({
       {lod !== "chip" && topRight && <Badge badge={topRight} style={{ left: cx + 14, top: cy - ring - 4 }} />}
       {lod !== "chip" && bottomRight && <Badge badge={bottomRight} style={{ left: cx + 16, top: cy + 10 }} />}
       {lod !== "chip" && topLeft && <Badge badge={topLeft} style={{ right: width - cx + 14, top: cy - ring - 4 }} />}
+      {escalated && escalated.count > 0 && <EscalationBadge escalated={escalated} lod={lod} />}
       {action}
 
       <span
@@ -129,6 +136,53 @@ export function AssetNode({
 
       <Ports connectable={!readOnly} hidden={!linkable} round={{ cx, cy, r: ring, top: cy - ring - 18, bottom: height + 3 }} />
     </div>
+  );
+}
+
+/**
+ * "▲ n" in escalation magenta, left of the asset circle: how many of its
+ * findings escalated. Grows with the far-zoom label so a zoomed-out board
+ * still points at them; a click spotlights every escalated finding.
+ */
+function EscalationBadge({
+  escalated,
+  lod,
+}: {
+  escalated: { count: number; title: string; onClick?: () => void };
+  lod: Lod;
+}) {
+  const { cx, cy, ring, width } = ASSET_NODE;
+  const big = lod === "chip";
+  const className = cn(
+    "nodrag nopan absolute inline-flex items-center gap-[3px] rounded-[3px] border-[1.5px] border-[var(--background)] bg-[var(--cb-escalation)] font-mono font-bold whitespace-nowrap text-[var(--cb-escalation-ink)]",
+    big ? "px-2 text-[24px] leading-[34px]" : "px-1 text-[10px] leading-[14px]",
+    escalated.onClick && "cursor-pointer hover:brightness-110",
+  );
+  const style: React.CSSProperties = big
+    ? { right: width - cx + ring + 6, top: cy - 18 }
+    : { right: width - cx + ring + 3, top: cy - 8 };
+  const content = (
+    <>
+      <span aria-hidden>▲</span>
+      {escalated.count}
+    </>
+  );
+  return escalated.onClick ? (
+    <button
+      type="button"
+      className={className}
+      style={style}
+      title={escalated.title}
+      aria-label={escalated.title}
+      onClick={escalated.onClick}
+      data-testid="escalation-badge"
+    >
+      {content}
+    </button>
+  ) : (
+    <span className={className} style={style} title={escalated.title} data-testid="escalation-badge">
+      {content}
+    </span>
   );
 }
 

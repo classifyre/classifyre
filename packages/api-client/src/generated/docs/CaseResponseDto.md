@@ -18,10 +18,17 @@ Name | Type
 `evidenceCount` | number
 `hypothesisCount` | number
 `inquiryCount` | number
+`removeGoneFindings` | boolean
+`removeResolvedFindings` | boolean
+`removeGoneAssets` | boolean
+`escalatedCount` | number
+`lastEscalatedAt` | Date
 `createdAt` | Date
 `updatedAt` | Date
 `evidence` | [Array&lt;CaseEvidenceDto&gt;](CaseEvidenceDto.md)
 `inquiries` | [Array&lt;CaseLinkedInquiryDto&gt;](CaseLinkedInquiryDto.md)
+`findingFilters` | [Array&lt;CaseFindingFilterDto&gt;](CaseFindingFilterDto.md)
+`cleanup` | [CaseCleanupResultDto](CaseCleanupResultDto.md)
 
 ## Example
 
@@ -42,10 +49,17 @@ const example = {
   "evidenceCount": null,
   "hypothesisCount": null,
   "inquiryCount": null,
+  "removeGoneFindings": null,
+  "removeResolvedFindings": null,
+  "removeGoneAssets": null,
+  "escalatedCount": null,
+  "lastEscalatedAt": null,
   "createdAt": null,
   "updatedAt": null,
   "evidence": null,
   "inquiries": null,
+  "findingFilters": null,
+  "cleanup": null,
 } satisfies CaseResponseDto
 
 console.log(example)

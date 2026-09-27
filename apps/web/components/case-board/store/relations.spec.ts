@@ -27,6 +27,9 @@ const row = (findingId: string, severity: SeverityKey | null = "medium"): Bubble
   missing: false,
   state: "open",
   note: null,
+  escalated: false,
+  escalationLabel: null,
+  escalatedAt: null,
 });
 
 /** Centre of a finding node placed at `spot`, relative to the asset circle's centre. */

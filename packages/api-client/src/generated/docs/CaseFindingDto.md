@@ -16,6 +16,9 @@ Name | Type
 `matchedContent` | string
 `note` | string
 `createdAt` | Date
+`escalatedAt` | Date
+`escalationRuleId` | string
+`escalationLabel` | string
 
 ## Example
 
@@ -34,6 +37,9 @@ const example = {
   "matchedContent": null,
   "note": null,
   "createdAt": null,
+  "escalatedAt": null,
+  "escalationRuleId": null,
+  "escalationLabel": null,
 } satisfies CaseFindingDto
 
 console.log(example)

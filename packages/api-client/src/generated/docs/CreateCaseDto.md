@@ -14,6 +14,9 @@ Name | Type
 `createdBy` | string
 `inquiryIds` | Array&lt;string&gt;
 `autoPullInquiryIds` | Array&lt;string&gt;
+`removeGoneFindings` | boolean
+`removeResolvedFindings` | boolean
+`removeGoneAssets` | boolean
 
 ## Example
 
@@ -30,6 +33,9 @@ const example = {
   "createdBy": null,
   "inquiryIds": null,
   "autoPullInquiryIds": null,
+  "removeGoneFindings": null,
+  "removeResolvedFindings": null,
+  "removeGoneAssets": null,
 } satisfies CreateCaseDto
 
 console.log(example)

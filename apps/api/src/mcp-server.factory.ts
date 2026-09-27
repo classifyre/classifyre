@@ -55,6 +55,8 @@ import { AutopilotService } from './autopilot/autopilot.service';
 import { GraphService } from './graph.service';
 import { CaseBoardService } from './case-board/case-board.service';
 import { CaseBoardReadService } from './case-board/case-board-read.service';
+import { CaseFindingFiltersService } from './cases/case-finding-filters.service';
+import { CaseEscalationService } from './cases/case-escalation.service';
 import {
   BOARD_MAX_OPS_PER_BATCH,
   BoardOpSchema,
@@ -304,6 +306,8 @@ export class McpServerFactoryService {
     private readonly retireOutOfScope: RetireOutOfScopeService,
     private readonly caseBoardService: CaseBoardService,
     private readonly caseBoardRead: CaseBoardReadService,
+    private readonly caseFindingFilters: CaseFindingFiltersService,
+    private readonly caseEscalation: CaseEscalationService,
   ) {}
 
   /**
@@ -3449,6 +3453,22 @@ export class McpServerFactoryService {
           assignee: z.string().optional(),
           createdBy: z.string().optional(),
           inquiryIds: z.array(z.string()).optional(),
+          removeGoneFindings: z
+            .boolean()
+            .optional()
+            .describe(
+              'Clean-up: findings the scans no longer see (retired by a run, or deleted) leave the case by themselves',
+            ),
+          removeResolvedFindings: z
+            .boolean()
+            .optional()
+            .describe('Clean-up: findings someone resolved leave the case'),
+          removeGoneAssets: z
+            .boolean()
+            .optional()
+            .describe(
+              'Clean-up: assets deleted from their source leave the case, with their findings',
+            ),
         },
         annotations: {
           readOnlyHint: false,
@@ -3462,7 +3482,10 @@ export class McpServerFactoryService {
       'update_case',
       {
         title: 'Update Case',
-        description: 'Update case metadata, status, severity, or AI mode.',
+        description:
+          'Update case metadata, status, severity, AI mode, or its clean-up ' +
+          'switches. Switching a clean-up rule on applies it right away: what it ' +
+          'takes out is reported in `cleanup` and written on the case timeline.',
         inputSchema: {
           id: z.string().uuid(),
           title: z.string().max(300).optional(),
@@ -3476,6 +3499,22 @@ export class McpServerFactoryService {
           assignee: z.string().optional(),
           conclusion: z.string().optional(),
           aiMode: z.enum(['INHERIT', 'MANAGED', 'OBSERVE_ONLY']).optional(),
+          removeGoneFindings: z
+            .boolean()
+            .optional()
+            .describe(
+              'Clean-up: findings the scans no longer see (retired by a run, or deleted) leave the case by themselves',
+            ),
+          removeResolvedFindings: z
+            .boolean()
+            .optional()
+            .describe('Clean-up: findings someone resolved leave the case'),
+          removeGoneAssets: z
+            .boolean()
+            .optional()
+            .describe(
+              'Clean-up: assets deleted from their source leave the case, with their findings',
+            ),
         },
         annotations: {
           readOnlyHint: false,
@@ -3629,6 +3668,154 @@ export class McpServerFactoryService {
             autoPullInquiryIds,
           }),
         );
+      },
+    );
+
+    server.registerTool(
+      'list_case_finding_filters',
+      {
+        title: 'List Case Finding Filters',
+        description:
+          "A case's finding rules, case-wide (inquiryId null) or for one linked " +
+          'question: filters (action EXCLUDE — kinds of finding it does not want) ' +
+          'and escalations (action ESCALATE — kinds that need attention). A ' +
+          'FINDING_TYPE rule names a finding type exactly; a VALUE_PATTERN rule is ' +
+          'a regular expression over the matched value. includeOptions also lists ' +
+          'the finding types the case holds and its questions answer, which is ' +
+          'what a FINDING_TYPE rule can pick from.',
+        inputSchema: {
+          id: z.string().uuid(),
+          includeOptions: z.boolean().optional(),
+          inquiryId: z
+            .string()
+            .optional()
+            .describe('With includeOptions: the types of this one question'),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ id, includeOptions, inquiryId }) => {
+        const filters = await this.caseFindingFilters.list(id);
+        if (!includeOptions) return jsonResult({ filters });
+        return jsonResult({
+          filters,
+          options: await this.caseFindingFilters.options(id, inquiryId ?? null),
+        });
+      },
+    );
+
+    server.registerTool(
+      'add_case_finding_filters',
+      {
+        title: 'Add Case Finding Rules',
+        description:
+          'Add finding rules to a case: filters (action EXCLUDE, the default) or ' +
+          'escalations (action ESCALATE). A filter keeps a kind of finding out: ' +
+          'matches in the case are detached right away (the timeline lists them), ' +
+          "and pulls from the case's questions — automatic ones and pull-everything " +
+          '— skip them from then on; attaching one by hand still works. An ' +
+          'escalation marks a kind of finding that needs attention: matches already ' +
+          'in the case are marked escalated now, and a question brings in new ' +
+          'matching answers by itself (even with auto-add off) and raises a ' +
+          'notification; filters win over escalations. Scope: omit inquiryId for ' +
+          'the whole case, or give a linked question to apply to its answers only. ' +
+          'Run with dryRun first: it reports how many findings would be detached or escalated.',
+        inputSchema: z.strictObject({
+          id: z.string().uuid(),
+          action: z.enum(['EXCLUDE', 'ESCALATE']).optional(),
+          inquiryId: z.string().nullable().optional(),
+          rules: z
+            .array(
+              z.strictObject({
+                kind: z.enum(['FINDING_TYPE', 'VALUE_PATTERN']),
+                pattern: z.string().min(1).max(500),
+                description: z.string().max(1000).optional(),
+              }),
+            )
+            .min(1)
+            .max(50),
+          dryRun: z.boolean().optional(),
+        }),
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+        },
+      },
+      async ({ id, action, inquiryId, rules, dryRun }) => {
+        if (dryRun) {
+          return jsonResult({
+            dryRun: true,
+            ...(await this.caseFindingFilters.preview(id, {
+              action,
+              inquiryId: inquiryId ?? null,
+              rules,
+            })),
+          });
+        }
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseFindingFilters.add(
+            id,
+            { action, inquiryId: inquiryId ?? null, rules },
+            'mcp',
+          ),
+        );
+      },
+    );
+
+    server.registerTool(
+      'clear_case_escalations',
+      {
+        title: 'Clear Case Escalations',
+        description:
+          'Take the escalation mark off findings of a case once a person has ' +
+          'dealt with them (all escalated findings when findingIds is omitted). ' +
+          'The findings stay in the case; the timeline records the clearing.',
+        inputSchema: {
+          id: z.string().uuid(),
+          findingIds: z
+            .array(z.string().uuid())
+            .optional()
+            .describe('Finding ids (not case-finding ids); omit for all'),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({ id, findingIds }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseEscalation.clear(id, findingIds, 'mcp'),
+        );
+      },
+    );
+
+    server.registerTool(
+      'remove_case_finding_filter',
+      {
+        title: 'Remove Case Finding Rule',
+        description:
+          'Remove one finding rule (filter or escalation) from a case. Findings ' +
+          'a filter detached stay detached, and findings an escalation marked stay ' +
+          'marked (clear_case_escalations clears them); the questions simply stop ' +
+          'applying the rule.',
+        inputSchema: {
+          id: z.string().uuid(),
+          filterId: z.string().uuid(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({ id, filterId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult({
+          filters: await this.caseFindingFilters.remove(id, filterId, 'mcp'),
+        });
       },
     );
 
