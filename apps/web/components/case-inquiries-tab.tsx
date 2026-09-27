@@ -53,7 +53,6 @@ import {
   type RuleAction,
 } from "@/components/case-cleanup/finding-filter-dialog";
 import { EscalationFlag } from "@workspace/case-board/components/finding-node";
-import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 
 export type CaseInquiriesTabProps = {
@@ -581,7 +580,7 @@ export function CaseInquiriesTab({
 /**
  * A scope's rules in two labelled rows: what it filters out and what it
  * escalates, each with its chips and a "+" that opens the rules dialog in
- * that mode. Escalation wears its magenta; filters stay neutral.
+ * that mode.
  */
 function RuleRows({
   caseId,
@@ -615,10 +614,7 @@ function RuleRows({
         return (
           <React.Fragment key={row.action}>
             <span
-              className={cn(
-                "inline-flex items-center gap-1 whitespace-nowrap pt-[3px] font-mono text-[10px] uppercase tracking-[0.12em]",
-                escalate ? "text-escalation" : "text-muted-foreground",
-              )}
+              className="text-muted-foreground inline-flex items-center gap-1 whitespace-nowrap pt-[3px] font-mono text-[10px] uppercase tracking-[0.12em]"
               data-testid={`rules-${testIdPrefix}-${row.action.toLowerCase()}`}
             >
               {escalate ? (
@@ -643,10 +639,7 @@ function RuleRows({
               <Button
                 size="icon"
                 variant="ghost"
-                className={cn(
-                  "h-6 w-6",
-                  escalate && "text-escalation hover:bg-escalation-soft hover:text-escalation",
-                )}
+                className="h-6 w-6"
                 aria-label={row.add}
                 title={row.add}
                 onClick={() => onAdd(row.action)}

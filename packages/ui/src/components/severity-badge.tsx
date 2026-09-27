@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { FINDING_SEVERITY_INK } from "../lib/finding-severity";
 import { cn } from "../lib/utils";
 
 /**
@@ -16,13 +17,11 @@ const severityBadgeVariants = cva(
       // card they measure 2.8:1 (low) to 3.9:1 (info) — the whole scale sits
       // under AA. Each gets a lifted twin, same hue, ~7:1 on #121212.
       severity: {
-        critical:
-          "border-[#b91c1c]/20 font-bold text-[#b91c1c] dark:border-[#f87171]/30 dark:text-[#f87171]",
-        high: "border-[#c2410c]/20 font-semibold text-[#c2410c] dark:border-[#fb923c]/30 dark:text-[#fb923c]",
-        medium:
-          "border-[#a16207]/20 font-semibold text-[#a16207] dark:border-[#fbbf24]/30 dark:text-[#fbbf24]",
-        low: "border-[#1d4ed8]/20 font-medium text-[#1d4ed8] dark:border-[#60a5fa]/30 dark:text-[#60a5fa]",
-        info: "border-[#78716c]/20 font-medium text-[#78716c] dark:border-[#a8a29e]/30 dark:text-[#a8a29e]",
+        critical: `border-[#b91c1c]/20 font-bold dark:border-[#f87171]/30 ${FINDING_SEVERITY_INK.critical}`,
+        high: `border-[#c2410c]/20 font-semibold dark:border-[#fb923c]/30 ${FINDING_SEVERITY_INK.high}`,
+        medium: `border-[#a16207]/20 font-semibold dark:border-[#fbbf24]/30 ${FINDING_SEVERITY_INK.medium}`,
+        low: `border-[#1d4ed8]/20 font-medium dark:border-[#60a5fa]/30 ${FINDING_SEVERITY_INK.low}`,
+        info: `border-[#78716c]/20 font-medium dark:border-[#a8a29e]/30 ${FINDING_SEVERITY_INK.info}`,
       },
     },
     defaultVariants: {

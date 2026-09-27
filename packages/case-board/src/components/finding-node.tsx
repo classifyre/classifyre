@@ -5,7 +5,7 @@ import { Check } from "lucide-react";
 import type { BoardColor } from "@workspace/schemas/case-board";
 import { cn } from "@workspace/ui/lib/utils";
 import { FINDING_NODE, type Lod, type SeverityKey } from "../lib/geometry";
-import { codeInk, FindingCircle, type FindingLook } from "./glyphs";
+import { codeInk, ESCALATION_COLOR, ESCALATION_INK, FindingCircle, type FindingLook } from "./glyphs";
 import { Ports } from "./ports";
 
 /**
@@ -54,7 +54,7 @@ export function FindingNodeView({
   struck?: boolean;
   /** Settled findings the View menu asked to fade (never hide). */
   faded?: boolean;
-  /** An escalation rule marked it: hazard ring, warning flag, magenta label. */
+  /** An escalation rule marked it: a ring and a warning flag in HIGH's colour. */
   escalated?: boolean;
 }) {
   const { cx, cy, r, width, height } = FINDING_NODE;
@@ -98,7 +98,7 @@ export function FindingNodeView({
         <span
           className={cn(
             "cb-halo pointer-events-none absolute inset-x-0 truncate px-0.5 text-center font-mono text-[9.5px] leading-tight text-muted-foreground",
-            escalated && "font-bold text-[var(--cb-escalation)]",
+            escalated && "text-foreground",
             struck && "line-through",
             !attached && "italic",
           )}
@@ -113,9 +113,9 @@ export function FindingNodeView({
 }
 
 /**
- * The warning flag an escalated finding (or a list row about one) carries: a
- * triangle in escalation magenta with an exclamation mark, outlined in the
- * background so it lifts off any severity colour behind it.
+ * The warning flag an escalated finding carries: a triangle in HIGH's colour
+ * with an exclamation mark, outlined in the background so it lifts off any
+ * severity colour behind it.
  */
 export function EscalationFlag({
   style,
@@ -137,13 +137,13 @@ export function EscalationFlag({
     >
       <path
         d="M7 1.1 L13.2 11.9 H0.8 Z"
-        fill="var(--cb-escalation)"
+        fill={ESCALATION_COLOR}
         stroke="var(--background)"
         strokeWidth={1.4}
         strokeLinejoin="round"
       />
-      <rect x={6.35} y={4.3} width={1.3} height={4} rx={0.65} fill="var(--cb-escalation-ink)" />
-      <circle cx={7} cy={10.1} r={0.8} fill="var(--cb-escalation-ink)" />
+      <rect x={6.35} y={4.3} width={1.3} height={4} rx={0.65} fill={ESCALATION_INK} />
+      <circle cx={7} cy={10.1} r={0.8} fill={ESCALATION_INK} />
     </svg>
   );
 }

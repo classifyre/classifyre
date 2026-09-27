@@ -4067,8 +4067,7 @@
     },
     "table": {
       "badge": "{{count}} escalated",
-      "tooltip": "{{count}} finding(s) escalated · last {{when}}",
-      "filter": "Escalated only"
+      "tooltip": "{{count}} finding(s) escalated · last {{when}}"
     }
   },
   "correlation": {

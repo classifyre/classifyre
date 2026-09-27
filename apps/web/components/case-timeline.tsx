@@ -30,8 +30,10 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { api, type CaseActivityDto } from "@workspace/api-client";
+import { EscalationFlag } from "@workspace/case-board/components/finding-node";
 import { Button } from "@workspace/ui/components/button";
 import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
+import { ESCALATION_INK } from "@/lib/escalation-tone";
 
 // ─── Event metadata ───────────────────────────────────────────────────────────
 
@@ -85,7 +87,7 @@ const TYPE_META: Record<
   FINDING_FILTER_ADDED: { icon: <Filter className="h-3.5 w-3.5" />, label: "Finding filter added", color: "text-blue-600 dark:text-blue-400", group: "case" },
   FINDING_FILTER_UPDATED: { icon: <Filter className="h-3.5 w-3.5" />, label: "Finding filter changed", color: "text-muted-foreground", group: "case" },
   FINDING_FILTER_REMOVED: { icon: <Filter className="h-3.5 w-3.5" />, label: "Finding filter removed", color: "text-muted-foreground", group: "case" },
-  FINDINGS_ESCALATED: { icon: <TriangleAlert className="h-3.5 w-3.5" />, label: "Escalated", color: "text-escalation", group: "escalation" },
+  FINDINGS_ESCALATED: { icon: <TriangleAlert className="h-3.5 w-3.5" />, label: "Escalated", color: ESCALATION_INK, group: "escalation" },
   ESCALATION_CLEARED: { icon: <TriangleAlert className="h-3.5 w-3.5" />, label: "Escalation cleared", color: "text-muted-foreground", group: "escalation" },
   FINDINGS_AUTO_REMOVED: { icon: <Eraser className="h-3.5 w-3.5" />, label: "Findings taken out", color: "text-red-600 dark:text-red-400", group: "evidence" },
   EVIDENCE_AUTO_REMOVED: { icon: <Eraser className="h-3.5 w-3.5" />, label: "Evidence taken out", color: "text-red-600 dark:text-red-400", group: "evidence" },
@@ -178,17 +180,6 @@ function sourceNamesOf(p: Record<string, unknown>): string[] {
   return names.length > 0 ? names : str(p.sourceName) ? [String(p.sourceName)] : [];
 }
 
-/** The little magenta triangle the board's escalated findings carry. */
-function EscalationMark() {
-  return (
-    <svg width={11} height={10} viewBox="0 0 14 13" className="shrink-0" aria-hidden>
-      <path d="M7 1.1 L13.2 11.9 H0.8 Z" fill="var(--escalation)" />
-      <rect x={6.35} y={4.3} width={1.3} height={4} rx={0.65} fill="var(--escalation-foreground)" />
-      <circle cx={7} cy={10.1} r={0.8} fill="var(--escalation-foreground)" />
-    </svg>
-  );
-}
-
 /** Why findings escalated when they did, as the second line of the row. */
 function escalationTrigger(p: Record<string, unknown>): string | null {
   switch (p.trigger) {
@@ -262,12 +253,8 @@ interface FilterPayload {
 function FilterChip({ filter }: { filter: FilterPayload }) {
   const escalation = filter.action === "ESCALATE";
   return (
-    <span
-      className={`inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] ${
-        escalation ? "border-escalation/50 bg-escalation-soft" : "border-border"
-      }`}
-    >
-      <span className={`font-mono uppercase ${escalation ? "text-escalation" : "text-muted-foreground"}`}>
+    <span className="inline-flex max-w-full items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px]">
+      <span className={`font-mono uppercase ${escalation ? ESCALATION_INK : "text-muted-foreground"}`}>
         {escalation ? "▲ " : ""}
         {filter.kind === "VALUE_PATTERN" ? "value" : "type"}
       </span>
@@ -543,7 +530,7 @@ function EventDetail({
             total={Number(p.count ?? listed.length)}
             truncated={p.truncated === true}
             onShowOnBoard={onShowOnBoard}
-            marker={<EscalationMark />}
+            marker={<EscalationFlag size={11} className="shrink-0" />}
           />,
         );
       }
@@ -1010,15 +997,7 @@ export function CaseTimeline({
                   };
                   const subject = eventSubject(item);
                   return (
-                    <li
-                      key={item.id}
-                      id={`timeline-event-${item.id}`}
-                      className={`relative py-2 pl-6 ${
-                        item.activityType === "FINDINGS_ESCALATED"
-                          ? "-ml-px rounded-r-[4px] border-l-2 border-escalation bg-escalation-soft/60 pr-2"
-                          : ""
-                      }`}
-                    >
+                    <li key={item.id} id={`timeline-event-${item.id}`} className="relative pl-6 py-2">
                       <span
                         className={`absolute -left-[9px] top-2.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-border bg-card ${meta.color}`}
                       >
