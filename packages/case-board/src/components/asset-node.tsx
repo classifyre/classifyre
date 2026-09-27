@@ -5,6 +5,7 @@ import { Loader2, Plus, type LucideIcon } from "lucide-react";
 import type { BoardColor } from "@workspace/schemas/case-board";
 import { cn } from "@workspace/ui/lib/utils";
 import { ASSET_NODE, type Lod, type SeverityKey } from "../lib/geometry";
+import { EscalationFlag } from "./finding-node";
 import { AssetCircle } from "./glyphs";
 import { Ports } from "./ports";
 
@@ -140,9 +141,10 @@ export function AssetNode({
 }
 
 /**
- * "▲ n" in escalation magenta, left of the asset circle: how many of its
- * findings escalated. Grows with the far-zoom label so a zoomed-out board
- * still points at them; a click spotlights every escalated finding.
+ * The escalated findings' warning flag and their count, left of the asset
+ * circle, in the chrome of the node's other badges. Grows with the far-zoom
+ * label so a zoomed-out board still points at them; a click spotlights every
+ * escalated finding.
  */
 function EscalationBadge({
   escalated,
@@ -154,16 +156,16 @@ function EscalationBadge({
   const { cx, cy, ring, width } = ASSET_NODE;
   const big = lod === "chip";
   const className = cn(
-    "nodrag nopan absolute inline-flex items-center gap-[3px] rounded-[3px] border-[1.5px] border-[var(--background)] bg-[var(--cb-escalation)] font-mono font-bold whitespace-nowrap text-[var(--cb-escalation-ink)]",
-    big ? "px-2 text-[24px] leading-[34px]" : "px-1 text-[10px] leading-[14px]",
-    escalated.onClick && "cursor-pointer hover:brightness-110",
+    "nodrag nopan absolute inline-flex items-center rounded-[3px] border-[1.5px] border-foreground bg-card font-mono font-bold whitespace-nowrap text-foreground",
+    big ? "gap-1.5 px-2 text-[24px] leading-[34px]" : "gap-[3px] px-1 text-[10px] leading-[14px]",
+    escalated.onClick && "cursor-pointer hover:brightness-95",
   );
   const style: React.CSSProperties = big
     ? { right: width - cx + ring + 6, top: cy - 18 }
     : { right: width - cx + ring + 3, top: cy - 8 };
   const content = (
     <>
-      <span aria-hidden>▲</span>
+      <EscalationFlag size={big ? 24 : 11} />
       {escalated.count}
     </>
   );

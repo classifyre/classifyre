@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Filter, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Filter, Loader2, Plus, Search, Trash2, TriangleAlert } from "lucide-react";
 import { EscalationFlag } from "@workspace/case-board/components/finding-node";
 import { toast } from "sonner";
 import {
@@ -542,7 +542,7 @@ export function FindingFilterDialog({
                 matched === 0
                   ? "border-border bg-muted/40 text-muted-foreground"
                   : escalate
-                    ? "border-escalation/40 bg-escalation-soft text-foreground"
+                    ? "border-border bg-muted/40 text-foreground"
                     : "border-amber-600/35 bg-amber-50 text-amber-900 dark:border-amber-400/30 dark:bg-amber-950/40 dark:text-amber-200",
               )}
             >
@@ -590,18 +590,12 @@ export function FindingFilterDialog({
             onClick={() => void submit()}
             disabled={!canSubmit}
             variant={!escalate && matched > 0 ? "destructive" : "default"}
-            className={cn(
-              escalate &&
-                "border-escalation bg-escalation text-escalation-foreground hover:bg-escalation/90",
-            )}
             data-testid="filter-submit"
           >
             {saving ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : escalate ? (
-              <span className="text-[11px] leading-none" aria-hidden>
-                ▲
-              </span>
+              <TriangleAlert className="size-3.5" />
             ) : (
               <Filter className="size-3.5" />
             )}
