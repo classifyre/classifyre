@@ -38,7 +38,13 @@ describe('CasesService', () => {
       findUniqueOrThrow: jest.fn(),
       delete: jest.fn(),
     },
-    caseFinding: { upsert: jest.fn(), createMany: jest.fn() },
+    caseFinding: {
+      upsert: jest.fn(),
+      createMany: jest.fn(),
+      findMany: jest.fn(() => Promise.resolve([])),
+    },
+    caseBoardItem: { findMany: jest.fn(() => Promise.resolve([])) },
+    caseFindingFilter: { count: jest.fn(() => Promise.resolve(0)) },
     asset: { findUnique: jest.fn() },
     finding: { findUnique: jest.fn(), findMany: jest.fn() },
   };
@@ -63,6 +69,10 @@ describe('CasesService', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     _count: { evidence: 0, threads: 0, inquiries: 0 },
+    removeGoneFindings: false,
+    removeResolvedFindings: false,
+    removeGoneAssets: false,
+    findingFilters: [],
     ...over,
   });
 
@@ -238,6 +248,16 @@ describe('CasesService', () => {
     expect(
       mockPrisma.caseFinding.createMany.mock.calls[0][0].data,
     ).toHaveLength(2);
+    // One timeline entry for the pull, naming what came in.
+    const pulled = mockActivity.record.mock.calls.filter(
+      (call) => call[1] === 'INQUIRY_PULLED',
+    );
+    expect(pulled).toHaveLength(1);
+    expect(
+      (pulled[0][2] as { findings: Array<{ findingId: string }> }).findings.map(
+        (f) => f.findingId,
+      ),
+    ).toEqual(['f1', 'f2']);
   });
 
   it('batch-attaches findings, creating asset evidence as needed', async () => {

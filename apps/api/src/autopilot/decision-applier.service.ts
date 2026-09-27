@@ -18,6 +18,7 @@ import { AgentSearchService } from './search/agent-search.service';
 import { EvidenceFloorService } from './evidence-floor.service';
 import { AI_ACTOR } from './autopilot.constants';
 import type { CaseOperation, InquiryMatcherProposal } from './autopilot.types';
+import type { FilterSummary } from '../cases/case-cleanup.service';
 
 type SeverityLiteral = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 
@@ -377,12 +378,28 @@ export class DecisionApplierService {
         const ids = op.findingIds ?? [];
         if (ids.length === 0) throw new Error('findingIds required');
         const existing = await this.search.existingIds('finding', ids);
-        const valid = ids.filter((id) => existing.has(id));
-        if (valid.length === 0) throw new Error('No valid findingIds');
-        await this.cases.attachFindings(caseId, {
-          findingIds: valid,
-          addedBy: AI_ACTOR,
-        });
+        const real = ids.filter((id) => existing.has(id));
+        if (real.length === 0) throw new Error('No valid findingIds');
+        // The investigator's "never this kind of finding in this case" holds
+        // against the autopilot too; say so, or it proposes them every run.
+        const excluded = await this.cases.caseWideExclusions(caseId, real);
+        const valid = real.filter((id) => !excluded.has(id));
+        if (valid.length > 0) {
+          await this.cases.attachFindings(caseId, {
+            findingIds: valid,
+            addedBy: AI_ACTOR,
+          });
+        }
+        if (excluded.size > 0) {
+          const reasons = [
+            ...new Set([...excluded.values()].map(describeFilter)),
+          ];
+          throw new Error(
+            `Attached ${valid.length} finding(s); ${excluded.size} were not attached ` +
+              `because the case filters them out (${reasons.join('; ')}). The ` +
+              `investigator excluded these on purpose — do not propose them again.`,
+          );
+        }
         // Invented ids used to be dropped in silence as long as one was real,
         // so a case could be attached to two findings while the model believed
         // it had attached six — and nothing told it otherwise.
@@ -608,4 +625,13 @@ function invalidRegexes(proposal: InquiryMatcherProposal): string[] {
     }
   }
   return errors;
+}
+
+/** A case filter as the model reads it in a refusal. */
+function describeFilter(filter: FilterSummary): string {
+  const what =
+    filter.kind === 'FINDING_TYPE'
+      ? `type ${filter.pattern}`
+      : `value matching /${filter.pattern}/`;
+  return filter.description ? `${what} — ${filter.description}` : what;
 }

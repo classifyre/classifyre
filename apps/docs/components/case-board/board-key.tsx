@@ -33,6 +33,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AssetCircle, codeInk, FindingCircle, SEVERITY_COLOR, type FindingLook } from "@workspace/case-board/components/glyphs";
+import { EscalationFlag } from "@workspace/case-board/components/finding-node";
 import { findingCode, type SeverityKey } from "@workspace/case-board/lib/geometry";
 import { STANCE_STROKE, TRACE_KIND_STROKE, type Stance, type TraceKind } from "@workspace/case-board/lib/kinds";
 import { cn } from "@workspace/ui/lib/utils";
@@ -132,17 +133,20 @@ function FindingGlyph({
   look = "open",
   detector = "IBAN",
   badge,
+  escalated = false,
 }: {
   severity: SeverityKey;
   look?: FindingLook;
   detector?: string;
   badge?: "new" | "check";
+  escalated?: boolean;
 }) {
   return (
     <span className="relative block" style={{ width: 40, height: 40 }}>
       <svg width={40} height={40} viewBox="-20 -20 40 40" className="absolute inset-0 overflow-visible" aria-hidden>
-        <FindingCircle cx={0} cy={0} severity={severity} look={look} />
+        <FindingCircle cx={0} cy={0} severity={severity} look={look} escalated={escalated} />
       </svg>
+      {escalated && <EscalationFlag size={13} style={{ left: -2, top: -3 }} />}
       <span
         className="absolute -translate-x-1/2 -translate-y-1/2 font-mono text-[9.5px] font-bold leading-none"
         style={{ left: 20, top: 20.5, color: codeInk(severity, look) }}
@@ -264,6 +268,10 @@ export function FindingKey() {
       </KeyItem>
       <KeyItem visual={<FindingGlyph severity="medium" look="ghost" detector="Address" />} title="Not in the case">
         A dashed grey ghost with an italic label: on the asset, not attached to the case yet.
+      </KeyItem>
+      <KeyItem visual={<FindingGlyph severity="high" detector="IBAN" escalated />} title="Escalated">
+        A magenta hazard ring and a warning flag: an escalation rule of the case matched it. Its label turns magenta
+        too, and its asset shows ▲ with how many of its findings escalated.
       </KeyItem>
     </KeyGrid>
   );

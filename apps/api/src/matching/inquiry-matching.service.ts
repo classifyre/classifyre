@@ -30,6 +30,7 @@ import {
   CASE_PULL,
   CasePullPort,
 } from '../cases/case-pull.port';
+import { CASE_CLEANUP, CaseCleanupPort } from '../cases/case-cleanup.port';
 import { InquiryActivityService } from '../inquiry-activity.service';
 import {
   PreviewDiagnosticDto,
@@ -179,6 +180,18 @@ export class InquiryMatchingService {
     }
   }
 
+  /** Automatic case clean-up, resolved the same way and for the same reason. */
+  private get caseCleanup(): CaseCleanupPort | null {
+    try {
+      return (
+        this.moduleRef?.get<CaseCleanupPort>(CASE_CLEANUP, { strict: false }) ??
+        null
+      );
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Registers this worker on the CURRENT namespace's pg-boss (invoked by the
    * NamespaceWorkerManager inside the namespace's CLS context).
@@ -314,6 +327,40 @@ export class InquiryMatchingService {
    * the live match set.
    */
   async processSourceCompletion(
+    sourceId: string,
+    runnerId: string | null,
+  ): Promise<{ landed: number }> {
+    try {
+      return await this.matchSourceCompletion(sourceId, runnerId);
+    } finally {
+      // After the auto-pull, so a case takes in this run's answers and lets go
+      // of what it retired in one pass. Runs whether or not any inquiry
+      // watches the source: clean-up rules are the case's, not the watches'.
+      await this.cleanUpCases(sourceId, runnerId);
+    }
+  }
+
+  /**
+   * Apply the clean-up rules of the open cases citing this source. A case
+   * that could not be cleaned is logged, never allowed to fail the run's
+   * matching job (which would retry it).
+   */
+  private async cleanUpCases(
+    sourceId: string,
+    runnerId: string | null,
+  ): Promise<void> {
+    const cleanup = this.caseCleanup;
+    if (!cleanup) return;
+    try {
+      await cleanup.sweepForSource(sourceId, { runnerId });
+    } catch (error) {
+      this.logger.warn(
+        `Case clean-up after source ${sourceId} failed: ${String(error)}`,
+      );
+    }
+  }
+
+  private async matchSourceCompletion(
     sourceId: string,
     runnerId: string | null,
   ): Promise<{ landed: number }> {
@@ -472,13 +519,30 @@ export class InquiryMatchingService {
     const pull = this.casePull;
     if (!pull) return;
 
+    // Cases that take this watch's new answers in: all of them with auto-add
+    // on, and — with it off — the escalating ones, when the case has an
+    // escalation rule for this watch or for every watch.
     const links = await this.prisma.caseInquiry.findMany({
       where: {
         inquiryId: q.id,
-        autoPull: true,
         case: { status: { notIn: ['CLOSED', 'ARCHIVED'] } },
+        OR: [
+          { autoPull: true },
+          { filters: { some: { action: 'ESCALATE' } } },
+          {
+            case: {
+              findingFilters: {
+                some: { action: 'ESCALATE', caseInquiryId: null },
+              },
+            },
+          },
+        ],
       },
-      select: { caseId: true, case: { select: { title: true } } },
+      select: {
+        caseId: true,
+        autoPull: true,
+        case: { select: { title: true } },
+      },
     });
     if (links.length === 0) return;
 
@@ -504,6 +568,12 @@ export class InquiryMatchingService {
           link.caseId,
           { inquiryId: q.id, findingIds: admitted },
           AUTO_PULL_ACTOR,
+          {
+            sourceId: run.sourceId,
+            runnerId: run.runnerId,
+            ...(capped ? { available: newIds.length } : {}),
+            ...(link.autoPull ? {} : { onlyEscalating: true }),
+          },
         );
         if (res.pulled === 0) continue;
         await this.activity?.tryRecord(
@@ -516,6 +586,7 @@ export class InquiryMatchingService {
             sourceId: run.sourceId,
             runnerId: run.runnerId,
             ...(capped ? { capped: true, available: newIds.length } : {}),
+            ...(link.autoPull ? {} : { escalated: true }),
           },
           AUTO_PULL_ACTOR,
         );

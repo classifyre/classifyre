@@ -1,0 +1,146 @@
+---
+title: Clean-up & filters
+description: Let a case take out findings and assets that no longer hold by itself, and keep kinds of finding out of it with filters, case-wide or per watch. Everything it takes out is written on the timeline.
+---
+
+import { Callout } from "nextra/components"
+
+# Clean-up & filters
+
+A case keeps everything you put in it until you say otherwise. Two tools let
+it say otherwise for you:
+
+- **Automatic clean-up** takes out findings and assets that no longer hold up:
+  findings the scans no longer see, findings someone resolved, assets deleted
+  from their source.
+- **Finding filters** keep a kind of finding out of the case: a finding type
+  (say *IP_ADDRESS*), or a value that matches a regular expression. A filter
+  holds for the whole case, or only for what one watch brings in.
+
+Both are **off until you switch them on**, and every removal is written on the
+case [timeline](/investigations/cases/timeline/): which finding or asset
+left, and why.
+
+Their counterpart is [escalation](/investigations/cases/escalation/): the same
+rules with the other action. Instead of keeping a kind of finding out, an
+escalation marks it, highlights it and brings it in.
+
+---
+
+## Automatic clean-up
+
+Three switches, on the **Edit case** page (Case file panel → **Change…**) and
+when you open a new case:
+
+| Switch | What leaves the case |
+|---|---|
+| **Remove findings that disappear** | A finding a scan no longer detects, or one that was deleted outright (a purge, a deleted source) |
+| **Remove resolved findings** | A finding someone marked resolved. False positives and ignored findings stay |
+| **Remove assets that disappear** | An asset deleted from its source, together with its findings |
+
+**When does it happen?**
+
+- **Right away when you switch one on.** Before you save, the edit page says
+  what saving will take out, with examples, so nothing leaves without you having
+  seen it coming. The toast after saving says how much left.
+- **After every scan** of a source the case cites.
+- **When someone changes a finding's status**, from the board, the findings
+  table or a bulk update.
+- **On a routine check** when the case board is opened, which catches anything
+  else (a purge, a deleted source).
+
+A **closed case is never touched**: it is a record.
+
+<Callout type="info">
+A finding the clean-up took out keeps its note and its hypothesis stances. If
+you attach it again from the board, it comes back exactly as it was.
+</Callout>
+
+---
+
+## Finding filters
+
+Some findings are noise for one investigation and signal for another: internal
+IP addresses, your own company's name, a test account. A filter keeps them out
+of this case without touching the finding or any other case.
+
+### What a filter does
+
+- **Findings in the case that match are detached now.** The filter dialog says
+  how many before you confirm, and the button carries the number.
+- **No watch adds them again**, neither by itself (auto-add) nor with
+  **Pull all**.
+- **Attaching one by hand still works.** Picking a finding yourself is a
+  deliberate choice, and the filter does not override it.
+- **Autopilot respects case-wide filters**, and leads stop suggesting filtered
+  findings.
+- **Filters win over [escalations](/investigations/cases/escalation/).** A
+  finding that matches both never comes in.
+
+### Case-wide or one watch
+
+| Scope | Applies to |
+|---|---|
+| **Every watch in this case** | Every finding of the case, whichever watch finds it (and findings you added by hand, when the filter is added) |
+| **Only one watch** | Only the answers of that watch. The same finding still comes in through another watch that does not filter it. Unlinking the watch removes its filters |
+
+### By type or by value
+
+- **Finding type**: pick from the types the case holds and its watches answer,
+  with how many of each are in the case and how many the watches answer. Select
+  several at once.
+- **Value**: a regular expression tested against the matched value, with a short
+  note on why. Use `^…$` to match the whole value, for example `^10\.` for
+  internal addresses; matching is case-sensitive. Add several patterns at once.
+  The dialog shows how many findings each pattern matches, and says so if one
+  is not a valid expression.
+
+### Where to add them
+
+- **Watches panel**: *Rules for every watch* at the top, and **Rules** on each
+  watch card. Press **+** in the **Filter out** row. The filters show as chips;
+  click a value filter to edit it, **×** to remove it.
+- **On the board**: right-click a finding → **Detach & filter out this type…**
+  or **Detach & filter out this value…** (the value is filled in as an exact
+  match). A finding that is not in the case offers **Filter out this type…** and
+  **Filter out this value…**.
+
+<Callout type="warning">
+**Removing a filter puts nothing back.** What it took out stays out; the
+watches simply stop skipping it. Pull the watch again, or attach findings on
+the board, if you need them back.
+</Callout>
+
+---
+
+## On the timeline
+
+| Entry | What it tells you |
+|---|---|
+| **Clean-up settings changed** | Which switch went on or off, and who changed it |
+| **Finding filter added / changed / removed** | The filter, its scope and its note; a changed filter shows the old and the new pattern |
+| **Taken out: no longer detected** | Findings a scan retired or that were deleted, marked which is which |
+| **Taken out: resolved** | Findings someone resolved |
+| **Detached by a filter** | The findings a filter took out, and the filter |
+| **Taken out: asset gone from its source** | The assets, and how many findings left with them |
+| **Evidence pulled from inquiry** | Now also how many matches the filters kept out |
+
+Each removal says **what set it off**: the switch being turned on, a scan of a
+named source, a status change or a routine check. It lists the findings it took
+out (type, value and asset) with a shortcut to their asset on the board.
+
+What the clean-up does by itself does not write a row per scan: its passes fold
+into one entry per reason while they keep coming (a pass within the hour since
+the last), which says how many passes, which sources and when:
+*Taken out: no longer detected, 12 findings, after 4 scans of Firmenbuch between
+09:10 and 10:05*. Switching a rule on or adding a filter is always an entry of
+its own.
+
+---
+
+## From MCP and the assistant
+
+`update_case` takes the three switches (`removeGoneFindings`,
+`removeResolvedFindings`, `removeGoneAssets`). `list_case_finding_filters`,
+`add_case_finding_filters` (run it with `dryRun` first: it reports how many
+findings would be detached) and `remove_case_finding_filter` manage filters.

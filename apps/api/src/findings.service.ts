@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
@@ -70,6 +71,8 @@ import {
   BULK_UPDATE_SYNC_LIMIT,
 } from './findings-bulk/finding-bulk-operation.constants';
 import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operation.service';
+// A value import: an @Optional() injection resolves from emitted metadata.
+import { CaseCleanupService } from './cases/case-cleanup.service';
 
 /**
  * Findings a filter-mode bulk update processes per page.
@@ -95,7 +98,26 @@ export class FindingsService {
     @Optional() private readonly stats?: FindingStatsService,
     @Optional() private readonly statsJobs?: FindingStatsScheduler,
     @Optional() private readonly bulkOperations?: FindingBulkOperationService,
+    @Optional() private readonly caseCleanup?: CaseCleanupService,
   ) {}
+
+  /**
+   * Cases whose clean-up rules take out resolved findings react to a status
+   * change right away rather than on the next scan. Never fails the update
+   * that caused it. `null`: too many findings to name — check every such case.
+   */
+  private async cleanUpCasesAfterStatusChange(
+    findingIds: string[] | null,
+  ): Promise<void> {
+    if (!this.caseCleanup) return;
+    try {
+      await this.caseCleanup.afterStatusChange(findingIds);
+    } catch (error) {
+      new Logger(FindingsService.name).warn(
+        `Case clean-up after a status change failed: ${String(error)}`,
+      );
+    }
+  }
 
   private readonly searchFindingSelect = {
     id: true,
@@ -1168,12 +1190,32 @@ export class FindingsService {
         [updatedFinding.detectedAt],
         'finding status changed',
       );
+      await this.cleanUpCasesAfterStatusChange([id]);
     }
 
     return updatedFinding;
   }
 
   async bulkUpdate(
+    dto: BulkUpdateFindingsDto,
+    userId?: string,
+  ): Promise<BulkUpdateFindingsResponseDto> {
+    const result = await this.applyBulkUpdate(dto, userId);
+    // A background operation reports in afterBulkOperation instead.
+    if (
+      dto.status &&
+      !result.dryRun &&
+      !result.async &&
+      result.updatedCount > 0
+    ) {
+      await this.cleanUpCasesAfterStatusChange(
+        result.ids.length > 0 ? result.ids : null,
+      );
+    }
+    return result;
+  }
+
+  private async applyBulkUpdate(
     dto: BulkUpdateFindingsDto,
     userId?: string,
   ): Promise<BulkUpdateFindingsResponseDto> {
@@ -1654,6 +1696,7 @@ export class FindingsService {
     if ((!target.status && !target.severity) || operation.changed === 0) return;
     await this.correlationJobs?.scheduleFull('bulk finding status changed');
     await this.statsJobs?.scheduleFull('bulk finding status changed');
+    if (target.status) await this.cleanUpCasesAfterStatusChange(null);
   }
 
   /**

@@ -13,6 +13,7 @@ import {
   Crosshair,
   ExternalLink,
   Eye,
+  Filter,
   FlaskConical,
   Loader2,
   MapPin,
@@ -80,9 +81,12 @@ import { dismissedLabel } from "../store/finding-state";
 import type { Bubble, BubbleRow } from "../store/types";
 import { BoardCanvas, BOARD_DRAG_MIME } from "../board-canvas";
 import { StateChip } from "@workspace/case-board/components/state-chip";
+import { EscalationFlag } from "@workspace/case-board/components/finding-node";
 import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 import { AiModeSelect, type AiMode } from "@/components/ai-mode-select";
 import { CaseAutopilotStatus } from "@/components/autopilot/case-autopilot-status";
+import { ToneBadge } from "@workspace/ui/components/tone-badge";
+import { CLEANUP_KEYS, cleanupOf } from "@/components/case-cleanup/cleanup-rules";
 
 const STATUSES = ["OPEN", "IN_PROGRESS"] as const;
 
@@ -590,6 +594,8 @@ function CaseFileDrawer({
         )}
       </section>
 
+      <CleanupSummary caseId={caseId} caseData={caseData} onChanged={onChanged} />
+
       <section className="space-y-2">
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
           {t("investigations.caseDetail.conclusion")}
@@ -637,6 +643,117 @@ function CaseFileDrawer({
   );
 }
 
+/**
+ * What the case lets go of by itself: its clean-up switches (changed on the
+ * edit page) and how many finding filters it holds (kept in the Watches
+ * panel, next to the watches they shape).
+ */
+function CleanupSummary({
+  caseId,
+  caseData,
+  onChanged,
+}: {
+  caseId: string;
+  caseData: CaseResponseDto;
+  onChanged: () => void;
+}) {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const ui = useUiStore();
+  const rules = cleanupOf(caseData);
+  const enabled = CLEANUP_KEYS.filter((key) => rules[key]);
+  const allRules = caseData.findingFilters ?? [];
+  const filters = allRules.filter((f) => f.action !== "ESCALATE");
+  const escalations = allRules.filter((f) => f.action === "ESCALATE");
+  const escalated = caseData.escalatedCount ?? 0;
+  const closed = caseData.status === "CLOSED" || caseData.status === "ARCHIVED";
+  const store = useBoardStore();
+  const [clearing, setClearing] = React.useState(false);
+  const clearAll = async () => {
+    setClearing(true);
+    try {
+      const res = await api.cases.caseCleanupControllerClearEscalations({
+        id: caseId,
+        clearCaseEscalationsDto: {},
+      });
+      toast.success(t("caseEscalation.clearedAll", { count: res.cleared }));
+      onChanged();
+      store.getState().refetch();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("caseEscalation.failedToClear"));
+    } finally {
+      setClearing(false);
+    }
+  };
+  return (
+    <section className="space-y-2" data-testid="case-file-cleanup">
+      <div className="flex items-center gap-2">
+        <p className="flex-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          {t("caseCleanup.title")}
+        </p>
+        {!closed && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 shrink-0 gap-1 text-xs"
+            onClick={() => router.push(nsPath(`/investigations/${caseId}/edit`))}
+          >
+            <Pencil className="size-3" /> {t("caseCleanup.edit")}
+          </Button>
+        )}
+      </div>
+      {enabled.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("caseCleanup.off")}</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-muted-foreground">{t("caseCleanup.removes")}</span>
+          {enabled.map((key) => (
+            <ToneBadge key={key} tone="active">
+              {t(`caseCleanup.short.${key}`)}
+            </ToneBadge>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2 text-xs">
+        <Filter className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1 text-muted-foreground">
+          {filters.length > 0 ? t("caseCleanup.filters", { count: filters.length }) : t("caseCleanup.noFilters")}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 shrink-0 px-1.5 text-[11px]"
+          onClick={() => ui.getState().openDrawer("inquiries")}
+        >
+          {t("caseCleanup.manageFilters")}
+        </Button>
+      </div>
+      <div className="flex items-center gap-2 text-xs" data-testid="case-file-escalation">
+        <EscalationFlag size={12} className="shrink-0" />
+        <span className={cn("min-w-0 flex-1", escalated > 0 ? "font-medium text-escalation" : "text-muted-foreground")}>
+          {escalated > 0 ? t("caseEscalation.summary", { count: escalated }) : t("caseEscalation.noneEscalated")}
+          {" · "}
+          {escalations.length > 0
+            ? t("caseEscalation.rules", { count: escalations.length })
+            : t("caseEscalation.noRules")}
+        </span>
+        {escalated > 0 && !closed && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 shrink-0 px-1.5 text-[11px]"
+            disabled={clearing}
+            onClick={() => void clearAll()}
+            data-testid="escalation-clear-all"
+          >
+            {t("caseEscalation.clearAll")}
+          </Button>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── Watches ─────────────────────────────────────────────────────────────────
 
 function InquiriesDrawer({
@@ -672,6 +789,8 @@ function InquiriesDrawer({
       linkable={all.filter((q) => !linkedIds.has(q.id) && q.status !== "ARCHIVED")}
       isClosed={caseData.status === "CLOSED" || caseData.status === "ARCHIVED"}
       inCaseFindingIds={inCase}
+      filters={caseData.findingFilters ?? []}
+      clientId={store.getState().clientId}
       onChanged={() => {
         onChanged();
         store.getState().refetch();
@@ -873,6 +992,7 @@ function ItemDetails({
                 <span className="font-medium">{row?.typeLabel ?? finding?.findingType}</span>
                 {row && row.state !== "open" && <StateChip tone="neutral">{row.state}</StateChip>}
               </div>
+              {row?.escalated && <EscalationNotice caseRowFindingId={row.findingId} row={row} />}
               <pre className="max-h-56 overflow-auto rounded-[4px] border-2 border-border bg-muted/40 p-2 font-mono text-xs whitespace-pre-wrap">
                 {finding?.contextBefore ? <span className="text-muted-foreground">{finding.contextBefore}</span> : null}
                 <mark className="bg-accent text-accent-foreground">{finding?.matchedContent ?? row?.value ?? ""}</mark>
@@ -902,6 +1022,63 @@ function ItemDetails({
             </>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Why a finding is escalated — the rule it matched, when — and the way to
+ * clear the mark once someone has dealt with it. The finding stays.
+ */
+function EscalationNotice({ caseRowFindingId, row }: { caseRowFindingId: string; row: BubbleRow }) {
+  const { t } = useTranslation();
+  const store = useBoardStore();
+  const readOnly = useBoard((s) => s.readOnly);
+  const caseId = useBoard((s) => s.caseId);
+  const [clearing, setClearing] = React.useState(false);
+  const clear = async () => {
+    setClearing(true);
+    try {
+      await api.cases.caseCleanupControllerClearEscalations({
+        id: caseId,
+        clearCaseEscalationsDto: { findingIds: [caseRowFindingId] },
+      });
+      toast.success(t("caseEscalation.cleared"));
+      store.getState().refetch();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("caseEscalation.failedToClear"));
+    } finally {
+      setClearing(false);
+    }
+  };
+  return (
+    <div
+      className="flex items-start gap-2.5 rounded-[4px] border-2 border-escalation/50 bg-escalation-soft p-2.5"
+      data-testid="escalation-notice"
+    >
+      <EscalationFlag size={16} className="mt-0.5 shrink-0" />
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-escalation">
+          {t("caseEscalation.state")}
+          {row.escalatedAt ? ` · ${formatDistanceToNowStrict(new Date(row.escalatedAt), { addSuffix: true })}` : ""}
+        </p>
+        {row.escalationLabel && (
+          <p className="text-xs">{t("caseEscalation.matched", { rule: row.escalationLabel })}</p>
+        )}
+      </div>
+      {!readOnly && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 shrink-0 gap-1 text-xs"
+          disabled={clearing}
+          onClick={() => void clear()}
+          data-testid="escalation-clear"
+        >
+          {clearing ? <Loader2 className="size-3 animate-spin" /> : <X className="size-3" />}
+          {t("caseEscalation.clear")}
+        </Button>
       )}
     </div>
   );
@@ -942,9 +1119,20 @@ function FindingList({
             {t(`caseBoard.severity.${row.severity ?? "info"}`)}
           </SeverityBadge>
           <span className="max-w-[110px] shrink-0 truncate text-muted-foreground">{row.typeLabel}</span>
-          <span className={cn("min-w-0 flex-1 truncate font-mono", row.state === "dismissed" && "line-through")}>
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate font-mono",
+              row.state === "dismissed" && "line-through",
+              attached && row.escalated && "font-semibold text-escalation",
+            )}
+          >
             {row.value ?? ""}
           </span>
+          {attached && row.escalated && (
+            <span title={row.escalationLabel ?? t("caseEscalation.state")} className="shrink-0">
+              <EscalationFlag size={12} />
+            </span>
+          )}
           {row.state !== "open" && (
             <StateChip tone={row.state === "resolved" ? "success" : row.state === "new" ? "accent" : row.state === "gone" ? "destructive" : "muted"}>
               {row.state === "dismissed" ? t(`caseBoard.states.${dismissedLabel(row.status)}`) : t(`caseBoard.states.${row.state}`)}

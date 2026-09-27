@@ -67,6 +67,24 @@ export interface CreateCaseDto {
      * @memberof CreateCaseDto
      */
     autoPullInquiryIds?: Array<string>;
+    /**
+     * Clean-up: take out findings the scans no longer see (retired by a run, or deleted). Off by default.
+     * @type {boolean}
+     * @memberof CreateCaseDto
+     */
+    removeGoneFindings?: boolean;
+    /**
+     * Clean-up: take out findings someone resolved. Off by default.
+     * @type {boolean}
+     * @memberof CreateCaseDto
+     */
+    removeResolvedFindings?: boolean;
+    /**
+     * Clean-up: take out assets deleted from their source, with their findings. Off by default.
+     * @type {boolean}
+     * @memberof CreateCaseDto
+     */
+    removeGoneAssets?: boolean;
 }
 
 
@@ -120,6 +138,9 @@ export function CreateCaseDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
         'inquiryIds': json['inquiryIds'] == null ? undefined : json['inquiryIds'],
         'autoPullInquiryIds': json['autoPullInquiryIds'] == null ? undefined : json['autoPullInquiryIds'],
+        'removeGoneFindings': json['removeGoneFindings'] == null ? undefined : json['removeGoneFindings'],
+        'removeResolvedFindings': json['removeResolvedFindings'] == null ? undefined : json['removeResolvedFindings'],
+        'removeGoneAssets': json['removeGoneAssets'] == null ? undefined : json['removeGoneAssets'],
     };
 }
 
@@ -142,6 +163,9 @@ export function CreateCaseDtoToJSONTyped(value?: CreateCaseDto | null, ignoreDis
         'createdBy': value['createdBy'],
         'inquiryIds': value['inquiryIds'],
         'autoPullInquiryIds': value['autoPullInquiryIds'],
+        'removeGoneFindings': value['removeGoneFindings'],
+        'removeResolvedFindings': value['removeResolvedFindings'],
+        'removeGoneAssets': value['removeGoneAssets'],
     };
 }
 

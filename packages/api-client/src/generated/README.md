@@ -121,6 +121,14 @@ All URIs are relative to *http://localhost*
 *CaseBoardApi* | [**caseBoardControllerNeighbours**](docs/CaseBoardApi.md#caseboardcontrollerneighbours) | **POST** /cases/{id}/board/neighbours | Live depth-1 neighbourhood of one evidence bubble (drawn as suggested items)
 *CaseBoardApi* | [**caseBoardControllerTakeSnapshot**](docs/CaseBoardApi.md#caseboardcontrollertakesnapshot) | **POST** /cases/{id}/board/snapshots | Capture the board as it is now
 *CaseBoardApi* | [**caseBoardControllerTrace**](docs/CaseBoardApi.md#caseboardcontrollertrace) | **POST** /cases/{id}/board/trace | Trace assets\&#39; connections: upstream, downstream and sideways through lineage, links, duplicates and similarity
+*CasesApi* | [**caseCleanupControllerAddFilters**](docs/CasesApi.md#casecleanupcontrolleraddfilters) | **POST** /cases/{id}/finding-filters | Add finding filters (case-wide or for one watch); matching findings leave the case now and are not pulled again
+*CasesApi* | [**caseCleanupControllerClearEscalations**](docs/CasesApi.md#casecleanupcontrollerclearescalations) | **POST** /cases/{id}/escalations/clear | Take the escalation mark off findings of the case (all of them when findingIds is omitted); the findings stay
+*CasesApi* | [**caseCleanupControllerFilterOptions**](docs/CasesApi.md#casecleanupcontrollerfilteroptions) | **GET** /cases/{id}/finding-filters/options | Finding types a filter can pick from: what the case holds and what its watches (or one watch) answer
+*CasesApi* | [**caseCleanupControllerListFilters**](docs/CasesApi.md#casecleanupcontrollerlistfilters) | **GET** /cases/{id}/finding-filters | The case\&#39;s finding filters, case-wide and per watch
+*CasesApi* | [**caseCleanupControllerPreviewCleanup**](docs/CasesApi.md#casecleanupcontrollerpreviewcleanup) | **POST** /cases/{id}/cleanup/preview | What the given clean-up switches would take out of the case right now (writes nothing)
+*CasesApi* | [**caseCleanupControllerPreviewFilters**](docs/CasesApi.md#casecleanupcontrollerpreviewfilters) | **POST** /cases/{id}/finding-filters/preview | How many findings in the case unsaved filter rules would take out now (writes nothing)
+*CasesApi* | [**caseCleanupControllerRemoveFilter**](docs/CasesApi.md#casecleanupcontrollerremovefilter) | **DELETE** /cases/{id}/finding-filters/{filterId} | Remove a filter. Findings it took out stay out; the watch just stops skipping them
+*CasesApi* | [**caseCleanupControllerUpdateFilter**](docs/CasesApi.md#casecleanupcontrollerupdatefilter) | **PATCH** /cases/{id}/finding-filters/{filterId} | Change a filter\&#39;s pattern or description; a new pattern takes out what it now matches
 *CasesApi* | [**caseEventsControllerCreate**](docs/CasesApi.md#caseeventscontrollercreate) | **POST** /cases/{caseId}/events | Add a dated event to the case chronology
 *CasesApi* | [**caseEventsControllerList**](docs/CasesApi.md#caseeventscontrollerlist) | **GET** /cases/{caseId}/events | List the case chronology (real-world events, ordered by date)
 *CasesApi* | [**caseEventsControllerRemove**](docs/CasesApi.md#caseeventscontrollerremove) | **DELETE** /cases/{caseId}/events/{eventId} | Remove a chronology event
@@ -369,6 +377,7 @@ All URIs are relative to *http://localhost*
 
 ### Models
 
+- [AddCaseFindingFiltersDto](docs/AddCaseFindingFiltersDto.md)
 - [AddEvidenceDto](docs/AddEvidenceDto.md)
 - [AddExclusionDto](docs/AddExclusionDto.md)
 - [AddFindingDto](docs/AddFindingDto.md)
@@ -472,9 +481,19 @@ All URIs are relative to *http://localhost*
 - [CaseBoardResponseDto](docs/CaseBoardResponseDto.md)
 - [CaseBoardSnapshotDto](docs/CaseBoardSnapshotDto.md)
 - [CaseBoardSnapshotSummaryDto](docs/CaseBoardSnapshotSummaryDto.md)
+- [CaseCleanupItemDto](docs/CaseCleanupItemDto.md)
+- [CaseCleanupPreviewDto](docs/CaseCleanupPreviewDto.md)
+- [CaseCleanupResultDto](docs/CaseCleanupResultDto.md)
+- [CaseCleanupRulesDto](docs/CaseCleanupRulesDto.md)
 - [CaseEventDto](docs/CaseEventDto.md)
 - [CaseEvidenceDto](docs/CaseEvidenceDto.md)
 - [CaseFindingDto](docs/CaseFindingDto.md)
+- [CaseFindingFilterDto](docs/CaseFindingFilterDto.md)
+- [CaseFindingFilterOptionsDto](docs/CaseFindingFilterOptionsDto.md)
+- [CaseFindingFilterRuleDto](docs/CaseFindingFilterRuleDto.md)
+- [CaseFindingFiltersChangeResponseDto](docs/CaseFindingFiltersChangeResponseDto.md)
+- [CaseFindingFiltersPreviewDto](docs/CaseFindingFiltersPreviewDto.md)
+- [CaseFindingTypeOptionDto](docs/CaseFindingTypeOptionDto.md)
 - [CaseLeadDto](docs/CaseLeadDto.md)
 - [CaseLinkedInquiryDto](docs/CaseLinkedInquiryDto.md)
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
@@ -496,6 +515,8 @@ All URIs are relative to *http://localhost*
 - [ChatBotSimulateResultDto](docs/ChatBotSimulateResultDto.md)
 - [ChatBotTestCheckDto](docs/ChatBotTestCheckDto.md)
 - [ChatBotTestResultDto](docs/ChatBotTestResultDto.md)
+- [ClearCaseEscalationsDto](docs/ClearCaseEscalationsDto.md)
+- [ClearCaseEscalationsResponseDto](docs/ClearCaseEscalationsResponseDto.md)
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
 - [CloseCaseDto](docs/CloseCaseDto.md)
 - [CloseCaseResponseDto](docs/CloseCaseResponseDto.md)
@@ -650,6 +671,7 @@ All URIs are relative to *http://localhost*
 - [PatternPreviewResponseDto](docs/PatternPreviewResponseDto.md)
 - [PayloadCursorEntryDto](docs/PayloadCursorEntryDto.md)
 - [PivotGraphDto](docs/PivotGraphDto.md)
+- [PreviewCaseFindingFiltersDto](docs/PreviewCaseFindingFiltersDto.md)
 - [PreviewDiagnosticDto](docs/PreviewDiagnosticDto.md)
 - [PreviewInquiryDto](docs/PreviewInquiryDto.md)
 - [PreviewResponseDto](docs/PreviewResponseDto.md)
@@ -817,6 +839,7 @@ All URIs are relative to *http://localhost*
 - [UpdateCapabilitiesDto](docs/UpdateCapabilitiesDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)
 - [UpdateCaseEventDto](docs/UpdateCaseEventDto.md)
+- [UpdateCaseFindingFilterDto](docs/UpdateCaseFindingFilterDto.md)
 - [UpdateCaseFindingNoteDto](docs/UpdateCaseFindingNoteDto.md)
 - [UpdateChatBotDto](docs/UpdateChatBotDto.md)
 - [UpdateCorrelationConfigDto](docs/UpdateCorrelationConfigDto.md)

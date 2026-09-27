@@ -12,6 +12,10 @@ export enum NotificationEvent {
   FINDINGS_MASS_RESOLVED = 'findings.mass_resolved',
   SOURCE_FIRST_SCAN = 'source.first_scan',
   CASE_ESCALATED = 'case.escalated',
+  // A case's escalation rules marked findings a watch brought in by itself.
+  // Distinct from CASE_ESCALATED, which the autopilot's escalation agent
+  // raises and deduplicates on: a rule firing must not mute the agent.
+  CASE_FINDINGS_ESCALATED = 'case.findings_escalated',
   // Autopilot changed a source's editable (detector/sampling/…) config.
   SOURCE_CONFIG_CHANGED = 'source.config_changed',
   // A standing inquiry gained unseen matches after a run.

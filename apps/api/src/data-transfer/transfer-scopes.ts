@@ -495,6 +495,14 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
     keys: ['id'],
     idRefs: ['id', 'caseId', 'inquiryId'],
   },
+  // After case_inquiries: a watch's own filters point at its link row.
+  {
+    model: 'caseFindingFilter',
+    scope: 'investigations',
+    order: 525,
+    keys: ['id'],
+    idRefs: ['id', 'caseId', 'caseInquiryId'],
+  },
   {
     model: 'caseEvidence',
     scope: 'investigations',
@@ -508,7 +516,9 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
     scope: 'investigations',
     order: 540,
     keys: ['id'],
-    idRefs: ['id', 'caseId', 'caseEvidenceId', 'findingId'],
+    // escalationRuleId names a case_finding_filters row (no foreign key: the
+    // rule may be gone); remapped by the same function, it keeps pointing at it.
+    idRefs: ['id', 'caseId', 'caseEvidenceId', 'findingId', 'escalationRuleId'],
   },
   {
     model: 'caseLead',

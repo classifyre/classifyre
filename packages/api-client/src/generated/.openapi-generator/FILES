@@ -3,6 +3,7 @@
 README.md
 docs/AIApi.md
 docs/AIProviderConfigsApi.md
+docs/AddCaseFindingFiltersDto.md
 docs/AddEvidenceDto.md
 docs/AddExclusionDto.md
 docs/AddFindingDto.md
@@ -110,9 +111,19 @@ docs/CaseBoardMetaDto.md
 docs/CaseBoardResponseDto.md
 docs/CaseBoardSnapshotDto.md
 docs/CaseBoardSnapshotSummaryDto.md
+docs/CaseCleanupItemDto.md
+docs/CaseCleanupPreviewDto.md
+docs/CaseCleanupResultDto.md
+docs/CaseCleanupRulesDto.md
 docs/CaseEventDto.md
 docs/CaseEvidenceDto.md
 docs/CaseFindingDto.md
+docs/CaseFindingFilterDto.md
+docs/CaseFindingFilterOptionsDto.md
+docs/CaseFindingFilterRuleDto.md
+docs/CaseFindingFiltersChangeResponseDto.md
+docs/CaseFindingFiltersPreviewDto.md
+docs/CaseFindingTypeOptionDto.md
 docs/CaseLeadDto.md
 docs/CaseLinkedInquiryDto.md
 docs/CaseListResponseDto.md
@@ -136,6 +147,8 @@ docs/ChatBotSimulateResultDto.md
 docs/ChatBotTestCheckDto.md
 docs/ChatBotTestResultDto.md
 docs/ChatBotsApi.md
+docs/ClearCaseEscalationsDto.md
+docs/ClearCaseEscalationsResponseDto.md
 docs/CliRunnerControllerUpdateRunnerStatusRequest.md
 docs/CloseCaseDto.md
 docs/CloseCaseResponseDto.md
@@ -307,6 +320,7 @@ docs/PatternLabelExclusionCandidateDto.md
 docs/PatternPreviewResponseDto.md
 docs/PayloadCursorEntryDto.md
 docs/PivotGraphDto.md
+docs/PreviewCaseFindingFiltersDto.md
 docs/PreviewDiagnosticDto.md
 docs/PreviewInquiryDto.md
 docs/PreviewResponseDto.md
@@ -478,6 +492,7 @@ docs/UpdateAiProviderConfigDto.md
 docs/UpdateCapabilitiesDto.md
 docs/UpdateCaseDto.md
 docs/UpdateCaseEventDto.md
+docs/UpdateCaseFindingFilterDto.md
 docs/UpdateCaseFindingNoteDto.md
 docs/UpdateChatBotDto.md
 docs/UpdateCorrelationConfigDto.md
@@ -544,6 +559,7 @@ src/apis/ThreadsApi.ts
 src/apis/WorkerQueuesApi.ts
 src/apis/index.ts
 src/index.ts
+src/models/AddCaseFindingFiltersDto.ts
 src/models/AddEvidenceDto.ts
 src/models/AddExclusionDto.ts
 src/models/AddFindingDto.ts
@@ -647,9 +663,19 @@ src/models/CaseBoardMetaDto.ts
 src/models/CaseBoardResponseDto.ts
 src/models/CaseBoardSnapshotDto.ts
 src/models/CaseBoardSnapshotSummaryDto.ts
+src/models/CaseCleanupItemDto.ts
+src/models/CaseCleanupPreviewDto.ts
+src/models/CaseCleanupResultDto.ts
+src/models/CaseCleanupRulesDto.ts
 src/models/CaseEventDto.ts
 src/models/CaseEvidenceDto.ts
 src/models/CaseFindingDto.ts
+src/models/CaseFindingFilterDto.ts
+src/models/CaseFindingFilterOptionsDto.ts
+src/models/CaseFindingFilterRuleDto.ts
+src/models/CaseFindingFiltersChangeResponseDto.ts
+src/models/CaseFindingFiltersPreviewDto.ts
+src/models/CaseFindingTypeOptionDto.ts
 src/models/CaseLeadDto.ts
 src/models/CaseLinkedInquiryDto.ts
 src/models/CaseListResponseDto.ts
@@ -671,6 +697,8 @@ src/models/ChatBotSimulateDto.ts
 src/models/ChatBotSimulateResultDto.ts
 src/models/ChatBotTestCheckDto.ts
 src/models/ChatBotTestResultDto.ts
+src/models/ClearCaseEscalationsDto.ts
+src/models/ClearCaseEscalationsResponseDto.ts
 src/models/CliRunnerControllerUpdateRunnerStatusRequest.ts
 src/models/CloseCaseDto.ts
 src/models/CloseCaseResponseDto.ts
@@ -825,6 +853,7 @@ src/models/PatternLabelExclusionCandidateDto.ts
 src/models/PatternPreviewResponseDto.ts
 src/models/PayloadCursorEntryDto.ts
 src/models/PivotGraphDto.ts
+src/models/PreviewCaseFindingFiltersDto.ts
 src/models/PreviewDiagnosticDto.ts
 src/models/PreviewInquiryDto.ts
 src/models/PreviewResponseDto.ts
@@ -992,6 +1021,7 @@ src/models/UpdateAiProviderConfigDto.ts
 src/models/UpdateCapabilitiesDto.ts
 src/models/UpdateCaseDto.ts
 src/models/UpdateCaseEventDto.ts
+src/models/UpdateCaseFindingFilterDto.ts
 src/models/UpdateCaseFindingNoteDto.ts
 src/models/UpdateChatBotDto.ts
 src/models/UpdateCorrelationConfigDto.ts

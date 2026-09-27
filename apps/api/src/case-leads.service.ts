@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   CaseActivityType,
@@ -16,6 +17,8 @@ import { EmbeddingService } from './embedding/embedding.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 import { GraphService } from './graph.service';
+// A value import: an @Optional() injection resolves from emitted metadata.
+import { CaseCleanupService } from './cases/case-cleanup.service';
 
 const MAX_SEED_FINDINGS = 10;
 const NEIGHBORS_PER_SEED = 5;
@@ -45,6 +48,7 @@ export class CaseLeadsService {
     private readonly matching: InquiryMatchingService,
     private readonly agentMemory: AgentMemoryService,
     private readonly graph: GraphService,
+    @Optional() private readonly cleanup?: CaseCleanupService,
   ) {}
 
   async list(caseId: string, status?: CaseLeadStatus) {
@@ -168,6 +172,13 @@ export class CaseLeadsService {
     };
     const candidates = new Map<string, Candidate>();
 
+    // A kind of finding the investigator filtered out of the case is not a
+    // lead either: case-wide filters for every candidate, a question's own for
+    // its matches.
+    const caseWideGate = this.cleanup
+      ? await this.cleanup.pullGate(caseId, null)
+      : () => null;
+
     for (const seed of attached) {
       let neighbors: Awaited<ReturnType<EmbeddingService['similarFindings']>> =
         [];
@@ -183,6 +194,13 @@ export class CaseLeadsService {
         if (known.has(neighbor.id) || candidates.has(neighbor.id)) continue;
         if (String(neighbor.status) !== 'OPEN') continue;
         if (neighbor.similarity < MIN_NEIGHBOR_SIMILARITY) continue;
+        if (
+          caseWideGate({
+            findingType: neighbor.findingType,
+            matchedContent: neighbor.matchedContent ?? null,
+          })
+        )
+          continue;
         candidates.set(neighbor.id, {
           findingId: neighbor.id,
           origin: 'SEMANTIC_NEIGHBOR',
@@ -197,8 +215,18 @@ export class CaseLeadsService {
       const matches = await this.matching.getLiveMatches(inquiryId, {
         limit: 50,
       });
+      const gate = this.cleanup
+        ? await this.cleanup.pullGate(caseId, inquiryId)
+        : () => null;
       for (const match of matches.items) {
         if (known.has(match.findingId) || candidates.has(match.findingId))
+          continue;
+        if (
+          gate({
+            findingType: match.label,
+            matchedContent: match.matchedContent ?? null,
+          })
+        )
           continue;
         const importance = match.ranking?.importance ?? null;
         if (importance === null || importance < MIN_INQUIRY_IMPORTANCE)

@@ -34,6 +34,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
 import { isFindingData } from "../store/projection";
 import type { Spotlight } from "../store/ui-store";
+import { EscalationFlag } from "@workspace/case-board/components/finding-node";
 import { Presence } from "./presence";
 
 /** The kind glyphs double as the board's legend: the same marks the nodes wear. */
@@ -49,6 +50,7 @@ function KindGlyph({ kind }: { kind: Spotlight }) {
   if (kind === "findings") {
     return <span className="size-2.5 shrink-0 rounded-full bg-[#f5a623] ring-1 ring-current/40" aria-hidden />;
   }
+  if (kind === "escalated") return <EscalationFlag size={15} className="shrink-0" />;
   return <FlaskConical className="size-3.5 shrink-0" strokeWidth={2.25} aria-hidden />;
 }
 
@@ -72,6 +74,9 @@ function Counter({
   active: boolean;
   onToggle: () => void;
 }) {
+  // Escalation is the one counter that asks for attention: magenta ink at
+  // rest, a magenta surface once pressed.
+  const alarm = kind === "escalated";
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -84,7 +89,13 @@ function Counter({
           className={cn(
             "group relative flex h-full items-center gap-2 px-3 transition-colors disabled:cursor-default disabled:opacity-45",
             "first:rounded-l-[2px] last:rounded-r-[2px] [&:not(:first-child)]:border-l-2 [&:not(:first-child)]:border-border",
-            active ? "bg-foreground text-background" : "enabled:hover:bg-muted",
+            active
+              ? alarm
+                ? "bg-escalation text-escalation-foreground"
+                : "bg-foreground text-background"
+              : alarm
+                ? "text-escalation enabled:hover:bg-escalation-soft"
+                : "enabled:hover:bg-muted",
           )}
         >
           <KindGlyph kind={kind} />
@@ -92,7 +103,13 @@ function Counter({
           <span
             className={cn(
               "hidden font-mono text-[10px] leading-none tracking-[0.12em] uppercase @6xl/topbar:inline",
-              active ? "text-background/75" : "text-muted-foreground",
+              active
+                ? alarm
+                  ? "text-escalation-foreground/80"
+                  : "text-background/75"
+                : alarm
+                  ? "text-escalation"
+                  : "text-muted-foreground",
             )}
           >
             {label}
@@ -130,12 +147,21 @@ export function TopBar({
   const readOnly = useBoard((s) => s.readOnly);
   const counts = useBoard((s) => {
     let findings = 0;
-    for (const b of s.bubbles.values()) findings += b.rows.length;
+    let escalated = 0;
+    for (const b of s.bubbles.values()) {
+      findings += b.rows.length;
+      escalated += b.escalatedCount;
+    }
     let hypotheses = 0;
     for (const item of s.items.values()) if (item.kind === "HYPOTHESIS") hypotheses += 1;
-    return `${s.bubbles.size}|${findings}|${hypotheses}`;
+    return `${s.bubbles.size}|${findings}|${hypotheses}|${escalated}`;
   });
-  const [evidence, findings, hypotheses] = counts.split("|").map(Number) as [number, number, number];
+  const [evidence, findings, hypotheses, escalated] = counts.split("|").map(Number) as [
+    number,
+    number,
+    number,
+    number,
+  ];
 
   const toggle = (kind: Spotlight) => {
     if (spotlight === kind) {
@@ -146,12 +172,17 @@ export function TopBar({
     // Bring them all into view. A finding is only drawn near enough, so the
     // assets that carry findings stand in for them when none is on screen.
     const nodes = rf.getNodes().filter((n) => !n.hidden);
+    const escalatedCarriers = new Set(
+      [...store.getState().bubbles.values()].filter((b) => b.escalatedCount > 0).map((b) => b.itemId),
+    );
     let targets =
       kind === "evidence"
         ? nodes.filter((n) => n.type === "evidence")
         : kind === "hypotheses"
           ? nodes.filter((n) => n.type === "hypothesis")
-          : nodes.filter((n) => isFindingData(n.data) && n.data.attached);
+          : kind === "escalated"
+            ? nodes.filter((n) => escalatedCarriers.has(n.id))
+            : nodes.filter((n) => isFindingData(n.data) && n.data.attached);
     if (kind === "findings" && targets.length === 0) {
       const carriers = new Set(
         [...store.getState().bubbles.values()].filter((b) => b.rows.length > 0).map((b) => b.itemId),
@@ -226,6 +257,18 @@ export function TopBar({
             active={spotlight === "hypotheses"}
             onToggle={() => toggle("hypotheses")}
           />
+          {(escalated > 0 || spotlight === "escalated") && (
+            <Counter
+              kind="escalated"
+              value={escalated}
+              label={t("caseEscalation.counter")}
+              hint={
+                spotlight === "escalated" ? t("caseEscalation.spotlightClear") : t("caseEscalation.spotlight")
+              }
+              active={spotlight === "escalated"}
+              onToggle={() => toggle("escalated")}
+            />
+          )}
         </div>
 
         <button

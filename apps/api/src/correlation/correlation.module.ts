@@ -5,6 +5,8 @@ import { GraphService } from '../graph.service';
 import { CaseActivityService } from '../case-activity.service';
 import { InquiryActivityService } from '../inquiry-activity.service';
 import { CasesService } from '../cases.service';
+import { CaseCleanupService } from '../cases/case-cleanup.service';
+import { CaseEscalationService } from '../cases/case-escalation.service';
 import { CaseBoardReadService } from '../case-board/case-board-read.service';
 import { InquiriesService } from '../inquiries.service';
 import { AgentMemoryService } from '../autopilot/memory/agent-memory.service';
@@ -40,6 +42,10 @@ import { SourceGraphModule } from '../stats/source-graph.module';
     AgentMemoryService,
     // A case closed by an agent is snapshotted like one closed by a person.
     CaseBoardReadService,
+    // CasesService's clean-up and filter gate; without it here pulls
+    // from this module would skip the case's filters.
+    CaseCleanupService,
+    CaseEscalationService,
     CasesService,
     InquiriesService,
     AgentAuditService,

@@ -99,8 +99,10 @@ export function emptyCounts(): Record<SeverityKey, number> {
 export function tallyBubble(bubble: Bubble): Bubble {
   const severityCounts = emptyCounts();
   let newCount = 0;
+  let escalatedCount = 0;
   let maxSeverity: SeverityKey | null = null;
   for (const row of bubble.rows) {
+    if (row.escalated) escalatedCount += 1;
     if (row.severity) {
       severityCounts[row.severity] += 1;
       if (!maxSeverity || SEVERITY_ORDER[row.severity] < SEVERITY_ORDER[maxSeverity]) {
@@ -115,6 +117,7 @@ export function tallyBubble(bubble: Bubble): Bubble {
     unattached: [...bubble.unattached].sort(compareRows),
     severityCounts,
     newCount,
+    escalatedCount,
     maxSeverity,
   };
 }
@@ -130,6 +133,8 @@ function rowFromNode(
     customDetectorName?: string | null;
     matchedContent?: string | null;
     note?: string | null;
+    escalatedAt?: Date | string | null;
+    escalationLabel?: string | null;
   },
 ): BubbleRow {
   const matchState =
@@ -153,6 +158,9 @@ function rowFromNode(
     missing,
     state: findingVisualState({ missing, matchState, status }),
     note: snapshot.note ?? null,
+    escalated: !!snapshot.escalatedAt,
+    escalationLabel: snapshot.escalatedAt ? (snapshot.escalationLabel ?? null) : null,
+    escalatedAt: snapshot.escalatedAt ? iso(snapshot.escalatedAt) : null,
   };
 }
 
@@ -198,6 +206,8 @@ export function buildDomain(
           customDetectorName: cf.customDetectorName,
           matchedContent: cf.matchedContent,
           note: cf.note,
+          escalatedAt: cf.escalatedAt,
+          escalationLabel: cf.escalationLabel,
         }),
       );
     }
@@ -229,6 +239,7 @@ export function buildDomain(
       unattached,
       severityCounts: emptyCounts(),
       newCount: 0,
+      escalatedCount: 0,
       maxSeverity: null,
     });
     d.bubbles.set(item.id, bubble);
@@ -348,6 +359,7 @@ export function placeholderBubble(itemId: string, preview: ItemPreview): Bubble 
     unattached: [],
     severityCounts: emptyCounts(),
     newCount: 0,
+    escalatedCount: 0,
     maxSeverity: null,
     pending: true,
   };

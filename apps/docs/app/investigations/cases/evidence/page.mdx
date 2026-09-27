@@ -49,10 +49,11 @@ A finding's **look** tells you where it stands:
 <FindingKey />
 
 <Callout type="info">
-Settled findings never disappear from the board on their own. A resolved,
+Settled findings do not disappear from the board on their own. A resolved,
 dismissed, gone or deleted finding keeps its place, because it is part of the
 record of the case. If they get in the way, switch them off in **View →
-Findings** and they fade instead.
+Findings** and they fade instead, or let the case take them out with
+[automatic clean-up](/investigations/cases/cleanup/).
 </Callout>
 
 ---
@@ -103,6 +104,10 @@ one, so the case holds exactly the findings that matter.
 - **Detach** a finding: right-click it → **Detach from case…**. The finding stays
   in its source; only its place in this case goes. The timeline records it, and
   **Undo** brings it back.
+- **Detach & filter out** every finding like it: right-click →
+  **Detach & filter out this type…** or **…this value…**. A
+  [finding filter](/investigations/cases/cleanup/#finding-filters) takes them
+  all out and keeps them out.
 
 ---
 
@@ -133,13 +138,16 @@ Right-click an asset or a finding for its menu:
 | **New hypothesis from selection**, or **Add to hypothesis** as supporting, contradicting or neutral | **Comment** |
 | **Comment** | **Highlight** in a marker colour |
 | **Show neighbours** and **Show connections** | **Mark resolved**, **Mark false positive**, **Reopen finding** |
-| **Collapse** or **Expand findings** | **Detach from case…** |
-| **Highlight** in a marker colour | |
+| **Collapse** or **Expand findings** | **Escalate this type…** or **this value…**, and **Clear escalation** on an escalated finding |
+| **Highlight** in a marker colour | **Detach from case…**, **Detach & filter out this type…** or **this value…** |
 | **Move to frame**, **Bring to front**, **Send to back** | |
 | **Remove from case…** | |
 
-A finding that is not in the case (a dashed ghost) offers **Open finding** and
-**Attach to case**.
+A finding that is not in the case (a dashed ghost) offers **Open finding**,
+**Attach to case**, and escalating or filtering out findings like it.
+
+An **escalated** finding (a magenta hazard ring and a warning flag) matched one
+of the case's [escalation rules](/investigations/cases/escalation/).
 
 **Removing evidence** takes its attached findings out of the case too. The
 timeline records it, and **Undo** restores everything, including notes and
@@ -158,5 +166,6 @@ and buttons to open the asset or finding in full or to **Show connections**.
 **Evidence is a record.** When a later scan changes the source (a finding is no
 longer found, a file is deleted), the case keeps what it knew and marks what
 changed: *gone from its source*, *deleted*. You never lose what the
-investigation was based on.
+investigation was based on, unless you ask the case to let go of it with
+[automatic clean-up](/investigations/cases/cleanup/).
 </Callout>

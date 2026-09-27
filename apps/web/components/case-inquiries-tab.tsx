@@ -7,15 +7,18 @@ import {
   ArrowRight,
   DownloadCloud,
   ExternalLink,
+  Filter,
   Link2,
   Loader2,
   Pencil,
+  Plus,
   Sparkles,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
+  type CaseFindingFilterDto,
   type CaseLinkedInquiryDto,
   type InquiryResponseDto,
 } from "@workspace/api-client";
@@ -43,6 +46,14 @@ import {
   AlertDialogTrigger,
 } from "@workspace/ui/components/alert-dialog";
 import { InquiryMatchesPanel } from "@/components/inquiry-matches-panel";
+import { FindingFilterChips } from "@/components/case-cleanup/finding-filter-chips";
+import {
+  FindingFilterDialog,
+  type FilterDialogRequest,
+  type RuleAction,
+} from "@/components/case-cleanup/finding-filter-dialog";
+import { EscalationFlag } from "@workspace/case-board/components/finding-node";
+import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 
 export type CaseInquiriesTabProps = {
@@ -52,6 +63,10 @@ export type CaseInquiriesTabProps = {
   isClosed: boolean;
   /** Findings already attached — shown as "in case" and not selectable. */
   inCaseFindingIds: Set<string>;
+  /** The case's finding filters, case-wide and per watch. */
+  filters?: CaseFindingFilterDto[];
+  /** The board tab, so its own filter changes do not echo back as someone else's. */
+  clientId?: string;
   onChanged: () => void;
 };
 
@@ -69,6 +84,8 @@ export function CaseInquiriesTab({
   linkable,
   isClosed,
   inCaseFindingIds,
+  filters = [],
+  clientId,
   onChanged,
 }: CaseInquiriesTabProps) {
   const router = useRouter();
@@ -82,6 +99,11 @@ export function CaseInquiriesTab({
   const [linking, setLinking] = React.useState(false);
   const [pulling, setPulling] = React.useState<string | null>(null);
   const [savingAutoPull, setSavingAutoPull] = React.useState<string | null>(null);
+  const [filterRequest, setFilterRequest] =
+    React.useState<FilterDialogRequest | null>(null);
+  const caseWideFilters = filters.filter((f) => !f.inquiryId);
+  const filtersOf = (inquiryId: string) =>
+    filters.filter((f) => f.inquiryId === inquiryId);
 
   // Keep the focus on a watch that still exists after a link or unlink.
   React.useEffect(() => {
@@ -152,7 +174,10 @@ export function CaseInquiriesTab({
         pullFromInquiryDto: { inquiryId },
       });
       toast.success(
-        t("investigations.caseDetail.pulled", { count: String(res.pulled) }),
+        t("investigations.caseDetail.pulled", { count: String(res.pulled) }) +
+          (res.filtered
+            ? ` · ${t("caseFilters.pullFiltered", { count: res.filtered })}`
+            : ""),
       );
       setSelected(new Set());
       onChanged();
@@ -229,6 +254,30 @@ export function CaseInquiriesTab({
           </CardContent>
         </Card>
       )}
+
+      {/* Rules that hold for the whole case, whichever watch finds a match. */}
+      <Card data-testid="case-wide-filters">
+        <CardContent className="space-y-2.5 p-3">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 shrink-0 text-accent-ink" />
+            <span className="min-w-0 flex-1 text-sm font-medium">
+              {t("caseFilters.rulesCaseWide")}
+            </span>
+          </div>
+          <RuleRows
+            caseId={caseId}
+            rules={caseWideFilters}
+            readOnly={isClosed}
+            onAdd={(action) => setFilterRequest({ action, inquiryId: null })}
+            onEdit={(filter) => setFilterRequest({ filter })}
+            onChanged={onChanged}
+            testIdPrefix="case"
+          />
+          <p className="text-muted-foreground text-[11px]">
+            {t("caseFilters.rulesHint")}
+          </p>
+        </CardContent>
+      </Card>
 
       {linked.length === 0 && (
         <Card>
@@ -386,6 +435,25 @@ export function CaseInquiriesTab({
                     </p>
                   )}
 
+                  {/* What this watch may not bring in (skipped by auto-add
+                      and by "pull all", taken out when added), and what it
+                      escalates (marked, and brought in even with auto-add off). */}
+                  <div className="space-y-1.5 border-t border-border pt-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs">
+                      <Filter className="h-3 w-3 text-muted-foreground" />
+                      {t("caseFilters.rulesWatch")}
+                    </span>
+                    <RuleRows
+                      caseId={caseId}
+                      rules={filtersOf(q.id)}
+                      readOnly={isClosed}
+                      onAdd={(action) => setFilterRequest({ action, inquiryId: q.id })}
+                      onEdit={(filter) => setFilterRequest({ filter })}
+                      onChanged={onChanged}
+                      testIdPrefix={`watch-${q.id}`}
+                    />
+                  </div>
+
                   {!isClosed && q.matchCount > 0 && (
                     <div className="flex gap-1.5">
                       <Button
@@ -496,6 +564,102 @@ export function CaseInquiriesTab({
           )}
         </div>
       </div>
+
+      <FindingFilterDialog
+        caseId={caseId}
+        watches={linked.map((q) => ({ id: q.id, title: q.title }))}
+        filters={filters}
+        request={filterRequest}
+        onClose={() => setFilterRequest(null)}
+        onApplied={() => onChanged()}
+        clientId={clientId}
+      />
+    </div>
+  );
+}
+
+/**
+ * A scope's rules in two labelled rows: what it filters out and what it
+ * escalates, each with its chips and a "+" that opens the rules dialog in
+ * that mode. Escalation wears its magenta; filters stay neutral.
+ */
+function RuleRows({
+  caseId,
+  rules,
+  readOnly,
+  onAdd,
+  onEdit,
+  onChanged,
+  testIdPrefix,
+}: {
+  caseId: string;
+  rules: CaseFindingFilterDto[];
+  readOnly: boolean;
+  onAdd: (action: RuleAction) => void;
+  onEdit: (filter: CaseFindingFilterDto) => void;
+  onChanged: () => void;
+  testIdPrefix: string;
+}) {
+  const { t } = useTranslation();
+  const rows: Array<{ action: RuleAction; label: string; add: string }> = [
+    { action: "EXCLUDE", label: t("caseFilters.rowFilter"), add: t("caseFilters.addFilter") },
+    { action: "ESCALATE", label: t("caseFilters.rowEscalate"), add: t("caseFilters.addEscalation") },
+  ];
+  return (
+    // One grid for both rows, so the chips line up under each other and the
+    // label column takes the width of its longest label (no wrapping).
+    <div className="grid grid-cols-[max-content_minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1.5">
+      {rows.map((row) => {
+        const own = rules.filter((r) => (r.action ?? "EXCLUDE") === row.action);
+        const escalate = row.action === "ESCALATE";
+        return (
+          <React.Fragment key={row.action}>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 whitespace-nowrap pt-[3px] font-mono text-[10px] uppercase tracking-[0.12em]",
+                escalate ? "text-escalation" : "text-muted-foreground",
+              )}
+              data-testid={`rules-${testIdPrefix}-${row.action.toLowerCase()}`}
+            >
+              {escalate ? (
+                <EscalationFlag size={11} className="shrink-0" />
+              ) : (
+                <Filter className="h-2.5 w-2.5 shrink-0" />
+              )}
+              {row.label}
+            </span>
+            {own.length > 0 ? (
+              <FindingFilterChips
+                caseId={caseId}
+                filters={own}
+                readOnly={readOnly}
+                onEdit={onEdit}
+                onChanged={onChanged}
+              />
+            ) : (
+              <span className="text-muted-foreground pt-[2px] text-[11px]">—</span>
+            )}
+            {!readOnly ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  "h-6 w-6",
+                  escalate && "text-escalation hover:bg-escalation-soft hover:text-escalation",
+                )}
+                aria-label={row.add}
+                title={row.add}
+                onClick={() => onAdd(row.action)}
+                data-testid={`add-${testIdPrefix}-${row.action.toLowerCase()}`}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <span />
+            )}
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }

@@ -37,6 +37,7 @@ describe('DecisionApplierService', () => {
     linkInquiries: jest.fn(),
     close: jest.fn(),
     reopen: jest.fn(),
+    caseWideExclusions: jest.fn(() => Promise.resolve(new Map())),
   };
   const mockThreads = {
     create: jest.fn(),
@@ -332,6 +333,37 @@ describe('DecisionApplierService', () => {
         rationale: '',
         findingIds: ['f1'],
       });
+      expect(mockCases.attachFindings).toHaveBeenCalledWith('c1', {
+        findingIds: ['f1'],
+        addedBy: AI_ACTOR,
+      });
+    });
+
+    it('applyCaseOperationCore leaves out what the case filters out, and says why', async () => {
+      mockSearch.existingIds.mockResolvedValue(new Set(['f1', 'f2']));
+      mockCases.attachFindings.mockResolvedValue({ attached: 1 });
+      mockCases.caseWideExclusions.mockResolvedValueOnce(
+        new Map([
+          [
+            'f2',
+            {
+              id: 'flt1',
+              kind: 'FINDING_TYPE',
+              pattern: 'IP_ADDRESS',
+              description: 'Internal addresses are noise here',
+              inquiryId: null,
+              inquiryTitle: null,
+            },
+          ],
+        ]),
+      );
+      await expect(
+        service.applyCaseOperationCore('c1', {
+          op: 'ATTACH_FINDINGS',
+          rationale: '',
+          findingIds: ['f1', 'f2'],
+        }),
+      ).rejects.toThrow(/case filters them out \(type IP_ADDRESS — Internal/);
       expect(mockCases.attachFindings).toHaveBeenCalledWith('c1', {
         findingIds: ['f1'],
         addedBy: AI_ACTOR,

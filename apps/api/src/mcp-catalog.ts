@@ -157,6 +157,10 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'attach_case_findings',
       'pull_case_from_inquiry',
       'link_case_inquiries',
+      'list_case_finding_filters',
+      'add_case_finding_filters',
+      'remove_case_finding_filter',
+      'clear_case_escalations',
       'get_case_graph',
       'get_case_timeline',
       'list_case_threads',
@@ -169,6 +173,7 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     operations: [
       'Attach evidence and findings to a case',
       "Pull a saved question's current matches into a case",
+      'Keep kinds of finding out of a case with filters, escalate the ones that need attention, and let it clean itself up',
       'Track hypotheses and discussion threads with supporting/contradicting links',
       'Close and reopen cases, archiving or reactivating linked questions',
       'Read and arrange the case board: notes, frames, links between findings, stances',

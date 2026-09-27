@@ -2,6 +2,7 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 import type { BoardEndpoint } from "@workspace/schemas/case-board";
 import type { BoardTraceResponseDto } from "@workspace/api-client";
 import type { TraceRequest } from "./trace";
+import type { FilterDialogRequest } from "@/components/case-cleanup/finding-filter-dialog";
 
 /**
  * Per-viewer UI state: the active tool, open drawers, the View popover's
@@ -29,7 +30,7 @@ export type DrawerKind =
   | "snapshots";
 
 /** A kind of board object the top bar's counters can spotlight. */
-export type Spotlight = "evidence" | "findings" | "hypotheses";
+export type Spotlight = "evidence" | "findings" | "hypotheses" | "escalated";
 
 /** What the details panel shows: an item (optionally one finding), or a suggested neighbour. */
 export type DetailsTarget = { itemId: string; findingId?: string | null } | { suggestedKey: string };
@@ -152,6 +153,8 @@ export interface UiState {
   connecting: boolean;
   /** A destructive action waiting for "Confirm". */
   confirm: ConfirmRequest | null;
+  /** The finding-filter dialog, opened from a finding's right-click menu. */
+  filterRequest: FilterDialogRequest | null;
   /** The "Run Autopilot" dialog for this case is open. */
   autopilotOpen: boolean;
   /** Bumped when a run starts, so the autopilot status reloads. */
@@ -255,6 +258,7 @@ export function createUiStore(): UiStore {
     hoveredEdgeId: null,
     connecting: false,
     confirm: null,
+    filterRequest: null,
     autopilotOpen: false,
     autopilotRefresh: 0,
     exporting: false,

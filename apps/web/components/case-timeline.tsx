@@ -9,7 +9,9 @@ import {
   ChevronDown,
   Crosshair,
   Download,
+  Eraser,
   FileText,
+  Filter,
   Fingerprint,
   FolderOpen,
   Frame,
@@ -22,8 +24,10 @@ import {
   MessageSquare,
   Pencil,
   Search,
+  SlidersHorizontal,
   StickyNote,
   Trash2,
+  TriangleAlert,
 } from "lucide-react";
 import { api, type CaseActivityDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
@@ -31,7 +35,7 @@ import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 
 // ─── Event metadata ───────────────────────────────────────────────────────────
 
-type EventGroup = "case" | "inquiry" | "evidence" | "thread" | "board" | "ai";
+type EventGroup = "case" | "inquiry" | "evidence" | "escalation" | "thread" | "board" | "ai";
 
 /** Synthetic activityType for autopilot runs blended into the timeline. */
 const AUTOPILOT_RUN = "AUTOPILOT_RUN";
@@ -75,14 +79,301 @@ const TYPE_META: Record<
   BOARD_ARRANGED: { icon: <LayoutGrid className="h-3.5 w-3.5" />, label: "Board rearranged", color: "text-muted-foreground", group: "board" },
   BOARD_SNAPSHOT_TAKEN: { icon: <Camera className="h-3.5 w-3.5" />, label: "Board snapshot taken", color: "text-muted-foreground", group: "board" },
   COMMENT_RESOLVED: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Comment resolved", color: "text-green-600 dark:text-green-400", group: "board" },
+  // Automatic clean-up and finding filters.
+  INQUIRY_SETTINGS_UPDATED: { icon: <SlidersHorizontal className="h-3.5 w-3.5" />, label: "Watch settings changed", color: "text-blue-600 dark:text-blue-400", group: "inquiry" },
+  CLEANUP_SETTINGS_UPDATED: { icon: <SlidersHorizontal className="h-3.5 w-3.5" />, label: "Clean-up settings changed", color: "text-amber-600 dark:text-amber-400", group: "case" },
+  FINDING_FILTER_ADDED: { icon: <Filter className="h-3.5 w-3.5" />, label: "Finding filter added", color: "text-blue-600 dark:text-blue-400", group: "case" },
+  FINDING_FILTER_UPDATED: { icon: <Filter className="h-3.5 w-3.5" />, label: "Finding filter changed", color: "text-muted-foreground", group: "case" },
+  FINDING_FILTER_REMOVED: { icon: <Filter className="h-3.5 w-3.5" />, label: "Finding filter removed", color: "text-muted-foreground", group: "case" },
+  FINDINGS_ESCALATED: { icon: <TriangleAlert className="h-3.5 w-3.5" />, label: "Escalated", color: "text-escalation", group: "escalation" },
+  ESCALATION_CLEARED: { icon: <TriangleAlert className="h-3.5 w-3.5" />, label: "Escalation cleared", color: "text-muted-foreground", group: "escalation" },
+  FINDINGS_AUTO_REMOVED: { icon: <Eraser className="h-3.5 w-3.5" />, label: "Findings taken out", color: "text-red-600 dark:text-red-400", group: "evidence" },
+  EVIDENCE_AUTO_REMOVED: { icon: <Eraser className="h-3.5 w-3.5" />, label: "Evidence taken out", color: "text-red-600 dark:text-red-400", group: "evidence" },
   [AUTOPILOT_RUN]: { icon: <Bot className="h-3.5 w-3.5" />, label: "AI autopilot run", color: "text-amber-600 dark:text-amber-400", group: "ai" },
 };
+
+// ─── Clean-up and filters ─────────────────────────────────────────────────────
+
+/** Actors that are the platform itself, named as what they are. */
+const SYSTEM_ACTORS: Record<string, string> = {
+  "case-cleanup": "automatic clean-up",
+  "inquiry-auto-pull": "a watch's auto-add",
+  mcp: "an MCP client",
+};
+
+const RULE_LABELS: Record<string, string> = {
+  removeGoneFindings: "Remove findings that disappear",
+  removeResolvedFindings: "Remove resolved findings",
+  removeGoneAssets: "Remove assets that disappear",
+};
+
+/** A removal's heading says which rule (or filter) took things out. */
+const REMOVAL_LABELS: Record<string, string> = {
+  FINDING_GONE: "Taken out: no longer detected",
+  FINDING_RESOLVED: "Taken out: resolved",
+  FILTER: "Detached by a filter",
+  ASSET_GONE: "Taken out: asset gone from its source",
+};
+
+/** Filter and escalation rules share their entries; the action names them. */
+function ruleAction(item: CaseActivityDto): "EXCLUDE" | "ESCALATE" | null {
+  const p = (item.payload ?? {}) as Record<string, unknown>;
+  if (!String(item.activityType).startsWith("FINDING_FILTER_")) return null;
+  const filter = (p.filter ?? (Array.isArray(p.filters) ? p.filters[0] : null)) as { action?: string } | null;
+  const action = (p.action as string | undefined) ?? filter?.action;
+  return action === "ESCALATE" ? "ESCALATE" : "EXCLUDE";
+}
+
+/** The group an entry files under; an escalation rule's changes go with escalations. */
+function eventGroup(item: CaseActivityDto): EventGroup {
+  if (ruleAction(item) === "ESCALATE") return "escalation";
+  return TYPE_META[item.activityType]?.group ?? "case";
+}
+
+function eventLabel(item: CaseActivityDto, fallback: string): string {
+  const p = (item.payload ?? {}) as Record<string, unknown>;
+  if (ruleAction(item) === "ESCALATE") {
+    if (item.activityType === "FINDING_FILTER_ADDED") return "Escalation rule added";
+    if (item.activityType === "FINDING_FILTER_UPDATED") return "Escalation rule changed";
+    if (item.activityType === "FINDING_FILTER_REMOVED") return "Escalation rule removed";
+  }
+  if (item.activityType === "FINDINGS_ESCALATED" && p.added === true) return "Escalated and brought in";
+  if (item.activityType === "FINDINGS_AUTO_REMOVED" || item.activityType === "EVIDENCE_AUTO_REMOVED") {
+    return REMOVAL_LABELS[String(p.reason)] ?? fallback;
+  }
+  if (item.activityType === "INQUIRY_PULLED") {
+    return p.automatic === true ? "Auto-added by a watch" : "Pulled from a watch";
+  }
+  if (isLegacyAutoPullToggle(item)) return "Watch settings changed";
+  return fallback;
+}
+
+/** Auto-add toggles were written as CASE_UPDATED before they had their own type. */
+function isLegacyAutoPullToggle(item: CaseActivityDto): boolean {
+  const p = (item.payload ?? {}) as Record<string, unknown>;
+  return item.activityType === "CASE_UPDATED" && typeof p.autoPull === "boolean";
+}
+
+const SETTING_LABELS: Record<string, string> = {
+  autoPull: "Auto-add new answers",
+};
+
+/** "3 passes between 14:02 and 15:40" for an entry that absorbed several. */
+function rangeText(p: Record<string, unknown>): string {
+  const first = str(p.firstAt);
+  const last = str(p.lastAt);
+  if (!first || !last || first === last) return "";
+  const a = timeLabel(new Date(first));
+  const b = timeLabel(new Date(last));
+  return a === b ? "" : ` between ${a} and ${b}`;
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+/** Source names a pass or merged passes name (older rows carry `sourceName`). */
+function sourceNamesOf(p: Record<string, unknown>): string[] {
+  const names = strList(p.sourceNames);
+  return names.length > 0 ? names : str(p.sourceName) ? [String(p.sourceName)] : [];
+}
+
+/** The little magenta triangle the board's escalated findings carry. */
+function EscalationMark() {
+  return (
+    <svg width={11} height={10} viewBox="0 0 14 13" className="shrink-0" aria-hidden>
+      <path d="M7 1.1 L13.2 11.9 H0.8 Z" fill="var(--escalation)" />
+      <rect x={6.35} y={4.3} width={1.3} height={4} rx={0.65} fill="var(--escalation-foreground)" />
+      <circle cx={7} cy={10.1} r={0.8} fill="var(--escalation-foreground)" />
+    </svg>
+  );
+}
+
+/** Why findings escalated when they did, as the second line of the row. */
+function escalationTrigger(p: Record<string, unknown>): string | null {
+  switch (p.trigger) {
+    case "RULE_ADDED":
+      return "already in the case when the escalation rule was added";
+    case "RULE_UPDATED":
+      return "already in the case when the escalation rule was changed";
+    case "ATTACHED":
+      return "as they were attached to the case";
+    case "ARRIVAL": {
+      const names = sourceNamesOf(p);
+      const passes = Number(p.passes ?? 1);
+      const watch = str(p.inquiryTitle) ? `“${String(p.inquiryTitle)}”` : "a watch";
+      const how = p.added === true ? `${watch} brought them in (auto-add is off)` : `they came in through ${watch}`;
+      const when =
+        passes > 1
+          ? ` over ${plural(passes, "scan")}${names.length > 0 ? ` of ${names.join(", ")}` : ""}${rangeText(p)}`
+          : names.length > 0
+            ? ` after a scan of ${names[0]}`
+            : "";
+      return `${how}${when}`;
+    }
+    default:
+      return null;
+  }
+}
+
+/** When and why a clean-up pass ran, as the second line of its row. */
+function triggerText(p: Record<string, unknown>): string | null {
+  const passes = Number(p.passes ?? 1);
+  const triggers = (p.triggers ?? null) as Record<string, number> | null;
+  if (passes > 1 && triggers) {
+    const names = sourceNamesOf(p);
+    const parts: string[] = [];
+    if (triggers.SCAN) parts.push(`${plural(triggers.SCAN, "scan")}${names.length > 0 ? ` of ${names.join(", ")}` : ""}`);
+    if (triggers.STATUS_CHANGE) parts.push(plural(triggers.STATUS_CHANGE, "status change"));
+    if (triggers.CHECK) parts.push(plural(triggers.CHECK, "routine check"));
+    return `after ${parts.join(", ")}${rangeText(p)}`;
+  }
+  switch (p.trigger) {
+    case "RULE_ENABLED": {
+      const rule = p.reason === "FINDING_RESOLVED" ? "removeResolvedFindings" : p.reason === "ASSET_GONE" ? "removeGoneAssets" : "removeGoneFindings";
+      return `when “${RULE_LABELS[rule]}” was switched on`;
+    }
+    case "SCAN": {
+      const names = sourceNamesOf(p);
+      return names.length > 0 ? `after a scan of ${names[0]}` : "after a scan";
+    }
+    case "STATUS_CHANGE":
+      return "after someone changed a finding's status";
+    case "CHECK":
+      return "on a routine check of the case";
+    case "FILTER_ADDED":
+      return "when the filter was added";
+    case "FILTER_UPDATED":
+      return "when the filter was changed";
+    default:
+      return null;
+  }
+}
+
+interface FilterPayload {
+  id?: string;
+  kind?: string;
+  action?: string;
+  pattern?: string;
+  description?: string | null;
+  inquiryTitle?: string | null;
+}
+
+function FilterChip({ filter }: { filter: FilterPayload }) {
+  const escalation = filter.action === "ESCALATE";
+  return (
+    <span
+      className={`inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] ${
+        escalation ? "border-escalation/50 bg-escalation-soft" : "border-border"
+      }`}
+    >
+      <span className={`font-mono uppercase ${escalation ? "text-escalation" : "text-muted-foreground"}`}>
+        {escalation ? "▲ " : ""}
+        {filter.kind === "VALUE_PATTERN" ? "value" : "type"}
+      </span>
+      <span className="min-w-0 truncate font-mono text-foreground">{filter.pattern}</span>
+      <span className="shrink-0 text-muted-foreground">
+        · {filter.inquiryTitle ? `for “${filter.inquiryTitle}”` : "every watch"}
+      </span>
+      {filter.description && <span className="min-w-0 truncate text-muted-foreground">· {filter.description}</span>}
+    </span>
+  );
+}
+
+interface RemovedFinding {
+  findingId?: string;
+  label?: string;
+  value?: string | null;
+  assetLabel?: string | null;
+  itemId?: string;
+  state?: string;
+}
+
+interface RemovedAsset {
+  label?: string;
+  findings?: number;
+  state?: string;
+}
+
+const LIST_PREVIEW = 5;
+
+/** What a clean-up pass took out, one row each, the first few shown. */
+function RemovedList({
+  findings,
+  assets,
+  total,
+  truncated,
+  onShowOnBoard,
+  marker,
+}: {
+  findings: RemovedFinding[];
+  assets: RemovedAsset[];
+  total: number;
+  truncated: boolean;
+  onShowOnBoard?: (itemId: string) => void;
+  /** Drawn before each finding (the escalation flag). */
+  marker?: React.ReactNode;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const rows = findings.length > 0 ? findings : assets;
+  const shown = open ? rows : rows.slice(0, LIST_PREVIEW);
+  // A row names at most so many; the count says the rest.
+  const notListed = truncated ? Math.max(0, total - rows.length) : 0;
+  return (
+    <div className="space-y-0.5">
+      <ul className="space-y-0.5">
+        {findings.length > 0
+          ? (shown as RemovedFinding[]).map((f, index) => (
+              <li key={f.findingId ?? index} className="flex min-w-0 items-center gap-1.5">
+                {marker}
+                <span className="min-w-0 truncate font-mono text-[11px]">
+                  <span className="text-foreground">{f.label}</span>
+                  {f.value ? `: ${f.value}` : ""}
+                  {f.assetLabel ? <span className="text-muted-foreground/80"> · {f.assetLabel}</span> : null}
+                </span>
+                {f.state && (
+                  <span className="shrink-0 rounded border border-border px-1 font-mono text-[9px] uppercase tracking-wide">
+                    {f.state === "DELETED" ? "deleted" : "no longer detected"}
+                  </span>
+                )}
+                {onShowOnBoard && f.itemId && (
+                  <button
+                    type="button"
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    title="Show its asset on the board"
+                    onClick={() => onShowOnBoard(f.itemId!)}
+                  >
+                    <Crosshair className="h-3 w-3" />
+                  </button>
+                )}
+              </li>
+            ))
+          : (shown as RemovedAsset[]).map((a, index) => (
+              <li key={index} className="min-w-0 truncate font-mono text-[11px]">
+                <span className="text-foreground">{a.label}</span>
+                {a.findings ? ` · ${a.findings} finding${a.findings === 1 ? "" : "s"} went with it` : ""}
+                {a.state === "DELETED" ? " · deleted" : ""}
+              </li>
+            ))}
+      </ul>
+      {rows.length > LIST_PREVIEW && (
+        <button type="button" className="text-[11px] underline" onClick={() => setOpen((v) => !v)}>
+          {open ? "Show fewer" : `Show all ${rows.length}`}
+        </button>
+      )}
+      {notListed > 0 && (open || rows.length <= LIST_PREVIEW) && (
+        <span className="block text-[11px]">+{notListed} more, not listed</span>
+      )}
+    </div>
+  );
+}
 
 const GROUP_FILTERS: Array<{ key: "ALL" | EventGroup; label: string }> = [
   { key: "ALL", label: "All" },
   { key: "case", label: "Case" },
   { key: "inquiry", label: "Inquiries" },
   { key: "evidence", label: "Evidence" },
+  { key: "escalation", label: "Escalations" },
   { key: "thread", label: "Threads" },
   { key: "board", label: "Board" },
   { key: "ai", label: "AI" },
@@ -105,7 +396,10 @@ function eventSubject(item: CaseActivityDto): string | null {
     case "INQUIRY_LINKED":
     case "INQUIRY_UNLINKED":
     case "INQUIRY_PULLED":
+    case "INQUIRY_SETTINGS_UPDATED":
       return str(p.inquiryTitle);
+    case "CASE_UPDATED":
+      return isLegacyAutoPullToggle(item) ? str(p.inquiryTitle) : null;
     case "THREAD_CREATED":
     case "THREAD_ENTRY_ADDED":
     case "THREAD_STATEMENT_UPDATED":
@@ -135,13 +429,33 @@ function eventSubject(item: CaseActivityDto): string | null {
       return str(p.label) ?? str(p.kind)?.replace(/_/g, " ") ?? str(p.relationType);
     case "COMMENT_RESOLVED":
       return str(p.threadTitle);
+    case "FINDINGS_AUTO_REMOVED": {
+      const n = Number(p.count ?? 0);
+      return `${n} finding${n === 1 ? "" : "s"}`;
+    }
+    case "EVIDENCE_AUTO_REMOVED": {
+      const n = Number(p.count ?? 0);
+      const assets = Array.isArray(p.assets) ? (p.assets as RemovedAsset[]) : [];
+      return n === 1 && assets[0]?.label ? String(assets[0].label) : `${n} assets`;
+    }
+    // The filter chips below carry the pattern; a long regex twice is noise.
+    case "FINDING_FILTER_ADDED":
+    case "FINDING_FILTER_UPDATED":
+    case "FINDING_FILTER_REMOVED":
+      return p.scope === "WATCH" ? str(p.inquiryTitle) : "every watch";
     default:
       return null;
   }
 }
 
 /** Rich detail block under the event title. Old events may lack the newer payload fields. */
-function EventDetail({ item }: { item: CaseActivityDto }) {
+function EventDetail({
+  item,
+  onShowOnBoard,
+}: {
+  item: CaseActivityDto;
+  onShowOnBoard?: (itemId: string) => void;
+}) {
   const p = (item.payload ?? {}) as Record<string, unknown>;
   const lines: React.ReactNode[] = [];
 
@@ -160,11 +474,216 @@ function EventDetail({ item }: { item: CaseActivityDto }) {
 
   switch (item.activityType) {
     case "INQUIRY_PULLED": {
+      const filtered = Number(p.filtered ?? 0);
+      const pulled = Number(p.pulled ?? 0);
+      const available = Number(p.available ?? 0);
+      if (p.automatic === true) {
+        const passes = Number(p.passes ?? 1);
+        const names = sourceNamesOf(p);
+        lines.push(
+          <span key="when" className="block">
+            {passes > 1
+              ? `over ${plural(passes, "scan")}${names.length > 0 ? ` of ${names.join(", ")}` : ""}${rangeText(p)}`
+              : names.length > 0
+                ? `after a scan of ${names[0]}`
+                : "after a scan"}
+          </span>,
+        );
+      }
       lines.push(
-        <span key="count">
-          {Number(p.pulled ?? 0)} finding{Number(p.pulled ?? 0) === 1 ? "" : "s"} copied into the case
+        <span key="count" className="block">
+          {plural(pulled, "finding")} added to the case
+          {filtered > 0 && (
+            <>
+              {" · "}
+              <span className="font-medium text-foreground">{filtered} kept out by filters</span>
+              {strList(p.filteredLabels).length > 0 ? ` (${strList(p.filteredLabels).slice(0, 4).join(", ")})` : ""}
+            </>
+          )}
+          {available > pulled && ` · ${available - pulled} more new answers wait for someone to add them`}
         </span>,
       );
+      const listed = Array.isArray(p.findings) ? (p.findings as RemovedFinding[]) : [];
+      if (listed.length > 0) {
+        lines.push(
+          <RemovedList
+            key="list"
+            findings={listed}
+            assets={[]}
+            total={pulled}
+            truncated={p.truncated === true}
+            onShowOnBoard={onShowOnBoard}
+          />,
+        );
+      }
+      break;
+    }
+    case "INQUIRY_LINKED":
+      if (p.autoPull === true) lines.push(<span key="auto">auto-add new answers: on</span>);
+      break;
+    case "FINDINGS_ESCALATED": {
+      const when = escalationTrigger(p);
+      if (when) lines.push(<span key="when" className="block">{when}</span>);
+      if (Array.isArray(p.rules) && p.rules.length > 0) {
+        lines.push(
+          <span key="rules" className="flex flex-wrap gap-1">
+            {(p.rules as FilterPayload[]).map((f, index) => (
+              <FilterChip key={f.id ?? index} filter={{ action: "ESCALATE", ...f }} />
+            ))}
+          </span>,
+        );
+      }
+      const listed = Array.isArray(p.findings) ? (p.findings as RemovedFinding[]) : [];
+      if (listed.length > 0) {
+        lines.push(
+          <RemovedList
+            key="list"
+            findings={listed}
+            assets={[]}
+            total={Number(p.count ?? listed.length)}
+            truncated={p.truncated === true}
+            onShowOnBoard={onShowOnBoard}
+            marker={<EscalationMark />}
+          />,
+        );
+      }
+      break;
+    }
+    case "ESCALATION_CLEARED": {
+      const listed = Array.isArray(p.findings) ? (p.findings as RemovedFinding[]) : [];
+      lines.push(
+        <span key="count" className="block">
+          {plural(Number(p.count ?? listed.length), "finding")} no longer escalated; they stay in the case
+        </span>,
+      );
+      if (listed.length > 0) {
+        lines.push(
+          <RemovedList
+            key="list"
+            findings={listed}
+            assets={[]}
+            total={Number(p.count ?? listed.length)}
+            truncated={p.truncated === true}
+            onShowOnBoard={onShowOnBoard}
+          />,
+        );
+      }
+      break;
+    }
+    case "INQUIRY_SETTINGS_UPDATED": {
+      const changes = Array.isArray(p.changes) ? (p.changes as Array<{ setting?: string; to?: unknown }>) : [];
+      for (const change of changes) {
+        lines.push(
+          <span key={String(change.setting)} className="block">
+            {SETTING_LABELS[String(change.setting)] ?? String(change.setting)} →{" "}
+            <span className="font-medium text-foreground">{change.to === true ? "on" : change.to === false ? "off" : String(change.to)}</span>
+          </span>,
+        );
+      }
+      break;
+    }
+    case "INQUIRY_UNLINKED": {
+      const dropped = Number(p.filtersDropped ?? 0);
+      if (dropped > 0) {
+        lines.push(
+          <span key="dropped">
+            its {dropped} filter{dropped === 1 ? "" : "s"} went with it
+          </span>,
+        );
+      }
+      break;
+    }
+    case "CLEANUP_SETTINGS_UPDATED": {
+      const changes = Array.isArray(p.changes) ? (p.changes as Array<{ rule?: string; enabled?: boolean }>) : [];
+      for (const change of changes) {
+        lines.push(
+          <span key={String(change.rule)} className="block">
+            {RULE_LABELS[String(change.rule)] ?? String(change.rule)} →{" "}
+            <span className="font-medium text-foreground">{change.enabled ? "on" : "off"}</span>
+          </span>,
+        );
+      }
+      break;
+    }
+    case "FINDING_FILTER_ADDED":
+    case "FINDING_FILTER_REMOVED":
+    case "FINDING_FILTER_UPDATED": {
+      const filters =
+        item.activityType === "FINDING_FILTER_ADDED"
+          ? Array.isArray(p.filters)
+            ? (p.filters as FilterPayload[])
+            : []
+          : p.filter
+            ? [p.filter as FilterPayload]
+            : [];
+      lines.push(
+        <span key="filters" className="flex flex-wrap gap-1">
+          {filters.map((f, index) => (
+            <FilterChip key={f.id ?? index} filter={f} />
+          ))}
+        </span>,
+      );
+      const before = p.before as { pattern?: string; description?: string | null } | undefined;
+      const after = p.filter as FilterPayload | undefined;
+      if (item.activityType === "FINDING_FILTER_UPDATED" && before) {
+        if (before.pattern !== after?.pattern) {
+          lines.push(
+            <span key="pattern" className="block font-mono text-[11px]">
+              {before.pattern} → <span className="text-foreground">{after?.pattern}</span>
+            </span>,
+          );
+        }
+        if ((before.description ?? null) !== (after?.description ?? null)) {
+          lines.push(
+            <span key="description" className="block">
+              why: “{before.description ?? "—"}” → <span className="text-foreground">“{after?.description ?? "—"}”</span>
+            </span>,
+          );
+        }
+      }
+      if (item.activityType === "FINDING_FILTER_REMOVED") {
+        lines.push(
+          <span key="note" className="block italic">
+            what it took out stays out; the watches just stop skipping it
+          </span>,
+        );
+      }
+      break;
+    }
+    case "FINDINGS_AUTO_REMOVED":
+    case "EVIDENCE_AUTO_REMOVED": {
+      const when = triggerText(p);
+      if (when) lines.push(<span key="when" className="block">{when}</span>);
+      if (p.reason === "FILTER" && Array.isArray(p.filters) && p.filters.length > 0) {
+        lines.push(
+          <span key="filters" className="flex flex-wrap gap-1">
+            {(p.filters as FilterPayload[]).map((f, index) => (
+              <FilterChip key={f.id ?? index} filter={f} />
+            ))}
+          </span>,
+        );
+      }
+      const findings = Array.isArray(p.findings) ? (p.findings as RemovedFinding[]) : [];
+      const assets = Array.isArray(p.assets) ? (p.assets as RemovedAsset[]) : [];
+      if (findings.length > 0 || assets.length > 0) {
+        lines.push(
+          <RemovedList
+            key="list"
+            findings={findings}
+            assets={assets}
+            total={Number(p.count ?? findings.length + assets.length)}
+            truncated={p.truncated === true}
+            onShowOnBoard={onShowOnBoard}
+          />,
+        );
+      }
+      if (item.activityType === "EVIDENCE_AUTO_REMOVED" && Number(p.findingsRemoved ?? 0) > 0) {
+        lines.push(
+          <span key="with" className="block">
+            {Number(p.findingsRemoved)} finding{Number(p.findingsRemoved) === 1 ? "" : "s"} left with {Number(p.count) === 1 ? "it" : "them"}
+          </span>,
+        );
+      }
       break;
     }
     case "THREAD_ENTRY_ADDED":
@@ -228,7 +747,13 @@ function EventDetail({ item }: { item: CaseActivityDto }) {
       }
       break;
     case "CASE_UPDATED":
-      if (str(p.status)) lines.push(<span key="status">status → {String(p.status)}</span>);
+      if (isLegacyAutoPullToggle(item)) {
+        lines.push(
+          <span key="auto" className="block">
+            {SETTING_LABELS.autoPull} → <span className="font-medium text-foreground">{p.autoPull ? "on" : "off"}</span>
+          </span>,
+        );
+      } else if (str(p.status)) lines.push(<span key="status">status → {String(p.status)}</span>);
       break;
     case "BOARD_NOTE_UPDATED":
     case "BOARD_FRAME_UPDATED": {
@@ -276,9 +801,11 @@ function EventDetail({ item }: { item: CaseActivityDto }) {
       break;
   }
 
-  // Finding/asset chips for batch events (pull + batch attach).
-  const findingLabels = strList(p.findingLabels);
-  const assetLabels = strList(p.assetLabels);
+  // Finding/asset chips for batch events (pull + batch attach). A pull that
+  // names its findings shows them instead.
+  const named = Array.isArray(p.findings) && p.findings.length > 0;
+  const findingLabels = named ? [] : strList(p.findingLabels);
+  const assetLabels = named ? [] : strList(p.assetLabels);
   const chips = [...new Set([...findingLabels, ...assetLabels])];
 
   if (lines.length === 0 && chips.length === 0) return null;
@@ -403,7 +930,7 @@ export function CaseTimeline({
     );
     return filter === "ALL"
       ? merged
-      : merged.filter((i) => (TYPE_META[i.activityType]?.group ?? "case") === filter);
+      : merged.filter((i) => eventGroup(i) === filter);
   }, [items, aiRuns, filter]);
 
   // Group by day, newest day first (API returns newest first).
@@ -483,7 +1010,15 @@ export function CaseTimeline({
                   };
                   const subject = eventSubject(item);
                   return (
-                    <li key={item.id} id={`timeline-event-${item.id}`} className="relative pl-6 py-2">
+                    <li
+                      key={item.id}
+                      id={`timeline-event-${item.id}`}
+                      className={`relative py-2 pl-6 ${
+                        item.activityType === "FINDINGS_ESCALATED"
+                          ? "-ml-px rounded-r-[4px] border-l-2 border-escalation bg-escalation-soft/60 pr-2"
+                          : ""
+                      }`}
+                    >
                       <span
                         className={`absolute -left-[9px] top-2.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-border bg-card ${meta.color}`}
                       >
@@ -491,7 +1026,7 @@ export function CaseTimeline({
                       </span>
                       <div className="flex items-baseline justify-between gap-3">
                         <p className="min-w-0 text-sm">
-                          <span className="font-medium">{meta.label}</span>
+                          <span className="font-medium">{eventLabel(item, meta.label)}</span>
                           {subject && (
                             <>
                               <span className="text-muted-foreground"> — </span>
@@ -503,7 +1038,7 @@ export function CaseTimeline({
                           {timeLabel(new Date(item.createdAt))}
                         </span>
                       </div>
-                      <EventDetail item={item} />
+                      <EventDetail item={item} onShowOnBoard={onShowOnBoard} />
                       {onShowOnBoard && str((item.payload as Record<string, unknown> | null)?.itemId) && (
                         <button
                           type="button"
@@ -519,7 +1054,9 @@ export function CaseTimeline({
                             by <AiActorBadge className="align-middle" />
                           </p>
                         ) : (
-                          <p className="text-muted-foreground/70 mt-0.5 text-[11px]">by {item.actor}</p>
+                          <p className="text-muted-foreground/70 mt-0.5 text-[11px]">
+                            by {SYSTEM_ACTORS[item.actor] ?? item.actor}
+                          </p>
                         ))}
                     </li>
                   );
