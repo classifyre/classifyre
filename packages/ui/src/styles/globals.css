@@ -43,15 +43,6 @@
   --destructive: #ff2b2b;
   --destructive-foreground: #ffffff;
 
-  /* Escalation — signal magenta. The complement of the acid-green accent:
-     lime says "in the case", magenta says "look at this now". Kept off every
-     severity hue (red, orange, amber, sky, grey), so an escalated finding
-     never reads as merely severe. 5.3:1 on white, so it is ink as well as a
-     surface. */
-  --escalation: #d6006b;
-  --escalation-foreground: #ffffff;
-  --escalation-soft: #ffe3f0;
-
   /* Borders */
   --border: #0a0a0a;
   --input: #ffffff;
@@ -105,10 +96,6 @@
   --destructive: #ff2b2b;
   --destructive-foreground: #ffffff;
 
-  --escalation: #ff4fa8;
-  --escalation-foreground: #0a0a0a;
-  --escalation-soft: #3b0a24;
-
   --border: #f5f5f5;
   --input: #0a0a0a;
   --ring: #f5f5f5;
@@ -150,9 +137,6 @@
   --color-accent-ink: var(--accent-ink);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-escalation: var(--escalation);
-  --color-escalation-foreground: var(--escalation-foreground);
-  --color-escalation-soft: var(--escalation-soft);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

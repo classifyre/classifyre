@@ -44,11 +44,6 @@
   --cb-manual: #b45309;
   --cb-evidence: #65a30d;
   --cb-select: #4d7c0f;
-  /* Escalated findings: signal magenta, the complement of the in-case lime,
-     off every severity hue. Same values as the app's --escalation, repeated
-     so the documentation's demos draw it without the app's theme. */
-  --cb-escalation: #d6006b;
-  --cb-escalation-ink: #ffffff;
 }
 
 .dark {
@@ -78,8 +73,6 @@
   --cb-manual: #d97706;
   --cb-evidence: #b7ff00;
   --cb-select: #b7ff00;
-  --cb-escalation: #ff4fa8;
-  --cb-escalation-ink: #0a0a0a;
 }
 
 .case-board .react-flow {

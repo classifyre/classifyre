@@ -65,6 +65,7 @@ import { CaseChronology } from "@/components/case-chronology";
 import { CaseLeads } from "@/components/case-leads";
 import { CaseInquiriesTab } from "@/components/case-inquiries-tab";
 import { EvidenceTable } from "@/components/evidence-table";
+import { ESCALATION_INK } from "@/lib/escalation-tone";
 import { nsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
 import { BoardProviders, useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
@@ -730,7 +731,7 @@ function CleanupSummary({
       </div>
       <div className="flex items-center gap-2 text-xs" data-testid="case-file-escalation">
         <EscalationFlag size={12} className="shrink-0" />
-        <span className={cn("min-w-0 flex-1", escalated > 0 ? "font-medium text-escalation" : "text-muted-foreground")}>
+        <span className={cn("min-w-0 flex-1", escalated > 0 ? "font-medium text-foreground" : "text-muted-foreground")}>
           {escalated > 0 ? t("caseEscalation.summary", { count: escalated }) : t("caseEscalation.noneEscalated")}
           {" · "}
           {escalations.length > 0
@@ -1054,12 +1055,12 @@ function EscalationNotice({ caseRowFindingId, row }: { caseRowFindingId: string;
   };
   return (
     <div
-      className="flex items-start gap-2.5 rounded-[4px] border-2 border-escalation/50 bg-escalation-soft p-2.5"
+      className="flex items-start gap-2.5 rounded-[4px] border-2 border-border p-2.5"
       data-testid="escalation-notice"
     >
       <EscalationFlag size={16} className="mt-0.5 shrink-0" />
       <div className="min-w-0 flex-1 space-y-0.5">
-        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-escalation">
+        <p className={cn("font-mono text-[10px] font-bold uppercase tracking-[0.14em]", ESCALATION_INK)}>
           {t("caseEscalation.state")}
           {row.escalatedAt ? ` · ${formatDistanceToNowStrict(new Date(row.escalatedAt), { addSuffix: true })}` : ""}
         </p>
@@ -1123,7 +1124,6 @@ function FindingList({
             className={cn(
               "min-w-0 flex-1 truncate font-mono",
               row.state === "dismissed" && "line-through",
-              attached && row.escalated && "font-semibold text-escalation",
             )}
           >
             {row.value ?? ""}

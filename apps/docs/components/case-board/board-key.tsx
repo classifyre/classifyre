@@ -269,9 +269,9 @@ export function FindingKey() {
       <KeyItem visual={<FindingGlyph severity="medium" look="ghost" detector="Address" />} title="Not in the case">
         A dashed grey ghost with an italic label: on the asset, not attached to the case yet.
       </KeyItem>
-      <KeyItem visual={<FindingGlyph severity="high" detector="IBAN" escalated />} title="Escalated">
-        A magenta hazard ring and a warning flag: an escalation rule of the case matched it. Its label turns magenta
-        too, and its asset shows ▲ with how many of its findings escalated.
+      <KeyItem visual={<FindingGlyph severity="medium" detector="IBAN" escalated />} title="Escalated">
+        A ring and a warning flag in the colour of high severity: an escalation rule of the case matched it. Its
+        asset shows the flag with how many of its findings escalated.
       </KeyItem>
     </KeyGrid>
   );

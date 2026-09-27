@@ -74,9 +74,6 @@ function Counter({
   active: boolean;
   onToggle: () => void;
 }) {
-  // Escalation is the one counter that asks for attention: magenta ink at
-  // rest, a magenta surface once pressed.
-  const alarm = kind === "escalated";
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -89,13 +86,7 @@ function Counter({
           className={cn(
             "group relative flex h-full items-center gap-2 px-3 transition-colors disabled:cursor-default disabled:opacity-45",
             "first:rounded-l-[2px] last:rounded-r-[2px] [&:not(:first-child)]:border-l-2 [&:not(:first-child)]:border-border",
-            active
-              ? alarm
-                ? "bg-escalation text-escalation-foreground"
-                : "bg-foreground text-background"
-              : alarm
-                ? "text-escalation enabled:hover:bg-escalation-soft"
-                : "enabled:hover:bg-muted",
+            active ? "bg-foreground text-background" : "enabled:hover:bg-muted",
           )}
         >
           <KindGlyph kind={kind} />
@@ -103,13 +94,7 @@ function Counter({
           <span
             className={cn(
               "hidden font-mono text-[10px] leading-none tracking-[0.12em] uppercase @6xl/topbar:inline",
-              active
-                ? alarm
-                  ? "text-escalation-foreground/80"
-                  : "text-background/75"
-                : alarm
-                  ? "text-escalation"
-                  : "text-muted-foreground",
+              active ? "text-background/75" : "text-muted-foreground",
             )}
           >
             {label}
