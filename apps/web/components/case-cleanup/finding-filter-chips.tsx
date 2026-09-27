@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { api, type CaseFindingFilterDto } from "@workspace/api-client";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
+import { ESCALATION_INK } from "@/lib/escalation-tone";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -55,19 +56,14 @@ export function FindingFilterChips({
             <Tooltip>
               <TooltipTrigger asChild>
                 <span
-                  className={cn(
-                    "inline-flex max-w-full items-center gap-1 rounded-[4px] border px-1.5 py-0.5 text-[11px]",
-                    escalation
-                      ? "border-escalation/50 bg-escalation-soft"
-                      : "border-border bg-card",
-                  )}
+                  className="border-border bg-card inline-flex max-w-full items-center gap-1 rounded-[4px] border px-1.5 py-0.5 text-[11px]"
                   data-testid="finding-filter-chip"
                   data-action={filter.action}
                 >
                   <span
                     className={cn(
                       "shrink-0 font-mono text-[9px] uppercase tracking-wide",
-                      escalation ? "text-escalation" : "text-muted-foreground",
+                      escalation ? ESCALATION_INK : "text-muted-foreground",
                     )}
                   >
                     {escalation && (

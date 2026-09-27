@@ -4067,8 +4067,7 @@
     },
     "table": {
       "badge": "{{count}} eskaliert",
-      "tooltip": "{{count}} Befund(e) eskaliert · zuletzt {{when}}",
-      "filter": "Nur eskalierte"
+      "tooltip": "{{count}} Befund(e) eskaliert · zuletzt {{when}}"
     }
   },
   "correlation": {

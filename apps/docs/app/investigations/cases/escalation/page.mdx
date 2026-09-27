@@ -13,15 +13,17 @@ number in a case about a data leak, a known suspect's name, an address on a
 sanctions list. **Escalation rules** name them. A finding that matches one is
 **escalated**:
 
-- it is **highlighted on the board**: a magenta hazard ring, a warning flag and
-  a magenta label, and its asset shows **▲** with how many of its findings
-  escalated;
-- the case shows it **in the case list**: a magenta edge on the row and a
-  **▲ 3 escalated** pill, and the **Escalated only** filter finds such cases;
+- it is **marked on the board** with a ring and a warning flag, and its asset
+  shows the flag with how many of its findings escalated;
+- the case shows it **in the case list** with a **▲ 3 escalated** badge next to
+  its title;
 - a watch **brings it in even when its auto-add is off**, and a
   **notification** goes out;
 - the **timeline** says which findings escalated, which rule matched them and
   what brought them in.
+
+Escalation has no colour of its own: its marks are drawn in the colour of
+**high** severity, the same as a high-severity finding or badge.
 
 Escalation rules are the same rules as [finding filters](/investigations/cases/cleanup/#finding-filters),
 with the other action: a filter keeps a kind of finding out, an escalation
@@ -87,19 +89,19 @@ changing one so that it matches the finding, marks it again.
 
 ## Seeing what escalated
 
-- **On the board**: escalated findings wear the hazard ring and flag. When an
-  asset's findings are folded away or you are zoomed far out, the asset's
-  **▲ n** badge still shows. Click the badge, or the **▲ Escalated** counter in
-  the top bar, to **light up every escalated finding** and dim the rest; press
-  it again (or `Esc`) to see everything.
+- **On the board**: escalated findings wear the ring and the flag. When an
+  asset's findings are folded away or you are zoomed far out, the asset's badge
+  (the flag and a count) still shows. Click the badge, or the **Escalated**
+  counter in the top bar, to **light up every escalated finding** and dim the
+  rest; press it again (or `Esc`) to see everything.
 - **In the Details panel**: an escalated finding shows which rule it matched
   and when, with **Clear escalation**.
-- **In the case list**: escalated cases have a magenta edge and the
-  **▲ n escalated** pill; hover it for when the last escalation happened.
-  **Escalated only** shows just those cases. An escalation also moves its case
-  to the top, since the list is ordered by last change.
-- **On the timeline**: escalation entries stand out in magenta, and the
-  **Escalations** filter shows only them and the rule changes.
+- **In the case list**: escalated cases carry the **▲ n escalated** badge;
+  hover it for when the last escalation happened. An escalation also moves its
+  case to the top, since the list is ordered by last change.
+- **On the timeline**: escalation entries carry the warning sign, each
+  escalated finding is flagged, and the **Escalations** filter shows only them
+  and the rule changes.
 
 <FindingKey />
 
