@@ -700,7 +700,7 @@
         "title": "Embeddings are turned off",
         "search": "Semantic ranking is unavailable — results match exact text only.",
         "similar": "Similar findings come from embeddings, which are turned off for this workspace.",
-        "leads": "Semantic neighbours are not suggested while embeddings are off; leads come from linked inquiry watches only.",
+        "leads": "Similar findings are not suggested while embeddings are off; look-alike documents and watch answers still are.",
         "duplicates": "Near-duplicate text groups are not updated while embeddings are off.",
         "index": "The semantic index is paused, so nothing is re-indexed or recalibrated."
       },
@@ -4069,6 +4069,85 @@
       "badge": "{{count}} escalated",
       "tooltip": "{{count}} finding(s) escalated · last {{when}}"
     }
+  },
+  "caseLeads": {
+    "intro": "Suggestions for this case. They refresh by themselves when its evidence or watches change, and when you open the board.",
+    "refresh": "Refresh",
+    "refreshHint": "Look for new leads now",
+    "refreshed": "{{count}} new leads",
+    "refreshedOne": "1 new lead",
+    "refreshedNone": "No new leads",
+    "refreshFull": "60 leads are waiting for review. Review some to make room for new ones.",
+    "refreshFailed": "Could not refresh the leads",
+    "search": "Search leads…",
+    "sort": {
+      "relevance": "Most relevant",
+      "newest": "Newest"
+    },
+    "filters": {
+      "all": "All",
+      "DUPLICATE": "Look-alikes",
+      "INQUIRY": "Watch answers",
+      "SEMANTIC_NEIGHBOR": "Similar",
+      "AUTOPILOT": "Autopilot",
+      "MANUAL": "Bookmarked"
+    },
+    "origin": {
+      "DUPLICATE": "Look-alike",
+      "INQUIRY": "Watch answer",
+      "SEMANTIC_NEIGHBOR": "Similar",
+      "SAME_VALUE": "Same value",
+      "AUTOPILOT": "Autopilot",
+      "MANUAL": "Bookmarked"
+    },
+    "why": {
+      "sameValue": "Same value as {{via}}",
+      "similar": "{{pct}}% similar to {{via}}",
+      "in": "in {{asset}}",
+      "watch": "Answer to the watch “{{watch}}”",
+      "new": "new",
+      "identical": "Identical copy of {{asset}}",
+      "confirmed": "Confirmed a duplicate of {{asset}} in Duplicate review",
+      "shares": "Shares {{labels}} with {{asset}}",
+      "sharesValues": "Shares most of its values with {{asset}}",
+      "matchWeight": "match weight {{pct}}%"
+    },
+    "score": {
+      "importance": "Importance {{value}}",
+      "similar": "{{pct}}% similar",
+      "match": "Match {{pct}}%",
+      "identical": "Identical"
+    },
+    "document": "Document",
+    "inAsset": "in {{asset}}",
+    "accept": "Accept",
+    "acceptHint": "Add to the case, next to what it relates to",
+    "dismiss": "Dismiss",
+    "showOnBoard": "Show what it relates to on the board",
+    "openWatch": "Open the watch",
+    "dismissTitle": "Dismiss this lead?",
+    "dismissManyTitle": "Dismiss {{count}} leads?",
+    "dismissBody": "They will not be suggested for this case again. Say why if you like: Autopilot learns from it.",
+    "reasonPlaceholder": "Reason (optional)…",
+    "dismissConfirm": "Dismiss",
+    "dismissShown": "Dismiss all {{count}} shown",
+    "accepted": "Added to the case",
+    "acceptFailed": "Could not accept the lead",
+    "dismissed": "Lead dismissed",
+    "dismissedMany": "{{count}} leads dismissed",
+    "dismissFailed": "Could not dismiss",
+    "emptyTitle": "Nothing to review",
+    "emptyBody": "Leads appear by themselves as the case grows: documents that look like your evidence, findings similar to it, and important answers of your watches.",
+    "noMatch": "No leads match these filters.",
+    "reviewed": "Reviewed ({{count}})",
+    "status": {
+      "ACCEPTED": "Accepted",
+      "DISMISSED": "Dismissed",
+      "inCase": "Already in the case"
+    },
+    "drag": "Drag onto the board to add it there",
+    "loading": "Loading leads…",
+    "resolved": "Finding resolved"
   },
   "correlation": {
     "findingsTab": "Findings",

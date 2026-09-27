@@ -1,30 +1,28 @@
 
-# GenerateCaseLeadsResponseDto
+# ReviewCaseLeadsDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`proposed` | number
-`considered` | number
-`settled` | number
-`byOrigin` | { [key: string]: number; }
-`full` | boolean
+`action` | string
+`reviewedBy` | string
+`reason` | string
+`leadIds` | Array&lt;string&gt;
 
 ## Example
 
 ```typescript
-import type { GenerateCaseLeadsResponseDto } from '@workspace/api-client'
+import type { ReviewCaseLeadsDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "proposed": null,
-  "considered": null,
-  "settled": null,
-  "byOrigin": null,
-  "full": null,
-} satisfies GenerateCaseLeadsResponseDto
+  "action": null,
+  "reviewedBy": null,
+  "reason": null,
+  "leadIds": null,
+} satisfies ReviewCaseLeadsDto
 
 console.log(example)
 
@@ -33,7 +31,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as GenerateCaseLeadsResponseDto
+const exampleParsed = JSON.parse(exampleJSON) as ReviewCaseLeadsDto
 console.log(exampleParsed)
 ```
 

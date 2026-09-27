@@ -32,17 +32,29 @@ export interface CaseLeadDto {
      */
     caseId: string;
     /**
-     * 
+     * The finding this lead proposes; null for an asset lead (a look-alike document)
      * @type {string}
      * @memberof CaseLeadDto
      */
-    findingId: string;
+    findingId?: string | null;
     /**
      * 
      * @type {string}
      * @memberof CaseLeadDto
      */
     assetId?: string | null;
+    /**
+     * FINDING: accepting attaches the finding. ASSET: accepting adds the document; its findings wait around it on the board
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    kind?: CaseLeadDtoKindEnum;
+    /**
+     * For a PROPOSED lead: OPEN waits for review; IN_CASE joined the case another way; GONE lost its finding or asset. The next refresh settles the last two
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    state?: CaseLeadDtoStateEnum;
     /**
      * 
      * @type {string}
@@ -74,11 +86,95 @@ export interface CaseLeadDto {
      */
     importance?: number | null;
     /**
-     * 
+     * Semantic similarity (SEMANTIC_NEIGHBOR) or the pair match weight (DUPLICATE)
      * @type {number}
      * @memberof CaseLeadDto
      */
     similarity?: number | null;
+    /**
+     * The evidence finding this lead resembles
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    viaFindingId?: string | null;
+    /**
+     * The evidence asset this lead hangs off (the duplicated document, or the resembled finding's asset)
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    viaAssetId?: string | null;
+    /**
+     * The watch (inquiry) this lead answers
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    viaInquiryId?: string | null;
+    /**
+     * What the lead hangs off, in words: the resembled finding, the watch title or the duplicated document
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    viaLabel?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    viaAssetName?: string | null;
+    /**
+     * Origin-specific facts: sameValue, isNew, relation (identical_content | likely_duplicate | confirmed), verdict, sharedLabels
+     * @type {{ [key: string]: any; }}
+     * @memberof CaseLeadDto
+     */
+    details?: { [key: string]: any; } | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    findingType?: string | null;
+    /**
+     * The matched value, shortened
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    value?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    severity?: string | null;
+    /**
+     * The finding's current status (OPEN, RESOLVED, …)
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    findingStatus?: string | null;
+    /**
+     * The document the lead is in, or is
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    assetName?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    assetType?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    sourceType?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof CaseLeadDto
+     */
+    sourceName?: string | null;
     /**
      * 
      * @type {string}
@@ -109,11 +205,31 @@ export interface CaseLeadDto {
 /**
  * @export
  */
+export const CaseLeadDtoKindEnum = {
+    Finding: 'FINDING',
+    Asset: 'ASSET'
+} as const;
+export type CaseLeadDtoKindEnum = typeof CaseLeadDtoKindEnum[keyof typeof CaseLeadDtoKindEnum];
+
+/**
+ * @export
+ */
+export const CaseLeadDtoStateEnum = {
+    Open: 'OPEN',
+    InCase: 'IN_CASE',
+    Gone: 'GONE'
+} as const;
+export type CaseLeadDtoStateEnum = typeof CaseLeadDtoStateEnum[keyof typeof CaseLeadDtoStateEnum];
+
+/**
+ * @export
+ */
 export const CaseLeadDtoOriginEnum = {
     SemanticNeighbor: 'SEMANTIC_NEIGHBOR',
     Inquiry: 'INQUIRY',
     Autopilot: 'AUTOPILOT',
-    Manual: 'MANUAL'
+    Manual: 'MANUAL',
+    Duplicate: 'DUPLICATE'
 } as const;
 export type CaseLeadDtoOriginEnum = typeof CaseLeadDtoOriginEnum[keyof typeof CaseLeadDtoOriginEnum];
 
@@ -134,7 +250,6 @@ export type CaseLeadDtoStatusEnum = typeof CaseLeadDtoStatusEnum[keyof typeof Ca
 export function instanceOfCaseLeadDto(value: object): value is CaseLeadDto {
     if (!('id' in value) || value['id'] === undefined) return false;
     if (!('caseId' in value) || value['caseId'] === undefined) return false;
-    if (!('findingId' in value) || value['findingId'] === undefined) return false;
     if (!('origin' in value) || value['origin'] === undefined) return false;
     if (!('status' in value) || value['status'] === undefined) return false;
     if (!('rationale' in value) || value['rationale'] === undefined) return false;
@@ -156,14 +271,30 @@ export function CaseLeadDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean
         
         'id': json['id'],
         'caseId': json['caseId'],
-        'findingId': json['findingId'],
+        'findingId': json['findingId'] == null ? undefined : json['findingId'],
         'assetId': json['assetId'] == null ? undefined : json['assetId'],
+        'kind': json['kind'] == null ? undefined : json['kind'],
+        'state': json['state'] == null ? undefined : json['state'],
         'origin': json['origin'],
         'status': json['status'],
         'rationale': json['rationale'],
         'title': json['title'],
         'importance': json['importance'] == null ? undefined : json['importance'],
         'similarity': json['similarity'] == null ? undefined : json['similarity'],
+        'viaFindingId': json['viaFindingId'] == null ? undefined : json['viaFindingId'],
+        'viaAssetId': json['viaAssetId'] == null ? undefined : json['viaAssetId'],
+        'viaInquiryId': json['viaInquiryId'] == null ? undefined : json['viaInquiryId'],
+        'viaLabel': json['viaLabel'] == null ? undefined : json['viaLabel'],
+        'viaAssetName': json['viaAssetName'] == null ? undefined : json['viaAssetName'],
+        'details': json['details'] == null ? undefined : json['details'],
+        'findingType': json['findingType'] == null ? undefined : json['findingType'],
+        'value': json['value'] == null ? undefined : json['value'],
+        'severity': json['severity'] == null ? undefined : json['severity'],
+        'findingStatus': json['findingStatus'] == null ? undefined : json['findingStatus'],
+        'assetName': json['assetName'] == null ? undefined : json['assetName'],
+        'assetType': json['assetType'] == null ? undefined : json['assetType'],
+        'sourceType': json['sourceType'] == null ? undefined : json['sourceType'],
+        'sourceName': json['sourceName'] == null ? undefined : json['sourceName'],
         'proposedBy': json['proposedBy'],
         'reviewedBy': json['reviewedBy'] == null ? undefined : json['reviewedBy'],
         'reviewedAt': json['reviewedAt'] == null ? undefined : (new Date(json['reviewedAt'])),
@@ -186,12 +317,28 @@ export function CaseLeadDtoToJSONTyped(value?: CaseLeadDto | null, ignoreDiscrim
         'caseId': value['caseId'],
         'findingId': value['findingId'],
         'assetId': value['assetId'],
+        'kind': value['kind'],
+        'state': value['state'],
         'origin': value['origin'],
         'status': value['status'],
         'rationale': value['rationale'],
         'title': value['title'],
         'importance': value['importance'],
         'similarity': value['similarity'],
+        'viaFindingId': value['viaFindingId'],
+        'viaAssetId': value['viaAssetId'],
+        'viaInquiryId': value['viaInquiryId'],
+        'viaLabel': value['viaLabel'],
+        'viaAssetName': value['viaAssetName'],
+        'details': value['details'],
+        'findingType': value['findingType'],
+        'value': value['value'],
+        'severity': value['severity'],
+        'findingStatus': value['findingStatus'],
+        'assetName': value['assetName'],
+        'assetType': value['assetType'],
+        'sourceType': value['sourceType'],
+        'sourceName': value['sourceName'],
         'proposedBy': value['proposedBy'],
         'reviewedBy': value['reviewedBy'],
         'reviewedAt': value['reviewedAt'] == null ? value['reviewedAt'] : value['reviewedAt'].toISOString(),

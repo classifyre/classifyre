@@ -9,6 +9,7 @@ import { CorrelationModule } from '../correlation/correlation.module';
 import { CasesService } from '../cases.service';
 import { CaseCleanupService } from '../cases/case-cleanup.service';
 import { CaseEscalationService } from '../cases/case-escalation.service';
+import { CaseLeadsScheduler } from '../cases/case-leads.scheduler';
 import { CaseBoardReadService } from '../case-board/case-board-read.service';
 import { CaseThreadsService } from '../case-threads.service';
 import { CaseActivityService } from '../case-activity.service';
@@ -96,6 +97,9 @@ import { SourceGraphModule } from '../stats/source-graph.module';
     AiProviderConfigService,
     AiClientService,
     CaseActivityService,
+    // CaseActivityService asks it to refresh a case's leads after evidence
+    // changes; without it here, cases the agents change would not.
+    CaseLeadsScheduler,
     InquiryActivityService,
     GraphService,
     CaseThreadsService,

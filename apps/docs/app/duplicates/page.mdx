@@ -124,7 +124,8 @@ storage on a large corpus — can turn it off:
 While it is off, every tab of this page says so above the queue and links to
 the switch, and the `correlation.scan` worker shows as held in
 [Settings → Workers](/settings/workers/). Scans still reach the AI harness —
-only the duplicate check is skipped.
+only the duplicate check is skipped. Cases stop suggesting
+[look-alike leads](/investigations/cases/leads/) until it is back on.
 
 ---
 
@@ -137,6 +138,10 @@ A decision is only worth taking if it can go somewhere.
 - **Create inquiry** — an [inquiry](/investigations/inquiry/) that keeps
   watching for the same signature, pre-filled with the labels and sources that
   made this pair match.
+- **A case finds them itself** — a case suggests the documents that look like
+  its evidence as [look-alike leads](/investigations/cases/leads/), ranked by
+  match weight. Pairs you marked *Not a duplicate* or *Split* are never
+  suggested, and pairs you confirmed come first.
 - **Nowhere, yet** — the common outcome, and a deliberate one. Confirmed
   duplicates that went nowhere are listed on their own in
   [Decisions](/duplicates/decisions/) so you can come back to them.

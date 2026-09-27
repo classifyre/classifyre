@@ -27,7 +27,7 @@ assets, cases, inquiries and the glossary.
 | Feature | What it builds | What reads it |
 | --- | --- | --- |
 | **Embeddings** | Vectors of finding evidence and document text, the importance rankings derived from them, and the document text chunks they are embedded from | Importance ranking, near-duplicate text groups, semantic search, similar findings, semantic case leads, the AI harness's evidence lookups |
-| **Duplicate detection** | Correlation values, signatures, clusters, patterns and the scored duplicate links in the asset graph | [Duplicate review](/duplicates/), "where else found", similar-asset links in the graph, the harness duplicates tools |
+| **Duplicate detection** | Correlation values, signatures, clusters, patterns and the scored duplicate links in the asset graph | [Duplicate review](/duplicates/), "where else found", similar-asset links in the graph, look-alike [case leads](/investigations/cases/leads/), the harness duplicates tools |
 
 Both are on in a new workspace. (Embeddings follow the deployment's default
 until a workspace chooses; a deployment that ships them off shows **Off by
@@ -90,6 +90,7 @@ works from the evidence as it stands.
 | Duplicate check after scans | Skipped | Skipped |
 | Recomputes and tuning changes | Wait (tuning is still saved) | Wait |
 | Duplicate review, "where else found", graph similarity links | Frozen as of turning off | Empty |
+| Look-alike case leads | None suggested (waiting ones stay) | None suggested |
 | Review decisions and asset lineage | Kept | Kept |
 | Workers held | `correlation.scan` | The same |
 | Turning back on | One full recompute | One full recompute |

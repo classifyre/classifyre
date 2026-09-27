@@ -14,6 +14,7 @@ import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { CaseBoardService } from '../case-board/case-board.service';
 import { CaseBoardReadService } from '../case-board/case-board-read.service';
 import { CaseCleanupService } from '../cases/case-cleanup.service';
+import { CaseLeadsScheduler } from '../cases/case-leads.scheduler';
 import {
   ApplyBoardOpsDto,
   ApplyBoardOpsResponseDto,
@@ -38,6 +39,7 @@ export class CaseBoardController {
     private readonly board: CaseBoardService,
     private readonly boardRead: CaseBoardReadService,
     private readonly cleanup: CaseCleanupService,
+    private readonly leads: CaseLeadsScheduler,
   ) {}
 
   @Get()
@@ -51,6 +53,9 @@ export class CaseBoardController {
     // away without a scan (a purge, a deleted source) is applied the next time
     // the board is read. Throttled per case, and it never fails the read.
     await this.cleanup.checkIfDue(id);
+    // Someone is looking: keep the case's leads fresh (throttled per case;
+    // the refresh runs in the worker and never delays the read).
+    void this.leads.requestOnRead(id);
     return this.boardRead.getBoard(id);
   }
 

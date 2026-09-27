@@ -75,6 +75,8 @@ import { GlossaryService } from './glossary/glossary.service';
 import { CaseLeadsController } from './controllers/case-leads.controller';
 import { CaseEventsController } from './controllers/case-events.controller';
 import { CaseLeadsService } from './case-leads.service';
+import { CaseLeadsScheduler } from './cases/case-leads.scheduler';
+import { CaseLeadsWorker } from './cases/case-leads.worker';
 import { CaseEventsService } from './case-events.service';
 import { NamespacesController } from './registry/namespaces.controller';
 import { SitemapController } from './sitemap/sitemap.controller';
@@ -230,6 +232,10 @@ import {
     ChatBotsService,
     GlossaryService,
     CaseLeadsService,
+    // Keeps each case's leads current: asked for by CaseActivityService (so it
+    // is provided wherever that is), run by the worker below.
+    CaseLeadsScheduler,
+    CaseLeadsWorker,
     CaseEventsService,
     NamespaceWorkerManager,
     SitemapService,

@@ -7,6 +7,7 @@ import {
   Camera,
   CheckCircle2,
   ChevronDown,
+  Compass,
   Crosshair,
   Download,
   Eraser,
@@ -90,6 +91,11 @@ const TYPE_META: Record<
   FINDINGS_ESCALATED: { icon: <TriangleAlert className="h-3.5 w-3.5" />, label: "Escalated", color: ESCALATION_INK, group: "escalation" },
   ESCALATION_CLEARED: { icon: <TriangleAlert className="h-3.5 w-3.5" />, label: "Escalation cleared", color: "text-muted-foreground", group: "escalation" },
   FINDINGS_AUTO_REMOVED: { icon: <Eraser className="h-3.5 w-3.5" />, label: "Findings taken out", color: "text-red-600 dark:text-red-400", group: "evidence" },
+  // Leads: suggestions for the case, and what became of them.
+  LEAD_PROPOSED: { icon: <Compass className="h-3.5 w-3.5" />, label: "Lead suggested", color: "text-muted-foreground", group: "evidence" },
+  LEAD_ACCEPTED: { icon: <Compass className="h-3.5 w-3.5" />, label: "Lead accepted", color: "text-green-600 dark:text-green-400", group: "evidence" },
+  LEAD_DISMISSED: { icon: <Compass className="h-3.5 w-3.5" />, label: "Lead dismissed", color: "text-muted-foreground", group: "evidence" },
+  LEADS_GENERATED: { icon: <Compass className="h-3.5 w-3.5" />, label: "New leads", color: "text-blue-600 dark:text-blue-400", group: "evidence" },
   EVIDENCE_AUTO_REMOVED: { icon: <Eraser className="h-3.5 w-3.5" />, label: "Evidence taken out", color: "text-red-600 dark:text-red-400", group: "evidence" },
   [AUTOPILOT_RUN]: { icon: <Bot className="h-3.5 w-3.5" />, label: "AI autopilot run", color: "text-amber-600 dark:text-amber-400", group: "ai" },
 };
@@ -100,7 +106,17 @@ const TYPE_META: Record<
 const SYSTEM_ACTORS: Record<string, string> = {
   "case-cleanup": "automatic clean-up",
   "inquiry-auto-pull": "a watch's auto-add",
+  "case-leads": "the case's own lead refresh",
   mcp: "an MCP client",
+};
+
+/** Lead origins, as the Leads panel names them. */
+const LEAD_ORIGINS: Record<string, [string, string]> = {
+  DUPLICATE: ["look-alike document", "look-alike documents"],
+  INQUIRY: ["watch answer", "watch answers"],
+  SEMANTIC_NEIGHBOR: ["similar finding", "similar findings"],
+  AUTOPILOT: ["Autopilot proposal", "Autopilot proposals"],
+  MANUAL: ["bookmark", "bookmarks"],
 };
 
 const RULE_LABELS: Record<string, string> = {
@@ -405,6 +421,12 @@ function eventSubject(item: CaseActivityDto): string | null {
       return str(p.label);
     case "CASE_CREATED":
       return str(p.title);
+    case "LEAD_PROPOSED":
+    case "LEAD_ACCEPTED":
+    case "LEAD_DISMISSED":
+      return str(p.label);
+    case "LEADS_GENERATED":
+      return plural(Number(p.proposed ?? 0), "lead");
     case "BOARD_NOTE_ADDED":
     case "BOARD_NOTE_REMOVED":
     case "BOARD_FRAME_ADDED":
@@ -507,6 +529,47 @@ function EventDetail({
     }
     case "INQUIRY_LINKED":
       if (p.autoPull === true) lines.push(<span key="auto">auto-add new answers: on</span>);
+      break;
+    case "LEADS_GENERATED": {
+      const byOrigin = (p.byOrigin ?? {}) as Record<string, number>;
+      const kinds = Object.entries(byOrigin)
+        .filter(([, n]) => n > 0)
+        .map(([origin, n]) => {
+          const [one, many] = LEAD_ORIGINS[origin] ?? [origin.toLowerCase(), origin.toLowerCase()];
+          return `${n} ${n === 1 ? one : many}`;
+        });
+      if (kinds.length > 0) lines.push(<span key="kinds" className="block">{kinds.join(" · ")}</span>);
+      const passes = Number(p.passes ?? 1);
+      if (passes > 1) {
+        lines.push(
+          <span key="when" className="block">
+            over {passes} refreshes
+            {rangeText(p)}
+          </span>,
+        );
+      }
+      const sample = strList(p.sample);
+      if (sample.length > 0) {
+        lines.push(
+          <span key="sample" className="flex flex-wrap gap-1">
+            {sample.slice(0, 6).map((label, index) => (
+              <span key={`${label}-${index}`} className="max-w-full truncate rounded border border-border px-1.5 py-0.5 font-mono text-[10px]">
+                {label}
+              </span>
+            ))}
+          </span>,
+        );
+      }
+      break;
+    }
+    case "LEAD_PROPOSED":
+    case "LEAD_ACCEPTED": {
+      const kind = LEAD_ORIGINS[String(p.origin)];
+      if (kind) lines.push(<span key="origin" className="block">{kind[0]}</span>);
+      break;
+    }
+    case "LEAD_DISMISSED":
+      if (str(p.reason)) lines.push(<span key="reason" className="block">why: “{String(p.reason)}”</span>);
       break;
     case "FINDINGS_ESCALATED": {
       const when = escalationTrigger(p);

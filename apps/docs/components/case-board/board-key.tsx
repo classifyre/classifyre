@@ -4,11 +4,15 @@ import "@workspace/case-board/board.css";
 
 import * as React from "react";
 import {
+  Bot,
   Check,
   Circle,
   Clock3,
   CloudCheck,
   Compass,
+  Copy,
+  Crosshair,
+  Equal,
   File,
   FileText,
   FlaskConical,
@@ -24,6 +28,7 @@ import {
   PanelRightOpen,
   Paperclip,
   Plus,
+  Radar,
   Redo2,
   Sparkles,
   SquarePlus,
@@ -505,6 +510,151 @@ export function PanelRail() {
           <span className="flex h-8 items-center text-muted-foreground">Show or hide the panel</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface ExampleLead {
+  icon: LucideIcon;
+  reason: string;
+  strong?: boolean;
+  score: string;
+  severity?: SeverityKey;
+  what: React.ReactNode;
+  where: string;
+  why: string;
+  extra?: React.ReactNode;
+}
+
+const EXAMPLE_LEADS: ExampleLead[] = [
+  {
+    icon: Copy,
+    reason: "Look-alike",
+    strong: true,
+    score: "Match 80%",
+    what: (
+      <span className="flex items-center gap-1.5 font-semibold">
+        <File className="size-3.5 text-muted-foreground" aria-hidden /> scan-of-contract.pdf
+      </span>
+    ),
+    where: "PDF · Finance share",
+    why: "Confirmed a duplicate of contract.pdf in Duplicate review",
+  },
+  {
+    icon: Sparkles,
+    reason: "Watch answer",
+    score: "Importance 91",
+    severity: "high",
+    what: (
+      <span>
+        <span className="mr-1.5 font-mono text-[10px] text-muted-foreground uppercase">IBAN</span>
+        <span className="font-mono font-medium">DE44 5001 0517 5407 3249 31</span>
+      </span>
+    ),
+    where: "in payments-2024.xlsx · Accounting",
+    why: "Answer to the watch “Payments to offshore accounts” · new",
+    extra: (
+      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+        <Sparkles className="size-3" aria-hidden /> Open the watch
+      </span>
+    ),
+  },
+  {
+    icon: Equal,
+    reason: "Same value",
+    strong: true,
+    score: "Importance 84",
+    severity: "medium",
+    what: (
+      <span>
+        <span className="mr-1.5 font-mono text-[10px] text-muted-foreground uppercase">EMAIL</span>
+        <span className="font-mono font-medium">j.doe@example.com</span>
+      </span>
+    ),
+    where: "in board-minutes.docx · SharePoint",
+    why: "Same value as EMAIL: j.doe@example.com in contract.pdf",
+  },
+];
+
+/**
+ * Three leads as the Leads panel draws them: the reason and its score, what
+ * and where, the evidence it relates to, and the buttons.
+ */
+export function LeadCards() {
+  return (
+    <div className="mx-auto my-6 grid max-w-[440px] gap-2" role="img" aria-label="Three example leads">
+      {EXAMPLE_LEADS.map((lead) => (
+        <div key={lead.reason} className="flex flex-col rounded-[4px] border-2 border-border bg-card text-left">
+          <div className="flex-1 space-y-1 px-3 pt-2.5 pb-2">
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1 rounded-[3px] border px-1.5 py-px font-mono text-[9px] font-bold tracking-[0.08em] whitespace-nowrap uppercase",
+                  lead.strong ? "border-foreground text-foreground" : "border-border text-muted-foreground",
+                )}
+              >
+                <lead.icon className="size-3" aria-hidden />
+                {lead.reason}
+              </span>
+              <span className="truncate font-mono text-[10px] text-muted-foreground tabular-nums">{lead.score}</span>
+              <span className="flex-1" />
+              {lead.severity && (
+                <span
+                  className="rounded-[3px] border px-1 font-mono text-[8px] font-bold uppercase"
+                  style={{ color: SEVERITY_COLOR[lead.severity], borderColor: SEVERITY_COLOR[lead.severity] }}
+                >
+                  {lead.severity}
+                </span>
+              )}
+            </div>
+            <div className="text-sm">{lead.what}</div>
+            <p className="truncate text-[11px] text-muted-foreground">{lead.where}</p>
+            <p className="text-xs">
+              <span className="text-muted-foreground">↳ </span>
+              {lead.why}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 border-t border-border px-2 py-1.5">
+            <span className="inline-flex h-6 items-center gap-1 rounded-[4px] bg-foreground px-2 text-[11px] font-medium text-background">
+              <Check className="size-3" strokeWidth={3} aria-hidden /> Accept
+            </span>
+            <span className="inline-flex h-6 items-center gap-1 rounded-[4px] border border-border px-2 text-[11px]">
+              <X className="size-3" aria-hidden /> Dismiss
+            </span>
+            <span className="flex-1" />
+            {lead.extra}
+            <Crosshair className="size-3.5 text-muted-foreground" aria-hidden />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The reason chips at the top of the Leads panel. */
+export function LeadFilters() {
+  const chips: Array<{ icon?: LucideIcon; label: string; count: number; active?: boolean }> = [
+    { label: "All", count: 9, active: true },
+    { icon: Copy, label: "Look-alikes", count: 3 },
+    { icon: Sparkles, label: "Watch answers", count: 2 },
+    { icon: Radar, label: "Similar", count: 3 },
+    { icon: Bot, label: "Autopilot", count: 1 },
+  ];
+  return (
+    <div className="my-4 flex flex-wrap gap-1" role="img" aria-label="The reason filters of the Leads panel">
+      {chips.map((chip) => (
+        <span
+          key={chip.label}
+          className={cn(
+            "inline-flex items-center gap-1 rounded-[4px] border-2 px-2 py-0.5 font-mono text-[10px] tracking-wide uppercase",
+            chip.active ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground",
+          )}
+        >
+          {chip.icon && <chip.icon className="size-3" aria-hidden />}
+          {chip.label}
+          <span className={chip.active ? "text-background/70" : "text-muted-foreground/70"}>{chip.count}</span>
+        </span>
+      ))}
     </div>
   );
 }

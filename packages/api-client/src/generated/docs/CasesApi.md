@@ -16,10 +16,11 @@ All URIs are relative to *http://localhost*
 | [**caseEventsControllerList**](CasesApi.md#caseeventscontrollerlist) | **GET** /cases/{caseId}/events | List the case chronology (real-world events, ordered by date) |
 | [**caseEventsControllerRemove**](CasesApi.md#caseeventscontrollerremove) | **DELETE** /cases/{caseId}/events/{eventId} | Remove a chronology event |
 | [**caseEventsControllerUpdate**](CasesApi.md#caseeventscontrollerupdate) | **PATCH** /cases/{caseId}/events/{eventId} | Update (and implicitly verify) a chronology event |
-| [**caseLeadsControllerGenerate**](CasesApi.md#caseleadscontrollergenerate) | **POST** /cases/{caseId}/leads/generate | Generate leads from case evidence (semantic neighbours + linked-inquiry matches) |
+| [**caseLeadsControllerGenerate**](CasesApi.md#caseleadscontrollergenerate) | **POST** /cases/{caseId}/leads/generate | Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change |
 | [**caseLeadsControllerList**](CasesApi.md#caseleadscontrollerlist) | **GET** /cases/{caseId}/leads | List leads (exploration candidates) for a case |
 | [**caseLeadsControllerPropose**](CasesApi.md#caseleadscontrollerpropose) | **POST** /cases/{caseId}/leads | Propose a finding as a lead for this case |
 | [**caseLeadsControllerReview**](CasesApi.md#caseleadscontrollerreview) | **POST** /cases/{caseId}/leads/{leadId}/review | Accept a lead into evidence, or dismiss it |
+| [**caseLeadsControllerReviewMany**](CasesApi.md#caseleadscontrollerreviewmany) | **POST** /cases/{caseId}/leads/review | Accept or dismiss several leads with one decision |
 | [**caseTimelineControllerGetTimeline**](CasesApi.md#casetimelinecontrollergettimeline) | **GET** /cases/{caseId}/timeline | Paginated unified case activity feed (newest first) |
 | [**casesControllerAddEvidence**](CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence |
 | [**casesControllerAddFinding**](CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of evidence |
@@ -863,7 +864,7 @@ No authorization required
 
 > GenerateCaseLeadsResponseDto caseLeadsControllerGenerate(caseId)
 
-Generate leads from case evidence (semantic neighbours + linked-inquiry matches)
+Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change
 
 ### Example
 
@@ -1127,6 +1128,74 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseLeadsControllerReviewMany
+
+> ReviewCaseLeadsResponseDto caseLeadsControllerReviewMany(caseId, reviewCaseLeadsDto)
+
+Accept or dismiss several leads with one decision
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseLeadsControllerReviewManyRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    caseId: caseId_example,
+    // ReviewCaseLeadsDto
+    reviewCaseLeadsDto: ...,
+  } satisfies CaseLeadsControllerReviewManyRequest;
+
+  try {
+    const data = await api.caseLeadsControllerReviewMany(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **caseId** | `string` |  | [Defaults to `undefined`] |
+| **reviewCaseLeadsDto** | [ReviewCaseLeadsDto](ReviewCaseLeadsDto.md) |  | |
+
+### Return type
+
+[**ReviewCaseLeadsResponseDto**](ReviewCaseLeadsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

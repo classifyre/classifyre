@@ -7,7 +7,7 @@ import * as React from "react";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { Loader2, Lock, RotateCcw, StickyNote, X } from "lucide-react";
 import { toast } from "sonner";
-import { api, type CaseLeadDto, type CaseResponseDto } from "@workspace/api-client";
+import { api, type CaseResponseDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@workspace/ui/components/resizable";
 import {
@@ -44,6 +44,8 @@ import { layoutBox } from "./hooks/use-auto-place";
 import { boardFileName, exportBoardPng, untilMeasured } from "./hooks/export-board";
 import { useBoardSocket } from "./hooks/use-board-socket";
 import { useNeighbourhoodLoader, useTraceLoader } from "./hooks/use-trace";
+import { useCaseLeads } from "./hooks/use-case-leads";
+import { isPendingLead } from "./store/leads";
 
 /** Refetch while visible: worker-side changes (auto-pull) do not push over the socket. */
 const POLL_MS = 60_000;
@@ -111,7 +113,10 @@ function BoardShell({ caseId }: { caseId: string }) {
   useFullBleedHeight(rootRef);
 
   const [caseData, setCaseData] = React.useState<CaseResponseDto | null>(null);
-  const [leads, setLeads] = React.useState<CaseLeadDto[]>([]);
+  // The case keeps its leads current by itself (in the worker); the board
+  // reads them with the case and on the same minute as its own refetch.
+  const leads = useCaseLeads(caseId, flyTo);
+  const reloadLeads = leads.reload;
 
   const loadCase = React.useCallback(async () => {
     try {
@@ -120,38 +125,33 @@ function BoardShell({ caseId }: { caseId: string }) {
       // The board itself reports load errors; the top bar just shows "…".
     }
   }, [caseId]);
-  const loadLeads = React.useCallback(async () => {
-    try {
-      setLeads(await api.cases.caseLeadsControllerList({ caseId }));
-    } catch {
-      setLeads([]);
-    }
-  }, [caseId]);
 
   const refreshAll = React.useCallback(() => {
     store.getState().refetch();
     void loadCase();
-    void loadLeads();
-  }, [store, loadCase, loadLeads]);
+    void reloadLeads();
+  }, [store, loadCase, reloadLeads]);
 
   React.useEffect(() => {
     void store.getState().load();
     void loadCase();
-    void loadLeads();
-  }, [store, loadCase, loadLeads]);
+    void reloadLeads();
+  }, [store, loadCase, reloadLeads]);
 
   // Refetch on focus and every minute while visible (PRD §7.5, multi-replica note).
   React.useEffect(() => {
     const onFocus = () => refreshAll();
     window.addEventListener("focus", onFocus);
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") store.getState().refetch();
+      if (document.visibilityState !== "visible") return;
+      store.getState().refetch();
+      void reloadLeads();
     }, POLL_MS);
     return () => {
       window.removeEventListener("focus", onFocus);
       window.clearInterval(timer);
     };
-  }, [refreshAll, store]);
+  }, [refreshAll, store, reloadLeads]);
 
   useBoardSocket(caseId);
   // The tab title and the header's breadcrumb name the case, not its id.
@@ -326,7 +326,7 @@ function BoardShell({ caseId }: { caseId: string }) {
                 </div>
               ) : (
                 <>
-                  <BoardCanvas onTidyUp={() => void tidyUp()} />
+                  <BoardCanvas onTidyUp={() => void tidyUp()} onDropLead={leads.acceptDropped} />
                   {isEmpty && <EmptyBoard />}
                   <FocusBanner />
                 </>
@@ -352,7 +352,7 @@ function BoardShell({ caseId }: { caseId: string }) {
           )}
         </ResizablePanelGroup>
         <PanelRail
-          pendingLeads={leads.filter((l) => l.status === "PROPOSED").length}
+          pendingLeads={leads.leads.filter(isPendingLead).length}
           newMatches={(caseData?.inquiries ?? []).reduce((sum, q) => sum + q.newMatchCount, 0)}
         />
       </div>

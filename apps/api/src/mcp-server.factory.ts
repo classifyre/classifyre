@@ -709,7 +709,7 @@ export class McpServerFactoryService {
       {
         title: 'List Case Leads',
         description:
-          "List a case's lead queue: ranked exploration candidates (semantic neighbours, high-importance inquiry matches, agent proposals) awaiting accept/dismiss review, plus reviewed history.",
+          "List a case's lead queue: ranked candidates awaiting accept/dismiss review, plus reviewed history. Origins: SEMANTIC_NEIGHBOR (similar to evidence; details.sameValue when it is the very same value), INQUIRY (important answer of a linked watch), DUPLICATE (a look-alike document from the duplicates engine — an ASSET lead with findingId null), AUTOPILOT, MANUAL. Each lead names what it hangs off (viaFindingId / viaAssetId / viaInquiryId, viaLabel) and where it is (assetName, sourceName). For PROPOSED leads, state OPEN waits for review; IN_CASE and GONE are settled by the next refresh.",
         inputSchema: {
           caseId: z.string().uuid(),
           status: z.enum(['PROPOSED', 'ACCEPTED', 'DISMISSED']).optional(),
@@ -751,7 +751,7 @@ export class McpServerFactoryService {
       {
         title: 'Generate Case Leads',
         description:
-          'Generate leads for a case from its own evidence: semantic neighbours of attached findings plus high-importance matches of linked inquiries. Bounded and idempotent (existing/dismissed leads are skipped).',
+          'Refresh leads for a case now from its own evidence: findings similar to it, high-importance answers of its linked watches, and look-alike documents the duplicates engine pairs with its evidence (pairs rejected or split in Duplicate review are never suggested). The case also refreshes its leads by itself whenever its evidence or watches change, so this is only needed for an immediate refresh. Bounded (per-kind quotas, at most 60 waiting) and idempotent (existing/dismissed leads are skipped).',
         inputSchema: { caseId: z.string().uuid() },
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
@@ -766,7 +766,7 @@ export class McpServerFactoryService {
       {
         title: 'Review Case Lead',
         description:
-          'Accept a lead into case evidence (via the normal attach flow) or dismiss it. Dismissals are remembered as precedents so agents stop re-proposing the finding.',
+          'Accept a lead into case evidence (a finding lead attaches its finding; an asset lead adds the document) or dismiss it. Dismissals are remembered as precedents so agents stop re-proposing the finding or document.',
         inputSchema: {
           caseId: z.string().uuid(),
           leadId: z.string().uuid(),

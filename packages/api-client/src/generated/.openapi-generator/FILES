@@ -355,6 +355,8 @@ docs/ReopenDecisionsResponseDto.md
 docs/RetireOutOfScopeFindingsDto.md
 docs/RevertResultDto.md
 docs/ReviewCaseLeadDto.md
+docs/ReviewCaseLeadsDto.md
+docs/ReviewCaseLeadsResponseDto.md
 docs/ReviewClusterRowDto.md
 docs/ReviewClustersResponseDto.md
 docs/ReviewDecisionRowDto.md
@@ -888,6 +890,8 @@ src/models/ReopenDecisionsResponseDto.ts
 src/models/RetireOutOfScopeFindingsDto.ts
 src/models/RevertResultDto.ts
 src/models/ReviewCaseLeadDto.ts
+src/models/ReviewCaseLeadsDto.ts
+src/models/ReviewCaseLeadsResponseDto.ts
 src/models/ReviewClusterRowDto.ts
 src/models/ReviewClustersResponseDto.ts
 src/models/ReviewDecisionRowDto.ts

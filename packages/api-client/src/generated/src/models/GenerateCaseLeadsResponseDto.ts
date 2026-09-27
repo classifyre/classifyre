@@ -20,17 +20,35 @@ import { mapValues } from '../runtime';
  */
 export interface GenerateCaseLeadsResponseDto {
     /**
-     * 
+     * New leads written by this refresh
      * @type {number}
      * @memberof GenerateCaseLeadsResponseDto
      */
     proposed: number;
     /**
-     * 
+     * Candidates found before quotas and room
      * @type {number}
      * @memberof GenerateCaseLeadsResponseDto
      */
     considered: number;
+    /**
+     * Waiting leads the case settled: already in it another way, gone, or filtered out
+     * @type {number}
+     * @memberof GenerateCaseLeadsResponseDto
+     */
+    settled?: number;
+    /**
+     * New leads per origin
+     * @type {{ [key: string]: number; }}
+     * @memberof GenerateCaseLeadsResponseDto
+     */
+    byOrigin?: { [key: string]: number; };
+    /**
+     * The case already holds as many waiting leads as it may; review some first
+     * @type {boolean}
+     * @memberof GenerateCaseLeadsResponseDto
+     */
+    full?: boolean;
 }
 
 /**
@@ -54,6 +72,9 @@ export function GenerateCaseLeadsResponseDtoFromJSONTyped(json: any, ignoreDiscr
         
         'proposed': json['proposed'],
         'considered': json['considered'],
+        'settled': json['settled'] == null ? undefined : json['settled'],
+        'byOrigin': json['byOrigin'] == null ? undefined : json['byOrigin'],
+        'full': json['full'] == null ? undefined : json['full'],
     };
 }
 
@@ -70,6 +91,9 @@ export function GenerateCaseLeadsResponseDtoToJSONTyped(value?: GenerateCaseLead
         
         'proposed': value['proposed'],
         'considered': value['considered'],
+        'settled': value['settled'],
+        'byOrigin': value['byOrigin'],
+        'full': value['full'],
     };
 }
 
