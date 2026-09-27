@@ -4,7 +4,7 @@ import { nsPath } from "@/lib/ns-path";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
-import { Filter, Loader2, Search } from "lucide-react";
+import { Filter, Loader2, Search, TriangleAlert } from "lucide-react";
 import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 import {
   api,
@@ -93,6 +93,7 @@ export function CasesTable({ variant = "full", limit = 6 }: CasesTableProps = {}
   const [search, setSearch] = useState("");
   const [statuses, setStatuses] = useState<string[]>([]);
   const [severities, setSeverities] = useState<string[]>([]);
+  const [escalatedOnly, setEscalatedOnly] = useState(false);
   const [pageSize, setPageSize] = useState(
     String(isCompact ? limit : DEFAULT_PAGE_SIZE),
   );
@@ -119,7 +120,7 @@ export function CasesTable({ variant = "full", limit = 6 }: CasesTableProps = {}
 
   useEffect(() => {
     setPage(1);
-  }, [search, statuses, severities, pageSize]);
+  }, [search, statuses, severities, escalatedOnly, pageSize]);
 
   // ── Fetch cases ───────────────────────────────────────────────────────────
 
@@ -147,6 +148,7 @@ export function CasesTable({ variant = "full", limit = 6 }: CasesTableProps = {}
             severities.length > 0
               ? (severities as typeof CasesControllerListSeverityEnum[keyof typeof CasesControllerListSeverityEnum][])
               : undefined,
+          escalated: escalatedOnly || undefined,
           skip: (page - 1) * resolvedPageSize,
           limit: resolvedPageSize,
         });
@@ -174,7 +176,7 @@ export function CasesTable({ variant = "full", limit = 6 }: CasesTableProps = {}
     return () => {
       active = false;
     };
-  }, [search, statuses, severities, page, resolvedPageSize]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [search, statuses, severities, escalatedOnly, page, resolvedPageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -260,6 +262,22 @@ export function CasesTable({ variant = "full", limit = 6 }: CasesTableProps = {}
             </MultiSelectGroup>
           </MultiSelectContent>
         </MultiSelect>
+
+        <button
+          type="button"
+          aria-pressed={escalatedOnly}
+          onClick={() => setEscalatedOnly((v) => !v)}
+          data-testid="cases-escalated-filter"
+          className={cn(
+            "inline-flex h-9 items-center gap-1.5 rounded-[4px] border-2 px-3 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors",
+            escalatedOnly
+              ? "border-escalation bg-escalation text-escalation-foreground"
+              : "border-border text-escalation hover:bg-escalation-soft",
+          )}
+        >
+          <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
+          {t("caseEscalation.table.filter")}
+        </button>
 
         {isFilterLoading && (
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -359,13 +377,24 @@ export function CasesTable({ variant = "full", limit = 6 }: CasesTableProps = {}
                 {data.map((c) => (
                   <Fragment key={c.id}>
                     <TableRow
-                      className="cursor-pointer hover:bg-muted/40"
+                      className={cn(
+                        "cursor-pointer hover:bg-muted/40",
+                        c.escalatedCount > 0 && "bg-escalation-soft/40 hover:bg-escalation-soft/70",
+                      )}
                       onClick={() => router.push(nsPath(`/investigations/${c.id}`))}
+                      data-escalated={c.escalatedCount > 0 ? "true" : undefined}
                     >
-                      <TableCell className="font-medium">
-                        <span className="inline-flex items-center gap-2">
+                      <TableCell
+                        className={cn(
+                          "font-medium",
+                          // The magenta edge: an escalated case reads at a glance down the list.
+                          c.escalatedCount > 0 && "shadow-[inset_3px_0_0_var(--escalation)]",
+                        )}
+                      >
+                        <span className="inline-flex flex-wrap items-center gap-2">
                           {c.title}
                           {isAiActor(c.createdBy) && <AiActorBadge />}
+                          {c.escalatedCount > 0 && <EscalatedPill count={c.escalatedCount} at={c.lastEscalatedAt} />}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -509,5 +538,32 @@ export function CasesTable({ variant = "full", limit = 6 }: CasesTableProps = {}
       </div>
       )}
     </div>
+  );
+}
+
+/**
+ * "▲ 3 escalated" on a case row: how many of its findings an escalation rule
+ * marked, and — on hover — when the last one did.
+ */
+function EscalatedPill({ count, at }: { count: number; at?: Date | null }) {
+  const { t } = useTranslation();
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="inline-flex cursor-default items-center gap-1 rounded-[4px] border border-escalation/60 bg-escalation-soft px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.08em] text-escalation"
+          data-testid="case-escalated-pill"
+        >
+          <span aria-hidden>▲</span>
+          {t("caseEscalation.table.badge", { count })}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {t("caseEscalation.table.tooltip", {
+          count,
+          when: at ? formatRelative(at) : "—",
+        })}
+      </TooltipContent>
+    </Tooltip>
   );
 }

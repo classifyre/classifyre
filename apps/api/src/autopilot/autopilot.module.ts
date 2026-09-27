@@ -7,6 +7,8 @@ import { AiClientService } from '../ai';
 import { MatchingModule } from '../matching/matching.module';
 import { CorrelationModule } from '../correlation/correlation.module';
 import { CasesService } from '../cases.service';
+import { CaseCleanupService } from '../cases/case-cleanup.service';
+import { CaseEscalationService } from '../cases/case-escalation.service';
 import { CaseBoardReadService } from '../case-board/case-board-read.service';
 import { CaseThreadsService } from '../case-threads.service';
 import { CaseActivityService } from '../case-activity.service';
@@ -100,6 +102,10 @@ import { SourceGraphModule } from '../stats/source-graph.module';
     InquiriesService,
     // A case closed by an agent is snapshotted like one closed by a person.
     CaseBoardReadService,
+    // CasesService's clean-up and filter gate; without it here pulls
+    // from this module would skip the case's filters.
+    CaseCleanupService,
+    CaseEscalationService,
     CasesService,
     AgentMemoryService,
     AgentSearchService,

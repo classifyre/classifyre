@@ -16,6 +16,7 @@ import {
   InquiryStatus,
   Severity,
 } from '@prisma/client';
+import { CaseCleanupResultDto, CaseFindingFilterDto } from './case-cleanup.dto';
 
 export class CreateCaseDto {
   @ApiProperty()
@@ -68,6 +69,30 @@ export class CreateCaseDto {
   @IsArray()
   @IsString({ each: true })
   autoPullInquiryIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Clean-up: take out findings the scans no longer see (retired by a run, or deleted). Off by default.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  removeGoneFindings?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Clean-up: take out findings someone resolved. Off by default.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  removeResolvedFindings?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Clean-up: take out assets deleted from their source, with their findings. Off by default.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  removeGoneAssets?: boolean;
 }
 
 export class UpdateCaseDto {
@@ -110,6 +135,30 @@ export class UpdateCaseDto {
   @IsOptional()
   @IsEnum(AiManagementMode)
   aiMode?: AiManagementMode;
+
+  @ApiPropertyOptional({
+    description:
+      'Clean-up: take out findings the scans no longer see (retired by a run, or deleted). Switching one on applies it right away.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  removeGoneFindings?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Clean-up: take out findings someone resolved. Switching one on applies it right away.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  removeResolvedFindings?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Clean-up: take out assets deleted from their source, with their findings. Switching one on applies it right away.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  removeGoneAssets?: boolean;
 }
 
 export class QueryCasesDto {
@@ -130,6 +179,12 @@ export class QueryCasesDto {
   @IsArray()
   @IsEnum(Severity, { each: true })
   severity?: Severity[];
+
+  @ApiPropertyOptional({
+    description: 'Only cases holding escalated findings',
+  })
+  @IsOptional()
+  escalated?: boolean;
 
   @ApiPropertyOptional({ default: 0 })
   @IsOptional()
@@ -239,6 +294,12 @@ export class PullFromInquiryDto {
 export class PullFromInquiryResponseDto {
   @ApiProperty({ description: 'Number of findings pulled into the case' })
   pulled!: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Matches the case's finding filters kept out (case-wide, or this watch's own)",
+  })
+  filtered?: number;
 }
 
 /** Resolved display info for an evidence node. */
@@ -293,6 +354,21 @@ export class CaseFindingDto {
 
   @ApiProperty()
   createdAt!: Date;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'When an escalation rule marked this finding',
+  })
+  escalatedAt?: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  escalationRuleId?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'What the escalation rule matched, in words',
+  })
+  escalationLabel?: string | null;
 }
 
 export class CaseEvidenceDto {
@@ -421,6 +497,34 @@ export class CaseResponseDto {
   @ApiProperty()
   inquiryCount!: number;
 
+  @ApiProperty({
+    description:
+      'Clean-up: findings the scans no longer see leave the case by themselves',
+  })
+  removeGoneFindings!: boolean;
+
+  @ApiProperty({
+    description: 'Clean-up: findings someone resolved leave the case',
+  })
+  removeResolvedFindings!: boolean;
+
+  @ApiProperty({
+    description:
+      'Clean-up: assets deleted from their source leave the case, with their findings',
+  })
+  removeGoneAssets!: boolean;
+
+  @ApiProperty({
+    description: 'Findings of the case an escalation rule marked',
+  })
+  escalatedCount!: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'When an escalation rule last marked a finding of the case',
+  })
+  lastEscalatedAt?: Date | null;
+
   @ApiProperty()
   createdAt!: Date;
 
@@ -432,6 +536,19 @@ export class CaseResponseDto {
 
   @ApiPropertyOptional({ type: [CaseLinkedInquiryDto] })
   inquiries?: CaseLinkedInquiryDto[];
+
+  @ApiPropertyOptional({
+    type: [CaseFindingFilterDto],
+    description: 'Finding filters, case-wide and per watch',
+  })
+  findingFilters?: CaseFindingFilterDto[];
+
+  @ApiPropertyOptional({
+    type: CaseCleanupResultDto,
+    description:
+      'On an update that switched a clean-up rule on: what it took out right away',
+  })
+  cleanup?: CaseCleanupResultDto;
 }
 
 /** Close a case with a conclusion. Linked inquiries are archived. */

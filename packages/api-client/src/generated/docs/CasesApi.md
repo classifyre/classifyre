@@ -4,6 +4,14 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**caseCleanupControllerAddFilters**](CasesApi.md#casecleanupcontrolleraddfilters) | **POST** /cases/{id}/finding-filters | Add finding filters (case-wide or for one watch); matching findings leave the case now and are not pulled again |
+| [**caseCleanupControllerClearEscalations**](CasesApi.md#casecleanupcontrollerclearescalations) | **POST** /cases/{id}/escalations/clear | Take the escalation mark off findings of the case (all of them when findingIds is omitted); the findings stay |
+| [**caseCleanupControllerFilterOptions**](CasesApi.md#casecleanupcontrollerfilteroptions) | **GET** /cases/{id}/finding-filters/options | Finding types a filter can pick from: what the case holds and what its watches (or one watch) answer |
+| [**caseCleanupControllerListFilters**](CasesApi.md#casecleanupcontrollerlistfilters) | **GET** /cases/{id}/finding-filters | The case\&#39;s finding filters, case-wide and per watch |
+| [**caseCleanupControllerPreviewCleanup**](CasesApi.md#casecleanupcontrollerpreviewcleanup) | **POST** /cases/{id}/cleanup/preview | What the given clean-up switches would take out of the case right now (writes nothing) |
+| [**caseCleanupControllerPreviewFilters**](CasesApi.md#casecleanupcontrollerpreviewfilters) | **POST** /cases/{id}/finding-filters/preview | How many findings in the case unsaved filter rules would take out now (writes nothing) |
+| [**caseCleanupControllerRemoveFilter**](CasesApi.md#casecleanupcontrollerremovefilter) | **DELETE** /cases/{id}/finding-filters/{filterId} | Remove a filter. Findings it took out stay out; the watch just stops skipping them |
+| [**caseCleanupControllerUpdateFilter**](CasesApi.md#casecleanupcontrollerupdatefilter) | **PATCH** /cases/{id}/finding-filters/{filterId} | Change a filter\&#39;s pattern or description; a new pattern takes out what it now matches |
 | [**caseEventsControllerCreate**](CasesApi.md#caseeventscontrollercreate) | **POST** /cases/{caseId}/events | Add a dated event to the case chronology |
 | [**caseEventsControllerList**](CasesApi.md#caseeventscontrollerlist) | **GET** /cases/{caseId}/events | List the case chronology (real-world events, ordered by date) |
 | [**caseEventsControllerRemove**](CasesApi.md#caseeventscontrollerremove) | **DELETE** /cases/{caseId}/events/{eventId} | Remove a chronology event |
@@ -33,6 +41,550 @@ All URIs are relative to *http://localhost*
 | [**casesControllerUpdate**](CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case |
 | [**caseworkControllerSummary**](CasesApi.md#caseworkcontrollersummary) | **GET** /casework/summary | Counts and recent activity across cases, inquiries and leads |
 
+
+
+## caseCleanupControllerAddFilters
+
+> CaseFindingFiltersChangeResponseDto caseCleanupControllerAddFilters(id, addCaseFindingFiltersDto)
+
+Add finding filters (case-wide or for one watch); matching findings leave the case now and are not pulled again
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseCleanupControllerAddFiltersRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // AddCaseFindingFiltersDto
+    addCaseFindingFiltersDto: ...,
+  } satisfies CaseCleanupControllerAddFiltersRequest;
+
+  try {
+    const data = await api.caseCleanupControllerAddFilters(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **addCaseFindingFiltersDto** | [AddCaseFindingFiltersDto](AddCaseFindingFiltersDto.md) |  | |
+
+### Return type
+
+[**CaseFindingFiltersChangeResponseDto**](CaseFindingFiltersChangeResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseCleanupControllerClearEscalations
+
+> ClearCaseEscalationsResponseDto caseCleanupControllerClearEscalations(id, clearCaseEscalationsDto)
+
+Take the escalation mark off findings of the case (all of them when findingIds is omitted); the findings stay
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseCleanupControllerClearEscalationsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // ClearCaseEscalationsDto
+    clearCaseEscalationsDto: ...,
+  } satisfies CaseCleanupControllerClearEscalationsRequest;
+
+  try {
+    const data = await api.caseCleanupControllerClearEscalations(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **clearCaseEscalationsDto** | [ClearCaseEscalationsDto](ClearCaseEscalationsDto.md) |  | |
+
+### Return type
+
+[**ClearCaseEscalationsResponseDto**](ClearCaseEscalationsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseCleanupControllerFilterOptions
+
+> CaseFindingFilterOptionsDto caseCleanupControllerFilterOptions(id, inquiryId)
+
+Finding types a filter can pick from: what the case holds and what its watches (or one watch) answer
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseCleanupControllerFilterOptionsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string (optional)
+    inquiryId: inquiryId_example,
+  } satisfies CaseCleanupControllerFilterOptionsRequest;
+
+  try {
+    const data = await api.caseCleanupControllerFilterOptions(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **inquiryId** | `string` |  | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**CaseFindingFilterOptionsDto**](CaseFindingFilterOptionsDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseCleanupControllerListFilters
+
+> Array&lt;CaseFindingFilterDto&gt; caseCleanupControllerListFilters(id)
+
+The case\&#39;s finding filters, case-wide and per watch
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseCleanupControllerListFiltersRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies CaseCleanupControllerListFiltersRequest;
+
+  try {
+    const data = await api.caseCleanupControllerListFilters(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**Array&lt;CaseFindingFilterDto&gt;**](CaseFindingFilterDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseCleanupControllerPreviewCleanup
+
+> CaseCleanupPreviewDto caseCleanupControllerPreviewCleanup(id, caseCleanupRulesDto)
+
+What the given clean-up switches would take out of the case right now (writes nothing)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseCleanupControllerPreviewCleanupRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // CaseCleanupRulesDto
+    caseCleanupRulesDto: ...,
+  } satisfies CaseCleanupControllerPreviewCleanupRequest;
+
+  try {
+    const data = await api.caseCleanupControllerPreviewCleanup(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **caseCleanupRulesDto** | [CaseCleanupRulesDto](CaseCleanupRulesDto.md) |  | |
+
+### Return type
+
+[**CaseCleanupPreviewDto**](CaseCleanupPreviewDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseCleanupControllerPreviewFilters
+
+> CaseFindingFiltersPreviewDto caseCleanupControllerPreviewFilters(id, previewCaseFindingFiltersDto)
+
+How many findings in the case unsaved filter rules would take out now (writes nothing)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseCleanupControllerPreviewFiltersRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // PreviewCaseFindingFiltersDto
+    previewCaseFindingFiltersDto: ...,
+  } satisfies CaseCleanupControllerPreviewFiltersRequest;
+
+  try {
+    const data = await api.caseCleanupControllerPreviewFilters(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **previewCaseFindingFiltersDto** | [PreviewCaseFindingFiltersDto](PreviewCaseFindingFiltersDto.md) |  | |
+
+### Return type
+
+[**CaseFindingFiltersPreviewDto**](CaseFindingFiltersPreviewDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseCleanupControllerRemoveFilter
+
+> Array&lt;CaseFindingFilterDto&gt; caseCleanupControllerRemoveFilter(id, filterId)
+
+Remove a filter. Findings it took out stay out; the watch just stops skipping them
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseCleanupControllerRemoveFilterRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string
+    filterId: filterId_example,
+  } satisfies CaseCleanupControllerRemoveFilterRequest;
+
+  try {
+    const data = await api.caseCleanupControllerRemoveFilter(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **filterId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**Array&lt;CaseFindingFilterDto&gt;**](CaseFindingFilterDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseCleanupControllerUpdateFilter
+
+> CaseFindingFiltersChangeResponseDto caseCleanupControllerUpdateFilter(id, filterId, updateCaseFindingFilterDto)
+
+Change a filter\&#39;s pattern or description; a new pattern takes out what it now matches
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseCleanupControllerUpdateFilterRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string
+    filterId: filterId_example,
+    // UpdateCaseFindingFilterDto
+    updateCaseFindingFilterDto: ...,
+  } satisfies CaseCleanupControllerUpdateFilterRequest;
+
+  try {
+    const data = await api.caseCleanupControllerUpdateFilter(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **filterId** | `string` |  | [Defaults to `undefined`] |
+| **updateCaseFindingFilterDto** | [UpdateCaseFindingFilterDto](UpdateCaseFindingFilterDto.md) |  | |
+
+### Return type
+
+[**CaseFindingFiltersChangeResponseDto**](CaseFindingFiltersChangeResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## caseEventsControllerCreate
@@ -1193,7 +1745,7 @@ No authorization required
 
 ## casesControllerList
 
-> CaseListResponseDto casesControllerList(search, status, severity, skip, limit)
+> CaseListResponseDto casesControllerList(search, status, severity, escalated, skip, limit)
 
 List cases
 
@@ -1217,6 +1769,8 @@ async function example() {
     status: ...,
     // Array<'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'> (optional)
     severity: ...,
+    // boolean | Only cases holding escalated findings (optional)
+    escalated: true,
     // number (optional)
     skip: 8.14,
     // number (optional)
@@ -1243,6 +1797,7 @@ example().catch(console.error);
 | **search** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **status** | `OPEN`, `IN_PROGRESS`, `CLOSED`, `ARCHIVED` |  | [Optional] [Enum: OPEN, IN_PROGRESS, CLOSED, ARCHIVED] |
 | **severity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
+| **escalated** | `boolean` | Only cases holding escalated findings | [Optional] [Defaults to `undefined`] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **limit** | `number` |  | [Optional] [Defaults to `50`] |
 

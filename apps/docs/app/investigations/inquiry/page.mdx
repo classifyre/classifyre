@@ -102,14 +102,19 @@ you ever change its criteria or want a fresh result after a quiet spell, you can
 
 ## Driving cases
 
-An inquiry can drive one or more [cases](/investigations/cases/). When it's
-linked to a case:
+An inquiry can drive one or more [cases](/investigations/cases/). Linked to a
+case, it is one of the case's **watches**, in the **Watches** panel of its board:
 
-- The case shows it in its **"Driving inquiries"** panel.
-- A **"Pull matches"** action copies the inquiry's current matching findings into
+- **Select matches to pull** or **All** copies the inquiry's current matches into
   the case as evidence.
-- Any **new matches** since the last pull are flagged in the case, so nothing
-  slips by while you work.
+- **Auto-add new answers** lets later scans add its new matches to the case by
+  themselves. It is off by default, and switching it on or off is written on the
+  case timeline.
+- **Rules** decide what the watch may bring in: [filters](/investigations/cases/cleanup/#finding-filters)
+  keep a kind of finding out, and [escalations](/investigations/cases/escalation/)
+  mark the kinds that need attention and bring them in even with auto-add off.
+- Any **new matches** since the last scan are flagged, so nothing slips by while
+  you work.
 
 ---
 

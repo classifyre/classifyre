@@ -13,6 +13,9 @@ Name | Type
 `assignee` | string
 `conclusion` | string
 `aiMode` | string
+`removeGoneFindings` | boolean
+`removeResolvedFindings` | boolean
+`removeGoneAssets` | boolean
 
 ## Example
 
@@ -28,6 +31,9 @@ const example = {
   "assignee": null,
   "conclusion": null,
   "aiMode": null,
+  "removeGoneFindings": null,
+  "removeResolvedFindings": null,
+  "removeGoneAssets": null,
 } satisfies UpdateCaseDto
 
 console.log(example)

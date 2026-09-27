@@ -30,6 +30,7 @@ export function FindingNodeView({
   resolved = false,
   struck = false,
   faded = false,
+  escalated = false,
 }: {
   findingId: string;
   /** False for a finding of the asset that is not in the case: italic, a dashed ghost. */
@@ -53,6 +54,8 @@ export function FindingNodeView({
   struck?: boolean;
   /** Settled findings the View menu asked to fade (never hide). */
   faded?: boolean;
+  /** An escalation rule marked it: hazard ring, warning flag, magenta label. */
+  escalated?: boolean;
 }) {
   const { cx, cy, r, width, height } = FINDING_NODE;
   return (
@@ -62,11 +65,13 @@ export function FindingNodeView({
       title={title}
       data-finding-id={findingId}
       data-row-attached={attached ? "true" : "false"}
+      data-escalated={escalated ? "true" : undefined}
       data-testid="finding-node"
     >
       <svg width={width} height={height} className="absolute inset-0 overflow-visible" aria-hidden>
-        <FindingCircle severity={severity} look={look} selected={selected} highlight={highlight} />
+        <FindingCircle severity={severity} look={look} selected={selected} highlight={highlight} escalated={escalated} />
       </svg>
+      {escalated && <EscalationFlag style={{ left: cx - r - 12, top: cy - r - 12 }} />}
       <span
         className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 font-mono text-[9.5px] font-bold leading-none"
         style={{ left: cx, top: cy + 0.5, color: codeInk(severity, look) }}
@@ -93,6 +98,7 @@ export function FindingNodeView({
         <span
           className={cn(
             "cb-halo pointer-events-none absolute inset-x-0 truncate px-0.5 text-center font-mono text-[9.5px] leading-tight text-muted-foreground",
+            escalated && "font-bold text-[var(--cb-escalation)]",
             struck && "line-through",
             !attached && "italic",
           )}
@@ -103,5 +109,41 @@ export function FindingNodeView({
       )}
       <Ports connectable={!readOnly} round={{ cx, cy, r, bottom: FINDING_NODE.height + 3 }} core={{ cx, cy, d: 2 * r + 8 }} />
     </div>
+  );
+}
+
+/**
+ * The warning flag an escalated finding (or a list row about one) carries: a
+ * triangle in escalation magenta with an exclamation mark, outlined in the
+ * background so it lifts off any severity colour behind it.
+ */
+export function EscalationFlag({
+  style,
+  size = 14,
+  className,
+}: {
+  style?: React.CSSProperties;
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      className={cn("pointer-events-none", style && "absolute", className)}
+      style={style}
+      width={size}
+      height={size - 1}
+      viewBox="0 0 14 13"
+      aria-hidden
+    >
+      <path
+        d="M7 1.1 L13.2 11.9 H0.8 Z"
+        fill="var(--cb-escalation)"
+        stroke="var(--background)"
+        strokeWidth={1.4}
+        strokeLinejoin="round"
+      />
+      <rect x={6.35} y={4.3} width={1.3} height={4} rx={0.65} fill="var(--cb-escalation-ink)" />
+      <circle cx={7} cy={10.1} r={0.8} fill="var(--cb-escalation-ink)" />
+    </svg>
   );
 }

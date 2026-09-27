@@ -15,18 +15,27 @@
 
 import * as runtime from '../runtime';
 import type {
+  AddCaseFindingFiltersDto,
   AddEvidenceDto,
   AddFindingDto,
   AttachFindingsDto,
   AttachFindingsResponseDto,
+  CaseCleanupPreviewDto,
+  CaseCleanupRulesDto,
   CaseEventDto,
   CaseEvidenceDto,
   CaseFindingDto,
+  CaseFindingFilterDto,
+  CaseFindingFilterOptionsDto,
+  CaseFindingFiltersChangeResponseDto,
+  CaseFindingFiltersPreviewDto,
   CaseLeadDto,
   CaseListResponseDto,
   CaseResponseDto,
   CaseTimelineResponseDto,
   CaseworkSummaryDto,
+  ClearCaseEscalationsDto,
+  ClearCaseEscalationsResponseDto,
   CloseCaseDto,
   CloseCaseResponseDto,
   CreateCaseDto,
@@ -34,6 +43,7 @@ import type {
   GenerateCaseLeadsResponseDto,
   GraphResponseDto,
   LinkInquiriesDto,
+  PreviewCaseFindingFiltersDto,
   ProposeCaseLeadDto,
   PullFromInquiryDto,
   PullFromInquiryResponseDto,
@@ -41,10 +51,13 @@ import type {
   SetInquiryAutoPullDto,
   UpdateCaseDto,
   UpdateCaseEventDto,
+  UpdateCaseFindingFilterDto,
   UpdateCaseFindingNoteDto,
   UpdateEvidenceNoteDto,
 } from '../models/index';
 import {
+    AddCaseFindingFiltersDtoFromJSON,
+    AddCaseFindingFiltersDtoToJSON,
     AddEvidenceDtoFromJSON,
     AddEvidenceDtoToJSON,
     AddFindingDtoFromJSON,
@@ -53,12 +66,24 @@ import {
     AttachFindingsDtoToJSON,
     AttachFindingsResponseDtoFromJSON,
     AttachFindingsResponseDtoToJSON,
+    CaseCleanupPreviewDtoFromJSON,
+    CaseCleanupPreviewDtoToJSON,
+    CaseCleanupRulesDtoFromJSON,
+    CaseCleanupRulesDtoToJSON,
     CaseEventDtoFromJSON,
     CaseEventDtoToJSON,
     CaseEvidenceDtoFromJSON,
     CaseEvidenceDtoToJSON,
     CaseFindingDtoFromJSON,
     CaseFindingDtoToJSON,
+    CaseFindingFilterDtoFromJSON,
+    CaseFindingFilterDtoToJSON,
+    CaseFindingFilterOptionsDtoFromJSON,
+    CaseFindingFilterOptionsDtoToJSON,
+    CaseFindingFiltersChangeResponseDtoFromJSON,
+    CaseFindingFiltersChangeResponseDtoToJSON,
+    CaseFindingFiltersPreviewDtoFromJSON,
+    CaseFindingFiltersPreviewDtoToJSON,
     CaseLeadDtoFromJSON,
     CaseLeadDtoToJSON,
     CaseListResponseDtoFromJSON,
@@ -69,6 +94,10 @@ import {
     CaseTimelineResponseDtoToJSON,
     CaseworkSummaryDtoFromJSON,
     CaseworkSummaryDtoToJSON,
+    ClearCaseEscalationsDtoFromJSON,
+    ClearCaseEscalationsDtoToJSON,
+    ClearCaseEscalationsResponseDtoFromJSON,
+    ClearCaseEscalationsResponseDtoToJSON,
     CloseCaseDtoFromJSON,
     CloseCaseDtoToJSON,
     CloseCaseResponseDtoFromJSON,
@@ -83,6 +112,8 @@ import {
     GraphResponseDtoToJSON,
     LinkInquiriesDtoFromJSON,
     LinkInquiriesDtoToJSON,
+    PreviewCaseFindingFiltersDtoFromJSON,
+    PreviewCaseFindingFiltersDtoToJSON,
     ProposeCaseLeadDtoFromJSON,
     ProposeCaseLeadDtoToJSON,
     PullFromInquiryDtoFromJSON,
@@ -97,11 +128,53 @@ import {
     UpdateCaseDtoToJSON,
     UpdateCaseEventDtoFromJSON,
     UpdateCaseEventDtoToJSON,
+    UpdateCaseFindingFilterDtoFromJSON,
+    UpdateCaseFindingFilterDtoToJSON,
     UpdateCaseFindingNoteDtoFromJSON,
     UpdateCaseFindingNoteDtoToJSON,
     UpdateEvidenceNoteDtoFromJSON,
     UpdateEvidenceNoteDtoToJSON,
 } from '../models/index';
+
+export interface CaseCleanupControllerAddFiltersRequest {
+    id: string;
+    addCaseFindingFiltersDto: AddCaseFindingFiltersDto;
+}
+
+export interface CaseCleanupControllerClearEscalationsRequest {
+    id: string;
+    clearCaseEscalationsDto: ClearCaseEscalationsDto;
+}
+
+export interface CaseCleanupControllerFilterOptionsRequest {
+    id: string;
+    inquiryId?: string;
+}
+
+export interface CaseCleanupControllerListFiltersRequest {
+    id: string;
+}
+
+export interface CaseCleanupControllerPreviewCleanupRequest {
+    id: string;
+    caseCleanupRulesDto: CaseCleanupRulesDto;
+}
+
+export interface CaseCleanupControllerPreviewFiltersRequest {
+    id: string;
+    previewCaseFindingFiltersDto: PreviewCaseFindingFiltersDto;
+}
+
+export interface CaseCleanupControllerRemoveFilterRequest {
+    id: string;
+    filterId: string;
+}
+
+export interface CaseCleanupControllerUpdateFilterRequest {
+    id: string;
+    filterId: string;
+    updateCaseFindingFilterDto: UpdateCaseFindingFilterDto;
+}
 
 export interface CaseEventsControllerCreateRequest {
     caseId: string;
@@ -192,6 +265,7 @@ export interface CasesControllerListRequest {
     search?: string;
     status?: Array<CasesControllerListStatusEnum>;
     severity?: Array<CasesControllerListSeverityEnum>;
+    escalated?: boolean;
     skip?: number;
     limit?: number;
 }
@@ -247,6 +321,372 @@ export interface CasesControllerUpdateRequest {
  * 
  */
 export class CasesApi extends runtime.BaseAPI {
+
+    /**
+     * Add finding filters (case-wide or for one watch); matching findings leave the case now and are not pulled again
+     */
+    async caseCleanupControllerAddFiltersRaw(requestParameters: CaseCleanupControllerAddFiltersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseFindingFiltersChangeResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseCleanupControllerAddFilters().'
+            );
+        }
+
+        if (requestParameters['addCaseFindingFiltersDto'] == null) {
+            throw new runtime.RequiredError(
+                'addCaseFindingFiltersDto',
+                'Required parameter "addCaseFindingFiltersDto" was null or undefined when calling caseCleanupControllerAddFilters().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/finding-filters`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AddCaseFindingFiltersDtoToJSON(requestParameters['addCaseFindingFiltersDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseFindingFiltersChangeResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Add finding filters (case-wide or for one watch); matching findings leave the case now and are not pulled again
+     */
+    async caseCleanupControllerAddFilters(requestParameters: CaseCleanupControllerAddFiltersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseFindingFiltersChangeResponseDto> {
+        const response = await this.caseCleanupControllerAddFiltersRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Take the escalation mark off findings of the case (all of them when findingIds is omitted); the findings stay
+     */
+    async caseCleanupControllerClearEscalationsRaw(requestParameters: CaseCleanupControllerClearEscalationsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ClearCaseEscalationsResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseCleanupControllerClearEscalations().'
+            );
+        }
+
+        if (requestParameters['clearCaseEscalationsDto'] == null) {
+            throw new runtime.RequiredError(
+                'clearCaseEscalationsDto',
+                'Required parameter "clearCaseEscalationsDto" was null or undefined when calling caseCleanupControllerClearEscalations().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/escalations/clear`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ClearCaseEscalationsDtoToJSON(requestParameters['clearCaseEscalationsDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ClearCaseEscalationsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Take the escalation mark off findings of the case (all of them when findingIds is omitted); the findings stay
+     */
+    async caseCleanupControllerClearEscalations(requestParameters: CaseCleanupControllerClearEscalationsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ClearCaseEscalationsResponseDto> {
+        const response = await this.caseCleanupControllerClearEscalationsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Finding types a filter can pick from: what the case holds and what its watches (or one watch) answer
+     */
+    async caseCleanupControllerFilterOptionsRaw(requestParameters: CaseCleanupControllerFilterOptionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseFindingFilterOptionsDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseCleanupControllerFilterOptions().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['inquiryId'] != null) {
+            queryParameters['inquiryId'] = requestParameters['inquiryId'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{id}/finding-filters/options`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseFindingFilterOptionsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Finding types a filter can pick from: what the case holds and what its watches (or one watch) answer
+     */
+    async caseCleanupControllerFilterOptions(requestParameters: CaseCleanupControllerFilterOptionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseFindingFilterOptionsDto> {
+        const response = await this.caseCleanupControllerFilterOptionsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * The case\'s finding filters, case-wide and per watch
+     */
+    async caseCleanupControllerListFiltersRaw(requestParameters: CaseCleanupControllerListFiltersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<CaseFindingFilterDto>>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseCleanupControllerListFilters().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{id}/finding-filters`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(CaseFindingFilterDtoFromJSON));
+    }
+
+    /**
+     * The case\'s finding filters, case-wide and per watch
+     */
+    async caseCleanupControllerListFilters(requestParameters: CaseCleanupControllerListFiltersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<CaseFindingFilterDto>> {
+        const response = await this.caseCleanupControllerListFiltersRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * What the given clean-up switches would take out of the case right now (writes nothing)
+     */
+    async caseCleanupControllerPreviewCleanupRaw(requestParameters: CaseCleanupControllerPreviewCleanupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseCleanupPreviewDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseCleanupControllerPreviewCleanup().'
+            );
+        }
+
+        if (requestParameters['caseCleanupRulesDto'] == null) {
+            throw new runtime.RequiredError(
+                'caseCleanupRulesDto',
+                'Required parameter "caseCleanupRulesDto" was null or undefined when calling caseCleanupControllerPreviewCleanup().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/cleanup/preview`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CaseCleanupRulesDtoToJSON(requestParameters['caseCleanupRulesDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseCleanupPreviewDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * What the given clean-up switches would take out of the case right now (writes nothing)
+     */
+    async caseCleanupControllerPreviewCleanup(requestParameters: CaseCleanupControllerPreviewCleanupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseCleanupPreviewDto> {
+        const response = await this.caseCleanupControllerPreviewCleanupRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * How many findings in the case unsaved filter rules would take out now (writes nothing)
+     */
+    async caseCleanupControllerPreviewFiltersRaw(requestParameters: CaseCleanupControllerPreviewFiltersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseFindingFiltersPreviewDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseCleanupControllerPreviewFilters().'
+            );
+        }
+
+        if (requestParameters['previewCaseFindingFiltersDto'] == null) {
+            throw new runtime.RequiredError(
+                'previewCaseFindingFiltersDto',
+                'Required parameter "previewCaseFindingFiltersDto" was null or undefined when calling caseCleanupControllerPreviewFilters().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/finding-filters/preview`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: PreviewCaseFindingFiltersDtoToJSON(requestParameters['previewCaseFindingFiltersDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseFindingFiltersPreviewDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * How many findings in the case unsaved filter rules would take out now (writes nothing)
+     */
+    async caseCleanupControllerPreviewFilters(requestParameters: CaseCleanupControllerPreviewFiltersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseFindingFiltersPreviewDto> {
+        const response = await this.caseCleanupControllerPreviewFiltersRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Remove a filter. Findings it took out stay out; the watch just stops skipping them
+     */
+    async caseCleanupControllerRemoveFilterRaw(requestParameters: CaseCleanupControllerRemoveFilterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<CaseFindingFilterDto>>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseCleanupControllerRemoveFilter().'
+            );
+        }
+
+        if (requestParameters['filterId'] == null) {
+            throw new runtime.RequiredError(
+                'filterId',
+                'Required parameter "filterId" was null or undefined when calling caseCleanupControllerRemoveFilter().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{id}/finding-filters/{filterId}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"filterId"}}`, encodeURIComponent(String(requestParameters['filterId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(CaseFindingFilterDtoFromJSON));
+    }
+
+    /**
+     * Remove a filter. Findings it took out stay out; the watch just stops skipping them
+     */
+    async caseCleanupControllerRemoveFilter(requestParameters: CaseCleanupControllerRemoveFilterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<CaseFindingFilterDto>> {
+        const response = await this.caseCleanupControllerRemoveFilterRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Change a filter\'s pattern or description; a new pattern takes out what it now matches
+     */
+    async caseCleanupControllerUpdateFilterRaw(requestParameters: CaseCleanupControllerUpdateFilterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseFindingFiltersChangeResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseCleanupControllerUpdateFilter().'
+            );
+        }
+
+        if (requestParameters['filterId'] == null) {
+            throw new runtime.RequiredError(
+                'filterId',
+                'Required parameter "filterId" was null or undefined when calling caseCleanupControllerUpdateFilter().'
+            );
+        }
+
+        if (requestParameters['updateCaseFindingFilterDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateCaseFindingFilterDto',
+                'Required parameter "updateCaseFindingFilterDto" was null or undefined when calling caseCleanupControllerUpdateFilter().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/finding-filters/{filterId}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"filterId"}}`, encodeURIComponent(String(requestParameters['filterId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateCaseFindingFilterDtoToJSON(requestParameters['updateCaseFindingFilterDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseFindingFiltersChangeResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Change a filter\'s pattern or description; a new pattern takes out what it now matches
+     */
+    async caseCleanupControllerUpdateFilter(requestParameters: CaseCleanupControllerUpdateFilterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseFindingFiltersChangeResponseDto> {
+        const response = await this.caseCleanupControllerUpdateFilterRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Add a dated event to the case chronology
@@ -1030,6 +1470,10 @@ export class CasesApi extends runtime.BaseAPI {
 
         if (requestParameters['severity'] != null) {
             queryParameters['severity'] = requestParameters['severity'];
+        }
+
+        if (requestParameters['escalated'] != null) {
+            queryParameters['escalated'] = requestParameters['escalated'];
         }
 
         if (requestParameters['skip'] != null) {

@@ -119,7 +119,10 @@ export function AssetCircle({
  * A finding as the old graph drew it: a small circle filled with its
  * severity's colour. Settled findings go hollow (resolved keeps its colour,
  * dismissed and deleted turn grey and dashed); one gone from its source gets
- * the dashed red ring; one not in the case is a dashed grey ghost.
+ * the dashed red ring; one not in the case is a dashed grey ghost. An
+ * escalated one wears the hazard ring: escalation magenta cut by the
+ * foreground at even steps, readable on either theme and on any severity,
+ * and static like every other state (no motion on nodes).
  */
 export function FindingCircle({
   cx = FINDING_NODE.cx,
@@ -128,6 +131,7 @@ export function FindingCircle({
   look,
   selected = false,
   highlight = null,
+  escalated = false,
 }: {
   cx?: number;
   cy?: number;
@@ -135,8 +139,11 @@ export function FindingCircle({
   look: FindingLook;
   selected?: boolean;
   highlight?: BoardColor | null;
+  escalated?: boolean;
 }) {
   const r = FINDING_NODE.r;
+  // Outside a marker highlight, so both read when a finding has both.
+  const hazard = r + (highlight ? 10 : 6);
   const color = SEVERITY_COLOR[severity];
   const hollow = look === "resolved" || look === "dismissed" || look === "deleted" || look === "ghost";
   const stroke =
@@ -145,6 +152,20 @@ export function FindingCircle({
     look === "dismissed" ? "3 2" : look === "deleted" ? "1 2" : look === "ghost" ? "2.5 2" : undefined;
   return (
     <g opacity={look === "deleted" ? 0.5 : look === "gone" ? 0.75 : 1}>
+      {escalated && (
+        <g data-escalated="true">
+          <circle cx={cx} cy={cy} r={hazard} fill="none" stroke="var(--cb-escalation)" strokeWidth={3.5} />
+          <circle
+            cx={cx}
+            cy={cy}
+            r={hazard}
+            fill="none"
+            stroke="var(--foreground)"
+            strokeWidth={3.5}
+            strokeDasharray="2.4 3.6"
+          />
+        </g>
+      )}
       {highlight && (
         <circle cx={cx} cy={cy} r={r + 6} fill="none" stroke={`var(--cb-${highlight})`} strokeWidth={4} opacity={0.8} />
       )}

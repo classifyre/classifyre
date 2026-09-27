@@ -25,6 +25,12 @@ export interface PullFromInquiryResponseDto {
      * @memberof PullFromInquiryResponseDto
      */
     pulled: number;
+    /**
+     * Matches the case's finding filters kept out (case-wide, or this watch's own)
+     * @type {number}
+     * @memberof PullFromInquiryResponseDto
+     */
+    filtered?: number;
 }
 
 /**
@@ -46,6 +52,7 @@ export function PullFromInquiryResponseDtoFromJSONTyped(json: any, ignoreDiscrim
     return {
         
         'pulled': json['pulled'],
+        'filtered': json['filtered'] == null ? undefined : json['filtered'],
     };
 }
 
@@ -61,6 +68,7 @@ export function PullFromInquiryResponseDtoToJSONTyped(value?: PullFromInquiryRes
     return {
         
         'pulled': value['pulled'],
+        'filtered': value['filtered'],
     };
 }
 

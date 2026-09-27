@@ -9,13 +9,33 @@ import { CaseActivityType, CaseThreadKind, Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
-import { CaseActivityService } from './case-activity.service';
+import {
+  CaseActivityService,
+  mergeDistinct,
+  mergeListed,
+} from './case-activity.service';
 import { InquiryActivityService } from './inquiry-activity.service';
 import { AUTO_PULL_ACTOR } from './cases/case-pull.port';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 // Value import, not `import type`: Nest resolves @Optional() injections from
 // emitted metadata, and a type-only import silently injects undefined.
 import { CaseBoardReadService } from './case-board/case-board-read.service';
+// Value imports for the same reason: both are @Optional() injections.
+import {
+  CaseCleanupService,
+  type FilterSummary,
+} from './cases/case-cleanup.service';
+import { toFilterDto } from './cases/case-finding-filters.service';
+import {
+  CaseEscalationService,
+  candidateOf,
+} from './cases/case-escalation.service';
+import {
+  anyRule,
+  CLEANUP_RULE_KEYS,
+  newlyEnabled,
+  type CleanupRules,
+} from './cases/case-cleanup.rules';
 import {
   AddEvidenceDto,
   AddFindingDto,
@@ -46,6 +66,7 @@ type CaseRow = Prisma.CaseGetPayload<{
         evidence: true;
         threads: { where: { kind: 'HYPOTHESIS' } };
         inquiryLinks: true;
+        findings: { where: { escalatedAt: { not: null } } };
       };
     };
   };
@@ -54,6 +75,26 @@ type EvidenceRow = Prisma.CaseEvidenceGetPayload<{
   include: { findings: true };
 }>;
 
+/** No global ValidationPipe: a form or MCP "true" arrives as text. */
+function flag(value: unknown): boolean {
+  return value === true || value === 'true';
+}
+
+/** Findings a pull names on its timeline entry; `pulled` counts the rest. */
+const PULL_LIST_CAP = 50;
+/** Matched values are clipped on the timeline. */
+const VALUE_MAX = 160;
+
+function clipValue(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.length > VALUE_MAX ? `${value.slice(0, VALUE_MAX)}…` : value;
+}
+
+function numberOf(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
 // Hypotheses are CaseThreads of kind HYPOTHESIS; count those for the DTO.
 const countSelect = {
   _count: {
@@ -61,6 +102,8 @@ const countSelect = {
       evidence: true,
       threads: { where: { kind: CaseThreadKind.HYPOTHESIS } },
       inquiryLinks: true,
+      // Escalated findings: the case list flags a case that holds any.
+      findings: { where: { escalatedAt: { not: null } } },
     },
   },
 } satisfies Prisma.CaseInclude;
@@ -78,6 +121,8 @@ export class CasesService {
     private readonly inquiryActivity: InquiryActivityService,
     private readonly agentMemory: AgentMemoryService,
     @Optional() private readonly boardRead?: CaseBoardReadService,
+    @Optional() private readonly cleanup?: CaseCleanupService,
+    @Optional() private readonly escalation?: CaseEscalationService,
   ) {}
 
   async create(dto: CreateCaseDto): Promise<CaseResponseDto> {
@@ -92,6 +137,11 @@ export class CasesService {
         throw new BadRequestException('One or more inquiries do not exist.');
       }
     }
+    const rules: CleanupRules = {
+      removeGoneFindings: flag(dto.removeGoneFindings),
+      removeResolvedFindings: flag(dto.removeResolvedFindings),
+      removeGoneAssets: flag(dto.removeGoneAssets),
+    };
     const created = await this.prisma.case.create({
       data: {
         title: dto.title,
@@ -100,6 +150,7 @@ export class CasesService {
         severity: dto.severity,
         assignee: dto.assignee,
         createdBy: dto.createdBy,
+        ...rules,
       },
       include: countSelect,
     });
@@ -109,6 +160,20 @@ export class CasesService {
       { title: dto.title },
       dto.createdBy,
     );
+    // Said once at the start, so the timeline explains every later removal.
+    if (anyRule(rules)) {
+      await this.activity.record(
+        created.id,
+        CaseActivityType.CLEANUP_SETTINGS_UPDATED,
+        {
+          changes: CLEANUP_RULE_KEYS.filter((key) => rules[key]).map(
+            (rule) => ({ rule, enabled: true }),
+          ),
+          rules,
+        },
+        dto.createdBy,
+      );
+    }
     if (inquiryIds.length > 0) {
       const autoPullIds = new Set(dto.autoPullInquiryIds ?? []);
       await this.prisma.caseInquiry.createMany({
@@ -205,21 +270,31 @@ export class CasesService {
     await this.ensureExists(caseId);
     const link = await this.prisma.caseInquiry.findUnique({
       where: { caseId_inquiryId: { caseId, inquiryId } },
-      select: { id: true, inquiry: { select: { title: true } } },
+      select: {
+        id: true,
+        autoPull: true,
+        inquiry: { select: { title: true } },
+      },
     });
     if (!link) {
       throw new NotFoundException(
         `Inquiry ${inquiryId} is not linked to case ${caseId}`,
       );
     }
+    // Setting it to what it already is changes nothing, so it says nothing.
+    if (link.autoPull === autoPull) return (await this.findOne(caseId))!;
     await this.prisma.caseInquiry.update({
       where: { id: link.id },
       data: { autoPull },
     });
     await this.activity.record(
       caseId,
-      CaseActivityType.CASE_UPDATED,
-      { inquiryId, inquiryTitle: link.inquiry.title, autoPull },
+      CaseActivityType.INQUIRY_SETTINGS_UPDATED,
+      {
+        inquiryId,
+        inquiryTitle: link.inquiry.title,
+        changes: [{ setting: 'autoPull', from: link.autoPull, to: autoPull }],
+      },
       actor,
     );
     return (await this.findOne(caseId))!;
@@ -229,6 +304,7 @@ export class CasesService {
   async unlinkInquiry(
     caseId: string,
     inquiryId: string,
+    actor?: string,
   ): Promise<CaseResponseDto> {
     await this.ensureExists(caseId);
     const link = await this.prisma.caseInquiry.findUnique({
@@ -239,11 +315,21 @@ export class CasesService {
       throw new NotFoundException(
         `Inquiry ${inquiryId} is not linked to case ${caseId}`,
       );
-    await this.prisma.caseInquiry.delete({ where: { id: link.id } });
-    await this.activity.record(caseId, CaseActivityType.INQUIRY_UNLINKED, {
-      inquiryId,
-      inquiryTitle: link.inquiry.title,
+    // The watch's own filters leave with the link (ON DELETE CASCADE).
+    const filtersDropped = await this.prisma.caseFindingFilter.count({
+      where: { caseInquiryId: link.id },
     });
+    await this.prisma.caseInquiry.delete({ where: { id: link.id } });
+    await this.activity.record(
+      caseId,
+      CaseActivityType.INQUIRY_UNLINKED,
+      {
+        inquiryId,
+        inquiryTitle: link.inquiry.title,
+        ...(filtersDropped > 0 ? { filtersDropped } : {}),
+      },
+      actor,
+    );
     await this.inquiryActivity.tryRecord(inquiryId, 'CASE_UNLINKED', {
       caseId,
     });
@@ -391,6 +477,9 @@ export class CasesService {
     const severityFilter = this.toArray(query.severity);
     if (statusFilter.length > 0) where.status = { in: statusFilter };
     if (severityFilter.length > 0) where.severity = { in: severityFilter };
+    if (flag(query.escalated)) {
+      where.findings = { some: { escalatedAt: { not: null } } };
+    }
     if (query.search && query.search.trim().length > 0) {
       const term = query.search.trim();
       where.OR = [
@@ -425,6 +514,17 @@ export class CasesService {
           orderBy: { createdAt: 'asc' },
           include: { inquiry: true },
         },
+        findingFilters: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            watch: {
+              select: {
+                inquiryId: true,
+                inquiry: { select: { title: true } },
+              },
+            },
+          },
+        },
       },
     });
     if (!row) return null;
@@ -438,7 +538,12 @@ export class CasesService {
       goneMatchCount: l.inquiry.goneMatchCount,
       autoPull: l.autoPull,
     }));
-    return { ...this.mapCase(row), evidence, inquiries };
+    return {
+      ...this.mapCase(row),
+      evidence,
+      inquiries,
+      findingFilters: row.findingFilters.map(toFilterDto),
+    };
   }
 
   async update(
@@ -446,7 +551,29 @@ export class CasesService {
     dto: UpdateCaseDto,
     actor?: string,
   ): Promise<CaseResponseDto> {
-    await this.ensureExists(id);
+    const before = await this.prisma.case.findUnique({
+      where: { id },
+      select: {
+        removeGoneFindings: true,
+        removeResolvedFindings: true,
+        removeGoneAssets: true,
+      },
+    });
+    if (!before) throw new NotFoundException(`Case with ID ${id} not found`);
+    const rules: CleanupRules = {
+      removeGoneFindings:
+        dto.removeGoneFindings === undefined
+          ? before.removeGoneFindings
+          : flag(dto.removeGoneFindings),
+      removeResolvedFindings:
+        dto.removeResolvedFindings === undefined
+          ? before.removeResolvedFindings
+          : flag(dto.removeResolvedFindings),
+      removeGoneAssets:
+        dto.removeGoneAssets === undefined
+          ? before.removeGoneAssets
+          : flag(dto.removeGoneAssets),
+    };
     const updated = await this.prisma.case.update({
       where: { id },
       data: {
@@ -457,20 +584,68 @@ export class CasesService {
         assignee: dto.assignee,
         conclusion: dto.conclusion,
         aiMode: dto.aiMode,
+        ...rules,
       },
       include: countSelect,
     });
-    const actType =
-      dto.conclusion !== undefined
-        ? CaseActivityType.CONCLUSION_UPDATED
-        : CaseActivityType.CASE_UPDATED;
-    await this.activity.record(
-      id,
-      actType,
-      { title: dto.title, status: dto.status, severity: dto.severity },
-      actor,
-    );
+    // A PATCH that only flips clean-up switches is not a case edit.
+    const touchesCase = (
+      [
+        'title',
+        'description',
+        'status',
+        'severity',
+        'assignee',
+        'conclusion',
+        'aiMode',
+      ] as const
+    ).some((key) => dto[key] !== undefined);
+    if (touchesCase) {
+      const actType =
+        dto.conclusion !== undefined
+          ? CaseActivityType.CONCLUSION_UPDATED
+          : CaseActivityType.CASE_UPDATED;
+      await this.activity.record(
+        id,
+        actType,
+        { title: dto.title, status: dto.status, severity: dto.severity },
+        actor,
+      );
+    }
+    const changes = CLEANUP_RULE_KEYS.filter(
+      (key) => rules[key] !== before[key],
+    ).map((rule) => ({ rule, enabled: rules[rule] }));
+    if (changes.length > 0) {
+      await this.activity.record(
+        id,
+        CaseActivityType.CLEANUP_SETTINGS_UPDATED,
+        { changes, rules },
+        actor,
+      );
+    }
     await this.syncEntityMaps(id);
+    // A switch turned on applies at once — what "remove resolved findings"
+    // promises includes the ones resolved last week.
+    const enabledNow = newlyEnabled(before, rules);
+    if (anyRule(enabledNow) && this.cleanup) {
+      const outcome = await this.cleanup.applyRules(id, {
+        trigger: 'RULE_ENABLED',
+        actor,
+        enabledNow,
+      });
+      const fresh = await this.prisma.case.findUniqueOrThrow({
+        where: { id },
+        include: countSelect,
+      });
+      return {
+        ...this.mapCase(fresh),
+        cleanup: {
+          findingsRemoved: outcome.findingsRemoved,
+          evidenceRemoved: outcome.evidenceRemoved,
+          findingsWithEvidence: outcome.findingsWithEvidence,
+        },
+      };
+    }
     return this.mapCase(updated);
   }
 
@@ -603,6 +778,9 @@ export class CasesService {
       finding.assetId,
       finding.asset,
     );
+    const held = await this.heldFindingIds(this.prisma, caseId, [
+      dto.findingId,
+    ]);
     const cf = await this.prisma.caseFinding.upsert({
       where: { caseId_findingId: { caseId, findingId: dto.findingId } },
       create: {
@@ -624,6 +802,12 @@ export class CasesService {
       findingId: dto.findingId,
       label: finding.findingType,
     });
+    if (!held.has(dto.findingId)) {
+      await this.escalateArrived(this.prisma, caseId, null, [dto.findingId], {
+        trigger: 'ATTACHED',
+        actor: undefined,
+      });
+    }
     return this.mapCaseFinding(cf);
   }
 
@@ -655,6 +839,11 @@ export class CasesService {
       },
     });
     if (findings.length === 0) return { attached: 0 };
+    const held = await this.heldFindingIds(
+      db,
+      caseId,
+      findings.map((f) => f.id),
+    );
 
     const evidenceByAsset = new Map<string, string>();
     for (const f of findings) {
@@ -701,6 +890,14 @@ export class CasesService {
       },
       dto.addedBy,
       tx,
+    );
+    // A case-wide escalation rule holds however a finding came in.
+    await this.escalateArrived(
+      db,
+      caseId,
+      null,
+      findings.filter((f) => !held.has(f.id)).map((f) => f.id),
+      { trigger: 'ATTACHED', actor: dto.addedBy },
     );
     return { attached: created.count };
   }
@@ -819,6 +1016,16 @@ export class CasesService {
     caseId: string,
     dto: PullFromInquiryDto,
     actor?: string,
+    run?: {
+      sourceId?: string | null;
+      runnerId?: string | null;
+      available?: number;
+      /**
+       * Only the answers that meet an escalation rule: the watch's auto-add is
+       * off, but an escalation brings its matches in anyway.
+       */
+      onlyEscalating?: boolean;
+    },
   ): Promise<PullFromInquiryResponseDto> {
     await this.ensureExists(caseId);
     const inquiry = await this.prisma.inquiry.findUnique({
@@ -828,13 +1035,17 @@ export class CasesService {
     if (!inquiry)
       throw new NotFoundException(`Inquiry ${dto.inquiryId} not found`);
 
+    const automatic = actor === AUTO_PULL_ACTOR;
+    // Matches a person picked one by one are their choice; "everything" and
+    // what a watch adds by itself go through the case's filters.
+    const picked = (dto.findingIds?.length ?? 0) > 0 && !automatic;
     let findingIds = dto.findingIds;
     if (!findingIds || findingIds.length === 0) {
       findingIds = await this.matching.getMatchingFindingIds(dto.inquiryId);
     }
     if (findingIds.length === 0) return { pulled: 0 };
 
-    const findings = await this.prisma.finding.findMany({
+    const matches = await this.prisma.finding.findMany({
       where: { id: { in: findingIds } },
       select: {
         id: true,
@@ -847,7 +1058,34 @@ export class CasesService {
         asset: { select: { name: true, assetType: true, sourceType: true } },
       },
     });
-    if (findings.length === 0) return { pulled: 0 };
+    if (matches.length === 0) return { pulled: 0 };
+
+    let findings = matches;
+    const kept: Array<{ findingType: string; filter: FilterSummary }> = [];
+    if (!picked && this.cleanup) {
+      const gate = await this.cleanup.pullGate(caseId, dto.inquiryId);
+      findings = matches.filter((f) => {
+        const filter = gate(f);
+        if (filter) kept.push({ findingType: f.findingType, filter });
+        return !filter;
+      });
+    }
+    if (run?.onlyEscalating) {
+      // Filters still win: a finding someone filtered out never comes in.
+      const escalates = this.escalation
+        ? await this.escalation.gate(caseId, dto.inquiryId)
+        : () => null;
+      findings = findings.filter((f) => escalates(f) !== null);
+      if (findings.length === 0) return { pulled: 0 };
+    }
+    if (findings.length === 0 && kept.length === 0) return { pulled: 0 };
+    // Which of them the case does not hold yet: those are what the timeline
+    // names as added (createMany skips the rest silently).
+    const held = await this.heldFindingIds(
+      this.prisma,
+      caseId,
+      findings.map((f) => f.id),
+    );
 
     // One evidence row per asset, then the finding rows.
     const evidenceByAsset = new Map<string, string>();
@@ -874,21 +1112,32 @@ export class CasesService {
     });
     for (const assetId of evidenceByAsset.keys())
       await this.graph.inferEdgesForAsset(assetId);
-    const automatic = actor === AUTO_PULL_ACTOR;
-    await this.activity.record(
-      caseId,
-      CaseActivityType.INQUIRY_PULLED,
-      {
-        inquiryId: dto.inquiryId,
-        inquiryTitle: inquiry.title,
+    const added = findings.filter((f) => !held.has(f.id));
+    // An escalation-only pull is told by its escalation entry alone: it
+    // happened because they escalate, which that entry says.
+    if (!run?.onlyEscalating) {
+      await this.recordPull(caseId, {
+        inquiry,
+        added,
         pulled: created.count,
+        kept,
+        evidenceByAsset,
         automatic,
-        findingLabels: findings.slice(0, 10).map((f) => f.findingType),
-        assetLabels: [
-          ...new Set(findings.map((f) => f.asset?.name).filter(Boolean)),
-        ].slice(0, 10),
+        actor,
+        run,
+      });
+    }
+    await this.escalateArrived(
+      this.prisma,
+      caseId,
+      inquiry,
+      added.map((f) => f.id),
+      {
+        trigger: 'ARRIVAL',
+        actor,
+        added: run?.onlyEscalating === true,
+        run,
       },
-      actor,
     );
     // The same event on the other timeline — but only for a deliberate pull.
     // An automatic one is recorded by the matching pass instead, as AUTO_PULLED
@@ -898,9 +1147,257 @@ export class CasesService {
       await this.inquiryActivity.tryRecord(dto.inquiryId, 'PULLED_TO_CASE', {
         caseId,
         pulled: created.count,
+        ...(kept.length > 0 ? { filtered: kept.length } : {}),
       });
     }
-    return { pulled: created.count };
+    return {
+      pulled: created.count,
+      ...(kept.length > 0 ? { filtered: kept.length } : {}),
+    };
+  }
+
+  /**
+   * The timeline entry for a pull: which findings came in (named, capped),
+   * what the filters kept out, and for a watch's own auto-add which scan
+   * brought them. An automatic pull folds into the watch's previous auto-add
+   * entry (CaseActivityService.recordCoalesced): a source that scans every few
+   * minutes reads as one growing entry, not one per scan. A pull that changed
+   * nothing writes nothing.
+   */
+  private async recordPull(
+    caseId: string,
+    pull: {
+      inquiry: { id: string; title: string };
+      added: Array<{
+        id: string;
+        assetId: string;
+        findingType: string;
+        severity: { toString(): string };
+        matchedContent: string | null;
+        asset: { name: string } | null;
+      }>;
+      pulled: number;
+      kept: Array<{ findingType: string; filter: FilterSummary }>;
+      evidenceByAsset: Map<string, string>;
+      automatic: boolean;
+      actor?: string;
+      run?: {
+        sourceId?: string | null;
+        runnerId?: string | null;
+        available?: number;
+      };
+    },
+  ): Promise<void> {
+    if (pull.pulled === 0 && pull.kept.length === 0) return;
+    const listed = pull.added.slice(0, PULL_LIST_CAP);
+    const items = await this.boardItemsFor(caseId, [
+      ...new Set(
+        listed
+          .map((f) => pull.evidenceByAsset.get(f.assetId))
+          .filter((id): id is string => !!id),
+      ),
+    ]);
+    const sourceId = pull.run?.sourceId ?? null;
+    const source = sourceId
+      ? await this.prisma.source.findUnique({
+          where: { id: sourceId },
+          select: { name: true },
+        })
+      : null;
+    const filters = new Map(pull.kept.map((k) => [k.filter.id, k.filter]));
+    const payload: Record<string, unknown> = {
+      inquiryId: pull.inquiry.id,
+      inquiryTitle: pull.inquiry.title,
+      pulled: pull.pulled,
+      automatic: pull.automatic,
+      findings: listed.map((f) => {
+        const evidenceId = pull.evidenceByAsset.get(f.assetId);
+        const itemId = evidenceId ? items.get(evidenceId) : undefined;
+        return {
+          findingId: f.id,
+          label: f.findingType,
+          value: clipValue(f.matchedContent),
+          severity: String(f.severity),
+          assetId: f.assetId,
+          assetLabel: f.asset?.name ?? null,
+          ...(itemId ? { itemId } : {}),
+        };
+      }),
+      ...(pull.added.length > PULL_LIST_CAP ? { truncated: true } : {}),
+      findingLabels: [...new Set(pull.added.map((f) => f.findingType))].slice(
+        0,
+        10,
+      ),
+      assetLabels: [
+        ...new Set(pull.added.map((f) => f.asset?.name).filter(Boolean)),
+      ].slice(0, 10),
+      // What the case's filters kept out, so a quiet auto-add explains itself.
+      ...(pull.kept.length > 0
+        ? {
+            filtered: pull.kept.length,
+            filteredLabels: [
+              ...new Set(pull.kept.map((k) => k.findingType)),
+            ].slice(0, 10),
+            filters: [...filters.values()].slice(0, 10),
+          }
+        : {}),
+      ...(sourceId
+        ? {
+            sourceId,
+            ...(source ? { sourceNames: [source.name] } : {}),
+            ...(pull.run?.runnerId ? { runnerId: pull.run.runnerId } : {}),
+          }
+        : {}),
+      // A capped auto-add says how many new answers it left for a person.
+      ...(pull.run?.available ? { available: pull.run.available } : {}),
+    };
+    if (!pull.automatic) {
+      await this.activity.record(
+        caseId,
+        CaseActivityType.INQUIRY_PULLED,
+        payload,
+        pull.actor,
+      );
+      return;
+    }
+    await this.activity.recordCoalesced(
+      caseId,
+      CaseActivityType.INQUIRY_PULLED,
+      payload,
+      AUTO_PULL_ACTOR,
+      {
+        key: `auto-pull:${pull.inquiry.id}`,
+        merge: (previous, next) => {
+          const listedMerged = mergeListed(
+            previous,
+            next,
+            'findings',
+            PULL_LIST_CAP,
+          );
+          const filtered =
+            numberOf(previous.filtered) + numberOf(next.filtered);
+          const filterList = new Map<string, unknown>();
+          for (const f of [
+            ...(Array.isArray(next.filters) ? next.filters : []),
+            ...(Array.isArray(previous.filters) ? previous.filters : []),
+          ] as Array<{ id?: string }>) {
+            if (f?.id && !filterList.has(f.id)) filterList.set(f.id, f);
+          }
+          return {
+            ...next,
+            pulled: numberOf(previous.pulled) + numberOf(next.pulled),
+            findings: listedMerged.list,
+            truncated: listedMerged.truncated || undefined,
+            findingLabels: mergeDistinct(previous, next, 'findingLabels', 10),
+            assetLabels: mergeDistinct(previous, next, 'assetLabels', 10),
+            ...(filtered > 0
+              ? {
+                  filtered,
+                  filteredLabels: mergeDistinct(
+                    previous,
+                    next,
+                    'filteredLabels',
+                    10,
+                  ),
+                  filters: [...filterList.values()].slice(0, 10),
+                }
+              : {}),
+            sourceNames: mergeDistinct(previous, next, 'sourceNames', 10),
+            available:
+              numberOf(previous.available) + numberOf(next.available) ||
+              undefined,
+          };
+        },
+      },
+    );
+  }
+
+  /** Which of these findings the case holds already. */
+  private async heldFindingIds(
+    db: Prisma.TransactionClient,
+    caseId: string,
+    findingIds: string[],
+  ): Promise<Set<string>> {
+    if (findingIds.length === 0) return new Set();
+    const rows = await db.caseFinding.findMany({
+      where: { caseId, findingId: { in: findingIds } },
+      select: { findingId: true },
+    });
+    return new Set(rows.map((row) => row.findingId));
+  }
+
+  /**
+   * Run the escalation rules over findings that just joined the case: the
+   * case-wide ones always, and `inquiry`'s own when they came through it.
+   */
+  private async escalateArrived(
+    db: Prisma.TransactionClient,
+    caseId: string,
+    inquiry: { id: string; title: string } | null,
+    findingIds: string[],
+    ctx: {
+      trigger: 'ARRIVAL' | 'ATTACHED';
+      actor: string | undefined;
+      added?: boolean;
+      run?: { sourceId?: string | null; runnerId?: string | null };
+    },
+  ): Promise<void> {
+    if (!this.escalation || findingIds.length === 0) return;
+    const rows = await db.caseFinding.findMany({
+      where: { caseId, findingId: { in: findingIds } },
+      include: { caseEvidence: { select: { entityId: true, label: true } } },
+    });
+    await this.escalation.escalateArrivals(
+      caseId,
+      inquiry,
+      rows.map(candidateOf),
+      { ...ctx, db },
+    );
+  }
+
+  /** The live board item of each evidence row, where the case has a board. */
+  private async boardItemsFor(
+    caseId: string,
+    evidenceIds: string[],
+  ): Promise<Map<string, string>> {
+    if (evidenceIds.length === 0) return new Map();
+    const rows = await this.prisma.caseBoardItem.findMany({
+      where: {
+        board: { caseId },
+        kind: 'EVIDENCE',
+        refId: { in: evidenceIds },
+        deletedAt: null,
+      },
+      select: { id: true, refId: true },
+    });
+    return new Map(
+      rows
+        .filter((r): r is { id: string; refId: string } => !!r.refId)
+        .map((r) => [r.refId, r.id]),
+    );
+  }
+
+  /**
+   * Which of these findings the case's case-wide filters keep out. For
+   * callers that attach on nobody's explicit say-so — the autopilot — so an
+   * investigator's "never this kind of finding" holds against it too.
+   */
+  async caseWideExclusions(
+    caseId: string,
+    findingIds: string[],
+  ): Promise<Map<string, FilterSummary>> {
+    const excluded = new Map<string, FilterSummary>();
+    if (!this.cleanup || findingIds.length === 0) return excluded;
+    const gate = await this.cleanup.pullGate(caseId, null);
+    const rows = await this.prisma.finding.findMany({
+      where: { id: { in: findingIds } },
+      select: { id: true, findingType: true, matchedContent: true },
+    });
+    for (const row of rows) {
+      const filter = gate(row);
+      if (filter) excluded.set(row.id, filter);
+    }
+    return excluded;
   }
 
   async getGraph(caseId: string, depth = 1): Promise<GraphResponseDto> {
@@ -978,6 +1475,11 @@ export class CasesService {
       evidenceCount: row._count.evidence,
       hypothesisCount: row._count.threads,
       inquiryCount: row._count.inquiryLinks,
+      removeGoneFindings: row.removeGoneFindings,
+      removeResolvedFindings: row.removeResolvedFindings,
+      removeGoneAssets: row.removeGoneAssets,
+      escalatedCount: row._count.findings,
+      lastEscalatedAt: row.lastEscalatedAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -994,8 +1496,14 @@ export class CasesService {
     matchedContent?: string | null;
     note: string | null;
     createdAt: Date;
+    escalatedAt?: Date | null;
+    escalationRuleId?: string | null;
+    escalationLabel?: string | null;
   }): CaseFindingDto {
     return {
+      escalatedAt: cf.escalatedAt ?? null,
+      escalationRuleId: cf.escalationRuleId ?? null,
+      escalationLabel: cf.escalationLabel ?? null,
       id: cf.id,
       caseEvidenceId: cf.caseEvidenceId,
       findingId: cf.findingId,

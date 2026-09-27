@@ -36,8 +36,12 @@ export type TestApp = {
   isRemote: boolean;
   /** Namespace provisioned once for the API test process. */
   namespace: Namespace;
-  /** Resolve a provider whose method calls run inside the test namespace. */
-  get<T extends object>(token: Type<T>): T;
+  /**
+   * Resolve a provider whose method calls run inside the test namespace. A
+   * class resolves to the first module's instance; pass the injection token
+   * a production caller uses (CASE_PULL, …) to get the instance it gets.
+   */
+  get<T extends object>(token: Type<T> | symbol): T;
 };
 
 /**
@@ -146,8 +150,8 @@ export async function createTestApp(
     app,
     isRemote: false,
     namespace,
-    get<T extends object>(token: Type<T>): T {
-      return bindToNamespace(app.get(token), cls, namespace);
+    get<T extends object>(token: Type<T> | symbol): T {
+      return bindToNamespace(app.get<T>(token), cls, namespace);
     },
     async close() {
       await app.close();

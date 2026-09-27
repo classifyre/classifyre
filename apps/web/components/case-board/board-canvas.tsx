@@ -46,7 +46,7 @@ import { SUGGESTED_AUTO_LIMIT, type DrawerKind, type UiState } from "./store/ui-
 import { isTraceData, layoutTrace, type TraceKind } from "./store/trace";
 import { takenRects } from "./store/geometry";
 import { parseFindingNodeId } from "./store/relations";
-import type { BoardDomain, ItemKind } from "./store/types";
+import type { BoardDomain, Bubble, ItemKind } from "./store/types";
 import { EvidenceBubble } from "./nodes/evidence-bubble";
 import { HypothesisCard } from "./nodes/hypothesis-card";
 import { NoteNode } from "./nodes/note-node";
@@ -440,8 +440,13 @@ export function BoardCanvas({
           n.type === "frame" ||
           (spotlight === "evidence" && n.type === "evidence") ||
           (spotlight === "hypotheses" && n.type === "hypothesis") ||
-          (spotlight === "findings" && isFindingData(n.data) && n.data.attached);
+          (spotlight === "findings" && isFindingData(n.data) && n.data.attached) ||
+          (spotlight === "escalated" && isEscalatedFinding(n, bubbles));
         if (lit) keep.add(n.id);
+      }
+      // An escalated finding keeps its asset lit: "where is it" is half the answer.
+      if (spotlight === "escalated") {
+        for (const b of bubbles.values()) if (b.escalatedCount > 0) keep.add(b.itemId);
       }
       keepOnly(keep);
     } else if (focusHypothesisItemId && allIds.includes(focusHypothesisItemId)) {
@@ -985,4 +990,12 @@ export function BoardCanvas({
       />
     </ContextMenu>
   );
+}
+
+/** A finding node whose row an escalation rule marked. */
+function isEscalatedFinding(n: BoardNode, bubbles: ReadonlyMap<string, Bubble>): boolean {
+  if (!isFindingData(n.data) || !n.data.attached) return false;
+  const bubble = bubbles.get(n.data.findingOf);
+  const findingId = n.data.findingId;
+  return !!bubble?.rows.some((r) => r.findingId === findingId && r.escalated);
 }
