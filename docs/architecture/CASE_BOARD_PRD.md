@@ -378,6 +378,21 @@ State is kept per user in `localStorage` (try/catch). It is **not** persisted on
 - A new finding on an asset that is already on the board appears **inside that bubble** as a `NEW` row. The tally shows "⟲ n new".
 - A new asset is created as an unplaced item. The client **auto-places** it in an *Incoming* column to the right of the board's bounding box, with a transient "New from ⟨watch⟩" marker (not persisted), until the user moves it.
 
+### 5.17 Leads: what the case may be missing (2026-09-27)
+
+**Decision:** one review inbox, with the canvas staying spatial. The Leads panel is the case's single list of suggestions, each with its reason and what it hangs off. Suggested neighbours on the canvas (§5.10) stay ambient context: no decision, nothing remembered. The same document may be both; accepting either settles the other.
+
+- **Sources** (`CaseLeadsService.generate`), each with a quota of 10 per refresh and a cap of 60 waiting leads per case:
+  - *Look-alike* (`DUPLICATE`, new): an **asset lead** (`findingId` null, unique per case and asset through a partial index) for documents the duplicates engine pairs with evidence (`identical_content`, `likely_duplicate`). Duplicate review's verdicts rule: REJECTED/SPLIT pairs are never suggested, CONFIRMED ones (any relation) come first, and accepting one stamps the verdict's `caseId` (*Used in*).
+  - *Watch answer* (`INQUIRY`): live matches of linked watches with importance ≥ 0.85.
+  - *Similar* (`SEMANTIC_NEIGHBOR`): neighbours of the 6 newest and 6 most important findings of the case, ≤ 3 per seed; `details.sameValue` when it is the seed's very value.
+  - *Autopilot* and *Bookmarked* (`MANUAL`) as before.
+- **What it hangs off:** `viaFindingId` / `viaAssetId` / `viaInquiryId`. The panel's *why* line, *Show on board* (flies to the via item) and placement of an accepted lead (right of the via item) read them.
+- **Automatic:** `CaseLeadsScheduler` queues `case-leads.refresh` (pg-boss, per-case singleton, 30 s slots, 15 s delay) from `CaseActivityService` on evidence/watch/filter activity, from the matching worker on new answers of a linked watch, and on board read (at most every 10 min). `CaseLeadsWorker` runs it. Automatic refreshes write one coalesced `LEADS_GENERATED` timeline entry, never one per lead.
+- **Settling:** each refresh first accepts, as `case-leads`, the leads whose subject joined the case another way, and deletes unreviewed leads whose subject is gone, no longer open (generated kinds only) or filtered out (except bookmarks). `list()` marks such leads `state: IN_CASE | GONE` until then.
+- **On the board:** dropping a lead card on the canvas accepts it where it lands (`onDropLead` → `useCaseLeads.accept`, placement hint). Accepting from the list places it beside its via item and flies there once placed. Either way the lead leaves the list optimistically. Leads reload with the board's 60 s poll, because worker-side changes don't reach the socket.
+- **Accepting runs the case's rules:** a finding accepted from a lead is an arrival for escalation rules (`escalateArrivals`, trigger `ATTACHED`), like any attach.
+
 ---
 
 ## 6. Data model (Postgres / Prisma)
@@ -1551,6 +1566,7 @@ The dashboard layout needs a **full-bleed variant** for this route: no page padd
 > - **Header, clicks, search:** the top bar is a ledger that spotlights (§5.1); a double click opens the side panel; ⌘K is scoped (All / Board / Corpus / Actions, Tab cycles) and peeks at each kind instead of listing the whole board.
 > - **Connections:** *Find path* became *Show connections* (§5.11), and neighbours reach any number of hops (§5.10), over `POST …/board/trace`. Hypotheses use the flask icon everywhere.
 > - **Persistence:** the queue starts and stops with the board's mount (`connect()`), not with the store, because StrictMode and Fast Refresh remount the same store. A 4xx batch is dropped and the board refetches, rather than retrying forever.
+> - **Leads (2026-09-27):** the Leads panel became the case's inbox of suggestions, refreshed by the case itself, with look-alike documents from the duplicates engine as asset leads; a dropped lead is accepted where it lands. See §5.17. Migration `20260927140000_case_leads_auto_refresh`; tests `case-leads.service.spec.ts`, `cases/case-leads.scheduler.spec.ts`, `test/case-leads.e2e-spec.ts`, web `store/leads.spec.ts`; user docs `investigations/cases/leads`.
 
 Sizes: **S** ≤ 2 dev-days, **M** 3–5, **L** 6–10. Each phase ships behind the `caseBoard` workspace feature switch and must pass `bun lint` (API lint is a CI gate: `require-await` and similar are errors), `bun check-types`, and its own tests.
 

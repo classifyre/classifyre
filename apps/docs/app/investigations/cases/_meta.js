@@ -2,6 +2,7 @@ export default {
   index: "Overview",
   board: "The case board",
   evidence: "Evidence & findings",
+  leads: "Leads",
   cleanup: "Clean-up & filters",
   escalation: "Escalation",
   links: "Lines & links",

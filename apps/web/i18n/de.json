@@ -700,7 +700,7 @@
         "title": "Embeddings sind ausgeschaltet",
         "search": "Semantisches Ranking ist nicht verfügbar — Ergebnisse treffen nur exakten Text.",
         "similar": "Ähnliche Befunde stammen aus Embeddings, die für diesen Arbeitsbereich ausgeschaltet sind.",
-        "leads": "Solange Embeddings ausgeschaltet sind, werden keine semantischen Nachbarn vorgeschlagen; Hinweise stammen nur aus verknüpften Anfrage-Beobachtung-Beobachtungen.",
+        "leads": "Solange Embeddings ausgeschaltet sind, werden keine ähnlichen Befunde vorgeschlagen; ähnliche Dokumente und Antworten der Beobachtungen weiterhin.",
         "duplicates": "Gruppen nahezu identischer Texte werden nicht aktualisiert, solange Embeddings ausgeschaltet sind.",
         "index": "Der semantische Index ist pausiert; es wird nichts neu indiziert oder rekalibriert."
       },
@@ -4069,6 +4069,85 @@
       "badge": "{{count}} eskaliert",
       "tooltip": "{{count}} Befund(e) eskaliert · zuletzt {{when}}"
     }
+  },
+  "caseLeads": {
+    "intro": "Vorschläge für diesen Fall. Sie aktualisieren sich von selbst, wenn sich Beweise oder Beobachtungen ändern, und wenn Sie das Board öffnen.",
+    "refresh": "Aktualisieren",
+    "refreshHint": "Jetzt nach neuen Hinweisen suchen",
+    "refreshed": "{{count}} neue Hinweise",
+    "refreshedOne": "1 neuer Hinweis",
+    "refreshedNone": "Keine neuen Hinweise",
+    "refreshFull": "60 Hinweise warten auf Prüfung. Prüfen Sie einige, um Platz für neue zu schaffen.",
+    "refreshFailed": "Hinweise konnten nicht aktualisiert werden",
+    "search": "Hinweise durchsuchen…",
+    "sort": {
+      "relevance": "Relevanteste",
+      "newest": "Neueste"
+    },
+    "filters": {
+      "all": "Alle",
+      "DUPLICATE": "Ähnliche Dokumente",
+      "INQUIRY": "Antworten",
+      "SEMANTIC_NEIGHBOR": "Ähnlich",
+      "AUTOPILOT": "Autopilot",
+      "MANUAL": "Gemerkt"
+    },
+    "origin": {
+      "DUPLICATE": "Ähnliches Dokument",
+      "INQUIRY": "Antwort einer Beobachtung",
+      "SEMANTIC_NEIGHBOR": "Ähnlich",
+      "SAME_VALUE": "Gleicher Wert",
+      "AUTOPILOT": "Autopilot",
+      "MANUAL": "Gemerkt"
+    },
+    "why": {
+      "sameValue": "Gleicher Wert wie {{via}}",
+      "similar": "{{pct}} % ähnlich zu {{via}}",
+      "in": "in {{asset}}",
+      "watch": "Antwort der Beobachtung „{{watch}}“",
+      "new": "neu",
+      "identical": "Identische Kopie von {{asset}}",
+      "confirmed": "In der Duplikatprüfung als Duplikat von {{asset}} bestätigt",
+      "shares": "Teilt {{labels}} mit {{asset}}",
+      "sharesValues": "Teilt die meisten Werte mit {{asset}}",
+      "matchWeight": "Übereinstimmung {{pct}} %"
+    },
+    "score": {
+      "importance": "Wichtigkeit {{value}}",
+      "similar": "{{pct}} % ähnlich",
+      "match": "Übereinstimmung {{pct}} %",
+      "identical": "Identisch"
+    },
+    "document": "Dokument",
+    "inAsset": "in {{asset}}",
+    "accept": "Annehmen",
+    "acceptHint": "Zum Fall hinzufügen, neben das, worauf es sich bezieht",
+    "dismiss": "Verwerfen",
+    "showOnBoard": "Auf dem Board zeigen, worauf es sich bezieht",
+    "openWatch": "Beobachtung öffnen",
+    "dismissTitle": "Diesen Hinweis verwerfen?",
+    "dismissManyTitle": "{{count}} Hinweise verwerfen?",
+    "dismissBody": "Sie werden für diesen Fall nicht mehr vorgeschlagen. Nennen Sie gern den Grund: Der Autopilot lernt daraus.",
+    "reasonPlaceholder": "Grund (optional)…",
+    "dismissConfirm": "Verwerfen",
+    "dismissShown": "Alle {{count}} angezeigten verwerfen",
+    "accepted": "Zum Fall hinzugefügt",
+    "acceptFailed": "Hinweis konnte nicht angenommen werden",
+    "dismissed": "Hinweis verworfen",
+    "dismissedMany": "{{count}} Hinweise verworfen",
+    "dismissFailed": "Verwerfen fehlgeschlagen",
+    "emptyTitle": "Nichts zu prüfen",
+    "emptyBody": "Hinweise entstehen von selbst, während der Fall wächst: Dokumente, die Ihren Beweisen ähneln, ähnliche Befunde und wichtige Antworten Ihrer Beobachtungen.",
+    "noMatch": "Keine Hinweise passen zu diesen Filtern.",
+    "reviewed": "Geprüft ({{count}})",
+    "status": {
+      "ACCEPTED": "Angenommen",
+      "DISMISSED": "Verworfen",
+      "inCase": "Schon im Fall"
+    },
+    "drag": "Auf das Board ziehen, um es dort hinzuzufügen",
+    "loading": "Hinweise werden geladen…",
+    "resolved": "Befund erledigt"
   },
   "correlation": {
     "findingsTab": "Funde",

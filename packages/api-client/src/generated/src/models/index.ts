@@ -329,6 +329,8 @@ export * from './ReopenDecisionsResponseDto';
 export * from './RetireOutOfScopeFindingsDto';
 export * from './RevertResultDto';
 export * from './ReviewCaseLeadDto';
+export * from './ReviewCaseLeadsDto';
+export * from './ReviewCaseLeadsResponseDto';
 export * from './ReviewClusterRowDto';
 export * from './ReviewClustersResponseDto';
 export * from './ReviewDecisionRowDto';

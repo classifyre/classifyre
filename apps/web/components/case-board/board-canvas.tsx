@@ -249,10 +249,13 @@ export function useFlyTo() {
 export function BoardCanvas({
   onTidyUp,
   rememberViewport = true,
+  onDropLead,
 }: {
   onTidyUp: () => void;
   /** Off for a snapshot: it must neither open at nor overwrite the live board's view. */
   rememberViewport?: boolean;
+  /** A lead dragged from the Leads panel was dropped here: accept it at `at`. */
+  onDropLead?: (leadId: string, at: { x: number; y: number }) => void;
 }) {
   const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
@@ -812,30 +815,16 @@ export function BoardCanvas({
           label?: string;
           assetType?: string | null;
           sourceType?: string | null;
-          /** A lead from the Leads drawer: accepted through the normal review. */
+          /** A lead from the Leads panel: dropping it accepts it, right here. */
           leadId?: string;
           assetId?: string | null;
         };
         const at = rf.screenToFlowPosition({ x: event.clientX, y: event.clientY });
         const s = store.getState();
         if (payload.leadId) {
-          // Accepting keeps the lead's own record (status, timeline entry);
-          // the hint makes the new bubble appear where it was dropped.
-          const hints = new Map(ui.getState().placementHints);
-          hints.set(`finding:${payload.entityId}`, at);
-          if (payload.assetId) hints.set(`asset:${payload.assetId}`, at);
-          ui.getState().set({ placementHints: hints });
-          void api.cases
-            .caseLeadsControllerReview({
-              caseId,
-              leadId: payload.leadId,
-              reviewCaseLeadDto: { action: "ACCEPT" as never },
-            })
-            .then(() => {
-              toast.success(t("caseBoard.toasts.evidenceAdded"));
-              s.refetch();
-            })
-            .catch((error: unknown) => toast.error(error instanceof Error ? error.message : String(error)));
+          // Accepted through the normal review, so the lead keeps its record
+          // (status, timeline entry) and leaves the panel at once.
+          onDropLead?.(payload.leadId, at);
           return;
         }
         const existing =
@@ -865,7 +854,7 @@ export function BoardCanvas({
         // Not ours.
       }
     },
-    [rf, store, ui, readOnly, t, caseId],
+    [rf, store, readOnly, t, onDropLead],
   );
 
   // Select: a drag on the canvas draws a selection box, the middle button (or

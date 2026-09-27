@@ -48,6 +48,8 @@ import type {
   PullFromInquiryDto,
   PullFromInquiryResponseDto,
   ReviewCaseLeadDto,
+  ReviewCaseLeadsDto,
+  ReviewCaseLeadsResponseDto,
   SetInquiryAutoPullDto,
   UpdateCaseDto,
   UpdateCaseEventDto,
@@ -122,6 +124,10 @@ import {
     PullFromInquiryResponseDtoToJSON,
     ReviewCaseLeadDtoFromJSON,
     ReviewCaseLeadDtoToJSON,
+    ReviewCaseLeadsDtoFromJSON,
+    ReviewCaseLeadsDtoToJSON,
+    ReviewCaseLeadsResponseDtoFromJSON,
+    ReviewCaseLeadsResponseDtoToJSON,
     SetInquiryAutoPullDtoFromJSON,
     SetInquiryAutoPullDtoToJSON,
     UpdateCaseDtoFromJSON,
@@ -214,6 +220,11 @@ export interface CaseLeadsControllerReviewRequest {
     caseId: string;
     leadId: string;
     reviewCaseLeadDto: ReviewCaseLeadDto;
+}
+
+export interface CaseLeadsControllerReviewManyRequest {
+    caseId: string;
+    reviewCaseLeadsDto: ReviewCaseLeadsDto;
 }
 
 export interface CaseTimelineControllerGetTimelineRequest {
@@ -872,7 +883,7 @@ export class CasesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Generate leads from case evidence (semantic neighbours + linked-inquiry matches)
+     * Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change
      */
     async caseLeadsControllerGenerateRaw(requestParameters: CaseLeadsControllerGenerateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GenerateCaseLeadsResponseDto>> {
         if (requestParameters['caseId'] == null) {
@@ -901,7 +912,7 @@ export class CasesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Generate leads from case evidence (semantic neighbours + linked-inquiry matches)
+     * Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change
      */
     async caseLeadsControllerGenerate(requestParameters: CaseLeadsControllerGenerateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GenerateCaseLeadsResponseDto> {
         const response = await this.caseLeadsControllerGenerateRaw(requestParameters, initOverrides);
@@ -1047,6 +1058,53 @@ export class CasesApi extends runtime.BaseAPI {
      */
     async caseLeadsControllerReview(requestParameters: CaseLeadsControllerReviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.caseLeadsControllerReviewRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Accept or dismiss several leads with one decision
+     */
+    async caseLeadsControllerReviewManyRaw(requestParameters: CaseLeadsControllerReviewManyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ReviewCaseLeadsResponseDto>> {
+        if (requestParameters['caseId'] == null) {
+            throw new runtime.RequiredError(
+                'caseId',
+                'Required parameter "caseId" was null or undefined when calling caseLeadsControllerReviewMany().'
+            );
+        }
+
+        if (requestParameters['reviewCaseLeadsDto'] == null) {
+            throw new runtime.RequiredError(
+                'reviewCaseLeadsDto',
+                'Required parameter "reviewCaseLeadsDto" was null or undefined when calling caseLeadsControllerReviewMany().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{caseId}/leads/review`;
+        urlPath = urlPath.replace(`{${"caseId"}}`, encodeURIComponent(String(requestParameters['caseId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ReviewCaseLeadsDtoToJSON(requestParameters['reviewCaseLeadsDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ReviewCaseLeadsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Accept or dismiss several leads with one decision
+     */
+    async caseLeadsControllerReviewMany(requestParameters: CaseLeadsControllerReviewManyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ReviewCaseLeadsResponseDto> {
+        const response = await this.caseLeadsControllerReviewManyRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

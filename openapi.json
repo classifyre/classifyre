@@ -7984,7 +7984,48 @@
             }
           }
         },
-        "summary": "Generate leads from case evidence (semantic neighbours + linked-inquiry matches)",
+        "summary": "Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{caseId}/leads/review": {
+      "post": {
+        "operationId": "CaseLeadsController_reviewMany",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCaseLeadsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewCaseLeadsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Accept or dismiss several leads with one decision",
         "tags": [
           "cases"
         ]
@@ -22515,7 +22556,8 @@
               "EVIDENCE_AUTO_REMOVED",
               "INQUIRY_SETTINGS_UPDATED",
               "FINDINGS_ESCALATED",
-              "ESCALATION_CLEARED"
+              "ESCALATION_CLEARED",
+              "LEADS_GENERATED"
             ]
           },
           "actor": {
@@ -24542,11 +24584,30 @@
             "type": "string"
           },
           "findingId": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "The finding this lead proposes; null for an asset lead (a look-alike document)"
           },
           "assetId": {
             "type": "string",
             "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FINDING",
+              "ASSET"
+            ],
+            "description": "FINDING: accepting attaches the finding. ASSET: accepting adds the document; its findings wait around it on the board"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_CASE",
+              "GONE"
+            ],
+            "description": "For a PROPOSED lead: OPEN waits for review; IN_CASE joined the case another way; GONE lost its finding or asset. The next refresh settles the last two"
           },
           "origin": {
             "type": "string",
@@ -24554,7 +24615,8 @@
               "SEMANTIC_NEIGHBOR",
               "INQUIRY",
               "AUTOPILOT",
-              "MANUAL"
+              "MANUAL",
+              "DUPLICATE"
             ]
           },
           "status": {
@@ -24581,7 +24643,73 @@
             "type": "number",
             "nullable": true,
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "description": "Semantic similarity (SEMANTIC_NEIGHBOR) or the pair match weight (DUPLICATE)"
+          },
+          "viaFindingId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The evidence finding this lead resembles"
+          },
+          "viaAssetId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The evidence asset this lead hangs off (the duplicated document, or the resembled finding's asset)"
+          },
+          "viaInquiryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The watch (inquiry) this lead answers"
+          },
+          "viaLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "What the lead hangs off, in words: the resembled finding, the watch title or the duplicated document"
+          },
+          "viaAssetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "details": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Origin-specific facts: sameValue, isNew, relation (identical_content | likely_duplicate | confirmed), verdict, sharedLabels"
+          },
+          "findingType": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "string",
+            "nullable": true,
+            "description": "The matched value, shortened"
+          },
+          "severity": {
+            "type": "string",
+            "nullable": true
+          },
+          "findingStatus": {
+            "type": "string",
+            "nullable": true,
+            "description": "The finding's current status (OPEN, RESOLVED, …)"
+          },
+          "assetName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The document the lead is in, or is"
+          },
+          "assetType": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceName": {
+            "type": "string",
+            "nullable": true
           },
           "proposedBy": {
             "type": "string"
@@ -24603,7 +24731,6 @@
         "required": [
           "id",
           "caseId",
-          "findingId",
           "origin",
           "status",
           "rationale",
@@ -24636,15 +24763,79 @@
         "type": "object",
         "properties": {
           "proposed": {
-            "type": "number"
+            "type": "number",
+            "description": "New leads written by this refresh"
           },
           "considered": {
-            "type": "number"
+            "type": "number",
+            "description": "Candidates found before quotas and room"
+          },
+          "settled": {
+            "type": "number",
+            "description": "Waiting leads the case settled: already in it another way, gone, or filtered out"
+          },
+          "byOrigin": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "New leads per origin"
+          },
+          "full": {
+            "type": "boolean",
+            "description": "The case already holds as many waiting leads as it may; review some first"
           }
         },
         "required": [
           "proposed",
           "considered"
+        ]
+      },
+      "ReviewCaseLeadsDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ACCEPT",
+              "DISMISS"
+            ]
+          },
+          "reviewedBy": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the lead was dismissed"
+          },
+          "leadIds": {
+            "description": "Leads to review with the same decision (at most 200)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "action",
+          "leadIds"
+        ]
+      },
+      "ReviewCaseLeadsResponseDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "number",
+            "description": "Leads whose status changed"
+          },
+          "failed": {
+            "type": "number",
+            "description": "Leads that could not be reviewed (gone, or not in this case)"
+          }
+        },
+        "required": [
+          "updated",
+          "failed"
         ]
       },
       "ReviewCaseLeadDto": {

@@ -158,6 +158,8 @@ export type {
   CaseLeadDto,
   ProposeCaseLeadDto,
   ReviewCaseLeadDto,
+  ReviewCaseLeadsDto,
+  ReviewCaseLeadsResponseDto,
   GenerateCaseLeadsResponseDto,
   CaseEventDto,
   CreateCaseEventDto,

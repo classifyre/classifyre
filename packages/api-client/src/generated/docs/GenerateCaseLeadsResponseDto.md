@@ -8,6 +8,9 @@ Name | Type
 ------------ | -------------
 `proposed` | number
 `considered` | number
+`settled` | number
+`byOrigin` | { [key: string]: number; }
+`full` | boolean
 
 ## Example
 
@@ -18,6 +21,9 @@ import type { GenerateCaseLeadsResponseDto } from '@workspace/api-client'
 const example = {
   "proposed": null,
   "considered": null,
+  "settled": null,
+  "byOrigin": null,
+  "full": null,
 } satisfies GenerateCaseLeadsResponseDto
 
 console.log(example)

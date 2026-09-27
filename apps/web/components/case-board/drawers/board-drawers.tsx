@@ -31,7 +31,6 @@ import {
   type CaseBoardResponseDto,
   type CaseBoardSnapshotSummaryDto,
   type CaseEventDto,
-  type CaseLeadDto,
   type CaseResponseDto,
   type FindingResponseDto,
   type InquiryResponseDto,
@@ -77,6 +76,8 @@ import { AddEvidencePanel } from "../ui/add-evidence-panel";
 import { ThreadPanel, VERDICTS } from "./thread-panel";
 import { ConnectionsPanel } from "./connections-panel";
 import { startTrace } from "../hooks/use-trace";
+import type { CaseLeads as CaseLeadsState } from "../hooks/use-case-leads";
+import { locateLead } from "../store/leads";
 import { useVisibleCentre } from "../hooks/use-visible-centre";
 import { dismissedLabel } from "../store/finding-state";
 import type { Bubble, BubbleRow } from "../store/types";
@@ -108,7 +109,7 @@ export function BoardDrawers({
 }: {
   caseId: string;
   caseData: CaseResponseDto | null;
-  leads: CaseLeadDto[];
+  leads: CaseLeadsState;
   onChanged: () => void;
   onFlyTo: (itemId: string) => void;
 }) {
@@ -161,7 +162,7 @@ export function BoardDrawers({
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {drawer === "timeline" && <TimelineDrawer caseId={caseId} onFlyTo={onFlyTo} />}
-        {drawer === "leads" && <LeadsDrawer caseId={caseId} leads={leads} onChanged={onChanged} />}
+        {drawer === "leads" && <LeadsDrawer leads={leads} />}
         {drawer === "caseFile" && <CaseFileDrawer caseId={caseId} caseData={caseData} onChanged={onChanged} />}
         {drawer === "inquiries" && <InquiriesDrawer caseId={caseId} caseData={caseData} onChanged={onChanged} />}
         {drawer === "evidence" && <EvidenceDrawer caseId={caseId} caseData={caseData} onChanged={onChanged} onFlyTo={onFlyTo} />}
@@ -462,38 +463,43 @@ function ThreadsOffBoard({ onFlyTo }: { onFlyTo: (itemId: string) => void }) {
   );
 }
 
-// ─── Leads (drag onto the canvas) ─────────────────────────────────────────────
+// ─── Leads (accept, dismiss, or drag onto the canvas) ─────────────────────────
 
-function LeadsDrawer({ caseId, leads, onChanged }: { caseId: string; leads: CaseLeadDto[]; onChanged: () => void }) {
-  const { t } = useTranslation();
+function LeadsDrawer({ leads }: { leads: CaseLeadsState }) {
   const store = useBoardStore();
+  const ui = useUiStore();
+  const readOnly = useBoard((s) => s.readOnly);
+  // Read so the panel follows the board: "Show on board" appears once what a
+  // lead relates to is on it.
+  useBoard((s) => s.itemByAsset);
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-muted-foreground">{t("caseBoard.drawers.dragToBoard")}</p>
-      <CaseLeads
-        caseId={caseId}
-        leads={leads}
-        loading={false}
-        onReviewed={() => {
-          onChanged();
-          store.getState().refetch();
-        }}
-        onGenerated={onChanged}
-        onLeadDragStart={(lead, event) => {
-          event.dataTransfer.setData(
-            BOARD_DRAG_MIME,
-            JSON.stringify({
-              leadId: lead.id,
-              entityType: "finding",
-              entityId: lead.findingId,
-              assetId: lead.assetId ?? null,
-              label: lead.title,
-            }),
-          );
-          event.dataTransfer.effectAllowed = "copy";
-        }}
-      />
-    </div>
+    <CaseLeads
+      leads={leads.leads}
+      loading={leads.loading}
+      readOnly={readOnly}
+      busy={leads.busy}
+      refreshing={leads.refreshing}
+      onAccept={(lead) => void leads.accept(lead)}
+      onDismiss={(ids, reason) => void leads.dismiss(ids, reason)}
+      onRefresh={() => void leads.refresh()}
+      onShowOnBoard={leads.showOnBoard}
+      canShowOnBoard={(lead) => locateLead(store.getState().itemByAsset, lead) !== null}
+      onOpenWatch={() => ui.getState().openDrawer("inquiries")}
+      onLeadDragStart={(lead, event) => {
+        // Dropping it on the canvas accepts it, where it was dropped.
+        event.dataTransfer.setData(
+          BOARD_DRAG_MIME,
+          JSON.stringify({
+            leadId: lead.id,
+            entityType: lead.kind === "ASSET" ? "asset" : "finding",
+            entityId: lead.findingId ?? lead.assetId,
+            assetId: lead.assetId ?? null,
+            label: lead.kind === "ASSET" ? (lead.assetName ?? lead.title) : lead.title,
+          }),
+        );
+        event.dataTransfer.effectAllowed = "copy";
+      }}
+    />
   );
 }
 

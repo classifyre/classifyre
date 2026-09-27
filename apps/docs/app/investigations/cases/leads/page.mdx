@@ -1,0 +1,218 @@
+---
+title: Leads
+description: What a case may be missing, suggested by the case itself — documents that look like your evidence, important answers of your watches, findings similar to what you have. Leads refresh by themselves; accept one, drag it onto the board, or dismiss it for good.
+---
+
+import { Callout } from "nextra/components"
+import { LeadCards, LeadFilters } from "@/components/case-board/board-key"
+
+# Leads
+
+A **lead** is something the case suggests it may be missing: a document that
+looks like a piece of your evidence, an important new answer of one of its
+watches, a finding similar to one already in the case, or something
+[Autopilot](/investigations/autopilot/) wants a person to check.
+
+Nothing joins the case by itself. You **accept** a lead, or drag it onto the
+board, and it becomes evidence. Or you **dismiss** it, and it is never suggested
+for this case again.
+
+Open the **Leads** panel from the rail on the right of the board. Its badge
+counts the leads waiting for you.
+
+<LeadCards />
+
+---
+
+## Where leads come from
+
+Every lead carries its reason. The panel names it on each card and lets you
+filter by it.
+
+| Reason | What it is | Comes from |
+|---|---|---|
+| **Look-alike** | A document that is an identical copy of a piece of evidence, or shares most of its key values: the same account numbers, e-mail addresses, names | [Duplicate detection](/duplicates/) |
+| **Watch answer** | An important answer of a watch linked to the case (importance 85 or more) that is not in the case yet | The case's [watches](/investigations/inquiry/) |
+| **Similar** | A finding whose content is close to a finding in the case | [Embeddings](/settings/embeddings/) |
+| **Same value** | A similar finding that carries *the very same value* as one in the case, in another document. The same IBAN turning up elsewhere is a thread to pull, not just a resemblance, so it is named apart | Embeddings |
+| **Autopilot** | Something the case agent found and wants a person to check, with its reasoning | [Autopilot](/investigations/autopilot/) |
+| **Bookmarked** | A finding someone put on the list by hand, through MCP or the API | People |
+
+Similar and same-value leads need embeddings. While
+[embeddings are off](/settings/cleanup/), the panel says so, and look-alikes and
+watch answers still come in.
+
+---
+
+## They refresh by themselves
+
+You don't have to ask for leads. The case looks for new ones:
+
+- whenever its **evidence changes**: something added on the board, a watch's
+  auto-add, a lead accepted, a finding attached from anywhere;
+- whenever a **watch** is linked or gets new answers;
+- whenever a **finding filter** is added or changed, so leads it rules out go
+  away;
+- when you **open the board**, at most every ten minutes.
+
+A burst of changes counts as one refresh, which runs in the background a few
+seconds after the last one. The panel picks up new leads within a minute.
+**Refresh** at the top of the panel looks right away.
+
+Each refresh proposes at most **ten leads of each kind**, so one kind never
+crowds out the others, and a case holds at most **60 leads waiting for
+review**. When it is full, review some to make room. A closed case gets no new
+leads.
+
+The case also keeps its list honest:
+
+- a lead whose finding or document joined the case another way (added from the
+  board, brought in by a watch) moves to **Reviewed** as **Already in the
+  case**;
+- a lead whose finding was resolved, deleted or filtered out, or whose document
+  is gone from its source, disappears. If the finding comes back, it can be
+  suggested again.
+
+---
+
+## Reading a lead
+
+| Part | Example | What it tells you |
+|---|---|---|
+| **Reason** | **LOOK-ALIKE** | Why the case suggests it (see above). Confirmed duplicates and same-value leads have a darker outline |
+| **Score** | *Match 80%* · *Importance 91* · *87% similar* · *Identical* | How strong the reason is: a look-alike's match weight, a finding's importance, or its similarity |
+| **Severity** | **HIGH** | The finding's severity (not shown for documents) |
+| **What** | `IBAN DE44 5001…` or a document's name | The finding and its value, or the document |
+| **Where** | *in payments-2024.xlsx · Accounting* | The document it is in and its source |
+| **Why** | *↳ Answer to the watch "Payments to offshore accounts" · new* | What in the case it relates to |
+
+At the foot of the card:
+
+- **Accept** adds it to the case.
+- **Dismiss** takes it off the list for good.
+- **⌖** flies the board to the evidence the lead relates to, so you can judge it
+  in context.
+- **Open the watch** (watch answers) opens the **Watches** panel.
+
+---
+
+## Accepting a lead
+
+There are two ways, and both are the same decision:
+
+- **Accept** on the card. The new evidence lands **next to what it relates to**
+  (right of the document it copies, or the finding it resembles), and the board
+  flies to it.
+- **Drag the card onto the board.** It is accepted right where you drop it.
+
+Either way the lead leaves the list at once, the badge goes down, and the
+[timeline](/investigations/cases/timeline/) records who accepted it.
+
+What joins the case depends on the kind of lead:
+
+| Lead | What is added |
+|---|---|
+| A finding (watch answer, similar, same value, Autopilot, bookmarked) | The finding, attached to the case. Its document comes with it if it was not on the board yet; if it was, the finding joins it there |
+| A look-alike document | The document, as evidence. Its findings wait around it as **+n** ghosts, to [attach](/investigations/cases/evidence/#attaching-and-detaching-findings) one by one |
+
+An accepted lead is treated like any other finding that arrives: a case-wide
+[escalation rule](/investigations/cases/escalation/) that matches marks it
+straight away.
+
+---
+
+## Dismissing a lead
+
+**Dismiss** asks for a reason. The reason is optional, and it teaches
+Autopilot what does not belong in this case. A dismissed lead is never
+suggested for this case again, by the case or by Autopilot.
+
+Under the list, **Dismiss all *n* shown** dismisses everything the current
+filters show. For example, after checking the two *Similar* leads that matter,
+dismiss the rest in one go.
+
+The **Reviewed** section at the bottom lists what was accepted and dismissed,
+by whom and when, and the leads that joined the case another way.
+
+---
+
+## Finding your way in a long list
+
+<LeadFilters />
+
+- **Reason chips** show how many leads of each kind wait. Click one to show only
+  those, and click it again for all.
+- **Search** filters by value, document, source, and what the lead relates to.
+- **Sort** by **Most relevant** (confirmed and identical copies first, then by
+  score) or **Newest**.
+
+---
+
+## Leads and Duplicate review
+
+Look-alike leads come from the same engine as [Duplicate review](/duplicates/),
+and the two agree:
+
+- a pair you marked **Not a duplicate** or **Split** is never suggested;
+- a pair you **confirmed** comes first and says *Confirmed a duplicate … in
+  Duplicate review*. When you accept it, its decision shows the case under
+  **Used in**, so it no longer counts as *went nowhere yet* in
+  [Decisions](/duplicates/decisions/);
+- turning duplicate detection off in [Features](/settings/cleanup/) stops
+  look-alike leads.
+
+The other direction still works too: **Add to case** in Decisions brings
+confirmed pairs into a case in bulk.
+
+---
+
+## Leads, neighbours and connections
+
+A copy of your evidence can show up twice: as a lead, and as a
+[suggested neighbour](/investigations/cases/connections/#suggested-neighbours)
+on the canvas. The two do different jobs:
+
+| | **Suggested neighbours** | **Leads** |
+|---|---|---|
+| **Where** | On the canvas, around your evidence | In the Leads panel |
+| **What** | Assets connected to the evidence: lineage, links, duplicates, similar | Findings and documents worth adding, each with a reason and a score |
+| **Decision** | None. Add one with **+**, or hide it until you reload | Accept or dismiss. Dismissals are remembered for the case |
+| **Best for** | Seeing the neighbourhood while you work | Working through what the case may be missing |
+
+Adding a neighbour that is also a lead settles the lead: it moves to
+**Reviewed** as **Already in the case**.
+
+---
+
+## Leads and watches
+
+A watch with **auto-add on** brings its new answers straight into the case, so
+they never become leads. With **auto-add off**, new answers wait in the
+**Watches** panel, and the important ones also appear as leads, so they do not
+drown among the rest.
+
+[Finding filters](/investigations/cases/cleanup/#finding-filters) apply to leads
+as they do to watches: a kind of finding the case filters out is not suggested,
+and waiting leads it matches go away when the filter is added. A lead you
+bookmarked yourself stays; picking something by hand is your call.
+
+---
+
+## Leads and Autopilot
+
+Autopilot proposes a lead instead of attaching a finding it has not verified,
+and writes its reasoning into the lead. It checks the list first and never
+proposes something that was dismissed. It does not need to ask for refreshes:
+the case does that by itself.
+
+Over [MCP](/settings/mcp-server/), the same list is available to any client:
+`list_case_leads`, `review_case_lead`, `propose_case_lead` and
+`generate_case_leads`.
+
+<Callout type="info">
+**In the timeline.** Automatic refreshes appear as **one** *New leads* entry
+per stretch of refreshes, by *the case's own lead refresh*. It says how many
+leads of each kind arrived and names a few. A refresh you ask for is an entry
+under your name. Every accept and dismiss is its own entry, with the reason
+when one was given.
+</Callout>
