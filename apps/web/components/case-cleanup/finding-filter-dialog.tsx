@@ -108,6 +108,8 @@ export function FindingFilterDialog({
   const [preview, setPreview] = React.useState<CaseFindingFiltersPreviewDto | null>(null);
   const [checking, setChecking] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  // One-time clean-up with the filter: assets it leaves without any finding go too.
+  const [removeEmptied, setRemoveEmptied] = React.useState(true);
   const nextKey = React.useRef(1);
 
   // A new request starts the dialog over.
@@ -127,6 +129,7 @@ export function FindingFilterDialog({
     setSearch("");
     setPreview(null);
     setSaving(false);
+    setRemoveEmptied(true);
   }, [request]);
 
   const inquiryId = scope === CASE_SCOPE ? null : scope;
@@ -243,6 +246,8 @@ export function FindingFilterDialog({
   const problems = kind === "VALUE_PATTERN" ? (preview?.problems ?? []) : [];
   const hasProblem = problems.some((p) => p !== "");
   const matched = preview?.matched ?? 0;
+  const emptied = escalate ? 0 : (preview?.emptiedAssets ?? 0);
+  const removingAssets = !escalate && removeEmptied && emptied > 0;
   const canSubmit =
     !saving && rules.length > 0 && !hasProblem && !(editing && rows[0]?.pattern.length === 0);
 
@@ -257,6 +262,9 @@ export function FindingFilterDialog({
   const setRow = (key: number, patch: Partial<PatternRow>) =>
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
+  const assetsRemovedNote = (count: number) =>
+    count > 0 ? ` ${t("caseFilters.dialog.assetsRemoved", { count })}` : "";
+
   const submit = async () => {
     setSaving(true);
     try {
@@ -267,6 +275,7 @@ export function FindingFilterDialog({
           updateCaseFindingFilterDto: {
             pattern: rows[0]?.pattern ?? editing.pattern,
             description: rows[0]?.description.trim() || null,
+            removeEmptiedAssets: !escalate && removeEmptied,
             clientId,
           },
         });
@@ -276,14 +285,20 @@ export function FindingFilterDialog({
               ? t("caseEscalation.dialog.updated", { count: res.escalated })
               : t("caseEscalation.dialog.updatedNone")
             : res.detached > 0
-              ? t("caseFilters.dialog.updated", { count: res.detached })
+              ? t("caseFilters.dialog.updated", { count: res.detached }) + assetsRemovedNote(res.assetsRemoved)
               : t("caseFilters.dialog.updatedNone"),
         );
         onApplied(res);
       } else {
         const res = await api.cases.caseCleanupControllerAddFilters({
           id: caseId,
-          addCaseFindingFiltersDto: { action, inquiryId, rules, clientId },
+          addCaseFindingFiltersDto: {
+            action,
+            inquiryId,
+            rules,
+            removeEmptiedAssets: !escalate && removeEmptied,
+            clientId,
+          },
         });
         toast.success(
           escalate
@@ -291,7 +306,7 @@ export function FindingFilterDialog({
               ? t("caseEscalation.dialog.applied", { count: res.escalated })
               : t("caseEscalation.dialog.appliedNone")
             : res.detached > 0
-              ? t("caseFilters.dialog.applied", { count: res.detached })
+              ? t("caseFilters.dialog.applied", { count: res.detached }) + assetsRemovedNote(res.assetsRemoved)
               : t("caseFilters.dialog.appliedNone"),
         );
         onApplied(res);
@@ -311,13 +326,14 @@ export function FindingFilterDialog({
       : matched > 0
         ? t("caseEscalation.dialog.submitCount", { count: matched })
         : t("caseEscalation.dialog.submit")
-    : editing
-      ? matched > 0
-        ? t("caseFilters.dialog.saveDetach", { count: matched })
-        : t("caseFilters.dialog.save")
-      : matched > 0
-        ? t("caseFilters.dialog.submitDetach", { count: matched })
-        : t("caseFilters.dialog.submit");
+    : (editing
+        ? matched > 0
+          ? t("caseFilters.dialog.saveDetach", { count: matched })
+          : t("caseFilters.dialog.save")
+        : matched > 0
+          ? t("caseFilters.dialog.submitDetach", { count: matched })
+          : t("caseFilters.dialog.submit")) +
+      (removingAssets ? ` · ${t("caseFilters.dialog.submitAssets", { count: emptied })}` : "");
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -579,6 +595,44 @@ export function FindingFilterDialog({
                 </p>
               )}
             </div>
+          )}
+
+          {!escalate && (
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-2.5 rounded-[4px] border-2 p-3 text-sm",
+                removingAssets ? "border-amber-600/35" : "border-border",
+              )}
+              data-testid="filter-remove-emptied"
+            >
+              <Checkbox
+                checked={removeEmptied}
+                onCheckedChange={(on) => setRemoveEmptied(on === true)}
+                className="mt-0.5"
+                aria-describedby="filter-remove-emptied-hint"
+              />
+              <span className="min-w-0 flex-1 space-y-1">
+                <span className="block font-medium">
+                  {t("caseFilters.dialog.removeEmptied")}
+                  {emptied > 0 && (
+                    <span className="ml-1.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+                      {t("caseFilters.dialog.removeEmptiedCount", { count: emptied })}
+                    </span>
+                  )}
+                </span>
+                <span id="filter-remove-emptied-hint" className="block text-[11px] text-muted-foreground">
+                  {t("caseFilters.dialog.removeEmptiedHint")}
+                </span>
+                {emptied > 0 && preview && preview.emptiedSample.length > 0 && (
+                  <span className="block truncate font-mono text-[11px] text-muted-foreground">
+                    {preview.emptiedSample.join(" · ")}
+                    {emptied > preview.emptiedSample.length
+                      ? ` ${t("caseFilters.dialog.previewMore", { count: emptied - preview.emptiedSample.length })}`
+                      : ""}
+                  </span>
+                )}
+              </span>
+            </label>
           )}
         </div>
 

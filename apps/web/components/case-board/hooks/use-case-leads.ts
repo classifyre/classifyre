@@ -6,7 +6,7 @@ import { api, type CaseLeadDto } from "@workspace/api-client";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoardStore, useUiStore } from "../store/board-context";
 import { absolutePosition } from "../store/ops";
-import { isPendingLead, locateLead } from "../store/leads";
+import { isPendingLead, locateLead, withSettled } from "../store/leads";
 import { freeSpotNear, itemExtent, newEvidenceSize, takenRects } from "../store/geometry";
 import { useFlyToEvidence } from "./use-place-evidence";
 import { useVisibleCentre } from "./use-visible-centre";
@@ -54,14 +54,26 @@ export function useCaseLeads(caseId: string, onFlyTo: (nodeId: string) => void):
   const leadsRef = React.useRef(leads);
   leadsRef.current = leads;
   const flyWhenPlaced = React.useRef<{ assetId: string; findingId: string | null; until: number } | null>(null);
+  /**
+   * Reviews this tab made that the server may not show yet. A list read that
+   * started before a review can answer after it (a poll, a refocus, the
+   * board's own refetch) and would put an accepted lead back in the queue;
+   * these hold until the server says the same.
+   */
+  const settled = React.useRef(new Map<string, CaseLeadDto["status"]>());
+  /** Only the newest read is applied: an older one answering late is stale. */
+  const readSeq = React.useRef(0);
 
   const reload = React.useCallback(async () => {
+    const seq = ++readSeq.current;
     try {
-      setLeads(await api.cases.caseLeadsControllerList({ caseId }));
+      const fresh = await api.cases.caseLeadsControllerList({ caseId });
+      if (seq !== readSeq.current) return;
+      setLeads(withSettled(fresh, settled.current));
     } catch {
       // Keep what is shown; the next poll tries again.
     } finally {
-      setLoading(false);
+      if (seq === readSeq.current) setLoading(false);
     }
   }, [caseId]);
 
@@ -88,7 +100,12 @@ export function useCaseLeads(caseId: string, onFlyTo: (nodeId: string) => void):
 
   const setStatus = React.useCallback((ids: readonly string[], status: CaseLeadDto["status"]) => {
     const set = new Set(ids);
+    for (const id of ids) settled.current.set(id, status);
     setLeads((list) => list.map((l) => (set.has(l.id) ? { ...l, status, reviewedAt: new Date() } : l)));
+  }, []);
+  /** A review that failed: the lead is back in the queue as the server has it. */
+  const unsettle = React.useCallback((ids: readonly string[]) => {
+    for (const id of ids) settled.current.delete(id);
   }, []);
   const setBusyIds = React.useCallback((ids: readonly string[], on: boolean) => {
     setBusy((prev) => {
@@ -145,13 +162,14 @@ export function useCaseLeads(caseId: string, onFlyTo: (nodeId: string) => void):
         store.getState().refetch();
       } catch {
         flyWhenPlaced.current = null;
+        unsettle([lead.id]);
         toast.error(t("caseLeads.acceptFailed"));
       } finally {
         setBusyIds([lead.id], false);
         void reload();
       }
     },
-    [caseId, store, ui, centre, reload, setBusyIds, setStatus, t],
+    [caseId, store, ui, centre, reload, setBusyIds, setStatus, unsettle, t],
   );
 
   const acceptDropped = React.useCallback(
@@ -183,13 +201,14 @@ export function useCaseLeads(caseId: string, onFlyTo: (nodeId: string) => void):
           toast.success(t("caseLeads.dismissedMany", { count: res.updated }));
         }
       } catch {
+        unsettle(leadIds);
         toast.error(t("caseLeads.dismissFailed"));
       } finally {
         setBusyIds(leadIds, false);
         void reload();
       }
     },
-    [caseId, reload, setBusyIds, setStatus, t],
+    [caseId, reload, setBusyIds, setStatus, unsettle, t],
   );
 
   const refresh = React.useCallback(async () => {

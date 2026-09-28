@@ -1,28 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
+import { ReactFlowProvider } from "@xyflow/react";
 import { formatDistanceToNowStrict } from "date-fns";
 import {
   ArrowLeft,
-  Bot,
   Check,
-  CheckCircle2,
   Circle,
   Crosshair,
-  ExternalLink,
   Eye,
-  Filter,
   FlaskConical,
   Loader2,
   MapPin,
   MessageSquare,
   PanelRightClose,
-  Pencil,
   Plus,
-  Save,
-  Waypoints,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,68 +23,40 @@ import {
   type CaseBoardResponseDto,
   type CaseBoardSnapshotSummaryDto,
   type CaseEventDto,
+  type CaseLeadDto,
   type CaseResponseDto,
-  type FindingResponseDto,
-  type InquiryResponseDto,
 } from "@workspace/api-client";
 import { Dialog, DialogContent, DialogTitle } from "@workspace/ui/components/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
-import { Textarea } from "@workspace/ui/components/textarea";
-import { SeverityBadge } from "@workspace/ui/components/severity-badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@workspace/ui/components/alert-dialog";
+import { StateChip } from "@workspace/case-board/components/state-chip";
 import { CaseTimeline } from "@/components/case-timeline";
 import { CaseChronology } from "@/components/case-chronology";
 import { CaseLeads } from "@/components/case-leads";
 import { CaseInquiriesTab } from "@/components/case-inquiries-tab";
 import { EvidenceTable } from "@/components/evidence-table";
-import { ESCALATION_INK } from "@/lib/escalation-tone";
-import { nsPath } from "@/lib/ns-path";
+import { CaseTargetProvider } from "@/components/case-target/case-target";
 import { useTranslation } from "@/hooks/use-translation";
 import { BoardProviders, useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
 import { createBoardStore } from "../store/board-store";
-import { createUiStore, type DrawerKind } from "../store/ui-store";
-import { addEvidence, attachFinding, placeThread } from "../store/commands";
-import { hypothesisMeta } from "../store/selectors";
+import { createUiStore, type DrawerKind, type TimelineView } from "../store/ui-store";
+import { EMPTY_URL_STATE, withBoardUrl } from "../store/url-state";
+import { CaseFilePanel } from "./case-file-panel";
+import { DetailsPanel } from "./details-panel";
+import { useBoardCaseTarget } from "../hooks/use-board-case-target";
+import { useTimelineLink } from "../hooks/use-timeline-link";
+import { usePlaceEvidence } from "../hooks/use-place-evidence";
+import { placeThread } from "../store/commands";
+import { hypothesisMeta, type EvidenceCandidate } from "../store/selectors";
 import { AddEvidencePanel } from "../ui/add-evidence-panel";
 import { ThreadPanel, VERDICTS } from "./thread-panel";
 import { ConnectionsPanel } from "./connections-panel";
-import { startTrace } from "../hooks/use-trace";
 import type { CaseLeads as CaseLeadsState } from "../hooks/use-case-leads";
 import { locateLead } from "../store/leads";
 import { useVisibleCentre } from "../hooks/use-visible-centre";
-import { dismissedLabel } from "../store/finding-state";
-import type { Bubble, BubbleRow } from "../store/types";
+import type { Bubble } from "../store/types";
 import { BoardCanvas, BOARD_DRAG_MIME } from "../board-canvas";
-import { StateChip } from "@workspace/case-board/components/state-chip";
-import { EscalationFlag } from "@workspace/case-board/components/finding-node";
-import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
-import { AiModeSelect, type AiMode } from "@/components/ai-mode-select";
-import { CaseAutopilotStatus } from "@/components/autopilot/case-autopilot-status";
-import { ToneBadge } from "@workspace/ui/components/tone-badge";
-import { CLEANUP_KEYS, cleanupOf } from "@/components/case-cleanup/cleanup-rules";
-
-const STATUSES = ["OPEN", "IN_PROGRESS"] as const;
-
-const openInTab = (path: string) => window.open(nsPath(path), "_blank", "noopener");
 
 /**
  * The board's side panel (D4, revised): every former case tab, plus details,
@@ -105,12 +69,16 @@ export function BoardDrawers({
   caseData,
   leads,
   onChanged,
+  onCaseChanged,
   onFlyTo,
 }: {
   caseId: string;
   caseData: CaseResponseDto | null;
   leads: CaseLeadsState;
+  /** Something the board shows changed: refetch the board, the case and the leads. */
   onChanged: () => void;
+  /** Only the case's own fields changed: reread the case. */
+  onCaseChanged: () => void;
   onFlyTo: (itemId: string) => void;
 }) {
   const { t } = useTranslation();
@@ -118,6 +86,8 @@ export function BoardDrawers({
   const drawerThreadId = useUi((s) => s.drawerThreadId);
   const threadKind = useBoard((s) => (drawerThreadId ? (s.threads.get(drawerThreadId)?.kind ?? null) : null));
   const ui = useUiStore();
+  // Everything the panel offers to add (graphs, similar findings…) goes into this case.
+  const caseTarget = useBoardCaseTarget(onFlyTo);
   if (!drawer) return null;
   const titles: Record<DrawerKind, string> = {
     details: t("caseBoard.drawers.details"),
@@ -160,19 +130,23 @@ export function BoardDrawers({
           <PanelRightClose className="size-4" aria-hidden />
         </button>
       </header>
+      <CaseTargetProvider value={caseTarget}>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {drawer === "timeline" && <TimelineDrawer caseId={caseId} onFlyTo={onFlyTo} />}
-        {drawer === "leads" && <LeadsDrawer leads={leads} />}
-        {drawer === "caseFile" && <CaseFileDrawer caseId={caseId} caseData={caseData} onChanged={onChanged} />}
+        {drawer === "timeline" && <TimelineDrawer caseId={caseId} caseData={caseData} onFlyTo={onFlyTo} />}
+        {drawer === "leads" && <LeadsDrawer leads={leads} onFlyTo={onFlyTo} />}
+        {drawer === "caseFile" && (
+          <CaseFilePanel caseId={caseId} caseData={caseData} onChanged={onChanged} onCaseChanged={onCaseChanged} />
+        )}
         {drawer === "inquiries" && <InquiriesDrawer caseId={caseId} caseData={caseData} onChanged={onChanged} />}
         {drawer === "evidence" && <EvidenceDrawer caseId={caseId} caseData={caseData} onChanged={onChanged} onFlyTo={onFlyTo} />}
         {drawer === "hypotheses" && <HypothesesDrawer onFlyTo={onFlyTo} />}
         {drawer === "thread" && <ThreadPanel caseId={caseId} onFlyTo={onFlyTo} />}
-        {drawer === "details" && <DetailsDrawer onFlyTo={onFlyTo} />}
+        {drawer === "details" && <DetailsPanel onFlyTo={onFlyTo} />}
         {drawer === "addEvidence" && <AddEvidencePanel onFlyTo={onFlyTo} />}
         {drawer === "connections" && <ConnectionsPanel onFlyTo={onFlyTo} />}
         {drawer === "snapshots" && <SnapshotsDrawer caseId={caseId} />}
       </div>
+      </CaseTargetProvider>
     </aside>
   );
 }
@@ -380,8 +354,19 @@ function HypothesesDrawer({ onFlyTo }: { onFlyTo: (itemId: string) => void }) {
 
 // ─── Timeline: activity, chronology, threads ──────────────────────────────────
 
-function TimelineDrawer({ caseId, onFlyTo }: { caseId: string; onFlyTo: (itemId: string) => void }) {
+function TimelineDrawer({
+  caseId,
+  caseData,
+  onFlyTo,
+}: {
+  caseId: string;
+  caseData: CaseResponseDto | null;
+  onFlyTo: (itemId: string) => void;
+}) {
   const { t } = useTranslation();
+  const ui = useUiStore();
+  const view = useUi((s) => s.timelineView);
+  const focus = useUi((s) => s.timelineFocus);
   const [events, setEvents] = React.useState<CaseEventDto[]>([]);
   const [loadingEvents, setLoadingEvents] = React.useState(true);
   const loadEvents = React.useCallback(async () => {
@@ -402,16 +387,31 @@ function TimelineDrawer({ caseId, onFlyTo }: { caseId: string; onFlyTo: (itemId:
     // Items removed since the event was recorded have nowhere to fly to.
     if (store.getState().items.has(itemId)) onFlyTo(itemId);
   };
+  const watches = React.useMemo(
+    () => (caseData?.inquiries ?? []).map((q) => ({ id: q.id, title: q.title })),
+    [caseData?.inquiries],
+  );
 
   return (
-    <Tabs defaultValue="activity">
+    <Tabs value={view} onValueChange={(value) => ui.getState().set({ timelineView: value as TimelineView })}>
       <TabsList className="mb-3 h-8">
         <TabsTrigger value="activity" className="text-xs">{t("caseBoard.drawers.activity")}</TabsTrigger>
         <TabsTrigger value="chronology" className="text-xs">{t("caseBoard.drawers.chronology")}</TabsTrigger>
         <TabsTrigger value="threads" className="text-xs">{t("caseBoard.drawers.threads")}</TabsTrigger>
       </TabsList>
       <TabsContent value="activity">
-        <CaseTimeline caseId={caseId} compact onShowOnBoard={showOnBoard} />
+        <CaseTimeline
+          caseId={caseId}
+          compact
+          onShowOnBoard={showOnBoard}
+          watches={watches}
+          focusEntryId={focus?.entryId ?? null}
+          focusNonce={focus?.nonce ?? 0}
+          onFocusEntry={(entryId) => ui.getState().focusTimeline(entryId)}
+          entryLink={(entryId) =>
+            withBoardUrl(window.location.href, { ...EMPTY_URL_STATE, panel: "timeline", entryId })
+          }
+        />
       </TabsContent>
       <TabsContent value="chronology">
         <CaseChronology caseId={caseId} events={events} loading={loadingEvents} onChanged={() => void loadEvents()} />
@@ -465,13 +465,32 @@ function ThreadsOffBoard({ onFlyTo }: { onFlyTo: (itemId: string) => void }) {
 
 // ─── Leads (accept, dismiss, or drag onto the canvas) ─────────────────────────
 
-function LeadsDrawer({ leads }: { leads: CaseLeadsState }) {
+function LeadsDrawer({ leads, onFlyTo }: { leads: CaseLeadsState; onFlyTo: (itemId: string) => void }) {
   const store = useBoardStore();
   const ui = useUiStore();
   const readOnly = useBoard((s) => s.readOnly);
-  // Read so the panel follows the board: "Show on board" appears once what a
-  // lead relates to is on it.
+  const place = usePlaceEvidence(onFlyTo);
+  // Read so the panel follows the board: "Show on board" and "in case" follow
+  // what is on it.
   useBoard((s) => s.itemByAsset);
+  useBoard((s) => s.bubbles);
+  const dragData = (lead: CaseLeadDto, event: React.DragEvent, withLead: boolean) => {
+    event.dataTransfer.setData(
+      BOARD_DRAG_MIME,
+      JSON.stringify({
+        // A waiting lead is accepted where it lands; a reviewed one just adds
+        // what it points at (its review stays as it was).
+        ...(withLead ? { leadId: lead.id } : {}),
+        entityType: lead.kind === "ASSET" ? "asset" : "finding",
+        entityId: lead.findingId ?? lead.assetId,
+        assetId: lead.assetId ?? null,
+        label: lead.kind === "ASSET" ? (lead.assetName ?? lead.title) : (lead.assetName ?? lead.title),
+        assetType: lead.assetType ?? null,
+        sourceType: lead.sourceType ?? null,
+      }),
+    );
+    event.dataTransfer.effectAllowed = "copy";
+  };
   return (
     <CaseLeads
       leads={leads.leads}
@@ -484,281 +503,38 @@ function LeadsDrawer({ leads }: { leads: CaseLeadsState }) {
       onRefresh={() => void leads.refresh()}
       onShowOnBoard={leads.showOnBoard}
       canShowOnBoard={(lead) => locateLead(store.getState().itemByAsset, lead) !== null}
-      onOpenWatch={() => ui.getState().openDrawer("inquiries")}
-      onLeadDragStart={(lead, event) => {
-        // Dropping it on the canvas accepts it, where it was dropped.
-        event.dataTransfer.setData(
-          BOARD_DRAG_MIME,
-          JSON.stringify({
-            leadId: lead.id,
-            entityType: lead.kind === "ASSET" ? "asset" : "finding",
-            entityId: lead.findingId ?? lead.assetId,
-            assetId: lead.assetId ?? null,
-            label: lead.kind === "ASSET" ? (lead.assetName ?? lead.title) : lead.title,
-          }),
-        );
-        event.dataTransfer.effectAllowed = "copy";
+      onOpenWatch={(inquiryId) => ui.getState().openDrawer("inquiries", { watchId: inquiryId })}
+      onLeadDragStart={(lead, event) => dragData(lead, event, true)}
+      isInCase={(lead) => leadInCase(store.getState(), lead)}
+      onReviewedDragStart={(lead, event) => dragData(lead, event, false)}
+      onAddReviewed={(lead) => {
+        const target = leadTarget(lead);
+        if (target) place(target);
       }}
     />
   );
 }
 
-// ─── Case file: status, conclusion, close ────────────────────────────────────
-
-function CaseFileDrawer({
-  caseId,
-  caseData,
-  onChanged,
-}: {
-  caseId: string;
-  caseData: CaseResponseDto | null;
-  onChanged: () => void;
-}) {
-  const { t } = useTranslation();
-  const ui = useUiStore();
-  const router = useRouter();
-  const autopilotRefresh = useUi((s) => s.autopilotRefresh);
-  const [conclusion, setConclusion] = React.useState(caseData?.conclusion ?? "");
-  const [saving, setSaving] = React.useState(false);
-  React.useEffect(() => setConclusion(caseData?.conclusion ?? ""), [caseData?.conclusion]);
-  if (!caseData) return <Loader2 className="size-4 animate-spin" />;
-  const closed = caseData.status === "CLOSED" || caseData.status === "ARCHIVED";
-
-  const update = async (patch: Record<string, unknown>) => {
-    setSaving(true);
-    try {
-      await api.cases.casesControllerUpdate({ id: caseId, updateCaseDto: patch as never });
-      onChanged();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const close = async () => {
-    try {
-      await api.cases.casesControllerClose({ id: caseId, closeCaseDto: { conclusion: conclusion.trim() } });
-      toast.success(t("investigations.caseDetail.caseClosed"));
-      onChanged();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
-    }
-  };
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-start gap-2">
-        {caseData.description ? (
-          <p className="min-w-0 flex-1 text-sm text-muted-foreground">{caseData.description}</p>
-        ) : (
-          <p className="min-w-0 flex-1 text-sm text-muted-foreground italic">{t("caseBoard.caseFile.noDescription")}</p>
-        )}
-        <Button variant="outline" size="sm" className="h-7 shrink-0 gap-1 text-xs" onClick={() => router.push(nsPath(`/investigations/${caseId}/edit`))}>
-          <Pencil className="size-3" /> {t("caseBoard.caseFile.edit")}
-        </Button>
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        {isAiActor(caseData.createdBy) && <AiActorBadge />}
-        <SeverityBadge severity={caseData.severity.toLowerCase() as never}>{caseData.severity}</SeverityBadge>
-        {!closed && (
-          <Select value={caseData.status} onValueChange={(status) => void update({ status })}>
-            <SelectTrigger className="h-8 w-44 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s.replace("_", " ")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        {caseData.assignee && <span className="text-xs text-muted-foreground">{caseData.assignee}</span>}
-      </div>
-      <section className="space-y-2" data-testid="case-file-autopilot">
-        <div className="flex items-center gap-2">
-          <p className="flex-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            {t("caseBoard.caseFile.autopilot")}
-          </p>
-          <AiModeSelect
-            value={(caseData.aiMode ?? "INHERIT") as AiMode}
-            disabled={saving}
-            onChange={(aiMode) => void update({ aiMode })}
-          />
-        </div>
-        <CaseAutopilotStatus caseId={caseId} refreshKey={autopilotRefresh} onFinished={onChanged} />
-        {!closed && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-            onClick={() => ui.getState().set({ autopilotOpen: true })}
-          >
-            <Bot className="size-3.5" /> {t("investigations.caseDetail.runAI")}
-          </Button>
-        )}
-      </section>
-
-      <CleanupSummary caseId={caseId} caseData={caseData} onChanged={onChanged} />
-
-      <section className="space-y-2">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-          {t("investigations.caseDetail.conclusion")}
-        </p>
-        {closed ? (
-          <p className="text-sm whitespace-pre-wrap">{caseData.conclusion || t("investigations.caseDetail.noConclusion")}</p>
-        ) : (
-          <>
-            <Textarea
-              rows={6}
-              value={conclusion}
-              placeholder={t("investigations.caseDetail.conclusionDesc")}
-              onChange={(e) => setConclusion(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()}
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" disabled={saving} onClick={() => void update({ conclusion })}>
-                <Save className="size-3.5" /> {t("investigations.caseDetail.saveDraft")}
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" disabled={conclusion.trim().length === 0}>
-                    <CheckCircle2 className="size-3.5" /> {t("investigations.caseDetail.closeCase")}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t("investigations.caseDetail.closeCaseTitle")}</AlertDialogTitle>
-                    <AlertDialogDescription>{t("investigations.caseDetail.closeCaseDesc")}</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => void close()}>{t("investigations.caseDetail.closeCase")}</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-              {conclusion.trim().length === 0 && (
-                <span className="text-xs text-muted-foreground">{t("investigations.caseDetail.conclusionRequired")}</span>
-              )}
-            </div>
-          </>
-        )}
-      </section>
-    </div>
-  );
+/** Whether what a lead points at is in the case now: its finding attached, or its asset evidence. */
+function leadInCase(s: { itemByAsset: ReadonlyMap<string, string>; itemByFinding: ReadonlyMap<string, string>; bubbles: ReadonlyMap<string, Bubble> }, lead: CaseLeadDto): boolean {
+  if (lead.findingId) {
+    const itemId = s.itemByFinding.get(lead.findingId);
+    return !!itemId && !!s.bubbles.get(itemId)?.rows.some((r) => r.findingId === lead.findingId);
+  }
+  return !!lead.assetId && s.itemByAsset.has(lead.assetId);
 }
 
-/**
- * What the case lets go of by itself: its clean-up switches (changed on the
- * edit page) and how many finding filters it holds (kept in the Watches
- * panel, next to the watches they shape).
- */
-function CleanupSummary({
-  caseId,
-  caseData,
-  onChanged,
-}: {
-  caseId: string;
-  caseData: CaseResponseDto;
-  onChanged: () => void;
-}) {
-  const { t } = useTranslation();
-  const router = useRouter();
-  const ui = useUiStore();
-  const rules = cleanupOf(caseData);
-  const enabled = CLEANUP_KEYS.filter((key) => rules[key]);
-  const allRules = caseData.findingFilters ?? [];
-  const filters = allRules.filter((f) => f.action !== "ESCALATE");
-  const escalations = allRules.filter((f) => f.action === "ESCALATE");
-  const escalated = caseData.escalatedCount ?? 0;
-  const closed = caseData.status === "CLOSED" || caseData.status === "ARCHIVED";
-  const store = useBoardStore();
-  const [clearing, setClearing] = React.useState(false);
-  const clearAll = async () => {
-    setClearing(true);
-    try {
-      const res = await api.cases.caseCleanupControllerClearEscalations({
-        id: caseId,
-        clearCaseEscalationsDto: {},
-      });
-      toast.success(t("caseEscalation.clearedAll", { count: res.cleared }));
-      onChanged();
-      store.getState().refetch();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("caseEscalation.failedToClear"));
-    } finally {
-      setClearing(false);
-    }
+/** What a lead points at, as something to put on the board. */
+function leadTarget(lead: CaseLeadDto): EvidenceCandidate | null {
+  if (!lead.assetId) return null;
+  return {
+    kind: lead.findingId ? "finding" : "asset",
+    id: lead.findingId ?? lead.assetId,
+    assetId: lead.assetId,
+    assetName: lead.assetName ?? lead.title,
+    assetType: lead.assetType ?? null,
+    sourceType: lead.sourceType ?? null,
   };
-  return (
-    <section className="space-y-2" data-testid="case-file-cleanup">
-      <div className="flex items-center gap-2">
-        <p className="flex-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-          {t("caseCleanup.title")}
-        </p>
-        {!closed && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 gap-1 text-xs"
-            onClick={() => router.push(nsPath(`/investigations/${caseId}/edit`))}
-          >
-            <Pencil className="size-3" /> {t("caseCleanup.edit")}
-          </Button>
-        )}
-      </div>
-      {enabled.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("caseCleanup.off")}</p>
-      ) : (
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="text-muted-foreground">{t("caseCleanup.removes")}</span>
-          {enabled.map((key) => (
-            <ToneBadge key={key} tone="active">
-              {t(`caseCleanup.short.${key}`)}
-            </ToneBadge>
-          ))}
-        </div>
-      )}
-      <div className="flex items-center gap-2 text-xs">
-        <Filter className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="min-w-0 flex-1 text-muted-foreground">
-          {filters.length > 0 ? t("caseCleanup.filters", { count: filters.length }) : t("caseCleanup.noFilters")}
-        </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 shrink-0 px-1.5 text-[11px]"
-          onClick={() => ui.getState().openDrawer("inquiries")}
-        >
-          {t("caseCleanup.manageFilters")}
-        </Button>
-      </div>
-      <div className="flex items-center gap-2 text-xs" data-testid="case-file-escalation">
-        <EscalationFlag size={12} className="shrink-0" />
-        <span className={cn("min-w-0 flex-1", escalated > 0 ? "font-medium text-foreground" : "text-muted-foreground")}>
-          {escalated > 0 ? t("caseEscalation.summary", { count: escalated }) : t("caseEscalation.noneEscalated")}
-          {" · "}
-          {escalations.length > 0
-            ? t("caseEscalation.rules", { count: escalations.length })
-            : t("caseEscalation.noRules")}
-        </span>
-        {escalated > 0 && !closed && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 shrink-0 px-1.5 text-[11px]"
-            disabled={clearing}
-            onClick={() => void clearAll()}
-            data-testid="escalation-clear-all"
-          >
-            {t("caseEscalation.clearAll")}
-          </Button>
-        )}
-      </div>
-    </section>
-  );
 }
 
 // ─── Watches ─────────────────────────────────────────────────────────────────
@@ -773,13 +549,9 @@ function InquiriesDrawer({
   onChanged: () => void;
 }) {
   const store = useBoardStore();
-  const [all, setAll] = React.useState<InquiryResponseDto[]>([]);
-  React.useEffect(() => {
-    api.inquiries
-      .inquiriesControllerList({ limit: 200 })
-      .then((res) => setAll(res.items))
-      .catch(() => setAll([]));
-  }, []);
+  const ui = useUiStore();
+  const watchId = useUi((s) => s.watchId);
+  const openTimeline = useTimelineLink();
   const bubbles = useBoard((s) => s.bubbles);
   const inCase = React.useMemo(() => {
     const ids = new Set<string>();
@@ -787,17 +559,30 @@ function InquiriesDrawer({
     return ids;
   }, [bubbles]);
   if (!caseData) return <Loader2 className="size-4 animate-spin" />;
-  const linked = caseData.inquiries ?? [];
-  const linkedIds = new Set(linked.map((q) => q.id));
   return (
     <CaseInquiriesTab
       caseId={caseId}
-      linked={linked}
-      linkable={all.filter((q) => !linkedIds.has(q.id) && q.status !== "ARCHIVED")}
+      linked={caseData.inquiries ?? []}
       isClosed={caseData.status === "CLOSED" || caseData.status === "ARCHIVED"}
       inCaseFindingIds={inCase}
       filters={caseData.findingFilters ?? []}
       clientId={store.getState().clientId}
+      selectedId={watchId}
+      onSelect={(inquiryId) => ui.getState().set({ watchId: inquiryId })}
+      onOpenHistory={(request, fallback) =>
+        void openTimeline(
+          request.kind === "settings"
+            ? {
+                types: ["INQUIRY_SETTINGS_UPDATED", "INQUIRY_PULLED", "INQUIRY_LINKED", "FINDING_FILTER_ADDED"],
+                inquiryId: request.inquiryId,
+              }
+            : {
+                watchTypes: [request.kind === "landed" ? "MATCHES_LANDED" : "MATCHES_RETIRED"],
+                inquiryIds: request.inquiryIds,
+              },
+          { fallback },
+        )
+      }
       onChanged={() => {
         onChanged();
         store.getState().refetch();
@@ -862,323 +647,6 @@ function EvidenceDrawer({
         if (itemId) onFlyTo(itemId);
       }}
     />
-  );
-}
-
-// ─── Details of a bubble or a finding row ─────────────────────────────────────
-
-function DetailsDrawer({ onFlyTo }: { onFlyTo: (itemId: string) => void }) {
-  const { t } = useTranslation();
-  const target = useUi((s) => s.detailsTarget);
-  if (!target) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">{t("caseBoard.drawers.detailsEmpty")}</p>;
-  }
-  if ("suggestedKey" in target) return <SuggestedDetails suggestedKey={target.suggestedKey} />;
-  return <ItemDetails itemId={target.itemId} findingId={target.findingId ?? null} onFlyTo={onFlyTo} />;
-}
-
-/** A neighbour that is not in the case yet: what it is, and the way in. */
-function SuggestedDetails({ suggestedKey }: { suggestedKey: string }) {
-  const { t } = useTranslation();
-  const suggestion = useBoard((s) => s.suggested.get(suggestedKey));
-  const readOnly = useBoard((s) => s.readOnly);
-  const store = useBoardStore();
-  const ui = useUiStore();
-  const rf = useReactFlow();
-  if (!suggestion) return <p className="py-8 text-center text-sm text-muted-foreground">{t("caseBoard.drawers.detailsEmpty")}</p>;
-  const add = () => {
-    const node = rf.getNode(suggestedKey);
-    store.getState().run(
-      addEvidence({ entityType: "asset", entityId: suggestion.assetId }, node ? node.position : null, {
-        label: suggestion.label,
-        assetType: suggestion.assetType,
-        sourceType: suggestion.sourceType,
-      }),
-    );
-  };
-  return (
-    <div className="space-y-3 text-sm">
-      <div className="space-y-1">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-          {suggestion.assetType ?? "asset"} {suggestion.sourceName ? `· ${suggestion.sourceName}` : ""}
-        </p>
-        <p className="font-semibold">{suggestion.label}</p>
-        <p className="text-xs text-muted-foreground">{t("caseBoard.suggested.hint")}</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" className="h-7 gap-1 text-xs" disabled={readOnly} onClick={add}>
-          <Plus className="size-3" /> {t("caseBoard.suggested.add")}
-        </Button>
-        <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => openInTab(`/assets/${suggestion.assetId}`)}>
-          <ExternalLink className="size-3" /> {t("caseBoard.menu.openAsset")}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 gap-1 text-xs"
-          onClick={() => startTrace(ui, { nodeId: suggestedKey, assetId: suggestion.assetId, label: suggestion.label })}
-        >
-          <Waypoints className="size-3" /> {t("caseBoard.menu.showConnections")}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function ItemDetails({
-  itemId,
-  findingId,
-  onFlyTo,
-}: {
-  itemId: string;
-  findingId: string | null;
-  onFlyTo: (itemId: string) => void;
-}) {
-  const { t } = useTranslation();
-  const ui = useUiStore();
-  const bubble = useBoard((s) => s.bubbles.get(itemId));
-  const [finding, setFinding] = React.useState<FindingResponseDto | null>(null);
-  const [loading, setLoading] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!findingId) {
-      setFinding(null);
-      return;
-    }
-    setLoading(true);
-    api.findings
-      .findingsControllerFindOne({ id: findingId })
-      .then(setFinding)
-      .catch(() => setFinding(null))
-      .finally(() => setLoading(false));
-  }, [findingId]);
-
-  if (!bubble) return <p className="py-8 text-center text-sm text-muted-foreground">{t("caseBoard.drawers.detailsEmpty")}</p>;
-  const row = findingId ? [...bubble.rows, ...bubble.unattached].find((r) => r.findingId === findingId) : undefined;
-
-  return (
-    <div className="space-y-4 text-sm">
-      <div className="space-y-1">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-          {bubble.assetType ?? "asset"} {bubble.sourceName ? `· ${bubble.sourceName}` : ""}
-        </p>
-        <p className="font-semibold">{bubble.label}</p>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => onFlyTo(bubble.itemId)}>
-            <Crosshair className="size-3" /> {t("caseBoard.drawers.showOnBoard")}
-          </Button>
-          {bubble.assetId && (
-            <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => openInTab(`/assets/${bubble.assetId}`)}>
-              <ExternalLink className="size-3" /> {t("caseBoard.menu.openAsset")}
-            </Button>
-          )}
-          {bubble.assetId && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1 text-xs"
-              onClick={() => startTrace(ui, { nodeId: bubble.itemId, assetId: bubble.assetId, label: bubble.label })}
-              data-testid="details-show-connections"
-            >
-              <Waypoints className="size-3" /> {t("caseBoard.menu.showConnections")}
-            </Button>
-          )}
-        </div>
-      </div>
-      <FindingList itemId={bubble.itemId} bubble={bubble} selectedId={findingId} />
-      {findingId && (
-        <div className="space-y-2 border-t-2 border-border pt-3">
-          {loading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-2">
-                <SeverityBadge severity={(row?.severity ?? finding?.severity?.toLowerCase() ?? "info") as never}>
-                  {row?.severity ?? finding?.severity}
-                </SeverityBadge>
-                <span className="font-medium">{row?.typeLabel ?? finding?.findingType}</span>
-                {row && row.state !== "open" && <StateChip tone="neutral">{row.state}</StateChip>}
-              </div>
-              {row?.escalated && <EscalationNotice caseRowFindingId={row.findingId} row={row} />}
-              <pre className="max-h-56 overflow-auto rounded-[4px] border-2 border-border bg-muted/40 p-2 font-mono text-xs whitespace-pre-wrap">
-                {finding?.contextBefore ? <span className="text-muted-foreground">{finding.contextBefore}</span> : null}
-                <mark className="bg-accent text-accent-foreground">{finding?.matchedContent ?? row?.value ?? ""}</mark>
-                {finding?.contextAfter ? <span className="text-muted-foreground">{finding.contextAfter}</span> : null}
-              </pre>
-              <dl className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1 text-xs">
-                <dt className="text-muted-foreground">Detector</dt>
-                <dd>{finding?.customDetectorName ?? finding?.detectorType ?? row?.detector ?? "—"}</dd>
-                <dt className="text-muted-foreground">Status</dt>
-                <dd>{finding?.status ?? row?.status ?? "—"}</dd>
-                {finding?.detectedAt && (
-                  <>
-                    <dt className="text-muted-foreground">Detected</dt>
-                    <dd>{new Date(finding.detectedAt).toLocaleString()}</dd>
-                  </>
-                )}
-                {row?.note && (
-                  <>
-                    <dt className="text-muted-foreground">Note</dt>
-                    <dd className="whitespace-pre-wrap">{row.note}</dd>
-                  </>
-                )}
-              </dl>
-              <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => openInTab(`/findings/${findingId}`)}>
-                <ExternalLink className="size-3" /> {t("caseBoard.menu.openFinding")}
-              </Button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Why a finding is escalated — the rule it matched, when — and the way to
- * clear the mark once someone has dealt with it. The finding stays.
- */
-function EscalationNotice({ caseRowFindingId, row }: { caseRowFindingId: string; row: BubbleRow }) {
-  const { t } = useTranslation();
-  const store = useBoardStore();
-  const readOnly = useBoard((s) => s.readOnly);
-  const caseId = useBoard((s) => s.caseId);
-  const [clearing, setClearing] = React.useState(false);
-  const clear = async () => {
-    setClearing(true);
-    try {
-      await api.cases.caseCleanupControllerClearEscalations({
-        id: caseId,
-        clearCaseEscalationsDto: { findingIds: [caseRowFindingId] },
-      });
-      toast.success(t("caseEscalation.cleared"));
-      store.getState().refetch();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("caseEscalation.failedToClear"));
-    } finally {
-      setClearing(false);
-    }
-  };
-  return (
-    <div
-      className="flex items-start gap-2.5 rounded-[4px] border-2 border-border p-2.5"
-      data-testid="escalation-notice"
-    >
-      <EscalationFlag size={16} className="mt-0.5 shrink-0" />
-      <div className="min-w-0 flex-1 space-y-0.5">
-        <p className={cn("font-mono text-[10px] font-bold uppercase tracking-[0.14em]", ESCALATION_INK)}>
-          {t("caseEscalation.state")}
-          {row.escalatedAt ? ` · ${formatDistanceToNowStrict(new Date(row.escalatedAt), { addSuffix: true })}` : ""}
-        </p>
-        {row.escalationLabel && (
-          <p className="text-xs">{t("caseEscalation.matched", { rule: row.escalationLabel })}</p>
-        )}
-      </div>
-      {!readOnly && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 shrink-0 gap-1 text-xs"
-          disabled={clearing}
-          onClick={() => void clear()}
-          data-testid="escalation-clear"
-        >
-          {clearing ? <Loader2 className="size-3 animate-spin" /> : <X className="size-3" />}
-          {t("caseEscalation.clear")}
-        </Button>
-      )}
-    </div>
-  );
-}
-
-/**
- * Every finding of the asset, as a list: the board draws them as nodes around
- * the asset (up to a dozen at a time), and this is where they all read as
- * text, with Attach for the ones not yet in the case.
- */
-function FindingList({
-  itemId,
-  bubble,
-  selectedId,
-}: {
-  itemId: string;
-  bubble: Bubble;
-  selectedId: string | null;
-}) {
-  const { t } = useTranslation();
-  const ui = useUiStore();
-  const store = useBoardStore();
-  const readOnly = useBoard((s) => s.readOnly);
-  const highlights = useBoard((s) => s.items.get(itemId)?.style.rowHighlights);
-  const select = (findingId: string) => ui.getState().set({ detailsTarget: { itemId, findingId } });
-  const line = (row: BubbleRow, attached: boolean) => (
-    <li key={row.findingId}>
-      <div
-        className={cn(
-          "flex w-full items-center gap-1.5 rounded-[3px] px-1.5 py-1 text-left text-[11px] hover:bg-muted/70",
-          row.findingId === selectedId && "bg-muted",
-          highlights?.[row.findingId] && `cb-row-${highlights[row.findingId]}`,
-          !attached && "text-muted-foreground",
-        )}
-      >
-        <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left" onClick={() => select(row.findingId)}>
-          <SeverityBadge severity={row.severity ?? "info"} className="w-[46px] shrink-0 justify-center px-0.5 py-px text-[8px]">
-            {t(`caseBoard.severity.${row.severity ?? "info"}`)}
-          </SeverityBadge>
-          <span className="max-w-[110px] shrink-0 truncate text-muted-foreground">{row.typeLabel}</span>
-          <span
-            className={cn(
-              "min-w-0 flex-1 truncate font-mono",
-              row.state === "dismissed" && "line-through",
-            )}
-          >
-            {row.value ?? ""}
-          </span>
-          {attached && row.escalated && (
-            <span title={row.escalationLabel ?? t("caseEscalation.state")} className="shrink-0">
-              <EscalationFlag size={12} />
-            </span>
-          )}
-          {row.state !== "open" && (
-            <StateChip tone={row.state === "resolved" ? "success" : row.state === "new" ? "accent" : row.state === "gone" ? "destructive" : "muted"}>
-              {row.state === "dismissed" ? t(`caseBoard.states.${dismissedLabel(row.status)}`) : t(`caseBoard.states.${row.state}`)}
-            </StateChip>
-          )}
-        </button>
-        {!attached && !readOnly && (
-          <button
-            type="button"
-            className="inline-flex shrink-0 items-center gap-0.5 rounded-[3px] border border-border px-1 py-px font-mono text-[9px] uppercase text-foreground hover:bg-muted"
-            title={t("caseBoard.bubble.attachHint")}
-            onClick={() => store.getState().run(attachFinding(itemId, row.findingId))}
-          >
-            <Plus className="size-2.5" aria-hidden />
-            {t("caseBoard.bubble.attach")}
-          </button>
-        )}
-      </div>
-    </li>
-  );
-  if (bubble.rows.length === 0 && bubble.unattached.length === 0) return null;
-  return (
-    <div className="space-y-2 border-t-2 border-border pt-3">
-      {bubble.rows.length > 0 && (
-        <section className="space-y-1">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            {t("caseBoard.bubble.findings")} · {bubble.rows.length}
-          </p>
-          <ul className="max-h-64 overflow-y-auto">{bubble.rows.map((row) => line(row, true))}</ul>
-        </section>
-      )}
-      {bubble.unattached.length > 0 && (
-        <section className="space-y-1">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            {t("caseBoard.bubble.notInCase")} · {bubble.unattached.length}
-          </p>
-          <ul className="max-h-48 overflow-y-auto">{bubble.unattached.map((row) => line(row, false))}</ul>
-        </section>
-      )}
-    </div>
   );
 }
 

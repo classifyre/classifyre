@@ -46,7 +46,7 @@ import { CasesService } from './cases.service';
 import { CaseThreadsService } from './case-threads.service';
 import { CaseActivityService } from './case-activity.service';
 import { CorrelationService } from './correlation/correlation.service';
-import { AgentKind, CaseThreadKind } from '@prisma/client';
+import { AgentKind, CaseActivityType, CaseThreadKind } from '@prisma/client';
 import { EmbeddingService } from './embedding/embedding.service';
 import { GlossaryService } from './glossary/glossary.service';
 import { CaseLeadsService } from './case-leads.service';
@@ -3721,7 +3721,10 @@ export class McpServerFactoryService {
           'matching answers by itself (even with auto-add off) and raises a ' +
           'notification; filters win over escalations. Scope: omit inquiryId for ' +
           'the whole case, or give a linked question to apply to its answers only. ' +
-          'Run with dryRun first: it reports how many findings would be detached or escalated.',
+          'removeEmptiedAssets (filters only) also takes out every asset the filter leaves ' +
+          'without a finding in the case. ' +
+          'Run with dryRun first: it reports how many findings would be detached or escalated ' +
+          '(and emptiedAssets: how many assets would be left without findings).',
         inputSchema: z.strictObject({
           id: z.string().uuid(),
           action: z.enum(['EXCLUDE', 'ESCALATE']).optional(),
@@ -3736,6 +3739,7 @@ export class McpServerFactoryService {
             )
             .min(1)
             .max(50),
+          removeEmptiedAssets: z.boolean().optional(),
           dryRun: z.boolean().optional(),
         }),
         annotations: {
@@ -3743,7 +3747,7 @@ export class McpServerFactoryService {
           destructiveHint: true,
         },
       },
-      async ({ id, action, inquiryId, rules, dryRun }) => {
+      async ({ id, action, inquiryId, rules, removeEmptiedAssets, dryRun }) => {
         if (dryRun) {
           return jsonResult({
             dryRun: true,
@@ -3758,7 +3762,12 @@ export class McpServerFactoryService {
         return jsonResult(
           await this.caseFindingFilters.add(
             id,
-            { action, inquiryId: inquiryId ?? null, rules },
+            {
+              action,
+              inquiryId: inquiryId ?? null,
+              rules,
+              removeEmptiedAssets,
+            },
             'mcp',
           ),
         );
@@ -3864,23 +3873,33 @@ export class McpServerFactoryService {
       'get_case_timeline',
       {
         title: 'Get Case Timeline',
-        description: 'Paginated unified case activity feed (newest first).',
+        description:
+          'Paginated unified case activity feed (newest first). Narrow it with `types` (e.g. FINDINGS_ESCALATED, FINDINGS_AUTO_REMOVED) or to one linked watch with `inquiryId`.',
         inputSchema: {
           caseId: z.string().uuid(),
           cursor: z.string().optional(),
           limit: z.number().int().min(1).max(100).optional(),
+          types: z
+            .array(
+              z.enum(Object.values(CaseActivityType) as [string, ...string[]]),
+            )
+            .max(20)
+            .optional()
+            .describe('Only these activity types'),
+          inquiryId: z.string().uuid().optional(),
         },
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
         },
       },
-      async ({ caseId, cursor, limit }) =>
+      async ({ caseId, cursor, limit, types, inquiryId }) =>
         jsonResult(
           await this.caseActivityService.getTimeline(
             caseId,
             cursor,
             limit ?? 50,
+            { types: types as CaseActivityType[] | undefined, inquiryId },
           ),
         ),
     );

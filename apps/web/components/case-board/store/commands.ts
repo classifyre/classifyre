@@ -395,6 +395,8 @@ export function createLink(input: NewLink): Command & { id: string } {
 export function updateLink(
   link: BoardLink,
   patch: Partial<Pick<BoardLink, "kind" | "label" | "certainty" | "confidence" | "note">>,
+  /** The version a text edit claims (see claims.ts `textClaim`); the link's own by default. */
+  expectedUpdatedAt: string = link.updatedAt,
 ): Command {
   const prev: Record<string, unknown> = {};
   for (const key of Object.keys(patch) as Array<keyof typeof patch>) prev[key] = link[key];
@@ -407,7 +409,7 @@ export function updateLink(
         opId: opId(),
         id: link.id,
         patch,
-        ...(withExpected ? { expectedUpdatedAt: link.updatedAt } : {}),
+        ...(withExpected ? { expectedUpdatedAt } : {}),
       },
     ],
     inverse: [

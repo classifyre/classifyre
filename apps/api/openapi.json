@@ -6657,6 +6657,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "types",
+            "required": false,
+            "in": "query",
+            "description": "Only these activity types (comma-separated), e.g. MATCHES_LANDED,MATCHES_RETIRED",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6748,6 +6757,7 @@
             "name": "cursor",
             "required": false,
             "in": "query",
+            "description": "The id of the last entry of the previous page",
             "schema": {
               "type": "string"
             }
@@ -6756,6 +6766,33 @@
             "name": "limit",
             "required": false,
             "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "types",
+            "required": false,
+            "in": "query",
+            "description": "Only these activity types (comma-separated), e.g. FINDINGS_ESCALATED,FINDINGS_AUTO_REMOVED",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inquiryId",
+            "required": false,
+            "in": "query",
+            "description": "Only entries about this linked watch (inquiry)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": false,
+            "in": "query",
+            "description": "An entry id the page must reach: the page runs from the newest entry down to and including it (at most 1000 entries)",
             "schema": {
               "type": "string"
             }
@@ -21244,8 +21281,10 @@
               "FINDING_GONE",
               "FINDING_RESOLVED",
               "FILTER",
-              "ASSET_GONE"
-            ]
+              "ASSET_GONE",
+              "FILTER_EMPTIED"
+            ],
+            "description": "FILTER_EMPTIED: an asset a filter left without any finding in the case"
           },
           "state": {
             "type": "string",
@@ -21439,13 +21478,26 @@
             "items": {
               "$ref": "#/components/schemas/CaseCleanupItemDto"
             }
+          },
+          "emptiedAssets": {
+            "type": "number",
+            "description": "Filters only: assets these rules would leave without a finding in the case"
+          },
+          "emptiedSample": {
+            "description": "Names of a few of those assets",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "matched",
           "perRule",
           "problems",
-          "sample"
+          "sample",
+          "emptiedAssets",
+          "emptiedSample"
         ]
       },
       "AddCaseFindingFiltersDto": {
@@ -21470,6 +21522,11 @@
             "items": {
               "$ref": "#/components/schemas/CaseFindingFilterRuleDto"
             }
+          },
+          "removeEmptiedAssets": {
+            "type": "boolean",
+            "default": false,
+            "description": "Filters only: also take out of the case every asset the filter leaves without a finding in it. An asset that had no finding in the case to begin with is left alone."
           },
           "clientId": {
             "type": "string",
@@ -21496,12 +21553,17 @@
           "escalated": {
             "type": "number",
             "description": "Findings already in the case the change marked escalated (escalations)"
+          },
+          "assetsRemoved": {
+            "type": "number",
+            "description": "Assets taken out because the filter left them without a finding (removeEmptiedAssets)"
           }
         },
         "required": [
           "filters",
           "detached",
-          "escalated"
+          "escalated",
+          "assetsRemoved"
         ]
       },
       "UpdateCaseFindingFilterDto": {
@@ -21513,6 +21575,11 @@
           "description": {
             "type": "string",
             "nullable": true
+          },
+          "removeEmptiedAssets": {
+            "type": "boolean",
+            "default": false,
+            "description": "Filters only: also take out of the case every asset the filter leaves without a finding in it. An asset that had no finding in the case to begin with is left alone."
           },
           "clientId": {
             "type": "string"

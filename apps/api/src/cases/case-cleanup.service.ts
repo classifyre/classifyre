@@ -99,9 +99,18 @@ export interface FindingRemovalPlan {
   filterId?: string;
 }
 
+/**
+ * Why evidence leaves by itself: its asset is gone from the source, or a
+ * filter just took out every finding the case held on it (and was asked to
+ * take out what it empties).
+ */
+export type EvidenceRemovalReason = 'ASSET_GONE' | 'FILTER_EMPTIED';
+
 interface EvidenceRemovalPlan {
   ev: CaseEvidence & { findings: CaseFinding[] };
-  state: GoneState;
+  reason: EvidenceRemovalReason;
+  /** For a gone asset: retired by a scan, or its row deleted. */
+  state?: GoneState;
 }
 
 interface Plan {
@@ -111,7 +120,9 @@ interface Plan {
 
 interface ExecuteContext {
   /** Which trigger each rule's timeline row names. */
-  triggerFor: (reason: FindingRemovalReason | 'ASSET_GONE') => CleanupTrigger;
+  triggerFor: (
+    reason: FindingRemovalReason | EvidenceRemovalReason,
+  ) => CleanupTrigger;
   /** Who the timeline credits: a person, the clean-up itself, or nobody named. */
   actor: string | undefined;
   run?: {
@@ -123,6 +134,8 @@ interface ExecuteContext {
 }
 
 export interface CleanupOutcome extends CaseCleanupResultDto {
+  /** Of `evidenceRemoved`: assets a filter left without findings. */
+  emptiedRemoved: number;
   /** The board's version after the pass, when it changed one. */
   version: number | null;
 }
@@ -131,17 +144,19 @@ const NOTHING: CleanupOutcome = {
   findingsRemoved: 0,
   evidenceRemoved: 0,
   findingsWithEvidence: 0,
+  emptiedRemoved: 0,
   version: null,
 };
 
 const RULE_FOR: Record<
-  FindingRemovalReason | 'ASSET_GONE',
+  FindingRemovalReason | EvidenceRemovalReason,
   keyof CleanupRules | null
 > = {
   FINDING_GONE: 'removeGoneFindings',
   FINDING_RESOLVED: 'removeResolvedFindings',
   ASSET_GONE: 'removeGoneAssets',
   FILTER: null,
+  FILTER_EMPTIED: null,
 };
 
 const CLEANUP_SELECT = {
@@ -254,7 +269,7 @@ export class CaseCleanupService implements CaseCleanupPort {
     const sample: CaseCleanupItemDto[] = [
       ...plan.evidence.map(
         (e): CaseCleanupItemDto => ({
-          reason: 'ASSET_GONE',
+          reason: e.reason,
           state: e.state,
           label: e.ev.label ?? e.ev.entityId,
           value: null,
@@ -399,16 +414,27 @@ export class CaseCleanupService implements CaseCleanupPort {
     tx: Db,
     caseId: string,
     filters: Array<FindingFilterRule & FilterSummary>,
-    ctx: { trigger: 'FILTER_ADDED' | 'FILTER_UPDATED'; actor?: string },
+    ctx: {
+      trigger: 'FILTER_ADDED' | 'FILTER_UPDATED';
+      actor?: string;
+      /** Also take out the assets this leaves without a finding in the case. */
+      removeEmptiedAssets?: boolean;
+    },
   ): Promise<CleanupOutcome> {
     const row = await this.lockCase(tx, caseId);
     if (!row || isReadOnlyCase(row.status) || filters.length === 0)
       return NOTHING;
     const findings = await this.planFilterRemovals(tx, caseId, filters);
+    const emptied = ctx.removeEmptiedAssets
+      ? await this.emptiedEvidence(tx, caseId, findings)
+      : [];
     return this.execute(
       tx,
       caseId,
-      { findings, evidence: [] },
+      {
+        findings,
+        evidence: emptied.map((ev) => ({ ev, reason: 'FILTER_EMPTIED' })),
+      },
       {
         triggerFor: () => ctx.trigger,
         actor: ctx.actor,
@@ -444,7 +470,14 @@ export class CaseCleanupService implements CaseCleanupPort {
       .filter(({ index }) => problems[index] === '');
     const perRule = rules.map(() => 0);
     if (valid.length === 0) {
-      return { matched: 0, perRule, problems, sample: [] };
+      return {
+        matched: 0,
+        perRule,
+        problems,
+        sample: [],
+        emptiedAssets: 0,
+        emptiedSample: [],
+      };
     }
     const filters: FindingFilterRule[] = valid.map(({ r, index }) => ({
       id: String(index),
@@ -474,6 +507,11 @@ export class CaseCleanupService implements CaseCleanupPort {
     }
     const first = new Map<string, FindingRemovalPlan>();
     for (const r of removals) if (!first.has(r.cf.id)) first.set(r.cf.id, r);
+    // What a filter would leave empty; an escalation leaves every finding in.
+    const emptied =
+      action === CaseFindingRuleAction.EXCLUDE
+        ? await this.emptiedEvidence(this.prisma, caseId, [...first.values()])
+        : [];
     return {
       matched: matched.size,
       perRule,
@@ -481,7 +519,36 @@ export class CaseCleanupService implements CaseCleanupPort {
       sample: [...first.values()]
         .slice(0, SAMPLE_CAP)
         .map((r) => this.sampleItem(r)),
+      emptiedAssets: emptied.length,
+      emptiedSample: emptied
+        .slice(0, SAMPLE_CAP)
+        .map((ev) => ev.label ?? ev.entityId),
     };
+  }
+
+  /**
+   * The case's evidence these removals leave without a single finding: every
+   * finding the case held on it is among them. Evidence that held no finding
+   * to begin with (an asset added on its own) is never "emptied".
+   */
+  async emptiedEvidence(
+    db: Db,
+    caseId: string,
+    removals: readonly FindingRemovalPlan[],
+  ): Promise<EvidenceRemovalPlan['ev'][]> {
+    if (removals.length === 0) return [];
+    const leaving = new Set(removals.map((r) => r.cf.id));
+    const touched = [...new Set(removals.map((r) => r.cf.caseEvidenceId))];
+    const evidence = await this.inChunks(touched, (ids) =>
+      db.caseEvidence.findMany({
+        where: { caseId, id: { in: ids } },
+        include: { findings: true },
+      }),
+    );
+    return evidence.filter(
+      (ev) =>
+        ev.findings.length > 0 && ev.findings.every((f) => leaving.has(f.id)),
+    );
   }
 
   /**
@@ -579,7 +646,7 @@ export class CaseCleanupService implements CaseCleanupPort {
           rules,
         );
         if (!state) continue;
-        plan.evidence.push({ ev, state });
+        plan.evidence.push({ ev, reason: 'ASSET_GONE', state });
         leaving.add(ev.id);
       }
     }
@@ -732,76 +799,21 @@ export class CaseCleanupService implements CaseCleanupPort {
     const itemByEvidence = board
       ? await this.itemsByEvidence(tx, board.id, evidenceIds)
       : new Map<string, CaseBoardItem>();
+    // Board items as this pass leaves them: a finding's undo state and an
+    // asset's tombstone can land on the same item, the one after the other.
+    const contents = new Map<string, Record<string, unknown>>();
+    const contentOf = (item: CaseBoardItem) =>
+      contents.get(item.id) ?? asRecord(item.content) ?? {};
+    const leavingEvidence = new Set(plan.evidence.map((e) => e.ev.id));
+    /** The live item of evidence that stays on the board, for "Show on board". */
+    const stayingItem = (evidenceId: string) =>
+      leavingEvidence.has(evidenceId)
+        ? undefined
+        : itemByEvidence.get(evidenceId);
 
-    let findingsWithEvidence = 0;
-    if (plan.evidence.length > 0) {
-      if (board) {
-        const leaving = plan.evidence
-          .map((e) => ({ e, item: itemByEvidence.get(e.ev.id) }))
-          .filter(
-            (x): x is { e: EvidenceRemovalPlan; item: CaseBoardItem } =>
-              !!x.item && !x.item.deletedAt,
-          );
-        const itemIds = leaving.map((x) => x.item.id);
-        await unparentChildren(tx, board.id, itemIds);
-        for (const { e, item } of leaving) {
-          await tx.caseBoardItem.update({
-            where: { id: item.id },
-            data: {
-              deletedAt: now,
-              updatedBy: ctx.actor ?? null,
-              content: toJson({
-                ...(asRecord(item.content) ?? {}),
-                tombstone: evidenceTombstone(e.ev),
-              }),
-            },
-          });
-        }
-        if (itemIds.length > 0) {
-          await tx.caseBoardLink.updateMany({
-            where: {
-              boardId: board.id,
-              deletedAt: null,
-              OR: [
-                { sourceItemId: { in: itemIds } },
-                { targetItemId: { in: itemIds } },
-              ],
-            },
-            data: { deletedAt: now },
-          });
-        }
-      }
-      await tx.caseEvidence.deleteMany({
-        where: { caseId, id: { in: plan.evidence.map((e) => e.ev.id) } },
-      });
-      findingsWithEvidence = plan.evidence.reduce(
-        (sum, e) => sum + e.ev.findings.length,
-        0,
-      );
-      await this.recordRemoval(
-        tx,
-        caseId,
-        CaseActivityType.EVIDENCE_AUTO_REMOVED,
-        ctx,
-        'ASSET_GONE',
-        {
-          reason: 'ASSET_GONE',
-          ...triggerPayload(ctx.triggerFor('ASSET_GONE')),
-          count: plan.evidence.length,
-          findingsRemoved: findingsWithEvidence,
-          assets: plan.evidence.slice(0, LIST_CAP).map((e) => ({
-            evidenceId: e.ev.id,
-            assetId: e.ev.entityId,
-            label: e.ev.label ?? e.ev.entityId,
-            findings: e.ev.findings.length,
-            state: e.state,
-          })),
-          ...(plan.evidence.length > LIST_CAP ? { truncated: true } : {}),
-          ...runPayload(ctx.run),
-        },
-      );
-    }
-
+    // Findings first: each keeps its undo state on its asset's item, so it
+    // comes back exactly (note, stances) if someone attaches it again — also
+    // when the asset itself leaves right after, emptied by a filter.
     if (plan.findings.length > 0) {
       if (board) {
         const byEvidence = new Map<string, FindingRemovalPlan[]>();
@@ -813,18 +825,19 @@ export class CaseCleanupService implements CaseCleanupPort {
         for (const [evidenceId, removals] of byEvidence) {
           const item = itemByEvidence.get(evidenceId);
           if (!item || item.deletedAt) continue;
-          const content = asRecord(item.content) ?? {};
-          const detached = asRecord(content.detached) ?? {};
+          const content = contentOf(item);
+          const detached = { ...(asRecord(content.detached) ?? {}) };
           for (const r of removals) {
             detached[r.cf.findingId] = {
               ...caseFindingTombstone(r.cf),
               detachedAt: now.toISOString(),
             };
           }
+          contents.set(item.id, { ...content, detached });
           await tx.caseBoardItem.update({
             where: { id: item.id },
             data: {
-              content: toJson({ ...content, detached }),
+              content: toJson(contents.get(item.id)!),
               updatedBy: ctx.actor ?? null,
             },
           });
@@ -855,7 +868,7 @@ export class CaseCleanupService implements CaseCleanupPort {
         const group = plan.findings.filter((r) => r.reason === reason);
         if (group.length === 0) continue;
         const items = new Set(
-          group.map((r) => itemByEvidence.get(r.cf.caseEvidenceId)?.id),
+          group.map((r) => stayingItem(r.cf.caseEvidenceId)?.id),
         );
         const onlyItem = items.size === 1 ? [...items][0] : undefined;
         const filterIds = new Set(group.map((r) => r.filterId));
@@ -877,8 +890,8 @@ export class CaseCleanupService implements CaseCleanupPort {
               severity: r.cf.severity,
               assetId: r.cf.caseEvidence.entityId,
               assetLabel: r.cf.caseEvidence.label,
-              ...(itemByEvidence.get(r.cf.caseEvidenceId)
-                ? { itemId: itemByEvidence.get(r.cf.caseEvidenceId)!.id }
+              ...(stayingItem(r.cf.caseEvidenceId)
+                ? { itemId: stayingItem(r.cf.caseEvidenceId)!.id }
                 : {}),
               ...(r.state ? { state: r.state } : {}),
               ...(r.filterId ? { filterId: r.filterId } : {}),
@@ -888,6 +901,90 @@ export class CaseCleanupService implements CaseCleanupPort {
             ...(onlyItem ? { itemId: onlyItem } : {}),
             ...(reason === 'FILTER' && ctx.filters
               ? { filters: ctx.filters.filter((f) => filterIds.has(f.id)) }
+              : {}),
+            ...runPayload(ctx.run),
+          },
+        );
+      }
+    }
+
+    let findingsWithEvidence = 0;
+    if (plan.evidence.length > 0) {
+      if (board) {
+        const leaving = plan.evidence
+          .map((e) => ({ e, item: itemByEvidence.get(e.ev.id) }))
+          .filter(
+            (x): x is { e: EvidenceRemovalPlan; item: CaseBoardItem } =>
+              !!x.item && !x.item.deletedAt,
+          );
+        const itemIds = leaving.map((x) => x.item.id);
+        await unparentChildren(tx, board.id, itemIds);
+        for (const { e, item } of leaving) {
+          await tx.caseBoardItem.update({
+            where: { id: item.id },
+            data: {
+              deletedAt: now,
+              updatedBy: ctx.actor ?? null,
+              content: toJson({
+                ...contentOf(item),
+                // An emptied asset comes back bare: its findings were filtered
+                // out and stay restorable one by one (`detached`).
+                tombstone: evidenceTombstone(
+                  e.reason === 'FILTER_EMPTIED'
+                    ? { ...e.ev, findings: [] }
+                    : e.ev,
+                ),
+              }),
+            },
+          });
+        }
+        if (itemIds.length > 0) {
+          await tx.caseBoardLink.updateMany({
+            where: {
+              boardId: board.id,
+              deletedAt: null,
+              OR: [
+                { sourceItemId: { in: itemIds } },
+                { targetItemId: { in: itemIds } },
+              ],
+            },
+            data: { deletedAt: now },
+          });
+        }
+      }
+      await tx.caseEvidence.deleteMany({
+        where: { caseId, id: { in: plan.evidence.map((e) => e.ev.id) } },
+      });
+      for (const reason of ['ASSET_GONE', 'FILTER_EMPTIED'] as const) {
+        const group = plan.evidence.filter((e) => e.reason === reason);
+        if (group.length === 0) continue;
+        // A gone asset takes its findings along; an emptied one has none left.
+        const withIt =
+          reason === 'ASSET_GONE'
+            ? group.reduce((sum, e) => sum + e.ev.findings.length, 0)
+            : 0;
+        findingsWithEvidence += withIt;
+        await this.recordRemoval(
+          tx,
+          caseId,
+          CaseActivityType.EVIDENCE_AUTO_REMOVED,
+          ctx,
+          reason,
+          {
+            reason,
+            ...triggerPayload(ctx.triggerFor(reason)),
+            count: group.length,
+            findingsRemoved: withIt,
+            assets: group.slice(0, LIST_CAP).map((e) => ({
+              evidenceId: e.ev.id,
+              assetId: e.ev.entityId,
+              label: e.ev.label ?? e.ev.entityId,
+              findings: e.ev.findings.length,
+              ...(e.state ? { state: e.state } : {}),
+            })),
+            ...(group.length > LIST_CAP ? { truncated: true } : {}),
+            ...(reason === 'FILTER_EMPTIED' && ctx.filters
+              ? { filters: ctx.filters }
               : {}),
             ...runPayload(ctx.run),
           },
@@ -908,6 +1005,8 @@ export class CaseCleanupService implements CaseCleanupPort {
       findingsRemoved: plan.findings.length,
       evidenceRemoved: plan.evidence.length,
       findingsWithEvidence,
+      emptiedRemoved: plan.evidence.filter((e) => e.reason === 'FILTER_EMPTIED')
+        .length,
       version,
     };
   }
@@ -923,7 +1022,7 @@ export class CaseCleanupService implements CaseCleanupPort {
     caseId: string,
     type: CaseActivityType,
     ctx: ExecuteContext,
-    reason: FindingRemovalReason | 'ASSET_GONE',
+    reason: FindingRemovalReason | EvidenceRemovalReason,
     payload: ActivityPayload,
   ): Promise<void> {
     if (ctx.actor === CASE_CLEANUP_ACTOR) {
@@ -949,11 +1048,19 @@ export class CaseCleanupService implements CaseCleanupPort {
   ): void {
     if (!this.events || outcome.version === null) return;
     const parts: string[] = [];
-    if (outcome.evidenceRemoved > 0) {
+    const gone = outcome.evidenceRemoved - outcome.emptiedRemoved;
+    if (gone > 0) {
       parts.push(
-        outcome.evidenceRemoved === 1
+        gone === 1
           ? 'took out an asset that is gone'
-          : `took out ${outcome.evidenceRemoved} assets that are gone`,
+          : `took out ${gone} assets that are gone`,
+      );
+    }
+    if (outcome.emptiedRemoved > 0) {
+      parts.push(
+        outcome.emptiedRemoved === 1
+          ? 'took out an asset a filter left without findings'
+          : `took out ${outcome.emptiedRemoved} assets a filter left without findings`,
       );
     }
     if (outcome.findingsRemoved > 0) {

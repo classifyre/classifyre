@@ -46,6 +46,12 @@ export interface AddCaseFindingFiltersDto {
      */
     rules: Array<CaseFindingFilterRuleDto>;
     /**
+     * Filters only: also take out of the case every asset the filter leaves without a finding in it. An asset that had no finding in the case to begin with is left alone.
+     * @type {boolean}
+     * @memberof AddCaseFindingFiltersDto
+     */
+    removeEmptiedAssets?: boolean;
+    /**
      * The board tab asking, so it can ignore the echo of its own change
      * @type {string}
      * @memberof AddCaseFindingFiltersDto
@@ -85,6 +91,7 @@ export function AddCaseFindingFiltersDtoFromJSONTyped(json: any, ignoreDiscrimin
         'action': json['action'] == null ? undefined : json['action'],
         'inquiryId': json['inquiryId'] == null ? undefined : json['inquiryId'],
         'rules': ((json['rules'] as Array<any>).map(CaseFindingFilterRuleDtoFromJSON)),
+        'removeEmptiedAssets': json['removeEmptiedAssets'] == null ? undefined : json['removeEmptiedAssets'],
         'clientId': json['clientId'] == null ? undefined : json['clientId'],
     };
 }
@@ -103,6 +110,7 @@ export function AddCaseFindingFiltersDtoToJSONTyped(value?: AddCaseFindingFilter
         'action': value['action'],
         'inquiryId': value['inquiryId'],
         'rules': ((value['rules'] as Array<any>).map(CaseFindingFilterRuleDtoToJSON)),
+        'removeEmptiedAssets': value['removeEmptiedAssets'],
         'clientId': value['clientId'],
     };
 }

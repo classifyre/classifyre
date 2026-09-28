@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { useReactFlow } from "@xyflow/react";
 import {
   Bot,
@@ -12,7 +11,6 @@ import {
   FlaskConical,
   History,
   MoreHorizontal,
-  Pencil,
   Search,
   Wand2,
 } from "lucide-react";
@@ -29,7 +27,6 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
 import { CaseStatusBadge } from "@/components/case-status-badge";
-import { nsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
 import { isFindingData } from "../store/projection";
@@ -127,7 +124,6 @@ export function TopBar({
   const ui = useUiStore();
   const store = useBoardStore();
   const rf = useReactFlow();
-  const router = useRouter();
   const spotlight = useUi((s) => s.spotlight);
   const readOnly = useBoard((s) => s.readOnly);
   const counts = useBoard((s) => {
@@ -190,11 +186,18 @@ export function TopBar({
           first row and the ledger, search and tools the second. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 @4xl/topbar:h-14 @4xl/topbar:flex-nowrap @4xl/topbar:py-0 @4xl/topbar:pr-2 @4xl/topbar:pl-4">
         <div className="flex min-w-0 basis-full items-center gap-2.5 @4xl/topbar:flex-1 @4xl/topbar:basis-auto">
-          <h1
-            className="min-w-0 truncate font-serif text-[17px] font-black tracking-[0.03em] uppercase"
-            title={caseData?.title}
-          >
-            {caseData?.title ?? "…"}
+          {/* The case's own details (title, description, clean-up…) live in the Case file panel. */}
+          <h1 className="min-w-0 truncate font-serif text-[17px] font-black tracking-[0.03em] uppercase">
+            <button
+              type="button"
+              className="max-w-full truncate text-left uppercase underline-offset-4 hover:underline disabled:no-underline"
+              title={caseData ? t("caseBoard.topBar.openCaseFile", { title: caseData.title }) : undefined}
+              disabled={!caseData}
+              onClick={() => ui.getState().openDrawer("caseFile")}
+              data-testid="board-case-title"
+            >
+              {caseData?.title ?? "…"}
+            </button>
           </h1>
           {caseData && <CaseStatusBadge status={caseData.status} />}
           {caseData && (
@@ -284,17 +287,11 @@ export function TopBar({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem
-            disabled={!caseData}
-            onSelect={() => caseData && router.push(nsPath(`/investigations/${caseData.id}/edit`))}
-          >
-            <Pencil className="size-4" /> {t("caseBoard.caseFile.edit")}
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled={readOnly} onSelect={() => ui.getState().set({ autopilotOpen: true })}>
-            <Bot className="size-4" /> {t("investigations.caseDetail.runAI")}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem disabled={readOnly} onSelect={onTidyUp}>
+            <DropdownMenuItem disabled={readOnly} onSelect={() => ui.getState().set({ autopilotOpen: true })}>
+              <Bot className="size-4" /> {t("investigations.caseDetail.runAI")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem disabled={readOnly} onSelect={onTidyUp}>
               <Wand2 className="size-4" /> {t("caseBoard.topBar.tidyUp")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={onExportPng}>

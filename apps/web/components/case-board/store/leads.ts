@@ -139,3 +139,24 @@ export function leadScore(lead: CaseLeadDto): LeadScore {
   if (lead.similarity != null) return { kind: "similar", pct: pct(lead.similarity) };
   return null;
 }
+
+/**
+ * The server's list with this tab's own reviews laid over it: a lead the
+ * server still lists as waiting, but that this tab reviewed, shows as
+ * reviewed. Once the server agrees, the override is dropped.
+ */
+export function withSettled(
+  fresh: CaseLeadDto[],
+  settled: Map<string, CaseLeadDto["status"]>,
+): CaseLeadDto[] {
+  if (settled.size === 0) return fresh;
+  return fresh.map((lead) => {
+    const status = settled.get(lead.id);
+    if (!status) return lead;
+    if (lead.status !== "PROPOSED") {
+      settled.delete(lead.id);
+      return lead;
+    }
+    return { ...lead, status, reviewedAt: lead.reviewedAt ?? new Date() };
+  });
+}

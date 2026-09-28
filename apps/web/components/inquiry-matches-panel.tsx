@@ -63,6 +63,8 @@ export type InquiryMatchesPanelProps = {
   reloadKey?: number;
   /** Reports the filtered totals to the parent header. */
   onStats?: (stats: InquiryMatchesStats) => void;
+  /** Bumped to show only the answers the latest scan no longer finds (and why each left). */
+  showGone?: number;
 };
 
 /**
@@ -79,6 +81,7 @@ export function InquiryMatchesPanel({
   onAllSelectedChange,
   reloadKey = 0,
   onStats,
+  showGone = 0,
 }: InquiryMatchesPanelProps) {
   const { t } = useTranslation();
   const [searchInput, setSearchInput] = React.useState("");
@@ -97,6 +100,10 @@ export function InquiryMatchesPanel({
   const [error, setError] = React.useState<string | null>(null);
 
   const resolvedPageSize = Number(pageSize);
+
+  React.useEffect(() => {
+    if (showGone > 0) setStates(["GONE"]);
+  }, [showGone]);
 
   // ── Debounce search ───────────────────────────────────────────────────────
 

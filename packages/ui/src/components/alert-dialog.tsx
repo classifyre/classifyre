@@ -152,12 +152,12 @@ function AlertDialogAction({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Action> &
   Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
   return (
-    <Button variant={variant} size={size} asChild>
-      <AlertDialogPrimitive.Action
-        data-slot="alert-dialog-action"
-        className={cn(className)}
-        {...props}
-      />
+    // The className goes through the Button, where it is merged with the
+    // variant's classes (a caller's colour replaces the variant's). Put on
+    // the child instead, Slot only concatenates the two, and whichever class
+    // Tailwind emits later wins — the variant's, in practice.
+    <Button variant={variant} size={size} className={className} asChild>
+      <AlertDialogPrimitive.Action data-slot="alert-dialog-action" {...props} />
     </Button>
   );
 }
@@ -170,12 +170,12 @@ function AlertDialogCancel({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Cancel> &
   Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
   return (
-    <Button variant={variant} size={size} asChild>
-      <AlertDialogPrimitive.Cancel
-        data-slot="alert-dialog-cancel"
-        className={cn(className)}
-        {...props}
-      />
+    // The className goes through the Button, where it is merged with the
+    // variant's classes (a caller's colour replaces the variant's). Put on
+    // the child instead, Slot only concatenates the two, and whichever class
+    // Tailwind emits later wins — the variant's, in practice.
+    <Button variant={variant} size={size} className={className} asChild>
+      <AlertDialogPrimitive.Cancel data-slot="alert-dialog-cancel" {...props} />
     </Button>
   );
 }

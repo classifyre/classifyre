@@ -50,6 +50,7 @@ export function FingerprintsGraphSelectionRail({
   focusCluster,
   assetLabel,
   occurrencesCache,
+  assetActions,
 }: {
   selection: GraphSelection;
   selectedNode: GraphNodeDto | null;
@@ -61,6 +62,8 @@ export function FingerprintsGraphSelectionRail({
   focusCluster: (meta: ClusterMeta) => void;
   assetLabel: (id: string) => string;
   occurrencesCache: FingerprintOccurrencesCache;
+  /** Extra actions for a selected asset (e.g. adding it to a case). */
+  assetActions?: (node: GraphNodeDto) => React.ReactNode;
 }) {
   const detailLink = useDetailLink();
   const sourceTypeLabel = useSourceTypeLabel();
@@ -144,6 +147,7 @@ export function FingerprintsGraphSelectionRail({
                 .join(" · ")}
             </p>
           )}
+          {assetActions?.(selectedNode)}
           <Button size="sm" variant="outline" asChild className="w-full">
             <a {...detailLink(`/assets/${selectedNode.id}`)}>
               <ExternalLink className="mr-1.5 h-3.5 w-3.5" />

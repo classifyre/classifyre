@@ -11,6 +11,7 @@ import {
   Equal,
   GripVertical,
   Loader2,
+  Plus,
   Radar,
   RefreshCw,
   Search,
@@ -89,6 +90,15 @@ export interface CaseLeadsProps {
   canShowOnBoard?: (lead: CaseLeadDto) => boolean;
   /** A watch's answer: open the watches. */
   onOpenWatch?: (inquiryId: string) => void;
+  /** Whether what a lead points at is in the case now (reviewed leads say so). */
+  isInCase?: (lead: CaseLeadDto) => boolean;
+  /**
+   * Makes reviewed leads that are not in the case draggable (the board adds
+   * what they point at where they are dropped); the review itself stays.
+   */
+  onReviewedDragStart?: (lead: CaseLeadDto, event: React.DragEvent) => void;
+  /** Add what a reviewed lead points at, without dragging. */
+  onAddReviewed?: (lead: CaseLeadDto) => void;
 }
 
 /**
@@ -110,6 +120,9 @@ export function CaseLeads({
   onShowOnBoard,
   canShowOnBoard,
   onOpenWatch,
+  isInCase,
+  onReviewedDragStart,
+  onAddReviewed,
 }: CaseLeadsProps) {
   const { t } = useTranslation();
   const [origin, setOrigin] = React.useState<LeadOrigin | "ALL">("ALL");
@@ -139,7 +152,7 @@ export function CaseLeads({
   );
 
   return (
-    <div className="space-y-3" data-testid="case-leads">
+    <div className="@container space-y-3" data-testid="case-leads">
       <FeatureOffNotice feature="embeddings" context="leads" variant="inline" />
       <div className="flex items-start gap-2">
         <p className="min-w-0 flex-1 text-xs text-muted-foreground">{t("caseLeads.intro")}</p>
@@ -260,25 +273,66 @@ export function CaseLeads({
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-2 space-y-1">
+            {reviewed.length > 0 && !readOnly && (onReviewedDragStart || onAddReviewed) && (
+              <p className="text-[11px] text-muted-foreground">{t("caseLeads.reviewedHint")}</p>
+            )}
             {reviewed.map((lead) => {
-              const inCase = joinedAnotherWay(lead);
+              const joined = joinedAnotherWay(lead);
+              // What the lead points at, as the case holds it now (it may have left since).
+              const here = isInCase ? isInCase(lead) : joined;
+              const draggable = !readOnly && !here && !!onReviewedDragStart;
               return (
-                <div key={lead.id} className="flex items-center gap-2 rounded-[4px] border border-border px-2.5 py-1.5 text-xs">
+                <div
+                  key={lead.id}
+                  className={cn(
+                    "group flex items-center gap-2 rounded-[4px] border border-border px-2.5 py-1.5 text-xs",
+                    draggable && "cursor-grab hover:border-foreground/40 active:cursor-grabbing",
+                  )}
+                  draggable={draggable || undefined}
+                  onDragStart={draggable ? (event) => onReviewedDragStart!(lead, event) : undefined}
+                  title={draggable ? t("caseLeads.drag") : undefined}
+                  data-testid="lead-reviewed"
+                  data-in-case={here || undefined}
+                >
                   <span
                     className={cn(
                       "shrink-0 rounded-[3px] border px-1 font-mono text-[9px] tracking-[0.06em] uppercase",
                       lead.status === "DISMISSED" ? "border-border text-muted-foreground" : "border-foreground/40 text-foreground",
                     )}
                   >
-                    {inCase ? t("caseLeads.status.inCase") : t(`caseLeads.status.${lead.status === "DISMISSED" ? "DISMISSED" : "ACCEPTED"}`)}
+                    {joined ? t("caseLeads.status.inCase") : t(`caseLeads.status.${lead.status === "DISMISSED" ? "DISMISSED" : "ACCEPTED"}`)}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{lead.kind === "ASSET" ? (lead.assetName ?? lead.title) : lead.title}</span>
-                  {!inCase && (
-                    <span className="shrink-0 text-muted-foreground">
+                  {!joined && (
+                    <span className="hidden shrink-0 text-muted-foreground @sm:inline">
                       {lead.reviewedBy ?? "—"}
                       {lead.reviewedAt ? ` · ${new Date(lead.reviewedAt).toLocaleDateString()}` : ""}
                     </span>
                   )}
+                  {here ? (
+                    <span
+                      className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[9px] text-muted-foreground uppercase"
+                      title={t("caseLeads.inCaseNow")}
+                      data-testid="lead-reviewed-in-case"
+                    >
+                      <Check className="size-3" aria-hidden /> {t("caseLeads.inCaseShort")}
+                    </span>
+                  ) : (
+                    !readOnly &&
+                    onAddReviewed && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 shrink-0 gap-0.5 px-1.5 text-[10px]"
+                        onClick={() => onAddReviewed(lead)}
+                        title={t("caseLeads.addAgainHint")}
+                        data-testid="lead-reviewed-add"
+                      >
+                        <Plus className="size-3" /> {t("caseLeads.addAgain")}
+                      </Button>
+                    )
+                  )}
+                  {draggable && <GripVertical className="size-3.5 shrink-0 text-muted-foreground/50 group-hover:text-muted-foreground" aria-hidden />}
                 </div>
               );
             })}

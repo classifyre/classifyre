@@ -635,7 +635,7 @@ No authorization required
 
 ## inquiriesControllerTimeline
 
-> InquiryTimelineResponseDto inquiriesControllerTimeline(id, cursor, limit)
+> InquiryTimelineResponseDto inquiriesControllerTimeline(id, cursor, limit, types)
 
 The inquiry\&#39;s own history: config changes and each run\&#39;s deltas
 
@@ -659,6 +659,8 @@ async function example() {
     cursor: cursor_example,
     // string (optional)
     limit: limit_example,
+    // string | Only these activity types (comma-separated), e.g. MATCHES_LANDED,MATCHES_RETIRED (optional)
+    types: types_example,
   } satisfies InquiriesControllerTimelineRequest;
 
   try {
@@ -681,6 +683,7 @@ example().catch(console.error);
 | **id** | `string` |  | [Defaults to `undefined`] |
 | **cursor** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **limit** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **types** | `string` | Only these activity types (comma-separated), e.g. MATCHES_LANDED,MATCHES_RETIRED | [Optional] [Defaults to `undefined`] |
 
 ### Return type
 

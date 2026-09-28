@@ -42,7 +42,7 @@ import {
   type BoardNode,
   type ProjectionView,
 } from "./store/projection";
-import { SUGGESTED_AUTO_LIMIT, type DrawerKind, type UiState } from "./store/ui-store";
+import { parseBoardEdgeId, SUGGESTED_AUTO_LIMIT, type DrawerKind, type UiState } from "./store/ui-store";
 import { isTraceData, layoutTrace, type TraceKind } from "./store/trace";
 import { takenRects } from "./store/geometry";
 import { parseFindingNodeId } from "./store/relations";
@@ -739,6 +739,25 @@ export function BoardCanvas({
     [ui, readOnly, store, rf, inspectorFor],
   );
 
+  /**
+   * A relation, like a node: a click selects it (an open details panel
+   * follows), a double click opens its details. Drawn links, platform
+   * relations and stances each explain themselves there.
+   */
+  const onEdgeClick = React.useCallback(
+    (_event: React.MouseEvent, edge: BoardEdge) => {
+      const u = ui.getState();
+      if (u.drawer === "details" && parseBoardEdgeId(edge.id)) u.openDrawer("details", { details: { edgeId: edge.id } });
+    },
+    [ui],
+  );
+  const onEdgeDoubleClick = React.useCallback(
+    (_event: React.MouseEvent, edge: BoardEdge) => {
+      if (parseBoardEdgeId(edge.id)) ui.getState().openDrawer("details", { details: { edgeId: edge.id } });
+    },
+    [ui],
+  );
+
   /** A double click opens what the node is about in the side panel. */
   const onNodeDoubleClick = React.useCallback(
     (event: React.MouseEvent, node: BoardNode) => {
@@ -890,6 +909,8 @@ export function BoardCanvas({
             connectionRadius={28}
             onNodeClick={onNodeClick}
             onPaneClick={onPaneClick}
+            onEdgeClick={onEdgeClick}
+            onEdgeDoubleClick={onEdgeDoubleClick}
             onEdgeMouseEnter={(_, e) => ui.getState().set({ hoveredEdgeId: e.id })}
             onEdgeMouseLeave={(_, e) => {
               if (ui.getState().hoveredEdgeId === e.id) ui.getState().set({ hoveredEdgeId: null });

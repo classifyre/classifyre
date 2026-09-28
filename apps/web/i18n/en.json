@@ -1288,7 +1288,8 @@
         "graphEmpty": "No neighbours to plot",
         "thisFinding": "This finding",
         "showList": "List",
-        "showGraph": "Graph"
+        "showGraph": "Graph",
+        "unavailable": "Similar findings are not available for this finding yet (it may not be embedded)."
       }
     },
     "statusLabels": {
@@ -2849,7 +2850,6 @@
       "caseClosed": "Case closed",
       "noConclusion": "No conclusion recorded.",
       "conclusionDesc": "Summarize what the evidence shows, which hypothesis it supports, and how strongly. Closing the case archives its inquiry watch.",
-      "saveDraft": "Save draft",
       "closeCase": "Close case",
       "closeCaseTitle": "Close this case?",
       "closeCaseDesc": "The conclusion is recorded, the case is marked closed and its linked inquiry watch is archived (it stops surfacing new matches). You can reopen later.",
@@ -2861,11 +2861,9 @@
       "unlinkInquiryTitle": "Unlink \"{{title}}\"?",
       "unlinkInquiryDesc": "The inquiry watch and the evidence already pulled from it are kept — only the link to this case is removed.",
       "unlink": "Unlink",
-      "currentMatch": "current match",
       "selectMatchesToPull": "Select matches to pull",
       "pullAllMatches": "Pull all current matches",
       "all": "All",
-      "linkAnotherInquiry": "Link another inquiry watch…",
       "link": "Link",
       "inquiryLinked": "Inquiry Watch linked",
       "failedToLinkInquiry": "Failed to link inquiry watch",
@@ -2880,7 +2878,7 @@
       "autoPullUpdated": "Auto-add updated",
       "failedToSetAutoPull": "Could not change auto-add",
       "goneMatch": "gone",
-      "goneWarning": "{{count}} piece(s) of evidence this case cites are no longer found by their source.",
+      "goneWarning": "{{count}} answer(s) of this case's watches are no longer found by their source. What the case cites of them stays, marked gone.",
       "inquiriesTabDesc": "The standing questions driving this case. Review what the latest scans landed without leaving the case.",
       "selectInquiry": "Select a watch to review its answers",
       "addSelectedToCase": "Add selected to case"
@@ -3025,17 +3023,6 @@
       "titleRequired": "Give the case a title",
       "failedToLoadInquiries": "Failed to load inquiry watches",
       "failedToLoadMatches": "Failed to load inquiry watch matches"
-    },
-    "editCase": {
-      "title": "Edit case",
-      "description": "Change what this case says it is about. Its evidence, threads and timeline are untouched.",
-      "back": "Back to case",
-      "save": "Save changes",
-      "saving": "Saving…",
-      "saved": "Case updated",
-      "failed": "Could not save the case",
-      "loading": "Loading case…",
-      "notFound": "Case not found"
     },
     "autopilot": {
       "toggleActivity": "Activity",
@@ -3221,8 +3208,6 @@
     },
     "inquiryForm": {
       "navLabel": "Inquiry Watch steps",
-      "backToInquiry": "Back to inquiry watch",
-      "backToInvestigations": "Back to investigations",
       "createTitle": "New inquiry watch",
       "editTitle": "Edit inquiry watch",
       "createDescription": "An inquiry watch is a saved query. Findings that match it are tracked so you can pull them into a case. Tune the filters and preview what currently matches before saving.",
@@ -3233,6 +3218,8 @@
       "stepFiltersDesc": "Decide which findings land here.",
       "stepPreview": "Preview",
       "stepPreviewDesc": "Check what matches right now.",
+      "stepCases": "Cases",
+      "stepCasesDesc": "Where this watch is used.",
       "defineCardTitle": "Define the inquiry watch",
       "defineCardDesc": "The question this inquiry watch keeps answering",
       "filtersCardTitle": "What should land here?",
@@ -3286,7 +3273,10 @@
       "findingTypesFilteredHint": "Listed types follow the detector selection above.",
       "advancedTitle": "Advanced",
       "advancedDesc": "Regex filters on the finding type and the detected value",
-      "unobservedType": "not currently observed"
+      "unobservedType": "not currently observed",
+      "casesTitle": "Cases it drives",
+      "casesDescEdit": "Link this watch to a case, or unlink it. Changes apply at once; the case keeps what it already pulled.",
+      "casesDescCreate": "The cases this watch should drive. They are linked once you create it."
     },
     "inquiries": {
       "searchPlaceholder": "Search inquiry watches…",
@@ -3310,8 +3300,6 @@
       "scopeAnyFinding": "any finding",
       "scopeMatchers": "{{count}} matchers",
       "newCount": "{{count}} new",
-      "case": "Case",
-      "casesCount": "{{count}} cases",
       "statusActive": "active",
       "statusArchived": "archived",
       "openCase": "Open case",
@@ -3369,7 +3357,8 @@
       "spotlightFindings": "Light up every finding in the case",
       "spotlightHypotheses": "Light up every hypothesis",
       "spotlightClear": "Show everything again",
-      "searchPlaceholder": "Search the board or add evidence…"
+      "searchPlaceholder": "Search the board or add evidence…",
+      "openCaseFile": "Open the case file: {{title}}"
     },
     "tools": {
       "select": "Select",
@@ -3412,7 +3401,6 @@
       "incoming": "New from a watch",
       "tally": "{{count}} {{severity}}",
       "menu": "Evidence actions",
-      "findings": "Findings",
       "notInCase": "On this asset, not in the case",
       "foldedHint": "{{count}} findings not shown: show them",
       "newBadge": "NEW"
@@ -3587,6 +3575,7 @@
       "duplicate": "Duplicate",
       "delete": "Delete",
       "whyHere": "Why is this here?",
+      "edgeDetails": "Details",
       "openBoth": "Open both",
       "addNoteHere": "Add note here",
       "addHypothesisHere": "Add hypothesis here",
@@ -3913,9 +3902,112 @@
       "entriesOne": "1 entry"
     },
     "caseFile": {
-      "noDescription": "No description yet.",
-      "edit": "Edit case…",
-      "autopilot": "Autopilot"
+      "autopilot": "Autopilot",
+      "details": "Details",
+      "status": "Status",
+      "statuses": {
+        "OPEN": "Open",
+        "IN_PROGRESS": "In progress"
+      },
+      "saving": "Saving…",
+      "saved": "Saved",
+      "saveFailed": "Not saved — retry",
+      "notSaved": "Not saved",
+      "saveError": "Could not save the case",
+      "opened": "Opened {{when}}",
+      "openedBy": "Opened {{when}} by {{who}}"
+    },
+    "timelineLink": {
+      "whatChanged": "What changed",
+      "history": "History",
+      "removals": "What left",
+      "none": "Nothing on the timeline explains this yet."
+    },
+    "details": {
+      "tabs": {
+        "inCase": "In case",
+        "other": "Other findings",
+        "duplicates": "Duplicates",
+        "lineage": "Lineage",
+        "overview": "Overview",
+        "similar": "Similar",
+        "whereElse": "Where else"
+      },
+      "noneInCase": "None of this asset's findings are in the case yet.",
+      "browseOther": "Browse its other findings",
+      "searchOther": "Search this asset's findings…",
+      "includeResolved": "Resolved too",
+      "loadingOther": "Loading findings…",
+      "otherFailed": "Could not load the asset's findings.",
+      "noOther": "Every finding of this asset is in the case.",
+      "noOtherMatch": "No finding of this asset matches.",
+      "select": "Select",
+      "selected": "{{count}} selected",
+      "attachSelected": "Attach",
+      "attachedOne": "Finding attached to the case",
+      "attachedMany": "{{count}} findings attached to the case",
+      "loadMore": "Load more ({{count}} left)",
+      "backToAsset": "Back to the asset",
+      "openFindingPage": "Finding page",
+      "detector": "Detector",
+      "status": "Status",
+      "confidence": "Confidence",
+      "detected": "Detected",
+      "note": "Note"
+    },
+    "edgeDetails": {
+      "gone": "This relation is no longer on the board.",
+      "link": "Link drawn on this board",
+      "kind": "Relation",
+      "certainty": "Certainty",
+      "label": "Label",
+      "note": "Note",
+      "notePlaceholder": "Why do these two belong together?",
+      "confidence": "Confidence",
+      "foundBy": "Found by",
+      "granularity": "Detail",
+      "columnLevel": "Column by column",
+      "alsoBetween": "{{count}} more relation(s) between the same two",
+      "evidence": "Read from",
+      "columns": "Columns ({{count}})",
+      "indirect": "(whole table)",
+      "openLineage": "Open lineage",
+      "loadingPair": "Loading the match…",
+      "noPair": "The duplicate review has no breakdown for this pair yet.",
+      "matchScore": "match score",
+      "sharedValues": "Shared values ({{count}})",
+      "openReview": "Open in duplicate review",
+      "stance": "Stance on a hypothesis",
+      "bearing": "How it bears on the hypothesis",
+      "methods": {
+        "RUNTIME_OBSERVED": "Observed at run time",
+        "SYSTEM_CATALOG": "The system's own catalog",
+        "SQL_PARSED": "Parsed from SQL",
+        "HEURISTIC": "A heuristic",
+        "MANUAL": "A person"
+      },
+      "what": {
+        "duplicate": {
+          "title": "Likely duplicate",
+          "body": "The duplicate detection found these two carry largely the same values. How strong the match is, and on what, is below."
+        },
+        "lineage": {
+          "title": "Lineage",
+          "body": "Data flows along this relation: the arrow points from where it came from to what it feeds."
+        },
+        "reference": {
+          "title": "Reference",
+          "body": "One of these names or links to the other. Nothing flows along it."
+        },
+        "usage": {
+          "title": "Usage",
+          "body": "One of these uses the other (a job, a report, a notebook)."
+        },
+        "global": {
+          "title": "Global relationship",
+          "body": "Someone made this link a relationship of the whole workspace: every case that holds both sees it."
+        }
+      }
     }
   },
   "caseCleanup": {
@@ -3936,11 +4028,6 @@
         "hint": "An asset deleted from its source leaves this case, together with its findings."
       }
     },
-    "short": {
-      "removeGoneFindings": "Findings that disappear",
-      "removeResolvedFindings": "Resolved findings",
-      "removeGoneAssets": "Assets that disappear"
-    },
     "timelineNote": "Whatever leaves the case is written on its timeline: which finding, and why.",
     "previewChecking": "Checking what this would take out…",
     "previewNothing": "Nothing in this case qualifies right now. From now on it applies as soon as something does.",
@@ -3949,12 +4036,14 @@
     "previewResolved": "{{count}} resolved finding(s)",
     "previewAssets": "{{count}} asset(s) gone from their source, with {{findings}} finding(s)",
     "savedWithRemovals": "Saved. {{count}} item(s) left the case; the timeline lists them.",
-    "off": "Off. Nothing leaves this case by itself.",
-    "removes": "Takes out:",
     "filters": "{{count}} finding filter(s)",
     "noFilters": "No finding filters",
     "manageFilters": "Filters…",
-    "edit": "Change…"
+    "panelHint": "Each switch applies as soon as you flip it; the timeline lists what leaves.",
+    "confirmTitle": "Turn on “{{rule}}”?",
+    "confirmBody": "The rule applies right away: what already qualifies leaves the case now.",
+    "previewTurnOn": "Turning it on takes these out of the case:",
+    "confirmAction": "Turn on"
   },
   "caseFilters": {
     "title": "Finding filters",
@@ -4010,7 +4099,12 @@
       "appliedNone": "Filter added.",
       "updated": "Filter updated: {{count}} more finding(s) detached.",
       "updatedNone": "Filter updated.",
-      "failed": "Could not save the filter"
+      "failed": "Could not save the filter",
+      "removeEmptied": "Also take out assets left without findings",
+      "removeEmptiedCount": "{{count}} asset(s) now",
+      "removeEmptiedHint": "An asset whose only findings in the case are the ones filtered out leaves the case too. It applies once, now; assets you added without findings stay.",
+      "submitAssets": "remove {{count}} asset(s)",
+      "assetsRemoved": "{{count}} asset(s) left without findings were taken out too."
     },
     "menu": {
       "detachType": "Detach & filter out this type…",
@@ -4147,7 +4241,12 @@
     },
     "drag": "Drag onto the board to add it there",
     "loading": "Loading leads…",
-    "resolved": "Finding resolved"
+    "resolved": "Finding resolved",
+    "reviewedHint": "Anything not in the case any more can be dragged onto the board (or added) again; its review stays as it was.",
+    "inCaseShort": "In case",
+    "inCaseNow": "What this lead points at is in the case now",
+    "addAgain": "Add",
+    "addAgainHint": "Put it on the board (the review stays)"
   },
   "correlation": {
     "findingsTab": "Findings",
@@ -4184,6 +4283,8 @@
       "recomputing": "Recomputing…",
       "external": "External ({{count}})",
       "useFocusedInCase": "Use focused in case",
+      "addVisibleHere": "Add visible to this case",
+      "addFocusedHere": "Add focused to this case",
       "useVisibleInCase": "Use visible in case",
       "resetView": "Reset"
     },
@@ -5703,5 +5804,61 @@
       "measured": "Shifted toward the bands with the higher hit rate, at most 15 points a run, never below 10% per band.",
       "fixed": "A fixed split set on the source."
     }
+  },
+  "caseTarget": {
+    "title": "Add to a case",
+    "description": "{{count}} item(s) go into the case you pick. An asset joins as evidence; a finding brings its asset along.",
+    "existing": "Existing case",
+    "new": "New case",
+    "search": "Search open cases…",
+    "loading": "Loading cases…",
+    "noCases": "No open case matches.",
+    "submit": "Add {{count}}",
+    "added": "{{count}} added to “{{title}}”.",
+    "openCase": "Open case",
+    "failed": "Could not add to the case",
+    "inCaseShort": "In case",
+    "addShort": "Add",
+    "attachShort": "Attach",
+    "menu": {
+      "addToCase": "Add to case…",
+      "addHere": "Add to this case",
+      "addManyHere": "Add {{count}} to this case",
+      "attach": "Attach to its asset in this case",
+      "inCase": "Already in this case",
+      "allInCase": "All already in this case"
+    },
+    "boardAdded": "Added to the case: {{label}}",
+    "boardAddedMany": "{{count}} added to the case"
+  },
+  "caseWatches": {
+    "heading": "Watches · {{count}}",
+    "showAll": "All watches",
+    "answers": "Its answers",
+    "answersCount": "{{count}} answers",
+    "autoAddOn": "Adds new answers by itself",
+    "autoAddOff": "New answers wait for you",
+    "filters": "{{count}} filter(s)",
+    "escalations": "{{count}} escalation rule(s)",
+    "link": "Link a watch",
+    "showGone": "Show them",
+    "showGoneHint": "Show these answers in the table, with why each left",
+    "pick": "Pick a watch…",
+    "createNew": "Create a new watch",
+    "noneToLink": "Every watch is linked already.",
+    "loadingList": "Loading watches…"
+  },
+  "inquiryCases": {
+    "none": "This watch drives no case yet.",
+    "noneYet": "Pick the cases this watch should drive; it is linked to them once created.",
+    "link": "Link to a case",
+    "unlink": "Unlink from this case",
+    "remove": "Don't link",
+    "unlinkTitle": "Stop driving “{{title}}”?",
+    "linked": "Now drives “{{title}}”.",
+    "unlinked": "No longer drives “{{title}}”.",
+    "linkFailed": "Created, but could not link it to: {{titles}}",
+    "open": "Open “{{title}}” at this watch",
+    "more": "+{{count}} more"
   }
 }

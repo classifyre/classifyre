@@ -13,7 +13,7 @@ import { parseFindingNodeId } from "../store/relations";
 import type { BoardState } from "../store/board-store";
 
 /** Label of whatever a node shows: an asset, a finding, a neighbour, a note. */
-export function nodeLabel(s: BoardState, nodeId: string): string {
+export function nodeLabel(s: Pick<BoardState, "suggested" | "bubbles" | "items" | "threads">, nodeId: string): string {
   if (nodeId.startsWith("sg:")) return s.suggested.get(nodeId)?.label ?? "";
   const finding = parseFindingNodeId(nodeId);
   if (finding) {

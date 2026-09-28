@@ -159,9 +159,33 @@ hypothesis stances.
 ## The Details panel
 
 Click an asset or a finding and the **Details** panel follows your selection
-(double-click opens it if it is closed). It shows where the asset came from, its
-findings with their severity and state, **Attach** for those not in the case,
-and buttons to open the asset or finding in full or to **Show connections**.
+(double-click opens it if it is closed). Its header says where the asset came
+from, with buttons to open the asset or finding in full or to **Show
+connections**. Below it, tabs:
+
+| For | Tab | What it shows |
+|---|---|---|
+| An asset | **In case** | Its findings that are in the case, with their severity, state and note |
+| | **Other findings** | Its findings that are not in the case yet, searchable and loaded page by page. Tick some and press **Attach**, or attach one at a time. **Resolved too** includes resolved ones |
+| | **Duplicates** | The documents that look like it, as in [Duplicate review](/duplicates/) |
+| | **Lineage** | Where its data comes from and where it goes, as in [lineage](/sources/lineage/) |
+| A finding | **Overview** | Its detector, confidence, status and note, and **Finding page** for everything else |
+| | **Similar** | Findings like it elsewhere, as a graph or a list |
+| | **Where else** | The other places its value was found |
+
+In the **Duplicates** and **Lineage** graphs, and in the similar findings,
+anything already in the case carries an **In case** mark. **Right-click** one
+that is not for **Add to this case**: an asset joins as evidence, a finding
+brings its asset along. The same graphs outside a case, on an asset's own page,
+offer **Add to case…** instead, to pick any open case or start one.
+
+Double-click a line between two things, or right-click it and choose
+**Details** (**Why is this here?** on a relation the platform found), and the
+panel describes that relation. For a line the platform
+found, that is what it means (a likely duplicate with its match score and shared
+values, a lineage step with its columns, a reference), how it was found and how
+sure the platform is. For a link you drew, you edit its kind, label,
+certainty, confidence and note right there.
 
 <Callout type="info">
 **Evidence is a record.** When a later scan changes the source (a finding is no
