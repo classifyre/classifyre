@@ -231,6 +231,9 @@ export interface CaseTimelineControllerGetTimelineRequest {
     caseId: string;
     cursor?: string;
     limit?: string;
+    types?: string;
+    inquiryId?: string;
+    until?: string;
 }
 
 export interface CasesControllerAddEvidenceRequest {
@@ -1126,6 +1129,18 @@ export class CasesApi extends runtime.BaseAPI {
 
         if (requestParameters['limit'] != null) {
             queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        if (requestParameters['types'] != null) {
+            queryParameters['types'] = requestParameters['types'];
+        }
+
+        if (requestParameters['inquiryId'] != null) {
+            queryParameters['inquiryId'] = requestParameters['inquiryId'];
+        }
+
+        if (requestParameters['until'] != null) {
+            queryParameters['until'] = requestParameters['until'];
         }
 
         const headerParameters: runtime.HTTPHeaders = {};

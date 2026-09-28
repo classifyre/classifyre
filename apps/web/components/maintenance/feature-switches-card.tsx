@@ -498,11 +498,8 @@ export function FeatureSwitchesCard() {
             </AlertDialogCancel>
             <AlertDialogAction
               data-testid="feature-off-confirm"
-              className={`rounded-[4px] text-xs ${
-                deleteChoice
-                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  : ""
-              }`}
+              variant={deleteChoice ? "destructive" : "default"}
+              className="rounded-[4px] text-xs"
               onClick={(event) => {
                 event.preventDefault();
                 void apply();
@@ -590,7 +587,8 @@ export function FeatureSwitchesCard() {
             </AlertDialogCancel>
             <AlertDialogAction
               data-testid="feature-delete-confirm"
-              className="rounded-[4px] bg-destructive text-xs text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
+              className="rounded-[4px] text-xs"
               onClick={(event) => {
                 event.preventDefault();
                 void apply();

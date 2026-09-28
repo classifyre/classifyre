@@ -45,6 +45,7 @@ import { boardFileName, exportBoardPng, untilMeasured } from "./hooks/export-boa
 import { useBoardSocket } from "./hooks/use-board-socket";
 import { useNeighbourhoodLoader, useTraceLoader } from "./hooks/use-trace";
 import { useCaseLeads } from "./hooks/use-case-leads";
+import { useBoardUrlState } from "./hooks/use-board-url-state";
 import { isPendingLead } from "./store/leads";
 
 /** Refetch while visible: worker-side changes (auto-pull) do not push over the socket. */
@@ -117,6 +118,8 @@ function BoardShell({ caseId }: { caseId: string }) {
   // reads them with the case and on the same minute as its own refetch.
   const leads = useCaseLeads(caseId, flyTo);
   const reloadLeads = leads.reload;
+  // The open panel lives in the address: a reload or a shared link opens it again.
+  useBoardUrlState(flyTo);
 
   const loadCase = React.useCallback(async () => {
     try {
@@ -346,7 +349,14 @@ function BoardShell({ caseId }: { caseId: string }) {
                   if (prev) panelWidthRef.current = Math.round(size.inPixels);
                 }}
               >
-                <BoardDrawers caseId={caseId} caseData={caseData} leads={leads} onChanged={refreshAll} onFlyTo={flyTo} />
+                <BoardDrawers
+                  caseId={caseId}
+                  caseData={caseData}
+                  leads={leads}
+                  onChanged={refreshAll}
+                  onCaseChanged={() => void loadCase()}
+                  onFlyTo={flyTo}
+                />
               </ResizablePanel>
             </>
           )}
@@ -490,14 +500,15 @@ function ConfirmDialog() {
         <AlertDialogFooter>
           <AlertDialogCancel>{t("caseBoard.menu.cancel")}</AlertDialogCancel>
           <AlertDialogAction
-            className={confirm?.destructive ? "bg-destructive text-white hover:bg-destructive/90" : undefined}
+            variant={confirm?.destructive ? "destructive" : "default"}
             onClick={() => {
               const action = confirm?.onConfirm;
               ui.getState().set({ confirm: null });
               void action?.();
             }}
           >
-            {confirm?.confirmLabel}
+            {/* The last step: drop the "…" of the menu label it reuses (which promises another step). */}
+            {confirm?.confirmLabel.replace(/(…|\.\.\.)$/, "")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

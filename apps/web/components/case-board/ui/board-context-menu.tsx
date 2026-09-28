@@ -85,6 +85,7 @@ import { spotInFrame } from "../store/geometry";
 import { parseFindingNodeId } from "../store/relations";
 import { hypothesisMeta, topZ } from "../store/selectors";
 import { humanizeKind } from "../edges/link-edge";
+import { boardEdgeId } from "../store/ui-store";
 import type { BoardItem } from "../store/types";
 
 export type MenuTarget =
@@ -283,6 +284,15 @@ export function BoardContextMenuContent({
       </ContextMenuSub>
     );
   };
+
+  const edgeDetailsItem = (edgeId: string) => (
+    <ContextMenuItem
+      onSelect={() => ui.getState().openDrawer("details", { details: { edgeId } })}
+      data-testid="menu-edge-details"
+    >
+      <Search className="size-4" /> {t("caseBoard.menu.edgeDetails")}
+    </ContextMenuItem>
+  );
 
   const content = (() => {
     switch (target.kind) {
@@ -838,6 +848,8 @@ export function BoardContextMenuContent({
           s.items.get(link.sourceItemId)?.kind === "EVIDENCE" && s.items.get(link.targetItemId)?.kind === "EVIDENCE";
         return (
           <>
+            {edgeDetailsItem(boardEdgeId({ kind: "link", linkId: link.id }))}
+            <ContextMenuSeparator />
             <ContextMenuSub>
               <ContextMenuSubTrigger disabled={readOnly}>
                 <Pencil className="size-4" /> {t("caseBoard.link.edit")}
@@ -901,6 +913,7 @@ export function BoardContextMenuContent({
               <Globe className="size-3.5" /> {t("caseBoard.edges.global")}
             </ContextMenuLabel>
             <ContextMenuSeparator />
+            {edgeDetailsItem(boardEdgeId({ kind: "system", systemEdgeId: target.systemEdgeId }))}
             <ContextMenuItem
               disabled={readOnly}
               variant="destructive"
@@ -935,12 +948,13 @@ export function BoardContextMenuContent({
             </ContextMenuLabel>
             <ContextMenuSeparator />
             <ContextMenuItem
-              onSelect={() => {
-                if (!edge) return;
-                toast.message(t("caseBoard.menu.whyHere"), {
-                  description: `${edge.relationType} · ${edge.relationClass} · ${edge.method ?? "—"} · ${Math.round(edge.confidence * 100)}%`,
-                });
-              }}
+              disabled={!edge}
+              onSelect={() =>
+                ui.getState().openDrawer("details", {
+                  details: { edgeId: boardEdgeId({ kind: "system", systemEdgeId: target.systemEdgeId }) },
+                })
+              }
+              data-testid="menu-edge-details"
             >
               <Search className="size-4" /> {t("caseBoard.menu.whyHere")}
             </ContextMenuItem>
@@ -970,6 +984,8 @@ export function BoardContextMenuContent({
         };
         return (
           <>
+            {edgeDetailsItem(boardEdgeId({ kind: "stance", supportId: support.id }))}
+            <ContextMenuSeparator />
             <ContextMenuSub>
               <ContextMenuSubTrigger disabled={readOnly}>
                 <FlaskConical className="size-4" /> {t("caseBoard.menu.stance")}

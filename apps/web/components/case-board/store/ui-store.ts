@@ -32,8 +32,36 @@ export type DrawerKind =
 /** A kind of board object the top bar's counters can spotlight. */
 export type Spotlight = "evidence" | "findings" | "hypotheses" | "escalated";
 
-/** What the details panel shows: an item (optionally one finding), or a suggested neighbour. */
-export type DetailsTarget = { itemId: string; findingId?: string | null } | { suggestedKey: string };
+/**
+ * What the details panel shows: an item (optionally one finding), a suggested
+ * neighbour, or a relation drawn between two nodes (a board edge id:
+ * `lnk:` a link someone drew, `sys:` one the platform found, `st:` a stance).
+ */
+export type DetailsTarget =
+  | { itemId: string; findingId?: string | null }
+  | { suggestedKey: string }
+  | { edgeId: string };
+
+/** The tabs of an asset's details. */
+export const ASSET_DETAILS_TABS = ["inCase", "other", "duplicates", "lineage"] as const;
+export type AssetDetailsTab = (typeof ASSET_DETAILS_TABS)[number];
+
+/** The tabs of a finding's details. */
+export const FINDING_DETAILS_TABS = ["overview", "similar", "whereElse"] as const;
+export type FindingDetailsTab = (typeof FINDING_DETAILS_TABS)[number];
+
+/** The timeline panel's own tabs. */
+export const TIMELINE_VIEWS = ["activity", "chronology", "threads"] as const;
+export type TimelineView = (typeof TIMELINE_VIEWS)[number];
+
+/**
+ * A timeline entry to bring into view and mark: a shared link, or an alert's
+ * "What changed". `nonce` makes asking for the same entry twice scroll again.
+ */
+export interface TimelineFocus {
+  entryId: string;
+  nonce: number;
+}
 
 export interface ViewPrefs {
   /** Suggested neighbours, by hops from the evidence. */
@@ -112,8 +140,16 @@ export interface UiState {
   drawer: DrawerKind | null;
   /** Thread shown in the hypothesis drawer. */
   drawerThreadId: string | null;
-  /** Item/finding shown in the details drawer. */
+  /** Item/finding/relation shown in the details drawer. */
   detailsTarget: DetailsTarget | null;
+  /** The details tab open (an asset's or a finding's); null for the default one. */
+  detailsTab: AssetDetailsTab | FindingDetailsTab | null;
+  /** The watch open in the Watches panel; null shows them all as cards. */
+  watchId: string | null;
+  /** The timeline panel's tab. */
+  timelineView: TimelineView;
+  /** A timeline entry to scroll to (and mark) once the timeline shows it. */
+  timelineFocus: TimelineFocus | null;
   /** Side panel width in pixels, remembered per viewer. */
   panelWidth: number;
   /** Query handed from the ⌘K palette to the add-evidence panel. */
@@ -169,9 +205,19 @@ export interface UiState {
 
   setTool(tool: Tool): void;
   setView(patch: Partial<ViewPrefs>): void;
-  openDrawer(kind: DrawerKind | null, opts?: { threadId?: string | null; details?: UiState["detailsTarget"] }): void;
-  set(patch: Partial<Omit<UiState, `set${string}` | "openDrawer" | "toggle">>): void;
+  openDrawer(kind: DrawerKind | null, opts?: OpenDrawerOptions): void;
+  /** Open the timeline at one entry: scroll to it and mark it. */
+  focusTimeline(entryId: string): void;
+  set(patch: Partial<Omit<UiState, `set${string}` | "openDrawer" | "toggle" | "focusTimeline">>): void;
   toggle(key: "showAllRows" | "expandedUnattached" | "hiddenSuggestions", id: string): void;
+}
+
+export interface OpenDrawerOptions {
+  threadId?: string | null;
+  details?: DetailsTarget | null;
+  /** The details tab to open on; a new details target starts on its default tab. */
+  detailsTab?: UiState["detailsTab"];
+  watchId?: string | null;
 }
 
 export type UiStore = StoreApi<UiState>;
@@ -233,6 +279,10 @@ export function createUiStore(): UiStore {
     drawer: null,
     drawerThreadId: null,
     detailsTarget: null,
+    detailsTab: null,
+    watchId: null,
+    timelineView: "activity",
+    timelineFocus: null,
     panelWidth: typeof window === "undefined" ? DEFAULT_PANEL_WIDTH : readPanelWidth(),
     addEvidenceQuery: "",
     paletteOpen: false,
@@ -272,13 +322,29 @@ export function createUiStore(): UiStore {
         return { view };
       }),
     openDrawer: (kind, opts) =>
-      set({
-        drawer: kind,
-        // The trace belongs to its panel: leaving the panel ends it.
-        ...(kind !== "connections" ? { trace: null } : {}),
-        ...(opts?.threadId !== undefined ? { drawerThreadId: opts.threadId } : {}),
-        ...(opts?.details !== undefined ? { detailsTarget: opts.details } : {}),
+      set((s) => {
+        const target = opts?.details;
+        // Another thing to inspect starts on its default tab, unless one was asked for.
+        const newTarget = target !== undefined && detailsKey(target) !== detailsKey(s.detailsTarget);
+        return {
+          drawer: kind,
+          // The trace belongs to its panel: leaving the panel ends it.
+          ...(kind !== "connections" ? { trace: null } : {}),
+          // So does a marked timeline entry.
+          ...(kind !== "timeline" ? { timelineFocus: null } : {}),
+          ...(opts?.threadId !== undefined ? { drawerThreadId: opts.threadId } : {}),
+          ...(target !== undefined ? { detailsTarget: target } : {}),
+          ...(opts?.detailsTab !== undefined ? { detailsTab: opts.detailsTab } : newTarget ? { detailsTab: null } : {}),
+          ...(opts?.watchId !== undefined ? { watchId: opts.watchId } : {}),
+        };
       }),
+    focusTimeline: (entryId) =>
+      set((s) => ({
+        drawer: "timeline",
+        trace: null,
+        timelineView: "activity",
+        timelineFocus: { entryId, nonce: (s.timelineFocus?.nonce ?? 0) + 1 },
+      })),
     set: (patch) => set(patch as Partial<UiState>),
     toggle: (key, id) =>
       set((s) => {
@@ -288,4 +354,37 @@ export function createUiStore(): UiStore {
         return { [key]: next } as Partial<UiState>;
       }),
   }));
+}
+
+/** One string per details target, so two targets compare by what they show. */
+export function detailsKey(target: DetailsTarget | null | undefined): string {
+  if (!target) return "";
+  if ("edgeId" in target) return `edge:${target.edgeId}`;
+  if ("suggestedKey" in target) return `suggested:${target.suggestedKey}`;
+  return `item:${target.itemId}:${target.findingId ?? ""}`;
+}
+
+/** What a board edge id stands for: a drawn link, a platform relation, or a stance. */
+export type BoardEdgeRef =
+  | { kind: "link"; linkId: string }
+  | { kind: "system"; systemEdgeId: string }
+  | { kind: "stance"; supportId: string };
+
+/** Parse a board edge id (`lnk:`, `sys:`, `st:`); null for anything else. */
+export function parseBoardEdgeId(edgeId: string): BoardEdgeRef | null {
+  const colon = edgeId.indexOf(":");
+  if (colon <= 0) return null;
+  const prefix = edgeId.slice(0, colon);
+  const id = edgeId.slice(colon + 1);
+  if (!id) return null;
+  if (prefix === "lnk") return { kind: "link", linkId: id };
+  if (prefix === "sys") return { kind: "system", systemEdgeId: id };
+  if (prefix === "st") return { kind: "stance", supportId: id };
+  return null;
+}
+
+export function boardEdgeId(ref: BoardEdgeRef): string {
+  if (ref.kind === "link") return `lnk:${ref.linkId}`;
+  if (ref.kind === "system") return `sys:${ref.systemEdgeId}`;
+  return `st:${ref.supportId}`;
 }

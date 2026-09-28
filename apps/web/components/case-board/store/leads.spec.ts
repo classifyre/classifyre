@@ -9,6 +9,7 @@ import {
   leadWhy,
   locateLead,
   selectLeads,
+  withSettled,
 } from "./leads";
 
 let n = 0;
@@ -134,5 +135,28 @@ describe("leads", () => {
     expect(leadScore(lead({ importance: 0.91, similarity: 0.8 }))).toEqual({ kind: "importance", value: 91 });
     expect(leadScore(lead({ similarity: 0.8 }))).toEqual({ kind: "similar", pct: 80 });
     expect(leadScore(lead({}))).toBeNull();
+  });
+});
+
+describe("withSettled (a review this tab made, before the server shows it)", () => {
+  it("keeps an accepted lead out of the queue when a stale read still lists it waiting", () => {
+    const waiting = lead({ id: "l1", status: "PROPOSED" });
+    const settled = new Map([["l1", "ACCEPTED" as const]]);
+    const [shown] = withSettled([waiting], settled);
+    expect(shown!.status).toBe("ACCEPTED");
+    expect(isPendingLead(shown!)).toBe(false);
+    expect(settled.has("l1")).toBe(true);
+  });
+
+  it("drops the override once the server agrees", () => {
+    const settled = new Map([["l1", "ACCEPTED" as const]]);
+    const [shown] = withSettled([lead({ id: "l1", status: "ACCEPTED", reviewedBy: "maria" })], settled);
+    expect(shown!.reviewedBy).toBe("maria");
+    expect(settled.size).toBe(0);
+  });
+
+  it("leaves every other lead as the server has it", () => {
+    const other = lead({ id: "l2" });
+    expect(withSettled([other], new Map([["l1", "DISMISSED" as const]]))[0]).toBe(other);
   });
 });

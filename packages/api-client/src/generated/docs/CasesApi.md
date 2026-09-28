@@ -1202,7 +1202,7 @@ No authorization required
 
 ## caseTimelineControllerGetTimeline
 
-> CaseTimelineResponseDto caseTimelineControllerGetTimeline(caseId, cursor, limit)
+> CaseTimelineResponseDto caseTimelineControllerGetTimeline(caseId, cursor, limit, types, inquiryId, until)
 
 Paginated unified case activity feed (newest first)
 
@@ -1222,10 +1222,16 @@ async function example() {
   const body = {
     // string
     caseId: caseId_example,
-    // string (optional)
+    // string | The id of the last entry of the previous page (optional)
     cursor: cursor_example,
     // string (optional)
     limit: limit_example,
+    // string | Only these activity types (comma-separated), e.g. FINDINGS_ESCALATED,FINDINGS_AUTO_REMOVED (optional)
+    types: types_example,
+    // string | Only entries about this linked watch (inquiry) (optional)
+    inquiryId: inquiryId_example,
+    // string | An entry id the page must reach: the page runs from the newest entry down to and including it (at most 1000 entries) (optional)
+    until: until_example,
   } satisfies CaseTimelineControllerGetTimelineRequest;
 
   try {
@@ -1246,8 +1252,11 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **caseId** | `string` |  | [Defaults to `undefined`] |
-| **cursor** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **cursor** | `string` | The id of the last entry of the previous page | [Optional] [Defaults to `undefined`] |
 | **limit** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **types** | `string` | Only these activity types (comma-separated), e.g. FINDINGS_ESCALATED,FINDINGS_AUTO_REMOVED | [Optional] [Defaults to `undefined`] |
+| **inquiryId** | `string` | Only entries about this linked watch (inquiry) | [Optional] [Defaults to `undefined`] |
+| **until** | `string` | An entry id the page must reach: the page runs from the newest entry down to and including it (at most 1000 entries) | [Optional] [Defaults to `undefined`] |
 
 ### Return type
 

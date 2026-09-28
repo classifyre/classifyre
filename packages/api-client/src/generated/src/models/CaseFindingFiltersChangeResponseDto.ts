@@ -45,6 +45,12 @@ export interface CaseFindingFiltersChangeResponseDto {
      * @memberof CaseFindingFiltersChangeResponseDto
      */
     escalated: number;
+    /**
+     * Assets taken out because the filter left them without a finding (removeEmptiedAssets)
+     * @type {number}
+     * @memberof CaseFindingFiltersChangeResponseDto
+     */
+    assetsRemoved: number;
 }
 
 /**
@@ -54,6 +60,7 @@ export function instanceOfCaseFindingFiltersChangeResponseDto(value: object): va
     if (!('filters' in value) || value['filters'] === undefined) return false;
     if (!('detached' in value) || value['detached'] === undefined) return false;
     if (!('escalated' in value) || value['escalated'] === undefined) return false;
+    if (!('assetsRemoved' in value) || value['assetsRemoved'] === undefined) return false;
     return true;
 }
 
@@ -70,6 +77,7 @@ export function CaseFindingFiltersChangeResponseDtoFromJSONTyped(json: any, igno
         'filters': ((json['filters'] as Array<any>).map(CaseFindingFilterDtoFromJSON)),
         'detached': json['detached'],
         'escalated': json['escalated'],
+        'assetsRemoved': json['assetsRemoved'],
     };
 }
 
@@ -87,6 +95,7 @@ export function CaseFindingFiltersChangeResponseDtoToJSONTyped(value?: CaseFindi
         'filters': ((value['filters'] as Array<any>).map(CaseFindingFilterDtoToJSON)),
         'detached': value['detached'],
         'escalated': value['escalated'],
+        'assetsRemoved': value['assetsRemoved'],
     };
 }
 

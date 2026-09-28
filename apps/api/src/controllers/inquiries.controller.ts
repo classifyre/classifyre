@@ -18,6 +18,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { InquiryActivityType } from '@prisma/client';
 import { InquiriesService } from '../inquiries.service';
 import {
   CreateInquiryDto,
@@ -32,6 +33,7 @@ import {
   UpdateInquiryDto,
 } from '../dto/inquiry.dto';
 import { InquiryTimelineResponseDto } from '../dto/inquiry-activity.dto';
+import { activityTypes } from '../activity-page';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 
 class RematchResponseDto {
@@ -136,16 +138,24 @@ export class InquiriesController {
   })
   @ApiQuery({ name: 'cursor', required: false })
   @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({
+    name: 'types',
+    required: false,
+    description:
+      'Only these activity types (comma-separated), e.g. MATCHES_LANDED,MATCHES_RETIRED',
+  })
   @ApiResponse({ status: 200, type: InquiryTimelineResponseDto })
   timeline(
     @Param('id') id: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
+    @Query('types') types?: string,
   ): Promise<InquiryTimelineResponseDto> {
     return this.inquiries.timeline(
       id,
-      cursor,
+      cursor || undefined,
       limit ? Number(limit) : undefined,
+      activityTypes(types, InquiryActivityType),
     );
   }
 

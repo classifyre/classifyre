@@ -9,6 +9,7 @@ Name | Type
 `action` | string
 `inquiryId` | string
 `rules` | [Array&lt;CaseFindingFilterRuleDto&gt;](CaseFindingFilterRuleDto.md)
+`removeEmptiedAssets` | boolean
 `clientId` | string
 
 ## Example
@@ -21,6 +22,7 @@ const example = {
   "action": null,
   "inquiryId": null,
   "rules": null,
+  "removeEmptiedAssets": null,
   "clientId": null,
 } satisfies AddCaseFindingFiltersDto
 

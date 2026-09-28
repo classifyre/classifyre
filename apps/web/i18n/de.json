@@ -1288,7 +1288,8 @@
         "graphEmpty": "Keine Nachbarn zum Darstellen",
         "thisFinding": "Dieses Finding",
         "showList": "Liste",
-        "showGraph": "Graph"
+        "showGraph": "Graph",
+        "unavailable": "Ähnliche Befunde sind für diesen Befund noch nicht verfügbar (er ist vielleicht noch nicht eingebettet)."
       }
     },
     "statusLabels": {
@@ -2849,7 +2850,6 @@
       "caseClosed": "Fall geschlossen",
       "noConclusion": "Keine Schlussfolgerung erfasst.",
       "conclusionDesc": "Fassen Sie zusammen, was die Beweise zeigen, welche Hypothese sie stützen und wie stark. Das Schließen des Falls archiviert die zugehörige Anfrage-Beobachtung.",
-      "saveDraft": "Entwurf speichern",
       "closeCase": "Fall schließen",
       "closeCaseTitle": "Diesen Fall schließen?",
       "closeCaseDesc": "Die Schlussfolgerung wird festgehalten, der Fall als geschlossen markiert und die verknüpfte Anfrage-Beobachtung archiviert (sie zeigt keine neuen Treffer mehr). Sie können ihn später wieder öffnen.",
@@ -2861,11 +2861,9 @@
       "unlinkInquiryTitle": "\"{{title}}\" trennen?",
       "unlinkInquiryDesc": "Die Anfrage-Beobachtung und die bereits daraus gezogenen Beweise bleiben erhalten – nur die Verknüpfung mit diesem Fall wird entfernt.",
       "unlink": "Trennen",
-      "currentMatch": "aktueller Treffer",
       "selectMatchesToPull": "Zu übernehmende Treffer auswählen",
       "pullAllMatches": "Alle aktuellen Treffer übernehmen",
       "all": "Alle",
-      "linkAnotherInquiry": "Weitere Anfrage-Beobachtung verknüpfen…",
       "link": "Verknüpfen",
       "inquiryLinked": "Anfrage-Beobachtung verknüpft",
       "failedToLinkInquiry": "Anfrage-Beobachtung konnte nicht verknüpft werden",
@@ -2880,7 +2878,7 @@
       "autoPullUpdated": "Automatisches Hinzufügen aktualisiert",
       "failedToSetAutoPull": "Automatisches Hinzufügen konnte nicht geändert werden",
       "goneMatch": "verschwunden",
-      "goneWarning": "{{count}} Beleg(e), die dieser Fall zitiert, werden von ihrer Quelle nicht mehr gefunden.",
+      "goneWarning": "{{count}} Antwort(en) der Beobachtungen dieses Falls werden von ihrer Quelle nicht mehr gefunden. Was der Fall davon zitiert, bleibt, als verschwunden markiert.",
       "inquiriesTabDesc": "Die stehenden Fragen, die diesen Fall treiben. Prüfen Sie, was die letzten Scans geliefert haben, ohne den Fall zu verlassen.",
       "selectInquiry": "Wählen Sie eine Beobachtung, um ihre Antworten zu prüfen",
       "addSelectedToCase": "Auswahl zum Fall hinzufügen"
@@ -3025,17 +3023,6 @@
       "titleRequired": "Geben Sie dem Fall einen Titel",
       "failedToLoadInquiries": "Anfrage-Beobachtung-Beobachtungen konnten nicht geladen werden",
       "failedToLoadMatches": "Anfrage-Beobachtung-Treffer konnten nicht geladen werden"
-    },
-    "editCase": {
-      "title": "Fall bearbeiten",
-      "description": "Ändern Sie, worum es in diesem Fall geht. Belege, Stränge und Zeitleiste bleiben unberührt.",
-      "back": "Zurück zum Fall",
-      "save": "Änderungen speichern",
-      "saving": "Wird gespeichert…",
-      "saved": "Fall aktualisiert",
-      "failed": "Fall konnte nicht gespeichert werden",
-      "loading": "Fall wird geladen…",
-      "notFound": "Fall nicht gefunden"
     },
     "autopilot": {
       "toggleActivity": "Aktivität",
@@ -3221,8 +3208,6 @@
     },
     "inquiryForm": {
       "navLabel": "Anfrage-Beobachtung-Schritte",
-      "backToInquiry": "Zurück zur Anfrage-Beobachtung",
-      "backToInvestigations": "Zurück zu Untersuchungen",
       "createTitle": "Neue Anfrage-Beobachtung",
       "editTitle": "Anfrage-Beobachtung bearbeiten",
       "createDescription": "Eine Anfrage-Beobachtung ist eine gespeicherte Abfrage. Passende Funde werden verfolgt, sodass Sie sie in einen Fall übernehmen können. Passen Sie die Filter an und prüfen Sie die aktuelle Vorschau, bevor Sie speichern.",
@@ -3233,6 +3218,8 @@
       "stepFiltersDesc": "Legen Sie fest, welche Funde hier landen.",
       "stepPreview": "Vorschau",
       "stepPreviewDesc": "Prüfen Sie, was aktuell passt.",
+      "stepCases": "Fälle",
+      "stepCasesDesc": "Wo diese Beobachtung genutzt wird.",
       "defineCardTitle": "Anfrage-Beobachtung definieren",
       "defineCardDesc": "Die Frage, die diese Anfrage-Beobachtung laufend beantwortet",
       "filtersCardTitle": "Was soll hier landen?",
@@ -3286,7 +3273,10 @@
       "findingTypesFilteredHint": "Aufgelistete Typen folgen der Detektorauswahl oben.",
       "advancedTitle": "Erweitert",
       "advancedDesc": "Regex-Filter auf Finding-Typ und erkannten Wert",
-      "unobservedType": "derzeit nicht beobachtet"
+      "unobservedType": "derzeit nicht beobachtet",
+      "casesTitle": "Fälle, die sie treibt",
+      "casesDescEdit": "Verknüpfen Sie diese Beobachtung mit einem Fall oder trennen Sie sie. Änderungen gelten sofort; der Fall behält, was er schon übernommen hat.",
+      "casesDescCreate": "Die Fälle, die diese Beobachtung treiben soll. Sie werden verknüpft, sobald Sie sie anlegen."
     },
     "inquiries": {
       "searchPlaceholder": "Anfrage-Beobachtung-Beobachtungen suchen…",
@@ -3310,8 +3300,6 @@
       "scopeAnyFinding": "beliebiger Fund",
       "scopeMatchers": "{{count}} Kriterien",
       "newCount": "{{count}} neu",
-      "case": "Fall",
-      "casesCount": "{{count}} Fälle",
       "statusActive": "aktiv",
       "statusArchived": "archiviert",
       "openCase": "Fall öffnen",
@@ -3369,7 +3357,8 @@
       "spotlightFindings": "Alle Befunde im Fall hervorheben",
       "spotlightHypotheses": "Alle Hypothesen hervorheben",
       "spotlightClear": "Wieder alles zeigen",
-      "searchPlaceholder": "Board durchsuchen oder Beweismittel hinzufügen…"
+      "searchPlaceholder": "Board durchsuchen oder Beweismittel hinzufügen…",
+      "openCaseFile": "Fallakte öffnen: {{title}}"
     },
     "tools": {
       "select": "Auswählen",
@@ -3412,7 +3401,6 @@
       "incoming": "Neu aus einer Beobachtung",
       "tally": "{{count}} {{severity}}",
       "menu": "Aktionen für das Beweismittel",
-      "findings": "Befunde",
       "notInCase": "Am Asset, nicht im Fall",
       "foldedHint": "{{count}} Befunde nicht angezeigt: anzeigen",
       "newBadge": "NEU"
@@ -3587,6 +3575,7 @@
       "duplicate": "Duplizieren",
       "delete": "Löschen",
       "whyHere": "Warum ist das hier?",
+      "edgeDetails": "Details",
       "openBoth": "Beide öffnen",
       "addNoteHere": "Notiz hier hinzufügen",
       "addHypothesisHere": "Hypothese hier hinzufügen",
@@ -3913,9 +3902,112 @@
       "entriesOne": "1 Eintrag"
     },
     "caseFile": {
-      "noDescription": "Noch keine Beschreibung.",
-      "edit": "Fall bearbeiten…",
-      "autopilot": "Autopilot"
+      "autopilot": "Autopilot",
+      "details": "Details",
+      "status": "Status",
+      "statuses": {
+        "OPEN": "Offen",
+        "IN_PROGRESS": "In Bearbeitung"
+      },
+      "saving": "Wird gespeichert…",
+      "saved": "Gespeichert",
+      "saveFailed": "Nicht gespeichert – erneut versuchen",
+      "notSaved": "Nicht gespeichert",
+      "saveError": "Fall konnte nicht gespeichert werden",
+      "opened": "Eröffnet {{when}}",
+      "openedBy": "Eröffnet {{when}} von {{who}}"
+    },
+    "timelineLink": {
+      "whatChanged": "Was sich geändert hat",
+      "history": "Verlauf",
+      "removals": "Was entfernt wurde",
+      "none": "Noch erklärt kein Eintrag der Zeitleiste das."
+    },
+    "details": {
+      "tabs": {
+        "inCase": "Im Fall",
+        "other": "Weitere Befunde",
+        "duplicates": "Duplikate",
+        "lineage": "Herkunft",
+        "overview": "Überblick",
+        "similar": "Ähnlich",
+        "whereElse": "Wo sonst"
+      },
+      "noneInCase": "Noch keiner der Befunde dieses Assets ist im Fall.",
+      "browseOther": "Weitere Befunde durchsehen",
+      "searchOther": "Befunde dieses Assets suchen…",
+      "includeResolved": "Auch erledigte",
+      "loadingOther": "Befunde werden geladen…",
+      "otherFailed": "Die Befunde des Assets konnten nicht geladen werden.",
+      "noOther": "Alle Befunde dieses Assets sind im Fall.",
+      "noOtherMatch": "Kein Befund dieses Assets passt.",
+      "select": "Auswählen",
+      "selected": "{{count}} ausgewählt",
+      "attachSelected": "Anhängen",
+      "attachedOne": "Befund an den Fall angehängt",
+      "attachedMany": "{{count}} Befunde an den Fall angehängt",
+      "loadMore": "Mehr laden ({{count}} übrig)",
+      "backToAsset": "Zurück zum Asset",
+      "openFindingPage": "Befundseite",
+      "detector": "Detektor",
+      "status": "Status",
+      "confidence": "Konfidenz",
+      "detected": "Erkannt",
+      "note": "Notiz"
+    },
+    "edgeDetails": {
+      "gone": "Diese Beziehung ist nicht mehr auf dem Board.",
+      "link": "Auf diesem Board gezogene Verbindung",
+      "kind": "Beziehung",
+      "certainty": "Sicherheit",
+      "label": "Beschriftung",
+      "note": "Notiz",
+      "notePlaceholder": "Warum gehören die beiden zusammen?",
+      "confidence": "Konfidenz",
+      "foundBy": "Gefunden durch",
+      "granularity": "Detail",
+      "columnLevel": "Spalte für Spalte",
+      "alsoBetween": "{{count}} weitere Beziehung(en) zwischen denselben beiden",
+      "evidence": "Gelesen aus",
+      "columns": "Spalten ({{count}})",
+      "indirect": "(ganze Tabelle)",
+      "openLineage": "Herkunft öffnen",
+      "loadingPair": "Treffer wird geladen…",
+      "noPair": "Die Duplikatprüfung hat für dieses Paar noch keine Aufschlüsselung.",
+      "matchScore": "Übereinstimmung",
+      "sharedValues": "Gemeinsame Werte ({{count}})",
+      "openReview": "In der Duplikatprüfung öffnen",
+      "stance": "Haltung zu einer Hypothese",
+      "bearing": "Wie es die Hypothese betrifft",
+      "methods": {
+        "RUNTIME_OBSERVED": "Zur Laufzeit beobachtet",
+        "SYSTEM_CATALOG": "Katalog des Systems",
+        "SQL_PARSED": "Aus SQL gelesen",
+        "HEURISTIC": "Eine Heuristik",
+        "MANUAL": "Eine Person"
+      },
+      "what": {
+        "duplicate": {
+          "title": "Wahrscheinliches Duplikat",
+          "body": "Die Duplikaterkennung hat gefunden, dass beide weitgehend dieselben Werte tragen. Wie stark der Treffer ist und worauf er beruht, steht unten."
+        },
+        "lineage": {
+          "title": "Herkunft",
+          "body": "Entlang dieser Beziehung fließen Daten: Der Pfeil zeigt von der Herkunft auf das, was daraus gespeist wird."
+        },
+        "reference": {
+          "title": "Verweis",
+          "body": "Eines nennt oder verlinkt das andere. Es fließt nichts entlang."
+        },
+        "usage": {
+          "title": "Nutzung",
+          "body": "Eines nutzt das andere (ein Job, ein Bericht, ein Notebook)."
+        },
+        "global": {
+          "title": "Globale Beziehung",
+          "body": "Jemand hat diese Verbindung zu einer Beziehung des ganzen Arbeitsbereichs gemacht: Jeder Fall mit beiden sieht sie."
+        }
+      }
     }
   },
   "caseCleanup": {
@@ -3936,11 +4028,6 @@
         "hint": "Ein Asset, das aus seiner Quelle gelöscht wurde, verlässt diesen Fall samt seinen Befunden."
       }
     },
-    "short": {
-      "removeGoneFindings": "Verschwundene Befunde",
-      "removeResolvedFindings": "Erledigte Befunde",
-      "removeGoneAssets": "Verschwundene Assets"
-    },
     "timelineNote": "Was den Fall verlässt, steht in seiner Zeitleiste: welcher Befund und warum.",
     "previewChecking": "Prüfe, was das entfernen würde…",
     "previewNothing": "Derzeit trifft nichts in diesem Fall zu. Ab jetzt greift die Regel, sobald etwas zutrifft.",
@@ -3949,12 +4036,14 @@
     "previewResolved": "{{count}} erledigte(r) Befund(e)",
     "previewAssets": "{{count}} Asset(s) aus der Quelle verschwunden, mit {{findings}} Befund(en)",
     "savedWithRemovals": "Gespeichert. {{count}} Eintrag/Einträge haben den Fall verlassen; die Zeitleiste listet sie auf.",
-    "off": "Aus. Nichts verlässt diesen Fall von selbst.",
-    "removes": "Entfernt:",
     "filters": "{{count}} Befundfilter",
     "noFilters": "Keine Befundfilter",
     "manageFilters": "Filter…",
-    "edit": "Ändern…"
+    "panelHint": "Jeder Schalter wirkt, sobald Sie ihn umlegen; die Zeitleiste listet auf, was den Fall verlässt.",
+    "confirmTitle": "„{{rule}}“ einschalten?",
+    "confirmBody": "Die Regel wirkt sofort: Was schon zutrifft, verlässt den Fall jetzt.",
+    "previewTurnOn": "Beim Einschalten verlassen diese den Fall:",
+    "confirmAction": "Einschalten"
   },
   "caseFilters": {
     "title": "Befundfilter",
@@ -4010,7 +4099,12 @@
       "appliedNone": "Filter hinzugefügt.",
       "updated": "Filter aktualisiert: {{count}} weitere(r) Befund(e) gelöst.",
       "updatedNone": "Filter aktualisiert.",
-      "failed": "Filter konnte nicht gespeichert werden"
+      "failed": "Filter konnte nicht gespeichert werden",
+      "removeEmptied": "Auch Assets ohne verbleibende Befunde entfernen",
+      "removeEmptiedCount": "jetzt {{count}} Asset(s)",
+      "removeEmptiedHint": "Ein Asset, dessen einzige Befunde im Fall die herausgefilterten sind, verlässt den Fall ebenfalls. Das gilt einmal, jetzt; Assets, die Sie ohne Befunde hinzugefügt haben, bleiben.",
+      "submitAssets": "{{count}} Asset(s) entfernen",
+      "assetsRemoved": "{{count}} Asset(s) ohne verbleibende Befunde wurden ebenfalls entfernt."
     },
     "menu": {
       "detachType": "Lösen & diesen Typ herausfiltern…",
@@ -4147,7 +4241,12 @@
     },
     "drag": "Auf das Board ziehen, um es dort hinzuzufügen",
     "loading": "Hinweise werden geladen…",
-    "resolved": "Befund erledigt"
+    "resolved": "Befund erledigt",
+    "reviewedHint": "Was nicht mehr im Fall ist, lässt sich erneut auf das Board ziehen (oder hinzufügen); seine Prüfung bleibt, wie sie war.",
+    "inCaseShort": "Im Fall",
+    "inCaseNow": "Worauf dieser Hinweis zeigt, ist jetzt im Fall",
+    "addAgain": "Hinzu",
+    "addAgainHint": "Auf das Board setzen (die Prüfung bleibt)"
   },
   "correlation": {
     "findingsTab": "Funde",
@@ -4184,6 +4283,8 @@
       "recomputing": "Neuberechnung…",
       "external": "Extern ({{count}})",
       "useFocusedInCase": "Fokussierte im Fall verwenden",
+      "addVisibleHere": "Sichtbare zu diesem Fall hinzufügen",
+      "addFocusedHere": "Fokussierte zu diesem Fall hinzufügen",
       "useVisibleInCase": "Sichtbare im Fall verwenden",
       "resetView": "Zurücksetzen"
     },
@@ -5703,5 +5804,61 @@
       "measured": "Zu den Bändern mit höherer Trefferquote verschoben, höchstens 15 Punkte pro Lauf, nie unter 10 % pro Band.",
       "fixed": "Eine an der Quelle festgelegte Aufteilung."
     }
+  },
+  "caseTarget": {
+    "title": "Zu einem Fall hinzufügen",
+    "description": "{{count}} Element(e) kommen in den gewählten Fall. Ein Asset wird Beweismittel; ein Befund bringt sein Asset mit.",
+    "existing": "Bestehender Fall",
+    "new": "Neuer Fall",
+    "search": "Offene Fälle suchen…",
+    "loading": "Fälle werden geladen…",
+    "noCases": "Kein offener Fall passt.",
+    "submit": "{{count}} hinzufügen",
+    "added": "{{count}} zu „{{title}}“ hinzugefügt.",
+    "openCase": "Fall öffnen",
+    "failed": "Konnte nicht zum Fall hinzugefügt werden",
+    "inCaseShort": "Im Fall",
+    "addShort": "Hinzu",
+    "attachShort": "Anhängen",
+    "menu": {
+      "addToCase": "Zu einem Fall hinzufügen…",
+      "addHere": "Zu diesem Fall hinzufügen",
+      "addManyHere": "{{count}} zu diesem Fall hinzufügen",
+      "attach": "An sein Asset in diesem Fall anhängen",
+      "inCase": "Schon in diesem Fall",
+      "allInCase": "Alle schon in diesem Fall"
+    },
+    "boardAdded": "Zum Fall hinzugefügt: {{label}}",
+    "boardAddedMany": "{{count}} zum Fall hinzugefügt"
+  },
+  "caseWatches": {
+    "heading": "Beobachtungen · {{count}}",
+    "showAll": "Alle Beobachtungen",
+    "answers": "Ihre Antworten",
+    "answersCount": "{{count}} Antworten",
+    "autoAddOn": "Fügt neue Antworten selbst hinzu",
+    "autoAddOff": "Neue Antworten warten auf Sie",
+    "filters": "{{count}} Filter",
+    "escalations": "{{count}} Eskalationsregel(n)",
+    "link": "Beobachtung verknüpfen",
+    "showGone": "Anzeigen",
+    "showGoneHint": "Diese Antworten in der Tabelle zeigen, mit dem Grund für jede",
+    "pick": "Beobachtung wählen…",
+    "createNew": "Neue Beobachtung anlegen",
+    "noneToLink": "Alle Beobachtungen sind schon verknüpft.",
+    "loadingList": "Beobachtungen werden geladen…"
+  },
+  "inquiryCases": {
+    "none": "Diese Beobachtung treibt noch keinen Fall.",
+    "noneYet": "Wählen Sie die Fälle, die diese Beobachtung treiben soll; sie wird nach dem Anlegen mit ihnen verknüpft.",
+    "link": "Mit einem Fall verknüpfen",
+    "unlink": "Von diesem Fall trennen",
+    "remove": "Nicht verknüpfen",
+    "unlinkTitle": "„{{title}}“ nicht mehr treiben?",
+    "linked": "Treibt jetzt „{{title}}“.",
+    "unlinked": "Treibt „{{title}}“ nicht mehr.",
+    "linkFailed": "Angelegt, konnte aber nicht verknüpft werden mit: {{titles}}",
+    "open": "„{{title}}“ bei dieser Beobachtung öffnen",
+    "more": "+{{count}} weitere"
   }
 }

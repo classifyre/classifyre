@@ -95,6 +95,33 @@ function numberOf(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** The case fields a PATCH edits, as the timeline compares them. */
+type CaseEditable = {
+  title: string;
+  description: string | null;
+  status: string;
+  severity: string;
+  assignee: string | null;
+  conclusion: string | null;
+  aiMode: string | null;
+};
+
+/** The case's description of itself: edits to these fold into one entry. */
+const DETAIL_FIELDS = [
+  'title',
+  'description',
+  'severity',
+  'assignee',
+] as const satisfies ReadonlyArray<keyof CaseEditable>;
+
+/** What the autopilot's entity map of a case says (AgentMemoryService.syncEntityMap). */
+const ENTITY_MAP_FIELDS = [
+  'title',
+  'description',
+  'status',
+  'severity',
+] as const satisfies ReadonlyArray<keyof CaseEditable>;
+
 // Hypotheses are CaseThreads of kind HYPOTHESIS; count those for the DTO.
 const countSelect = {
   _count: {
@@ -554,6 +581,13 @@ export class CasesService {
     const before = await this.prisma.case.findUnique({
       where: { id },
       select: {
+        title: true,
+        description: true,
+        status: true,
+        severity: true,
+        assignee: true,
+        conclusion: true,
+        aiMode: true,
         removeGoneFindings: true,
         removeResolvedFindings: true,
         removeGoneAssets: true,
@@ -588,30 +622,7 @@ export class CasesService {
       },
       include: countSelect,
     });
-    // A PATCH that only flips clean-up switches is not a case edit.
-    const touchesCase = (
-      [
-        'title',
-        'description',
-        'status',
-        'severity',
-        'assignee',
-        'conclusion',
-        'aiMode',
-      ] as const
-    ).some((key) => dto[key] !== undefined);
-    if (touchesCase) {
-      const actType =
-        dto.conclusion !== undefined
-          ? CaseActivityType.CONCLUSION_UPDATED
-          : CaseActivityType.CASE_UPDATED;
-      await this.activity.record(
-        id,
-        actType,
-        { title: dto.title, status: dto.status, severity: dto.severity },
-        actor,
-      );
-    }
+    await this.recordCaseEdits(id, before, updated, actor);
     const changes = CLEANUP_RULE_KEYS.filter(
       (key) => rules[key] !== before[key],
     ).map((rule) => ({ rule, enabled: rules[rule] }));
@@ -623,7 +634,15 @@ export class CasesService {
         actor,
       );
     }
-    await this.syncEntityMaps(id);
+    // The autopilot's map of the case names its title, description, status
+    // and severity; an autosaved assignee or conclusion leaves it as it is.
+    if (
+      ENTITY_MAP_FIELDS.some(
+        (key) => (before[key] ?? '') !== (updated[key] ?? ''),
+      )
+    ) {
+      await this.syncEntityMaps(id);
+    }
     // A switch turned on applies at once — what "remove resolved findings"
     // promises includes the ones resolved last week.
     const enabledNow = newlyEnabled(before, rules);
@@ -647,6 +666,77 @@ export class CasesService {
       };
     }
     return this.mapCase(updated);
+  }
+
+  /**
+   * What a PATCH changed, on the timeline. The case file saves as someone
+   * types and may send a field back unchanged, so only real changes count.
+   * Edits to the case's description of itself (title, description, severity,
+   * assignee) and to the conclusion draft fold into one entry per stretch of
+   * editing; a status or Autopilot-mode change is a decision, its own entry.
+   */
+  private async recordCaseEdits(
+    id: string,
+    before: CaseEditable,
+    after: CaseEditable,
+    actor: string | undefined,
+  ): Promise<void> {
+    const changed = (key: keyof CaseEditable) =>
+      (before[key] ?? '') !== (after[key] ?? '');
+    const edited = DETAIL_FIELDS.filter(changed);
+    if (edited.length > 0) {
+      await this.activity.recordEdit(
+        id,
+        CaseActivityType.CASE_UPDATED,
+        {
+          fields: edited,
+          title: after.title,
+          severity: after.severity,
+          ...(edited.includes('title') ? { previousTitle: before.title } : {}),
+        },
+        actor,
+        'details',
+        (previous, next) => ({
+          ...next,
+          fields: [
+            ...new Set([
+              ...(Array.isArray(previous.fields) ? previous.fields : []),
+              ...(Array.isArray(next.fields) ? next.fields : []),
+            ]),
+          ],
+          // The title the stretch of editing started from.
+          ...(previous.previousTitle !== undefined
+            ? { previousTitle: previous.previousTitle }
+            : {}),
+        }),
+      );
+    }
+    if (changed('status')) {
+      await this.activity.record(
+        id,
+        CaseActivityType.CASE_UPDATED,
+        { status: after.status, previousStatus: before.status },
+        actor,
+      );
+    }
+    if (changed('aiMode')) {
+      await this.activity.record(
+        id,
+        CaseActivityType.CASE_UPDATED,
+        { aiMode: after.aiMode, previousAiMode: before.aiMode },
+        actor,
+      );
+    }
+    if (changed('conclusion')) {
+      await this.activity.recordEdit(
+        id,
+        CaseActivityType.CONCLUSION_UPDATED,
+        { draft: true, length: (after.conclusion ?? '').length },
+        actor,
+        'conclusion',
+        (_previous, next) => next,
+      );
+    }
   }
 
   async remove(id: string): Promise<void> {

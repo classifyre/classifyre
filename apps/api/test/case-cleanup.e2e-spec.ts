@@ -695,6 +695,95 @@ describe('Case clean-up and finding filters (e2e)', () => {
         ),
       ).toBe(true);
     });
+
+    it('take out the assets a filter leaves without findings, when asked', async () => {
+      const caseId = await seedCase();
+      // One asset only holds the secret; the other holds an IP address too.
+      const only = await seedAsset('only-secret.txt', [
+        { type: 'SECRET_KEYWORD', value: 'password=1' },
+      ]);
+      const mixed = await seedAsset('mixed.txt', [
+        { type: 'SECRET_KEYWORD', value: 'password=2' },
+        { type: 'IP_ADDRESS', value: '192.0.2.7' },
+      ]);
+      // An asset with no finding in the case is never "emptied".
+      const bare = await seedAsset('bare.txt', []);
+      await attach(caseId, [...only.findingIds, ...mixed.findingIds]);
+      await api()
+        .post(`/cases/${caseId}/evidence`)
+        .send({ entityType: 'asset', entityId: bare.assetId })
+        .expect(201);
+      const board = await api().get(`/cases/${caseId}/board`).expect(200);
+      const itemOf = (assetId: string) =>
+        (
+          board.body.items as Array<{
+            id: string;
+            kind: string;
+            refId: string | null;
+          }>
+        ).find(
+          (i) =>
+            i.kind === 'EVIDENCE' &&
+            (
+              board.body.evidence as Array<{ id: string; entityId: string }>
+            ).some((e) => e.id === i.refId && e.entityId === assetId),
+        )?.id;
+      const onlyItem = itemOf(only.assetId);
+
+      const rule = [{ kind: 'FINDING_TYPE', pattern: 'SECRET_KEYWORD' }];
+      const preview = await api()
+        .post(`/cases/${caseId}/finding-filters/preview`)
+        .send({ rules: rule })
+        .expect(200);
+      expect(preview.body).toMatchObject({
+        matched: 2,
+        emptiedAssets: 1,
+        emptiedSample: ['only-secret.txt'],
+      });
+
+      const added = await api()
+        .post(`/cases/${caseId}/finding-filters`)
+        .set('X-Actor-Name', encodeURIComponent(actor))
+        .send({ rules: rule, removeEmptiedAssets: true })
+        .expect(200);
+      expect(added.body).toMatchObject({ detached: 2, assetsRemoved: 1 });
+      expect(await citedFindingIds(caseId)).toEqual([mixed.findingIds[1]]);
+      const evidence = await prisma.caseEvidence.findMany({
+        where: { caseId },
+        select: { entityId: true },
+      });
+      expect(evidence.map((e) => e.entityId).sort()).toEqual(
+        [mixed.assetId, bare.assetId].sort(),
+      );
+
+      const events = await timeline(caseId);
+      expect(
+        events.find((e) => e.activityType === 'EVIDENCE_AUTO_REMOVED')?.payload,
+      ).toMatchObject({
+        reason: 'FILTER_EMPTIED',
+        trigger: 'FILTER_ADDED',
+        count: 1,
+        assets: [{ assetId: only.assetId, label: 'only-secret.txt' }],
+      });
+      expect(
+        events.find((e) => e.activityType === 'FINDINGS_AUTO_REMOVED')?.payload,
+      ).toMatchObject({ reason: 'FILTER', count: 2 });
+
+      // The emptied asset's board item is put away with a bare tombstone, and
+      // its filtered finding stays restorable on its own.
+      if (onlyItem) {
+        const item = await prisma.caseBoardItem.findUniqueOrThrow({
+          where: { id: onlyItem },
+        });
+        expect(item.deletedAt).not.toBeNull();
+        const content = item.content as {
+          tombstone?: { findings: unknown[] };
+          detached?: Record<string, unknown>;
+        };
+        expect(content.tombstone?.findings).toEqual([]);
+        expect(Object.keys(content.detached ?? {})).toEqual(only.findingIds);
+      }
+    });
   });
 
   describe('escalation rules', () => {

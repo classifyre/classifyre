@@ -4,10 +4,10 @@ import * as React from "react";
 import { toast } from "sonner";
 import {
   Ban,
+  ExternalLink,
   Fingerprint,
   FolderPlus,
   Globe,
-  Info,
   Maximize2,
   RotateCw,
   Search,
@@ -24,11 +24,6 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { Input } from "@workspace/ui/components/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/popover";
 import { Slider } from "@workspace/ui/components/slider";
 import { Spinner } from "@workspace/ui/components/spinner";
 import {
@@ -67,6 +62,13 @@ import {
   FingerprintsGraphSelectionRail,
 } from "./fingerprints-graph-rail";
 import type { FingerprintOccurrencesCache } from "./fingerprint-value-occurrences";
+import { GRAPH_BODY_CLASS, GRAPH_RAIL_CLASS } from "./graph-explorer/graph-explorer";
+import { GraphNodeMenu, type GraphMenuAt } from "./graph-explorer/graph-node-menu";
+import { assetCandidate, useAddToCase, type CaseCandidate } from "./case-target/case-target";
+import { AddToCaseButton, AddToCaseMenuItem, useCaseDecorator } from "./case-target/case-target-menu";
+import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@workspace/ui/components/dropdown-menu";
+import { cn } from "@workspace/ui/lib/utils";
+import { useNsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
 
 const SELECT_MODE = { kind: "select" } as const;
@@ -136,6 +138,9 @@ export function FingerprintsGraph({
   occurrencesCache?: FingerprintOccurrencesCache;
 }) {
   const { t } = useTranslation();
+  const nsPath = useNsPath();
+  // Inside a case board, adds go to that case; elsewhere the person picks one.
+  const { target: caseTarget, dialog: caseDialog } = useAddToCase();
   const localOccurrencesCache = React.useRef<FingerprintOccurrencesCache>(new Map());
   const effectiveOccurrencesCache =
     occurrencesCache ?? localOccurrencesCache.current;
@@ -164,11 +169,7 @@ export function FingerprintsGraph({
   const [path, setPath] = React.useState<PathResult | null>(null);
   const [tuneOpen, setTuneOpen] = React.useState(false);
   const [caseOpen, setCaseOpen] = React.useState(false);
-  const [ctxMenu, setCtxMenu] = React.useState<{
-    x: number;
-    y: number;
-    node: GraphNodeDto;
-  } | null>(null);
+  const [ctxMenu, setCtxMenu] = React.useState<GraphMenuAt<GraphNodeDto> | null>(null);
 
   const clearFocus = React.useCallback(() => {
     setPath(null);
@@ -176,17 +177,12 @@ export function FingerprintsGraph({
     setCtxMenu(null);
   }, []);
 
-  // Right-click a real shared-value node → quick-exclude it from correlation.
+  // Right-click: an asset joins a case; a shared value brings in the assets
+  // that share it, or is excluded from correlation.
   const onNodeContextMenu = React.useCallback(
     (node: GraphNodeDto, x: number, y: number) => {
-      if (
-        node.type !== "finding" ||
-        node.detectorType === "BUNDLE" ||
-        node.id.startsWith("bundle-node:")
-      ) {
-        return;
-      }
-      setCtxMenu({ x, y, node });
+      if (isClusterNode(node)) return;
+      setCtxMenu({ x, y, target: node });
     },
     [],
   );
@@ -779,7 +775,7 @@ export function FingerprintsGraph({
     return m;
   }, [renderEdges]);
 
-  const nodeDecorator = React.useCallback(
+  const heatDecorator = React.useCallback(
     (n: GraphNodeDto): NodeDecoration | null =>
       n.type === "finding"
         ? {
@@ -788,6 +784,23 @@ export function FingerprintsGraph({
           }
         : null,
     [maxConfidenceByKey],
+  );
+  // Assets already in the case wear an "in case" badge (inside a case only).
+  const nodeDecorator = useCaseDecorator(caseTarget, heatDecorator) ?? heatDecorator;
+
+  /** The asset nodes a shared value (or a bundle of them) connects. */
+  const assetsSharing = React.useCallback(
+    (node: GraphNodeDto): CaseCandidate[] => {
+      const detail = bundleDetails.get(node.id);
+      const ids = detail
+        ? detail.assetIds
+        : dEdges.filter((e) => e.toId === node.id && e.fromType === "asset").map((e) => e.fromId);
+      return [...new Set(ids)]
+        .map((id) => nodes.find((n) => n.type === "asset" && n.id === id))
+        .filter((n): n is GraphNodeDto => !!n)
+        .map((n) => assetCandidate({ id: n.id, label: n.label, assetType: n.assetType, sourceType: n.sourceType }));
+    },
+    [bundleDetails, dEdges, nodes],
   );
 
   const edgeStyle = React.useCallback(
@@ -801,7 +814,19 @@ export function FingerprintsGraph({
     [],
   );
 
-  const useInCase = React.useCallback(() => setCaseOpen(true), []);
+  // In a case: straight into it. Elsewhere: the dialog that picks (or starts) one.
+  const useInCase = React.useCallback(() => {
+    if (!caseTarget.caseId) {
+      setCaseOpen(true);
+      return;
+    }
+    caseTarget.add(
+      targetAssetIds
+        .map((id) => nodes.find((n) => n.type === "asset" && n.id === id))
+        .filter((n): n is GraphNodeDto => !!n)
+        .map((n) => assetCandidate({ id: n.id, label: n.label, assetType: n.assetType, sourceType: n.sourceType })),
+    );
+  }, [caseTarget, targetAssetIds, nodes]);
   const rawNodeByKeyGetter = React.useCallback(
     (k: string) => rawNodeByKey.get(k),
     [rawNodeByKey],
@@ -821,6 +846,13 @@ export function FingerprintsGraph({
         focusCluster={focusCluster}
         assetLabel={assetLabel}
         occurrencesCache={effectiveOccurrencesCache}
+        assetActions={(node) => (
+          <AddToCaseButton
+            target={caseTarget}
+            candidate={assetCandidate({ id: node.id, label: node.label, assetType: node.assetType, sourceType: node.sourceType })}
+            className="h-8 w-full gap-1.5 text-xs"
+          />
+        )}
       />
     ),
     [
@@ -833,6 +865,7 @@ export function FingerprintsGraph({
       focusCluster,
       assetLabel,
       effectiveOccurrencesCache,
+      caseTarget,
     ],
   );
   const overviewFooter = React.useMemo(
@@ -860,8 +893,13 @@ export function FingerprintsGraph({
   // hover highlighting inside the selection panel may lag the canvas by
   // one selection cycle — the canvas itself is unaffected.
 
+  const railIdle = !selection && !clustered.hasCollapsedClusters;
+  const menuNode = ctxMenu?.target ?? null;
+  const menuIsValue = !!menuNode && menuNode.type === "finding";
+  const menuIsBundle = menuIsValue && (menuNode.detectorType === "BUNDLE" || menuNode.id.startsWith(BUNDLE_NODE_PREFIX));
+
   return (
-    <div className="flex h-full flex-col border-2 border-border bg-card">
+    <div className="@container/graph flex h-full flex-col border-2 border-border bg-card">
       {/* ── Toolbar ── */}
       <div className="flex flex-wrap items-center gap-2 border-b-2 border-border px-3 py-2">
         <div className="relative">
@@ -960,13 +998,17 @@ export function FingerprintsGraph({
           <Button
             size="sm"
             className="h-8"
-            disabled={targetAssetIds.length === 0}
+            disabled={targetAssetIds.length === 0 || caseTarget.readOnly}
             onClick={useInCase}
           >
             <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
-            {focusActive
-              ? t("correlation.fingerprints.useFocusedInCase")
-              : t("correlation.fingerprints.useVisibleInCase")}
+            {caseTarget.caseId
+              ? focusActive
+                ? t("correlation.fingerprints.addFocusedHere")
+                : t("correlation.fingerprints.addVisibleHere")
+              : focusActive
+                ? t("correlation.fingerprints.useFocusedInCase")
+                : t("correlation.fingerprints.useVisibleInCase")}
           </Button>
           <Button
             variant="outline"
@@ -986,9 +1028,9 @@ export function FingerprintsGraph({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1">
+      <div className={GRAPH_BODY_CLASS}>
         {/* Canvas is always mounted (so pan/zoom binds); states overlay it. */}
-        <div ref={containerRef} className="relative min-w-0 flex-1 overflow-hidden">
+        <div ref={containerRef} className="relative min-h-[220px] min-w-0 flex-1 overflow-hidden">
           <GraphCanvas
             nodes={renderNodes}
             edges={renderEdges}
@@ -1051,50 +1093,60 @@ export function FingerprintsGraph({
           )}
         </div>
 
-        {/* ── Detail / actions rail ── */}
-        <aside className="w-[260px] shrink-0 space-y-4 overflow-y-auto border-l-2 border-border bg-background p-3">
+        {/* ── Detail / actions rail (under the canvas when narrow) ── */}
+        <aside className={cn(GRAPH_RAIL_CLASS, railIdle && "hidden @xl/graph:block")}>
           {selection ? selectionRail : overviewFooter}
         </aside>
       </div>
 
-      {/* Right-click quick-exclude menu */}
-      {ctxMenu && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setCtxMenu(null)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setCtxMenu(null);
-            }}
-          />
-          <div
-            className="fixed z-50 w-60 overflow-hidden rounded-[4px] border-2 border-border bg-popover shadow-md"
-            style={{ left: ctxMenu.x, top: ctxMenu.y }}
-          >
-            <div className="truncate border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
-              <span className="font-mono uppercase">{ctxMenu.node.detectorType}</span>{" "}
-              <span className="font-mono text-foreground">{ctxMenu.node.label}</span>
-            </div>
-            <button
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-              onClick={() => void exclude(ctxMenu.node, "value")}
-            >
-              <Ban className="h-3.5 w-3.5" />
-              {t("correlation.exclude.value")}
-            </button>
-            <button
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-              onClick={() => void exclude(ctxMenu.node, "label")}
-            >
-              <Ban className="h-3.5 w-3.5" />
-              {t("correlation.exclude.label", {
-                label: (ctxMenu.node.detectorType ?? "").toLowerCase(),
-              })}
-            </button>
-          </div>
-        </>
-      )}
+      {/* Right-click: add to a case, open, or exclude a shared value */}
+      <GraphNodeMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} className="w-64">
+        {menuNode && menuNode.type === "asset" && (
+          <>
+            <AddToCaseMenuItem
+              target={caseTarget}
+              candidates={[
+                assetCandidate({
+                  id: menuNode.id,
+                  label: menuNode.label,
+                  assetType: menuNode.assetType,
+                  sourceType: menuNode.sourceType,
+                }),
+              ]}
+              onDone={() => setCtxMenu(null)}
+            />
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => window.open(nsPath(`/assets/${menuNode.id}`), "_blank", "noopener")}>
+              <ExternalLink className="size-4" /> {t("correlation.fingerprints.openAsset")}
+            </DropdownMenuItem>
+          </>
+        )}
+        {menuNode && menuIsValue && (
+          <>
+            <DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">
+              <span className="font-mono uppercase">{menuIsBundle ? "" : menuNode.detectorType}</span>{" "}
+              <span className="font-mono text-foreground">{menuNode.label}</span>
+            </DropdownMenuLabel>
+            <AddToCaseMenuItem target={caseTarget} candidates={assetsSharing(menuNode)} onDone={() => setCtxMenu(null)} />
+            {!menuIsBundle && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => void exclude(menuNode, "value")}>
+                  <Ban className="size-4" />
+                  {t("correlation.exclude.value")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void exclude(menuNode, "label")}>
+                  <Ban className="size-4" />
+                  {t("correlation.exclude.label", {
+                    label: (menuNode.detectorType ?? "").toLowerCase(),
+                  })}
+                </DropdownMenuItem>
+              </>
+            )}
+          </>
+        )}
+      </GraphNodeMenu>
+      {caseDialog}
 
       <CorrelationTuningDialog
         open={tuneOpen}

@@ -20,19 +20,23 @@ import {
   Globe,
   Highlighter,
   LayoutGrid,
+  Link,
   Link2,
   Loader2,
   MessageSquare,
   Pencil,
   Search,
   SlidersHorizontal,
+  Sparkles,
   StickyNote,
   Trash2,
   TriangleAlert,
+  Unlink,
 } from "lucide-react";
-import { api, type CaseActivityDto } from "@workspace/api-client";
+import { api, type CaseActivityDto, type InquiryActivityDto } from "@workspace/api-client";
 import { EscalationFlag } from "@workspace/case-board/components/finding-node";
 import { Button } from "@workspace/ui/components/button";
+import { cn } from "@workspace/ui/lib/utils";
 import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 import { ESCALATION_INK } from "@/lib/escalation-tone";
 
@@ -42,6 +46,23 @@ type EventGroup = "case" | "inquiry" | "evidence" | "escalation" | "thread" | "b
 
 /** Synthetic activityType for autopilot runs blended into the timeline. */
 const AUTOPILOT_RUN = "AUTOPILOT_RUN";
+
+/**
+ * A linked watch's own history, blended in: what a scan changed about the
+ * watch's answers. It is what explains "N new" and "N gone" on the Watches
+ * panel, so those link here. Ids are `watch:<inquiry activity id>`.
+ */
+const WATCH_LANDED = "WATCH_MATCHES_LANDED";
+const WATCH_RETIRED = "WATCH_MATCHES_RETIRED";
+export const WATCH_ENTRY_PREFIX = "watch:";
+
+/** The timeline id of a watch history entry. */
+export function watchEntryId(activityId: string): string {
+  return `${WATCH_ENTRY_PREFIX}${activityId}`;
+}
+
+/** Watch history entries blended per watch: its newest scan deltas. */
+const WATCH_ENTRIES_PER_WATCH = 50;
 
 const TYPE_META: Record<
   string,
@@ -98,6 +119,8 @@ const TYPE_META: Record<
   LEADS_GENERATED: { icon: <Compass className="h-3.5 w-3.5" />, label: "New leads", color: "text-blue-600 dark:text-blue-400", group: "evidence" },
   EVIDENCE_AUTO_REMOVED: { icon: <Eraser className="h-3.5 w-3.5" />, label: "Evidence taken out", color: "text-red-600 dark:text-red-400", group: "evidence" },
   [AUTOPILOT_RUN]: { icon: <Bot className="h-3.5 w-3.5" />, label: "AI autopilot run", color: "text-amber-600 dark:text-amber-400", group: "ai" },
+  [WATCH_LANDED]: { icon: <Sparkles className="h-3.5 w-3.5" />, label: "New answers from a watch", color: "text-blue-600 dark:text-blue-400", group: "inquiry" },
+  [WATCH_RETIRED]: { icon: <Unlink className="h-3.5 w-3.5" />, label: "Watch answers no longer found", color: "text-red-600 dark:text-red-400", group: "inquiry" },
 };
 
 // ─── Clean-up and filters ─────────────────────────────────────────────────────
@@ -131,6 +154,7 @@ const REMOVAL_LABELS: Record<string, string> = {
   FINDING_RESOLVED: "Taken out: resolved",
   FILTER: "Detached by a filter",
   ASSET_GONE: "Taken out: asset gone from its source",
+  FILTER_EMPTIED: "Taken out: no findings left after a filter",
 };
 
 /** Filter and escalation rules share their entries; the action names them. */
@@ -163,8 +187,23 @@ function eventLabel(item: CaseActivityDto, fallback: string): string {
     return p.automatic === true ? "Auto-added by a watch" : "Pulled from a watch";
   }
   if (isLegacyAutoPullToggle(item)) return "Watch settings changed";
+  if (item.activityType === "CASE_UPDATED") {
+    if (Array.isArray(p.fields)) return "Case details edited";
+    if (str(p.aiMode)) return "Autopilot mode changed";
+    if (p.reopened === true) return "Case reopened";
+    if (str(p.status)) return "Status changed";
+  }
+  if (item.activityType === "CONCLUSION_UPDATED" && p.draft === true) return "Conclusion draft edited";
   return fallback;
 }
+
+/** The names of the case fields an edit entry lists. */
+const FIELD_LABELS: Record<string, string> = {
+  title: "title",
+  description: "description",
+  severity: "severity",
+  assignee: "assignee",
+};
 
 /** Auto-add toggles were written as CASE_UPDATED before they had their own type. */
 function isLegacyAutoPullToggle(item: CaseActivityDto): boolean {
@@ -308,6 +347,7 @@ function RemovedList({
   truncated,
   onShowOnBoard,
   marker,
+  emptied = false,
 }: {
   findings: RemovedFinding[];
   assets: RemovedAsset[];
@@ -316,6 +356,8 @@ function RemovedList({
   onShowOnBoard?: (itemId: string) => void;
   /** Drawn before each finding (the escalation flag). */
   marker?: React.ReactNode;
+  /** Assets a filter emptied: their findings were filtered out, not taken along. */
+  emptied?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const rows = findings.length > 0 ? findings : assets;
@@ -354,7 +396,11 @@ function RemovedList({
           : (shown as RemovedAsset[]).map((a, index) => (
               <li key={index} className="min-w-0 truncate font-mono text-[11px]">
                 <span className="text-foreground">{a.label}</span>
-                {a.findings ? ` · ${a.findings} finding${a.findings === 1 ? "" : "s"} went with it` : ""}
+                {a.findings
+                  ? emptied
+                    ? ` · its ${a.findings === 1 ? "finding was" : `${a.findings} findings were`} filtered out`
+                    : ` · ${a.findings} finding${a.findings === 1 ? "" : "s"} went with it`
+                  : ""}
                 {a.state === "DELETED" ? " · deleted" : ""}
               </li>
             ))}
@@ -395,6 +441,7 @@ function eventSubject(item: CaseActivityDto): string | null {
   const p = (item.payload ?? {}) as Record<string, unknown>;
   // Synthetic AI-run events are not part of the generated activity enum.
   if ((item.activityType as string) === AUTOPILOT_RUN) return str(p.instruction);
+  if (isWatchEntry(item)) return str(p.inquiryTitle);
   switch (item.activityType) {
     case "INQUIRY_LINKED":
     case "INQUIRY_UNLINKED":
@@ -402,7 +449,7 @@ function eventSubject(item: CaseActivityDto): string | null {
     case "INQUIRY_SETTINGS_UPDATED":
       return str(p.inquiryTitle);
     case "CASE_UPDATED":
-      return isLegacyAutoPullToggle(item) ? str(p.inquiryTitle) : null;
+      return isLegacyAutoPullToggle(item) ? str(p.inquiryTitle) : Array.isArray(p.fields) ? str(p.title) : null;
     case "THREAD_CREATED":
     case "THREAD_ENTRY_ADDED":
     case "THREAD_STATEMENT_UPDATED":
@@ -477,6 +524,31 @@ function EventDetail({
           {str(p.summary) ? ` — ${String(p.summary)}` : ""}
           {status === "FAILED" && str(p.error) ? ` — ${String(p.error)}` : ""}
         </span>
+      </div>
+    );
+  }
+
+  if (isWatchEntry(item)) {
+    const count = Number(p.count ?? 0);
+    const source = str(p.sourceName);
+    const landed = (item.activityType as string) === WATCH_LANDED;
+    const labels = strList(p.sampleLabels);
+    return (
+      <div className="text-muted-foreground mt-0.5 space-y-1 text-xs">
+        <span className="block">
+          {landed
+            ? `${plural(count, "new answer")} after a scan${source ? ` of ${source}` : ""}`
+            : `the latest scan${source ? ` of ${source}` : ""} no longer finds ${plural(count, "answer")}; what the case cites of them stays, marked gone`}
+        </span>
+        {labels.length > 0 && (
+          <span className="flex flex-wrap gap-1">
+            {[...new Set(labels)].slice(0, 6).map((label) => (
+              <span key={label} className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px]">
+                {label}
+              </span>
+            ))}
+          </span>
+        )}
       </div>
     );
   }
@@ -704,7 +776,7 @@ function EventDetail({
     case "EVIDENCE_AUTO_REMOVED": {
       const when = triggerText(p);
       if (when) lines.push(<span key="when" className="block">{when}</span>);
-      if (p.reason === "FILTER" && Array.isArray(p.filters) && p.filters.length > 0) {
+      if ((p.reason === "FILTER" || p.reason === "FILTER_EMPTIED") && Array.isArray(p.filters) && p.filters.length > 0) {
         lines.push(
           <span key="filters" className="flex flex-wrap gap-1">
             {(p.filters as FilterPayload[]).map((f, index) => (
@@ -724,6 +796,7 @@ function EventDetail({
             total={Number(p.count ?? findings.length + assets.length)}
             truncated={p.truncated === true}
             onShowOnBoard={onShowOnBoard}
+            emptied={p.reason === "FILTER_EMPTIED"}
           />,
         );
       }
@@ -786,6 +859,14 @@ function EventDetail({
       break;
     }
     case "CONCLUSION_UPDATED":
+      if (p.draft === true && Number(p.passes ?? 1) > 1) {
+        lines.push(
+          <span key="saves">
+            {plural(Number(p.passes), "save")}
+            {rangeText(p)}
+          </span>,
+        );
+      }
       if (p.closed) {
         const archived = Number(p.archivedInquiries ?? 0);
         lines.push(
@@ -803,7 +884,37 @@ function EventDetail({
             {SETTING_LABELS.autoPull} → <span className="font-medium text-foreground">{p.autoPull ? "on" : "off"}</span>
           </span>,
         );
-      } else if (str(p.status)) lines.push(<span key="status">status → {String(p.status)}</span>);
+      } else if (Array.isArray(p.fields)) {
+        const fields = strList(p.fields).map((f) => FIELD_LABELS[f] ?? f);
+        const passes = Number(p.passes ?? 1);
+        lines.push(
+          <span key="fields" className="block">
+            edited {fields.join(", ")}
+            {passes > 1 ? ` · ${plural(passes, "save")}${rangeText(p)}` : ""}
+          </span>,
+        );
+        if (strList(p.fields).includes("title") && str(p.previousTitle) && p.previousTitle !== p.title) {
+          lines.push(
+            <span key="title" className="block">
+              “{String(p.previousTitle)}” → <span className="font-medium text-foreground">“{String(p.title ?? "")}”</span>
+            </span>,
+          );
+        }
+      } else if (str(p.aiMode)) {
+        lines.push(
+          <span key="ai">
+            {str(p.previousAiMode) ? `${String(p.previousAiMode)} → ` : ""}
+            <span className="font-medium text-foreground">{String(p.aiMode)}</span>
+          </span>,
+        );
+      } else if (str(p.status)) {
+        lines.push(
+          <span key="status">
+            {str(p.previousStatus) ? `${String(p.previousStatus)} → ` : "status → "}
+            <span className="font-medium text-foreground">{String(p.status)}</span>
+          </span>,
+        );
+      }
       break;
     case "BOARD_NOTE_UPDATED":
     case "BOARD_FRAME_UPDATED": {
@@ -907,18 +1018,38 @@ export function CaseTimeline({
   caseId,
   compact = false,
   onShowOnBoard,
+  watches = [],
+  focusEntryId = null,
+  focusNonce = 0,
+  onFocusEntry,
+  entryLink,
 }: {
   caseId: string;
   /** Narrow container (the case board's drawer): no day index column. */
   compact?: boolean;
   /** Board events carry an itemId; when given, they offer "Show on board". */
   onShowOnBoard?: (itemId: string) => void;
+  /** The case's linked watches: their scan deltas are blended in. */
+  watches?: ReadonlyArray<{ id: string; title: string }>;
+  /** An entry to bring into view and mark (a shared link, an alert's "What changed"). */
+  focusEntryId?: string | null;
+  /** Bumped to scroll to the same entry again. */
+  focusNonce?: number;
+  /** Someone picked an entry (its time): mark it, and keep it in the address. */
+  onFocusEntry?: (entryId: string) => void;
+  /** The address that opens the timeline at an entry; when given, each entry can be copied as a link. */
+  entryLink?: (entryId: string) => string;
 }) {
   const [items, setItems] = React.useState<CaseActivityDto[]>([]);
   const [aiRuns, setAiRuns] = React.useState<CaseActivityDto[]>([]);
+  const [watchEntries, setWatchEntries] = React.useState<CaseActivityDto[]>([]);
   const [cursor, setCursor] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [filter, setFilter] = React.useState<"ALL" | EventGroup>("ALL");
+  const [missing, setMissing] = React.useState<string | null>(null);
+  // The entry the first page must reach; later pages just continue.
+  const reachRef = React.useRef<string | null>(null);
+  reachRef.current = focusEntryId && !focusEntryId.startsWith(WATCH_ENTRY_PREFIX) ? focusEntryId : null;
 
   const load = React.useCallback(
     async (append = false, fromCursor?: string) => {
@@ -928,6 +1059,7 @@ export function CaseTimeline({
           caseId,
           cursor: append ? fromCursor : undefined,
           limit: "100",
+          until: append ? undefined : (reachRef.current ?? undefined),
         });
         setItems((prev) => (append ? [...prev, ...res.items] : res.items));
         setCursor(res.nextCursor ?? null);
@@ -974,14 +1106,97 @@ export function CaseTimeline({
     void load();
   }, [load]);
 
-  const visible = React.useMemo(() => {
-    const merged = [...items, ...aiRuns].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-    return filter === "ALL"
-      ? merged
-      : merged.filter((i) => eventGroup(i) === filter);
-  }, [items, aiRuns, filter]);
+  // A deep link to an entry older than the first page: read down to it.
+  React.useEffect(() => {
+    const target = reachRef.current;
+    if (!target || loading || items.some((i) => i.id === target)) return;
+    if (items.length > 0 && !cursor) return;
+    void load();
+    // Only a new focus asks again; `items` changing must not loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusEntryId, focusNonce]);
+
+  const watchKey = watches.map((w) => `${w.id}:${w.title}`).join("|");
+  React.useEffect(() => {
+    if (watches.length === 0) {
+      setWatchEntries([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const titles = new Map(watches.map((w) => [w.id, w.title]));
+      const pages = await Promise.all(
+        watches.map((w) =>
+          api.inquiries
+            .inquiriesControllerTimeline({
+              id: w.id,
+              types: "MATCHES_LANDED,MATCHES_RETIRED",
+              limit: String(WATCH_ENTRIES_PER_WATCH),
+            })
+            .catch(() => null),
+        ),
+      );
+      const rows = pages.flatMap((page) => page?.items ?? []);
+      const sourceIds = [...new Set(rows.map((r) => str((r.payload as Record<string, unknown>).sourceId)).filter(Boolean))];
+      const sourceNames = new Map<string, string>();
+      if (sourceIds.length > 0) {
+        try {
+          const sources = await api.sources.sourcesControllerListSources();
+          for (const src of sources as Array<{ id: string; name?: string | null }>) {
+            if (src.name) sourceNames.set(src.id, src.name);
+          }
+        } catch {
+          // Entries still read without the source's name.
+        }
+      }
+      if (cancelled) return;
+      setWatchEntries(rows.map((row) => toWatchEntry(row, caseId, titles.get(row.inquiryId) ?? null, sourceNames)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // watchKey stands for `watches`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchKey, caseId]);
+
+  const merged = React.useMemo(
+    () =>
+      [...items, ...aiRuns, ...watchEntries].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
+    [items, aiRuns, watchEntries],
+  );
+  const visible = React.useMemo(
+    () => (filter === "ALL" ? merged : merged.filter((i) => eventGroup(i) === filter)),
+    [merged, filter],
+  );
+
+  // Bring the focused entry into view once it is loaded: show every kind if a
+  // filter hides it, then scroll it to the middle.
+  const listRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!focusEntryId) {
+      setMissing(null);
+      return;
+    }
+    const entry = merged.find((i) => i.id === focusEntryId);
+    if (!entry) {
+      const settled = !loading && (focusEntryId.startsWith(WATCH_ENTRY_PREFIX) ? watchEntries.length > 0 || watches.length === 0 : !cursor);
+      setMissing(settled ? focusEntryId : null);
+      return;
+    }
+    setMissing(null);
+    if (filter !== "ALL" && eventGroup(entry) !== filter) {
+      setFilter("ALL");
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      const el = listRef.current?.querySelector<HTMLElement>(`[data-entry-id="${CSS.escape(focusEntryId)}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+    // Scroll once per focus (nonce), when the entry turns up, or when a filter reset shows it.
+  }, [focusEntryId, focusNonce, merged, filter, loading, cursor, watchEntries.length, watches.length]);
 
   // Group by day, newest day first (API returns newest first).
   const days = React.useMemo(() => {
@@ -1001,6 +1216,19 @@ export function CaseTimeline({
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const [copied, setCopied] = React.useState<string | null>(null);
+  const copyLink = (id: string) => {
+    if (!entryLink) return;
+    onFocusEntry?.(id);
+    void navigator.clipboard?.writeText(entryLink(id)).then(
+      () => {
+        setCopied(id);
+        window.setTimeout(() => setCopied((c) => (c === id ? null : c)), 1500);
+      },
+      () => undefined,
+    );
+  };
+
   if (loading && items.length === 0) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
@@ -1011,7 +1239,7 @@ export function CaseTimeline({
 
   return (
     <div className={compact ? "space-y-4" : "grid gap-6 lg:grid-cols-[1fr_200px]"}>
-      <div className="min-w-0 space-y-4">
+      <div className="min-w-0 space-y-4" ref={listRef}>
         {/* ── Filters ── */}
         <div className="flex flex-wrap items-center gap-1.5">
           {GROUP_FILTERS.map(({ key, label }) => (
@@ -1034,6 +1262,12 @@ export function CaseTimeline({
             Refresh
           </button>
         </div>
+
+        {missing && (
+          <p className="rounded-[4px] border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground" role="status">
+            The entry this link points at is not in the timeline any more (it may be older than the history kept for a watch).
+          </p>
+        )}
 
         {days.length === 0 ? (
           <p className="text-muted-foreground py-8 text-center text-sm">
@@ -1059,8 +1293,18 @@ export function CaseTimeline({
                     group: "case" as const,
                   };
                   const subject = eventSubject(item);
+                  const focused = item.id === focusEntryId;
                   return (
-                    <li key={item.id} id={`timeline-event-${item.id}`} className="relative pl-6 py-2">
+                    <li
+                      key={item.id}
+                      id={`timeline-event-${item.id}`}
+                      data-entry-id={item.id}
+                      data-focused={focused || undefined}
+                      className={cn(
+                        "group/entry relative scroll-mt-24 py-2 pl-6 transition-colors",
+                        focused && "-mr-1 rounded-r-[4px] bg-accent/10 pr-1 shadow-[inset_3px_0_0_var(--accent)]",
+                      )}
+                    >
                       <span
                         className={`absolute -left-[9px] top-2.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-border bg-card ${meta.color}`}
                       >
@@ -1076,8 +1320,30 @@ export function CaseTimeline({
                             </>
                           )}
                         </p>
-                        <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
-                          {timeLabel(new Date(item.createdAt))}
+                        <span className="flex shrink-0 items-center gap-1">
+                          {entryLink && (
+                            <button
+                              type="button"
+                              className={cn(
+                                "text-muted-foreground hover:text-foreground focus-visible:opacity-100",
+                                copied === item.id ? "opacity-100" : "opacity-0 group-hover/entry:opacity-100",
+                              )}
+                              title={copied === item.id ? "Link copied" : "Copy a link to this entry"}
+                              aria-label="Copy a link to this entry"
+                              onClick={() => copyLink(item.id)}
+                            >
+                              {copied === item.id ? <CheckCircle2 className="h-3 w-3" /> : <Link className="h-3 w-3" />}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="text-muted-foreground font-mono text-[11px] tabular-nums hover:text-foreground disabled:cursor-default disabled:hover:text-muted-foreground"
+                            disabled={!onFocusEntry}
+                            onClick={() => onFocusEntry?.(item.id)}
+                            title={new Date(item.createdAt).toLocaleString()}
+                          >
+                            {timeLabel(new Date(item.createdAt))}
+                          </button>
                         </span>
                       </div>
                       <EventDetail item={item} onShowOnBoard={onShowOnBoard} />
@@ -1145,4 +1411,33 @@ export function CaseTimeline({
       )}
     </div>
   );
+}
+
+function isWatchEntry(item: CaseActivityDto): boolean {
+  const type = item.activityType as string;
+  return type === WATCH_LANDED || type === WATCH_RETIRED;
+}
+
+/** A watch's scan delta, shaped as a case timeline entry. */
+function toWatchEntry(
+  row: InquiryActivityDto,
+  caseId: string,
+  inquiryTitle: string | null,
+  sourceNames: ReadonlyMap<string, string>,
+): CaseActivityDto {
+  const p = (row.payload ?? {}) as Record<string, unknown>;
+  const sourceId = str(p.sourceId);
+  return {
+    id: watchEntryId(row.id),
+    caseId,
+    activityType: (row.activityType === "MATCHES_RETIRED" ? WATCH_RETIRED : WATCH_LANDED) as CaseActivityDto["activityType"],
+    payload: {
+      ...p,
+      inquiryId: row.inquiryId,
+      inquiryTitle,
+      sourceName: sourceId ? (sourceNames.get(sourceId) ?? null) : null,
+    },
+    actor: undefined,
+    createdAt: row.createdAt,
+  };
 }
