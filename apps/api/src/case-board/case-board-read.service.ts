@@ -213,7 +213,12 @@ export class CaseBoardReadService {
       await Promise.all([
         this.prisma.caseBoard.findUniqueOrThrow({
           where: { id: boardId },
-          select: { id: true, caseId: true, version: true },
+          select: {
+            id: true,
+            caseId: true,
+            version: true,
+            thumbnail: { select: { signature: true } },
+          },
         }),
         this.prisma.caseBoardItem.findMany({
           where: { boardId, deletedAt: null },
@@ -359,6 +364,7 @@ export class CaseBoardReadService {
         version: board.version,
         readOnly: isReadOnlyCase(caseStatus),
         caseStatus,
+        thumbnailSignature: board.thumbnail?.signature ?? null,
       },
       items: items.map(toBoardItemDto),
       links: links.map(toBoardLinkDto),

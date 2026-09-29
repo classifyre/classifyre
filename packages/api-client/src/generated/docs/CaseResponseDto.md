@@ -23,6 +23,9 @@ Name | Type
 `removeGoneAssets` | boolean
 `escalatedCount` | number
 `lastEscalatedAt` | Date
+`findingCount` | number
+`newMatchCount` | number
+`thumbnail` | [CaseThumbnailDto](CaseThumbnailDto.md)
 `createdAt` | Date
 `updatedAt` | Date
 `evidence` | [Array&lt;CaseEvidenceDto&gt;](CaseEvidenceDto.md)
@@ -54,6 +57,9 @@ const example = {
   "removeGoneAssets": null,
   "escalatedCount": null,
   "lastEscalatedAt": null,
+  "findingCount": null,
+  "newMatchCount": null,
+  "thumbnail": null,
   "createdAt": null,
   "updatedAt": null,
   "evidence": null,

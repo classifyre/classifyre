@@ -1823,7 +1823,7 @@ No authorization required
 
 ## casesControllerList
 
-> CaseListResponseDto casesControllerList(search, status, severity, escalated, skip, limit)
+> CaseListResponseDto casesControllerList(search, status, severity, escalated, ids, excludeIds, withCardDetails, skip, limit)
 
 List cases
 
@@ -1849,6 +1849,12 @@ async function example() {
     severity: ...,
     // boolean | Only cases holding escalated findings (optional)
     escalated: true,
+    // Array<string> | Only these cases (at most 100) (optional)
+    ids: ...,
+    // Array<string> | Leave these cases out (at most 100), e.g. the ones a page already shows above the list (optional)
+    excludeIds: ...,
+    // boolean | Add what a case card shows: finding count, new watch matches and the board\'s thumbnail sketch (optional)
+    withCardDetails: true,
     // number (optional)
     skip: 8.14,
     // number (optional)
@@ -1876,6 +1882,9 @@ example().catch(console.error);
 | **status** | `OPEN`, `IN_PROGRESS`, `CLOSED`, `ARCHIVED` |  | [Optional] [Enum: OPEN, IN_PROGRESS, CLOSED, ARCHIVED] |
 | **severity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
 | **escalated** | `boolean` | Only cases holding escalated findings | [Optional] [Defaults to `undefined`] |
+| **ids** | `Array<string>` | Only these cases (at most 100) | [Optional] |
+| **excludeIds** | `Array<string>` | Leave these cases out (at most 100), e.g. the ones a page already shows above the list | [Optional] |
+| **withCardDetails** | `boolean` | Add what a case card shows: finding count, new watch matches and the board\&#39;s thumbnail sketch | [Optional] [Defaults to `undefined`] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **limit** | `number` |  | [Optional] [Defaults to `50`] |
 

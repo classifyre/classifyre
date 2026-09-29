@@ -49,6 +49,12 @@ export interface CaseBoardMetaDto {
      * @memberof CaseBoardMetaDto
      */
     caseStatus: string;
+    /**
+     * Signature of the stored thumbnail sketch, null before the board's first one. The board sends a new sketch only when its own differs.
+     * @type {string}
+     * @memberof CaseBoardMetaDto
+     */
+    thumbnailSignature?: string | null;
 }
 
 /**
@@ -78,6 +84,7 @@ export function CaseBoardMetaDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'version': json['version'],
         'readOnly': json['readOnly'],
         'caseStatus': json['caseStatus'],
+        'thumbnailSignature': json['thumbnailSignature'] == null ? undefined : json['thumbnailSignature'],
     };
 }
 
@@ -97,6 +104,7 @@ export function CaseBoardMetaDtoToJSONTyped(value?: CaseBoardMetaDto | null, ign
         'version': value['version'],
         'readOnly': value['readOnly'],
         'caseStatus': value['caseStatus'],
+        'thumbnailSignature': value['thumbnailSignature'],
     };
 }
 

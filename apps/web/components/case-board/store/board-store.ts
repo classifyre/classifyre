@@ -43,6 +43,8 @@ export interface BoardState extends BoardDomain {
   presence: string[];
   notice: BoardNotice | null;
   clientId: string;
+  /** The stored thumbnail sketch's signature as of the last read (null: none yet). */
+  thumbnailSignature: string | null;
 
   load(): Promise<void>;
   hydrate(res: CaseBoardResponseDto): void;
@@ -225,6 +227,7 @@ export function createBoardStore(
       presence: [],
       notice: null,
       clientId: persistence.clientId,
+      thumbnailSignature: null,
       ...emptyDomain(),
 
       async load() {
@@ -287,6 +290,7 @@ export function createBoardStore(
           version: Math.max(state.version, res.board.version),
           readOnly,
           caseStatus: res.board.caseStatus,
+          thumbnailSignature: res.board.thumbnailSignature ?? null,
           loaded: true,
           loadError: null,
         });

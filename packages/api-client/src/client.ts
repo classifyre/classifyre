@@ -264,6 +264,7 @@ export type {
   CreateCaseDto,
   UpdateCaseDto,
   CaseResponseDto,
+  CaseThumbnailDto,
   CaseListResponseDto,
   CaseworkSummaryDto,
   CaseworkCasesDto,
@@ -380,6 +381,8 @@ export type {
   BoardTraceEdgeDto,
   CaseBoardSnapshotSummaryDto,
   CaseBoardSnapshotDto,
+  PutBoardThumbnailDto,
+  BoardThumbnailStateDto,
   // Search as you type
   QuickSearchRequestDto,
   QuickSearchResponseDto,

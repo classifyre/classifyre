@@ -406,6 +406,15 @@ State is kept per user in `localStorage` (try/catch). It is **not** persisted on
 - **Timeline deep links:** `GET /cases/:id/timeline` takes `types`, `inquiryId` and `until` (keyset pages up to an anchor entry, ≤ 1000 rows) so a link can open the feed at an entry however old. Warnings across the board (gone evidence, watch answers gone, clean-up removals, escalations) link to their entry (*What changed*); watch history (`MATCHES_LANDED` / `MATCHES_RETIRED`) is blended in as `watch:<id>` entries. Every entry can copy its own link.
 - **The address:** `?panel=` (`details`, `hypotheses`, `thread`, `add-evidence`, `evidence`, `leads`, `watches`, `timeline`, `case-file`, `snapshots`) plus what the panel shows (`item`, `finding`, `edge`, `suggested`, `tab`, `thread`, `watch`, `view`, `entry`). `store/url-state.ts` parses and serializes (pure, tested); `useBoardUrlState` restores it once the board has loaded and writes it back with `history.replaceState` (no history entry per click; `popstate` re-applies). Viewport, view choices and panel width stay per-viewer in `localStorage`.
 
+### 5.19 Case cards and the board sketch (2026-09-29)
+
+The investigations page lists cases as cards (`components/cases/`): the board drawn small on top, then priority and status, title and summary (the conclusion once closed), a strip of counts (assets, findings, hypotheses, watches), new watch matches and escalations, assignee and freshness. The three cases this browser opened last get a row of their own above the rest (`lib/recently-opened.ts`, `localStorage` per workspace: there is no user model to key a server-side list on); a search or filter shows one list of matches. The workspace directory has the same row of workspaces (recorded by `NamespaceProvider` on every entry), but there they also stay in their categories, badge and all: the directory is read by category, and a workspace missing from its own looks lost.
+
+- **Shapes, not a screenshot.** The card's picture is a `BoardSketch` (`packages/schemas/src/case-board.ts`): positions and sizes of what the canvas shows (assets, findings, hypothesis cards, notes, frames, comment pins, and the edges between them), integers in their own box, capped at 250 shapes and 400 edges (~2–20 KB). A DOM capture would have to render every off-screen node and block the page while it copies styles; an image could not follow the viewer's light or dark theme. The card draws the sketch on a `<canvas>` in the board's tokens (`components/cases/board-sketch.ts`).
+- **Built by the board, lazily.** `store/sketch.ts` projects the domain with a canonical view (no neighbours or traces, every relation kind, default rows) and default sizes only, so the same board always sketches the same. `useBoardThumbnail` sketches 4 s after the last change (every change restarts the wait), at most every 30 s while editing, and once more on leaving if one is owed (`keepalive`). It sends only when the content hash (`signature`) differs from the stored one, which the board read reports (`board.thumbnailSignature`), so opening a board that an agent changed refreshes its card, and opening an unchanged one sends nothing.
+- **Stored apart from the board.** `case_board_thumbnails` (one row per board) keeps the JSON out of every read and version bump of `case_boards`. A sketch drawn at an older board version never replaces a newer one; an identical one is not written. It is a cache: not part of the board's version, timeline, snapshots or namespace export. The case list adds it (and the finding and new-match counts) only when asked with `withCardDetails`, so MCP and the dashboard do not carry it.
+- **Until then:** a board never opened has no sketch; its card says so and shows the evidence count as outlines. A demo instance refuses the write, so its cards stay that way.
+
 ---
 
 ## 6. Data model (Postgres / Prisma)
@@ -583,6 +592,7 @@ enum CaseActivityType {
 | `GET` | `/cases/:id/board/snapshots/:snapshotId` | Read-only snapshot payload |
 | `POST` | `/cases/:id/board/snapshots` | Manual snapshot |
 | `POST` | `/cases/:id/board/neighbours` | `{ itemId }` → suggested ghosts for one bubble (wraps `POST /graph/expand`) |
+| `PUT` | `/cases/:id/board/thumbnail` | `{ sketch, signature, version }`: the board drawn small for its case card (§5.19) |
 
 The existing `GET /cases/:id/graph` and `/graph/*` endpoints stay unchanged: Discovery, MCP and autopilot use them.
 

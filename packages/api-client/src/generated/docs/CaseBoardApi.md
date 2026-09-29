@@ -9,6 +9,7 @@ All URIs are relative to *http://localhost*
 | [**caseBoardControllerGetSnapshot**](CaseBoardApi.md#caseboardcontrollergetsnapshot) | **GET** /cases/{id}/board/snapshots/{snapshotId} | One board snapshot, exactly as it was captured |
 | [**caseBoardControllerListSnapshots**](CaseBoardApi.md#caseboardcontrollerlistsnapshots) | **GET** /cases/{id}/board/snapshots | Board snapshots, newest first |
 | [**caseBoardControllerNeighbours**](CaseBoardApi.md#caseboardcontrollerneighbours) | **POST** /cases/{id}/board/neighbours | Live depth-1 neighbourhood of one evidence bubble (drawn as suggested items) |
+| [**caseBoardControllerSaveThumbnail**](CaseBoardApi.md#caseboardcontrollersavethumbnail) | **PUT** /cases/{id}/board/thumbnail | Store the board drawn small for its case card (a sketch the client builds from its canvas) |
 | [**caseBoardControllerTakeSnapshot**](CaseBoardApi.md#caseboardcontrollertakesnapshot) | **POST** /cases/{id}/board/snapshots | Capture the board as it is now |
 | [**caseBoardControllerTrace**](CaseBoardApi.md#caseboardcontrollertrace) | **POST** /cases/{id}/board/trace | Trace assets\&#39; connections: upstream, downstream and sideways through lineage, links, duplicates and similarity |
 
@@ -329,6 +330,74 @@ example().catch(console.error);
 ### Return type
 
 [**GraphResponseDto**](GraphResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseBoardControllerSaveThumbnail
+
+> BoardThumbnailStateDto caseBoardControllerSaveThumbnail(id, putBoardThumbnailDto)
+
+Store the board drawn small for its case card (a sketch the client builds from its canvas)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CaseBoardApi,
+} from '@workspace/api-client';
+import type { CaseBoardControllerSaveThumbnailRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CaseBoardApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // PutBoardThumbnailDto
+    putBoardThumbnailDto: ...,
+  } satisfies CaseBoardControllerSaveThumbnailRequest;
+
+  try {
+    const data = await api.caseBoardControllerSaveThumbnail(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **putBoardThumbnailDto** | [PutBoardThumbnailDto](PutBoardThumbnailDto.md) |  | |
+
+### Return type
+
+[**BoardThumbnailStateDto**](BoardThumbnailStateDto.md)
 
 ### Authorization
 

@@ -119,6 +119,7 @@ All URIs are relative to *http://localhost*
 *CaseBoardApi* | [**caseBoardControllerGetSnapshot**](docs/CaseBoardApi.md#caseboardcontrollergetsnapshot) | **GET** /cases/{id}/board/snapshots/{snapshotId} | One board snapshot, exactly as it was captured
 *CaseBoardApi* | [**caseBoardControllerListSnapshots**](docs/CaseBoardApi.md#caseboardcontrollerlistsnapshots) | **GET** /cases/{id}/board/snapshots | Board snapshots, newest first
 *CaseBoardApi* | [**caseBoardControllerNeighbours**](docs/CaseBoardApi.md#caseboardcontrollerneighbours) | **POST** /cases/{id}/board/neighbours | Live depth-1 neighbourhood of one evidence bubble (drawn as suggested items)
+*CaseBoardApi* | [**caseBoardControllerSaveThumbnail**](docs/CaseBoardApi.md#caseboardcontrollersavethumbnail) | **PUT** /cases/{id}/board/thumbnail | Store the board drawn small for its case card (a sketch the client builds from its canvas)
 *CaseBoardApi* | [**caseBoardControllerTakeSnapshot**](docs/CaseBoardApi.md#caseboardcontrollertakesnapshot) | **POST** /cases/{id}/board/snapshots | Capture the board as it is now
 *CaseBoardApi* | [**caseBoardControllerTrace**](docs/CaseBoardApi.md#caseboardcontrollertrace) | **POST** /cases/{id}/board/trace | Trace assets\&#39; connections: upstream, downstream and sideways through lineage, links, duplicates and similarity
 *CasesApi* | [**caseCleanupControllerAddFilters**](docs/CasesApi.md#casecleanupcontrolleraddfilters) | **POST** /cases/{id}/finding-filters | Add finding filters (case-wide or for one watch); matching findings leave the case now and are not pulled again
@@ -440,6 +441,7 @@ All URIs are relative to *http://localhost*
 - [BoardNeighboursDto](docs/BoardNeighboursDto.md)
 - [BoardSupportDto](docs/BoardSupportDto.md)
 - [BoardThreadSummaryDto](docs/BoardThreadSummaryDto.md)
+- [BoardThumbnailStateDto](docs/BoardThumbnailStateDto.md)
 - [BoardTraceDirection](docs/BoardTraceDirection.md)
 - [BoardTraceEdgeDto](docs/BoardTraceEdgeDto.md)
 - [BoardTraceKind](docs/BoardTraceKind.md)
@@ -500,6 +502,7 @@ All URIs are relative to *http://localhost*
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
 - [CaseResponseDto](docs/CaseResponseDto.md)
 - [CaseThreadKind](docs/CaseThreadKind.md)
+- [CaseThumbnailDto](docs/CaseThumbnailDto.md)
 - [CaseTimelineResponseDto](docs/CaseTimelineResponseDto.md)
 - [CaseworkCaseDto](docs/CaseworkCaseDto.md)
 - [CaseworkCaseStatusBreakdownDto](docs/CaseworkCaseStatusBreakdownDto.md)
@@ -682,6 +685,7 @@ All URIs are relative to *http://localhost*
 - [PurgeQueuedJobsResponseDto](docs/PurgeQueuedJobsResponseDto.md)
 - [PurgeSourceAssetsResponseDto](docs/PurgeSourceAssetsResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
+- [PutBoardThumbnailDto](docs/PutBoardThumbnailDto.md)
 - [QuickSearchAssetDto](docs/QuickSearchAssetDto.md)
 - [QuickSearchFindingDto](docs/QuickSearchFindingDto.md)
 - [QuickSearchRequestDto](docs/QuickSearchRequestDto.md)

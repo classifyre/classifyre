@@ -2386,6 +2386,7 @@ model CaseBoard {
   items         CaseBoardItem[]
   links         CaseBoardLink[]
   snapshots     CaseBoardSnapshot[]
+  thumbnail     CaseBoardThumbnail?
 
   @@map("case_boards")
 }
@@ -2481,6 +2482,25 @@ model CaseBoardSnapshot {
 
   @@index([boardId, createdAt(sort: Desc)])
   @@map("case_board_snapshots")
+}
+
+// The board drawn small for its case card (BoardSketch in
+// packages/schemas/src/case-board.ts): shapes, not pixels. Built by the web
+// board from what its canvas shows once an edit settles, so it trails the
+// board by a few seconds and is never a record of it. Its own table keeps the
+// JSON out of every read and version bump of case_boards.
+model CaseBoardThumbnail {
+  boardId   String   @id @map("board_id")
+  sketch    Json     @db.JsonB
+  // board.version it was drawn at: a tab that fell behind cannot replace it
+  version   Int
+  // Content hash from the client, so an unchanged board is not sent again
+  signature String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  board CaseBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@map("case_board_thumbnails")
 }
 
 // ── Investigation autopilot ──────────────────────────────────────────────────

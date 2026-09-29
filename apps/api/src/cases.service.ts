@@ -80,6 +80,20 @@ function flag(value: unknown): boolean {
   return value === true || value === 'true';
 }
 
+/** An id filter of the case list takes at most this many ids. */
+const ID_FILTER_MAX = 100;
+
+/** Case ids from a query string: a lone value or a list, junk dropped. */
+function idList(value: unknown): string[] {
+  const values: unknown[] = Array.isArray(value) ? value : [value];
+  return values
+    .filter(
+      (v): v is string =>
+        typeof v === 'string' && v.length > 0 && v.length <= 64,
+    )
+    .slice(0, ID_FILTER_MAX);
+}
+
 /** Findings a pull names on its timeline entry; `pulled` counts the rest. */
 const PULL_LIST_CAP = 50;
 /** Matched values are clipped on the timeline. */
@@ -507,6 +521,14 @@ export class CasesService {
     if (flag(query.escalated)) {
       where.findings = { some: { escalatedAt: { not: null } } };
     }
+    const ids = idList(query.ids);
+    const excludeIds = idList(query.excludeIds);
+    if (ids.length > 0 || excludeIds.length > 0) {
+      where.id = {
+        ...(ids.length > 0 ? { in: ids } : {}),
+        ...(excludeIds.length > 0 ? { notIn: excludeIds } : {}),
+      };
+    }
     if (query.search && query.search.trim().length > 0) {
       const term = query.search.trim();
       where.OR = [
@@ -525,7 +547,62 @@ export class CasesService {
       }),
       this.prisma.case.count({ where }),
     ]);
-    return { items: rows.map((r) => this.mapCase(r)), total, skip, limit };
+    const items = rows.map((r) => this.mapCase(r));
+    if (flag(query.withCardDetails)) await this.addCardDetails(items);
+    return { items, total, skip, limit };
+  }
+
+  /**
+   * What a case card shows beyond the case row: its finding count, the new
+   * matches waiting in its watches, and its board drawn small. One query each
+   * for the whole page.
+   */
+  private async addCardDetails(items: CaseResponseDto[]): Promise<void> {
+    if (items.length === 0) return;
+    const caseIds = items.map((c) => c.id);
+    const [findingCounts, watches, thumbnails] = await Promise.all([
+      this.prisma.caseFinding.groupBy({
+        by: ['caseId'],
+        where: { caseId: { in: caseIds } },
+        _count: { _all: true },
+      }),
+      this.prisma.caseInquiry.findMany({
+        where: { caseId: { in: caseIds } },
+        select: { caseId: true, inquiry: { select: { newMatchCount: true } } },
+      }),
+      this.prisma.caseBoardThumbnail.findMany({
+        where: { board: { caseId: { in: caseIds } } },
+        select: {
+          sketch: true,
+          updatedAt: true,
+          board: { select: { caseId: true } },
+        },
+      }),
+    ]);
+    const findings = new Map(
+      findingCounts.map((row) => [row.caseId, row._count._all]),
+    );
+    const newMatches = new Map<string, number>();
+    for (const watch of watches) {
+      newMatches.set(
+        watch.caseId,
+        (newMatches.get(watch.caseId) ?? 0) + watch.inquiry.newMatchCount,
+      );
+    }
+    const sketches = new Map(
+      thumbnails.map((t) => [
+        t.board.caseId,
+        {
+          sketch: t.sketch as Record<string, unknown>,
+          updatedAt: t.updatedAt,
+        },
+      ]),
+    );
+    for (const item of items) {
+      item.findingCount = findings.get(item.id) ?? 0;
+      item.newMatchCount = newMatches.get(item.id) ?? 0;
+      item.thumbnail = sketches.get(item.id) ?? null;
+    }
   }
 
   async findOne(id: string): Promise<CaseResponseDto | null> {

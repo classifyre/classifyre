@@ -186,6 +186,32 @@ export class QueryCasesDto {
   @IsOptional()
   escalated?: boolean;
 
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Only these cases (at most 100)',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  ids?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Leave these cases out (at most 100), e.g. the ones a page already shows above the list',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  excludeIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      "Add what a case card shows: finding count, new watch matches and the board's thumbnail sketch",
+  })
+  @IsOptional()
+  withCardDetails?: boolean;
+
   @ApiPropertyOptional({ default: 0 })
   @IsOptional()
   @Type(() => Number)
@@ -460,6 +486,20 @@ export class SetInquiryAutoPullDto {
   autoPull!: boolean;
 }
 
+/** The board drawn small for the case card (BoardSketch). */
+export class CaseThumbnailDto {
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    description:
+      'BoardSketch (packages/schemas/src/case-board.ts): shapes with integer coordinates in their own box',
+  })
+  sketch!: Record<string, unknown>;
+
+  @ApiProperty()
+  updatedAt!: Date;
+}
+
 export class CaseResponseDto {
   @ApiProperty()
   id!: string;
@@ -524,6 +564,25 @@ export class CaseResponseDto {
     description: 'When an escalation rule last marked a finding of the case',
   })
   lastEscalatedAt?: Date | null;
+
+  @ApiPropertyOptional({
+    description: 'Findings attached to the case (list with withCardDetails)',
+  })
+  findingCount?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'New matches waiting across the linked inquiry watches (list with withCardDetails)',
+  })
+  newMatchCount?: number;
+
+  @ApiPropertyOptional({
+    type: CaseThumbnailDto,
+    nullable: true,
+    description:
+      'The board drawn small; null until the board has been opened once (list with withCardDetails)',
+  })
+  thumbnail?: CaseThumbnailDto | null;
 
   @ApiProperty()
   createdAt!: Date;
