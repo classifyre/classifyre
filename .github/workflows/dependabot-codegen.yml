@@ -68,6 +68,7 @@ jobs:
           CHANGED_FILES=(
             bun.lock
             apps/docs/src/_generated/helm-values.mdx
+            apps/docs/src/_generated/mcp-catalog.json
             packages/api-client/src/generated
             apps/cli/src/models/generated_input.py
             apps/cli/src/models/generated_detectors.py

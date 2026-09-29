@@ -43,6 +43,10 @@ describe('McpServerFactoryService destructive tools reject unknown keys', () => 
       rules: [{ kind: 'FINDING_TYPE', pattern: 'IP_ADDRESS' }],
       dryRun: true,
     },
+    update_case: { id: uuid, removeResolvedFindings: true },
+    update_case_finding_filter: { id: uuid, filterId: uuid, pattern: 'IBAN' },
+    unlink_case_inquiry: { id: uuid, inquiryId: uuid },
+    tidy_case_board: { caseId: uuid, dryRun: true },
   };
 
   let registered: Record<string, RegisteredTool>;

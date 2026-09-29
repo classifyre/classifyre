@@ -12,6 +12,7 @@ export default {
   navigate: "Navigating & shortcuts",
   "use-cases": "Use cases",
   timeline: "Timeline",
+  mcp: "AI agents & MCP",
   // Redirect stub for the old URL; not a nav entry.
   graph: { display: "hidden" },
 }

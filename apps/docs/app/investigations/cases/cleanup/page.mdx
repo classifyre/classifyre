@@ -153,7 +153,18 @@ its own.
 
 ## From MCP and the assistant
 
-`update_case` takes the three switches (`removeGoneFindings`,
-`removeResolvedFindings`, `removeGoneAssets`). `list_case_finding_filters`,
-`add_case_finding_filters` (run it with `dryRun` first: it reports how many
-findings would be detached) and `remove_case_finding_filter` manage filters.
+Every step here has an MCP tool, and every one that takes something out can be
+previewed first without changing anything:
+
+- **Clean-up**: `preview_case_cleanup` reports what the switches would take out
+  now (all three, or the ones named); `update_case` switches them on
+  (`removeGoneFindings`, `removeResolvedFindings`, `removeGoneAssets`) and
+  applies them at once.
+- **Filters**: `preview_case_finding_filters` reports what unsaved rules would
+  take out (per rule, with a sample, and the assets they would leave empty);
+  `add_case_finding_filters` adds them, `update_case_finding_filter` changes a
+  rule's pattern or description, `remove_case_finding_filter` removes one, and
+  `list_case_finding_filters` lists them with the finding types to pick from.
+
+The token needs the **Cases** scope. See
+[AI agents & MCP](/investigations/cases/mcp/).

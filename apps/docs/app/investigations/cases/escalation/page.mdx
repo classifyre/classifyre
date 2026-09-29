@@ -138,7 +138,9 @@ scans of Firmenbuch between 09:10 and 10:05*.
 
 ## From MCP and the assistant
 
-`add_case_finding_filters` with `action: "ESCALATE"` adds escalation rules; run
-it with `dryRun` first, and it reports how many findings would be escalated.
-`clear_case_escalations` takes the marks off. `get_case` reports each case's
-`escalatedCount` and `lastEscalatedAt`.
+`preview_case_finding_filters` with `action: "ESCALATE"` reports how many
+findings unsaved escalation rules would mark, without saving them;
+`add_case_finding_filters` with the same action adds them, and
+`update_case_finding_filter` changes one. `clear_case_escalations` takes the
+marks off. `get_case` reports each case's `escalatedCount` and
+`lastEscalatedAt`. See [AI agents & MCP](/investigations/cases/mcp/).

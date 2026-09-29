@@ -1,0 +1,210 @@
+---
+title: AI agents & MCP
+description: Let an AI client read a case board, arrange it, keep the case clean and trace its connections over MCP. Which scopes its token needs, which tool does what, and how to use them safely.
+---
+
+import { Callout } from "nextra/components"
+import { McpToolCatalog } from "@/components/mcp/mcp-catalog"
+
+# AI agents & MCP
+
+Everything you do on a case — arranging its board, cleaning it up, following
+watches, weighing hypotheses — an AI client can do as well, over the
+[MCP server](/settings/mcp-server/): Claude, Cursor, Codex or your own agent.
+The assistant in the app uses the very same tools, and asks you before every
+change it makes.
+
+An agent's changes are ordinary board changes: they land on the
+[timeline](/investigations/cases/timeline/) under **mcp**, other people's open
+boards update, and a closed case stays read-only.
+
+---
+
+## Give the client a token
+
+`Settings → MCP Server → Create token`. Switch **All tools** off and tick what
+the client needs:
+
+| Scope | For |
+| --- | --- |
+| **Cases** | Finding cases, putting evidence in, watches, clean-up and finding rules, hypotheses, the timeline |
+| **Case Board** | Reading the board, notes, frames, links and stances, placing and tidying, connections, snapshots |
+| **Findings**, **Assets** | Searching for the evidence to put on the board |
+
+A client that should only read and arrange boards still needs **Cases** to find
+a case by name (`search_cases`); without it, give it the case id.
+
+<Callout type="info">
+**Case Board is its own scope.** Its tools used to be part of **Cases**, and
+tokens that had **Cases** were given **Case Board** automatically on upgrade. A
+token created since needs **Case Board** ticked.
+</Callout>
+
+---
+
+## Read the board
+
+`get_case_board` returns the board as a **labelled summary**: every item with
+what it stands for, so a client never has to join ids across lists.
+
+```json
+{
+  "board": { "caseId": "3f5c…", "version": 12, "readOnly": false, "caseStatus": "OPEN" },
+  "counts": { "evidence": 3, "findings": 7, "hypotheses": 1, "notes": 1, "frames": 1, "links": 1, "stances": 2, "unplaced": 1 },
+  "items": [
+    {
+      "id": "8f0c…", "kind": "EVIDENCE", "label": "payroll-2024.xlsx", "x": 40, "y": 60, "parentId": "c2d1…",
+      "assetId": "a9e2…", "findingCount": 2,
+      "findings": [{ "findingId": "f-17", "type": "IBAN", "value": "AT61 1904 3002 3457 3201", "severity": "HIGH", "state": "new" }]
+    },
+    {
+      "id": "5b7e…", "kind": "HYPOTHESIS", "label": "Payroll left via the share", "unplaced": true,
+      "status": "PROPOSED", "stances": { "supports": 2, "contradicts": 0, "neutral": 0 }
+    }
+  ],
+  "links": [], "stances": [], "relations": [{ "source": "8f0c…", "target": "a41b…" }]
+}
+```
+
+- A finding's **state** is the one the board shows: `open`, `new`, `gone`,
+  `resolved`, `dismissed` or `deleted` (see
+  [Evidence & findings](/investigations/cases/evidence/)).
+- **Positions**: `x`/`y` of an item with a `parentId` — inside a frame, or a
+  comment pin — are relative to that parent. `unplaced` items have no position
+  yet.
+- **relations** are the lines the platform draws between evidence (lineage,
+  duplicates). Nobody can change those on the board.
+- `board.version` goes back as `baseVersion` when changing the board.
+- `view: "full"` returns the raw board instead; `snapshotId` reads a
+  [snapshot](#snapshots) in the same shape.
+
+---
+
+## Change the board
+
+`apply_case_board_ops` takes a batch of changes, applied in order in one go.
+Each change succeeds or is refused on its own (`rejected`, with a reason), so
+one stale item never sinks the rest.
+
+```json
+{
+  "caseId": "3f5c…",
+  "baseVersion": 12,
+  "ops": [
+    { "type": "item.create", "id": "0b6e2a7c-0f4e-4c2a-9a55-3c1d2e4f5a6b", "kind": "NOTE", "x": 900, "y": 40,
+      "content": { "text": "Both exports carry the same IBAN. Who ran them?" }, "style": { "color": "yellow" } },
+    { "type": "link.create", "id": "9d1fb3e2-7c4a-4f1e-8b2d-5e6f7a8b9c0d", "kind": "related_to", "certainty": "SUSPECTED",
+      "source": { "itemId": "0b6e2a7c-0f4e-4c2a-9a55-3c1d2e4f5a6b" }, "target": { "itemId": "8f0c…", "findingId": "f-17" } },
+    { "type": "stance.set", "hypothesisItemId": "5b7e…", "target": { "itemId": "8f0c…" }, "stance": "SUPPORTS", "note": "Same IBAN" }
+  ]
+}
+```
+
+| On the board you… | The op |
+| --- | --- |
+| Add a note or a frame | `item.create` (`NOTE` with `content.text`, `FRAME` with `content.title`) |
+| Move, resize, recolour, highlight, collapse, move into a frame | `item.update` (`x`, `y`, `width`, `height`, `parentId`, `style`, `collapsed`) |
+| Delete a note, frame, pin or hypothesis card, and undo it | `item.delete`, `item.restore` |
+| Draw a link, edit it, delete it | `link.create`, `link.update`, `link.delete` / `link.restore` |
+| Make a link a global relationship | `link.promote` |
+| Add evidence, remove it from the case | `evidence.add` (an asset, or a finding with its asset), `evidence.remove` |
+| Attach or detach a finding | `finding.attach`, `finding.detach` |
+| Add a hypothesis, set its stances | `hypothesis.create`, `stance.set`, `stance.remove` |
+| Comment, resolve a comment | `comment.create`, `comment.resolve` |
+| Put a thread back on the board | `thread.place` |
+
+- **Ids are the client's**: every new item or link gets a fresh UUID, so a
+  batch sent twice changes nothing twice, and later ops of the same batch can
+  refer to it (the link above points at the note created before it).
+- **Undo** is the matching `restore`; removed evidence comes back with its
+  findings, notes and stances.
+- **x/y can be left out** when adding evidence, hypotheses or comments; then
+  let the board [place them](#arrange-the-board).
+
+---
+
+## Arrange the board
+
+| Tool | Does | Changes what people arranged? |
+| --- | --- | --- |
+| `place_case_board_items` | Gives every item without a position a spot next to what it connects to, as the board does when someone opens it | No: placed items never move |
+| `frame_case_board_items` | Groups items into a new frame (laid out anew, or kept where they stand with `arrangement: "keep"`) or into an existing one, which grows to fit | Only the items named |
+| `tidy_case_board` | **Tidy up**: lays the whole board out again, left to right along its relations, and sends dragged findings back to their spots | Yes, all of it |
+
+`tidy_case_board` replaces the arrangement people made. Run it with
+`dryRun: true` first to see every move, and take a
+[snapshot](#snapshots) first if the current layout matters. Each move reports
+where the item was (`from`), so a tidy can be walked back with `item.update`.
+
+<Callout type="info">
+The agent's layouts use the same sizes as the board in the browser — assets
+with their findings fanned out around them, cards, notes, frames — so what an
+agent places does not land on top of what is there.
+</Callout>
+
+---
+
+## Trace connections
+
+`trace_case_connections` is **Show connections** for an agent: what the case's
+assets connect to beyond the board, **upstream** (what feeds them),
+**downstream** (what they feed) and **alongside** (duplicates, look-alikes),
+hop by hop. Every node says whether it is in the case already (`inCase`, with
+its board item). An agent brings one in with `evidence.add`. See
+[Connections & neighbours](/investigations/cases/connections/).
+
+---
+
+## Clean-up, filters and escalation
+
+Every rule that takes things out of a case can be **previewed first**, without
+changing anything:
+
+| Preview | Then |
+| --- | --- |
+| `preview_case_cleanup`: what the clean-up switches would take out now | `update_case` with `removeGoneFindings`, `removeResolvedFindings` or `removeGoneAssets` |
+| `preview_case_finding_filters`: what filters would take out, or escalations mark | `add_case_finding_filters`, `update_case_finding_filter`, `remove_case_finding_filter` |
+
+`clear_case_escalations` takes escalation marks off once they are dealt with.
+The rules themselves are explained in
+[Clean-up & filters](/investigations/cases/cleanup/) and
+[Escalation](/investigations/cases/escalation/).
+
+---
+
+## Watches and hypotheses
+
+- **Watches**: `link_case_inquiries` links questions; `set_case_inquiry_auto_pull`
+  turns a watch's auto-add on or off; `unlink_case_inquiry` stops the case
+  following it (its per-watch rules go with the link).
+- **Verdicts**: `update_case_thread` sets a hypothesis's status (*Supported*,
+  *Refuted*, …) and confidence, and writes the change in its log.
+  `add_case_thread_entry` adds notes, or a new statement of the claim.
+- **Stances** on the board are `stance.set` / `stance.remove`.
+
+---
+
+## Snapshots
+
+`take_case_board_snapshot` freezes the board as it is; `list_case_board_snapshots`
+lists them (closing a case takes one by itself), and `get_case_board` with a
+`snapshotId` reads one back.
+
+---
+
+## What stays with people
+
+Some things are deliberately not open to agents: **deleting a case**,
+**deleting a hypothesis** with its whole log (an agent can take the card off the
+board, which keeps the thread), **deleting a global relationship everywhere**,
+and exporting the board as an image. They destroy history the case exists to
+keep, so they stay a person's decision in the app.
+
+---
+
+## Tool reference
+
+Generated from the MCP server itself. Open a tool for its parameters
+(`*` = required).
+
+<McpToolCatalog scopes={["case_board", "cases"]} />

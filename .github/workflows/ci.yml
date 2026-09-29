@@ -141,6 +141,7 @@ jobs:
         run: |
           if ! git diff --quiet -- \
             apps/docs/src/_generated/helm-values.mdx \
+            apps/docs/src/_generated/mcp-catalog.json \
             packages/api-client/src/generated \
             apps/cli/src/models/generated_input.py \
             apps/cli/src/models/generated_detectors.py \
@@ -148,12 +149,14 @@ jobs:
             echo "::error::Generated files are out of date. Run 'bun run codegen', 'bun run docs:generate', and commit changes."
             git status --short -- \
               apps/docs/src/_generated/helm-values.mdx \
+              apps/docs/src/_generated/mcp-catalog.json \
               packages/api-client/src/generated \
               apps/cli/src/models/generated_input.py \
               apps/cli/src/models/generated_detectors.py \
               apps/cli/src/models/generated_single_asset_scan_results.py
             git diff --stat -- \
               apps/docs/src/_generated/helm-values.mdx \
+              apps/docs/src/_generated/mcp-catalog.json \
               packages/api-client/src/generated \
               apps/cli/src/models/generated_input.py \
               apps/cli/src/models/generated_detectors.py \
