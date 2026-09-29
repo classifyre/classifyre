@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Put,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ActorName } from '../actor-name.decorator';
@@ -13,16 +14,20 @@ import { AllowInDemoMode } from '../demo-mode.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { CaseBoardService } from '../case-board/case-board.service';
 import { CaseBoardReadService } from '../case-board/case-board-read.service';
+import { CaseBoardThumbnailService } from '../case-board/case-board-thumbnail.service';
 import { CaseCleanupService } from '../cases/case-cleanup.service';
+import { CaseLeadsScheduler } from '../cases/case-leads.scheduler';
 import {
   ApplyBoardOpsDto,
   ApplyBoardOpsResponseDto,
   BoardNeighboursDto,
   BoardTraceRequestDto,
+  BoardThumbnailStateDto,
   BoardTraceResponseDto,
   CaseBoardResponseDto,
   CaseBoardSnapshotDto,
   CaseBoardSnapshotSummaryDto,
+  PutBoardThumbnailDto,
 } from '../dto/case-board.dto';
 import { GraphResponseDto } from '../dto/graph.dto';
 
@@ -37,7 +42,9 @@ export class CaseBoardController {
   constructor(
     private readonly board: CaseBoardService,
     private readonly boardRead: CaseBoardReadService,
+    private readonly thumbnails: CaseBoardThumbnailService,
     private readonly cleanup: CaseCleanupService,
+    private readonly leads: CaseLeadsScheduler,
   ) {}
 
   @Get()
@@ -51,6 +58,9 @@ export class CaseBoardController {
     // away without a scan (a purge, a deleted source) is applied the next time
     // the board is read. Throttled per case, and it never fails the read.
     await this.cleanup.checkIfDue(id);
+    // Someone is looking: keep the case's leads fresh (throttled per case;
+    // the refresh runs in the worker and never delays the read).
+    void this.leads.requestOnRead(id);
     return this.boardRead.getBoard(id);
   }
 
@@ -101,6 +111,19 @@ export class CaseBoardController {
     @Body() dto: BoardTraceRequestDto,
   ): Promise<BoardTraceResponseDto> {
     return this.board.trace(id, dto);
+  }
+
+  @Put('thumbnail')
+  @ApiOperation({
+    summary:
+      'Store the board drawn small for its case card (a sketch the client builds from its canvas)',
+  })
+  @ApiResponse({ status: 200, type: BoardThumbnailStateDto })
+  saveThumbnail(
+    @Param('id') id: string,
+    @Body() dto: PutBoardThumbnailDto,
+  ): Promise<BoardThumbnailStateDto> {
+    return this.thumbnails.save(id, dto);
   }
 
   @Get('snapshots')

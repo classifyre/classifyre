@@ -37,7 +37,7 @@ export class CaseLeadsToolset {
       {
         name: 'cases.list_leads',
         description:
-          'List the lead queue of a case (PROPOSED candidates plus reviewed history). Check before proposing: never re-propose a DISMISSED finding.',
+          'List the lead queue of a case (PROPOSED candidates plus reviewed history). Check before proposing: never re-propose a DISMISSED finding. DUPLICATE leads are look-alike documents (asset leads, findingId null); viaLabel says what in the case a lead hangs off.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -89,7 +89,7 @@ export class CaseLeadsToolset {
       {
         name: 'cases.generate_leads',
         description:
-          'Deterministically generate leads for a case from its own evidence: semantic neighbours of attached findings plus high-importance matches of linked inquiries. Bounded and idempotent.',
+          'Refresh the leads of a case now from its own evidence: similar findings, high-importance answers of linked watches, and look-alike documents from the duplicates engine. The case already refreshes its leads by itself after every evidence or watch change, so call this only when you need the result in this cycle. Bounded and idempotent.',
         inputSchema: {
           type: 'object',
           properties: { caseId: { type: 'string' } },

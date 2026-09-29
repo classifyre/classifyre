@@ -5,3 +5,5 @@ node_modules/
 # auto-generated from helm/classifyre/README.md — rebuilt on every docs build
 src/_generated/*
 !src/_generated/helm-values.mdx
+# the MCP tool catalog, written by the API's `bun run codegen` (openapi:generate)
+!src/_generated/mcp-catalog.json

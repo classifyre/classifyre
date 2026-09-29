@@ -1,4 +1,9 @@
-import { ASSET_NODE, defaultFindingSpot, FINDING_NODE, type SeverityKey, type XY } from "@workspace/case-board/lib/geometry";
+import { defaultFindingSpot, type SeverityKey, type XY } from "@workspace/case-board/lib/geometry";
+import {
+  evidenceExtent as sharedEvidenceExtent,
+  MAX_FINDING_NODES,
+  type Extent,
+} from "@workspace/schemas/case-board";
 import type { BoardItem, Bubble, BubbleRow } from "./types";
 
 export {
@@ -27,11 +32,12 @@ export {
  * its spot (`item.style.findingPositions`, relative to the asset node).
  *
  * Pure, so the projection, the layout estimates and the tests share it. The
- * shapes' numbers live in @workspace/case-board, which the docs draw from too.
+ * shapes' numbers live in @workspace/schemas/case-board (the API lays boards
+ * out with them too), re-exported by @workspace/case-board for the docs.
  */
 
 /** An expanded asset shows this many finding nodes; the rest wait behind "▸n". */
-export const MAX_FINDING_NODES = 12;
+export { MAX_FINDING_NODES };
 
 export interface ShownFinding {
   row: BubbleRow;
@@ -61,33 +67,23 @@ export function findingSpot(item: Pick<BoardItem, "style">, findingId: string, i
 }
 
 /** Space an item takes around its position: its own box, or an asset with its findings. */
-export interface Extent {
-  dx: number;
-  dy: number;
-  width: number;
-  height: number;
-}
+export type { Extent };
 
+/**
+ * The room evidence takes as the board draws it: the asset and the finding
+ * nodes shown around it. The arithmetic is shared with the API's layouts.
+ */
 export function evidenceExtent(
   item: Pick<BoardItem, "style" | "collapsed">,
   bubble: Pick<Bubble, "rows" | "unattached"> | undefined,
   opts: { showAll: boolean; showUnattached: boolean } = { showAll: false, showUnattached: false },
 ): Extent {
-  let x0 = 0;
-  let y0 = 0;
-  let x1: number = ASSET_NODE.width;
-  let y1: number = ASSET_NODE.height;
-  if (bubble && !item.collapsed) {
-    const { nodes } = shownFindings(bubble, opts);
-    nodes.forEach(({ row }, i) => {
-      const spot = findingSpot(item, row.findingId, i, nodes.length);
-      x0 = Math.min(x0, spot.x);
-      y0 = Math.min(y0, spot.y);
-      x1 = Math.max(x1, spot.x + FINDING_NODE.width);
-      y1 = Math.max(y1, spot.y + FINDING_NODE.height);
-    });
-  }
-  return { dx: x0, dy: y0, width: x1 - x0, height: y1 - y0 };
+  const findingIds = bubble ? shownFindings(bubble, opts).nodes.map(({ row }) => row.findingId) : [];
+  return sharedEvidenceExtent({
+    collapsed: item.collapsed,
+    findingIds,
+    findingPositions: item.style.findingPositions,
+  });
 }
 
 /** Findings per severity, for the donut a collapsed asset wears. */

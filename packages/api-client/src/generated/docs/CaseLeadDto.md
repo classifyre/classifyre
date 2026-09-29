@@ -10,12 +10,28 @@ Name | Type
 `caseId` | string
 `findingId` | string
 `assetId` | string
+`kind` | string
+`state` | string
 `origin` | string
 `status` | string
 `rationale` | string
 `title` | string
 `importance` | number
 `similarity` | number
+`viaFindingId` | string
+`viaAssetId` | string
+`viaInquiryId` | string
+`viaLabel` | string
+`viaAssetName` | string
+`details` | { [key: string]: any; }
+`findingType` | string
+`value` | string
+`severity` | string
+`findingStatus` | string
+`assetName` | string
+`assetType` | string
+`sourceType` | string
+`sourceName` | string
 `proposedBy` | string
 `reviewedBy` | string
 `reviewedAt` | Date
@@ -32,12 +48,28 @@ const example = {
   "caseId": null,
   "findingId": null,
   "assetId": null,
+  "kind": null,
+  "state": null,
   "origin": null,
   "status": null,
   "rationale": null,
   "title": null,
   "importance": null,
   "similarity": null,
+  "viaFindingId": null,
+  "viaAssetId": null,
+  "viaInquiryId": null,
+  "viaLabel": null,
+  "viaAssetName": null,
+  "details": null,
+  "findingType": null,
+  "value": null,
+  "severity": null,
+  "findingStatus": null,
+  "assetName": null,
+  "assetType": null,
+  "sourceType": null,
+  "sourceName": null,
   "proposedBy": null,
   "reviewedBy": null,
   "reviewedAt": null,

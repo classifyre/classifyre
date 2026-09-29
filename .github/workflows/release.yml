@@ -169,8 +169,8 @@ jobs:
 
           expected_sha="$(git rev-parse HEAD)"
           run_json="$(
-            gh api "repos/${REPO}/actions/workflows/ci.yml/runs?branch=develop&status=completed&per_page=20" \
-              --jq ".workflow_runs | map(select(.head_sha == \"${expected_sha}\")) | sort_by(.created_at) | reverse | .[0]"
+            gh api "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${expected_sha}&per_page=50" \
+              --jq '.workflow_runs | map(select(.status == "completed" and .head_branch == "develop")) | sort_by(.created_at) | reverse | .[0]'
           )"
 
           if [[ -z "${run_json}" || "${run_json}" == "null" ]]; then

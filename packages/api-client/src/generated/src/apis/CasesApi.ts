@@ -48,6 +48,8 @@ import type {
   PullFromInquiryDto,
   PullFromInquiryResponseDto,
   ReviewCaseLeadDto,
+  ReviewCaseLeadsDto,
+  ReviewCaseLeadsResponseDto,
   SetInquiryAutoPullDto,
   UpdateCaseDto,
   UpdateCaseEventDto,
@@ -122,6 +124,10 @@ import {
     PullFromInquiryResponseDtoToJSON,
     ReviewCaseLeadDtoFromJSON,
     ReviewCaseLeadDtoToJSON,
+    ReviewCaseLeadsDtoFromJSON,
+    ReviewCaseLeadsDtoToJSON,
+    ReviewCaseLeadsResponseDtoFromJSON,
+    ReviewCaseLeadsResponseDtoToJSON,
     SetInquiryAutoPullDtoFromJSON,
     SetInquiryAutoPullDtoToJSON,
     UpdateCaseDtoFromJSON,
@@ -216,10 +222,18 @@ export interface CaseLeadsControllerReviewRequest {
     reviewCaseLeadDto: ReviewCaseLeadDto;
 }
 
+export interface CaseLeadsControllerReviewManyRequest {
+    caseId: string;
+    reviewCaseLeadsDto: ReviewCaseLeadsDto;
+}
+
 export interface CaseTimelineControllerGetTimelineRequest {
     caseId: string;
     cursor?: string;
     limit?: string;
+    types?: string;
+    inquiryId?: string;
+    until?: string;
 }
 
 export interface CasesControllerAddEvidenceRequest {
@@ -266,6 +280,9 @@ export interface CasesControllerListRequest {
     status?: Array<CasesControllerListStatusEnum>;
     severity?: Array<CasesControllerListSeverityEnum>;
     escalated?: boolean;
+    ids?: Array<string>;
+    excludeIds?: Array<string>;
+    withCardDetails?: boolean;
     skip?: number;
     limit?: number;
 }
@@ -872,7 +889,7 @@ export class CasesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Generate leads from case evidence (semantic neighbours + linked-inquiry matches)
+     * Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change
      */
     async caseLeadsControllerGenerateRaw(requestParameters: CaseLeadsControllerGenerateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GenerateCaseLeadsResponseDto>> {
         if (requestParameters['caseId'] == null) {
@@ -901,7 +918,7 @@ export class CasesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Generate leads from case evidence (semantic neighbours + linked-inquiry matches)
+     * Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change
      */
     async caseLeadsControllerGenerate(requestParameters: CaseLeadsControllerGenerateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GenerateCaseLeadsResponseDto> {
         const response = await this.caseLeadsControllerGenerateRaw(requestParameters, initOverrides);
@@ -1050,6 +1067,53 @@ export class CasesApi extends runtime.BaseAPI {
     }
 
     /**
+     * Accept or dismiss several leads with one decision
+     */
+    async caseLeadsControllerReviewManyRaw(requestParameters: CaseLeadsControllerReviewManyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ReviewCaseLeadsResponseDto>> {
+        if (requestParameters['caseId'] == null) {
+            throw new runtime.RequiredError(
+                'caseId',
+                'Required parameter "caseId" was null or undefined when calling caseLeadsControllerReviewMany().'
+            );
+        }
+
+        if (requestParameters['reviewCaseLeadsDto'] == null) {
+            throw new runtime.RequiredError(
+                'reviewCaseLeadsDto',
+                'Required parameter "reviewCaseLeadsDto" was null or undefined when calling caseLeadsControllerReviewMany().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{caseId}/leads/review`;
+        urlPath = urlPath.replace(`{${"caseId"}}`, encodeURIComponent(String(requestParameters['caseId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ReviewCaseLeadsDtoToJSON(requestParameters['reviewCaseLeadsDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ReviewCaseLeadsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Accept or dismiss several leads with one decision
+     */
+    async caseLeadsControllerReviewMany(requestParameters: CaseLeadsControllerReviewManyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ReviewCaseLeadsResponseDto> {
+        const response = await this.caseLeadsControllerReviewManyRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Paginated unified case activity feed (newest first)
      */
     async caseTimelineControllerGetTimelineRaw(requestParameters: CaseTimelineControllerGetTimelineRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseTimelineResponseDto>> {
@@ -1068,6 +1132,18 @@ export class CasesApi extends runtime.BaseAPI {
 
         if (requestParameters['limit'] != null) {
             queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        if (requestParameters['types'] != null) {
+            queryParameters['types'] = requestParameters['types'];
+        }
+
+        if (requestParameters['inquiryId'] != null) {
+            queryParameters['inquiryId'] = requestParameters['inquiryId'];
+        }
+
+        if (requestParameters['until'] != null) {
+            queryParameters['until'] = requestParameters['until'];
         }
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -1474,6 +1550,18 @@ export class CasesApi extends runtime.BaseAPI {
 
         if (requestParameters['escalated'] != null) {
             queryParameters['escalated'] = requestParameters['escalated'];
+        }
+
+        if (requestParameters['ids'] != null) {
+            queryParameters['ids'] = requestParameters['ids'];
+        }
+
+        if (requestParameters['excludeIds'] != null) {
+            queryParameters['excludeIds'] = requestParameters['excludeIds'];
+        }
+
+        if (requestParameters['withCardDetails'] != null) {
+            queryParameters['withCardDetails'] = requestParameters['withCardDetails'];
         }
 
         if (requestParameters['skip'] != null) {

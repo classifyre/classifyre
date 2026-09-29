@@ -10,6 +10,8 @@ Name | Type
 `perRule` | Array&lt;number&gt;
 `problems` | Array&lt;string&gt;
 `sample` | [Array&lt;CaseCleanupItemDto&gt;](CaseCleanupItemDto.md)
+`emptiedAssets` | number
+`emptiedSample` | Array&lt;string&gt;
 
 ## Example
 
@@ -22,6 +24,8 @@ const example = {
   "perRule": null,
   "problems": null,
   "sample": null,
+  "emptiedAssets": null,
+  "emptiedSample": null,
 } satisfies CaseFindingFiltersPreviewDto
 
 console.log(example)

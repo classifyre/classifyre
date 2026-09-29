@@ -32,6 +32,12 @@ export interface UpdateCaseFindingFilterDto {
      */
     description?: string | null;
     /**
+     * Filters only: also take out of the case every asset the filter leaves without a finding in it. An asset that had no finding in the case to begin with is left alone.
+     * @type {boolean}
+     * @memberof UpdateCaseFindingFilterDto
+     */
+    removeEmptiedAssets?: boolean;
+    /**
      * 
      * @type {string}
      * @memberof UpdateCaseFindingFilterDto
@@ -58,6 +64,7 @@ export function UpdateCaseFindingFilterDtoFromJSONTyped(json: any, ignoreDiscrim
         
         'pattern': json['pattern'] == null ? undefined : json['pattern'],
         'description': json['description'] == null ? undefined : json['description'],
+        'removeEmptiedAssets': json['removeEmptiedAssets'] == null ? undefined : json['removeEmptiedAssets'],
         'clientId': json['clientId'] == null ? undefined : json['clientId'],
     };
 }
@@ -75,6 +82,7 @@ export function UpdateCaseFindingFilterDtoToJSONTyped(value?: UpdateCaseFindingF
         
         'pattern': value['pattern'],
         'description': value['description'],
+        'removeEmptiedAssets': value['removeEmptiedAssets'],
         'clientId': value['clientId'],
     };
 }

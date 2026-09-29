@@ -3,6 +3,7 @@ import {
   Logger,
   OnApplicationBootstrap,
   OnApplicationShutdown,
+  Optional,
 } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import { runsBackgroundWorkers } from '../service-role';
@@ -28,6 +29,7 @@ import { DataTransferWorker } from '../data-transfer/data-transfer.worker';
 import { FindingBulkOperationWorker } from '../findings-bulk/finding-bulk-operation.worker';
 import { FindingStatsWorker } from '../stats/finding-stats.worker';
 import { SourceGraphWorker } from '../stats/source-graph.worker';
+import { CaseLeadsWorker } from '../cases/case-leads.worker';
 import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { NotificationEventsGateway } from '../websocket/notification-events.gateway';
 import {
@@ -118,6 +120,8 @@ export class NamespaceWorkerManager
     private readonly notificationEvents: NotificationEventsGateway,
     private readonly leadership: WorkerLeadershipService,
     private readonly prisma: PrismaService,
+    // Last and optional: specs construct this class positionally.
+    @Optional() private readonly caseLeads?: CaseLeadsWorker,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -322,6 +326,7 @@ export class NamespaceWorkerManager
         await this.findingBulkOperations.registerForNamespace();
         await this.findingStats.registerForNamespace();
         await this.sourceGraph.registerForNamespace();
+        await this.caseLeads?.registerForNamespace();
         this.dataTransfer.schedulePurge(e.schemaName);
         await this.mcpClient
           .refresh()

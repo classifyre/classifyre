@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `pattern` | string
 `description` | string
+`removeEmptiedAssets` | boolean
 `clientId` | string
 
 ## Example
@@ -19,6 +20,7 @@ import type { UpdateCaseFindingFilterDto } from '@workspace/api-client'
 const example = {
   "pattern": null,
   "description": null,
+  "removeEmptiedAssets": null,
   "clientId": null,
 } satisfies UpdateCaseFindingFilterDto
 

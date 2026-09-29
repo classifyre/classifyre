@@ -68,6 +68,7 @@ docs/BoardLinkDto.md
 docs/BoardNeighboursDto.md
 docs/BoardSupportDto.md
 docs/BoardThreadSummaryDto.md
+docs/BoardThumbnailStateDto.md
 docs/BoardTraceDirection.md
 docs/BoardTraceEdgeDto.md
 docs/BoardTraceKind.md
@@ -129,6 +130,7 @@ docs/CaseLinkedInquiryDto.md
 docs/CaseListResponseDto.md
 docs/CaseResponseDto.md
 docs/CaseThreadKind.md
+docs/CaseThumbnailDto.md
 docs/CaseTimelineResponseDto.md
 docs/CasesApi.md
 docs/CaseworkCaseDto.md
@@ -330,6 +332,7 @@ docs/PullFromInquiryResponseDto.md
 docs/PurgeQueuedJobsResponseDto.md
 docs/PurgeSourceAssetsResponseDto.md
 docs/PutAssetChunksDto.md
+docs/PutBoardThumbnailDto.md
 docs/QuickSearchAssetDto.md
 docs/QuickSearchFindingDto.md
 docs/QuickSearchRequestDto.md
@@ -355,6 +358,8 @@ docs/ReopenDecisionsResponseDto.md
 docs/RetireOutOfScopeFindingsDto.md
 docs/RevertResultDto.md
 docs/ReviewCaseLeadDto.md
+docs/ReviewCaseLeadsDto.md
+docs/ReviewCaseLeadsResponseDto.md
 docs/ReviewClusterRowDto.md
 docs/ReviewClustersResponseDto.md
 docs/ReviewDecisionRowDto.md
@@ -621,6 +626,7 @@ src/models/BoardLinkDto.ts
 src/models/BoardNeighboursDto.ts
 src/models/BoardSupportDto.ts
 src/models/BoardThreadSummaryDto.ts
+src/models/BoardThumbnailStateDto.ts
 src/models/BoardTraceDirection.ts
 src/models/BoardTraceEdgeDto.ts
 src/models/BoardTraceKind.ts
@@ -681,6 +687,7 @@ src/models/CaseLinkedInquiryDto.ts
 src/models/CaseListResponseDto.ts
 src/models/CaseResponseDto.ts
 src/models/CaseThreadKind.ts
+src/models/CaseThumbnailDto.ts
 src/models/CaseTimelineResponseDto.ts
 src/models/CaseworkCaseDto.ts
 src/models/CaseworkCaseStatusBreakdownDto.ts
@@ -863,6 +870,7 @@ src/models/PullFromInquiryResponseDto.ts
 src/models/PurgeQueuedJobsResponseDto.ts
 src/models/PurgeSourceAssetsResponseDto.ts
 src/models/PutAssetChunksDto.ts
+src/models/PutBoardThumbnailDto.ts
 src/models/QuickSearchAssetDto.ts
 src/models/QuickSearchFindingDto.ts
 src/models/QuickSearchRequestDto.ts
@@ -888,6 +896,8 @@ src/models/ReopenDecisionsResponseDto.ts
 src/models/RetireOutOfScopeFindingsDto.ts
 src/models/RevertResultDto.ts
 src/models/ReviewCaseLeadDto.ts
+src/models/ReviewCaseLeadsDto.ts
+src/models/ReviewCaseLeadsResponseDto.ts
 src/models/ReviewClusterRowDto.ts
 src/models/ReviewClustersResponseDto.ts
 src/models/ReviewDecisionRowDto.ts

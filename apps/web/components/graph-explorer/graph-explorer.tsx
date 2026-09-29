@@ -28,8 +28,23 @@ import { ClusterControls } from "./cluster-controls";
 import { ClusterDetailPanel, ClusterOverviewPanel } from "./cluster-panels";
 import { useClusterLabelFormatter } from "./use-cluster-label";
 import { useClusterFocus } from "./use-cluster-focus";
+import { GraphNodeMenu, type GraphMenuAt } from "./graph-node-menu";
+import { cn } from "@workspace/ui/lib/utils";
 
 const SELECT_MODE: GraphMode = { kind: "select" };
+
+/**
+ * The detail rail beside the canvas. In a narrow container (a side panel)
+ * it moves under the canvas instead of squeezing it, and stays out of the
+ * way until something is selected. Pair it with `GRAPH_BODY_CLASS` inside an
+ * element carrying `@container/graph`.
+ */
+export const GRAPH_RAIL_CLASS =
+  "max-h-[45%] w-full shrink-0 space-y-4 overflow-y-auto border-t-2 border-border bg-background p-3 " +
+  "@xl/graph:max-h-none @xl/graph:w-[260px] @xl/graph:border-t-0 @xl/graph:border-l-2";
+
+/** The canvas-and-rail row: a column when narrow, a row when there is room. */
+export const GRAPH_BODY_CLASS = "flex min-h-0 flex-1 flex-col @xl/graph:flex-row";
 
 /** State and helpers the shell hands to sidebar/toolbar render props. */
 export interface GraphExplorerContext {
@@ -69,6 +84,13 @@ export interface GraphExplorerProps {
   focusComponentOnClick?: boolean;
   onNodeClick?: (node: GraphNodeDto, ctx: GraphExplorerContext) => void;
   onNodeDoubleClick?: (node: GraphNodeDto, ctx: GraphExplorerContext) => void;
+  /**
+   * What a right-click on a node offers (dropdown menu items), or null for
+   * no menu on that node. Cluster nodes never get one.
+   */
+  nodeMenu?: (node: GraphNodeDto, close: () => void) => React.ReactNode | null;
+  /** Content drawn beside the canvas regardless of the view (dialogs the menu opens). */
+  children?: React.ReactNode;
 }
 
 /**
@@ -92,9 +114,14 @@ export function GraphExplorer({
   focusComponentOnClick,
   onNodeClick,
   onNodeDoubleClick,
+  nodeMenu,
+  children,
 }: GraphExplorerProps) {
   const { t } = useTranslation();
   const [selection, setSelection] = React.useState<GraphSelection>(null);
+  const [menu, setMenu] = React.useState<GraphMenuAt<GraphNodeDto> | null>(null);
+  const closeMenu = React.useCallback(() => setMenu(null), []);
+  const menuContent = menu && nodeMenu ? nodeMenu(menu.target, closeMenu) : null;
   const [path, setPath] = React.useState<PathResult | null>(null);
   const [hoverKey, setHoverKey] = React.useState<string | null>(null);
 
@@ -209,8 +236,10 @@ export function GraphExplorer({
   const selectedClusterMeta =
     selectedNode && isClusterNode(selectedNode) ? selectedNode.cluster : null;
 
+  const railIdle = !selection && !clustered.hasCollapsedClusters;
+
   return (
-    <div className="flex h-full flex-col border-2 border-border bg-card">
+    <div className="@container/graph flex h-full flex-col border-2 border-border bg-card">
       <div className="flex flex-wrap items-center gap-2 border-b-2 border-border px-3 py-2">
         {header}
         <ClusterControls clustered={clustered} />
@@ -232,9 +261,9 @@ export function GraphExplorer({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1">
+      <div className={GRAPH_BODY_CLASS}>
         {/* Canvas is always mounted (so pan/zoom binds); states overlay it. */}
-        <div ref={containerRef} className="relative min-w-0 flex-1 overflow-hidden">
+        <div ref={containerRef} className="relative min-h-[220px] min-w-0 flex-1 overflow-hidden">
           <GraphCanvas
             nodes={renderNodes}
             edges={renderEdges}
@@ -250,7 +279,10 @@ export function GraphExplorer({
             edgeStyle={edgeStyle}
             onNodeClick={handleNodeClick}
             onNodeDoubleClick={handleNodeDoubleClick}
-            onNodeContextMenu={() => undefined}
+            onNodeContextMenu={(node, x, y) => {
+              if (!nodeMenu || isClusterNode(node)) return;
+              setMenu({ x, y, target: node });
+            }}
             onEdgeClick={(edge) => setSelection({ type: "edge", id: edge.id })}
             onEdgeContextMenu={() => undefined}
             onBackgroundClick={clearFocus}
@@ -263,12 +295,7 @@ export function GraphExplorer({
         </div>
 
         {(sidebar || clustered.clusters.size > 0) && (
-          <aside
-            className={
-              sidebarClassName ??
-              "w-[260px] shrink-0 space-y-4 overflow-y-auto border-l-2 border-border bg-background p-3"
-            }
-          >
+          <aside className={cn(sidebarClassName ?? GRAPH_RAIL_CLASS, railIdle && "hidden @xl/graph:block")}>
             {selectedClusterMeta ? (
               <ClusterDetailPanel
                 meta={selectedClusterMeta}
@@ -299,6 +326,10 @@ export function GraphExplorer({
           </aside>
         )}
       </div>
+      <GraphNodeMenu menu={menuContent ? menu : null} onClose={closeMenu}>
+        {menuContent}
+      </GraphNodeMenu>
+      {children}
     </div>
   );
 }

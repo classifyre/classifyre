@@ -11,6 +11,7 @@ Name | Type
 `version` | number
 `readOnly` | boolean
 `caseStatus` | string
+`thumbnailSignature` | string
 
 ## Example
 
@@ -24,6 +25,7 @@ const example = {
   "version": null,
   "readOnly": null,
   "caseStatus": null,
+  "thumbnailSignature": null,
 } satisfies CaseBoardMetaDto
 
 console.log(example)

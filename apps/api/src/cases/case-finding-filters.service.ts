@@ -123,7 +123,12 @@ export class CaseFindingFiltersService {
       );
     }
     if (fresh.length === 0) {
-      return { filters: await this.list(caseId), detached: 0, escalated: 0 };
+      return {
+        filters: await this.list(caseId),
+        detached: 0,
+        escalated: 0,
+        assetsRemoved: 0,
+      };
     }
 
     let escalated = 0;
@@ -174,6 +179,7 @@ export class CaseFindingFiltersService {
         return this.cleanup.applyFilters(tx, caseId, saved, {
           trigger: 'FILTER_ADDED',
           actor,
+          removeEmptiedAssets: flag(dto.removeEmptiedAssets),
         });
       },
       { timeout: 30_000, maxWait: 10_000 },
@@ -183,6 +189,7 @@ export class CaseFindingFiltersService {
       filters: await this.list(caseId),
       detached: outcome?.findingsRemoved ?? 0,
       escalated,
+      assetsRemoved: outcome?.emptiedRemoved ?? 0,
     };
   }
 
@@ -205,7 +212,12 @@ export class CaseFindingFiltersService {
         ? current.description
         : dto.description?.trim() || null;
     if (pattern === current.pattern && description === current.description) {
-      return { filters: await this.list(caseId), detached: 0, escalated: 0 };
+      return {
+        filters: await this.list(caseId),
+        detached: 0,
+        escalated: 0,
+        assetsRemoved: 0,
+      };
     }
 
     let escalated = 0;
@@ -254,6 +266,7 @@ export class CaseFindingFiltersService {
         return this.cleanup.applyFilters(tx, caseId, saved, {
           trigger: 'FILTER_UPDATED',
           actor,
+          removeEmptiedAssets: flag(dto.removeEmptiedAssets),
         });
       },
       { timeout: 30_000, maxWait: 10_000 },
@@ -263,6 +276,7 @@ export class CaseFindingFiltersService {
       filters: await this.list(caseId),
       detached: outcome?.findingsRemoved ?? 0,
       escalated,
+      assetsRemoved: outcome?.emptiedRemoved ?? 0,
     };
   }
 
@@ -529,6 +543,11 @@ export class CaseFindingFiltersService {
       );
     }
   }
+}
+
+/** No global ValidationPipe: a form or MCP "true" can arrive as text. */
+function flag(value: unknown): boolean {
+  return value === true || value === 'true';
 }
 
 /** Filter unless asked otherwise: every caller before escalation meant one. */

@@ -9,6 +9,7 @@ Name | Type
 `filters` | [Array&lt;CaseFindingFilterDto&gt;](CaseFindingFilterDto.md)
 `detached` | number
 `escalated` | number
+`assetsRemoved` | number
 
 ## Example
 
@@ -20,6 +21,7 @@ const example = {
   "filters": null,
   "detached": null,
   "escalated": null,
+  "assetsRemoved": null,
 } satisfies CaseFindingFiltersChangeResponseDto
 
 console.log(example)

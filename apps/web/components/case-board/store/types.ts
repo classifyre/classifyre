@@ -161,6 +161,12 @@ export interface SystemEdge {
   origin: "SOURCE_DERIVED" | "INFERRED" | "MANUAL";
   confidence: number;
   method: string | null;
+  /** DATASET | FIELD: whether column-level mappings came with it. */
+  granularity?: string | null;
+  /** Column-level dependencies (lineage): `downstream ← upstreams` through `transform`. */
+  fieldMappings?: Array<{ downstream?: string | null; upstreams: string[]; transform?: string; type?: string }>;
+  /** What the edge was read from: `{ sql, queryId, runId }` and the like. */
+  evidence?: Record<string, unknown> | null;
 }
 
 /** A depth-1 neighbour asset that is not evidence (drawn as a faint ghost). */

@@ -5,13 +5,24 @@
  * app's board and the documentation's demos draw from these, so both look
  * the same.
  *
+ * The sizes that decide what overlaps what (nodes, finding spots, cards,
+ * frames) live in `@workspace/schemas/case-board`, because the API lays
+ * boards out with them too (the MCP arrange tools); they are re-exported here.
+ *
  * Pure: no React, so the board's store, layout estimates and tests share it.
  */
 
-export interface XY {
-  x: number;
-  y: number;
-}
+import { ASSET_NODE, FINDING_NODE, type XY } from "@workspace/schemas/case-board";
+
+export {
+  ASSET_NODE,
+  defaultFindingSpot,
+  FINDING_NODE,
+  FRAME_TITLE_HEIGHT,
+  HYPOTHESIS_WIDTH,
+  ringRadius,
+  type XY,
+} from "@workspace/schemas/case-board";
 
 /** Circle the edges attach to: centre relative to the node's top-left, radius. */
 export interface RoundShape {
@@ -25,54 +36,10 @@ export type SeverityKey = "critical" | "high" | "medium" | "low" | "info";
 /** Six visible states of a finding, top-down priority (the board's finding-state.ts). */
 export type FindingVisualState = "deleted" | "gone" | "resolved" | "dismissed" | "new" | "open";
 
-export const ASSET_NODE = {
-  width: 176,
-  /** Asset circle centre, leaving room above for hypothesis dots and badges. */
-  cx: 88,
-  cy: 30,
-  r: 19,
-  /** The lime "in the case" ring. */
-  ring: 24,
-  height: 92,
-} as const;
-
-export const FINDING_NODE = {
-  width: 132,
-  cx: 66,
-  cy: 17,
-  r: 13,
-  height: 50,
-} as const;
-
 /** Edges end just outside the circles, clear of the rings. */
 export const EVIDENCE_ROUND: RoundShape = { cx: ASSET_NODE.cx, cy: ASSET_NODE.cy, r: ASSET_NODE.ring + 3 };
 export const ASSET_ROUND: RoundShape = { cx: ASSET_NODE.cx, cy: ASSET_NODE.cy, r: ASSET_NODE.r + 3 };
 export const FINDING_ROUND: RoundShape = { cx: FINDING_NODE.cx, cy: FINDING_NODE.cy, r: FINDING_NODE.r + 3 };
-
-/** Radius of the ring the default finding spots sit on: wide enough that labels don't collide. */
-export function ringRadius(count: number): number {
-  return Math.max(118, Math.round((count * 96) / (2 * Math.PI)));
-}
-
-/**
- * Default spot of finding `index` of `count`, as the finding node's top-left
- * relative to the asset node's top-left. A few findings fan out to the right
- * of their asset; four or more go all the way round, starting at 12 o'clock.
- */
-export function defaultFindingSpot(index: number, count: number): XY {
-  const r = ringRadius(count);
-  let angle: number;
-  if (count <= 3) {
-    const spread = count === 1 ? 0 : count === 2 ? Math.PI / 7 : Math.PI / 4.5;
-    angle = count === 1 ? 0 : -spread + (2 * spread * index) / (count - 1);
-  } else {
-    angle = -Math.PI / 2 + (2 * Math.PI * index) / count;
-  }
-  return {
-    x: Math.round(ASSET_NODE.cx + r * Math.cos(angle) - FINDING_NODE.cx),
-    y: Math.round(ASSET_NODE.cy + r * Math.sin(angle) - FINDING_NODE.cy),
-  };
-}
 
 /**
  * Hypothesis colours when a thread has none of its own. The same eight hues
@@ -88,12 +55,6 @@ export const HYPOTHESIS_PALETTE = [
   "#06b6d4",
   "#84cc16",
 ] as const;
-
-/** Hypothesis cards are this wide; their height follows the statement. */
-export const HYPOTHESIS_WIDTH = 300;
-
-/** A frame's title bar; its contents start below it. */
-export const FRAME_TITLE_HEIGHT = 40;
 
 /** Where the line from a circle's centre towards `towards` leaves the circle. */
 export function circleAnchor(

@@ -8,6 +8,7 @@ import {
 } from "@workspace/api-client";
 import { withLocaleAndSlug } from "@/lib/ns-path";
 import { useLocale } from "@/lib/app-path";
+import { RECENT_WORKSPACES, recordOpened } from "@/lib/recently-opened";
 
 interface NamespaceContextValue {
   /** Active namespace slug from the route (e.g. "acme-corp"). */
@@ -75,6 +76,13 @@ export function NamespaceProvider({
     setNamespace(null);
     void refresh();
   }, [refresh]);
+
+  // The workspace directory opens with the workspaces visited last, however
+  // they were entered: a card, the switcher, a link.
+  const namespaceId = namespace?.id;
+  React.useEffect(() => {
+    if (namespaceId) recordOpened(RECENT_WORKSPACES, namespaceId);
+  }, [namespaceId]);
 
   const value = React.useMemo<NamespaceContextValue>(
     () => ({

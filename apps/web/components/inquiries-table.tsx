@@ -5,7 +5,6 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
-  FolderOpen,
   FolderPlus,
   Loader2,
   Pencil,
@@ -52,6 +51,7 @@ import {
 } from "@workspace/ui/components";
 import { Filter, Search } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
+import { CaseLinks } from "@/components/inquiry-cases";
 import type { TranslationKey } from "@/i18n";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -365,34 +365,15 @@ export function InquiriesTable() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          {q.cases.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(
-                                  nsPath(
-                                    q.cases.length === 1
-                                      ? `/investigations/${q.cases[0]!.id}`
-                                      : `/investigations/inquiries/${q.id}`,
-                                  ),
-                                );
-                              }}
-                            >
-                              <FolderOpen className="h-3.5 w-3.5" />
-                              {q.cases.length === 1
-                                ? t("investigations.inquiries.case")
-                                : t("investigations.inquiries.casesCount", {
-                                    count: q.cases.length,
-                                  })}
-                            </Button>
-                          )}
+                          {/* Every case it drives, by name: a watch can drive several. */}
+                          <CaseLinks
+                            cases={q.cases}
+                            onOpen={(caseId) =>
+                              router.push(
+                                nsPath(`/investigations/${caseId}?panel=watches&watch=${q.id}`),
+                              )
+                            }
+                          />
                         </TableCell>
                         <TableCell>
                           <Badge

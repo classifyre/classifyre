@@ -34,6 +34,13 @@ import {
     CaseFindingFilterDtoToJSON,
     CaseFindingFilterDtoToJSONTyped,
 } from './CaseFindingFilterDto';
+import type { CaseThumbnailDto } from './CaseThumbnailDto';
+import {
+    CaseThumbnailDtoFromJSON,
+    CaseThumbnailDtoFromJSONTyped,
+    CaseThumbnailDtoToJSON,
+    CaseThumbnailDtoToJSONTyped,
+} from './CaseThumbnailDto';
 import type { CaseCleanupResultDto } from './CaseCleanupResultDto';
 import {
     CaseCleanupResultDtoFromJSON,
@@ -150,6 +157,24 @@ export interface CaseResponseDto {
      * @memberof CaseResponseDto
      */
     lastEscalatedAt?: Date | null;
+    /**
+     * Findings attached to the case (list with withCardDetails)
+     * @type {number}
+     * @memberof CaseResponseDto
+     */
+    findingCount?: number;
+    /**
+     * New matches waiting across the linked inquiry watches (list with withCardDetails)
+     * @type {number}
+     * @memberof CaseResponseDto
+     */
+    newMatchCount?: number;
+    /**
+     * The board drawn small; null until the board has been opened once (list with withCardDetails)
+     * @type {CaseThumbnailDto}
+     * @memberof CaseResponseDto
+     */
+    thumbnail?: CaseThumbnailDto | null;
     /**
      * 
      * @type {Date}
@@ -271,6 +296,9 @@ export function CaseResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'removeGoneAssets': json['removeGoneAssets'],
         'escalatedCount': json['escalatedCount'],
         'lastEscalatedAt': json['lastEscalatedAt'] == null ? undefined : (new Date(json['lastEscalatedAt'])),
+        'findingCount': json['findingCount'] == null ? undefined : json['findingCount'],
+        'newMatchCount': json['newMatchCount'] == null ? undefined : json['newMatchCount'],
+        'thumbnail': json['thumbnail'] == null ? undefined : CaseThumbnailDtoFromJSON(json['thumbnail']),
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
         'evidence': json['evidence'] == null ? undefined : ((json['evidence'] as Array<any>).map(CaseEvidenceDtoFromJSON)),
@@ -308,6 +336,9 @@ export function CaseResponseDtoToJSONTyped(value?: CaseResponseDto | null, ignor
         'removeGoneAssets': value['removeGoneAssets'],
         'escalatedCount': value['escalatedCount'],
         'lastEscalatedAt': value['lastEscalatedAt'] == null ? value['lastEscalatedAt'] : value['lastEscalatedAt'].toISOString(),
+        'findingCount': value['findingCount'],
+        'newMatchCount': value['newMatchCount'],
+        'thumbnail': CaseThumbnailDtoToJSON(value['thumbnail']),
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
         'evidence': value['evidence'] == null ? undefined : ((value['evidence'] as Array<any>).map(CaseEvidenceDtoToJSON)),

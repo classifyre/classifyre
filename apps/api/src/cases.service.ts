@@ -80,6 +80,20 @@ function flag(value: unknown): boolean {
   return value === true || value === 'true';
 }
 
+/** An id filter of the case list takes at most this many ids. */
+const ID_FILTER_MAX = 100;
+
+/** Case ids from a query string: a lone value or a list, junk dropped. */
+function idList(value: unknown): string[] {
+  const values: unknown[] = Array.isArray(value) ? value : [value];
+  return values
+    .filter(
+      (v): v is string =>
+        typeof v === 'string' && v.length > 0 && v.length <= 64,
+    )
+    .slice(0, ID_FILTER_MAX);
+}
+
 /** Findings a pull names on its timeline entry; `pulled` counts the rest. */
 const PULL_LIST_CAP = 50;
 /** Matched values are clipped on the timeline. */
@@ -94,6 +108,33 @@ function numberOf(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 }
+
+/** The case fields a PATCH edits, as the timeline compares them. */
+type CaseEditable = {
+  title: string;
+  description: string | null;
+  status: string;
+  severity: string;
+  assignee: string | null;
+  conclusion: string | null;
+  aiMode: string | null;
+};
+
+/** The case's description of itself: edits to these fold into one entry. */
+const DETAIL_FIELDS = [
+  'title',
+  'description',
+  'severity',
+  'assignee',
+] as const satisfies ReadonlyArray<keyof CaseEditable>;
+
+/** What the autopilot's entity map of a case says (AgentMemoryService.syncEntityMap). */
+const ENTITY_MAP_FIELDS = [
+  'title',
+  'description',
+  'status',
+  'severity',
+] as const satisfies ReadonlyArray<keyof CaseEditable>;
 
 // Hypotheses are CaseThreads of kind HYPOTHESIS; count those for the DTO.
 const countSelect = {
@@ -480,6 +521,14 @@ export class CasesService {
     if (flag(query.escalated)) {
       where.findings = { some: { escalatedAt: { not: null } } };
     }
+    const ids = idList(query.ids);
+    const excludeIds = idList(query.excludeIds);
+    if (ids.length > 0 || excludeIds.length > 0) {
+      where.id = {
+        ...(ids.length > 0 ? { in: ids } : {}),
+        ...(excludeIds.length > 0 ? { notIn: excludeIds } : {}),
+      };
+    }
     if (query.search && query.search.trim().length > 0) {
       const term = query.search.trim();
       where.OR = [
@@ -498,7 +547,62 @@ export class CasesService {
       }),
       this.prisma.case.count({ where }),
     ]);
-    return { items: rows.map((r) => this.mapCase(r)), total, skip, limit };
+    const items = rows.map((r) => this.mapCase(r));
+    if (flag(query.withCardDetails)) await this.addCardDetails(items);
+    return { items, total, skip, limit };
+  }
+
+  /**
+   * What a case card shows beyond the case row: its finding count, the new
+   * matches waiting in its watches, and its board drawn small. One query each
+   * for the whole page.
+   */
+  private async addCardDetails(items: CaseResponseDto[]): Promise<void> {
+    if (items.length === 0) return;
+    const caseIds = items.map((c) => c.id);
+    const [findingCounts, watches, thumbnails] = await Promise.all([
+      this.prisma.caseFinding.groupBy({
+        by: ['caseId'],
+        where: { caseId: { in: caseIds } },
+        _count: { _all: true },
+      }),
+      this.prisma.caseInquiry.findMany({
+        where: { caseId: { in: caseIds } },
+        select: { caseId: true, inquiry: { select: { newMatchCount: true } } },
+      }),
+      this.prisma.caseBoardThumbnail.findMany({
+        where: { board: { caseId: { in: caseIds } } },
+        select: {
+          sketch: true,
+          updatedAt: true,
+          board: { select: { caseId: true } },
+        },
+      }),
+    ]);
+    const findings = new Map(
+      findingCounts.map((row) => [row.caseId, row._count._all]),
+    );
+    const newMatches = new Map<string, number>();
+    for (const watch of watches) {
+      newMatches.set(
+        watch.caseId,
+        (newMatches.get(watch.caseId) ?? 0) + watch.inquiry.newMatchCount,
+      );
+    }
+    const sketches = new Map(
+      thumbnails.map((t) => [
+        t.board.caseId,
+        {
+          sketch: t.sketch as Record<string, unknown>,
+          updatedAt: t.updatedAt,
+        },
+      ]),
+    );
+    for (const item of items) {
+      item.findingCount = findings.get(item.id) ?? 0;
+      item.newMatchCount = newMatches.get(item.id) ?? 0;
+      item.thumbnail = sketches.get(item.id) ?? null;
+    }
   }
 
   async findOne(id: string): Promise<CaseResponseDto | null> {
@@ -554,6 +658,13 @@ export class CasesService {
     const before = await this.prisma.case.findUnique({
       where: { id },
       select: {
+        title: true,
+        description: true,
+        status: true,
+        severity: true,
+        assignee: true,
+        conclusion: true,
+        aiMode: true,
         removeGoneFindings: true,
         removeResolvedFindings: true,
         removeGoneAssets: true,
@@ -588,30 +699,7 @@ export class CasesService {
       },
       include: countSelect,
     });
-    // A PATCH that only flips clean-up switches is not a case edit.
-    const touchesCase = (
-      [
-        'title',
-        'description',
-        'status',
-        'severity',
-        'assignee',
-        'conclusion',
-        'aiMode',
-      ] as const
-    ).some((key) => dto[key] !== undefined);
-    if (touchesCase) {
-      const actType =
-        dto.conclusion !== undefined
-          ? CaseActivityType.CONCLUSION_UPDATED
-          : CaseActivityType.CASE_UPDATED;
-      await this.activity.record(
-        id,
-        actType,
-        { title: dto.title, status: dto.status, severity: dto.severity },
-        actor,
-      );
-    }
+    await this.recordCaseEdits(id, before, updated, actor);
     const changes = CLEANUP_RULE_KEYS.filter(
       (key) => rules[key] !== before[key],
     ).map((rule) => ({ rule, enabled: rules[rule] }));
@@ -623,7 +711,15 @@ export class CasesService {
         actor,
       );
     }
-    await this.syncEntityMaps(id);
+    // The autopilot's map of the case names its title, description, status
+    // and severity; an autosaved assignee or conclusion leaves it as it is.
+    if (
+      ENTITY_MAP_FIELDS.some(
+        (key) => (before[key] ?? '') !== (updated[key] ?? ''),
+      )
+    ) {
+      await this.syncEntityMaps(id);
+    }
     // A switch turned on applies at once — what "remove resolved findings"
     // promises includes the ones resolved last week.
     const enabledNow = newlyEnabled(before, rules);
@@ -647,6 +743,77 @@ export class CasesService {
       };
     }
     return this.mapCase(updated);
+  }
+
+  /**
+   * What a PATCH changed, on the timeline. The case file saves as someone
+   * types and may send a field back unchanged, so only real changes count.
+   * Edits to the case's description of itself (title, description, severity,
+   * assignee) and to the conclusion draft fold into one entry per stretch of
+   * editing; a status or Autopilot-mode change is a decision, its own entry.
+   */
+  private async recordCaseEdits(
+    id: string,
+    before: CaseEditable,
+    after: CaseEditable,
+    actor: string | undefined,
+  ): Promise<void> {
+    const changed = (key: keyof CaseEditable) =>
+      (before[key] ?? '') !== (after[key] ?? '');
+    const edited = DETAIL_FIELDS.filter(changed);
+    if (edited.length > 0) {
+      await this.activity.recordEdit(
+        id,
+        CaseActivityType.CASE_UPDATED,
+        {
+          fields: edited,
+          title: after.title,
+          severity: after.severity,
+          ...(edited.includes('title') ? { previousTitle: before.title } : {}),
+        },
+        actor,
+        'details',
+        (previous, next) => ({
+          ...next,
+          fields: [
+            ...new Set([
+              ...(Array.isArray(previous.fields) ? previous.fields : []),
+              ...(Array.isArray(next.fields) ? next.fields : []),
+            ]),
+          ],
+          // The title the stretch of editing started from.
+          ...(previous.previousTitle !== undefined
+            ? { previousTitle: previous.previousTitle }
+            : {}),
+        }),
+      );
+    }
+    if (changed('status')) {
+      await this.activity.record(
+        id,
+        CaseActivityType.CASE_UPDATED,
+        { status: after.status, previousStatus: before.status },
+        actor,
+      );
+    }
+    if (changed('aiMode')) {
+      await this.activity.record(
+        id,
+        CaseActivityType.CASE_UPDATED,
+        { aiMode: after.aiMode, previousAiMode: before.aiMode },
+        actor,
+      );
+    }
+    if (changed('conclusion')) {
+      await this.activity.recordEdit(
+        id,
+        CaseActivityType.CONCLUSION_UPDATED,
+        { draft: true, length: (after.conclusion ?? '').length },
+        actor,
+        'conclusion',
+        (_previous, next) => next,
+      );
+    }
   }
 
   async remove(id: string): Promise<void> {

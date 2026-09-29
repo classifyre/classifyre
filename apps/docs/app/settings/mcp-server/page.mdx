@@ -5,6 +5,8 @@ description: Connect Classifyre MCP to Claude, Cursor, Codex CLI, Gemini CLI, an
 ---
 
 import { Badge, Separator } from "@workspace/ui/components"
+import { Callout } from "nextra/components"
+import { McpScopeTable, McpToolCatalog } from "@/components/mcp/mcp-catalog"
 
 # MCP Server Integration Guide
 
@@ -39,7 +41,8 @@ Content-Type: application/json
 ## Before You Connect
 
 1. Enable MCP in the dashboard: `Settings -> MCP Server -> Enable MCP`.
-2. Create a token in the same settings page.
+2. Create a token in the same settings page, and choose its tool access: all
+   tools, or only the [scopes](#choose-what-a-token-can-do-scopes) the client needs.
 3. Copy the token immediately. Classifyre returns plaintext only once.
 
 If MCP is disabled, `POST /<workspace>/mcp` returns `503`.
@@ -59,7 +62,7 @@ curl -X POST https://<your-host>/<workspace>/instance-settings/mcp/tokens \
 Response includes:
 - `plainTextToken`: full bearer token (one-time only)
 - `tokenPreview`: masked preview stored for later display
-- token metadata (`id`, `name`, timestamps, active status)
+- token metadata (`id`, `name`, `toolGroupIds`, timestamps, active status)
 
 ### List Tokens
 
@@ -82,6 +85,47 @@ curl -X PATCH https://<your-host>/<workspace>/instance-settings/mcp/tokens/<toke
 ```bash
 curl -X DELETE https://<your-host>/<workspace>/instance-settings/mcp/tokens/<token-id>
 ```
+
+## Choose What a Token Can Do (scopes)
+
+Every token has **tool access**: either *all tools*, or a list of capability
+groups (scopes). A client connected with a scoped token sees and can call only
+the tools of those groups — the rest are left out of `tools/list` and refused.
+
+**In the app:** `Settings -> MCP Server -> Create token`, switch **All tools**
+off and tick the groups the client needs. Each group shows how many tools it
+turns on; hover it to see their names. **Edit** changes the scope of an
+existing token; the client picks it up on its next request.
+
+**Over the API:** send `toolGroupIds` with the ids from the table below (an
+unknown id is refused with `400`). `null` or no `toolGroupIds` means all tools,
+including groups added in later versions.
+
+```bash
+curl -X POST https://<your-host>/<workspace>/instance-settings/mcp/tokens \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Claude, case work","toolGroupIds":["cases","case_board","findings","assets"]}'
+
+curl -X PATCH https://<your-host>/<workspace>/instance-settings/mcp/tokens/<token-id> \
+  -H "Content-Type: application/json" \
+  -d '{"toolGroupIds":["cases","case_board"]}'
+```
+
+<McpScopeTable />
+
+<Callout type="info">
+**Scopes that work together.** Most scopes read better with a neighbour: the
+**Case Board** tools need a case id, which **Cases** finds (`search_cases`);
+putting findings on a board goes better with **Findings** and **Assets** to
+search for them. A scope never grants anything outside its own tools.
+</Callout>
+
+<Callout type="warning">
+**Case Board is its own scope since v0.6.3.** Its tools used to belong to
+**Cases**. Tokens that had **Cases** were given **Case Board** as well when
+they upgraded, so nothing they could do before went away; a token created
+afterwards needs **Case Board** ticked to arrange boards.
+</Callout>
 
 ## Token Format and Validation
 
@@ -273,68 +317,40 @@ curl -X POST https://<your-host>/<workspace>/mcp \
 
 ## Classifyre MCP Capability Map
 
-This section is documented from `apps/api/src/mcp-catalog.ts` and no longer shown in the Settings UI.
+Generated from the tools the server registers (the same source as the tool
+catalog under `Settings -> MCP Server`), so it always matches what a client
+sees. **read-only** tools never change anything; **destructive** tools can take
+things away (clients usually ask before calling them); **idempotent** tools can
+be repeated safely. Open a tool for its parameters (`*` = required).
 
-### Sources
+<McpToolCatalog />
 
-- Description: Create, validate, update, delete, inspect, and run ingestion sources.
-- Tools: `search_sources`, `get_source`, `create_source`, `update_source`, `delete_source`, `test_source_connection`, `start_source_run`
-- Operations:
-  - Search and filter sources
-  - Validate source configs against JSON Schema before save
-  - Start connection tests and runs
+### Resources and prompts
 
-### Custom Detectors
+| URI / name | What it holds |
+| --- | --- |
+| `classifyre://overview` | Connection details, every capability group and its tools |
+| `classifyre://investigation-guide` | The intended investigation loop: coverage → ranked findings → watches → cases and their board → conclusion |
+| `classifyre://capabilities/{groupId}` | One capability group in detail |
+| `brainstorm_custom_detector` (prompt) | Guides a client to propose regex, classifier or entity detector configs before training |
 
-- Description: Manage regex, classifier, and entity detectors and train them on feedback.
-- Tools: `list_custom_detectors`, `get_custom_detector`, `list_custom_detector_examples`, `create_custom_detector`, `update_custom_detector`, `delete_custom_detector`, `train_custom_detector`, `get_custom_detector_training_history`
-- Operations:
-  - Create detectors for rulesets, classifiers, and entities
-  - Inspect starter examples before authoring a detector
-  - Trigger training and inspect training history
-
-### Runs
-
-- Description: Inspect ingestion runs, stop stuck runs, and fetch logs for debugging.
-- Tools: `search_runs`, `get_run`, `get_run_logs`, `stop_run`, `list_source_runs`
-- Operations:
-  - Search runs across the instance or by source
-  - Read paginated runner logs
-  - Stop long-running jobs
-
-### Findings
-
-- Description: Search, inspect, and update findings including bulk status changes.
-- Tools: `search_findings`, `get_finding`, `update_finding`, `bulk_update_findings`, `get_findings_discovery`
-- Operations:
-  - Search and filter findings by status, severity, type, and text
-  - Resolve or reopen findings
-  - Summarize discovery totals for MCP clients
-
-### Assets
-
-- Description: Inspect assets, search asset inventory, and link findings back to content.
-- Tools: `search_assets`, `get_asset`, `list_source_assets`, `list_asset_finding_summaries`
-- Operations:
-  - Search assets with nested finding filters
-  - Inspect a single asset
-  - Browse asset-level finding summaries
-
-### Prompt Helpers
-
-- `brainstorm_custom_detector`
-  - Title: Brainstorm Custom Detector
-  - Description: Guide an MCP client to propose regex, classifier, or entity detector configs before training.
+Resources are descriptive and readable with any token.
 
 ## How To Add New MCP Capabilities
 
-When adding new MCP functionality in API code:
+When adding MCP functionality in API code:
 
-1. Update `apps/api/src/mcp-catalog.ts` with the new capability group and tool names.
-2. Register tool handlers in `apps/api/src/mcp-server.factory.ts`.
-3. Implement execution logic in `apps/api/src/mcp-tool-executor.service.ts`.
-4. If needed, expose supporting API endpoints and DTO updates.
-5. Validate by calling `tools/list` and the new tool through `POST /<workspace>/mcp`.
+1. Register the tool in `apps/api/src/mcp-server.factory.ts` with a clear
+   description (what it does, when to use it, what it returns), a zod input
+   schema — `z.strictObject` for anything destructive — and honest annotations
+   (`readOnlyHint`, `destructiveHint`, `idempotentHint`).
+2. Put its name in one capability group in `apps/api/src/mcp-catalog.ts` (or
+   add a group). `mcp-catalog.completeness.spec.ts` fails on a tool without a
+   group, since a scoped token could never reach it.
+3. Destructive tools go in `mcp-server.factory.destructive-tools.spec.ts`.
+4. Run `bun run codegen`: it regenerates this page's catalog
+   (`apps/docs/src/_generated/mcp-catalog.json`); commit it with the change.
+5. Validate with `tools/list` and a `tools/call` through `POST /<workspace>/mcp`.
 
 ## Security Notes
 
@@ -348,6 +364,8 @@ When adding new MCP functionality in API code:
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | `401 Unauthorized` | Invalid/missing token | Verify `Authorization: Bearer ...` |
+| A tool is missing from `tools/list` | The token's scope does not include its group | Edit the token under `Settings -> MCP Server` and tick the group (see the capability map) |
+| `DEMO_MODE_READ_ONLY` from a write tool | The instance runs in demo mode | Writes are refused on demo instances; read tools still work |
 | `404 Not Found` | Wrong URL | Confirm host and `/mcp` path |
 | `503 Service Unavailable` | MCP disabled | Enable MCP in Settings |
 | Connection refused | Host not reachable | Check port, firewall, reverse proxy |

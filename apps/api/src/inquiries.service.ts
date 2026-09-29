@@ -296,9 +296,10 @@ export class InquiriesService {
     id: string,
     cursor?: string,
     limit?: number,
+    types?: InquiryActivityType[],
   ): Promise<InquiryTimelineResponseDto> {
     await this.ensureExists(id);
-    return this.activity.getTimeline(id, cursor, limit);
+    return this.activity.getTimeline(id, cursor, limit, types);
   }
 
   /** Preview what a matcher config currently selects, before saving. */

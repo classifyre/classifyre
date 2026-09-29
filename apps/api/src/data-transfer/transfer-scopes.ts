@@ -525,7 +525,15 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
     scope: 'investigations',
     order: 550,
     keys: ['id'],
-    idRefs: ['id', 'caseId', 'findingId', 'assetId'],
+    idRefs: [
+      'id',
+      'caseId',
+      'findingId',
+      'assetId',
+      'viaFindingId',
+      'viaAssetId',
+      'viaInquiryId',
+    ],
   },
   {
     model: 'caseEvent',

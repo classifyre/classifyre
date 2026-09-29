@@ -19,6 +19,8 @@ import { SimilarFindingsGraph } from "@/components/similar-findings-graph";
 import { FeatureOffNotice } from "@/components/feature-off-notice";
 import { useTranslation } from "@/hooks/use-translation";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
+import { findingCandidate, useAddToCase } from "@/components/case-target/case-target";
+import { AddToCaseButton } from "@/components/case-target/case-target-menu";
 
 const LIMIT = 8;
 
@@ -40,18 +42,27 @@ export function SimilarFindingsCard({
   matchedContent = "",
   assetId,
   assetName,
+  embedded = false,
+  defaultView = "graph",
 }: {
   findingId: string;
   /** Matched text of the finding being viewed — labels the graph's centre node. */
   matchedContent?: string;
   assetId?: string;
   assetName?: string;
+  /**
+   * Inside another panel (the case board's details): no card around it, the
+   * graph fills its space, and an empty result says so instead of hiding.
+   */
+  embedded?: boolean;
+  defaultView?: "graph" | "list";
 }) {
   const nsPath = useNsPath();
   const { t } = useTranslation();
   const [items, setItems] = useState<SimilarFindingDto[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [view, setView] = useState<"graph" | "list">("graph");
+  const [view, setView] = useState<"graph" | "list">(defaultView);
+  const { target: caseTarget, dialog: caseDialog } = useAddToCase();
   // Off is not "no neighbours": say why the card is empty and where the
   // switch is, instead of hiding it like an ordinary miss.
   const embeddingsOff = useWorkspaceFeatures().isOff("embeddings");
@@ -75,6 +86,7 @@ export function SimilarFindingsCard({
   }, [findingId, embeddingsOff]);
 
   if (embeddingsOff) {
+    if (embedded) return <FeatureOffNotice feature="embeddings" context="similar" variant="inline" />;
     return (
       <Card className="rounded-[6px] border-2">
         <CardHeader className="pb-3">
@@ -94,7 +106,110 @@ export function SimilarFindingsCard({
     );
   }
 
-  if (failed || items?.length === 0) return null;
+  if (failed || items?.length === 0) {
+    if (!embedded) return null;
+    return (
+      <p className="py-6 text-center text-sm text-muted-foreground">
+        {failed ? t("findings.detail.similarFindings.unavailable") : t("findings.detail.similarFindings.graphEmpty")}
+      </p>
+    );
+  }
+
+  const viewToggle = items !== null && (
+    <div className="flex shrink-0 items-center gap-1">
+      <Button
+        size="sm"
+        variant={view === "graph" ? "default" : "outline"}
+        className="h-8 text-xs"
+        onClick={() => setView("graph")}
+      >
+        <Share2 className="mr-1.5 h-3.5 w-3.5" />
+        {t("findings.detail.similarFindings.showGraph")}
+      </Button>
+      <Button
+        size="sm"
+        variant={view === "list" ? "default" : "outline"}
+        className="h-8 text-xs"
+        onClick={() => setView("list")}
+      >
+        <List className="mr-1.5 h-3.5 w-3.5" />
+        {t("findings.detail.similarFindings.showList")}
+      </Button>
+    </div>
+  );
+
+  const body =
+    items === null ? (
+      <div className="flex h-16 items-center justify-center">
+        <Spinner label={t("findings.detail.similarFindings.loading")} />
+      </div>
+    ) : view === "graph" ? (
+      <SimilarFindingsGraph
+        findingId={findingId}
+        items={items}
+        anchorLabel={matchedContent}
+        anchorAssetId={assetId}
+        anchorAssetName={assetName}
+        className={embedded ? "h-[min(520px,65vh)]" : undefined}
+      />
+    ) : (
+      <div className="space-y-2">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className="flex items-start gap-2 rounded-[4px] border border-border/60 bg-muted/30 p-3 transition-colors hover:border-border"
+          >
+            <Link href={nsPath(`/findings/${item.id}`)} className="block min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="rounded-[3px] text-[10px]">
+                  {t("findings.detail.similarFindings.similarity")}{" "}
+                  {Math.round(item.similarity * 100)}%
+                </Badge>
+                {item.evidenceAnalysis && (
+                  <Badge variant="outline" className="rounded-[3px] text-[10px]">
+                    {t("findings.detail.similarFindings.importance")}{" "}
+                    {Math.round(item.evidenceAnalysis.importanceScore * 100)}
+                  </Badge>
+                )}
+                {item.asset?.name && (
+                  <span className="text-muted-foreground truncate text-xs">
+                    {item.asset.name}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1.5 truncate font-mono text-xs text-muted-foreground">
+                {truncate(item.matchedContent)}
+              </p>
+            </Link>
+            {item.assetId && (
+              <AddToCaseButton
+                target={caseTarget}
+                candidate={findingCandidate({
+                  id: item.id,
+                  assetId: item.assetId,
+                  findingType: item.findingType,
+                  value: item.matchedContent,
+                  assetName: item.asset?.name ?? null,
+                })}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    );
+
+  if (embedded) {
+    return (
+      <div className="space-y-3" data-testid="similar-findings">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="min-w-0 flex-1 text-xs text-muted-foreground">{t("findings.detail.similarFindings.desc")}</p>
+          {viewToggle}
+        </div>
+        {body}
+        {caseDialog}
+      </div>
+    );
+  }
 
   return (
     <Card className="rounded-[6px] border-2">
@@ -109,75 +224,12 @@ export function SimilarFindingsCard({
               {t("findings.detail.similarFindings.desc")}
             </CardDescription>
           </div>
-          {items !== null && (
-            <div className="flex shrink-0 items-center gap-1">
-              <Button
-                size="sm"
-                variant={view === "graph" ? "default" : "outline"}
-                className="h-8 text-xs"
-                onClick={() => setView("graph")}
-              >
-                <Share2 className="mr-1.5 h-3.5 w-3.5" />
-                {t("findings.detail.similarFindings.showGraph")}
-              </Button>
-              <Button
-                size="sm"
-                variant={view === "list" ? "default" : "outline"}
-                className="h-8 text-xs"
-                onClick={() => setView("list")}
-              >
-                <List className="mr-1.5 h-3.5 w-3.5" />
-                {t("findings.detail.similarFindings.showList")}
-              </Button>
-            </div>
-          )}
+          {viewToggle}
         </div>
       </CardHeader>
       <CardContent>
-        {items === null ? (
-          <div className="flex h-16 items-center justify-center">
-            <Spinner label={t("findings.detail.similarFindings.loading")} />
-          </div>
-        ) : view === "graph" ? (
-          <SimilarFindingsGraph
-            findingId={findingId}
-            items={items}
-            anchorLabel={matchedContent}
-            anchorAssetId={assetId}
-            anchorAssetName={assetName}
-          />
-        ) : (
-          <div className="space-y-2">
-            {items.map((item) => (
-              <Link
-                key={item.id}
-                href={nsPath(`/findings/${item.id}`)}
-                className="block rounded-[4px] border border-border/60 bg-muted/30 p-3 transition-colors hover:border-border"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="rounded-[3px] text-[10px]">
-                    {t("findings.detail.similarFindings.similarity")}{" "}
-                    {Math.round(item.similarity * 100)}%
-                  </Badge>
-                  {item.evidenceAnalysis && (
-                    <Badge variant="outline" className="rounded-[3px] text-[10px]">
-                      {t("findings.detail.similarFindings.importance")}{" "}
-                      {Math.round(item.evidenceAnalysis.importanceScore * 100)}
-                    </Badge>
-                  )}
-                  {item.asset?.name && (
-                    <span className="text-muted-foreground truncate text-xs">
-                      {item.asset.name}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1.5 truncate font-mono text-xs text-muted-foreground">
-                  {truncate(item.matchedContent)}
-                </p>
-              </Link>
-            ))}
-          </div>
-        )}
+        {body}
+        {caseDialog}
       </CardContent>
     </Card>
   );

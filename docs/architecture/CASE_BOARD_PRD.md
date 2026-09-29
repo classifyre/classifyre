@@ -146,7 +146,7 @@ Nothing that works today may be lost. Every feature is mapped here.
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Top bar (56 px, one line; revised 2026-09-25):** the case — title, status, severity (the app's breadcrumb is the way back, so there is no back button) — then a **ledger** of what is on the board: *n evidence · n findings · n hypotheses*, each with the mark its nodes wear. Pressing a counter **spotlights** that kind (everything else dims) and brings all of it into view; pressing it again, `Esc` or a click on the empty canvas lets the rest back. Then a wide search field (⌘K), presence avatars (§5.12) and the overflow menu (*Tidy up board*, *Export PNG*, *Board snapshots*, *Close case*). Watches live on the rail; the save state is a small mark at the rail's foot.
+- **Top bar (56 px, one line; revised 2026-09-25):** the case — title, status, severity (the app's breadcrumb is the way back, so there is no back button) — then a **ledger** of what is on the board: *n evidence · n findings · n hypotheses*, each with the mark its nodes wear. Pressing a counter **spotlights** that kind (everything else dims) and brings all of it into view; pressing it again, `Esc` or a click on the empty canvas lets the rest back. Then a wide search field (⌘K), presence avatars (§5.12) and the overflow menu (*Run Autopilot*, *Tidy up board*, *Export PNG*, *Board snapshots*, *Close case*). The title opens the Case file panel, which is where the case is edited (§5.18); there is no edit page. Watches live on the rail; the save state is a small mark at the rail's foot.
 - **Right rail (44 px):** one icon per side panel — Details, Hypotheses, Add evidence | Evidence, Leads *with pending count*, Watches *with new matches*, Timeline, Case file, Snapshots — and at the bottom the save state (saved ✓ / saving / failed) and a toggle that folds the panel away or brings back the last one. The open panel's icon is filled; clicking it again closes the panel.
 - **Clicks:** a single click selects; if Details or a thread is already open in the side panel, it follows the click. A **double click opens** what the node is about there: details for an asset, a finding or a neighbour, the thread for a hypothesis card or a comment pin. The mouse wheel zooms (Space + drag or the middle button pans); with the Select tool a drag on the canvas draws a selection box, with the Hand tool every drag pans and nothing is picked up.
 - **Side panel:** docked between the canvas and the rail, resizable by its edge (min 300 px, max 70 %), width remembered per viewer. Its header has the title, a back arrow in a single hypothesis (to the list), and a close button. `Esc` closes it once the canvas has nothing left to clear (selection, tool, path).
@@ -340,7 +340,7 @@ State is kept per user in `localStorage` (try/catch). It is **not** persisted on
 - Every write goes through `POST /cases/:id/board/ops`. The server then emits `case-board:changed` to the room `ns:<schema>:case:<caseId>`.
 - Other open clients refetch the board and merge it, keeping their own unflushed local ops on top. A toast reads "MK moved 3 items · added a note" (from the op summary).
 - **Presence-lite:** the gateway keeps a list of the actor names subscribed to the room, and the top bar shows their avatars ("Also here: MK").
-- **Identity (interim):** the app has no user model. Until auth lands, the web asks once for a *display name* (stored in `localStorage`) and sends it as the `X-Actor-Name` header. The API reads it with an `@ActorName()` decorator into `actor` / `createdBy` / `author`. See Open question Q1.
+- **Identity (interim):** the app has no user model. Until auth lands, the web asks once for a *display name* (stored in `localStorage`) and sends it as the `X-Actor-Name` header. The API reads it with an `@ActorName()` decorator into `actor` / `createdBy` / `author`. See Open question Q1. **2026-09-28:** the "Your name on this board" control is hidden (`SELF_NAME_ENABLED = false` in `ui/presence.tsx`) until governance lands; presence still shows the others, and a name already stored is still sent.
 - **Conflicts:** position/size/z use last write wins per item. Note text and link labels carry `expectedUpdatedAt`, and a stale edit is rejected per op. The client shows "Changed by MK meanwhile. Your text was copied to the clipboard" and reloads that item.
 
 ### 5.13 Undo / redo
@@ -377,6 +377,43 @@ State is kept per user in `localStorage` (try/catch). It is **not** persisted on
 
 - A new finding on an asset that is already on the board appears **inside that bubble** as a `NEW` row. The tally shows "⟲ n new".
 - A new asset is created as an unplaced item. The client **auto-places** it in an *Incoming* column to the right of the board's bounding box, with a transient "New from ⟨watch⟩" marker (not persisted), until the user moves it.
+
+### 5.17 Leads: what the case may be missing (2026-09-27)
+
+**Decision:** one review inbox, with the canvas staying spatial. The Leads panel is the case's single list of suggestions, each with its reason and what it hangs off. Suggested neighbours on the canvas (§5.10) stay ambient context: no decision, nothing remembered. The same document may be both; accepting either settles the other.
+
+- **Sources** (`CaseLeadsService.generate`), each with a quota of 10 per refresh and a cap of 60 waiting leads per case:
+  - *Look-alike* (`DUPLICATE`, new): an **asset lead** (`findingId` null, unique per case and asset through a partial index) for documents the duplicates engine pairs with evidence (`identical_content`, `likely_duplicate`). Duplicate review's verdicts rule: REJECTED/SPLIT pairs are never suggested, CONFIRMED ones (any relation) come first, and accepting one stamps the verdict's `caseId` (*Used in*).
+  - *Watch answer* (`INQUIRY`): live matches of linked watches with importance ≥ 0.85.
+  - *Similar* (`SEMANTIC_NEIGHBOR`): neighbours of the 6 newest and 6 most important findings of the case, ≤ 3 per seed; `details.sameValue` when it is the seed's very value.
+  - *Autopilot* and *Bookmarked* (`MANUAL`) as before.
+- **What it hangs off:** `viaFindingId` / `viaAssetId` / `viaInquiryId`. The panel's *why* line, *Show on board* (flies to the via item) and placement of an accepted lead (right of the via item) read them.
+- **Automatic:** `CaseLeadsScheduler` queues `case-leads.refresh` (pg-boss, per-case singleton, 30 s slots, 15 s delay) from `CaseActivityService` on evidence/watch/filter activity, from the matching worker on new answers of a linked watch, and on board read (at most every 10 min). `CaseLeadsWorker` runs it. Automatic refreshes write one coalesced `LEADS_GENERATED` timeline entry, never one per lead.
+- **Settling:** each refresh first accepts, as `case-leads`, the leads whose subject joined the case another way, and deletes unreviewed leads whose subject is gone, no longer open (generated kinds only) or filtered out (except bookmarks). `list()` marks such leads `state: IN_CASE | GONE` until then.
+- **On the board:** dropping a lead card on the canvas accepts it where it lands (`onDropLead` → `useCaseLeads.accept`, placement hint). Accepting from the list places it beside its via item and flies there once placed. Either way the lead leaves the list optimistically. Leads reload with the board's 60 s poll, because worker-side changes don't reach the socket.
+- **Accepting runs the case's rules:** a finding accepted from a lead is an arrival for escalation rules (`escalateArrivals`, trigger `ATTACHED`), like any attach.
+
+
+### 5.18 Panels in depth, deep links and the address (2026-09-28)
+
+- **Details (asset):** four tabs — *In case* (its findings in the case), *Other findings* (the rest, searched and paged server-side, multi-select *Attach*), *Duplicates* (the fingerprints graph) and *Lineage* (the lineage view). **Details (finding):** *Overview*, *Similar* (similar-findings graph or list), *Where else* (value occurrences), and *Finding page*. The graphs are the asset/finding pages' own components, embedded; each node carries an *In case* mark and a right-click **case target** menu.
+- **Case target** (`components/case-target/`): one abstraction for "add this to a case". Inside a board, `CaseTargetProvider` makes it *this* case (places evidence through the board's ops, flies to it); anywhere else the same menu opens `AddToCaseDialog` (pick an open case via `CaseSearchList`, or start one).
+- **Edge details:** the Details panel also takes `{ edgeId }` (`lnk:` drawn link, `sys:` platform relation, `st:` stance). A double click opens it; a single click follows while Details is open; every edge menu has *Details* (a platform relation's is *Why is this here?*). A drawn link is edited in place (kind, label, certainty, confidence, note — each an `updateLink` op with `expectedUpdatedAt`). A platform relation explains itself: its kind in words, how it was found (`method`), confidence, and per kind a duplicate pair breakdown (match score, shared values → Duplicate review) or the lineage columns (→ lineage view).
+- **Leads:** a dropped or accepted lead leaves the list at once and stays gone — reads are sequenced (`readSeq`) and local *settled* overrides win over a slower, older list response. *Reviewed* leads not in the case can be dragged or added again; those in the case say so.
+- **Watches:** a grid of small watch cards (auto-add, filter and escalation counts as marks); opening one keeps its card marked and shows it large above its answers table. The last card, *Link a watch*, re-reads the inquiry list every time its menu opens and offers *Create a new watch* (a new tab at `/investigations/inquiries/new?caseId=…&returnTo=…`; once created it is linked and the tab lands on the board at that watch). Inquiry pages (view, create, edit) manage the cases an inquiry drives (`InquiryCasesPanel`); the inquiries table lists case names. Editors honour `?returnTo=` (`lib/return-to.ts`, same-app paths only) before history.
+- **Case file:** title, description, severity, status and the clean-up switches are edited here and saved as they change (`useAutosave`, debounced, with a save mark). Turning a clean-up rule on asks first, with its preview. Edits write a **coalesced** `CASE_UPDATED` per actor (a new row after 15 minutes without edits; `recordEdit`), with before/after per field. `/investigations/:id/edit` redirects to `?panel=case-file`.
+- **Filter clean-up:** adding an *exclude* filter can also take out assets left without findings in the case (`removeEmptiedAssets`, on by default in the dialog, counted and sampled in the preview). They leave as `EVIDENCE_AUTO_REMOVED` with reason `FILTER_EMPTIED`.
+- **Timeline deep links:** `GET /cases/:id/timeline` takes `types`, `inquiryId` and `until` (keyset pages up to an anchor entry, ≤ 1000 rows) so a link can open the feed at an entry however old. Warnings across the board (gone evidence, watch answers gone, clean-up removals, escalations) link to their entry (*What changed*); watch history (`MATCHES_LANDED` / `MATCHES_RETIRED`) is blended in as `watch:<id>` entries. Every entry can copy its own link.
+- **The address:** `?panel=` (`details`, `hypotheses`, `thread`, `add-evidence`, `evidence`, `leads`, `watches`, `timeline`, `case-file`, `snapshots`) plus what the panel shows (`item`, `finding`, `edge`, `suggested`, `tab`, `thread`, `watch`, `view`, `entry`). `store/url-state.ts` parses and serializes (pure, tested); `useBoardUrlState` restores it once the board has loaded and writes it back with `history.replaceState` (no history entry per click; `popstate` re-applies). Viewport, view choices and panel width stay per-viewer in `localStorage`.
+
+### 5.19 Case cards and the board sketch (2026-09-29)
+
+The investigations page lists cases as cards (`components/cases/`): the board drawn small on top, then priority and status, title and summary (the conclusion once closed), a strip of counts (assets, findings, hypotheses, watches), new watch matches and escalations, assignee and freshness. The three cases this browser opened last get a row of their own above the rest (`lib/recently-opened.ts`, `localStorage` per workspace: there is no user model to key a server-side list on); a search or filter shows one list of matches. The workspace directory has the same row of workspaces (recorded by `NamespaceProvider` on every entry), but there they also stay in their categories, badge and all: the directory is read by category, and a workspace missing from its own looks lost.
+
+- **Shapes, not a screenshot.** The card's picture is a `BoardSketch` (`packages/schemas/src/case-board.ts`): positions and sizes of what the canvas shows (assets, findings, hypothesis cards, notes, frames, comment pins, and the edges between them), integers in their own box, capped at 250 shapes and 400 edges (~2–20 KB). A DOM capture would have to render every off-screen node and block the page while it copies styles; an image could not follow the viewer's light or dark theme. The card draws the sketch on a `<canvas>` in the board's tokens (`components/cases/board-sketch.ts`).
+- **Built by the board, lazily.** `store/sketch.ts` projects the domain with a canonical view (no neighbours or traces, every relation kind, default rows) and default sizes only, so the same board always sketches the same. `useBoardThumbnail` sketches 4 s after the last change (every change restarts the wait), at most every 30 s while editing, and once more on leaving if one is owed (`keepalive`). It sends only when the content hash (`signature`) differs from the stored one, which the board read reports (`board.thumbnailSignature`), so opening a board that an agent changed refreshes its card, and opening an unchanged one sends nothing.
+- **Stored apart from the board.** `case_board_thumbnails` (one row per board) keeps the JSON out of every read and version bump of `case_boards`. A sketch drawn at an older board version never replaces a newer one; an identical one is not written. It is a cache: not part of the board's version, timeline, snapshots or namespace export. The case list adds it (and the finding and new-match counts) only when asked with `withCardDetails`, so MCP and the dashboard do not carry it.
+- **Until then:** a board never opened has no sketch; its card says so and shows the evidence count as outlines. A demo instance refuses the write, so its cards stay that way.
 
 ---
 
@@ -555,6 +592,7 @@ enum CaseActivityType {
 | `GET` | `/cases/:id/board/snapshots/:snapshotId` | Read-only snapshot payload |
 | `POST` | `/cases/:id/board/snapshots` | Manual snapshot |
 | `POST` | `/cases/:id/board/neighbours` | `{ itemId }` → suggested ghosts for one bubble (wraps `POST /graph/expand`) |
+| `PUT` | `/cases/:id/board/thumbnail` | `{ sketch, signature, version }`: the board drawn small for its case card (§5.19) |
 
 The existing `GET /cases/:id/graph` and `/graph/*` endpoints stay unchanged: Discovery, MCP and autopilot use them.
 
@@ -872,14 +910,36 @@ export class CaseBoardGateway implements OnGatewayDisconnect {
 
 ### 7.6 MCP (the UI assistant = MCP 1:1)
 
-Add two tools in `mcp-server.factory.ts`. The catalog picks them up automatically through `McpToolsCatalogService`.
+The board has its own MCP capability group, **`case_board`** ("Case Board" in
+the token dialog, `apps/api/src/mcp-catalog.ts`); the case domain tools stay in
+**`cases`**. Migration `20260928120000_mcp_case_board_tool_group` gave every
+token scoped to `cases` the new group too, since the two board tools used to
+live there. Every tool reaches the UI assistant through the same catalog, and
+its writes wait for *Confirm* (2026-09-28):
 
-- `get_case_board`: `{ caseId }` → a compact board: items with kind/ref/position/frame, links, stance rows, thread summaries. **No** full graph payload (point to `get_case_graph` for that).
-- `apply_case_board_ops`: `{ caseId, ops: BoardOp[] }` (the same zod schema; mutating, so the UI assistant gates it behind *Confirm*). This lets agents post notes ("Autopilot: 3 new matches since Tuesday"), place hypotheses and draw suspected links. Agent-created items get `createdBy = 'ai-autopilot'` and render with the `AiActorBadge`.
+| Tool | Scope | Kind | Does |
+|---|---|---|---|
+| `get_case_board` | case_board | read | Labelled summary by default (`board-summary.ts`): items joined with their asset, findings and finding state, thread, note text or frame title; links, stances, platform relations, threads off the board. `view: "full"` = raw payload; `snapshotId` reads a snapshot |
+| `apply_case_board_ops` | case_board | destructive | The op endpoint (§7.3); `opId` optional (defaults `op-n`), every op still strict |
+| `place_case_board_items` | case_board | write | Server-side auto-place (§8.9) of unplaced items |
+| `tidy_case_board` | case_board | destructive | Tidy up, server-side; `dryRun`; moves report `from` |
+| `frame_case_board_items` | case_board | write | New frame around items (`compact` / `keep`) or into an existing frame (grows) |
+| `trace_case_connections` | case_board | read | `POST …/board/trace`, seeds default to the case's assets, nodes marked `inCase` + `itemId` |
+| `list_case_board_snapshots` / `take_case_board_snapshot` | case_board | read / write | §7.1 snapshots |
+| `preview_case_cleanup`, `preview_case_finding_filters` | cases | read | Previews the assistant can run in-loop before proposing the write |
+| `update_case_finding_filter`, `set_case_inquiry_auto_pull`, `unlink_case_inquiry`, `update_case_thread` | cases | write | The case file, watches and hypotheses panels |
 
-Update the case section of the MCP instructions (around line 260 of `mcp-server.factory.ts`) so they describe the board.
+Server-side layout: the arrange tools compute plans from one board read
+(`apps/api/src/case-board/board-layout.ts`) and apply them as ordinary
+`item.update` / `item.create` ops through `CaseBoardService.applyOps`, so
+versions, the timeline and socket pushes behave as for a person. Sizes, the
+free-spot search, auto-place and a layered layout (a dependency-free stand-in
+for ELK) live in `@workspace/schemas/case-board`, shared with the web board.
 
----
+Not exposed on purpose: deleting a case or a hypothesis thread with its log,
+*Delete everywhere* on a global relationship, Export PNG. Agents' writes carry
+the actor `mcp`. User docs: `apps/docs/app/investigations/cases/mcp/`; tool
+catalog generated into the MCP Server settings page.
 
 ## 8. Frontend architecture
 
@@ -1551,6 +1611,7 @@ The dashboard layout needs a **full-bleed variant** for this route: no page padd
 > - **Header, clicks, search:** the top bar is a ledger that spotlights (§5.1); a double click opens the side panel; ⌘K is scoped (All / Board / Corpus / Actions, Tab cycles) and peeks at each kind instead of listing the whole board.
 > - **Connections:** *Find path* became *Show connections* (§5.11), and neighbours reach any number of hops (§5.10), over `POST …/board/trace`. Hypotheses use the flask icon everywhere.
 > - **Persistence:** the queue starts and stops with the board's mount (`connect()`), not with the store, because StrictMode and Fast Refresh remount the same store. A 4xx batch is dropped and the board refetches, rather than retrying forever.
+> - **Leads (2026-09-27):** the Leads panel became the case's inbox of suggestions, refreshed by the case itself, with look-alike documents from the duplicates engine as asset leads; a dropped lead is accepted where it lands. See §5.17. Migration `20260927140000_case_leads_auto_refresh`; tests `case-leads.service.spec.ts`, `cases/case-leads.scheduler.spec.ts`, `test/case-leads.e2e-spec.ts`, web `store/leads.spec.ts`; user docs `investigations/cases/leads`.
 
 Sizes: **S** ≤ 2 dev-days, **M** 3–5, **L** 6–10. Each phase ships behind the `caseBoard` workspace feature switch and must pass `bun lint` (API lint is a CI gate: `require-await` and similar are errors), `bun check-types`, and its own tests.
 

@@ -119,6 +119,7 @@ All URIs are relative to *http://localhost*
 *CaseBoardApi* | [**caseBoardControllerGetSnapshot**](docs/CaseBoardApi.md#caseboardcontrollergetsnapshot) | **GET** /cases/{id}/board/snapshots/{snapshotId} | One board snapshot, exactly as it was captured
 *CaseBoardApi* | [**caseBoardControllerListSnapshots**](docs/CaseBoardApi.md#caseboardcontrollerlistsnapshots) | **GET** /cases/{id}/board/snapshots | Board snapshots, newest first
 *CaseBoardApi* | [**caseBoardControllerNeighbours**](docs/CaseBoardApi.md#caseboardcontrollerneighbours) | **POST** /cases/{id}/board/neighbours | Live depth-1 neighbourhood of one evidence bubble (drawn as suggested items)
+*CaseBoardApi* | [**caseBoardControllerSaveThumbnail**](docs/CaseBoardApi.md#caseboardcontrollersavethumbnail) | **PUT** /cases/{id}/board/thumbnail | Store the board drawn small for its case card (a sketch the client builds from its canvas)
 *CaseBoardApi* | [**caseBoardControllerTakeSnapshot**](docs/CaseBoardApi.md#caseboardcontrollertakesnapshot) | **POST** /cases/{id}/board/snapshots | Capture the board as it is now
 *CaseBoardApi* | [**caseBoardControllerTrace**](docs/CaseBoardApi.md#caseboardcontrollertrace) | **POST** /cases/{id}/board/trace | Trace assets\&#39; connections: upstream, downstream and sideways through lineage, links, duplicates and similarity
 *CasesApi* | [**caseCleanupControllerAddFilters**](docs/CasesApi.md#casecleanupcontrolleraddfilters) | **POST** /cases/{id}/finding-filters | Add finding filters (case-wide or for one watch); matching findings leave the case now and are not pulled again
@@ -133,10 +134,11 @@ All URIs are relative to *http://localhost*
 *CasesApi* | [**caseEventsControllerList**](docs/CasesApi.md#caseeventscontrollerlist) | **GET** /cases/{caseId}/events | List the case chronology (real-world events, ordered by date)
 *CasesApi* | [**caseEventsControllerRemove**](docs/CasesApi.md#caseeventscontrollerremove) | **DELETE** /cases/{caseId}/events/{eventId} | Remove a chronology event
 *CasesApi* | [**caseEventsControllerUpdate**](docs/CasesApi.md#caseeventscontrollerupdate) | **PATCH** /cases/{caseId}/events/{eventId} | Update (and implicitly verify) a chronology event
-*CasesApi* | [**caseLeadsControllerGenerate**](docs/CasesApi.md#caseleadscontrollergenerate) | **POST** /cases/{caseId}/leads/generate | Generate leads from case evidence (semantic neighbours + linked-inquiry matches)
+*CasesApi* | [**caseLeadsControllerGenerate**](docs/CasesApi.md#caseleadscontrollergenerate) | **POST** /cases/{caseId}/leads/generate | Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change
 *CasesApi* | [**caseLeadsControllerList**](docs/CasesApi.md#caseleadscontrollerlist) | **GET** /cases/{caseId}/leads | List leads (exploration candidates) for a case
 *CasesApi* | [**caseLeadsControllerPropose**](docs/CasesApi.md#caseleadscontrollerpropose) | **POST** /cases/{caseId}/leads | Propose a finding as a lead for this case
 *CasesApi* | [**caseLeadsControllerReview**](docs/CasesApi.md#caseleadscontrollerreview) | **POST** /cases/{caseId}/leads/{leadId}/review | Accept a lead into evidence, or dismiss it
+*CasesApi* | [**caseLeadsControllerReviewMany**](docs/CasesApi.md#caseleadscontrollerreviewmany) | **POST** /cases/{caseId}/leads/review | Accept or dismiss several leads with one decision
 *CasesApi* | [**caseTimelineControllerGetTimeline**](docs/CasesApi.md#casetimelinecontrollergettimeline) | **GET** /cases/{caseId}/timeline | Paginated unified case activity feed (newest first)
 *CasesApi* | [**casesControllerAddEvidence**](docs/CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence
 *CasesApi* | [**casesControllerAddFinding**](docs/CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of evidence
@@ -439,6 +441,7 @@ All URIs are relative to *http://localhost*
 - [BoardNeighboursDto](docs/BoardNeighboursDto.md)
 - [BoardSupportDto](docs/BoardSupportDto.md)
 - [BoardThreadSummaryDto](docs/BoardThreadSummaryDto.md)
+- [BoardThumbnailStateDto](docs/BoardThumbnailStateDto.md)
 - [BoardTraceDirection](docs/BoardTraceDirection.md)
 - [BoardTraceEdgeDto](docs/BoardTraceEdgeDto.md)
 - [BoardTraceKind](docs/BoardTraceKind.md)
@@ -499,6 +502,7 @@ All URIs are relative to *http://localhost*
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
 - [CaseResponseDto](docs/CaseResponseDto.md)
 - [CaseThreadKind](docs/CaseThreadKind.md)
+- [CaseThumbnailDto](docs/CaseThumbnailDto.md)
 - [CaseTimelineResponseDto](docs/CaseTimelineResponseDto.md)
 - [CaseworkCaseDto](docs/CaseworkCaseDto.md)
 - [CaseworkCaseStatusBreakdownDto](docs/CaseworkCaseStatusBreakdownDto.md)
@@ -681,6 +685,7 @@ All URIs are relative to *http://localhost*
 - [PurgeQueuedJobsResponseDto](docs/PurgeQueuedJobsResponseDto.md)
 - [PurgeSourceAssetsResponseDto](docs/PurgeSourceAssetsResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
+- [PutBoardThumbnailDto](docs/PutBoardThumbnailDto.md)
 - [QuickSearchAssetDto](docs/QuickSearchAssetDto.md)
 - [QuickSearchFindingDto](docs/QuickSearchFindingDto.md)
 - [QuickSearchRequestDto](docs/QuickSearchRequestDto.md)
@@ -706,6 +711,8 @@ All URIs are relative to *http://localhost*
 - [RetireOutOfScopeFindingsDto](docs/RetireOutOfScopeFindingsDto.md)
 - [RevertResultDto](docs/RevertResultDto.md)
 - [ReviewCaseLeadDto](docs/ReviewCaseLeadDto.md)
+- [ReviewCaseLeadsDto](docs/ReviewCaseLeadsDto.md)
+- [ReviewCaseLeadsResponseDto](docs/ReviewCaseLeadsResponseDto.md)
 - [ReviewClusterRowDto](docs/ReviewClusterRowDto.md)
 - [ReviewClustersResponseDto](docs/ReviewClustersResponseDto.md)
 - [ReviewDecisionRowDto](docs/ReviewDecisionRowDto.md)

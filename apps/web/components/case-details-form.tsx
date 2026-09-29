@@ -38,19 +38,21 @@ export const EMPTY_CASE_DETAILS: CaseDetailsValues = {
 /**
  * The fields that describe a case, independent of how it was started.
  *
- * Shared by the creation stepper and the edit page so the two cannot drift —
- * before this, a case could only ever be described at the moment it was opened,
- * and there was no edit route at all.
+ * Shared by the creation stepper and the board's Case file panel (where it
+ * saves as you type) so the two cannot drift.
  */
 export function CaseDetailsForm({
   values,
   onChange,
   idPrefix = "case",
+  disabled = false,
 }: {
   values: CaseDetailsValues;
   onChange: (next: CaseDetailsValues) => void;
   /** Keeps label/input ids unique when two of these share a page. */
   idPrefix?: string;
+  /** Shown, not editable (a closed case). */
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const set = <K extends keyof CaseDetailsValues>(
@@ -70,6 +72,7 @@ export function CaseDetailsForm({
           onChange={(e) => set("title", e.target.value)}
           placeholder={t("investigations.newCase.titlePlaceholder")}
           maxLength={300}
+          disabled={disabled}
         />
       </div>
 
@@ -83,6 +86,7 @@ export function CaseDetailsForm({
           onChange={(e) => set("description", e.target.value)}
           placeholder={t("investigations.newCase.descriptionPlaceholder")}
           rows={4}
+          disabled={disabled}
         />
       </div>
 
@@ -92,6 +96,7 @@ export function CaseDetailsForm({
           <Select
             value={values.severity}
             onValueChange={(v) => set("severity", v)}
+            disabled={disabled}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -115,6 +120,7 @@ export function CaseDetailsForm({
             value={values.assignee}
             onChange={(e) => set("assignee", e.target.value)}
             placeholder={t("investigations.newCase.assigneePlaceholder")}
+            disabled={disabled}
           />
         </div>
       </div>

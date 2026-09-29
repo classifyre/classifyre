@@ -4998,6 +4998,39 @@
             }
           },
           {
+            "name": "ids",
+            "required": false,
+            "in": "query",
+            "description": "Only these cases (at most 100)",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "excludeIds",
+            "required": false,
+            "in": "query",
+            "description": "Leave these cases out (at most 100), e.g. the ones a page already shows above the list",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "withCardDetails",
+            "required": false,
+            "in": "query",
+            "description": "Add what a case card shows: finding count, new watch matches and the board's thumbnail sketch",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "skip",
             "required": false,
             "in": "query",
@@ -5812,6 +5845,47 @@
           }
         },
         "summary": "Trace assets' connections: upstream, downstream and sideways through lineage, links, duplicates and similarity",
+        "tags": [
+          "case-board"
+        ]
+      }
+    },
+    "/cases/{id}/board/thumbnail": {
+      "put": {
+        "operationId": "CaseBoardController_saveThumbnail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutBoardThumbnailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardThumbnailStateDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Store the board drawn small for its case card (a sketch the client builds from its canvas)",
         "tags": [
           "case-board"
         ]
@@ -6657,6 +6731,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "types",
+            "required": false,
+            "in": "query",
+            "description": "Only these activity types (comma-separated), e.g. MATCHES_LANDED,MATCHES_RETIRED",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6748,6 +6831,7 @@
             "name": "cursor",
             "required": false,
             "in": "query",
+            "description": "The id of the last entry of the previous page",
             "schema": {
               "type": "string"
             }
@@ -6756,6 +6840,33 @@
             "name": "limit",
             "required": false,
             "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "types",
+            "required": false,
+            "in": "query",
+            "description": "Only these activity types (comma-separated), e.g. FINDINGS_ESCALATED,FINDINGS_AUTO_REMOVED",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inquiryId",
+            "required": false,
+            "in": "query",
+            "description": "Only entries about this linked watch (inquiry)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": false,
+            "in": "query",
+            "description": "An entry id the page must reach: the page runs from the newest entry down to and including it (at most 1000 entries)",
             "schema": {
               "type": "string"
             }
@@ -7984,7 +8095,48 @@
             }
           }
         },
-        "summary": "Generate leads from case evidence (semantic neighbours + linked-inquiry matches)",
+        "summary": "Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{caseId}/leads/review": {
+      "post": {
+        "operationId": "CaseLeadsController_reviewMany",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCaseLeadsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewCaseLeadsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Accept or dismiss several leads with one decision",
         "tags": [
           "cases"
         ]
@@ -19442,6 +19594,24 @@
           "title"
         ]
       },
+      "CaseThumbnailDto": {
+        "type": "object",
+        "properties": {
+          "sketch": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "BoardSketch (packages/schemas/src/case-board.ts): shapes with integer coordinates in their own box"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sketch",
+          "updatedAt"
+        ]
+      },
       "EvidenceEntityDto": {
         "type": "object",
         "properties": {
@@ -19770,6 +19940,24 @@
             "type": "string",
             "nullable": true,
             "description": "When an escalation rule last marked a finding of the case"
+          },
+          "findingCount": {
+            "type": "number",
+            "description": "Findings attached to the case (list with withCardDetails)"
+          },
+          "newMatchCount": {
+            "type": "number",
+            "description": "New matches waiting across the linked inquiry watches (list with withCardDetails)"
+          },
+          "thumbnail": {
+            "nullable": true,
+            "description": "The board drawn small; null until the board has been opened once (list with withCardDetails)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CaseThumbnailDto"
+              }
+            ]
           },
           "createdAt": {
             "format": "date-time",
@@ -20346,6 +20534,11 @@
           "caseStatus": {
             "type": "string",
             "description": "Case status at read time"
+          },
+          "thumbnailSignature": {
+            "type": "string",
+            "nullable": true,
+            "description": "Signature of the stored thumbnail sketch, null before the board's first one. The board sends a new sketch only when its own differs."
           }
         },
         "required": [
@@ -21108,6 +21301,56 @@
           "truncated"
         ]
       },
+      "PutBoardThumbnailDto": {
+        "type": "object",
+        "properties": {
+          "sketch": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The board drawn small (BoardSketch): shapes with integer coordinates in their own box, at most 250 nodes and 400 edges."
+          },
+          "signature": {
+            "type": "string",
+            "description": "Content hash of the sketch, computed by the client",
+            "maxLength": 64
+          },
+          "version": {
+            "type": "number",
+            "description": "The board version the sketch was drawn at. An older one never replaces a newer one."
+          }
+        },
+        "required": [
+          "sketch",
+          "signature",
+          "version"
+        ]
+      },
+      "BoardThumbnailStateDto": {
+        "type": "object",
+        "properties": {
+          "signature": {
+            "type": "string"
+          },
+          "version": {
+            "type": "number",
+            "description": "Board version the stored sketch was drawn at"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "written": {
+            "type": "boolean",
+            "description": "False when the stored sketch was kept: the same one, or drawn at a later version"
+          }
+        },
+        "required": [
+          "signature",
+          "version",
+          "updatedAt",
+          "written"
+        ]
+      },
       "CaseBoardSnapshotSummaryDto": {
         "type": "object",
         "properties": {
@@ -21203,8 +21446,10 @@
               "FINDING_GONE",
               "FINDING_RESOLVED",
               "FILTER",
-              "ASSET_GONE"
-            ]
+              "ASSET_GONE",
+              "FILTER_EMPTIED"
+            ],
+            "description": "FILTER_EMPTIED: an asset a filter left without any finding in the case"
           },
           "state": {
             "type": "string",
@@ -21398,13 +21643,26 @@
             "items": {
               "$ref": "#/components/schemas/CaseCleanupItemDto"
             }
+          },
+          "emptiedAssets": {
+            "type": "number",
+            "description": "Filters only: assets these rules would leave without a finding in the case"
+          },
+          "emptiedSample": {
+            "description": "Names of a few of those assets",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "matched",
           "perRule",
           "problems",
-          "sample"
+          "sample",
+          "emptiedAssets",
+          "emptiedSample"
         ]
       },
       "AddCaseFindingFiltersDto": {
@@ -21429,6 +21687,11 @@
             "items": {
               "$ref": "#/components/schemas/CaseFindingFilterRuleDto"
             }
+          },
+          "removeEmptiedAssets": {
+            "type": "boolean",
+            "default": false,
+            "description": "Filters only: also take out of the case every asset the filter leaves without a finding in it. An asset that had no finding in the case to begin with is left alone."
           },
           "clientId": {
             "type": "string",
@@ -21455,12 +21718,17 @@
           "escalated": {
             "type": "number",
             "description": "Findings already in the case the change marked escalated (escalations)"
+          },
+          "assetsRemoved": {
+            "type": "number",
+            "description": "Assets taken out because the filter left them without a finding (removeEmptiedAssets)"
           }
         },
         "required": [
           "filters",
           "detached",
-          "escalated"
+          "escalated",
+          "assetsRemoved"
         ]
       },
       "UpdateCaseFindingFilterDto": {
@@ -21472,6 +21740,11 @@
           "description": {
             "type": "string",
             "nullable": true
+          },
+          "removeEmptiedAssets": {
+            "type": "boolean",
+            "default": false,
+            "description": "Filters only: also take out of the case every asset the filter leaves without a finding in it. An asset that had no finding in the case to begin with is left alone."
           },
           "clientId": {
             "type": "string"
@@ -22515,7 +22788,8 @@
               "EVIDENCE_AUTO_REMOVED",
               "INQUIRY_SETTINGS_UPDATED",
               "FINDINGS_ESCALATED",
-              "ESCALATION_CLEARED"
+              "ESCALATION_CLEARED",
+              "LEADS_GENERATED"
             ]
           },
           "actor": {
@@ -24542,11 +24816,30 @@
             "type": "string"
           },
           "findingId": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "The finding this lead proposes; null for an asset lead (a look-alike document)"
           },
           "assetId": {
             "type": "string",
             "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FINDING",
+              "ASSET"
+            ],
+            "description": "FINDING: accepting attaches the finding. ASSET: accepting adds the document; its findings wait around it on the board"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_CASE",
+              "GONE"
+            ],
+            "description": "For a PROPOSED lead: OPEN waits for review; IN_CASE joined the case another way; GONE lost its finding or asset. The next refresh settles the last two"
           },
           "origin": {
             "type": "string",
@@ -24554,7 +24847,8 @@
               "SEMANTIC_NEIGHBOR",
               "INQUIRY",
               "AUTOPILOT",
-              "MANUAL"
+              "MANUAL",
+              "DUPLICATE"
             ]
           },
           "status": {
@@ -24581,7 +24875,73 @@
             "type": "number",
             "nullable": true,
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "description": "Semantic similarity (SEMANTIC_NEIGHBOR) or the pair match weight (DUPLICATE)"
+          },
+          "viaFindingId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The evidence finding this lead resembles"
+          },
+          "viaAssetId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The evidence asset this lead hangs off (the duplicated document, or the resembled finding's asset)"
+          },
+          "viaInquiryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The watch (inquiry) this lead answers"
+          },
+          "viaLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "What the lead hangs off, in words: the resembled finding, the watch title or the duplicated document"
+          },
+          "viaAssetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "details": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Origin-specific facts: sameValue, isNew, relation (identical_content | likely_duplicate | confirmed), verdict, sharedLabels"
+          },
+          "findingType": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "string",
+            "nullable": true,
+            "description": "The matched value, shortened"
+          },
+          "severity": {
+            "type": "string",
+            "nullable": true
+          },
+          "findingStatus": {
+            "type": "string",
+            "nullable": true,
+            "description": "The finding's current status (OPEN, RESOLVED, …)"
+          },
+          "assetName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The document the lead is in, or is"
+          },
+          "assetType": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceName": {
+            "type": "string",
+            "nullable": true
           },
           "proposedBy": {
             "type": "string"
@@ -24603,7 +24963,6 @@
         "required": [
           "id",
           "caseId",
-          "findingId",
           "origin",
           "status",
           "rationale",
@@ -24636,15 +24995,79 @@
         "type": "object",
         "properties": {
           "proposed": {
-            "type": "number"
+            "type": "number",
+            "description": "New leads written by this refresh"
           },
           "considered": {
-            "type": "number"
+            "type": "number",
+            "description": "Candidates found before quotas and room"
+          },
+          "settled": {
+            "type": "number",
+            "description": "Waiting leads the case settled: already in it another way, gone, or filtered out"
+          },
+          "byOrigin": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "New leads per origin"
+          },
+          "full": {
+            "type": "boolean",
+            "description": "The case already holds as many waiting leads as it may; review some first"
           }
         },
         "required": [
           "proposed",
           "considered"
+        ]
+      },
+      "ReviewCaseLeadsDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ACCEPT",
+              "DISMISS"
+            ]
+          },
+          "reviewedBy": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the lead was dismissed"
+          },
+          "leadIds": {
+            "description": "Leads to review with the same decision (at most 200)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "action",
+          "leadIds"
+        ]
+      },
+      "ReviewCaseLeadsResponseDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "number",
+            "description": "Leads whose status changed"
+          },
+          "failed": {
+            "type": "number",
+            "description": "Leads that could not be reviewed (gone, or not in this case)"
+          }
+        },
+        "required": [
+          "updated",
+          "failed"
         ]
       },
       "ReviewCaseLeadDto": {

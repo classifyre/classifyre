@@ -23,6 +23,9 @@ import type {
 } from "./graph-explorer/explorer-types";
 import { useDetailLink } from "@/hooks/use-detail-link";
 import { useTranslation } from "@/hooks/use-translation";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@workspace/ui/components/dropdown-menu";
+import { useAddToCase } from "./case-target/case-target";
+import { AddToCaseButton, AddToCaseMenuItem, nodeCandidate, useCaseDecorator } from "./case-target/case-target-menu";
 
 /** Prefix marking the finding the page is about (it anchors the graph). */
 const ANCHOR = "anchor";
@@ -61,6 +64,7 @@ export function SimilarFindingsGraph({
   anchorLabel,
   anchorAssetId,
   anchorAssetName,
+  className = "h-[420px]",
 }: {
   findingId: string;
   items: SimilarFindingDto[];
@@ -68,9 +72,13 @@ export function SimilarFindingsGraph({
   anchorLabel: string;
   anchorAssetId?: string;
   anchorAssetName?: string;
+  /** The graph's height (a fixed one by default). */
+  className?: string;
 }) {
   const { t } = useTranslation();
   const detailLink = useDetailLink();
+  // Inside a case board, adds go to that case; elsewhere the person picks one.
+  const { target: caseTarget, dialog: caseDialog } = useAddToCase();
 
   const { nodes, edges, similarityById } = React.useMemo(() => {
     const nodes: GraphNodeDto[] = [];
@@ -147,7 +155,7 @@ export function SimilarFindingsGraph({
     return { nodes, edges, similarityById };
   }, [findingId, items, anchorLabel, anchorAssetId, anchorAssetName, t]);
 
-  const nodeDecorator = React.useCallback(
+  const heatDecorator = React.useCallback(
     (n: GraphNodeDto): NodeDecoration | null => {
       if (n.type !== "finding") return null;
       if (n.id === findingId) return ANCHOR_DECO;
@@ -157,6 +165,29 @@ export function SimilarFindingsGraph({
       };
     },
     [findingId, similarityById],
+  );
+  const nodeDecorator = useCaseDecorator(caseTarget, heatDecorator) ?? heatDecorator;
+
+  const nodeMenu = React.useCallback(
+    (node: GraphNodeDto, close: () => void) => {
+      const candidate = nodeCandidate(node);
+      if (!candidate) return null;
+      return (
+        <>
+          <AddToCaseMenuItem target={caseTarget} candidates={[candidate]} onDone={close} />
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() =>
+              window.open(detailLink(node.type === "asset" ? `/assets/${node.id}` : `/findings/${node.id}`).href, "_blank", "noopener")
+            }
+          >
+            <ExternalLink className="size-4" />
+            {t(node.type === "asset" ? "graphExplorer.openDocument" : "graphExplorer.openFinding")}
+          </DropdownMenuItem>
+        </>
+      );
+    },
+    [caseTarget, detailLink, t],
   );
 
   const edgeStyle = React.useCallback(
@@ -183,7 +214,7 @@ export function SimilarFindingsGraph({
   }
 
   return (
-    <div className="h-[420px]">
+    <div className={className}>
       <GraphExplorer
         nodes={nodes}
         edges={edges}
@@ -193,6 +224,7 @@ export function SimilarFindingsGraph({
         // them into Louvain meta-nodes would hide the very structure the graph
         // exists to show.
         clustering={{ enabled: false }}
+        nodeMenu={nodeMenu}
         header={
           <>
             <Layers className="h-4 w-4 text-muted-foreground" />
@@ -201,7 +233,6 @@ export function SimilarFindingsGraph({
             </span>
           </>
         }
-        sidebarClassName="w-[260px] shrink-0 space-y-4 overflow-y-auto border-l-2 border-border bg-background p-3"
         sidebar={({ selectedNode }) =>
           selectedNode ? (
             <div className="space-y-3" key={keyOf(selectedNode)}>
@@ -229,6 +260,13 @@ export function SimilarFindingsGraph({
                   <FileText className="h-3 w-3 shrink-0" />
                   {selectedNode.assetName}
                 </p>
+              )}
+              {nodeCandidate(selectedNode) && (
+                <AddToCaseButton
+                  target={caseTarget}
+                  candidate={nodeCandidate(selectedNode)!}
+                  className="h-8 w-full gap-1.5 text-xs"
+                />
               )}
               {selectedNode.id !== findingId && (
                 <Button size="sm" variant="outline" asChild className="w-full">
@@ -270,7 +308,9 @@ export function SimilarFindingsGraph({
             </div>
           )
         }
-      />
+      >
+        {caseDialog}
+      </GraphExplorer>
     </div>
   );
 }

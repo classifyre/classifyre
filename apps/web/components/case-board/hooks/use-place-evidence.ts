@@ -50,17 +50,19 @@ export function usePlaceEvidence(onFlyTo: (nodeId: string) => void) {
   const centre = useVisibleCentre();
   const flyTo = useFlyToEvidence(onFlyTo);
   return React.useCallback(
-    (c: EvidenceCandidate) => {
+    /** `fly: false` places without moving the view (one of several placed at once). */
+    (c: EvidenceCandidate, opts: { fly?: boolean } = {}) => {
+      const fly = opts.fly ?? true;
       const s = store.getState();
       const status = evidenceStatus(s, c);
       const itemId = s.itemByAsset.get(c.assetId);
       if (status === "onBoard" && itemId) {
-        flyTo(itemId, c.kind === "finding" ? c.id : null);
+        if (fly) flyTo(itemId, c.kind === "finding" ? c.id : null);
         return;
       }
       if (status === "attachable" && itemId) {
         s.run(attachFinding(itemId, c.id));
-        flyTo(itemId, c.id);
+        if (fly) flyTo(itemId, c.id);
         return;
       }
       const at = centre();
@@ -72,7 +74,7 @@ export function usePlaceEvidence(onFlyTo: (nodeId: string) => void) {
         sourceType: c.sourceType,
       });
       s.run(cmd);
-      flyTo(cmd.itemId);
+      if (fly) flyTo(cmd.itemId);
     },
     [store, centre, flyTo],
   );
