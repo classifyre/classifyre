@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { CaseActivityType } from '@prisma/client';
 import { CaseThreadsService } from '../case-threads.service';
 import { CaseActivityService } from '../case-activity.service';
 import {
@@ -22,6 +23,7 @@ import {
   UpdateThreadDto,
 } from '../dto/case-thread.dto';
 import { CaseTimelineResponseDto } from '../dto/case-activity.dto';
+import { activityTypes } from '../activity-page';
 
 // ─── Timeline ─────────────────────────────────────────────────────────────────
 
@@ -34,18 +36,47 @@ export class CaseTimelineController {
   @ApiOperation({
     summary: 'Paginated unified case activity feed (newest first)',
   })
-  @ApiQuery({ name: 'cursor', required: false })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    description: 'The id of the last entry of the previous page',
+  })
   @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({
+    name: 'types',
+    required: false,
+    description:
+      'Only these activity types (comma-separated), e.g. FINDINGS_ESCALATED,FINDINGS_AUTO_REMOVED',
+  })
+  @ApiQuery({
+    name: 'inquiryId',
+    required: false,
+    description: 'Only entries about this linked watch (inquiry)',
+  })
+  @ApiQuery({
+    name: 'until',
+    required: false,
+    description:
+      'An entry id the page must reach: the page runs from the newest entry down to and including it (at most 1000 entries)',
+  })
   @ApiResponse({ status: 200, type: CaseTimelineResponseDto })
   async getTimeline(
     @Param('caseId') caseId: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
+    @Query('types') types?: string,
+    @Query('inquiryId') inquiryId?: string,
+    @Query('until') until?: string,
   ): Promise<CaseTimelineResponseDto> {
     return this.activity.getTimeline(
       caseId,
-      cursor,
+      cursor || undefined,
       limit ? Number(limit) : 50,
+      {
+        types: activityTypes(types, CaseActivityType),
+        inquiryId: inquiryId || undefined,
+        until: until || undefined,
+      },
     );
   }
 }

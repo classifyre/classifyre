@@ -16,10 +16,11 @@ All URIs are relative to *http://localhost*
 | [**caseEventsControllerList**](CasesApi.md#caseeventscontrollerlist) | **GET** /cases/{caseId}/events | List the case chronology (real-world events, ordered by date) |
 | [**caseEventsControllerRemove**](CasesApi.md#caseeventscontrollerremove) | **DELETE** /cases/{caseId}/events/{eventId} | Remove a chronology event |
 | [**caseEventsControllerUpdate**](CasesApi.md#caseeventscontrollerupdate) | **PATCH** /cases/{caseId}/events/{eventId} | Update (and implicitly verify) a chronology event |
-| [**caseLeadsControllerGenerate**](CasesApi.md#caseleadscontrollergenerate) | **POST** /cases/{caseId}/leads/generate | Generate leads from case evidence (semantic neighbours + linked-inquiry matches) |
+| [**caseLeadsControllerGenerate**](CasesApi.md#caseleadscontrollergenerate) | **POST** /cases/{caseId}/leads/generate | Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change |
 | [**caseLeadsControllerList**](CasesApi.md#caseleadscontrollerlist) | **GET** /cases/{caseId}/leads | List leads (exploration candidates) for a case |
 | [**caseLeadsControllerPropose**](CasesApi.md#caseleadscontrollerpropose) | **POST** /cases/{caseId}/leads | Propose a finding as a lead for this case |
 | [**caseLeadsControllerReview**](CasesApi.md#caseleadscontrollerreview) | **POST** /cases/{caseId}/leads/{leadId}/review | Accept a lead into evidence, or dismiss it |
+| [**caseLeadsControllerReviewMany**](CasesApi.md#caseleadscontrollerreviewmany) | **POST** /cases/{caseId}/leads/review | Accept or dismiss several leads with one decision |
 | [**caseTimelineControllerGetTimeline**](CasesApi.md#casetimelinecontrollergettimeline) | **GET** /cases/{caseId}/timeline | Paginated unified case activity feed (newest first) |
 | [**casesControllerAddEvidence**](CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence |
 | [**casesControllerAddFinding**](CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of evidence |
@@ -863,7 +864,7 @@ No authorization required
 
 > GenerateCaseLeadsResponseDto caseLeadsControllerGenerate(caseId)
 
-Generate leads from case evidence (semantic neighbours + linked-inquiry matches)
+Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change
 
 ### Example
 
@@ -1131,9 +1132,77 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## caseLeadsControllerReviewMany
+
+> ReviewCaseLeadsResponseDto caseLeadsControllerReviewMany(caseId, reviewCaseLeadsDto)
+
+Accept or dismiss several leads with one decision
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseLeadsControllerReviewManyRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    caseId: caseId_example,
+    // ReviewCaseLeadsDto
+    reviewCaseLeadsDto: ...,
+  } satisfies CaseLeadsControllerReviewManyRequest;
+
+  try {
+    const data = await api.caseLeadsControllerReviewMany(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **caseId** | `string` |  | [Defaults to `undefined`] |
+| **reviewCaseLeadsDto** | [ReviewCaseLeadsDto](ReviewCaseLeadsDto.md) |  | |
+
+### Return type
+
+[**ReviewCaseLeadsResponseDto**](ReviewCaseLeadsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## caseTimelineControllerGetTimeline
 
-> CaseTimelineResponseDto caseTimelineControllerGetTimeline(caseId, cursor, limit)
+> CaseTimelineResponseDto caseTimelineControllerGetTimeline(caseId, cursor, limit, types, inquiryId, until)
 
 Paginated unified case activity feed (newest first)
 
@@ -1153,10 +1222,16 @@ async function example() {
   const body = {
     // string
     caseId: caseId_example,
-    // string (optional)
+    // string | The id of the last entry of the previous page (optional)
     cursor: cursor_example,
     // string (optional)
     limit: limit_example,
+    // string | Only these activity types (comma-separated), e.g. FINDINGS_ESCALATED,FINDINGS_AUTO_REMOVED (optional)
+    types: types_example,
+    // string | Only entries about this linked watch (inquiry) (optional)
+    inquiryId: inquiryId_example,
+    // string | An entry id the page must reach: the page runs from the newest entry down to and including it (at most 1000 entries) (optional)
+    until: until_example,
   } satisfies CaseTimelineControllerGetTimelineRequest;
 
   try {
@@ -1177,8 +1252,11 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **caseId** | `string` |  | [Defaults to `undefined`] |
-| **cursor** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **cursor** | `string` | The id of the last entry of the previous page | [Optional] [Defaults to `undefined`] |
 | **limit** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **types** | `string` | Only these activity types (comma-separated), e.g. FINDINGS_ESCALATED,FINDINGS_AUTO_REMOVED | [Optional] [Defaults to `undefined`] |
+| **inquiryId** | `string` | Only entries about this linked watch (inquiry) | [Optional] [Defaults to `undefined`] |
+| **until** | `string` | An entry id the page must reach: the page runs from the newest entry down to and including it (at most 1000 entries) | [Optional] [Defaults to `undefined`] |
 
 ### Return type
 
@@ -1745,7 +1823,7 @@ No authorization required
 
 ## casesControllerList
 
-> CaseListResponseDto casesControllerList(search, status, severity, escalated, skip, limit)
+> CaseListResponseDto casesControllerList(search, status, severity, escalated, ids, excludeIds, withCardDetails, skip, limit)
 
 List cases
 
@@ -1771,6 +1849,12 @@ async function example() {
     severity: ...,
     // boolean | Only cases holding escalated findings (optional)
     escalated: true,
+    // Array<string> | Only these cases (at most 100) (optional)
+    ids: ...,
+    // Array<string> | Leave these cases out (at most 100), e.g. the ones a page already shows above the list (optional)
+    excludeIds: ...,
+    // boolean | Add what a case card shows: finding count, new watch matches and the board\'s thumbnail sketch (optional)
+    withCardDetails: true,
     // number (optional)
     skip: 8.14,
     // number (optional)
@@ -1798,6 +1882,9 @@ example().catch(console.error);
 | **status** | `OPEN`, `IN_PROGRESS`, `CLOSED`, `ARCHIVED` |  | [Optional] [Enum: OPEN, IN_PROGRESS, CLOSED, ARCHIVED] |
 | **severity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
 | **escalated** | `boolean` | Only cases holding escalated findings | [Optional] [Defaults to `undefined`] |
+| **ids** | `Array<string>` | Only these cases (at most 100) | [Optional] |
+| **excludeIds** | `Array<string>` | Leave these cases out (at most 100), e.g. the ones a page already shows above the list | [Optional] |
+| **withCardDetails** | `boolean` | Add what a case card shows: finding count, new watch matches and the board\&#39;s thumbnail sketch | [Optional] [Defaults to `undefined`] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **limit** | `number` |  | [Optional] [Defaults to `50`] |
 

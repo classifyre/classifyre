@@ -115,6 +115,8 @@ function ToolGroupPicker({
           {groups.map((group) => (
             <label
               key={group.id}
+              // The tools a group turns on, for a hover check before saving.
+              title={group.toolNames.join(", ")}
               className="flex items-start gap-2 rounded-[4px] px-1.5 py-1 hover:bg-background"
             >
               <Checkbox
@@ -132,6 +134,11 @@ function ToolGroupPicker({
               <span className="space-y-0.5">
                 <span className="block text-xs font-medium">
                   {group.title}
+                  <span className="ml-1.5 font-normal text-muted-foreground">
+                    {t("mcp.catalog.toolCount", {
+                      count: group.toolNames.length,
+                    })}
+                  </span>
                 </span>
                 <span className="block text-[11px] leading-snug text-muted-foreground">
                   {group.description}

@@ -1405,6 +1405,9 @@ enum CaseActivityType {
   // Findings an escalation rule marked, and a person clearing the mark.
   FINDINGS_ESCALATED
   ESCALATION_CLEARED
+  // A refresh of the case's leads (automatic or asked for): how many new ones,
+  // of which kinds. Automatic refreshes coalesce into one entry.
+  LEADS_GENERATED
 }
 
 enum EvidenceStance {
@@ -1941,16 +1944,21 @@ model Case {
 
 // ── Case leads (exploration triage) ─────────────────────────────────────────
 // Ranked candidates that MIGHT belong in a case: semantic neighbours of
-// accepted evidence, high-importance inquiry matches, autopilot proposals, or
-// manual bookmarks. A lead is not evidence — accepting one creates the
-// CaseEvidence/CaseFinding through the normal attach flow; dismissing one is
-// remembered so agents stop re-proposing it.
+// accepted evidence, high-importance inquiry matches, look-alike documents from
+// the duplicates engine, autopilot proposals, or manual bookmarks. A lead is not
+// evidence — accepting one creates the CaseEvidence/CaseFinding through the
+// normal attach flow; dismissing one is remembered so agents stop re-proposing
+// it. The case refreshes its own leads (CaseLeadsScheduler) whenever its
+// evidence or watches change.
 
 enum CaseLeadOrigin {
   SEMANTIC_NEIGHBOR
   INQUIRY
   AUTOPILOT
   MANUAL
+  // A document the duplicates engine pairs with evidence: a byte-identical copy
+  // or one sharing most of its weighted values. Always an asset lead.
+  DUPLICATE
 }
 
 enum CaseLeadStatus {
@@ -1962,7 +1970,12 @@ enum CaseLeadStatus {
 model CaseLead {
   id         String         @id @default(uuid())
   caseId     String         @map("case_id")
-  findingId  String         @map("finding_id")
+  // Null for an ASSET lead (a look-alike document): accepting it adds the
+  // asset, whose findings then wait around it on the board. Asset leads are
+  // unique per (case, asset) through a partial index Prisma cannot model:
+  // `case_leads_case_id_asset_id_asset_lead_key`, migration
+  // 20260927140000_case_leads_auto_refresh.
+  findingId  String?        @map("finding_id")
   assetId    String?        @map("asset_id")
   origin     CaseLeadOrigin
   status     CaseLeadStatus @default(PROPOSED)
@@ -1970,7 +1983,18 @@ model CaseLead {
   // Snapshots at proposal time (findings may be reconciled later).
   title      String
   importance Float?
+  // Semantic similarity for SEMANTIC_NEIGHBOR; the pair's match weight for
+  // DUPLICATE.
   similarity Float?
+  // What in the case the lead hangs off: the evidence finding it resembles,
+  // the evidence asset it duplicates (or that finding's asset), the watch that
+  // answered it. "Show on board" and placing it next to its evidence read these.
+  viaFindingId String?      @map("via_finding_id")
+  viaAssetId   String?      @map("via_asset_id")
+  viaInquiryId String?      @map("via_inquiry_id")
+  // Origin-specific facts for the card: the duplicate relation and its review
+  // verdict, the labels a pair shares, whether a value is the same as its seed's.
+  details    Json?          @db.JsonB
   proposedBy String         @map("proposed_by")
   reviewedBy String?        @map("reviewed_by")
   reviewedAt DateTime?      @map("reviewed_at")
@@ -2362,6 +2386,7 @@ model CaseBoard {
   items         CaseBoardItem[]
   links         CaseBoardLink[]
   snapshots     CaseBoardSnapshot[]
+  thumbnail     CaseBoardThumbnail?
 
   @@map("case_boards")
 }
@@ -2457,6 +2482,25 @@ model CaseBoardSnapshot {
 
   @@index([boardId, createdAt(sort: Desc)])
   @@map("case_board_snapshots")
+}
+
+// The board drawn small for its case card (BoardSketch in
+// packages/schemas/src/case-board.ts): shapes, not pixels. Built by the web
+// board from what its canvas shows once an edit settles, so it trails the
+// board by a few seconds and is never a record of it. Its own table keeps the
+// JSON out of every read and version bump of case_boards.
+model CaseBoardThumbnail {
+  boardId   String   @id @map("board_id")
+  sketch    Json     @db.JsonB
+  // board.version it was drawn at: a tab that fell behind cannot replace it
+  version   Int
+  // Content hash from the client, so an unchanged board is not sent again
+  signature String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  board CaseBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@map("case_board_thumbnails")
 }
 
 // ── Investigation autopilot ──────────────────────────────────────────────────

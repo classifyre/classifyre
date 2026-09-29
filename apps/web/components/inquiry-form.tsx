@@ -2,7 +2,7 @@
 
 import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Database, Fingerprint, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -39,6 +39,8 @@ import {
   type StepperNavItem,
 } from "@/components/stepper-nav";
 import { useTranslation } from "@/hooks/use-translation";
+import { useGoBack } from "@/hooks/use-go-back";
+import { InquiryCasesPanel, type CaseRef } from "@/components/inquiry-cases";
 import {
   ALL_SOURCES_VALUE,
   customDetectorValue,
@@ -68,7 +70,7 @@ const parseList = (s: string) =>
     .filter(Boolean);
 const joinList = (items: string[]) => items.join(", ");
 
-const STEP_IDS = ["define", "filters", "preview"] as const;
+const STEP_IDS = ["define", "filters", "preview", "cases"] as const;
 type StepId = (typeof STEP_IDS)[number];
 
 export type InquiryFormProps = {
@@ -101,6 +103,28 @@ export const InquiryForm = React.forwardRef<
   const router = useRouter();
   const { t } = useTranslation();
   const isEdit = mode === "edit";
+  const searchParams = useSearchParams();
+  // Leave the way the person came (a case board passes ?returnTo=), else back.
+  const { goBack, returnTo } = useGoBack(
+    isEdit && inquiryId ? `/investigations/inquiries/${inquiryId}` : "/investigations?tab=inquiries",
+  );
+  // A new watch started from a case (?caseId=) is linked to it once created.
+  const [draftCases, setDraftCases] = React.useState<CaseRef[]>([]);
+  const presetCaseId = !isEdit ? searchParams?.get("caseId") : null;
+  React.useEffect(() => {
+    if (!presetCaseId) return;
+    let cancelled = false;
+    api.cases
+      .casesControllerFindOne({ id: presetCaseId })
+      .then((c) => {
+        if (cancelled) return;
+        setDraftCases((prev) => (prev.some((x) => x.id === c.id) ? prev : [...prev, { id: c.id, title: c.title, status: c.status }]));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [presetCaseId]);
 
   const [title, setTitle] = React.useState(initial?.title ?? "");
   const [description, setDescription] = React.useState(
@@ -148,6 +172,7 @@ export const InquiryForm = React.forwardRef<
     define: React.useRef<HTMLElement>(null),
     filters: React.useRef<HTMLElement>(null),
     preview: React.useRef<HTMLElement>(null),
+    cases: React.useRef<HTMLElement>(null),
   };
 
   const steps: StepperNavItem<StepId>[] = [
@@ -165,6 +190,11 @@ export const InquiryForm = React.forwardRef<
       id: "preview",
       title: t("investigations.inquiryForm.stepPreview"),
       description: t("investigations.inquiryForm.stepPreviewDesc"),
+    },
+    {
+      id: "cases",
+      title: t("investigations.inquiryForm.stepCases"),
+      description: t("investigations.inquiryForm.stepCasesDesc"),
     },
   ];
 
@@ -460,7 +490,8 @@ export const InquiryForm = React.forwardRef<
           },
         });
         toast.success(t("investigations.inquiryForm.updated"));
-        router.push(nsPath(`/investigations/inquiries/${inquiryId}`));
+        // Back to where the edit started (a case board, the watch's page…).
+        goBack();
       } else {
         const created = await api.inquiries.inquiriesControllerCreate({
           createInquiryDto: {
@@ -469,8 +500,28 @@ export const InquiryForm = React.forwardRef<
             ...matchers,
           },
         });
+        // The cases picked for it: one link each, so one refusal (a closed
+        // case) does not undo the others.
+        const failed: string[] = [];
+        for (const c of draftCases) {
+          try {
+            await api.cases.casesControllerLinkInquiries({ id: c.id, linkInquiriesDto: { inquiryIds: [created.id] } });
+          } catch {
+            failed.push(c.title);
+          }
+        }
+        if (failed.length > 0) {
+          toast.error(t("inquiryCases.linkFailed", { titles: failed.join(", ") }));
+        }
         toast.success(t("investigations.inquiryForm.created"));
-        router.push(nsPath(`/investigations/inquiries/${created.id}`));
+        // Started from a case: back to it, with the new watch open.
+        if (presetCaseId && draftCases.some((c) => c.id === presetCaseId) && !failed.length) {
+          router.push(nsPath(`/investigations/${presetCaseId}?panel=watches&watch=${created.id}`));
+        } else if (returnTo) {
+          router.push(returnTo);
+        } else {
+          router.push(nsPath(`/investigations/inquiries/${created.id}`));
+        }
       }
     } catch (err) {
       console.error(err);
@@ -486,11 +537,7 @@ export const InquiryForm = React.forwardRef<
     }
   };
 
-  const back = () => {
-    if (isEdit && inquiryId)
-      router.push(nsPath(`/investigations/inquiries/${inquiryId}`));
-    else router.push(nsPath("/investigations"));
-  };
+  const back = goBack;
 
   const noSourcesChosen = !matchAllSources && selectedSources.size === 0;
 
@@ -503,9 +550,8 @@ export const InquiryForm = React.forwardRef<
           className="mb-4 rounded-[4px] border-2 border-border"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          {isEdit
-            ? t("investigations.inquiryForm.backToInquiry")
-            : t("investigations.inquiryForm.backToInvestigations")}
+          {/* Plain "Back": it goes where the person came from, which may be a case board. */}
+          {t("common.back")}
         </Button>
         <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
           {isEdit
@@ -977,6 +1023,21 @@ export const InquiryForm = React.forwardRef<
                     </p>
                   )}
                 </div>
+              )}
+            </AiAssistedCard>
+          </section>
+
+          <section ref={sectionRefs.cases} data-testid="inquiry-form-cases">
+            <AiAssistedCard
+              title={t("investigations.inquiryForm.casesTitle")}
+              description={
+                isEdit ? t("investigations.inquiryForm.casesDescEdit") : t("investigations.inquiryForm.casesDescCreate")
+              }
+            >
+              {isEdit && inquiryId ? (
+                <InquiryCasesPanel mode="live" inquiryId={inquiryId} initial={initial?.cases ?? []} />
+              ) : (
+                <InquiryCasesPanel mode="draft" value={draftCases} onChange={setDraftCases} />
               )}
             </AiAssistedCard>
           </section>

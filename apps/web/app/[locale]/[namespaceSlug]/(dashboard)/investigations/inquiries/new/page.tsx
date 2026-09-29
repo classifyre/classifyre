@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { Suspense, useMemo, useRef } from "react";
 import type { AssistantUiAction } from "@workspace/api-client";
 import { InquiryForm, type InquiryFormHandle } from "@/components/inquiry-form";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
@@ -42,5 +42,10 @@ export default function NewInquiryPage() {
 
   useRegisterAssistantBridge(assistantBridge);
 
-  return <InquiryForm ref={formRef} mode="create" />;
+  // The form reads ?caseId= / ?returnTo= (useSearchParams needs a boundary).
+  return (
+    <Suspense>
+      <InquiryForm ref={formRef} mode="create" />
+    </Suspense>
+  );
 }

@@ -1,9 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { CaseActivityType, Prisma, PrismaClient } from '@prisma/client';
 
 type JsonInput = any;
 import { PrismaService } from './prisma.service';
 import { CaseTimelineResponseDto } from './dto/case-activity.dto';
+import { afterAnchor, pageSize, UNTIL_MAX, upToAnchor } from './activity-page';
+// A value import: an @Optional() injection resolves from emitted metadata.
+import { CaseLeadsScheduler } from './cases/case-leads.scheduler';
 
 type TxClient = Omit<
   PrismaClient,
@@ -27,11 +30,40 @@ export const COALESCE_SPAN_MS = 24 * 60 * 60_000;
 export interface CoalescedRecord {
   key: string;
   merge: (previous: ActivityPayload, next: ActivityPayload) => ActivityPayload;
+  /** How long since it last grew the entry keeps absorbing (default {@link COALESCE_GAP_MS}). */
+  gapMs?: number;
 }
+
+/**
+ * A person editing one of the case's own fields: the case file saves as they
+ * type, so a stretch of editing is one entry, closed after this long without
+ * a save.
+ */
+export const EDIT_COALESCE_GAP_MS = 15 * 60_000;
+
+/**
+ * Activity that changes what a case's leads should be: new evidence (new seeds,
+ * new documents to find copies of), a watch linked or answering, a filter that
+ * rules a kind of finding out. Every way into a case records one of these, so
+ * this is the one place the lead refresh has to listen.
+ */
+const REFRESHES_LEADS: ReadonlySet<CaseActivityType> = new Set([
+  CaseActivityType.EVIDENCE_ADDED,
+  CaseActivityType.FINDING_ADDED,
+  CaseActivityType.INQUIRY_LINKED,
+  CaseActivityType.INQUIRY_PULLED,
+  CaseActivityType.LEAD_ACCEPTED,
+  CaseActivityType.FINDINGS_ESCALATED,
+  CaseActivityType.FINDING_FILTER_ADDED,
+  CaseActivityType.FINDING_FILTER_UPDATED,
+]);
 
 @Injectable()
 export class CaseActivityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly leads?: CaseLeadsScheduler,
+  ) {}
 
   /** Record one activity row. Pass a tx client when inside a transaction. */
   async record(
@@ -50,6 +82,17 @@ export class CaseActivityService {
         actor: actor ?? null,
       },
     });
+    this.nudgeLeads(caseId, activityType);
+  }
+
+  /**
+   * Ask for the case's leads to be refreshed after this activity. Fire and
+   * forget: the refresh starts after a short delay (so a surrounding
+   * transaction has committed) and coalesces with the rest of a burst.
+   */
+  private nudgeLeads(caseId: string, activityType: CaseActivityType): void {
+    if (!this.leads || !REFRESHES_LEADS.has(activityType)) return;
+    void this.leads.request(caseId, activityType.toLowerCase());
   }
 
   /**
@@ -63,13 +106,15 @@ export class CaseActivityService {
    * merged entry moves to the time of its latest pass and keeps `firstAt`,
    * `lastAt` and `passes`, so it can say "5 scans between 14:00 and 15:40".
    *
-   * A person's own actions never go through here: each is its own entry.
+   * A person's own actions never go through here — each is its own entry —
+   * except their edits to a field the case file autosaves (see
+   * {@link recordEdit}), where every keystroke pause is a save.
    */
   async recordCoalesced(
     caseId: string,
     activityType: CaseActivityType,
     payload: ActivityPayload,
-    actor: string,
+    actor: string | null,
     coalesce: CoalescedRecord,
     tx?: TxClient,
   ): Promise<void> {
@@ -80,7 +125,9 @@ export class CaseActivityService {
         caseId,
         activityType,
         actor,
-        createdAt: { gte: new Date(now.getTime() - COALESCE_GAP_MS) },
+        createdAt: {
+          gte: new Date(now.getTime() - (coalesce.gapMs ?? COALESCE_GAP_MS)),
+        },
         payload: { path: ['coalesceKey'], equals: coalesce.key },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -105,6 +152,7 @@ export class CaseActivityService {
         where: { id: recent.id },
         data: { payload: merged as JsonInput, createdAt: now },
       });
+      this.nudgeLeads(caseId, activityType);
       return;
     }
     await client.caseActivity.create({
@@ -122,22 +170,85 @@ export class CaseActivityService {
         } as JsonInput,
       },
     });
+    this.nudgeLeads(caseId, activityType);
   }
 
+  /**
+   * A person's edit to the case's own fields (title, description, the
+   * conclusion draft…), saved as they type. Saves by the same person to the
+   * same `key` within {@link EDIT_COALESCE_GAP_MS} of each other read as one
+   * entry; two people's edits never merge.
+   */
+  async recordEdit(
+    caseId: string,
+    activityType: CaseActivityType,
+    payload: ActivityPayload,
+    actor: string | undefined,
+    key: string,
+    merge: CoalescedRecord['merge'],
+    tx?: TxClient,
+  ): Promise<void> {
+    await this.recordCoalesced(
+      caseId,
+      activityType,
+      payload,
+      actor ?? null,
+      { key: `edit:${key}`, merge, gapMs: EDIT_COALESCE_GAP_MS },
+      tx,
+    );
+  }
+
+  /**
+   * A page of the case's timeline, newest first. `types` narrows it to some
+   * activity types, `inquiryId` to entries about one watch. `until` names an
+   * entry the page must reach (a deep link to it): the page then runs from
+   * the top down to and including that entry, however long, up to
+   * {@link UNTIL_MAX} rows.
+   */
   async getTimeline(
     caseId: string,
     cursor?: string,
     limit = 50,
+    opts: {
+      types?: CaseActivityType[];
+      inquiryId?: string;
+      until?: string;
+    } = {},
   ): Promise<CaseTimelineResponseDto> {
-    const take = Math.min(Math.max(1, limit), 100);
-
-    const where: Prisma.CaseActivityWhereInput = { caseId };
+    let take = pageSize(limit);
+    const filters: Prisma.CaseActivityWhereInput[] = [{ caseId }];
+    if (opts.types && opts.types.length > 0) {
+      filters.push({ activityType: { in: opts.types } });
+    }
+    if (opts.inquiryId) {
+      filters.push({
+        payload: { path: ['inquiryId'], equals: opts.inquiryId },
+      });
+    }
     if (cursor) {
-      where.id = { lt: cursor };
+      const anchor = await this.prisma.caseActivity.findFirst({
+        where: { id: cursor, caseId },
+        select: { id: true, createdAt: true },
+      });
+      // A cursor that names nothing in this case ends the feed.
+      if (!anchor) return { items: [], nextCursor: null };
+      filters.push(afterAnchor(anchor));
+    }
+    if (opts.until) {
+      const target = await this.prisma.caseActivity.findFirst({
+        where: { id: opts.until, caseId },
+        select: { id: true, createdAt: true },
+      });
+      if (target) {
+        const reach = await this.prisma.caseActivity.count({
+          where: { AND: [...filters, upToAnchor(target)] },
+        });
+        take = Math.min(Math.max(take, reach), UNTIL_MAX);
+      }
     }
 
     const rows = await this.prisma.caseActivity.findMany({
-      where,
+      where: { AND: filters },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: take + 1,
     });

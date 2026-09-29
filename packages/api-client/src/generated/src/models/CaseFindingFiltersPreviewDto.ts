@@ -51,6 +51,18 @@ export interface CaseFindingFiltersPreviewDto {
      * @memberof CaseFindingFiltersPreviewDto
      */
     sample: Array<CaseCleanupItemDto>;
+    /**
+     * Filters only: assets these rules would leave without a finding in the case
+     * @type {number}
+     * @memberof CaseFindingFiltersPreviewDto
+     */
+    emptiedAssets: number;
+    /**
+     * Names of a few of those assets
+     * @type {Array<string>}
+     * @memberof CaseFindingFiltersPreviewDto
+     */
+    emptiedSample: Array<string>;
 }
 
 /**
@@ -61,6 +73,8 @@ export function instanceOfCaseFindingFiltersPreviewDto(value: object): value is 
     if (!('perRule' in value) || value['perRule'] === undefined) return false;
     if (!('problems' in value) || value['problems'] === undefined) return false;
     if (!('sample' in value) || value['sample'] === undefined) return false;
+    if (!('emptiedAssets' in value) || value['emptiedAssets'] === undefined) return false;
+    if (!('emptiedSample' in value) || value['emptiedSample'] === undefined) return false;
     return true;
 }
 
@@ -78,6 +92,8 @@ export function CaseFindingFiltersPreviewDtoFromJSONTyped(json: any, ignoreDiscr
         'perRule': json['perRule'],
         'problems': json['problems'],
         'sample': ((json['sample'] as Array<any>).map(CaseCleanupItemDtoFromJSON)),
+        'emptiedAssets': json['emptiedAssets'],
+        'emptiedSample': json['emptiedSample'],
     };
 }
 
@@ -96,6 +112,8 @@ export function CaseFindingFiltersPreviewDtoToJSONTyped(value?: CaseFindingFilte
         'perRule': value['perRule'],
         'problems': value['problems'],
         'sample': ((value['sample'] as Array<any>).map(CaseCleanupItemDtoToJSON)),
+        'emptiedAssets': value['emptiedAssets'],
+        'emptiedSample': value['emptiedSample'],
     };
 }
 

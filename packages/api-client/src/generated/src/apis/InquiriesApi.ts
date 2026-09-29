@@ -99,6 +99,7 @@ export interface InquiriesControllerTimelineRequest {
     id: string;
     cursor?: string;
     limit?: string;
+    types?: string;
 }
 
 export interface InquiriesControllerUpdateRequest {
@@ -497,6 +498,10 @@ export class InquiriesApi extends runtime.BaseAPI {
 
         if (requestParameters['limit'] != null) {
             queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        if (requestParameters['types'] != null) {
+            queryParameters['types'] = requestParameters['types'];
         }
 
         const headerParameters: runtime.HTTPHeaders = {};

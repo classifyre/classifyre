@@ -42,6 +42,10 @@ describe('CasesService', () => {
       upsert: jest.fn(),
       createMany: jest.fn(),
       findMany: jest.fn(() => Promise.resolve([])),
+      groupBy: jest.fn((): Promise<unknown[]> => Promise.resolve([])),
+    },
+    caseBoardThumbnail: {
+      findMany: jest.fn((): Promise<unknown[]> => Promise.resolve([])),
     },
     caseBoardItem: { findMany: jest.fn(() => Promise.resolve([])) },
     caseFindingFilter: { count: jest.fn(() => Promise.resolve(0)) },
@@ -50,7 +54,7 @@ describe('CasesService', () => {
   };
   const mockGraph = { inferEdgesForAsset: jest.fn(), caseGraph: jest.fn() };
   const mockMatching = { getMatchingFindingIds: jest.fn() };
-  const mockActivity = { record: jest.fn() };
+  const mockActivity = { record: jest.fn(), recordEdit: jest.fn() };
   const mockInquiryActivity = { record: jest.fn(), tryRecord: jest.fn() };
   const mockAgentMemory = {
     recordEntityDeletion: jest.fn(),
@@ -399,10 +403,137 @@ describe('CasesService', () => {
     expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q2');
   });
 
+  describe('list', () => {
+    beforeEach(() => {
+      mockPrisma.case.findMany.mockResolvedValue([
+        caseRow({ id: 'c1' }),
+        caseRow({ id: 'c2' }),
+      ]);
+      mockPrisma.case.count.mockResolvedValue(2);
+    });
+
+    it('narrows to, and leaves out, cases by id', async () => {
+      await service.list({ ids: ['c1', 'c2'], excludeIds: 'c3' as never });
+      const where = mockPrisma.case.findMany.mock.calls[0][0].where;
+      expect(where.id).toEqual({ in: ['c1', 'c2'], notIn: ['c3'] });
+      expect(mockPrisma.case.count).toHaveBeenCalledWith({ where });
+    });
+
+    it('drops id values that are not ids', async () => {
+      await service.list({ ids: [{ evil: 1 }, '', 'c1'] as never });
+      const where = mockPrisma.case.findMany.mock.calls[0][0].where;
+      expect(where.id).toEqual({ in: ['c1'] });
+    });
+
+    it('adds finding counts, new watch matches and the board sketch for cards', async () => {
+      mockPrisma.caseFinding.groupBy.mockResolvedValue([
+        { caseId: 'c1', _count: { _all: 12 } },
+      ]);
+      mockPrisma.caseInquiry.findMany.mockResolvedValue([
+        { caseId: 'c1', inquiry: { newMatchCount: 3 } },
+        { caseId: 'c1', inquiry: { newMatchCount: 2 } },
+        { caseId: 'c2', inquiry: { newMatchCount: 0 } },
+      ]);
+      const updatedAt = new Date('2026-09-29T10:00:00Z');
+      const sketch = { v: 1, w: 10, h: 10, nodes: [], edges: [] };
+      mockPrisma.caseBoardThumbnail.findMany.mockResolvedValue([
+        { sketch, updatedAt, board: { caseId: 'c2' } },
+      ]);
+
+      const result = await service.list({ withCardDetails: 'true' as never });
+
+      expect(result.items[0]).toMatchObject({
+        id: 'c1',
+        findingCount: 12,
+        newMatchCount: 5,
+        thumbnail: null,
+      });
+      expect(result.items[1]).toMatchObject({
+        id: 'c2',
+        findingCount: 0,
+        newMatchCount: 0,
+        thumbnail: { sketch, updatedAt },
+      });
+    });
+
+    it('leaves card details out unless asked', async () => {
+      const result = await service.list({});
+      expect(result.items[0]).not.toHaveProperty('thumbnail');
+      expect(mockPrisma.caseBoardThumbnail.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   it('throws NotFound for a missing case on update', async () => {
     mockPrisma.case.findUnique.mockResolvedValue(null);
     await expect(
       service.update('missing', { title: 'x' }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  describe('update timeline (the case file autosaves)', () => {
+    const stored = caseRow({ aiMode: 'INHERIT' });
+    const patch = async (dto: Record<string, unknown>) => {
+      mockPrisma.case.findUnique.mockResolvedValue(stored);
+      mockPrisma.case.update.mockResolvedValue({ ...stored, ...dto });
+      await service.update('c1', dto, 'maria');
+    };
+
+    it('folds edits of the case description into one entry per stretch', async () => {
+      await patch({ title: 'Renamed', description: 'Wider scope' });
+      expect(mockActivity.recordEdit).toHaveBeenCalledTimes(1);
+      const [caseId, type, payload, actor, key, merge] =
+        mockActivity.recordEdit.mock.calls[0];
+      expect([caseId, type, actor, key]).toEqual([
+        'c1',
+        'CASE_UPDATED',
+        'maria',
+        'details',
+      ]);
+      expect(payload).toMatchObject({
+        fields: ['title', 'description'],
+        title: 'Renamed',
+        previousTitle: 'Customer data exposure',
+      });
+      // A later save adds its fields; the title it started from stays.
+      expect(
+        merge(payload, { fields: ['severity'], previousTitle: 'Renamed' }),
+      ).toMatchObject({
+        fields: ['title', 'description', 'severity'],
+        previousTitle: 'Customer data exposure',
+      });
+      expect(mockActivity.record).not.toHaveBeenCalled();
+      expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('case', 'c1');
+    });
+
+    it('writes nothing for a field sent back unchanged', async () => {
+      await patch({ title: stored.title, assignee: '' });
+      expect(mockActivity.recordEdit).not.toHaveBeenCalled();
+      expect(mockActivity.record).not.toHaveBeenCalled();
+      expect(mockAgentMemory.syncEntityMap).not.toHaveBeenCalled();
+    });
+
+    it('keeps a status change as its own entry', async () => {
+      await patch({ status: 'IN_PROGRESS' });
+      expect(mockActivity.record).toHaveBeenCalledWith(
+        'c1',
+        'CASE_UPDATED',
+        { status: 'IN_PROGRESS', previousStatus: 'OPEN' },
+        'maria',
+      );
+      expect(mockActivity.recordEdit).not.toHaveBeenCalled();
+    });
+
+    it('folds conclusion drafts and leaves the entity map alone', async () => {
+      await patch({ conclusion: 'Draft one' });
+      expect(mockActivity.recordEdit).toHaveBeenCalledWith(
+        'c1',
+        'CONCLUSION_UPDATED',
+        { draft: true, length: 9 },
+        'maria',
+        'conclusion',
+        expect.any(Function),
+      );
+      expect(mockAgentMemory.syncEntityMap).not.toHaveBeenCalled();
+    });
   });
 });

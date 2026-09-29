@@ -10,6 +10,7 @@ import {
 import { PrismaService } from '../prisma.service';
 import { renderReasons } from '../embedding/reason-labels';
 import { PgBossService } from '../scheduler/pg-boss.service';
+import { CaseLeadsScheduler } from '../cases/case-leads.scheduler';
 import {
   candidateWhere,
   CompiledMatcher,
@@ -175,6 +176,19 @@ export class InquiryMatchingService {
       return (
         this.moduleRef?.get<CasePullPort>(CASE_PULL, { strict: false }) ?? null
       );
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * The lead refresh of the cases a watch feeds, resolved the same way: new
+   * answers can be leads of a case whose auto-add is off, and nothing else
+   * tells that case they arrived.
+   */
+  private get caseLeads(): CaseLeadsScheduler | null {
+    try {
+      return this.moduleRef?.get(CaseLeadsScheduler, { strict: false }) ?? null;
     } catch {
       return null;
     }
@@ -433,6 +447,7 @@ export class InquiryMatchingService {
           goneCount,
         });
         await this.autoPullToCases(q, newIds, { sourceId, runnerId });
+        await this.refreshLinkedLeads(q.id, newIds);
       }
       landed += newCount;
     }
@@ -595,6 +610,36 @@ export class InquiryMatchingService {
           `Auto-pull into case ${link.caseId} from inquiry ${q.id} failed: ${String(error)}`,
         );
       }
+    }
+  }
+
+  /**
+   * Ask every open case this watch feeds to refresh its leads: its important
+   * new answers may be leads there. Coalesced per case by the scheduler, and
+   * never fails the run.
+   */
+  private async refreshLinkedLeads(
+    inquiryId: string,
+    newIds: string[],
+  ): Promise<void> {
+    if (newIds.length === 0) return;
+    const leads = this.caseLeads;
+    if (!leads) return;
+    try {
+      const links = await this.prisma.caseInquiry.findMany({
+        where: {
+          inquiryId,
+          case: { status: { notIn: ['CLOSED', 'ARCHIVED'] } },
+        },
+        select: { caseId: true },
+      });
+      for (const link of links) {
+        await leads.request(link.caseId, 'new watch answers');
+      }
+    } catch (error) {
+      this.logger.debug(
+        `Lead refresh after new answers of inquiry ${inquiryId} not queued: ${String(error)}`,
+      );
     }
   }
 

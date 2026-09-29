@@ -35,6 +35,7 @@ const GROUP_ORDER = [
   "lineage",
   "inquiries",
   "cases",
+  "case_board",
   "case_leads",
   "correlation",
   "glossary",

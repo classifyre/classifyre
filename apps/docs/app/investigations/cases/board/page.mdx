@@ -33,7 +33,8 @@ The screen has six parts:
 From left to right:
 
 - **The case's name**, with its **status** (open, in progress, closed) and its
-  **severity**. Rename or edit the case from the **More** menu (**Edit case…**).
+  **severity**. Click the name to open the **Case file** panel, where you rename
+  the case and change what it says about itself.
 - **What's on the board**: three counters for **evidence**, **findings** and
   **hypotheses**. Click one to **spotlight** everything of that kind: it lights
   up and the rest fades, and the view zooms to fit it. Click it again, or press
@@ -41,9 +42,8 @@ From left to right:
 - **Search**: the wide box in the middle. Click it or press `⌘K` (`Ctrl K` on
   Windows) to search the board, find assets and findings anywhere in your data
   and add them, or run an action. See [the search](/investigations/cases/navigate/#search-and-actions-k).
-- **Who else is here**: the initials of anyone else with the board open. Click
-  your own to set the name your notes, links and timeline entries carry.
-- **More**: edit the case, run Autopilot, **tidy up** the board, **export** it
+- **Who else is here**: the initials of anyone else with the board open.
+- **More**: run Autopilot, **tidy up** the board, **export** it
   as an image, open or take **board snapshots**, open the **shortcuts and visual
   key**, and **close the case**.
 
@@ -147,18 +147,22 @@ the panel you had open. `Esc` closes it too.
 
 | Panel | What you find there |
 |---|---|
-| **Details** | The asset or finding you selected: its source, its findings (with **Attach** for those not in the case), **Open asset**, **Open finding** and **Show connections** |
+| **Details** | What you selected. For an asset, four tabs: the findings **in the case**, its **other findings** (pick some and **Attach** them), its **duplicates** and its **lineage**. For a finding: an **overview**, **similar** findings and **where else** its value turns up. For a line: what the relation is, and for a link you drew, its kind, label and note to edit. See [the Details panel](/investigations/cases/evidence/#the-details-panel) |
 | **Hypotheses** | Every hypothesis of the case, on the board or not, with its verdict, confidence and balance of evidence. Click one to open its thread |
 | **Add evidence** | Search for assets and findings to add. Click one to drop it in the middle of your view, or drag it onto the board |
 | **Evidence** | The case's evidence as a table, with notes on each asset and finding. Click a row to fly to it on the board |
-| **Leads** | Findings suggested for this case, from [Autopilot](/investigations/autopilot/), the linked inquiries and look-alike content. **Accept** one to add it as evidence, **dismiss** it, or drag it onto the board where you want it. **Generate leads** asks for fresh ones. A badge counts the ones waiting |
-| **Watches** | The inquiries that feed this case with new matches. Link or unlink them here. A badge counts new matches |
-| **Timeline** | Three tabs. *Activity* is everything done on the case. *Chronology* is the story you reconstruct: real-world events in the order they happened, which you add, date and mark as verified. *Threads* lists every discussion, with **Show on board** or **Place on board** |
-| **Case file** | The description (**Edit case…**), the AI mode and Autopilot, the **conclusion** (save a draft any time), and **Close case** |
+| **Leads** | What the case may be missing: documents that look like your evidence, important answers of its watches, similar findings, and [Autopilot](/investigations/autopilot/)'s proposals, each with its reason. They refresh by themselves. **Accept** one, drag it onto the board where you want it (which accepts it too), or **dismiss** it for good. Reviewed leads that are not in the case can be dragged in again. A badge counts the ones waiting. See [Leads](/investigations/cases/leads/) |
+| **Watches** | The inquiries that feed this case with new matches, as a grid of small cards (auto-add, filters and escalations at a glance). Click one to open it and its answers below; its card stays marked in the grid. The last card links another watch, or creates a new one in a new tab. A badge counts new matches |
+| **Timeline** | Three tabs. *Activity* is everything done on the case. *Chronology* is the story you reconstruct: real-world events in the order they happened, which you add, date and mark as verified. *Threads* lists every discussion, with **Show on board** or **Place on board**. Warnings elsewhere on the board (evidence gone from its source, answers a watch lost) link to the entry that explains them |
+| **Case file** | The case's title, description, severity and status, and its [automatic clean-up](/investigations/cases/cleanup/#automatic-clean-up) switches; the AI mode and Autopilot; the **conclusion**; and **Close case**. Everything saves as you change it, and a mark says when it is saved |
 | **Board snapshots** | Saved pictures of the board: one is taken when the case closes, and you can take one any time. Open one to see the board exactly as it was, read-only |
 
 Hypothesis threads and **Show connections** open in the same place, from the
 board itself.
+
+The address in your browser follows the panels: which one is open, its tab, the
+watch you opened, the timeline entry you are reading. Reload the page, or send
+the address to a teammate, and the board opens the same way.
 
 At the foot of the rail, a small mark says whether your changes are saved: a
 tick once everything is saved, a spinner while saving, and a warning if a save
@@ -204,3 +208,6 @@ snapshots from the **Board snapshots** panel. A snapshot is read-only; **Back to
 the live board** returns to the current one.
 
 </Steps>
+
+AI clients can read, arrange and snapshot the board over MCP, with a token that
+has the **Case Board** scope. See [AI agents & MCP](/investigations/cases/mcp/).

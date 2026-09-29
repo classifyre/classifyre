@@ -8,7 +8,6 @@ import {
   Archive,
   ArrowLeft,
   DownloadCloud,
-  FolderOpen,
   FolderPlus,
   Loader2,
   Pencil,
@@ -45,7 +44,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@workspace/ui/components/alert-dialog";
-import { CaseStatusBadge } from "@/components/case-status-badge";
 import {
   InquiryMatchesPanel,
   type InquiryMatchesStats,
@@ -66,6 +64,8 @@ import {
 import { formatRelative } from "@/lib/date";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { useTranslation } from "@/hooks/use-translation";
+import { useGoBack } from "@/hooks/use-go-back";
+import { InquiryCasesPanel } from "@/components/inquiry-cases";
 
 export default function InquiryDetailPage() {
   return (
@@ -80,6 +80,7 @@ function InquiryDetailInner() {
   const searchParams = useSearchParams();
   const { t } = useTranslation();
   const inquiryId = useRouteId();
+  const { goBack } = useGoBack("/investigations?tab=inquiries");
   const preferredCaseId = searchParams.get("caseId");
 
   const [inquiry, setInquiry] = React.useState<InquiryResponseDto | null>(null);
@@ -292,9 +293,9 @@ function InquiryDetailInner() {
           variant="ghost"
           size="sm"
           className="-ml-2 mb-2"
-          onClick={() => router.push(nsPath("/investigations?tab=inquiries"))}
+          onClick={goBack}
         >
-          <ArrowLeft className="h-4 w-4" /> {t("investigations.page.tabInquiries")}
+          <ArrowLeft className="h-4 w-4" /> {t("common.back")}
         </Button>
         <div className="flex flex-wrap items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-[4px] border-2 border-border bg-card">
@@ -374,29 +375,19 @@ function InquiryDetailInner() {
               </Button>
             )}
           </div>
-          {inquiry.cases.length === 0 ? (
+          {inquiry.cases.length === 0 && (
             <p className="text-muted-foreground text-sm">
               {t("investigations.inquiryDetail.matchesLiveDesc")}
             </p>
-          ) : (
-            <div className="space-y-1.5">
-              {inquiry.cases.map((c) => (
-                <div
-                  key={c.id}
-                  className="flex items-center gap-2 rounded-[4px] border border-border px-3 py-2"
-                >
-                  <FolderOpen className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                  <button
-                    className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline"
-                    onClick={() => router.push(nsPath(`/investigations/${c.id}`))}
-                  >
-                    {c.title}
-                  </button>
-                  <CaseStatusBadge status={c.status as never} />
-                </div>
-              ))}
-            </div>
           )}
+          {/* Link it to another case, or unlink it, right here. */}
+          <InquiryCasesPanel
+            mode="live"
+            inquiryId={inquiryId}
+            initial={inquiry.cases}
+            readOnly={isArchived}
+            onChanged={() => void load()}
+          />
         </CardContent>
       </Card>
 

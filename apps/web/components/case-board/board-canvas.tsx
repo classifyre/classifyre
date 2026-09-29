@@ -42,7 +42,7 @@ import {
   type BoardNode,
   type ProjectionView,
 } from "./store/projection";
-import { SUGGESTED_AUTO_LIMIT, type DrawerKind, type UiState } from "./store/ui-store";
+import { parseBoardEdgeId, SUGGESTED_AUTO_LIMIT, type DrawerKind, type UiState } from "./store/ui-store";
 import { isTraceData, layoutTrace, type TraceKind } from "./store/trace";
 import { takenRects } from "./store/geometry";
 import { parseFindingNodeId } from "./store/relations";
@@ -249,10 +249,13 @@ export function useFlyTo() {
 export function BoardCanvas({
   onTidyUp,
   rememberViewport = true,
+  onDropLead,
 }: {
   onTidyUp: () => void;
   /** Off for a snapshot: it must neither open at nor overwrite the live board's view. */
   rememberViewport?: boolean;
+  /** A lead dragged from the Leads panel was dropped here: accept it at `at`. */
+  onDropLead?: (leadId: string, at: { x: number; y: number }) => void;
 }) {
   const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
@@ -736,6 +739,25 @@ export function BoardCanvas({
     [ui, readOnly, store, rf, inspectorFor],
   );
 
+  /**
+   * A relation, like a node: a click selects it (an open details panel
+   * follows), a double click opens its details. Drawn links, platform
+   * relations and stances each explain themselves there.
+   */
+  const onEdgeClick = React.useCallback(
+    (_event: React.MouseEvent, edge: BoardEdge) => {
+      const u = ui.getState();
+      if (u.drawer === "details" && parseBoardEdgeId(edge.id)) u.openDrawer("details", { details: { edgeId: edge.id } });
+    },
+    [ui],
+  );
+  const onEdgeDoubleClick = React.useCallback(
+    (_event: React.MouseEvent, edge: BoardEdge) => {
+      if (parseBoardEdgeId(edge.id)) ui.getState().openDrawer("details", { details: { edgeId: edge.id } });
+    },
+    [ui],
+  );
+
   /** A double click opens what the node is about in the side panel. */
   const onNodeDoubleClick = React.useCallback(
     (event: React.MouseEvent, node: BoardNode) => {
@@ -812,30 +834,16 @@ export function BoardCanvas({
           label?: string;
           assetType?: string | null;
           sourceType?: string | null;
-          /** A lead from the Leads drawer: accepted through the normal review. */
+          /** A lead from the Leads panel: dropping it accepts it, right here. */
           leadId?: string;
           assetId?: string | null;
         };
         const at = rf.screenToFlowPosition({ x: event.clientX, y: event.clientY });
         const s = store.getState();
         if (payload.leadId) {
-          // Accepting keeps the lead's own record (status, timeline entry);
-          // the hint makes the new bubble appear where it was dropped.
-          const hints = new Map(ui.getState().placementHints);
-          hints.set(`finding:${payload.entityId}`, at);
-          if (payload.assetId) hints.set(`asset:${payload.assetId}`, at);
-          ui.getState().set({ placementHints: hints });
-          void api.cases
-            .caseLeadsControllerReview({
-              caseId,
-              leadId: payload.leadId,
-              reviewCaseLeadDto: { action: "ACCEPT" as never },
-            })
-            .then(() => {
-              toast.success(t("caseBoard.toasts.evidenceAdded"));
-              s.refetch();
-            })
-            .catch((error: unknown) => toast.error(error instanceof Error ? error.message : String(error)));
+          // Accepted through the normal review, so the lead keeps its record
+          // (status, timeline entry) and leaves the panel at once.
+          onDropLead?.(payload.leadId, at);
           return;
         }
         const existing =
@@ -865,7 +873,7 @@ export function BoardCanvas({
         // Not ours.
       }
     },
-    [rf, store, ui, readOnly, t, caseId],
+    [rf, store, readOnly, t, onDropLead],
   );
 
   // Select: a drag on the canvas draws a selection box, the middle button (or
@@ -901,6 +909,8 @@ export function BoardCanvas({
             connectionRadius={28}
             onNodeClick={onNodeClick}
             onPaneClick={onPaneClick}
+            onEdgeClick={onEdgeClick}
+            onEdgeDoubleClick={onEdgeDoubleClick}
             onEdgeMouseEnter={(_, e) => ui.getState().set({ hoveredEdgeId: e.id })}
             onEdgeMouseLeave={(_, e) => {
               if (ui.getState().hoveredEdgeId === e.id) ui.getState().set({ hoveredEdgeId: null });

@@ -4,6 +4,7 @@ import { InquiryActivityType, Prisma, PrismaClient } from '@prisma/client';
 type JsonInput = any;
 import { PrismaService } from './prisma.service';
 import { InquiryTimelineResponseDto } from './dto/inquiry-activity.dto';
+import { afterAnchor, pageSize } from './activity-page';
 
 type TxClient = Omit<
   PrismaClient,
@@ -67,20 +68,28 @@ export class InquiryActivityService {
     }
   }
 
+  /** A page of the watch's history, newest first (see activity-page.ts), optionally of some types only. */
   async getTimeline(
     inquiryId: string,
     cursor?: string,
     limit = 50,
+    types?: InquiryActivityType[],
   ): Promise<InquiryTimelineResponseDto> {
-    const take = Math.min(Math.max(1, limit), 100);
-
-    const where: Prisma.InquiryActivityWhereInput = { inquiryId };
+    const take = pageSize(limit);
+    const filters: Prisma.InquiryActivityWhereInput[] = [{ inquiryId }];
+    if (types && types.length > 0)
+      filters.push({ activityType: { in: types } });
     if (cursor) {
-      where.id = { lt: cursor };
+      const anchor = await this.prisma.inquiryActivity.findFirst({
+        where: { id: cursor, inquiryId },
+        select: { id: true, createdAt: true },
+      });
+      if (!anchor) return { items: [], nextCursor: null };
+      filters.push(afterAnchor(anchor));
     }
 
     const rows = await this.prisma.inquiryActivity.findMany({
-      where,
+      where: { AND: filters },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: take + 1,
     });

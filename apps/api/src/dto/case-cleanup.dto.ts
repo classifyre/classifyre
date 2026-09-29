@@ -38,9 +38,22 @@ export class CaseCleanupRulesDto {
 /** One finding or asset a rule or filter would take out (or took out). */
 export class CaseCleanupItemDto {
   @ApiProperty({
-    enum: ['FINDING_GONE', 'FINDING_RESOLVED', 'FILTER', 'ASSET_GONE'],
+    enum: [
+      'FINDING_GONE',
+      'FINDING_RESOLVED',
+      'FILTER',
+      'ASSET_GONE',
+      'FILTER_EMPTIED',
+    ],
+    description:
+      'FILTER_EMPTIED: an asset a filter left without any finding in the case',
   })
-  reason!: 'FINDING_GONE' | 'FINDING_RESOLVED' | 'FILTER' | 'ASSET_GONE';
+  reason!:
+    | 'FINDING_GONE'
+    | 'FINDING_RESOLVED'
+    | 'FILTER'
+    | 'ASSET_GONE'
+    | 'FILTER_EMPTIED';
 
   @ApiPropertyOptional({
     enum: ['RETIRED', 'DELETED'],
@@ -181,6 +194,16 @@ export class AddCaseFindingFiltersDto {
   rules!: CaseFindingFilterRuleDto[];
 
   @ApiPropertyOptional({
+    default: false,
+    description:
+      'Filters only: also take out of the case every asset the filter leaves without a finding in it. ' +
+      'An asset that had no finding in the case to begin with is left alone.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  removeEmptiedAssets?: boolean;
+
+  @ApiPropertyOptional({
     description:
       'The board tab asking, so it can ignore the echo of its own change',
   })
@@ -202,6 +225,16 @@ export class UpdateCaseFindingFilterDto {
   @MaxLength(1000)
   description?: string | null;
 
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      'Filters only: also take out of the case every asset the filter leaves without a finding in it. ' +
+      'An asset that had no finding in the case to begin with is left alone.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  removeEmptiedAssets?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -222,6 +255,12 @@ export class CaseFindingFiltersChangeResponseDto {
       'Findings already in the case the change marked escalated (escalations)',
   })
   escalated!: number;
+
+  @ApiProperty({
+    description:
+      'Assets taken out because the filter left them without a finding (removeEmptiedAssets)',
+  })
+  assetsRemoved!: number;
 }
 
 export class PreviewCaseFindingFiltersDto {
@@ -265,6 +304,18 @@ export class CaseFindingFiltersPreviewDto {
 
   @ApiProperty({ type: [CaseCleanupItemDto], description: 'A few of them' })
   sample!: CaseCleanupItemDto[];
+
+  @ApiProperty({
+    description:
+      'Filters only: assets these rules would leave without a finding in the case',
+  })
+  emptiedAssets!: number;
+
+  @ApiProperty({
+    type: [String],
+    description: 'Names of a few of those assets',
+  })
+  emptiedSample!: string[];
 }
 
 /** A finding type the scope detects, for the filter picker. */

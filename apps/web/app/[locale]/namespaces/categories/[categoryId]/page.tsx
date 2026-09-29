@@ -25,6 +25,7 @@ import {
 import { useOpenWorkspace } from "@/hooks/use-open-workspace";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocalePath } from "@/lib/app-path";
+import { RECENT_WORKSPACES, useOpenedAt } from "@/lib/recently-opened";
 import { useStaticRouteParam } from "@/lib/use-route-id";
 
 /**
@@ -40,6 +41,7 @@ export default function CategoryDetailPage() {
   const { t } = useTranslation();
   const localePath = useLocalePath();
   const openWorkspace = useOpenWorkspace();
+  const openedAt = useOpenedAt(RECENT_WORKSPACES);
 
   const [category, setCategory] = React.useState<NamespaceCategory | null>(
     null,
@@ -218,6 +220,7 @@ export default function CategoryDetailPage() {
                     key={ns.id}
                     namespace={ns}
                     stats={stats[ns.id]}
+                    openedAt={openedAt.get(ns.id)}
                     onOpen={openWorkspace}
                   />
                 ))}

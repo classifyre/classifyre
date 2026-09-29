@@ -51,8 +51,10 @@ import { InquiriesService } from './inquiries.service';
 import { CaseThreadsService } from './case-threads.service';
 import { CaseActivityService } from './case-activity.service';
 import { CaseBoardService } from './case-board/case-board.service';
+import { CaseBoardToolsService } from './case-board/case-board-tools.service';
 import { QuickSearchService } from './search/quick-search.service';
 import { CaseBoardReadService } from './case-board/case-board-read.service';
+import { CaseBoardThumbnailService } from './case-board/case-board-thumbnail.service';
 import { InquiryActivityService } from './inquiry-activity.service';
 import { CASE_PULL } from './cases/case-pull.port';
 import { CASE_CLEANUP } from './cases/case-cleanup.port';
@@ -75,6 +77,8 @@ import { GlossaryService } from './glossary/glossary.service';
 import { CaseLeadsController } from './controllers/case-leads.controller';
 import { CaseEventsController } from './controllers/case-events.controller';
 import { CaseLeadsService } from './case-leads.service';
+import { CaseLeadsScheduler } from './cases/case-leads.scheduler';
+import { CaseLeadsWorker } from './cases/case-leads.worker';
 import { CaseEventsService } from './case-events.service';
 import { NamespacesController } from './registry/namespaces.controller';
 import { SitemapController } from './sitemap/sitemap.controller';
@@ -216,7 +220,9 @@ import {
     InquiriesService,
     CaseThreadsService,
     CaseBoardReadService,
+    CaseBoardThumbnailService,
     CaseBoardService,
+    CaseBoardToolsService,
     QuickSearchService,
     GraphService,
     AgentMemoryService,
@@ -230,6 +236,10 @@ import {
     ChatBotsService,
     GlossaryService,
     CaseLeadsService,
+    // Keeps each case's leads current: asked for by CaseActivityService (so it
+    // is provided wherever that is), run by the worker below.
+    CaseLeadsScheduler,
+    CaseLeadsWorker,
     CaseEventsService,
     NamespaceWorkerManager,
     SitemapService,

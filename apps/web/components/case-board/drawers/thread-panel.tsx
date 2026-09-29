@@ -885,7 +885,7 @@ function ThreadMenu({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-white hover:bg-destructive/90" onClick={() => void remove()}>
+            <AlertDialogAction variant="destructive" onClick={() => void remove()}>
               {t("caseBoard.thread.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>

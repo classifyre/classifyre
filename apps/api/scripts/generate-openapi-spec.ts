@@ -13,8 +13,10 @@
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from '../src/app.module';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
+import { McpToolsCatalogService } from '../src/mcp-tools-catalog.service';
+import { MCP_CAPABILITY_GROUPS, MCP_PROMPTS } from '../src/mcp-catalog';
+import { mkdirSync, writeFileSync } from 'fs';
+import { dirname, join } from 'path';
 
 /**
  * A syntactically valid connection URL for providers that build a pg Pool at
@@ -84,6 +86,41 @@ async function generateSpec() {
   console.log(`📄 Root mirror: ${rootOutputPath}`);
   console.log(`📊 Endpoints: ${Object.keys(document.paths).length}`);
   console.log(`🏷️  Tags: ${document.tags?.length || 0}`);
+
+  // The MCP tool catalog for the docs site (Settings → MCP Server), read back
+  // from the tools the server really registers, like the settings page does —
+  // so the documented tools, scopes and parameters cannot drift from the code.
+  const tools = app.get(McpToolsCatalogService).getTools();
+  const catalog = {
+    groups: MCP_CAPABILITY_GROUPS.map((group) => ({
+      id: group.id,
+      title: group.title,
+      description: group.description,
+      operations: group.operations,
+      tools: group.toolNames.map((name) => {
+        const tool = tools.find((t) => t.name === name);
+        return {
+          name,
+          title: tool?.title ?? name,
+          description: tool?.description ?? '',
+          readOnly: tool?.readOnly ?? false,
+          destructive: tool?.destructive ?? false,
+          idempotent: tool?.idempotent ?? false,
+          parameters: tool?.parameters ?? [],
+        };
+      }),
+    })),
+    prompts: MCP_PROMPTS,
+  };
+  const catalogPath = join(
+    __dirname,
+    '../../docs/src/_generated/mcp-catalog.json',
+  );
+  mkdirSync(dirname(catalogPath), { recursive: true });
+  writeFileSync(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
+  console.log(
+    `🧰 MCP catalog: ${tools.length} tools in ${catalog.groups.length} groups → ${catalogPath}`,
+  );
 
   await app.close();
 }

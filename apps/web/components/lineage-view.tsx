@@ -33,6 +33,14 @@ import type {
   NodeDecoration,
 } from "./graph-explorer/explorer-types";
 import { useNsPath } from "@/lib/ns-path";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@workspace/ui/components/dropdown-menu";
+import { useAddToCase } from "@/components/case-target/case-target";
+import {
+  AddToCaseButton,
+  AddToCaseMenuItem,
+  nodeCandidate,
+  useCaseDecorator,
+} from "@/components/case-target/case-target-menu";
 
 /**
  * Everything this asset is connected to: where its data came from, what
@@ -50,6 +58,9 @@ const EXTERNAL_DECO: NodeDecoration = { ringColor: ACCENT };
 
 export function LineageView({ assetId }: { assetId: string }) {
   const nsPath = useNsPath();
+  // Right-click an asset to add it to a case: this case inside a case board,
+  // any case elsewhere.
+  const { target: caseTarget, dialog: caseDialog } = useAddToCase();
   const [direction, setDirection] = React.useState<Direction>("both");
   const [collapse, setCollapse] = React.useState(false);
   const [nodes, setNodes] = React.useState<GraphNodeDto[]>([]);
@@ -147,9 +158,27 @@ export function LineageView({ assetId }: { assetId: string }) {
     [nodes],
   );
 
-  const nodeDecorator = React.useCallback(
+  const baseDecorator = React.useCallback(
     (n: GraphNodeDto) => (n.type === "external" ? EXTERNAL_DECO : null),
     [],
+  );
+  const nodeDecorator = useCaseDecorator(caseTarget, baseDecorator);
+
+  const nodeMenu = React.useCallback(
+    (node: GraphNodeDto, close: () => void) => {
+      const candidate = nodeCandidate(node);
+      if (!candidate) return null;
+      return (
+        <>
+          <AddToCaseMenuItem target={caseTarget} candidates={[candidate]} onDone={close} />
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => window.open(nsPath(`/assets/${node.id}`), "_blank", "noopener")}>
+            <ExternalLink className="size-4" /> Open asset
+          </DropdownMenuItem>
+        </>
+      );
+    },
+    [caseTarget, nsPath],
   );
 
   /**
@@ -195,6 +224,7 @@ export function LineageView({ assetId }: { assetId: string }) {
       nodeDecorator={nodeDecorator}
       edgeStyle={edgeStyle}
       clustering={{ assetStats }}
+      nodeMenu={nodeMenu}
       header={
         <>
           <Waypoints className="h-4 w-4 text-muted-foreground" />
@@ -270,7 +300,6 @@ export function LineageView({ assetId }: { assetId: string }) {
           )
         ) : undefined
       }
-      sidebarClassName="w-[260px] shrink-0 space-y-4 overflow-y-auto border-l-2 border-border bg-background p-3"
       sidebar={({ selectedNode }) =>
         selectedNode ? (
           <div className="space-y-3" key={keyOf(selectedNode)}>
@@ -308,22 +337,46 @@ export function LineageView({ assetId }: { assetId: string }) {
                 Add a source for it and this node fills itself in.
               </p>
             ) : (
-              <Button size="sm" variant="outline" asChild className="w-full">
-                <a
-                  href={nsPath(`/assets/${selectedNode.id}`)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                  Open asset
-                </a>
-              </Button>
+              <>
+                <SelectedAssetAddToCase node={selectedNode} target={caseTarget} />
+                <Button size="sm" variant="outline" asChild className="w-full">
+                  <a
+                    href={nsPath(`/assets/${selectedNode.id}`)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                    Open asset
+                  </a>
+                </Button>
+              </>
             )}
           </div>
         ) : (
           <EdgeClassLegend />
         )
       }
+    >
+      {caseDialog}
+    </GraphExplorer>
+  );
+}
+
+/** The selected asset's way into the case, as a full-width button. */
+function SelectedAssetAddToCase({
+  node,
+  target,
+}: {
+  node: GraphNodeDto;
+  target: ReturnType<typeof useAddToCase>["target"];
+}) {
+  const candidate = nodeCandidate(node);
+  if (!candidate) return null;
+  return (
+    <AddToCaseButton
+      target={target}
+      candidate={candidate}
+      className="h-8 w-full gap-1.5 text-xs"
     />
   );
 }

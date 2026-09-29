@@ -18,12 +18,14 @@ import type {
   ApplyBoardOpsDto,
   ApplyBoardOpsResponseDto,
   BoardNeighboursDto,
+  BoardThumbnailStateDto,
   BoardTraceRequestDto,
   BoardTraceResponseDto,
   CaseBoardResponseDto,
   CaseBoardSnapshotDto,
   CaseBoardSnapshotSummaryDto,
   GraphResponseDto,
+  PutBoardThumbnailDto,
 } from '../models/index';
 import {
     ApplyBoardOpsDtoFromJSON,
@@ -32,6 +34,8 @@ import {
     ApplyBoardOpsResponseDtoToJSON,
     BoardNeighboursDtoFromJSON,
     BoardNeighboursDtoToJSON,
+    BoardThumbnailStateDtoFromJSON,
+    BoardThumbnailStateDtoToJSON,
     BoardTraceRequestDtoFromJSON,
     BoardTraceRequestDtoToJSON,
     BoardTraceResponseDtoFromJSON,
@@ -44,6 +48,8 @@ import {
     CaseBoardSnapshotSummaryDtoToJSON,
     GraphResponseDtoFromJSON,
     GraphResponseDtoToJSON,
+    PutBoardThumbnailDtoFromJSON,
+    PutBoardThumbnailDtoToJSON,
 } from '../models/index';
 
 export interface CaseBoardControllerApplyOpsRequest {
@@ -67,6 +73,11 @@ export interface CaseBoardControllerListSnapshotsRequest {
 export interface CaseBoardControllerNeighboursRequest {
     id: string;
     boardNeighboursDto: BoardNeighboursDto;
+}
+
+export interface CaseBoardControllerSaveThumbnailRequest {
+    id: string;
+    putBoardThumbnailDto: PutBoardThumbnailDto;
 }
 
 export interface CaseBoardControllerTakeSnapshotRequest {
@@ -293,6 +304,53 @@ export class CaseBoardApi extends runtime.BaseAPI {
      */
     async caseBoardControllerNeighbours(requestParameters: CaseBoardControllerNeighboursRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GraphResponseDto> {
         const response = await this.caseBoardControllerNeighboursRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Store the board drawn small for its case card (a sketch the client builds from its canvas)
+     */
+    async caseBoardControllerSaveThumbnailRaw(requestParameters: CaseBoardControllerSaveThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BoardThumbnailStateDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseBoardControllerSaveThumbnail().'
+            );
+        }
+
+        if (requestParameters['putBoardThumbnailDto'] == null) {
+            throw new runtime.RequiredError(
+                'putBoardThumbnailDto',
+                'Required parameter "putBoardThumbnailDto" was null or undefined when calling caseBoardControllerSaveThumbnail().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/board/thumbnail`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: PutBoardThumbnailDtoToJSON(requestParameters['putBoardThumbnailDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BoardThumbnailStateDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Store the board drawn small for its case card (a sketch the client builds from its canvas)
+     */
+    async caseBoardControllerSaveThumbnail(requestParameters: CaseBoardControllerSaveThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BoardThumbnailStateDto> {
+        const response = await this.caseBoardControllerSaveThumbnailRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

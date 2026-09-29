@@ -18,6 +18,10 @@ import { z } from "zod";
  * undo/redo replay the same op without temp-id remapping. Creating ops are
  * idempotent on that id: replaying `item.create` for an item that was deleted
  * brings the same row back.
+ *
+ * The end of this file holds the board's geometry and layout (sizes, free
+ * spots, the layered layout), shared the same way: the web board places and
+ * tidies with it, and so do the API's arrange tools.
  */
 
 export const BOARD_COLORS = [
@@ -333,3 +337,699 @@ export const BOARD_GEOMETRY_PATCH_KEYS = [
   "collapsed",
   "parentId",
 ] as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Geometry and layout
+//
+// How much room things take on the board and where they go. The web board
+// draws and lays out with these numbers, and the API's arrange tools (MCP:
+// place, tidy up, frame) lay a board out without a browser, so both sides
+// agree on what overlaps what.
+//
+// Pure: no React, no DOM. It lives in this file rather than a sibling module
+// because the API loads this file as it is at runtime: Node strips the types
+// but will not resolve an extension-less relative import.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface XY {
+  x: number;
+  y: number;
+}
+
+/** A box on the canvas: its top-left corner and its size. */
+export interface Rect extends XY {
+  w: number;
+  h: number;
+}
+
+/**
+ * The room an item takes around its position. Evidence reaches left of and
+ * above its asset node, because its findings sit around it; hence the offsets.
+ */
+export interface Extent {
+  dx: number;
+  dy: number;
+  width: number;
+  height: number;
+}
+
+/** An asset: a circle with its kind icon and its name under it (PRD §5.2). */
+export const ASSET_NODE = {
+  width: 176,
+  /** Asset circle centre, leaving room above for hypothesis dots and badges. */
+  cx: 88,
+  cy: 30,
+  r: 19,
+  /** The lime "in the case" ring. */
+  ring: 24,
+  height: 92,
+} as const;
+
+/** A finding: a small circle in its severity's colour, its label under it. */
+export const FINDING_NODE = {
+  width: 132,
+  cx: 66,
+  cy: 17,
+  r: 13,
+  height: 50,
+} as const;
+
+/** An expanded asset draws this many finding nodes; the rest wait behind "▸n". */
+export const MAX_FINDING_NODES = 12;
+
+/** Hypothesis cards are this wide; their height follows the statement. */
+export const HYPOTHESIS_WIDTH = 300;
+
+/** A frame's title bar; its contents start below it. */
+export const FRAME_TITLE_HEIGHT = 40;
+
+/** Clear space kept between a frame's edge and what is inside it. */
+export const FRAME_PADDING = 24;
+
+export const DEFAULT_NOTE_SIZE = { width: 220, height: 160 } as const;
+export const DEFAULT_FRAME_SIZE = { width: 640, height: 400 } as const;
+/** The smallest frame the board draws. */
+export const MIN_FRAME_SIZE = { width: 320, height: 200 } as const;
+export const COMMENT_PIN_SIZE = { width: 40, height: 32 } as const;
+
+/** Radius of the ring the default finding spots sit on: wide enough that labels don't collide. */
+export function ringRadius(count: number): number {
+  return Math.max(118, Math.round((count * 96) / (2 * Math.PI)));
+}
+
+/**
+ * Default spot of finding `index` of `count`, as the finding node's top-left
+ * relative to the asset node's top-left. A few findings fan out to the right
+ * of their asset; four or more go all the way round, starting at 12 o'clock.
+ */
+export function defaultFindingSpot(index: number, count: number): XY {
+  const r = ringRadius(count);
+  let angle: number;
+  if (count <= 3) {
+    const spread = count === 1 ? 0 : count === 2 ? Math.PI / 7 : Math.PI / 4.5;
+    angle = count === 1 ? 0 : -spread + (2 * spread * index) / (count - 1);
+  } else {
+    angle = -Math.PI / 2 + (2 * Math.PI * index) / count;
+  }
+  return {
+    x: Math.round(ASSET_NODE.cx + r * Math.cos(angle) - FINDING_NODE.cx),
+    y: Math.round(ASSET_NODE.cy + r * Math.sin(angle) - FINDING_NODE.cy),
+  };
+}
+
+/**
+ * The room evidence takes: its asset node and the finding nodes drawn around
+ * it. `findingIds` are the findings drawn, in drawing order (at most
+ * MAX_FINDING_NODES unless the asset shows all); a finding someone dragged
+ * sits at its `findingPositions` spot, the others at their default spots. A
+ * collapsed asset is the asset node alone.
+ */
+export function evidenceExtent(opts: {
+  collapsed?: boolean | null;
+  findingIds: readonly string[];
+  findingPositions?: Readonly<Record<string, XY | null | undefined>> | null;
+}): Extent {
+  let x0 = 0;
+  let y0 = 0;
+  let x1: number = ASSET_NODE.width;
+  let y1: number = ASSET_NODE.height;
+  if (!opts.collapsed) {
+    const count = opts.findingIds.length;
+    opts.findingIds.forEach((findingId, index) => {
+      const spot =
+        opts.findingPositions?.[findingId] ?? defaultFindingSpot(index, count);
+      x0 = Math.min(x0, spot.x);
+      y0 = Math.min(y0, spot.y);
+      x1 = Math.max(x1, spot.x + FINDING_NODE.width);
+      y1 = Math.max(y1, spot.y + FINDING_NODE.height);
+    });
+  }
+  return { dx: x0, dy: y0, width: x1 - x0, height: y1 - y0 };
+}
+
+/**
+ * A hypothesis card's height before anything measured it: header, up to four
+ * lines of statement, confidence and the stance counts.
+ */
+export function estimateHypothesisHeight(statement: string | null | undefined): number {
+  const chars = (statement ?? "").trim().length;
+  const lines = Math.min(4, Math.max(1, Math.ceil(chars / 38)));
+  return 116 + 18 * lines;
+}
+
+export function overlaps(a: Rect, b: Rect, gap: number): boolean {
+  return (
+    a.x < b.x + b.w + gap &&
+    a.x + a.w + gap > b.x &&
+    a.y < b.y + b.h + gap &&
+    a.y + a.h + gap > b.y
+  );
+}
+
+/**
+ * Walk outwards from `anchor` in rings until a spot that overlaps nothing.
+ * The first candidates of each ring lie right of the anchor, so what is placed
+ * reads as "next to" what it belongs to.
+ */
+export function freeSpotNear(
+  anchor: XY,
+  size: { width: number; height: number },
+  taken: readonly Rect[],
+  gap = 48,
+  step = 60,
+): XY {
+  for (let ring = 0; ring < 60; ring += 1) {
+    const d = ring * step;
+    const candidates: XY[] =
+      ring === 0
+        ? [anchor]
+        : [
+            { x: anchor.x + d, y: anchor.y },
+            { x: anchor.x, y: anchor.y + d },
+            { x: anchor.x + d, y: anchor.y + d },
+            { x: anchor.x + d, y: anchor.y - d },
+            { x: anchor.x, y: anchor.y - d },
+            { x: anchor.x - d, y: anchor.y },
+            { x: anchor.x - d, y: anchor.y + d },
+            { x: anchor.x - d, y: anchor.y - d },
+          ];
+    for (const c of candidates) {
+      const r = { x: c.x, y: c.y, w: size.width, h: size.height };
+      if (!taken.some((t) => overlaps(r, t, gap))) return c;
+    }
+  }
+  return anchor;
+}
+
+/** An item to place, with the box it needs relative to its position. */
+export interface PlaceRequest {
+  id: string;
+  box: Extent;
+}
+
+/**
+ * Places new items next to what they connect to (PRD §8.9), growing outwards:
+ * the item with the most neighbours already on the board goes first, and once
+ * placed it anchors the items that only connect to it. So a batch that arrives
+ * as a chain (evidence → hypothesis → evidence) lands as a chain, not as one
+ * item by the board and the rest in a separate block.
+ *
+ * `rectOf` gives the rect of an item already on the board, `taken` the rects
+ * nothing may overlap. Returns item positions (box offsets removed) and the
+ * items with no path to the board, left for the caller to lay out as a block.
+ */
+export function placeNearNeighbours(opts: {
+  items: readonly PlaceRequest[];
+  rectOf: (id: string) => Rect | undefined;
+  neighbours: (id: string) => readonly string[];
+  taken: readonly Rect[];
+  gap: number;
+}): { positions: Map<string, XY>; orphans: PlaceRequest[] } {
+  const { items, rectOf, neighbours, gap } = opts;
+  const taken = [...opts.taken];
+  const placed = new Map<string, Rect>();
+  const positions = new Map<string, XY>();
+  const rect = (id: string) => placed.get(id) ?? rectOf(id);
+  const pending = new Map(items.map((i) => [i.id, i]));
+
+  for (;;) {
+    // Most anchors first; ties keep the input (model) order.
+    let best: { item: PlaceRequest; anchors: Rect[] } | null = null;
+    for (const item of pending.values()) {
+      const anchors = neighbours(item.id)
+        .filter((id) => id !== item.id)
+        .map(rect)
+        .filter((r): r is Rect => r !== undefined);
+      if (anchors.length > 0 && (!best || anchors.length > best.anchors.length)) {
+        best = { item, anchors };
+      }
+    }
+    if (!best) break;
+    const { item, anchors } = best;
+    const cx = anchors.reduce((sum, r) => sum + r.x + r.w / 2, 0) / anchors.length;
+    const cy = anchors.reduce((sum, r) => sum + r.y + r.h / 2, 0) / anchors.length;
+    const size = { width: item.box.width, height: item.box.height };
+    const at = freeSpotNear({ x: cx + 60, y: cy - size.height / 2 }, size, taken, gap);
+    const r: Rect = { x: at.x, y: at.y, w: size.width, h: size.height };
+    taken.push(r);
+    placed.set(item.id, r);
+    positions.set(item.id, { x: at.x - item.box.dx, y: at.y - item.box.dy });
+    pending.delete(item.id);
+  }
+  return { positions, orphans: [...pending.values()] };
+}
+
+/**
+ * Where an item lands when it is moved into a frame: the first free spot, row
+ * by row, inside the frame's padding. With no room left it goes below
+ * everything there, and `grow` is the size the frame needs to hold it.
+ * `siblings` are the boxes already inside, relative to the frame; the result
+ * is relative to the frame too, as a child's position is.
+ */
+export function spotInFrame(
+  frame: { width: number; height: number },
+  siblings: readonly Rect[],
+  ext: Extent,
+): { at: XY; grow: { width: number; height: number } | null } {
+  const { width, height } = frame;
+  const top = FRAME_TITLE_HEIGHT + FRAME_PADDING / 2;
+  const step = 20;
+  for (let y = top; y + ext.height <= height - FRAME_PADDING; y += step) {
+    for (let x = FRAME_PADDING; x + ext.width <= width - FRAME_PADDING; x += step) {
+      const box = { x, y, w: ext.width, h: ext.height };
+      if (!siblings.some((r) => overlaps(box, r, FRAME_PADDING))) {
+        return { at: { x: x - ext.dx, y: y - ext.dy }, grow: null };
+      }
+    }
+  }
+  const x = FRAME_PADDING;
+  const y = Math.max(top, ...siblings.map((r) => r.y + r.h + FRAME_PADDING));
+  return {
+    at: { x: x - ext.dx, y: y - ext.dy },
+    grow: {
+      width: Math.max(width, x + ext.width + FRAME_PADDING),
+      height: Math.max(height, y + ext.height + FRAME_PADDING),
+    },
+  };
+}
+
+export interface LayoutNode {
+  id: string;
+  width: number;
+  height: number;
+}
+
+/** A relation the layout should keep short; it reads source → target, left to right. */
+export interface LayoutEdge {
+  source: string;
+  target: string;
+}
+
+/** Spacing of the layered layout: the numbers the board's Tidy up gives ELK. */
+export const LAYERED_LAYOUT = {
+  nodeSpacing: 60,
+  layerSpacing: 140,
+  componentSpacing: 100,
+  aspectRatio: 1.8,
+} as const;
+
+interface LaidOutComponent {
+  positions: Map<string, XY>;
+  width: number;
+  height: number;
+  count: number;
+  /** Input index of its first node: ties between groups keep the input order. */
+  first: number;
+}
+
+/**
+ * A layered layout, left to right, without a browser: what the board's Tidy
+ * up does with ELK, for the API (the MCP arrange tools) and anything else
+ * that must lay a board out server-side.
+ *
+ * Each connected group gets its own columns: a relation's source sits left
+ * of its target (cycles are broken where a depth-first walk closes them),
+ * nodes within a column are ordered to cross few lines and centred on what
+ * feeds them. Groups are then packed in rows towards a 1.8 aspect ratio,
+ * biggest first. Unrelated nodes are groups of one, so they pack into a grid.
+ *
+ * Returns each node's top-left corner, offset by `origin`. Deterministic: the
+ * same input gives the same picture.
+ */
+export function layeredLayout(
+  nodes: readonly LayoutNode[],
+  edges: readonly LayoutEdge[],
+  origin: XY = { x: 0, y: 0 },
+): Map<string, XY> {
+  const out = new Map<string, XY>();
+  if (nodes.length === 0) return out;
+  const index = new Map<string, number>();
+  const size = new Map<string, LayoutNode>();
+  nodes.forEach((n, i) => {
+    if (index.has(n.id)) return;
+    index.set(n.id, i);
+    size.set(n.id, n);
+  });
+
+  const succ = new Map<string, string[]>();
+  const adjacent = new Map<string, string[]>();
+  const push = (map: Map<string, string[]>, key: string, value: string) => {
+    const list = map.get(key);
+    if (list) list.push(value);
+    else map.set(key, [value]);
+  };
+  const seen = new Set<string>();
+  for (const e of edges) {
+    if (e.source === e.target || !index.has(e.source) || !index.has(e.target)) continue;
+    const key = `${e.source}\u0000${e.target}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    push(succ, e.source, e.target);
+    push(adjacent, e.source, e.target);
+    push(adjacent, e.target, e.source);
+  }
+
+  // Connected groups, each listed in input order.
+  const grouped = new Set<string>();
+  const components: string[][] = [];
+  for (const id of index.keys()) {
+    if (grouped.has(id)) continue;
+    grouped.add(id);
+    const members: string[] = [];
+    const queue = [id];
+    for (let head = 0; head < queue.length; head += 1) {
+      const current = queue[head]!;
+      members.push(current);
+      for (const next of adjacent.get(current) ?? []) {
+        if (grouped.has(next)) continue;
+        grouped.add(next);
+        queue.push(next);
+      }
+    }
+    members.sort((a, b) => index.get(a)! - index.get(b)!);
+    components.push(members);
+  }
+
+  const blocks = components.map((members) =>
+    layoutComponent(members, succ, size, index.get(members[0]!)!),
+  );
+
+  // Pack the groups in rows, biggest first, towards the target aspect ratio.
+  blocks.sort((a, b) => b.count - a.count || a.first - b.first);
+  const gap = LAYERED_LAYOUT.componentSpacing;
+  const area = blocks.reduce((sum, b) => sum + (b.width + gap) * (b.height + gap), 0);
+  const rowWidth = Math.max(
+    ...blocks.map((b) => b.width),
+    Math.sqrt(area * LAYERED_LAYOUT.aspectRatio),
+  );
+  let cx = 0;
+  let cy = 0;
+  let rowHeight = 0;
+  for (const block of blocks) {
+    if (cx > 0 && cx + block.width > rowWidth) {
+      cx = 0;
+      cy += rowHeight + gap;
+      rowHeight = 0;
+    }
+    for (const [id, p] of block.positions) {
+      out.set(id, {
+        x: Math.round(origin.x + cx + p.x),
+        y: Math.round(origin.y + cy + p.y),
+      });
+    }
+    cx += block.width + gap;
+    rowHeight = Math.max(rowHeight, block.height);
+  }
+  return out;
+}
+
+function layoutComponent(
+  members: readonly string[],
+  succ: ReadonlyMap<string, readonly string[]>,
+  size: ReadonlyMap<string, LayoutNode>,
+  first: number,
+): LaidOutComponent {
+  const inGroup = new Set(members);
+  const dagSucc = new Map<string, string[]>();
+  const dagPred = new Map<string, string[]>();
+  const dagEdges = new Set<string>();
+  const addDag = (from: string, to: string) => {
+    const key = `${from}\u0000${to}`;
+    if (dagEdges.has(key)) return;
+    dagEdges.add(key);
+    (dagSucc.get(from) ?? dagSucc.set(from, []).get(from)!).push(to);
+    (dagPred.get(to) ?? dagPred.set(to, []).get(to)!).push(from);
+  };
+
+  // Break cycles: a depth-first walk in input order reverses every edge that
+  // closes a cycle (it points back at a node still on the walk's stack).
+  const state = new Map<string, 1 | 2>();
+  for (const root of members) {
+    if (state.has(root)) continue;
+    state.set(root, 1);
+    const stack: Array<{ id: string; next: number }> = [{ id: root, next: 0 }];
+    while (stack.length > 0) {
+      const top = stack[stack.length - 1]!;
+      const outs = (succ.get(top.id) ?? []).filter((to) => inGroup.has(to));
+      if (top.next < outs.length) {
+        const to = outs[top.next]!;
+        top.next += 1;
+        const s = state.get(to);
+        if (s === 1) {
+          addDag(to, top.id);
+        } else {
+          addDag(top.id, to);
+          if (s === undefined) {
+            state.set(to, 1);
+            stack.push({ id: to, next: 0 });
+          }
+        }
+      } else {
+        state.set(top.id, 2);
+        stack.pop();
+      }
+    }
+  }
+
+  // Longest-path layering: a node sits one column right of its rightmost source.
+  const layer = new Map<string, number>(members.map((id) => [id, 0]));
+  const indegree = new Map<string, number>(
+    members.map((id) => [id, (dagPred.get(id) ?? []).length]),
+  );
+  const topo = members.filter((id) => indegree.get(id) === 0);
+  for (let head = 0; head < topo.length; head += 1) {
+    const id = topo[head]!;
+    for (const to of dagSucc.get(id) ?? []) {
+      layer.set(to, Math.max(layer.get(to)!, layer.get(id)! + 1));
+      const left = indegree.get(to)! - 1;
+      indegree.set(to, left);
+      if (left === 0) topo.push(to);
+    }
+  }
+  // A lone input sits just left of what it feeds, not in the first column.
+  for (const id of topo) {
+    if ((dagPred.get(id) ?? []).length > 0) continue;
+    const outs = dagSucc.get(id) ?? [];
+    if (outs.length === 0) continue;
+    layer.set(id, Math.max(0, Math.min(...outs.map((to) => layer.get(to)!)) - 1));
+  }
+  const used = [...new Set(layer.values())].sort((a, b) => a - b);
+  const column = new Map(used.map((value, i) => [value, i]));
+  const layers: string[][] = used.map(() => []);
+  for (const id of members) layers[column.get(layer.get(id)!)!]!.push(id);
+
+  // Order each column to cross few lines: barycentre sweeps, left to right
+  // and back, over relative positions so columns of any length compare.
+  const pos = new Map<string, number>();
+  const setPos = (row: readonly string[]) =>
+    row.forEach((id, i) => pos.set(id, (i + 0.5) / row.length));
+  layers.forEach(setPos);
+  const sweep = (row: string[], neighbours: (id: string) => readonly string[]) => {
+    const keyed = row.map((id, i) => {
+      const ns = neighbours(id);
+      const bary =
+        ns.length > 0
+          ? ns.reduce((sum, n) => sum + pos.get(n)!, 0) / ns.length
+          : pos.get(id)!;
+      return { id, bary, i };
+    });
+    keyed.sort((a, b) => a.bary - b.bary || a.i - b.i);
+    keyed.forEach((k, i) => {
+      row[i] = k.id;
+    });
+    setPos(row);
+  };
+  const preds = (id: string) => dagPred.get(id) ?? [];
+  const succs = (id: string) => dagSucc.get(id) ?? [];
+  for (let pass = 0; pass < 4; pass += 1) {
+    for (let l = 1; l < layers.length; l += 1) sweep(layers[l]!, preds);
+    for (let l = layers.length - 2; l >= 0; l -= 1) sweep(layers[l]!, succs);
+  }
+  for (let l = 1; l < layers.length; l += 1) sweep(layers[l]!, preds);
+
+  // Coordinates: columns left to right, each node centred in its column and
+  // as close as the column allows to the middle of what feeds it.
+  const node = (id: string) => size.get(id)!;
+  const columnWidth = layers.map((row) => Math.max(...row.map((id) => node(id).width)));
+  const columnX: number[] = [];
+  let x = 0;
+  for (let l = 0; l < layers.length; l += 1) {
+    columnX.push(x);
+    x += columnWidth[l]! + LAYERED_LAYOUT.layerSpacing;
+  }
+  const top = new Map<string, number>();
+  const centre = (id: string) => top.get(id)! + node(id).height / 2;
+  for (const row of layers) {
+    let bottom = Number.NEGATIVE_INFINITY;
+    const placed: Array<{ id: string; y: number; want: number | null }> = [];
+    for (const id of row) {
+      const fed = preds(id).filter((p) => top.has(p));
+      const want =
+        fed.length > 0
+          ? fed.reduce((sum, p) => sum + centre(p), 0) / fed.length - node(id).height / 2
+          : null;
+      const y =
+        bottom === Number.NEGATIVE_INFINITY
+          ? (want ?? 0)
+          : Math.max(want ?? Number.NEGATIVE_INFINITY, bottom + LAYERED_LAYOUT.nodeSpacing);
+      placed.push({ id, y, want });
+      bottom = y + node(id).height;
+    }
+    // Room was made by pushing nodes down; lift the column back so, on
+    // average, it sits where its sources wanted it.
+    const pushed = placed.filter((p) => p.want !== null).map((p) => p.y - p.want!);
+    const lift = pushed.length > 0 ? pushed.reduce((sum, d) => sum + d, 0) / pushed.length : 0;
+    for (const p of placed) top.set(p.id, p.y - lift);
+  }
+
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const id of members) {
+    minY = Math.min(minY, top.get(id)!);
+    maxY = Math.max(maxY, top.get(id)! + node(id).height);
+  }
+  const positions = new Map<string, XY>();
+  layers.forEach((row, l) => {
+    for (const id of row) {
+      positions.set(id, {
+        x: columnX[l]! + (columnWidth[l]! - node(id).width) / 2,
+        y: top.get(id)! - minY,
+      });
+    }
+  });
+  return {
+    positions,
+    width: x - LAYERED_LAYOUT.layerSpacing,
+    height: maxY - minY,
+    count: members.length,
+    first,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Board sketch: the case card's thumbnail
+//
+// The board drawn small, as shapes rather than pixels. The web board builds it
+// from its own state once an edit settles and stores it with
+// `PUT /cases/:id/board/thumbnail`; the case list draws it on each card.
+// Shapes instead of a screenshot because a DOM capture has to render every
+// off-screen node and blocks the page for as long as it takes, an image cannot
+// follow the viewer's light or dark theme, and a few kilobytes of JSON is all a
+// card needs. It is a likeness, not a record: the board is the record.
+//
+// Coordinates are integers in the sketch's own box, (0,0) to (w,h). Asset,
+// finding and comment shapes are placed by their centre, boxes by their
+// top-left corner.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const BOARD_SKETCH_VERSION = 1;
+/** A card is a few hundred pixels wide; past this many shapes it is texture. */
+export const BOARD_SKETCH_MAX_NODES = 250;
+export const BOARD_SKETCH_MAX_EDGES = 400;
+/** Labels are cut to this; a card shows a line or two at most. */
+export const BOARD_SKETCH_LABEL_MAX_CHARS = 80;
+/** The serialized size the API accepts. Caps above keep a real sketch well under it. */
+export const BOARD_SKETCH_MAX_BYTES = 64 * 1024;
+
+export const BOARD_SKETCH_SEVERITIES = ["critical", "high", "medium", "low", "info"] as const;
+export type BoardSketchSeverity = (typeof BOARD_SKETCH_SEVERITIES)[number];
+
+/**
+ * How an edge is drawn: `c` an asset to one of its findings, `g` the same to a
+ * finding outside the case; `l` lineage, `k` links, `d` duplicates, `s`
+ * look-alikes; `m` a link someone drew, `q` a suspected one; `+`, `-` and `0`
+ * a hypothesis supported, contradicted or neutral.
+ */
+export const BOARD_SKETCH_EDGE_STYLES = ["c", "g", "l", "k", "d", "s", "m", "q", "+", "-", "0"] as const;
+export type BoardSketchEdgeStyle = (typeof BOARD_SKETCH_EDGE_STYLES)[number];
+
+const SKETCH_EXTENT_LIMIT = 2 * COORD_LIMIT;
+const SketchCoord = z.number().int().min(0).max(SKETCH_EXTENT_LIMIT);
+const SketchSize = z.number().int().min(1).max(SIZE_LIMIT);
+const SketchLabel = z.string().max(BOARD_SKETCH_LABEL_MAX_CHARS).optional();
+const SketchSeverity = z.enum(BOARD_SKETCH_SEVERITIES);
+const SketchFlag = z.literal(true).optional();
+
+export const BoardSketchNodeSchema = z.discriminatedUnion("t", [
+  /** An asset. `d`: its findings are folded away, worst severity. `m`: gone from its source. */
+  z.strictObject({
+    t: z.literal("a"),
+    x: SketchCoord,
+    y: SketchCoord,
+    d: SketchSeverity.optional(),
+    m: SketchFlag,
+    h: BoardColorSchema.optional(),
+    l: SketchLabel,
+  }),
+  /** A finding. `o`: resolved, dismissed or gone. `g`: not in the case. */
+  z.strictObject({
+    t: z.literal("f"),
+    x: SketchCoord,
+    y: SketchCoord,
+    s: SketchSeverity,
+    o: SketchFlag,
+    g: SketchFlag,
+  }),
+  /** A hypothesis card, in its colour. `o`: resolved. */
+  z.strictObject({
+    t: z.literal("h"),
+    x: SketchCoord,
+    y: SketchCoord,
+    w: SketchSize,
+    h: SketchSize,
+    c: z.string().regex(/^#[0-9a-f]{6}$/i),
+    l: SketchLabel,
+    o: SketchFlag,
+  }),
+  /** A sticky note. */
+  z.strictObject({
+    t: z.literal("n"),
+    x: SketchCoord,
+    y: SketchCoord,
+    w: SketchSize,
+    h: SketchSize,
+    c: BoardColorSchema,
+    l: SketchLabel,
+  }),
+  /** A frame. `k`: collapsed to its title bar. */
+  z.strictObject({
+    t: z.literal("r"),
+    x: SketchCoord,
+    y: SketchCoord,
+    w: SketchSize,
+    h: SketchSize,
+    c: BoardColorSchema,
+    l: SketchLabel,
+    k: SketchFlag,
+  }),
+  /** A comment pin. */
+  z.strictObject({ t: z.literal("p"), x: SketchCoord, y: SketchCoord }),
+]);
+export type BoardSketchNode = z.infer<typeof BoardSketchNodeSchema>;
+
+const SketchIndex = z.number().int().min(0).max(BOARD_SKETCH_MAX_NODES - 1);
+
+/** An edge between two nodes of the sketch, by their index. */
+export const BoardSketchEdgeSchema = z.strictObject({
+  a: SketchIndex,
+  b: SketchIndex,
+  t: z.enum(BOARD_SKETCH_EDGE_STYLES),
+});
+export type BoardSketchEdge = z.infer<typeof BoardSketchEdgeSchema>;
+
+export const BoardSketchSchema = z
+  .strictObject({
+    v: z.literal(BOARD_SKETCH_VERSION),
+    w: z.number().int().min(0).max(SKETCH_EXTENT_LIMIT),
+    h: z.number().int().min(0).max(SKETCH_EXTENT_LIMIT),
+    nodes: z.array(BoardSketchNodeSchema).max(BOARD_SKETCH_MAX_NODES),
+    edges: z.array(BoardSketchEdgeSchema).max(BOARD_SKETCH_MAX_EDGES),
+  })
+  .superRefine((sketch, ctx) => {
+    sketch.edges.forEach((edge, i) => {
+      if (edge.a >= sketch.nodes.length || edge.b >= sketch.nodes.length) {
+        ctx.addIssue({ code: "custom", path: ["edges", i], message: "edge endpoint is not a node of the sketch" });
+      }
+    });
+  });
+export type BoardSketch = z.infer<typeof BoardSketchSchema>;

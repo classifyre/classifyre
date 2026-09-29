@@ -26,5 +26,10 @@ export default function EditInquiryPage() {
     );
   }
 
-  return <InquiryForm mode="edit" inquiryId={inquiryId} initial={inquiry} />;
+  // The form reads ?returnTo= (useSearchParams needs a boundary).
+  return (
+    <React.Suspense>
+      <InquiryForm mode="edit" inquiryId={inquiryId} initial={inquiry} />
+    </React.Suspense>
+  );
 }

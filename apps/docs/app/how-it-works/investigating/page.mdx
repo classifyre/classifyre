@@ -41,15 +41,19 @@ from scratch.
 ## Leads: a triage queue, not evidence yet
 
 A **lead** is a *candidate* — something that might belong in the case, but
-hasn't been confirmed. Leads come from a few places: findings that look like
-close neighbours of evidence you already accepted, high-importance matches from
-a linked inquiry, or a suggestion from an AI agent. A lead is never treated as
-evidence on its own — it sits in a queue until a person makes a call.
+hasn't been confirmed. Leads come from a few places: documents the duplicates
+engine pairs with evidence you already have (copies, or files sharing its key
+values), high-importance answers of a linked inquiry, findings that look like
+close neighbours of your evidence, or a suggestion from an AI agent. The case
+refreshes its own leads whenever its evidence or inquiries change. A lead is
+never treated as evidence on its own — it sits in a queue until a person makes
+a call. On the case board they live in the
+[Leads panel](/investigations/cases/leads/).
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> Proposed: Suggested by ranking,<br/>an inquiry, or an agent
+    [*] --> Proposed: Suggested by the case,<br/>an inquiry, or an agent
     Proposed --> Accepted: You confirm it belongs
     Proposed --> Dismissed: You rule it out
     Accepted --> [*]
@@ -60,6 +64,10 @@ stateDiagram-v2
 - **Accepted** — you've confirmed it, and it becomes evidence in the case.
 - **Dismissed** — you've ruled it out. Classifyre remembers this, so the same
   candidate isn't proposed again.
+
+A lead can also settle by itself: if its finding or document reaches the case
+another way, it counts as accepted; if the finding is resolved or filtered out
+before anyone looks, it quietly leaves the queue.
 
 That memory of dismissals matters: it's what keeps the queue useful instead of
 repeating itself.

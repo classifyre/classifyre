@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { FolderOpen, Plus, RefreshCw, Tags } from "lucide-react";
+import { FolderOpen, History, Plus, RefreshCw, Tags } from "lucide-react";
 import {
   api,
   setActiveNamespaceSlug,
@@ -25,8 +25,14 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { CreateNamespaceDialog } from "@/components/namespace/create-namespace-dialog";
+import { SectionHeading } from "@/components/section-heading";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocalePath } from "@/lib/app-path";
+import {
+  forgetOpened,
+  RECENT_WORKSPACES,
+  useRecentlyOpened,
+} from "@/lib/recently-opened";
 import { WorkspaceHeader } from "@/components/namespace/workspace-header";
 import { useActiveNamespaces } from "@/components/active-namespaces-provider";
 import { useNamespaceCategories } from "@/hooks/use-namespace-categories";
@@ -35,6 +41,9 @@ import {
   WorkspaceCard,
   WorkspaceCardSkeleton,
 } from "@/components/namespace/workspace-card";
+
+/** One row of the grid on a desktop. */
+const RECENT_COUNT = 3;
 
 /** A category heading plus the workspaces filed under it. */
 interface WorkspaceGroup {
@@ -96,6 +105,7 @@ function groupByCategory(
 
 export default function LandingPage() {
   const { t } = useTranslation();
+  const headingId = React.useId();
   const localePath = useLocalePath();
   const { removeBySlug } = useActiveNamespaces();
   const open = useOpenWorkspace();
@@ -165,6 +175,30 @@ export default function LandingPage() {
   };
 
   const hasWorkspaces = (namespaces?.length ?? 0) > 0;
+
+  // The workspaces opened last get a row of their own above the directory, as
+  // a shortcut. Unlike a workspace's cases they also stay in their categories:
+  // the directory is read by category, and a workspace missing from its own
+  // looks lost to whoever scrolls down to it.
+  const recent = useRecentlyOpened(RECENT_WORKSPACES);
+  const openedAt = React.useMemo(
+    () => new Map(recent.map((r) => [r.id, r.at])),
+    [recent],
+  );
+  const recentWorkspaces = React.useMemo(() => {
+    const byId = new Map((namespaces ?? []).map((ns) => [ns.id, ns]));
+    return recent.flatMap((r) => byId.get(r.id) ?? []).slice(0, RECENT_COUNT);
+  }, [namespaces, recent]);
+
+  // Deleted since they were opened: out of the row, so the next one moves up.
+  React.useEffect(() => {
+    if (!namespaces) return;
+    const live = new Set(namespaces.map((ns) => ns.id));
+    forgetOpened(
+      RECENT_WORKSPACES,
+      recent.filter((r) => !live.has(r.id)).map((r) => r.id),
+    );
+  }, [namespaces, recent]);
 
   const groups = React.useMemo(
     () =>
@@ -252,51 +286,96 @@ export default function LandingPage() {
             />
           </Card>
         ) : (
-          <div className="space-y-10">
-            {groups.map((group) => (
+          <div className="space-y-12">
+            {recentWorkspaces.length > 0 && (
               <section
-                key={group.id}
-                // Only label the section when the heading is actually rendered;
-                // a dangling aria-labelledby is worse than none.
-                aria-labelledby={
-                  showGroupHeadings ? `group-${group.id}` : undefined
-                }
+                aria-labelledby={`${headingId}-recent`}
+                className="space-y-5"
               >
-                {showGroupHeadings && (
-                  <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b pb-2">
-                    <h2
-                      id={`group-${group.id}`}
-                      className="font-serif text-lg uppercase tracking-[0.06em]"
-                    >
-                      {group.title}
-                    </h2>
-                    <span className="text-xs text-muted-foreground">
-                      {group.workspaces.length === 1
-                        ? t("workspaces.groupCountOne")
-                        : t("workspaces.groupCount", {
-                            count: group.workspaces.length,
-                          })}
-                    </span>
-                    {group.description && (
-                      <p className="w-full text-sm text-muted-foreground sm:w-auto sm:flex-1 sm:text-right">
-                        {group.description}
-                      </p>
-                    )}
-                  </div>
-                )}
+                <SectionHeading
+                  id={`${headingId}-recent`}
+                  icon={History}
+                  title={t("common.recentlyOpened")}
+                />
                 <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {group.workspaces.map((ns) => (
+                  {recentWorkspaces.map((ns) => (
                     <WorkspaceCard
                       key={ns.id}
                       namespace={ns}
                       stats={stats[ns.id]}
+                      openedAt={openedAt.get(ns.id)}
                       onOpen={open}
                       onDelete={setPendingDelete}
                     />
                   ))}
                 </div>
               </section>
-            ))}
+            )}
+            {groups.length > 0 && (
+              <section
+                aria-labelledby={
+                  recentWorkspaces.length > 0
+                    ? `${headingId}-rest`
+                    : undefined
+                }
+                className="space-y-5"
+              >
+                {recentWorkspaces.length > 0 && (
+                  <SectionHeading
+                    id={`${headingId}-rest`}
+                    title={t("workspaces.allWorkspaces")}
+                    count={namespaces.length}
+                  />
+                )}
+                <div className="space-y-10">
+                  {groups.map((group) => (
+                    <section
+                      key={group.id}
+                      // Only label the section when the heading is actually rendered;
+                      // a dangling aria-labelledby is worse than none.
+                      aria-labelledby={
+                        showGroupHeadings ? `group-${group.id}` : undefined
+                      }
+                    >
+                      {showGroupHeadings && (
+                        <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b pb-2">
+                          <h2
+                            id={`group-${group.id}`}
+                            className="font-serif text-lg uppercase tracking-[0.06em]"
+                          >
+                            {group.title}
+                          </h2>
+                          <span className="text-xs text-muted-foreground">
+                            {group.workspaces.length === 1
+                              ? t("workspaces.groupCountOne")
+                              : t("workspaces.groupCount", {
+                                  count: group.workspaces.length,
+                                })}
+                          </span>
+                          {group.description && (
+                            <p className="w-full text-sm text-muted-foreground sm:w-auto sm:flex-1 sm:text-right">
+                              {group.description}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                        {group.workspaces.map((ns) => (
+                          <WorkspaceCard
+                            key={ns.id}
+                            namespace={ns}
+                            stats={stats[ns.id]}
+                            openedAt={openedAt.get(ns.id)}
+                            onOpen={open}
+                            onDelete={setPendingDelete}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
 

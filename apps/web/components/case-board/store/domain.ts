@@ -2,6 +2,7 @@ import type {
   BoardItemDto,
   BoardLinkDto,
   CaseBoardResponseDto,
+  GraphEdgeDto,
   GraphNodeDto,
   GraphResponseDto,
 } from "@workspace/api-client";
@@ -286,17 +287,7 @@ export function buildDomain(
   for (const e of res.graph.edges) {
     const relationClass = e.relationClass ?? "REFERENCE";
     if (HIDDEN_CLASSES.has(relationClass) || e.relationType === "CONTAINS") continue;
-    const edge: SystemEdge = {
-      id: e.id,
-      from: nodeKey(e.fromType, e.fromId),
-      to: nodeKey(e.toType, e.toId),
-      relationType: e.relationType,
-      relationClass,
-      origin: e.origin,
-      confidence: e.confidence,
-      method: e.method ?? null,
-    };
-    d.systemEdges.set(e.id, edge);
+    d.systemEdges.set(e.id, toSystemEdge(e, relationClass));
   }
 
   // Suggested ghosts: live assets one hop from the evidence that are not on
@@ -382,18 +373,7 @@ export function mergeNeighbourGraph(
     if (HIDDEN_CLASSES.has(relationClass) || e.relationType === "CONTAINS") continue;
     const from = nodeKey(e.fromType, e.fromId);
     const to = nodeKey(e.toType, e.toId);
-    if (!systemEdges.has(e.id)) {
-      systemEdges.set(e.id, {
-        id: e.id,
-        from,
-        to,
-        relationType: e.relationType,
-        relationClass,
-        origin: e.origin,
-        confidence: e.confidence,
-        method: e.method ?? null,
-      });
-    }
+    if (!systemEdges.has(e.id)) systemEdges.set(e.id, toSystemEdge(e, relationClass));
     for (const key of [from, to]) {
       if (!key.startsWith("asset:")) continue;
       const assetId = key.slice(6);
@@ -420,6 +400,23 @@ export function mergeNeighbourGraph(
     }
   }
   return { ...d, systemEdges, suggested };
+}
+
+/** A platform edge as the board keeps it: what it draws, and what its details panel explains. */
+function toSystemEdge(e: GraphEdgeDto, relationClass: string): SystemEdge {
+  return {
+    id: e.id,
+    from: nodeKey(e.fromType, e.fromId),
+    to: nodeKey(e.toType, e.toId),
+    relationType: e.relationType,
+    relationClass,
+    origin: e.origin,
+    confidence: e.confidence,
+    method: e.method ?? null,
+    granularity: e.granularity ?? null,
+    fieldMappings: e.fieldMappings ?? undefined,
+    evidence: e.evidence ?? null,
+  };
 }
 
 export const ALL_SEVERITIES = SEVERITY_KEYS;

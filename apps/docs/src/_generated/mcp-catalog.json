@@ -1,0 +1,4989 @@
+{
+  "groups": [
+    {
+      "id": "sources",
+      "title": "Sources",
+      "description": "Create, validate, update, delete, inspect, and run ingestion sources.",
+      "operations": [
+        "Search and filter sources",
+        "Validate source configs against JSON Schema before save",
+        "Start connection tests and runs"
+      ],
+      "tools": [
+        {
+          "name": "list_source_types",
+          "title": "List Source Types",
+          "description": "List every source type that can be created (type id + label). Call this before create_source when unsure of the exact type id.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": []
+        },
+        {
+          "name": "get_source_schema",
+          "title": "Get Source Config Schema",
+          "description": "The full JSON Schema for one source type config — exact field names, required/masked/optional sections, defaults and enums. Call this before create_source/update_source and build the config to match.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "type",
+              "type": "string",
+              "required": true,
+              "description": "Source type id from list_source_types, e.g. POSTGRESQL"
+            }
+          ]
+        },
+        {
+          "name": "search_sources",
+          "title": "Search Sources",
+          "description": "Search and filter sources with latest runner summaries.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "filters",
+              "type": "object",
+              "required": false,
+              "description": "Source filters. Omit entirely to match all sources."
+            },
+            {
+              "name": "filters.search",
+              "type": "string",
+              "required": false,
+              "description": "Filter by source name (case-insensitive contains)."
+            },
+            {
+              "name": "filters.type",
+              "type": "string[]",
+              "required": false,
+              "description": "Filter by source type id (e.g. POSTGRESQL, CONFLUENCE). See list_source_types."
+            },
+            {
+              "name": "filters.status",
+              "type": "enum[]",
+              "required": false,
+              "description": "Filter by the status of each source’s latest run.",
+              "enumValues": [
+                "PENDING",
+                "RUNNING",
+                "COMPLETED",
+                "WARNING",
+                "ERROR",
+                "STOPPED"
+              ]
+            },
+            {
+              "name": "page",
+              "type": "object",
+              "required": false,
+              "description": "Pagination and sorting."
+            },
+            {
+              "name": "page.skip",
+              "type": "integer",
+              "required": false,
+              "description": "Offset. Defaults to 0."
+            },
+            {
+              "name": "page.limit",
+              "type": "integer",
+              "required": false,
+              "description": "Max results (1–200). Defaults to 25."
+            },
+            {
+              "name": "page.sortBy",
+              "type": "enum",
+              "required": false,
+              "description": "Sort field. Defaults to CREATED_AT.",
+              "enumValues": [
+                "NAME",
+                "TYPE",
+                "STATUS",
+                "CREATED_AT",
+                "UPDATED_AT",
+                "LAST_RUN_AT"
+              ]
+            },
+            {
+              "name": "page.sortOrder",
+              "type": "enum",
+              "required": false,
+              "description": "Defaults to DESC.",
+              "enumValues": [
+                "ASC",
+                "DESC"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "get_source",
+          "title": "Get Source",
+          "description": "Fetch a single source by ID. A CUSTOM source's notebook cells are summarised rather than inlined — the whole connector program would otherwise land in context on every read. Pass include_notebook when you actually need the code, or use get_notebook.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "include_notebook",
+              "type": "boolean",
+              "required": false,
+              "description": "Inline the notebook cells instead of just { revision, cellCount }"
+            }
+          ]
+        },
+        {
+          "name": "create_source",
+          "title": "Create Source",
+          "description": "Create a new source after validating the config against the source JSON Schema.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "type",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "config",
+              "type": "object",
+              "required": true
+            },
+            {
+              "name": "scheduleEnabled",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "scheduleCron",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "scheduleTimezone",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "update_source",
+          "title": "Update Source",
+          "description": "Update a source and optionally its schedule. Source configs are revalidated before save.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "type",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "config",
+              "type": "object",
+              "required": false
+            },
+            {
+              "name": "scheduleEnabled",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "scheduleCron",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "scheduleTimezone",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "delete_source",
+          "title": "Delete Source",
+          "description": "Delete a source and its associated schedules and data.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "test_source_connection",
+          "title": "Test Source Connection",
+          "description": "Run a lightweight connectivity test for a source.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "start_source_run",
+          "title": "Start Source Run",
+          "description": "Trigger a new ingestion run for a source.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "triggerType",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "MANUAL",
+                "SCHEDULED",
+                "WEBHOOK",
+                "API"
+              ]
+            },
+            {
+              "name": "triggeredBy",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "validate_source_config",
+          "title": "Validate Source Config",
+          "description": "Dry-run validate a source config against its JSON Schema without creating anything. Returns normalized config on success or a list of validation errors on failure.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "type",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "config",
+              "type": "unknown",
+              "required": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom_detectors",
+      "title": "Custom Detectors",
+      "description": "Manage regex, classifier, and entity detectors and train them on feedback.",
+      "operations": [
+        "Create detectors for rulesets, classifiers, and entities",
+        "Inspect starter examples before authoring a detector",
+        "Trigger training and inspect training history"
+      ],
+      "tools": [
+        {
+          "name": "list_custom_detectors",
+          "title": "List Custom Detectors",
+          "description": "List custom detectors and usage statistics.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "includeInactive",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_custom_detector",
+          "title": "Get Custom Detector",
+          "description": "Fetch a single custom detector.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "list_custom_detector_examples",
+          "title": "List Custom Detector Examples",
+          "description": "Return starter examples for ruleset, classifier, and entity detector authoring.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": []
+        },
+        {
+          "name": "create_custom_detector",
+          "title": "Create Custom Detector",
+          "description": "Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, or TAG. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={\"<key>\": \"<value>\"}), and it is not selectable on a source.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "key",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "aiProviderConfigId",
+              "type": "string",
+              "required": false,
+              "description": "AI provider credential ID. Required for LLM (AI) detectors.",
+              "format": "uuid"
+            },
+            {
+              "name": "pipeline_schema",
+              "type": "object",
+              "required": true,
+              "description": "Pipeline schema. GLiNER2 example: { type: \"GLINER2\", entities: { order_id: { description: \"Order ID like ORD-123\", required: true } }, classification: { intent: { labels: [\"refund\", \"bug\"], multi_label: false } } }. LLM (AI) example: { type: \"LLM\", system_prompt: \"Classify the sentiment of the text.\", labels: [{ name: \"good\" }, { name: \"bad\" }, { name: \"violent\" }], severity_map: [{ pattern: \"violent\", severity: \"critical\" }], output_fields: [{ name: \"language\", type: \"string\" }] }. TAG example: { type: \"TAG\", label: \"Cardholder data\", severity: \"high\" }"
+            },
+            {
+              "name": "isActive",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "update_custom_detector",
+          "title": "Update Custom Detector",
+          "description": "Update detector metadata, pipeline schema, AI provider credential, or activation status.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "key",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "description",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "aiProviderConfigId",
+              "type": "string",
+              "required": false,
+              "description": "AI provider credential ID. Required for LLM (AI) detectors.",
+              "format": "uuid"
+            },
+            {
+              "name": "pipeline_schema",
+              "type": "object",
+              "required": false,
+              "description": "Updated pipeline schema (any supported type)."
+            },
+            {
+              "name": "isActive",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "delete_custom_detector",
+          "title": "Delete Custom Detector",
+          "description": "Delete a custom detector.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "retire_out_of_scope_findings",
+          "title": "Retire Out-of-Scope Findings",
+          "description": "Resolve OPEN findings a custom detector can no longer produce because its scope.asset_kinds was narrowed or regex patterns were removed — a rescan never resolves those. Two steps, each a background operation (follow the returned id with get_findings_bulk_operation): (1) dryRun (default) changes nothing and reports, under counts: candidates, byReason, citedByCase, watchedByInquiries, inquiries, wouldRetire and notProvable. (2) dryRun: false with fromOperationId (that COMPLETED dry run), expectedCount (its wouldRetire) and confirm: true. It never retires more than expectedCount. Findings a case cites or an ACTIVE inquiry watches are never retired by this tool. Retired findings are RESOLVED without detector feedback; widening the scope again lets re-detection reopen them.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "customDetectorId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "dryRun",
+              "type": "boolean",
+              "required": false,
+              "description": "Default true: count only."
+            },
+            {
+              "name": "sourceIds",
+              "type": "string[]",
+              "required": false,
+              "description": "Dry run only: restrict to these sources."
+            },
+            {
+              "name": "fromOperationId",
+              "type": "string",
+              "required": false,
+              "description": "Retire only: the completed dry run operation id.",
+              "format": "uuid"
+            },
+            {
+              "name": "expectedCount",
+              "type": "integer",
+              "required": false,
+              "description": "Retire only: the dry run's counts.wouldRetire."
+            },
+            {
+              "name": "confirm",
+              "type": "boolean",
+              "required": false,
+              "description": "Retire only: required."
+            }
+          ]
+        },
+        {
+          "name": "train_custom_detector",
+          "title": "Train Custom Detector",
+          "description": "Trigger custom detector training, optionally scoped to a single source.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": false,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "get_custom_detector_training_history",
+          "title": "Get Custom Detector Training History",
+          "description": "List recent training runs for a detector.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "validate_detector_config",
+          "title": "Validate Detector Config",
+          "description": "Dry-run validate a custom detector pipeline schema against both the JSON Schema and the detector-specific validation rules, without creating anything.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "pipelineSchema",
+              "type": "object",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "list_detector_test_scenarios",
+          "title": "List Detector Test Scenarios",
+          "description": "List all test scenarios for a custom detector.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "detector_id",
+              "type": "string",
+              "required": true,
+              "description": "Custom detector ID"
+            }
+          ]
+        },
+        {
+          "name": "create_detector_test_scenario",
+          "title": "Create Detector Test Scenario",
+          "description": "Create a test scenario for a custom detector. Expected outcome shapes by detector type: REGEX/RULESET {\"shouldMatch\": true|false}; classifier/LLM {\"label\": \"...\", \"minConfidence\": 0.6}; entity {\"entities\": [{\"label\": \"PersonName\", \"text\": \"Ostap\"}]}. The nested pipeline-output shape ({\"classification\": {task: {label, confidence}}} / {\"entities\": {label: [{value}]}}) is also accepted. Labels compare case-insensitively with underscores treated as spaces, so \"market_gaming_instruction\" matches \"Market gaming instruction\".",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "detector_id",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "description": "Short scenario name"
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "input_text",
+              "type": "string",
+              "required": true,
+              "description": "Text to test against the detector"
+            },
+            {
+              "name": "expected_outcome",
+              "type": "object",
+              "required": true,
+              "description": "Expected outcome — see tool description for the per-detector-type shapes"
+            }
+          ]
+        },
+        {
+          "name": "run_detector_tests",
+          "title": "Run Detector Tests",
+          "description": "Run test scenarios for a custom detector and return a pass/fail matrix. Pass scenario_ids to re-run only specific scenarios (avoids re-running every scenario — each LLM-detector scenario costs a model call); omit to run all. FAIL results include an expected-vs-actual explanation in errorMessage.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "detector_id",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "scenario_ids",
+              "type": "string[]",
+              "required": false,
+              "description": "Optional scenario IDs to run; omit to run every scenario for the detector"
+            }
+          ]
+        },
+        {
+          "name": "delete_detector_test_scenario",
+          "title": "Delete Detector Test Scenario",
+          "description": "Delete a test scenario (and its past results) from a custom detector.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "detector_id",
+              "type": "string",
+              "required": true,
+              "description": "Custom detector ID"
+            },
+            {
+              "name": "scenario_id",
+              "type": "string",
+              "required": true,
+              "description": "Test scenario ID to delete"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "runs",
+      "title": "Runs",
+      "description": "Inspect ingestion runs, stop stuck runs, and fetch logs for debugging.",
+      "operations": [
+        "Search runs across the instance or by source",
+        "Read paginated runner logs",
+        "Stop long-running jobs"
+      ],
+      "tools": [
+        {
+          "name": "search_runs",
+          "title": "Search Runs",
+          "description": "Search runner history with filters and pagination.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "filters",
+              "type": "object",
+              "required": false,
+              "description": "Run (runner) filters. Omit entirely to match all runs."
+            },
+            {
+              "name": "filters.search",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive text search across runner id, source name/type, triggeredBy, and error message."
+            },
+            {
+              "name": "filters.sourceId",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these source UUIDs."
+            },
+            {
+              "name": "filters.sourceType",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these source type ids. See list_source_types."
+            },
+            {
+              "name": "filters.status",
+              "type": "enum[]",
+              "required": false,
+              "description": "Restrict to runs in these statuses.",
+              "enumValues": [
+                "PENDING",
+                "RUNNING",
+                "COMPLETED",
+                "WARNING",
+                "ERROR",
+                "STOPPED"
+              ]
+            },
+            {
+              "name": "filters.triggerType",
+              "type": "enum[]",
+              "required": false,
+              "description": "Restrict to runs started by these trigger types.",
+              "enumValues": [
+                "MANUAL",
+                "SCHEDULED",
+                "WEBHOOK",
+                "API",
+                "AUTOPILOT"
+              ]
+            },
+            {
+              "name": "filters.triggeredBy",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to runs started by these actors."
+            },
+            {
+              "name": "filters.triggeredAfter",
+              "type": "string",
+              "required": false,
+              "description": "ISO-8601 timestamp. Only runs triggered at or after this."
+            },
+            {
+              "name": "filters.triggeredBefore",
+              "type": "string",
+              "required": false,
+              "description": "ISO-8601 timestamp. Only runs triggered at or before this."
+            },
+            {
+              "name": "page",
+              "type": "object",
+              "required": false,
+              "description": "Pagination and sorting."
+            },
+            {
+              "name": "page.skip",
+              "type": "integer",
+              "required": false,
+              "description": "Offset. Defaults to 0."
+            },
+            {
+              "name": "page.limit",
+              "type": "integer",
+              "required": false,
+              "description": "Max results (1–200). Defaults to 50."
+            },
+            {
+              "name": "page.sortBy",
+              "type": "enum",
+              "required": false,
+              "description": "Sort field. Defaults to TRIGGERED_AT.",
+              "enumValues": [
+                "TRIGGERED_AT",
+                "STATUS",
+                "SOURCE_NAME",
+                "DURATION_MS",
+                "TOTAL_FINDINGS"
+              ]
+            },
+            {
+              "name": "page.sortOrder",
+              "type": "enum",
+              "required": false,
+              "description": "Defaults to DESC.",
+              "enumValues": [
+                "ASC",
+                "DESC"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "get_run",
+          "title": "Get Run",
+          "description": "Fetch a single runner record.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "runnerId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "get_run_logs",
+          "title": "Get Run Logs",
+          "description": "Fetch paginated runner logs for debugging.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "runnerId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "stop_run",
+          "title": "Stop Run",
+          "description": "Stop a running scan or cancel a queued (PENDING) one. Both end STOPPED.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "runnerId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "list_source_runs",
+          "title": "List Source Runs",
+          "description": "List runs for a single source.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "description": "Filter to runs in this status.",
+              "enumValues": [
+                "PENDING",
+                "RUNNING",
+                "COMPLETED",
+                "WARNING",
+                "ERROR",
+                "STOPPED"
+              ]
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false,
+              "description": "Offset. Defaults to 0."
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false,
+              "description": "Max results (1–200)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "findings",
+      "title": "Findings",
+      "description": "Search, inspect, and update findings including bulk status changes.",
+      "operations": [
+        "Search and filter findings by status, severity, type, and text",
+        "Resolve or reopen findings",
+        "Summarize discovery totals for MCP clients",
+        "Find semantic neighbours, boilerplate clusters, and ranking explanations"
+      ],
+      "tools": [
+        {
+          "name": "search_findings",
+          "title": "Search Findings",
+          "description": "Search findings using filters, text search, and pagination.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "filters",
+              "type": "object",
+              "required": false,
+              "description": "Finding filters. Omit entirely to match all findings. Unknown keys are rejected."
+            },
+            {
+              "name": "filters.search",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive text search across finding fields and related asset/source names."
+            },
+            {
+              "name": "filters.sourceId",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these source UUIDs."
+            },
+            {
+              "name": "filters.assetId",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these asset UUIDs."
+            },
+            {
+              "name": "filters.runnerId",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to findings produced by these run (runner) UUIDs."
+            },
+            {
+              "name": "filters.detectorType",
+              "type": "enum[]",
+              "required": false,
+              "description": "Restrict to these built-in detector types. Use CUSTOM for custom detectors (optionally narrow with customDetectorKey).",
+              "enumValues": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            },
+            {
+              "name": "filters.customDetectorKey",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to findings from these custom detector keys."
+            },
+            {
+              "name": "filters.findingType",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these finding type identifiers (e.g. specific secret or PII types)."
+            },
+            {
+              "name": "filters.category",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these finding categories."
+            },
+            {
+              "name": "filters.severity",
+              "type": "enum[]",
+              "required": false,
+              "description": "Restrict to these severities.",
+              "enumValues": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "INFO"
+              ]
+            },
+            {
+              "name": "filters.status",
+              "type": "enum[]",
+              "required": false,
+              "description": "Restrict to these statuses. Without it, RESOLVED findings are excluded unless includeResolved is true.",
+              "enumValues": [
+                "OPEN",
+                "FALSE_POSITIVE",
+                "RESOLVED",
+                "IGNORED"
+              ]
+            },
+            {
+              "name": "filters.includeResolved",
+              "type": "boolean",
+              "required": false,
+              "description": "Include RESOLVED findings when no status is given. Defaults to false."
+            },
+            {
+              "name": "filters.detectionIdentity",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these detection identities."
+            },
+            {
+              "name": "filters.firstDetectedAfter",
+              "type": "string",
+              "required": false,
+              "description": "ISO-8601 timestamp. Only findings first detected at or after this."
+            },
+            {
+              "name": "filters.lastDetectedBefore",
+              "type": "string",
+              "required": false,
+              "description": "ISO-8601 timestamp. Only findings last detected at or before this."
+            },
+            {
+              "name": "filters.excludeIds",
+              "type": "string[]",
+              "required": false,
+              "description": "Leave out these finding ids."
+            },
+            {
+              "name": "page",
+              "type": "object",
+              "required": false,
+              "description": "Pagination."
+            },
+            {
+              "name": "page.skip",
+              "type": "integer",
+              "required": false,
+              "description": "Number of results to skip (offset). Defaults to 0."
+            },
+            {
+              "name": "page.limit",
+              "type": "integer",
+              "required": false,
+              "description": "Max results to return (1–200). Defaults to 50."
+            },
+            {
+              "name": "semantic_query",
+              "type": "string",
+              "required": false,
+              "description": "Natural-language query. Uses hybrid lexical + semantic ranking and returns score reasons."
+            },
+            {
+              "name": "semantic_mode",
+              "type": "enum",
+              "required": false,
+              "description": "Semantic ranking mode. Defaults to hybrid.",
+              "enumValues": [
+                "hybrid",
+                "vector",
+                "off"
+              ]
+            },
+            {
+              "name": "ranking",
+              "type": "enum",
+              "required": false,
+              "description": "Corpus browsing order when semantic_query is omitted. Defaults to importance.",
+              "enumValues": [
+                "importance",
+                "newest",
+                "severity"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "get_finding",
+          "title": "Get Finding",
+          "description": "Fetch a single finding with asset and source context.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "update_finding",
+          "title": "Update Finding",
+          "description": "Update finding status, severity, or resolution context for a single finding.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "OPEN",
+                "RESOLVED",
+                "FALSE_POSITIVE",
+                "IGNORED"
+              ]
+            },
+            {
+              "name": "severity",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "INFO"
+              ]
+            },
+            {
+              "name": "changeReason",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "comment",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "bulk_update_findings",
+          "title": "Bulk Update Findings",
+          "description": "Bulk update findings by IDs (at most 1,000) or by filters, including status, severity, and comment. Filters use the same keys as search_findings; an unknown key is an error, never a wider match. Run with dryRun: true first — it returns the exact count (wouldUpdate) and whether the filters narrow the corpus — then pass that count as expectedCount: if more findings match when the update runs, nothing is written. Filters that narrow nothing beyond status require confirm: true. A selection over 2,000 findings is queued as a background operation: the result carries operationId — follow it with get_findings_bulk_operation.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "ids",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "filters",
+              "type": "object",
+              "required": false,
+              "description": "Finding filters. Omit entirely to match all findings. Unknown keys are rejected."
+            },
+            {
+              "name": "filters.search",
+              "type": "string",
+              "required": false,
+              "description": "Case-insensitive text search across finding fields and related asset/source names."
+            },
+            {
+              "name": "filters.sourceId",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these source UUIDs."
+            },
+            {
+              "name": "filters.assetId",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these asset UUIDs."
+            },
+            {
+              "name": "filters.runnerId",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to findings produced by these run (runner) UUIDs."
+            },
+            {
+              "name": "filters.detectorType",
+              "type": "enum[]",
+              "required": false,
+              "description": "Restrict to these built-in detector types. Use CUSTOM for custom detectors (optionally narrow with customDetectorKey).",
+              "enumValues": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            },
+            {
+              "name": "filters.customDetectorKey",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to findings from these custom detector keys."
+            },
+            {
+              "name": "filters.findingType",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these finding type identifiers (e.g. specific secret or PII types)."
+            },
+            {
+              "name": "filters.category",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these finding categories."
+            },
+            {
+              "name": "filters.severity",
+              "type": "enum[]",
+              "required": false,
+              "description": "Restrict to these severities.",
+              "enumValues": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "INFO"
+              ]
+            },
+            {
+              "name": "filters.status",
+              "type": "enum[]",
+              "required": false,
+              "description": "Restrict to these statuses. Without it, RESOLVED findings are excluded unless includeResolved is true.",
+              "enumValues": [
+                "OPEN",
+                "FALSE_POSITIVE",
+                "RESOLVED",
+                "IGNORED"
+              ]
+            },
+            {
+              "name": "filters.includeResolved",
+              "type": "boolean",
+              "required": false,
+              "description": "Include RESOLVED findings when no status is given. Defaults to false."
+            },
+            {
+              "name": "filters.detectionIdentity",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these detection identities."
+            },
+            {
+              "name": "filters.firstDetectedAfter",
+              "type": "string",
+              "required": false,
+              "description": "ISO-8601 timestamp. Only findings first detected at or after this."
+            },
+            {
+              "name": "filters.lastDetectedBefore",
+              "type": "string",
+              "required": false,
+              "description": "ISO-8601 timestamp. Only findings last detected at or before this."
+            },
+            {
+              "name": "filters.excludeIds",
+              "type": "string[]",
+              "required": false,
+              "description": "Leave out these finding ids."
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "OPEN",
+                "RESOLVED",
+                "FALSE_POSITIVE",
+                "IGNORED"
+              ]
+            },
+            {
+              "name": "severity",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "INFO"
+              ]
+            },
+            {
+              "name": "comment",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "dryRun",
+              "type": "boolean",
+              "required": false,
+              "description": "Count what would be updated without writing anything."
+            },
+            {
+              "name": "expectedCount",
+              "type": "integer",
+              "required": false,
+              "description": "The dryRun count. If more findings match at update time, the update is refused (409) and nothing is written."
+            },
+            {
+              "name": "confirm",
+              "type": "boolean",
+              "required": false,
+              "description": "Required (true) when the filters narrow nothing beyond status, includeResolved and excludeIds — the update would apply to every finding in the namespace."
+            }
+          ]
+        },
+        {
+          "name": "get_findings_bulk_operation",
+          "title": "Get Findings Bulk Operation",
+          "description": "Progress of a background bulk finding operation — the operationId bulk_update_findings returns when a selection is too large to change in one request, and the id retire_out_of_scope_findings returns for its dry run and its retire. Reports status (PENDING, RUNNING, COMPLETED, FAILED, CANCELLED), how many findings were examined, changed and exempted, percent, and operation-specific counts (a retire dry run puts wouldRetire and its exemptions there).",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "operationId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "cancel_findings_bulk_operation",
+          "title": "Cancel Findings Bulk Operation",
+          "description": "Stop a background bulk finding operation. A queued one is cancelled outright; a running one stops after its current page. Findings it already changed stay changed — this stops the operation, it does not undo it.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "operationId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "get_findings_discovery",
+          "title": "Get Findings Discovery",
+          "description": "Return discovery totals, review-state mix, activity, and top assets for findings. Severity is a priority level, not a threat level — it says how much a finding matters, not how dangerous it is.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "windowDays",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "includeResolved",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "purge_source_findings",
+          "title": "Purge Source Findings",
+          "description": "Permanently delete EVERY finding of a source — all statuses, including resolved and false-positive. Irreversible; finding history is lost. Case evidence snapshots survive by design, and correlation fingerprints are recomputed in the background afterwards. Useful when iterating on detector configurations and the accumulated findings are pure noise. To clean up only findings from removed/disabled detectors, rely instead on the cleanup_removed_detector_findings source option (default on) and rescan.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": true,
+              "description": "Source whose findings to purge"
+            },
+            {
+              "name": "confirm",
+              "type": "boolean",
+              "required": true,
+              "description": "Must be true — acknowledges the purge is irreversible"
+            }
+          ]
+        },
+        {
+          "name": "purge_source_assets",
+          "title": "Purge Source Assets",
+          "description": "Permanently delete assets of a source, and with them every finding, extraction, correlation value and chunk derived from those assets. Heavier than purge_source_findings: it removes the ingested material itself, so the source must be re-scanned before anything from it can be examined again. Correlation fingerprints are recomputed afterwards.\n\nWith no filter this deletes EVERY asset of the source. The filters exist for the case a scan can never resolve on its own: when a connector narrows its scope, the assets it used to produce are stranded, because retirement requires a run that saw the whole scope and found them gone — and a rotating-sample connector never has one. ALWAYS call once with dry_run first and report what it matched before deleting.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": true,
+              "description": "Source whose assets to purge"
+            },
+            {
+              "name": "confirm",
+              "type": "boolean",
+              "required": true,
+              "description": "Must be true — acknowledges the purge is irreversible"
+            },
+            {
+              "name": "external_id_prefix",
+              "type": "string",
+              "required": false,
+              "description": "Only assets whose connector-assigned id (metadata.external_id) starts with this, e.g. 'fin-'"
+            },
+            {
+              "name": "asset_kind",
+              "type": "string",
+              "required": false,
+              "description": "Only assets of this catalog kind: record | document | page | file | table"
+            },
+            {
+              "name": "name_prefix",
+              "type": "string",
+              "required": false,
+              "description": "Only assets whose display name starts with this"
+            },
+            {
+              "name": "urn_prefix",
+              "type": "string",
+              "required": false,
+              "description": "Only assets whose URN starts with this"
+            },
+            {
+              "name": "not_scanned_since",
+              "type": "string",
+              "required": false,
+              "description": "ISO-8601 timestamp; only assets last scanned before it, plus assets never scanned"
+            },
+            {
+              "name": "dry_run",
+              "type": "boolean",
+              "required": false,
+              "description": "Report what matches and delete nothing"
+            }
+          ]
+        },
+        {
+          "name": "find_similar_findings",
+          "title": "Find Similar Findings",
+          "description": "Return semantic neighbours for one finding, including similarity, duplicate/noise signals, and ranking explanations.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "findingId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "find_boilerplate_clusters",
+          "title": "Find Boilerplate Clusters",
+          "description": "Find repeated or near-duplicate finding groups, ordered by cluster size. Omit sourceIds to scan the whole corpus — clusters spanning multiple sources (sourceCount > 1) are the same content circulating between systems, which can itself be a lead. Use this to separate bulk boilerplate from distinctive evidence.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "sourceIds",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "threshold",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "explain_finding",
+          "title": "Explain Finding",
+          "description": "One-call evidence explanation for a finding: importance/quality ranking with its reasons and raw signals, duplicate-group size, top semantic neighbours, and the detector severity/confidence kept as a separate axis. Use before escalating or attaching a finding as case evidence. Similarity and importance are triage signals, not proof.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "assets",
+      "title": "Assets",
+      "description": "Inspect assets, search asset inventory, and link findings back to content.",
+      "operations": [
+        "Search assets with nested finding filters",
+        "Inspect a single asset",
+        "Browse asset-level finding summaries"
+      ],
+      "tools": [
+        {
+          "name": "search_assets",
+          "title": "Search Assets",
+          "description": "Search assets and their nested findings. Narrow by asset attributes (assets), by the findings attached to each asset (findings), or both.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "assets",
+              "type": "object",
+              "required": false,
+              "description": "Asset-level filters. Omit entirely to match all assets."
+            },
+            {
+              "name": "assets.search",
+              "type": "string",
+              "required": false,
+              "description": "Filter by asset name (case-insensitive contains)."
+            },
+            {
+              "name": "assets.sourceId",
+              "type": "string",
+              "required": false,
+              "description": "Restrict to a single source UUID."
+            },
+            {
+              "name": "assets.runnerId",
+              "type": "string",
+              "required": false,
+              "description": "Restrict to a single run UUID."
+            },
+            {
+              "name": "assets.status",
+              "type": "enum[]",
+              "required": false,
+              "description": "Restrict to assets in these ingestion statuses.",
+              "enumValues": [
+                "NEW",
+                "UPDATED",
+                "UNCHANGED",
+                "DELETED"
+              ]
+            },
+            {
+              "name": "assets.sourceTypes",
+              "type": "string[]",
+              "required": false,
+              "description": "Restrict to these source type ids. See list_source_types."
+            },
+            {
+              "name": "assets.metadata",
+              "type": "object",
+              "required": false,
+              "description": "Match connector-authored metadata exactly, e.g. {\"legal_form_code\": {\"in\": [\"GES\", \"AG\"]}}. Values compare as JSON: a number matches only a number. Keys may be nested with dots."
+            },
+            {
+              "name": "findings",
+              "type": "object",
+              "required": false,
+              "description": "Finding-level filters — narrow assets by the findings attached to them. Omit to ignore findings when filtering."
+            },
+            {
+              "name": "findings.detectorType",
+              "type": "enum[]",
+              "required": false,
+              "description": "Only assets with findings from these detector types.",
+              "enumValues": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            },
+            {
+              "name": "findings.customDetectorKey",
+              "type": "string[]",
+              "required": false,
+              "description": "Only assets with findings from these custom detector keys."
+            },
+            {
+              "name": "findings.runnerId",
+              "type": "string[]",
+              "required": false,
+              "description": "Only findings produced by these run UUIDs."
+            },
+            {
+              "name": "findings.findingType",
+              "type": "string[]",
+              "required": false,
+              "description": "Only assets with these finding types."
+            },
+            {
+              "name": "findings.category",
+              "type": "string[]",
+              "required": false,
+              "description": "Only assets with findings in these categories."
+            },
+            {
+              "name": "findings.severity",
+              "type": "enum[]",
+              "required": false,
+              "description": "Only assets with findings of these severities.",
+              "enumValues": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "INFO"
+              ]
+            },
+            {
+              "name": "findings.status",
+              "type": "enum[]",
+              "required": false,
+              "description": "Only assets with findings in these statuses.",
+              "enumValues": [
+                "OPEN",
+                "FALSE_POSITIVE",
+                "RESOLVED",
+                "IGNORED"
+              ]
+            },
+            {
+              "name": "findings.includeResolved",
+              "type": "boolean",
+              "required": false,
+              "description": "Include RESOLVED/IGNORED findings when matching. Default false."
+            },
+            {
+              "name": "page",
+              "type": "object",
+              "required": false,
+              "description": "Pagination and sorting."
+            },
+            {
+              "name": "page.skip",
+              "type": "integer",
+              "required": false,
+              "description": "Offset. Defaults to 0."
+            },
+            {
+              "name": "page.limit",
+              "type": "integer",
+              "required": false,
+              "description": "Max results (1–200). Defaults to 50."
+            },
+            {
+              "name": "page.sortBy",
+              "type": "enum",
+              "required": false,
+              "description": "Sort field. Defaults to LAST_SCANNED_AT.",
+              "enumValues": [
+                "NAME",
+                "SOURCE_ID",
+                "ASSET_TYPE",
+                "STATUS",
+                "LAST_SCANNED_AT",
+                "UPDATED_AT",
+                "CREATED_AT"
+              ]
+            },
+            {
+              "name": "page.sortOrder",
+              "type": "enum",
+              "required": false,
+              "description": "Defaults to DESC.",
+              "enumValues": [
+                "ASC",
+                "DESC"
+              ]
+            },
+            {
+              "name": "options",
+              "type": "object",
+              "required": false,
+              "description": "Result-shaping options."
+            },
+            {
+              "name": "options.excludeFindings",
+              "type": "boolean",
+              "required": false,
+              "description": "Skip the findings join and return assets with empty findings arrays. Default false."
+            },
+            {
+              "name": "options.includeAssetsWithoutFindings",
+              "type": "boolean",
+              "required": false,
+              "description": "Include assets even if they have no findings matching the finding filters. Default false."
+            },
+            {
+              "name": "semantic_query",
+              "type": "string",
+              "required": false,
+              "description": "Meaning-based query over extracted asset text chunks."
+            },
+            {
+              "name": "semantic_mode",
+              "type": "enum",
+              "required": false,
+              "description": "Hybrid combines asset-name and semantic rank. Defaults to hybrid.",
+              "enumValues": [
+                "off",
+                "hybrid",
+                "vector"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "get_asset",
+          "title": "Get Asset",
+          "description": "Fetch a single asset by ID.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "list_source_assets",
+          "title": "List Source Assets",
+          "description": "List assets belonging to a single source.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "assetType",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "TXT",
+                "IMAGE",
+                "VIDEO",
+                "AUDIO",
+                "URL",
+                "TABLE",
+                "BINARY",
+                "OTHER"
+              ]
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "NEW",
+                "UPDATED",
+                "UNCHANGED"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "list_asset_finding_summaries",
+          "title": "List Asset Finding Summaries",
+          "description": "Return asset-level finding summaries and rollups for remediation workflows.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": false,
+              "format": "uuid"
+            },
+            {
+              "name": "assetId",
+              "type": "string",
+              "required": false,
+              "format": "uuid"
+            },
+            {
+              "name": "runnerId",
+              "type": "string",
+              "required": false,
+              "format": "uuid"
+            },
+            {
+              "name": "detectorType",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "findingType",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "severity",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "includeResolved",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "sort",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "LATEST",
+                "MOST_FINDINGS",
+                "HIGHEST_SEVERITY"
+              ]
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inquiries",
+      "title": "Inquiries",
+      "description": "Create and manage saved questions — standing finding queries that surface new matches over time.",
+      "operations": [
+        "Preview matcher configs before saving a question",
+        "List findings currently matching a saved question",
+        "See what the latest scan landed or retired for a question",
+        "Recompute matches on demand"
+      ],
+      "tools": [
+        {
+          "name": "list_inquiries",
+          "title": "List Inquiries",
+          "description": "List saved questions (standing finding queries) with pagination and filters.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "search",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "status",
+              "type": "enum[]",
+              "required": false,
+              "enumValues": [
+                "ACTIVE",
+                "ARCHIVED"
+              ]
+            },
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": false,
+              "description": "Filter to a linked case, or \"none\" for unlinked"
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_inquiry",
+          "title": "Get Inquiry",
+          "description": "Fetch a single saved question by ID.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "create_inquiry",
+          "title": "Create Inquiry",
+          "description": "Create a saved question (a standing finding query). Matches are computed immediately.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "createdBy",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "matchAllSources",
+              "type": "boolean",
+              "required": false,
+              "description": "Match findings from any source (ignores sourceIds)"
+            },
+            {
+              "name": "sourceIds",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "detectorTypes",
+              "type": "enum[]",
+              "required": false,
+              "description": "Empty = any detector",
+              "enumValues": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            },
+            {
+              "name": "customDetectorKeys",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "findingTypes",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "findingTypeRegex",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "findingValueRegex",
+              "type": "string[]",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "update_inquiry",
+          "title": "Update Inquiry",
+          "description": "Update a saved question. Matches are recomputed if any matcher field is provided.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "ACTIVE",
+                "ARCHIVED"
+              ]
+            },
+            {
+              "name": "aiMode",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "INHERIT",
+                "MANAGED",
+                "OBSERVE_ONLY"
+              ]
+            },
+            {
+              "name": "matchAllSources",
+              "type": "boolean",
+              "required": false,
+              "description": "Match findings from any source (ignores sourceIds)"
+            },
+            {
+              "name": "sourceIds",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "detectorTypes",
+              "type": "enum[]",
+              "required": false,
+              "description": "Empty = any detector",
+              "enumValues": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            },
+            {
+              "name": "customDetectorKeys",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "findingTypes",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "findingTypeRegex",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "findingValueRegex",
+              "type": "string[]",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "delete_inquiry",
+          "title": "Delete Inquiry",
+          "description": "Delete a saved question.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "list_inquiry_matches",
+          "title": "List Inquiry Matches",
+          "description": "Findings currently matching a saved question (live query, never persisted). NEW means the latest completed run of the finding's source created it; GONE means that run retired it, so it answers the question but no longer exists. Defaults to NEW and ONGOING — ask for GONE by name.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "search",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "severity",
+              "type": "enum[]",
+              "required": false,
+              "enumValues": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "INFO"
+              ]
+            },
+            {
+              "name": "state",
+              "type": "enum[]",
+              "required": false,
+              "enumValues": [
+                "NEW",
+                "ONGOING",
+                "GONE"
+              ]
+            },
+            {
+              "name": "onlyNew",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_inquiry_timeline",
+          "title": "Get Inquiry Timeline",
+          "description": "A saved question's own history: matcher changes, and what each run landed or retired. The durable record — a match's NEW state is live and expires the next time its source runs, but the run that produced it stays here.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "rematch_inquiry",
+          "title": "Rematch Inquiry",
+          "description": "Recompute the persisted match count for a saved question on demand.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "preview_inquiry_matchers",
+          "title": "Preview Inquiry Matchers",
+          "description": "Preview what a matcher configuration currently selects, before saving a question.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "matchAllSources",
+              "type": "boolean",
+              "required": false,
+              "description": "Match findings from any source (ignores sourceIds)"
+            },
+            {
+              "name": "sourceIds",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "detectorTypes",
+              "type": "enum[]",
+              "required": false,
+              "description": "Empty = any detector",
+              "enumValues": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            },
+            {
+              "name": "customDetectorKeys",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "findingTypes",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "findingTypeRegex",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "findingValueRegex",
+              "type": "string[]",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_inquiry_match_options",
+          "title": "Get Inquiry Match Options",
+          "description": "Filter options for building a question: sources, custom detectors, and distinct finding types.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "sourceIds",
+              "type": "string[]",
+              "required": false,
+              "description": "Scope finding type counts to these sources"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cases",
+      "title": "Cases",
+      "description": "Investigation cases: evidence and findings, linked questions (watches), clean-up and finding rules, hypotheses and discussion threads, and the timeline. Pair with Case Board to arrange the canvas.",
+      "operations": [
+        "Attach evidence and findings to a case",
+        "Pull a saved question's current matches into a case, link and unlink watches, and turn their auto-add on or off",
+        "Let a case clean itself up and keep kinds of finding out of it with filters — every change previewable first — and escalate the ones that need attention",
+        "Track hypotheses and discussion threads: supporting/contradicting links, verdicts and confidence on record",
+        "Close and reopen cases, archiving or reactivating linked questions"
+      ],
+      "tools": [
+        {
+          "name": "search_cases",
+          "title": "Search Cases",
+          "description": "Search cases with filters and pagination.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "search",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "status",
+              "type": "enum[]",
+              "required": false,
+              "enumValues": [
+                "OPEN",
+                "IN_PROGRESS",
+                "CLOSED",
+                "ARCHIVED"
+              ]
+            },
+            {
+              "name": "severity",
+              "type": "enum[]",
+              "required": false,
+              "enumValues": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "INFO"
+              ]
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_case",
+          "title": "Get Case",
+          "description": "Fetch a single case with evidence, findings, and linked questions.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "create_case",
+          "title": "Create Case",
+          "description": "Create an investigation case, optionally linking questions.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "OPEN",
+                "IN_PROGRESS",
+                "CLOSED",
+                "ARCHIVED"
+              ]
+            },
+            {
+              "name": "severity",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "INFO"
+              ]
+            },
+            {
+              "name": "assignee",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "createdBy",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "inquiryIds",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "removeGoneFindings",
+              "type": "boolean",
+              "required": false,
+              "description": "Clean-up: findings the scans no longer see (retired by a run, or deleted) leave the case by themselves"
+            },
+            {
+              "name": "removeResolvedFindings",
+              "type": "boolean",
+              "required": false,
+              "description": "Clean-up: findings someone resolved leave the case"
+            },
+            {
+              "name": "removeGoneAssets",
+              "type": "boolean",
+              "required": false,
+              "description": "Clean-up: assets deleted from their source leave the case, with their findings"
+            }
+          ]
+        },
+        {
+          "name": "update_case",
+          "title": "Update Case",
+          "description": "Update case metadata, status, severity, AI mode, or its clean-up switches. Switching a clean-up rule on applies it right away: what it takes out is reported in `cleanup` and written on the case timeline — run preview_case_cleanup first to see how much that is. Closing a case goes through close_case (it needs a conclusion and snapshots the board), not through status here.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "OPEN",
+                "IN_PROGRESS",
+                "CLOSED",
+                "ARCHIVED"
+              ]
+            },
+            {
+              "name": "severity",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "INFO"
+              ]
+            },
+            {
+              "name": "assignee",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "conclusion",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "aiMode",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "INHERIT",
+                "MANAGED",
+                "OBSERVE_ONLY"
+              ]
+            },
+            {
+              "name": "removeGoneFindings",
+              "type": "boolean",
+              "required": false,
+              "description": "Clean-up: findings the scans no longer see (retired by a run, or deleted) leave the case by themselves"
+            },
+            {
+              "name": "removeResolvedFindings",
+              "type": "boolean",
+              "required": false,
+              "description": "Clean-up: findings someone resolved leave the case"
+            },
+            {
+              "name": "removeGoneAssets",
+              "type": "boolean",
+              "required": false,
+              "description": "Clean-up: assets deleted from their source leave the case, with their findings"
+            }
+          ]
+        },
+        {
+          "name": "close_case",
+          "title": "Close Case",
+          "description": "Close a case with a conclusion. Linked questions are archived unless they drive another open case, or keepInquiries is true (use it when the questions are standing checks that should keep running after the case is answered).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "conclusion",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "closedBy",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "keepInquiries",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "reopen_case",
+          "title": "Reopen Case",
+          "description": "Reopen a closed/archived case and reactivate the questions that were archived alongside it.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "note",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "reopenedBy",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "add_case_evidence",
+          "title": "Add Case Evidence",
+          "description": "Attach an asset as evidence to a case.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "entityType",
+              "type": "string",
+              "required": true,
+              "description": "Must be \"asset\""
+            },
+            {
+              "name": "entityId",
+              "type": "string",
+              "required": true,
+              "description": "Asset UUID"
+            },
+            {
+              "name": "note",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "addedBy",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "attach_case_findings",
+          "title": "Attach Case Findings",
+          "description": "Batch-attach findings to a case by ID. Asset evidence rows are created automatically.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "findingIds",
+              "type": "string[]",
+              "required": true
+            },
+            {
+              "name": "addedBy",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "pull_case_from_inquiry",
+          "title": "Pull Case From Inquiry",
+          "description": "Pull a linked question's current matches into the case as evidence and findings.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "inquiryId",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "findingIds",
+              "type": "string[]",
+              "required": false,
+              "description": "Specific finding IDs (omit = all current matches)"
+            }
+          ]
+        },
+        {
+          "name": "link_case_inquiries",
+          "title": "Link Case Inquiries",
+          "description": "Link additional questions to a case. Already-linked ones are ignored. Ids also named in autoPullInquiryIds will pull their new matches into the case by themselves as later scans land them.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "inquiryIds",
+              "type": "string[]",
+              "required": true
+            },
+            {
+              "name": "autoPullInquiryIds",
+              "type": "string[]",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "set_case_inquiry_auto_pull",
+          "title": "Set Case Watch Auto-add",
+          "description": "Turn automatic pulling of a linked question's new matches into a case on or off (the watch's auto-add). On: matches that later scans land join the case by themselves, subject to the case's filters. Off: they wait for pull_case_from_inquiry — escalation rules still bring matching answers in. The question must be linked already (link_case_inquiries).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "inquiryId",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "autoPull",
+              "type": "boolean",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "unlink_case_inquiry",
+          "title": "Unlink Case Watch",
+          "description": "Unlink a question (a watch) from a case: the case stops following it. The question itself and the evidence it already brought in stay; the filters and escalation rules scoped to that watch are dropped with the link. To end a case and archive its questions, use close_case instead.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "inquiryId",
+              "type": "string",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "preview_case_cleanup",
+          "title": "Preview Case Clean-up",
+          "description": "What a case's automatic clean-up would take out right now, without changing anything: findings the scans no longer see (removeGoneFindings), findings someone resolved (removeResolvedFindings), and assets deleted from their source, with their findings (removeGoneAssets). Name the switches to preview, or leave them all out to preview all three. Returns a count per switch and a sample. Switching one on (update_case) applies it at once.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "removeGoneFindings",
+              "type": "boolean",
+              "required": false,
+              "description": "Clean-up: findings the scans no longer see (retired by a run, or deleted) leave the case by themselves"
+            },
+            {
+              "name": "removeResolvedFindings",
+              "type": "boolean",
+              "required": false,
+              "description": "Clean-up: findings someone resolved leave the case"
+            },
+            {
+              "name": "removeGoneAssets",
+              "type": "boolean",
+              "required": false,
+              "description": "Clean-up: assets deleted from their source leave the case, with their findings"
+            }
+          ]
+        },
+        {
+          "name": "list_case_finding_filters",
+          "title": "List Case Finding Filters",
+          "description": "A case's finding rules, case-wide (inquiryId null) or for one linked question: filters (action EXCLUDE — kinds of finding it does not want) and escalations (action ESCALATE — kinds that need attention). A FINDING_TYPE rule names a finding type exactly; a VALUE_PATTERN rule is a regular expression over the matched value. includeOptions also lists the finding types the case holds and its questions answer, which is what a FINDING_TYPE rule can pick from.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "includeOptions",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "inquiryId",
+              "type": "string",
+              "required": false,
+              "description": "With includeOptions: the types of this one question"
+            }
+          ]
+        },
+        {
+          "name": "preview_case_finding_filters",
+          "title": "Preview Case Finding Rules",
+          "description": "What unsaved finding rules would do to a case right now, without saving anything: how many findings in the case a filter (action EXCLUDE, the default) would take out or an escalation (ESCALATE) would mark — in total and per rule — with a sample, why a rule could not be saved (`problems`, per rule), and for filters how many assets would be left without a finding in the case (emptiedAssets). Same rules as add_case_finding_filters; also use it to try a new pattern before update_case_finding_filter.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "action",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "EXCLUDE",
+                "ESCALATE"
+              ]
+            },
+            {
+              "name": "inquiryId",
+              "type": "unknown",
+              "required": false,
+              "description": "A linked question to scope the rules to; omit for the whole case"
+            },
+            {
+              "name": "rules",
+              "type": "object[]",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "add_case_finding_filters",
+          "title": "Add Case Finding Rules",
+          "description": "Add finding rules to a case: filters (action EXCLUDE, the default) or escalations (action ESCALATE). A filter keeps a kind of finding out: matches in the case are detached right away (the timeline lists them), and pulls from the case's questions — automatic ones and pull-everything — skip them from then on; attaching one by hand still works. An escalation marks a kind of finding that needs attention: matches already in the case are marked escalated now, and a question brings in new matching answers by itself (even with auto-add off) and raises a notification; filters win over escalations. Scope: omit inquiryId for the whole case, or give a linked question to apply to its answers only. removeEmptiedAssets (filters only) also takes out every asset the filter leaves without a finding in the case. Run with dryRun first: it reports how many findings would be detached or escalated (and emptiedAssets: how many assets would be left without findings).",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "action",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "EXCLUDE",
+                "ESCALATE"
+              ]
+            },
+            {
+              "name": "inquiryId",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "rules",
+              "type": "object[]",
+              "required": true
+            },
+            {
+              "name": "removeEmptiedAssets",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "dryRun",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "update_case_finding_filter",
+          "title": "Update Case Finding Rule",
+          "description": "Change one finding rule of a case (a filter or an escalation): its pattern and/or description. A new pattern applies at once — a filter takes out the findings it now matches (removeEmptiedAssets also takes out assets left without a finding in the case), an escalation marks them — and the timeline records the change. Try the new pattern with preview_case_finding_filters first. A rule's kind, action and scope cannot change: remove it (remove_case_finding_filter) and add another.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "filterId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "pattern",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "description",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "removeEmptiedAssets",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "remove_case_finding_filter",
+          "title": "Remove Case Finding Rule",
+          "description": "Remove one finding rule (filter or escalation) from a case. Findings a filter detached stay detached, and findings an escalation marked stay marked (clear_case_escalations clears them); the questions simply stop applying the rule.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "filterId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "clear_case_escalations",
+          "title": "Clear Case Escalations",
+          "description": "Take the escalation mark off findings of a case once a person has dealt with them (all escalated findings when findingIds is omitted). The findings stay in the case; the timeline records the clearing.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "findingIds",
+              "type": "string[]",
+              "required": false,
+              "description": "Finding ids (not case-finding ids); omit for all"
+            }
+          ]
+        },
+        {
+          "name": "get_case_graph",
+          "title": "Get Case Graph",
+          "description": "Get the evidence neighbourhood graph for a case.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "depth",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_case_timeline",
+          "title": "Get Case Timeline",
+          "description": "Paginated unified case activity feed (newest first). Narrow it with `types` (e.g. FINDINGS_ESCALATED, FINDINGS_AUTO_REMOVED) or to one linked watch with `inquiryId`.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "cursor",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "types",
+              "type": "enum[]",
+              "required": false,
+              "description": "Only these activity types",
+              "enumValues": [
+                "CASE_CREATED",
+                "CASE_UPDATED",
+                "CONCLUSION_UPDATED",
+                "INQUIRY_LINKED",
+                "INQUIRY_UNLINKED",
+                "INQUIRY_PULLED",
+                "EVIDENCE_ADDED",
+                "EVIDENCE_REMOVED",
+                "EVIDENCE_NOTE_UPDATED",
+                "FINDING_ADDED",
+                "FINDING_REMOVED",
+                "FINDING_NOTE_UPDATED",
+                "THREAD_CREATED",
+                "THREAD_ENTRY_ADDED",
+                "THREAD_STATEMENT_UPDATED",
+                "THREAD_STATUS_CHANGED",
+                "THREAD_CONFIDENCE_CHANGED",
+                "SUPPORT_LINKED",
+                "SUPPORT_UNLINKED",
+                "SUPPORT_UPDATED",
+                "LEAD_PROPOSED",
+                "LEAD_ACCEPTED",
+                "LEAD_DISMISSED",
+                "EVENT_ADDED",
+                "EVENT_UPDATED",
+                "EVENT_REMOVED",
+                "BOARD_NOTE_ADDED",
+                "BOARD_NOTE_UPDATED",
+                "BOARD_NOTE_REMOVED",
+                "BOARD_FRAME_ADDED",
+                "BOARD_FRAME_UPDATED",
+                "BOARD_FRAME_REMOVED",
+                "BOARD_LINK_ADDED",
+                "BOARD_LINK_UPDATED",
+                "BOARD_LINK_REMOVED",
+                "BOARD_LINK_PROMOTED",
+                "BOARD_ITEM_HIGHLIGHTED",
+                "BOARD_ARRANGED",
+                "BOARD_SNAPSHOT_TAKEN",
+                "COMMENT_RESOLVED",
+                "CLEANUP_SETTINGS_UPDATED",
+                "FINDING_FILTER_ADDED",
+                "FINDING_FILTER_UPDATED",
+                "FINDING_FILTER_REMOVED",
+                "FINDINGS_AUTO_REMOVED",
+                "EVIDENCE_AUTO_REMOVED",
+                "INQUIRY_SETTINGS_UPDATED",
+                "FINDINGS_ESCALATED",
+                "ESCALATION_CLEARED",
+                "LEADS_GENERATED"
+              ]
+            },
+            {
+              "name": "inquiryId",
+              "type": "string",
+              "required": false,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "list_case_threads",
+          "title": "List Case Threads",
+          "description": "List threads (hypothesis + discussion) for a case.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "create_case_thread",
+          "title": "Create Case Thread",
+          "description": "Create a thread on a case: a HYPOTHESIS (with status/confidence) or a DISCUSSION.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "kind",
+              "type": "enum",
+              "required": false,
+              "description": "Defaults to HYPOTHESIS",
+              "enumValues": [
+                "HYPOTHESIS",
+                "DISCUSSION"
+              ]
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "required": true,
+              "description": "Hypothesis name or discussion topic"
+            },
+            {
+              "name": "statement",
+              "type": "string",
+              "required": false,
+              "description": "Initial statement body (hypothesis threads)"
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "PROPOSED",
+                "SUPPORTED",
+                "REFUTED",
+                "INCONCLUSIVE"
+              ]
+            },
+            {
+              "name": "confidence",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "createdBy",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "add_case_thread_entry",
+          "title": "Add Case Thread Entry",
+          "description": "Add an entry to a thread's log. NOTE is commentary and leaves the title alone; STATEMENT revises the claim itself, and the thread title becomes the first 200 characters of its body. STATUS_CHANGE and CONFIDENCE_CHANGE entries only record a remark — they do not change the thread: use update_case_thread to change a hypothesis's status or confidence (it logs the change itself).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "threadId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "entryType",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "NOTE",
+                "STATEMENT",
+                "STATUS_CHANGE",
+                "CONFIDENCE_CHANGE"
+              ]
+            },
+            {
+              "name": "body",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "author",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "update_case_thread",
+          "title": "Update Case Thread",
+          "description": "Update a hypothesis or discussion thread: its title, its colour on the board, its verdict (status PROPOSED, SUPPORTED, REFUTED or INCONCLUSIVE), its confidence (0–1) or its testable predicate. A status or confidence change is written into the thread's log (STATUS_CHANGE / CONFIDENCE_CHANGE) and on the case timeline, so the evolution of a hypothesis stays on record. To revise the claim itself, add a STATEMENT entry (add_case_thread_entry) instead.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "threadId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "PROPOSED",
+                "SUPPORTED",
+                "REFUTED",
+                "INCONCLUSIVE"
+              ]
+            },
+            {
+              "name": "confidence",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "color",
+              "type": "unknown",
+              "required": false,
+              "description": "A CSS colour such as #3b82f6; null for the default"
+            },
+            {
+              "name": "testablePredicate",
+              "type": "unknown",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "link_case_thread_support",
+          "title": "Link Case Thread Support",
+          "description": "Link evidence or a finding to a thread as supporting/contradicting/neutral.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "threadId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "targetType",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "evidence",
+                "finding"
+              ]
+            },
+            {
+              "name": "targetId",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "stance",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "SUPPORTS",
+                "CONTRADICTS",
+                "NEUTRAL"
+              ]
+            },
+            {
+              "name": "weight",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "note",
+              "type": "string",
+              "required": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "case_board",
+      "title": "Case Board",
+      "description": "The canvas a case is arranged on: read it as a labelled summary; add notes, frames, links and hypothesis stances; place new items, tidy the board up and group items into frames; trace what the evidence connects to beyond the board; and take snapshots. Pair with Cases so a client can find cases and change what they hold.",
+      "operations": [
+        "Read the board: every item labelled, its findings with their state, links, stances and platform relations",
+        "Add notes, frames, comment pins, links between items or single findings, and hypothesis stances",
+        "Arrange: place new items next to what they connect to, tidy the whole board up, group items into frames",
+        "Trace connections upstream, downstream and alongside the evidence, and bring assets into the case",
+        "Snapshot the board, and read any snapshot back"
+      ],
+      "tools": [
+        {
+          "name": "get_case_board",
+          "title": "Get Case Board",
+          "description": "Read a case's board, the canvas the case is arranged on. By default a labelled summary: every item with what it stands for — EVIDENCE (the asset, and the findings the case holds on it with their state: open, new, gone, resolved, dismissed or deleted), HYPOTHESIS (title, status, confidence, stance counts), NOTE (its text), FRAME (title, number of members) and COMMENT pins (latest text, what they are pinned to) — plus the links drawn between items or single findings, hypothesis stances, the platform relations between the evidence (lineage, duplicates: drawn by the board, not editable) and threads not on the board. x/y of an item with a parentId (inside a frame, or a comment pin) are relative to that parent; `unplaced` items have no position yet (place_case_board_items gives them one). board.version is the baseVersion for apply_case_board_ops. view \"full\" returns the raw board payload instead (large; the neighbourhood graph only with includeGraph). snapshotId reads a snapshot (list_case_board_snapshots) in the same shape: the board exactly as it was captured.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "view",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "summary",
+                "full"
+              ]
+            },
+            {
+              "name": "includeGraph",
+              "type": "boolean",
+              "required": false,
+              "description": "view \"full\" only: include the neighbourhood graph"
+            },
+            {
+              "name": "snapshotId",
+              "type": "string",
+              "required": false,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "apply_case_board_ops",
+          "title": "Apply Case Board Ops",
+          "description": "Change a case's board with a batch of ops, applied in order in one transaction; each op succeeds or is rejected on its own (`rejected`, with a reason and a code such as NOT_FOUND, STALE or ALREADY_ON_BOARD). Read the board first (get_case_board) for item ids, and pass its board.version as baseVersion. Ids of new things are yours: give every new item or link a fresh UUID (id / itemId), so a resent batch is harmless and later ops of the same batch can refer to it. opId is optional (op-1, op-2, … in the result). An endpoint is {itemId, findingId?}: a board item, optionally one finding of an EVIDENCE item. Ops: item.create (NOTE with content.text, FRAME with content.title), item.update (x, y, width, height, z, parentId — a FRAME to put the item in, null to take it out —, collapsed, style: color, highlight, rowHighlights per finding, findingPositions; content), item.delete and item.restore (notes, frames, comment pins and hypothesis cards: a card leaves the board, its thread stays; never evidence), link.create/update/delete/restore (kind such as related_to, same_entity, communicates_with, derived_from, contradicts, precedes or your own; certainty CONFIRMED or SUSPECTED; confidence 0–1), link.promote (copies a link between evidence into the global graph, for every case), evidence.add (an asset, or a finding, which brings its asset) and evidence.remove, finding.attach/detach, hypothesis.create (optionally with supports), stance.set/remove (SUPPORTS, CONTRADICTS, NEUTRAL), comment.create/resolve and thread.place. x/y may be left out of evidence.add, hypothesis.create, comment.create and thread.place: then call place_case_board_items to give them a spot. x/y inside a frame are relative to the frame. Every delete can be undone with the matching restore. Closed cases are read-only.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "baseVersion",
+              "type": "integer",
+              "required": false,
+              "description": "board.version you read; defaults to the current version"
+            },
+            {
+              "name": "ops",
+              "type": "unknown[]",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "place_case_board_items",
+          "title": "Place Case Board Items",
+          "description": "Give every item on a case's board that has no position yet — evidence, hypotheses or comments added without x/y, by an agent, a watch or a lead — a spot next to what it connects to: what the board does by itself when someone opens it, done now. Comment pins go by the item they annotate; items with nothing on the board to sit next to go into one block right of the board; a board with nothing placed gets one layered layout. Never moves an item that already has a position. Returns each placed item with its position, and the new board version.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "tidy_case_board",
+          "title": "Tidy Up Case Board",
+          "description": "Tidy up a case's board, like the board's own Tidy up: lay everything at the top level out again, left to right along its relations (what feeds or supports something sits left of it), each connected group together and the groups packed side by side; items in a frame move with their frame, dragged findings go back to their spots around their asset, and items without a position get one. This replaces the arrangement people made: run it with dryRun first to see the moves, prefer place_case_board_items when only new items need a spot, and take_case_board_snapshot first if the current arrangement matters. Every move says where the item was (`from`); to walk a tidy back, send those positions as item.update ops (apply_case_board_ops).",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "dryRun",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "frame_case_board_items",
+          "title": "Frame Case Board Items",
+          "description": "Group items on a case's board into a frame, a named box whose members move with it. Pass `title` (and optionally `color`) for a new frame, or `frameId` for one already on the board (a `title` then renames it). A new frame lays its members out anew inside, relations left to right, where they were and clear of everything else (arrangement \"compact\", the default); \"keep\" wraps them where they stand. Into an existing frame each item takes the next free spot and the frame grows to fit. Items in another frame move over; comment pins stay with the item they annotate. Returns the frame, where each member landed (x/y relative to the frame, and where it was), and what was skipped and why.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "itemIds",
+              "type": "string[]",
+              "required": true
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "frameId",
+              "type": "string",
+              "required": false,
+              "format": "uuid"
+            },
+            {
+              "name": "color",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "yellow",
+                "blue",
+                "green",
+                "pink",
+                "gray",
+                "red",
+                "amber",
+                "violet"
+              ]
+            },
+            {
+              "name": "arrangement",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "compact",
+                "keep"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "trace_case_connections",
+          "title": "Trace Case Connections",
+          "description": "Show connections: what the assets of a case connect to beyond its board, hop by hop through the global graph — upstream (what feeds them: lineage), downstream (what they feed) and alongside (duplicates, look-alikes, drawn links). Traces from every asset in the case unless assetIds names some. kinds narrows which relations are followed; depth is hops (1–6, 6 meaning as far as it goes; default 2); limit caps the nodes returned (default 150, at most 300), and `truncated` says when it was hit. Each node says whether it is in the case already (inCase, with its board itemId), which side it is on and which node it was reached from (via). Add one to the case with apply_case_board_ops evidence.add.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "assetIds",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "direction",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "up",
+                "down",
+                "both"
+              ]
+            },
+            {
+              "name": "depth",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "kinds",
+              "type": "enum[]",
+              "required": false,
+              "enumValues": [
+                "lineage",
+                "links",
+                "duplicates",
+                "similar"
+              ]
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "list_case_board_snapshots",
+          "title": "List Case Board Snapshots",
+          "description": "A case board's snapshots, newest first: frozen copies of the board taken when the case closed (reason CASE_CLOSED) or on request (MANUAL). Read one with get_case_board and its snapshotId.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "take_case_board_snapshot",
+          "title": "Take Case Board Snapshot",
+          "description": "Capture a case's board as it is now in an immutable snapshot (kept for good; the case timeline records it). Take one before a big rearrangement (tidy_case_board) or before handing a case over, so the arrangement a conclusion was drawn from survives later edits.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "autopilot",
+      "title": "AI Autopilot",
+      "description": "Observe and control the autonomous agents: runs, decisions, memory, per-agent enable/disable, and manual triggers.",
+      "operations": [
+        "Audit what each agent did, to which entity, and why",
+        "Enable or disable individual agents for scan cycles",
+        "Trigger a steered autopilot cycle or cancel a running one",
+        "Inspect agent memory and aggregate health stats"
+      ],
+      "tools": [
+        {
+          "name": "list_autopilot_agents",
+          "title": "List Autopilot Agents",
+          "description": "List every AI-autopilot agent with its configuration: kind, whether it is enabled for scan cycles, its goal (default + any override), iteration budget, and assigned tools. INQUIRY/CASE/CONFIG/DETECTOR_AUTHOR/ESCALATION are toggleable; DUPLICATES (deterministic fingerprinting) and DREAM (scheduled memory consolidation) always run and cannot be toggled.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": []
+        },
+        {
+          "name": "update_autopilot_agent",
+          "title": "Update Autopilot Agent",
+          "description": "Enable/disable an autopilot agent for scan cycles, or override its goal or iteration budget. Only INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR and ESCALATION accept enable/disable. Pass goal: null or max_iterations: null to reset to the factory default.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "kind",
+              "type": "enum",
+              "required": true,
+              "description": "Agent kind to update",
+              "enumValues": [
+                "INQUIRY",
+                "CASE",
+                "CONFIG",
+                "DETECTOR_AUTHOR",
+                "ESCALATION"
+              ]
+            },
+            {
+              "name": "enabled",
+              "type": "boolean",
+              "required": false,
+              "description": "Enable or disable the agent on scan cycles"
+            },
+            {
+              "name": "goal",
+              "type": "unknown",
+              "required": false,
+              "description": "Goal override; null resets to the factory default"
+            },
+            {
+              "name": "max_iterations",
+              "type": "unknown",
+              "required": false,
+              "description": "Iteration budget override (1-50); null resets to default"
+            }
+          ]
+        },
+        {
+          "name": "list_autopilot_runs",
+          "title": "List Autopilot Runs",
+          "description": "List AI-autopilot agent runs (newest first) with status, trigger, summary and error. Filter by agent kind, source, case, status, trigger origin (scan_completed | manual | schedule), free-text search, or time window.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "agent_kind",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "INQUIRY",
+                "CASE",
+                "DREAM",
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR",
+                "ESCALATION",
+                "CHAT",
+                "SUPERVISOR"
+              ]
+            },
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": false,
+              "description": "Only runs for this source"
+            },
+            {
+              "name": "case_id",
+              "type": "string",
+              "required": false,
+              "description": "Only runs focused on this case"
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "PENDING",
+                "RUNNING",
+                "COMPLETED",
+                "FAILED",
+                "SKIPPED",
+                "CANCELLED"
+              ]
+            },
+            {
+              "name": "trigger",
+              "type": "string",
+              "required": false,
+              "description": "scan_completed | manual | schedule"
+            },
+            {
+              "name": "search",
+              "type": "string",
+              "required": false,
+              "description": "Substring search over summary, instruction and error"
+            },
+            {
+              "name": "since",
+              "type": "string",
+              "required": false,
+              "description": "ISO time lower bound"
+            },
+            {
+              "name": "until",
+              "type": "string",
+              "required": false,
+              "description": "ISO time upper bound"
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_autopilot_run",
+          "title": "Get Autopilot Run",
+          "description": "Full detail of one autopilot agent run, including every decision it made (action, outcome, target entity, rationale, payload).",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Agent run ID"
+            }
+          ]
+        },
+        {
+          "name": "get_autopilot_run_logs",
+          "title": "Get Autopilot Run Logs",
+          "description": "Step-by-step logs of one autopilot run. channel BUSINESS is the analyst narrative; TECHNICAL includes mechanics and raw model I/O.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "run_id",
+              "type": "string",
+              "required": true,
+              "description": "Agent run ID"
+            },
+            {
+              "name": "channel",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "BUSINESS",
+                "TECHNICAL"
+              ]
+            },
+            {
+              "name": "level",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "DEBUG",
+                "INFO",
+                "WARN",
+                "ERROR"
+              ]
+            },
+            {
+              "name": "search",
+              "type": "string",
+              "required": false,
+              "description": "Substring search over the message"
+            }
+          ]
+        },
+        {
+          "name": "list_autopilot_activity",
+          "title": "List Autopilot Activity",
+          "description": "Cross-run timeline of autopilot decisions (what each agent did, to which entity, with what outcome and rationale). This is the audit surface for \"what did the AI change?\" — filter by agent kind, action, outcome, entity type (inquiry | case | source | detector | memory | system | asset), rationale search, or time window.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "agent_kind",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "INQUIRY",
+                "CASE",
+                "DREAM",
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR",
+                "ESCALATION",
+                "CHAT",
+                "SUPERVISOR"
+              ]
+            },
+            {
+              "name": "entity_type",
+              "type": "string",
+              "required": false,
+              "description": "inquiry | case | source | detector | memory | system | asset"
+            },
+            {
+              "name": "search",
+              "type": "string",
+              "required": false,
+              "description": "Substring search over the rationale"
+            },
+            {
+              "name": "since",
+              "type": "string",
+              "required": false,
+              "description": "ISO time lower bound"
+            },
+            {
+              "name": "until",
+              "type": "string",
+              "required": false,
+              "description": "ISO time upper bound"
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "list_autopilot_memory",
+          "title": "List Autopilot Memory",
+          "description": "List the autopilot agents' persistent memory entries (glossary terms, decision precedents, source profiles, detector lessons). Higher weight = recalled first.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "search",
+              "type": "string",
+              "required": false,
+              "description": "Substring search over key and content"
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_autopilot_stats",
+          "title": "Get Autopilot Stats",
+          "description": "Aggregate autopilot health: runs by status and agent kind, recent failures, decision counts.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": []
+        },
+        {
+          "name": "trigger_autopilot",
+          "title": "Trigger Autopilot",
+          "description": "Manually enqueue an autopilot cycle. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR, ESCALATION) run in canonical order; pass agent_kinds to run a subset, source_id to focus on one source, case_id to focus the CASE agent on one case, and instruction to steer the cycle.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "instruction",
+              "type": "string",
+              "required": false,
+              "description": "Highest-priority steering prompt for this cycle"
+            },
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": false,
+              "description": "Limit the review to one source; omit for all sources"
+            },
+            {
+              "name": "agent_kinds",
+              "type": "enum[]",
+              "required": false,
+              "description": "Which agents to run; omit for the full pipeline",
+              "enumValues": [
+                "INQUIRY",
+                "CASE",
+                "DREAM",
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR",
+                "ESCALATION",
+                "CHAT",
+                "SUPERVISOR"
+              ]
+            },
+            {
+              "name": "case_id",
+              "type": "string",
+              "required": false,
+              "description": "Focus the CASE agent on one case"
+            }
+          ]
+        },
+        {
+          "name": "cancel_autopilot_run",
+          "title": "Cancel Autopilot Run",
+          "description": "Cancel a pending or running autopilot agent run. The runtime aborts before its next step.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "description": "Agent run ID to cancel"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "correlation",
+      "title": "Correlation",
+      "description": "Tune and inspect deterministic asset correlation (evidence fingerprints and duplicate detection).",
+      "operations": [
+        "Tune label weights and related/duplicate thresholds",
+        "Exclude noisy values, regexes, or labels from correlation",
+        "Recompute a single asset synchronously or schedule a full background recompute",
+        "Trace where a normalized finding value appears across assets"
+      ],
+      "tools": [
+        {
+          "name": "get_correlation_config",
+          "title": "Get Correlation Config",
+          "description": "Correlation tuning: per-label weights (dynamic) plus related/duplicate match thresholds.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": []
+        },
+        {
+          "name": "save_correlation_config",
+          "title": "Save Correlation Config",
+          "description": "Update correlation tuning (weights/thresholds/exclusions) and schedule a background recompute.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "defaultWeight",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "relatedMin",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "duplicateMin",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "labelWeights",
+              "type": "object",
+              "required": false,
+              "description": "Per-label weight overrides"
+            },
+            {
+              "name": "exclusions",
+              "type": "object[]",
+              "required": false,
+              "description": "Full replacement list of exclusion rules"
+            }
+          ]
+        },
+        {
+          "name": "add_correlation_exclusion",
+          "title": "Add Correlation Exclusion",
+          "description": "Add a correlation exclusion rule (ignore a noisy value/regex/label) and schedule a background recompute.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "mode",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "value",
+                "regex",
+                "label"
+              ]
+            },
+            {
+              "name": "label",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "value",
+              "type": "unknown",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "remove_correlation_exclusion",
+          "title": "Remove Correlation Exclusion",
+          "description": "Remove a correlation exclusion rule by ID and schedule a background recompute.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "recompute_correlation",
+          "title": "Recompute Correlation",
+          "description": "Recompute correlation. Pass assetId to recompute a single asset synchronously; omit it to schedule a full background recompute (avoids blocking on large instances).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "assetId",
+              "type": "string",
+              "required": false,
+              "description": "Recompute just this asset synchronously",
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "get_value_occurrences",
+          "title": "Get Value Occurrences",
+          "description": "Where else a normalized finding value appears across assets (reverse index).",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "label",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "value",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "valueHash",
+              "type": "string",
+              "required": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom_source_code",
+      "title": "Custom Source Code",
+      "description": "Author, run, and debug the Python notebook behind a CUSTOM source: cells, packages, local folders, uploaded files, and executions.",
+      "operations": [
+        "Read and edit notebook cells, packages, and local folders",
+        "Upload input files and manage declared dependencies",
+        "Run a single cell, a connection test, or the whole notebook, then poll for output and errors"
+      ],
+      "tools": [
+        {
+          "name": "get_notebook",
+          "title": "Get Notebook",
+          "description": "Read a source’s notebook: cells, revision, variables, secret keys, packages, and local folders.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "scope",
+              "type": "enum",
+              "required": false,
+              "description": "Which notebook: the CUSTOM source’s connector notebook, or the per-asset augmentation notebook.",
+              "enumValues": [
+                "connector",
+                "augmentation"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "add_notebook_cell",
+          "title": "Add Notebook Cell",
+          "description": "Insert a new cell into a notebook. Appended at the end unless afterCellId is given.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "scope",
+              "type": "enum",
+              "required": false,
+              "description": "Which notebook: the CUSTOM source’s connector notebook, or the per-asset augmentation notebook.",
+              "enumValues": [
+                "connector",
+                "augmentation"
+              ]
+            },
+            {
+              "name": "baseRevision",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "name": "cellId",
+              "type": "string",
+              "required": false,
+              "description": "Defaults to a generated id if omitted."
+            },
+            {
+              "name": "type",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "code",
+                "markdown"
+              ]
+            },
+            {
+              "name": "source",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "afterCellId",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "update_notebook_cell",
+          "title": "Update Notebook Cell",
+          "description": "Replace one cell’s source (and optionally its type).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "scope",
+              "type": "enum",
+              "required": false,
+              "description": "Which notebook: the CUSTOM source’s connector notebook, or the per-asset augmentation notebook.",
+              "enumValues": [
+                "connector",
+                "augmentation"
+              ]
+            },
+            {
+              "name": "baseRevision",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "name": "cellId",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "source",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "type",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "code",
+                "markdown"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "delete_notebook_cell",
+          "title": "Delete Notebook Cell",
+          "description": "Remove one cell from a notebook.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "scope",
+              "type": "enum",
+              "required": false,
+              "description": "Which notebook: the CUSTOM source’s connector notebook, or the per-asset augmentation notebook.",
+              "enumValues": [
+                "connector",
+                "augmentation"
+              ]
+            },
+            {
+              "name": "baseRevision",
+              "type": "integer",
+              "required": true
+            },
+            {
+              "name": "cellId",
+              "type": "string",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "set_notebook_packages",
+          "title": "Set Notebook Packages",
+          "description": "Replace the Python packages installed into the notebook’s run environment before any cell executes. Call list_notebook_runtime_packages first — the base image’s own dependencies do not need listing.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "scope",
+              "type": "enum",
+              "required": false,
+              "description": "Which notebook: the CUSTOM source’s connector notebook, or the per-asset augmentation notebook.",
+              "enumValues": [
+                "connector",
+                "augmentation"
+              ]
+            },
+            {
+              "name": "packages",
+              "type": "object[]",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "set_notebook_local_folders",
+          "title": "Set Notebook Local Folders",
+          "description": "Replace the local folders a notebook reads with ctx.folder(\"name\"). Needs a deployment that exposes host folders to scans: the all-in-one Docker image (bind-mount them) or a Kubernetes chart with api.localFolders configured. Otherwise upload files to the source instead (upload_notebook_file).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "scope",
+              "type": "enum",
+              "required": false,
+              "description": "Which notebook: the CUSTOM source’s connector notebook, or the per-asset augmentation notebook.",
+              "enumValues": [
+                "connector",
+                "augmentation"
+              ]
+            },
+            {
+              "name": "folders",
+              "type": "object[]",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "list_notebook_runtime_packages",
+          "title": "List Notebook Runtime Packages",
+          "description": "Python packages already baked into the notebook runtime image — do not declare these again with set_notebook_packages.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": []
+        },
+        {
+          "name": "upload_notebook_file",
+          "title": "Upload Notebook File",
+          "description": "Upload a file for the notebook to read via ctx.files. Stored in Postgres and deduplicated by content hash.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "fileName",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "contentBase64",
+              "type": "string",
+              "required": true,
+              "description": "File bytes, base64-encoded."
+            },
+            {
+              "name": "mimeType",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "list_notebook_files",
+          "title": "List Notebook Files",
+          "description": "List files uploaded to a CUSTOM source.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "delete_notebook_file",
+          "title": "Delete Notebook File",
+          "description": "Delete one uploaded file from a CUSTOM source.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "fileId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "run_notebook",
+          "title": "Run Notebook",
+          "description": "Start a notebook execution and return immediately — poll get_notebook_execution for the result. Modes: \"cell\" runs one cell (requires targetCellId), \"test_connection\" is the connection/auth smoke test, \"preview_extract\" samples a few assets end-to-end, \"preview_augment\" runs the augmentation notebook over a sample of real assets and reports per-asset diffs, \"all\" replays every cell in order (the closest thing to a full local test of the whole connector).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "scope",
+              "type": "enum",
+              "required": false,
+              "description": "Which notebook: the CUSTOM source’s connector notebook, or the per-asset augmentation notebook.",
+              "enumValues": [
+                "connector",
+                "augmentation"
+              ]
+            },
+            {
+              "name": "mode",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "cell",
+                "all",
+                "test_connection",
+                "preview_extract",
+                "preview_augment"
+              ]
+            },
+            {
+              "name": "targetCellId",
+              "type": "string",
+              "required": false,
+              "description": "Required when mode is \"cell\"."
+            },
+            {
+              "name": "maxAssets",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_notebook_execution",
+          "title": "Get Notebook Execution",
+          "description": "Poll one notebook execution: status, per-cell outputs, and structured error/failedCellId once it finishes.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "executionId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "list_notebook_executions",
+          "title": "List Notebook Executions",
+          "description": "Recent notebook executions for a source, newest first.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "cancel_notebook_execution",
+          "title": "Cancel Notebook Execution",
+          "description": "Stop a running notebook execution. Cells cannot be interrupted from inside Python, so this ends the process or deletes the Job.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "executionId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "extractions",
+      "title": "Extractions",
+      "description": "Inspect structured field extractions and how much of a run’s content was actually covered.",
+      "operations": [
+        "Search structured extraction records and read one in full",
+        "Check what fraction of a run’s assets were text-extracted",
+        "List the fields an extractor schema declares"
+      ],
+      "tools": [
+        {
+          "name": "get_finding_extraction",
+          "title": "Get Finding Extraction",
+          "description": "Get structured extraction data for a specific finding.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "finding_id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "search_extractions",
+          "title": "Search Extractions",
+          "description": "Search structured extraction records across custom detector findings.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "custom_detector_key",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "custom_detector_id",
+              "type": "string",
+              "required": false,
+              "format": "uuid"
+            },
+            {
+              "name": "source_id",
+              "type": "string",
+              "required": false,
+              "format": "uuid"
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_extraction_coverage",
+          "title": "Get Extraction Coverage",
+          "description": "Get field-level coverage statistics for a custom detector's extractions.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "custom_detector_id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "list_extractor_schema",
+          "title": "List Extractor Schema",
+          "description": "Show the extractor field schema for a custom detector plus a recent extraction example.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "custom_detector_id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "case_leads",
+      "title": "Case Leads",
+      "description": "AI-proposed next steps for a case: generate, review, and track supporting events.",
+      "operations": [
+        "Generate or propose candidate leads for a case",
+        "Accept, reject, or otherwise review a lead",
+        "Track the events a lead is based on"
+      ],
+      "tools": [
+        {
+          "name": "list_case_leads",
+          "title": "List Case Leads",
+          "description": "List a case's lead queue: ranked candidates awaiting accept/dismiss review, plus reviewed history. Origins: SEMANTIC_NEIGHBOR (similar to evidence; details.sameValue when it is the very same value), INQUIRY (important answer of a linked watch), DUPLICATE (a look-alike document from the duplicates engine — an ASSET lead with findingId null), AUTOPILOT, MANUAL. Each lead names what it hangs off (viaFindingId / viaAssetId / viaInquiryId, viaLabel) and where it is (assetName, sourceName). For PROPOSED leads, state OPEN waits for review; IN_CASE and GONE are settled by the next refresh.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "PROPOSED",
+                "ACCEPTED",
+                "DISMISSED"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "propose_case_lead",
+          "title": "Propose Case Lead",
+          "description": "Propose a finding as a lead for a case (instead of attaching it as evidence directly). Leads are reviewed by a human; a dismissed lead is never re-proposed.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "findingId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "rationale",
+              "type": "string",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "generate_case_leads",
+          "title": "Generate Case Leads",
+          "description": "Refresh leads for a case now from its own evidence: findings similar to it, high-importance answers of its linked watches, and look-alike documents the duplicates engine pairs with its evidence (pairs rejected or split in Duplicate review are never suggested). The case also refreshes its leads by itself whenever its evidence or watches change, so this is only needed for an immediate refresh. Bounded (per-kind quotas, at most 60 waiting) and idempotent (existing/dismissed leads are skipped).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "review_case_lead",
+          "title": "Review Case Lead",
+          "description": "Accept a lead into case evidence (a finding lead attaches its finding; an asset lead adds the document) or dismiss it. Dismissals are remembered as precedents so agents stop re-proposing the finding or document.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "leadId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "action",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "ACCEPT",
+                "DISMISS"
+              ]
+            },
+            {
+              "name": "reason",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "list_case_events",
+          "title": "List Case Events",
+          "description": "List the case chronology: dated real-world events reconstructed from evidence, ordered by date. Distinct from get_case_timeline (the app activity/audit log).",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "create_case_event",
+          "title": "Create Case Event",
+          "description": "Add a dated real-world event to the case chronology. Cite the findingIds/evidenceIds the date came from; unsupported dates do not belong in a chronology.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "occurredAt",
+              "type": "string",
+              "required": true,
+              "description": "ISO date or datetime"
+            },
+            {
+              "name": "precision",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "DAY",
+                "MONTH",
+                "YEAR"
+              ]
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "confidence",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "findingIds",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "evidenceIds",
+              "type": "string[]",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "delete_case_event",
+          "title": "Delete Case Event",
+          "description": "Remove an event from the case chronology.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "eventId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "glossary",
+      "title": "Glossary",
+      "description": "The shared term glossary findings and detectors resolve abbreviations and jargon against.",
+      "operations": [
+        "List and look up glossary terms",
+        "Add or update a term definition"
+      ],
+      "tools": [
+        {
+          "name": "list_glossary_terms",
+          "title": "List Glossary Terms",
+          "description": "List the shared investigation glossary: canonical terms, aliases, entity types and verification state. The vocabulary investigators and agents share.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "query",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "entityType",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "PERSON",
+                "ORGANIZATION",
+                "LOCATION",
+                "REFERENCE",
+                "TERM",
+                "OTHER"
+              ]
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "lookup_glossary",
+          "title": "Lookup Glossary",
+          "description": "Resolve a name, alias or concept against the glossary (exact, alias and semantic matching). Use before treating two spellings as separate entities.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "query",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "upsert_glossary_term",
+          "title": "Upsert Glossary Term",
+          "description": "Create or update a glossary term (canonical name, aliases, entity type, notes). Terms written through MCP are operator-curated and verified.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "term",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "aliases",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "entityType",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "PERSON",
+                "ORGANIZATION",
+                "LOCATION",
+                "REFERENCE",
+                "TERM",
+                "OTHER"
+              ]
+            },
+            {
+              "name": "notes",
+              "type": "string",
+              "required": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lineage",
+      "title": "Lineage",
+      "description": "Trace how data flows between assets via the stitched edge graph, and look up what a relation type means.",
+      "operations": [
+        "Walk an asset's upstream/downstream FLOW lineage",
+        "List relation types in use and their FLOW/CONTAINMENT/IDENTITY/REFERENCE/USAGE class"
+      ],
+      "tools": [
+        {
+          "name": "get_asset_lineage",
+          "title": "Get Asset Lineage",
+          "description": "Trace an asset's FLOW lineage (where its data came from / what depends on it), walking edges up to `depth` hops. Returns the same hydrated node/edge graph the web graph explorer renders, so this is how to verify a stitched cross-source lineage edge (e.g. two assets linked by a shared external URN) without a browser.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "assetId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "direction",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "up",
+                "down",
+                "both"
+              ]
+            },
+            {
+              "name": "depth",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "collapseContainers",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "mergeIdentity",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_relation_types",
+          "title": "Get Relation Types",
+          "description": "Edge relation types actually in use, plus builtin suggestions, each classified as FLOW | CONTAINMENT | IDENTITY | REFERENCE | USAGE. Call before get_asset_lineage to know what a relationType on a returned edge means.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": []
+        }
+      ]
+    }
+  ],
+  "prompts": [
+    {
+      "name": "brainstorm_custom_detector",
+      "title": "Brainstorm Custom Detector",
+      "description": "Guide an MCP client to propose regex, classifier, or entity detector configs before training."
+    }
+  ]
+}

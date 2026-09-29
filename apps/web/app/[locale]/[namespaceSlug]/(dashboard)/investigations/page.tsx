@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Sparkles } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
-import { CasesTable } from "@/components/cases-table";
+import { CasesGrid } from "@/components/cases/cases-grid";
 import { InquiriesTable } from "@/components/inquiries-table";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -24,13 +24,13 @@ function InvestigationsPageInner() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-serif text-3xl font-black uppercase tracking-[0.04em]">
             {t("nav.investigations")}
           </h1>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={() => router.push(nsPath("/investigations/inquiries/new"))}
@@ -50,7 +50,7 @@ function InvestigationsPageInner() {
         </TabsList>
 
         <TabsContent value="cases">
-          <CasesTable />
+          <CasesGrid />
         </TabsContent>
 
         <TabsContent value="inquiries">
