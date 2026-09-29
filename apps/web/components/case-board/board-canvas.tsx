@@ -148,7 +148,8 @@ export function mergeNodes(prev: BoardNode[], next: BoardNode[]): BoardNode[] {
       selected: old.selected,
       dragging: old.dragging,
       resizing: old.resizing,
-      measured: old.measured,
+      // Finding nodes declare their size (projection.ts); the rest wait to be measured.
+      measured: old.measured ?? p.measured,
     };
   });
   return changed ? out : prev;

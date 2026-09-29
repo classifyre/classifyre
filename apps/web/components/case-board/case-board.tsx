@@ -334,6 +334,7 @@ function BoardShell({ caseId }: { caseId: string }) {
                 <>
                   <BoardCanvas onTidyUp={() => void tidyUp()} onDropLead={leads.acceptDropped} />
                   {isEmpty && <EmptyBoard />}
+                  <ArrangingNotice />
                   <FocusBanner />
                 </>
               )}
@@ -411,6 +412,21 @@ function EmptyBoard() {
             </Button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** The first layout of a board is running: nothing is drawn until it lands. */
+function ArrangingNotice() {
+  const { t } = useTranslation();
+  const arranging = useUi((s) => s.arranging);
+  if (arranging === 0) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status">
+      <div className="flex items-center gap-2 rounded-[6px] border-2 border-border bg-card px-4 py-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+        {t("caseBoard.arranging", { count: arranging.toLocaleString() })}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import type { ElkNode } from "elkjs/lib/elk-api";
+import { layeredLayout } from "@workspace/schemas/case-board";
 
 export interface LayoutNode {
   id: string;
@@ -12,6 +13,19 @@ export interface LayoutEdge {
   target: string;
 }
 
+/**
+ * ELK is given boards up to this size. Keeping the model order
+ * (NODES_AND_EDGES) makes its crossing minimisation blow up on dense graphs:
+ * 100 assets with 300 relations take under a second, 40 with 624 took 42 s,
+ * and a 523-asset case (2,352 relations) had not finished after 8 minutes.
+ * Bigger boards get the shared layered layout instead: the same columns (the
+ * API's arrange tools use it), in milliseconds.
+ */
+export const ELK_MAX_NODES = 200;
+export const ELK_MAX_EDGES = 200;
+/** ELK gets this long in its worker; after that the shared layout takes over. */
+const ELK_TIMEOUT_MS = 5_000;
+
 type Pending = {
   resolve: (value: ElkNode) => void;
   reject: (reason: unknown) => void;
@@ -20,6 +34,14 @@ type Pending = {
 let worker: Worker | null = null;
 let seq = 0;
 const pending = new Map<number, Pending>();
+
+/** Stop the worker and fail what waits on it: a layout that overran is still running there. */
+function dropWorker(reason: string): void {
+  for (const job of pending.values()) job.reject(new Error(reason));
+  pending.clear();
+  worker?.terminate();
+  worker = null;
+}
 
 function getWorker(): Worker | null {
   if (worker) return worker;
@@ -33,12 +55,7 @@ function getWorker(): Worker | null {
       if (event.data.error || !event.data.result) job.reject(new Error(event.data.error ?? "layout failed"));
       else job.resolve(event.data.result);
     };
-    worker.onerror = () => {
-      for (const job of pending.values()) job.reject(new Error("layout worker failed"));
-      pending.clear();
-      worker?.terminate();
-      worker = null;
-    };
+    worker.onerror = () => dropWorker("layout worker failed");
     return worker;
   } catch {
     return null;
@@ -46,32 +63,11 @@ function getWorker(): Worker | null {
 }
 
 /**
- * A simple grid, used when no worker is available (tests, very old
- * browsers) or ELK fails: predictable beats nothing.
- */
-export function gridLayout(nodes: LayoutNode[], origin = { x: 0, y: 0 }): Map<string, { x: number; y: number }> {
-  const out = new Map<string, { x: number; y: number }>();
-  const columns = Math.max(1, Math.ceil(Math.sqrt(nodes.length)));
-  let rowHeight = 0;
-  let x = origin.x;
-  let y = origin.y;
-  nodes.forEach((n, i) => {
-    if (i > 0 && i % columns === 0) {
-      x = origin.x;
-      y += rowHeight + 80;
-      rowHeight = 0;
-    }
-    out.set(n.id, { x, y });
-    x += n.width + 80;
-    rowHeight = Math.max(rowHeight, n.height);
-  });
-  return out;
-}
-
-/**
  * "Tidy up" and the first layout of a board (PRD §8.9): ELK's layered
  * algorithm, left to right, with disconnected groups packed side by side.
- * Only ever runs on request — never continuously.
+ * Only ever runs on request — never continuously. ELK runs in a worker only:
+ * a big board is laid out by the shared layered layout, as is any board whose
+ * ELK run fails or overruns. ELK on the main thread froze the page.
  */
 export async function elkLayout(
   nodes: LayoutNode[],
@@ -80,6 +76,11 @@ export async function elkLayout(
 ): Promise<Map<string, { x: number; y: number }>> {
   if (nodes.length === 0) return new Map();
   const ids = new Set(nodes.map((n) => n.id));
+  const usable = edges.filter((e) => ids.has(e.source) && ids.has(e.target) && e.source !== e.target);
+  const shared = () => layeredLayout(nodes, usable, origin);
+  const w = nodes.length <= ELK_MAX_NODES && usable.length <= ELK_MAX_EDGES ? getWorker() : null;
+  if (!w) return shared();
+
   const graph: ElkNode = {
     id: "root",
     layoutOptions: {
@@ -93,38 +94,23 @@ export async function elkLayout(
       "elk.aspectRatio": "1.8",
     },
     children: nodes.map((n) => ({ id: n.id, width: n.width, height: n.height })),
-    edges: edges
-      .filter((e) => ids.has(e.source) && ids.has(e.target) && e.source !== e.target)
-      .map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+    edges: usable.map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
   };
-  const toPositions = (result: ElkNode) => {
+  const id = ++seq;
+  try {
+    const result = await new Promise<ElkNode>((resolve, reject) => {
+      pending.set(id, { resolve, reject });
+      w.postMessage({ id, graph });
+      setTimeout(() => {
+        if (pending.has(id)) dropWorker("layout timed out");
+      }, ELK_TIMEOUT_MS);
+    });
     const out = new Map<string, { x: number; y: number }>();
     for (const c of result.children ?? []) {
       out.set(c.id, { x: origin.x + (c.x ?? 0), y: origin.y + (c.y ?? 0) });
     }
     return out;
-  };
-  const w = getWorker();
-  if (w) {
-    const id = ++seq;
-    try {
-      const result = await new Promise<ElkNode>((resolve, reject) => {
-        pending.set(id, { resolve, reject });
-        w.postMessage({ id, graph });
-        setTimeout(() => {
-          if (pending.delete(id)) reject(new Error("layout timed out"));
-        }, 15_000);
-      });
-      return toPositions(result);
-    } catch {
-      // Fall through to the main thread: a slower layout beats a grid.
-    }
-  }
-  try {
-    const mod = await import("elkjs/lib/elk.bundled.js");
-    const ELK = (mod as unknown as { default: new () => { layout: (g: ElkNode) => Promise<ElkNode> } }).default;
-    return toPositions(await new ELK().layout(graph));
   } catch {
-    return gridLayout(nodes, origin);
+    return shared();
   }
 }

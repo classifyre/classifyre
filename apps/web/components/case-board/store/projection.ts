@@ -1,6 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import { bendParallel } from "@workspace/case-board/lib/edges";
-import type { Lod } from "@workspace/case-board/lib/geometry";
+import { FINDING_NODE, FINDING_PORTS, roundPortHandles, type Lod } from "@workspace/case-board/lib/geometry";
 import { absolutePosition } from "./ops";
 import {
   ASSET_ROUND,
@@ -89,6 +89,15 @@ export interface ProjectionView {
   /** Kinds of relation drawn (and followed to neighbours). */
   kinds: ReadonlySet<TraceKind>;
 }
+
+/**
+ * A finding node is always this size, with these ports. Declared, so React
+ * Flow counts it as measured and mounts it only once it is in view: zooming
+ * into detail otherwise mounted every finding on the board at once just to
+ * measure it (3,248 on one case, a two-second freeze each time).
+ */
+const FINDING_MEASURED = { width: FINDING_NODE.width, height: FINDING_NODE.height };
+const FINDING_HANDLES = roundPortHandles(FINDING_PORTS);
 
 export const isItemData = (data: unknown): data is ItemNodeData =>
   !!data && typeof (data as ItemNodeData).itemId === "string";
@@ -198,6 +207,8 @@ export function projectNodes(d: BoardDomain, view: ProjectionView): BoardNode[] 
           position: findingSpot(item, row.findingId, index, findings.length),
           parentId: item.id,
           data: { findingOf: item.id, findingId: row.findingId, attached, round: FINDING_ROUND },
+          measured: { ...FINDING_MEASURED },
+          handles: FINDING_HANDLES,
           zIndex: item.z,
           deletable: false,
           draggable: !view.readOnly,

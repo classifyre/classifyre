@@ -3338,6 +3338,7 @@
   },
   "caseBoard": {
     "loading": "Opening the board…",
+    "arranging": "Arranging {{count}} items on the board…",
     "loadError": "The board could not be loaded.",
     "retry": "Try again",
     "boardLabel": "Case board",
@@ -3805,7 +3806,8 @@
       "snapshotTaken": "Snapshot taken",
       "tidied": "Board tidied up",
       "rejected": "Not saved: {{reason}}",
-      "exported": "Board exported"
+      "exported": "Board exported",
+      "arrangeFailed": "The board could not be arranged: {{reason}}"
     },
     "suggested": {
       "add": "Add to case",
