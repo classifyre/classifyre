@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { useReactFlow } from "@xyflow/react";
+import { toast } from "sonner";
+import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore, useUiStore } from "../store/board-context";
 import type { BoardState } from "../store/board-store";
 import { placeItems, type XY } from "../store/commands";
@@ -9,9 +11,9 @@ import { ownerItem } from "../store/domain";
 import { absolutePosition } from "../store/ops";
 import { ASSET_NODE } from "../store/relations";
 import { estimateItemSize, HYPOTHESIS_WIDTH, itemExtent, type Rect } from "../store/geometry";
-import { placeNearNeighbours } from "../store/placement";
+import { pairEdges, placeNearNeighbours } from "../store/placement";
 import type { BoardItem } from "../store/types";
-import { elkLayout, type LayoutEdge } from "./elk-layout";
+import { elkLayout } from "./elk-layout";
 
 const GAP = 48;
 
@@ -82,6 +84,7 @@ export function neighboursOf(s: BoardState, item: BoardItem): string[] {
  * board (closed case, demo instance) places on screen only, never saving.
  */
 export function useAutoPlace(): void {
+  const { t } = useTranslation();
   const store = useBoardStore();
   const ui = useUiStore();
   const rf = useReactFlow();
@@ -104,6 +107,10 @@ export function useAutoPlace(): void {
       const all = [...s.items.values()];
       const unplaced = all.filter((i) => i.x === null || i.y === null);
       const placed = all.filter((i) => i.x !== null && i.y !== null);
+      const firstOpen = placed.filter((i) => !i.parentId).length === 0;
+      // Unplaced items are not drawn, so until the first layout lands the
+      // canvas is empty: say what it is waiting for.
+      if (firstOpen) ui.getState().set({ arranging: unplaced.length });
       const positions = new Map<string, XY>();
       const incoming: string[] = [];
 
@@ -150,17 +157,16 @@ export function useAutoPlace(): void {
         }
       }
 
-      if (placed.filter((i) => !i.parentId).length === 0) {
+      if (firstOpen) {
         // First open of a case that predates the board: one layout for all.
         const boxes = new Map(floating.map((i) => [i.id, layoutBox(s, i)]));
         const nodes = floating.map((i) => ({ id: i.id, width: boxes.get(i.id)!.width, height: boxes.get(i.id)!.height }));
         // (Items with a placement hint were placed above and are not in `floating`.)
-        const edges: LayoutEdge[] = [];
-        for (const item of floating) {
-          for (const other of neighboursOf(s, item)) {
-            edges.push({ id: `${item.id}->${other}`, source: item.id, target: other });
-          }
-        }
+        const byId = new Map(floating.map((i) => [i.id, i]));
+        const edges = pairEdges(
+          floating.map((i) => i.id),
+          (id) => neighboursOf(s, byId.get(id)!),
+        );
         const laid = await elkLayout(nodes, edges);
         // ELK places boxes; an item's position is its box minus the reach of its findings.
         for (const [id, pos] of laid) {
@@ -192,13 +198,10 @@ export function useAutoPlace(): void {
           // rather than a column that grows with every item.
           const right = Math.max(...taken.map((r) => r.x + r.w));
           const top = Math.min(...taken.map((r) => r.y));
-          const ids = new Set(orphans.map((o) => o.id));
-          const edges: LayoutEdge[] = [];
-          for (const o of orphans) {
-            for (const other of neighbours.get(o.id) ?? []) {
-              if (ids.has(other)) edges.push({ id: `${o.id}->${other}`, source: o.id, target: other });
-            }
-          }
+          const edges = pairEdges(
+            orphans.map((o) => o.id),
+            (id) => neighbours.get(id) ?? [],
+          );
           const laid = await elkLayout(
             orphans.map((o) => ({ id: o.id, width: o.box.width, height: o.box.height })),
             edges,
@@ -221,8 +224,15 @@ export function useAutoPlace(): void {
         for (const id of incoming) next.add(id);
         ui.getState().set({ incoming: next });
       }
-    })().finally(() => {
-      running.current = false;
-    });
-  }, [loaded, readOnly, unplacedKey, store, ui, rf]);
+    })()
+      .catch((error: unknown) => {
+        // Nothing unplaced is drawn, so a silent failure is an empty board.
+        console.error("Case board: auto-place failed", error);
+        toast.error(t("caseBoard.toasts.arrangeFailed", { reason: error instanceof Error ? error.message : String(error) }));
+      })
+      .finally(() => {
+        running.current = false;
+        ui.getState().set({ arranging: 0 });
+      });
+  }, [loaded, readOnly, unplacedKey, store, ui, rf, t]);
 }

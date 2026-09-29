@@ -3338,6 +3338,7 @@
   },
   "caseBoard": {
     "loading": "Board wird geöffnet…",
+    "arranging": "{{count}} Elemente werden auf dem Board angeordnet…",
     "loadError": "Das Board konnte nicht geladen werden.",
     "retry": "Erneut versuchen",
     "boardLabel": "Fall-Board",
@@ -3805,7 +3806,8 @@
       "snapshotTaken": "Schnappschuss erstellt",
       "tidied": "Board aufgeräumt",
       "rejected": "Nicht gespeichert: {{reason}}",
-      "exported": "Board exportiert"
+      "exported": "Board exportiert",
+      "arrangeFailed": "Das Board konnte nicht angeordnet werden: {{reason}}"
     },
     "suggested": {
       "add": "Zum Fall hinzufügen",

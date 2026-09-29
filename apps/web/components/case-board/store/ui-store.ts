@@ -197,6 +197,8 @@ export interface UiState {
   autopilotRefresh: number;
   /** A PNG export is being drawn: every node renders, not only those in view. */
   exporting: boolean;
+  /** Items the first layout is placing right now (unplaced items are not drawn until then). */
+  arranging: number;
   /**
    * Where an item added outside the board (an accepted lead dropped on the
    * canvas) should appear, keyed `asset:<id>` or `finding:<id>`.
@@ -312,6 +314,7 @@ export function createUiStore(): UiStore {
     autopilotOpen: false,
     autopilotRefresh: 0,
     exporting: false,
+    arranging: 0,
     placementHints: new Map(),
 
     setTool: (tool) => set({ tool, pendingLink: null }),

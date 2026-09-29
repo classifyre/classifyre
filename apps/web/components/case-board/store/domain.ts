@@ -181,7 +181,16 @@ export function buildDomain(
   for (const dto of res.links) d.links.set(dto.id, toBoardLink(dto));
 
   const nodes = new Map<string, GraphNodeDto>();
-  for (const n of res.graph.nodes) nodes.set(nodeKey(n.type, n.id), n);
+  // Each asset's live findings, looked up per bubble below (a scan of every
+  // node per bubble was millions of steps on a case with hundreds of assets).
+  const findingsByAsset = new Map<string, GraphNodeDto[]>();
+  for (const n of res.graph.nodes) {
+    nodes.set(nodeKey(n.type, n.id), n);
+    if (n.type !== "finding" || !n.assetId || n.missing) continue;
+    const list = findingsByAsset.get(n.assetId);
+    if (list) list.push(n);
+    else findingsByAsset.set(n.assetId, [n]);
+  }
   d.truncated = res.graph.truncated;
 
   const evidenceById = new Map(res.evidence.map((e) => [e.id, e]));
@@ -213,9 +222,8 @@ export function buildDomain(
       );
     }
     const unattached: BubbleRow[] = [];
-    for (const n of res.graph.nodes) {
-      if (n.type !== "finding" || n.assetId !== ev.entityId) continue;
-      if (attached.has(n.id) || n.missing) continue;
+    for (const n of findingsByAsset.get(ev.entityId) ?? []) {
+      if (attached.has(n.id)) continue;
       unattached.push(
         rowFromNode(n.id, n, {
           caseFindingId: null,
