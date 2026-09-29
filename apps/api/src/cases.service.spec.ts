@@ -42,9 +42,11 @@ describe('CasesService', () => {
       upsert: jest.fn(),
       createMany: jest.fn(),
       findMany: jest.fn(() => Promise.resolve([])),
-      groupBy: jest.fn(() => Promise.resolve([])),
+      groupBy: jest.fn((): Promise<unknown[]> => Promise.resolve([])),
     },
-    caseBoardThumbnail: { findMany: jest.fn(() => Promise.resolve([])) },
+    caseBoardThumbnail: {
+      findMany: jest.fn((): Promise<unknown[]> => Promise.resolve([])),
+    },
     caseBoardItem: { findMany: jest.fn(() => Promise.resolve([])) },
     caseFindingFilter: { count: jest.fn(() => Promise.resolve(0)) },
     asset: { findUnique: jest.fn() },
