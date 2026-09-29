@@ -106,7 +106,8 @@
     "pausedBannerTitle": "This workspace is paused",
     "pausedBannerDescription": "Scans, schedules, AI harness cycles and duplicate checks are stopped. Everything is read-only until you resume.",
     "pausedBannerReason": "Reason: {{reason}}",
-    "pausedBannerAction": "Resume in settings"
+    "pausedBannerAction": "Resume in settings",
+    "allWorkspaces": "All workspaces"
   },
   "categories": {
     "label": "Categories",
@@ -344,7 +345,9 @@
       "morePages": "More pages"
     },
     "remove": "Remove",
-    "more": "More"
+    "more": "More",
+    "openedAgo": "Opened {{when}}",
+    "recentlyOpened": "Recently opened"
   },
   "settings": {
     "title": "Settings",
@@ -2425,6 +2428,30 @@
           "sortByAdded": "Sort by date added"
         }
       }
+    },
+    "card": {
+      "boardAlt": "The board of {{title}}, drawn small",
+      "notDrawn": "Open the case to draw its board",
+      "emptyBoard": "Nothing on the board yet",
+      "noDescription": "No description yet",
+      "unassigned": "Unassigned",
+      "updatedAt": "Updated {{when}}",
+      "newMatches": "New matches: {{count}}",
+      "newMatchesHint": "New matches in the linked inquiry watches, waiting to be pulled into the case",
+      "stats": {
+        "assets": "Assets",
+        "findings": "Findings",
+        "hypotheses": "Hypotheses",
+        "watches": "Watches"
+      }
+    },
+    "grid": {
+      "all": "All cases",
+      "rest": "All other cases",
+      "results": "Matching cases",
+      "perPage": "Per page",
+      "range": "{{from}}–{{to}} of {{total}}",
+      "emptyHint": "Start one with New case, or let an inquiry watch open one."
     }
   },
   "forms": {

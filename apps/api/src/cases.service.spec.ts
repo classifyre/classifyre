@@ -42,7 +42,9 @@ describe('CasesService', () => {
       upsert: jest.fn(),
       createMany: jest.fn(),
       findMany: jest.fn(() => Promise.resolve([])),
+      groupBy: jest.fn(() => Promise.resolve([])),
     },
+    caseBoardThumbnail: { findMany: jest.fn(() => Promise.resolve([])) },
     caseBoardItem: { findMany: jest.fn(() => Promise.resolve([])) },
     caseFindingFilter: { count: jest.fn(() => Promise.resolve(0)) },
     asset: { findUnique: jest.fn() },
@@ -397,6 +399,66 @@ describe('CasesService', () => {
     expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('case', 'c1');
     expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q1');
     expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q2');
+  });
+
+  describe('list', () => {
+    beforeEach(() => {
+      mockPrisma.case.findMany.mockResolvedValue([
+        caseRow({ id: 'c1' }),
+        caseRow({ id: 'c2' }),
+      ]);
+      mockPrisma.case.count.mockResolvedValue(2);
+    });
+
+    it('narrows to, and leaves out, cases by id', async () => {
+      await service.list({ ids: ['c1', 'c2'], excludeIds: 'c3' as never });
+      const where = mockPrisma.case.findMany.mock.calls[0][0].where;
+      expect(where.id).toEqual({ in: ['c1', 'c2'], notIn: ['c3'] });
+      expect(mockPrisma.case.count).toHaveBeenCalledWith({ where });
+    });
+
+    it('drops id values that are not ids', async () => {
+      await service.list({ ids: [{ evil: 1 }, '', 'c1'] as never });
+      const where = mockPrisma.case.findMany.mock.calls[0][0].where;
+      expect(where.id).toEqual({ in: ['c1'] });
+    });
+
+    it('adds finding counts, new watch matches and the board sketch for cards', async () => {
+      mockPrisma.caseFinding.groupBy.mockResolvedValue([
+        { caseId: 'c1', _count: { _all: 12 } },
+      ]);
+      mockPrisma.caseInquiry.findMany.mockResolvedValue([
+        { caseId: 'c1', inquiry: { newMatchCount: 3 } },
+        { caseId: 'c1', inquiry: { newMatchCount: 2 } },
+        { caseId: 'c2', inquiry: { newMatchCount: 0 } },
+      ]);
+      const updatedAt = new Date('2026-09-29T10:00:00Z');
+      const sketch = { v: 1, w: 10, h: 10, nodes: [], edges: [] };
+      mockPrisma.caseBoardThumbnail.findMany.mockResolvedValue([
+        { sketch, updatedAt, board: { caseId: 'c2' } },
+      ]);
+
+      const result = await service.list({ withCardDetails: 'true' as never });
+
+      expect(result.items[0]).toMatchObject({
+        id: 'c1',
+        findingCount: 12,
+        newMatchCount: 5,
+        thumbnail: null,
+      });
+      expect(result.items[1]).toMatchObject({
+        id: 'c2',
+        findingCount: 0,
+        newMatchCount: 0,
+        thumbnail: { sketch, updatedAt },
+      });
+    });
+
+    it('leaves card details out unless asked', async () => {
+      const result = await service.list({});
+      expect(result.items[0]).not.toHaveProperty('thumbnail');
+      expect(mockPrisma.caseBoardThumbnail.findMany).not.toHaveBeenCalled();
+    });
   });
 
   it('throws NotFound for a missing case on update', async () => {

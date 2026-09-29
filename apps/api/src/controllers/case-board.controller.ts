@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Put,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ActorName } from '../actor-name.decorator';
@@ -13,6 +14,7 @@ import { AllowInDemoMode } from '../demo-mode.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { CaseBoardService } from '../case-board/case-board.service';
 import { CaseBoardReadService } from '../case-board/case-board-read.service';
+import { CaseBoardThumbnailService } from '../case-board/case-board-thumbnail.service';
 import { CaseCleanupService } from '../cases/case-cleanup.service';
 import { CaseLeadsScheduler } from '../cases/case-leads.scheduler';
 import {
@@ -20,10 +22,12 @@ import {
   ApplyBoardOpsResponseDto,
   BoardNeighboursDto,
   BoardTraceRequestDto,
+  BoardThumbnailStateDto,
   BoardTraceResponseDto,
   CaseBoardResponseDto,
   CaseBoardSnapshotDto,
   CaseBoardSnapshotSummaryDto,
+  PutBoardThumbnailDto,
 } from '../dto/case-board.dto';
 import { GraphResponseDto } from '../dto/graph.dto';
 
@@ -38,6 +42,7 @@ export class CaseBoardController {
   constructor(
     private readonly board: CaseBoardService,
     private readonly boardRead: CaseBoardReadService,
+    private readonly thumbnails: CaseBoardThumbnailService,
     private readonly cleanup: CaseCleanupService,
     private readonly leads: CaseLeadsScheduler,
   ) {}
@@ -106,6 +111,19 @@ export class CaseBoardController {
     @Body() dto: BoardTraceRequestDto,
   ): Promise<BoardTraceResponseDto> {
     return this.board.trace(id, dto);
+  }
+
+  @Put('thumbnail')
+  @ApiOperation({
+    summary:
+      'Store the board drawn small for its case card (a sketch the client builds from its canvas)',
+  })
+  @ApiResponse({ status: 200, type: BoardThumbnailStateDto })
+  saveThumbnail(
+    @Param('id') id: string,
+    @Body() dto: PutBoardThumbnailDto,
+  ): Promise<BoardThumbnailStateDto> {
+    return this.thumbnails.save(id, dto);
   }
 
   @Get('snapshots')

@@ -106,7 +106,8 @@
     "pausedBannerTitle": "Dieser Arbeitsbereich ist pausiert",
     "pausedBannerDescription": "Scans, Pläne, KI-Harness-Zyklen und Duplikatprüfungen sind gestoppt. Bis zum Fortsetzen ist alles schreibgeschützt.",
     "pausedBannerReason": "Grund: {{reason}}",
-    "pausedBannerAction": "In den Einstellungen fortsetzen"
+    "pausedBannerAction": "In den Einstellungen fortsetzen",
+    "allWorkspaces": "Alle Arbeitsbereiche"
   },
   "categories": {
     "label": "Kategorien",
@@ -344,7 +345,9 @@
       "morePages": "Weitere Seiten"
     },
     "remove": "Entfernen",
-    "more": "Mehr"
+    "more": "Mehr",
+    "openedAgo": "Geöffnet {{when}}",
+    "recentlyOpened": "Zuletzt geöffnet"
   },
   "settings": {
     "title": "Einstellungen",
@@ -2425,6 +2428,30 @@
           "sortByAdded": "Nach Hinzufügedatum sortieren"
         }
       }
+    },
+    "card": {
+      "boardAlt": "Das Board von {{title}}, verkleinert",
+      "notDrawn": "Fall öffnen, um sein Board zu zeichnen",
+      "emptyBoard": "Noch nichts auf dem Board",
+      "noDescription": "Noch keine Beschreibung",
+      "unassigned": "Nicht zugewiesen",
+      "updatedAt": "Aktualisiert {{when}}",
+      "newMatches": "Neue Treffer: {{count}}",
+      "newMatchesHint": "Neue Treffer in den verknüpften Beobachtungen, bereit für den Fall",
+      "stats": {
+        "assets": "Assets",
+        "findings": "Befunde",
+        "hypotheses": "Hypothesen",
+        "watches": "Anfragen"
+      }
+    },
+    "grid": {
+      "all": "Alle Fälle",
+      "rest": "Alle weiteren Fälle",
+      "results": "Passende Fälle",
+      "perPage": "Pro Seite",
+      "range": "{{from}}–{{to}} von {{total}}",
+      "emptyHint": "Lege mit „Neuer Fall“ einen an oder lass eine Anfrage-Beobachtung einen eröffnen."
     }
   },
   "forms": {

@@ -54,6 +54,7 @@ import { CaseBoardService } from './case-board/case-board.service';
 import { CaseBoardToolsService } from './case-board/case-board-tools.service';
 import { QuickSearchService } from './search/quick-search.service';
 import { CaseBoardReadService } from './case-board/case-board-read.service';
+import { CaseBoardThumbnailService } from './case-board/case-board-thumbnail.service';
 import { InquiryActivityService } from './inquiry-activity.service';
 import { CASE_PULL } from './cases/case-pull.port';
 import { CASE_CLEANUP } from './cases/case-cleanup.port';
@@ -219,6 +220,7 @@ import {
     InquiriesService,
     CaseThreadsService,
     CaseBoardReadService,
+    CaseBoardThumbnailService,
     CaseBoardService,
     CaseBoardToolsService,
     QuickSearchService,

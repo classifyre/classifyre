@@ -35,6 +35,14 @@ export class CaseBoardMetaDto {
 
   @ApiProperty({ description: 'Case status at read time' })
   caseStatus!: string;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    description:
+      "Signature of the stored thumbnail sketch, null before the board's first one. The board sends a new sketch only when its own differs.",
+  })
+  thumbnailSignature?: string | null;
 }
 
 /** Anything placed on the board. Positions of children are relative to `parentId`. */
@@ -533,4 +541,44 @@ export class CaseBoardSnapshotDto extends CaseBoardSnapshotSummaryDto {
     description: 'The board exactly as it was served when captured',
   })
   payload!: CaseBoardResponseDto;
+}
+
+/** Body of PUT /cases/:id/board/thumbnail. See `BoardSketchSchema`. */
+export class PutBoardThumbnailDto {
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    description:
+      'The board drawn small (BoardSketch): shapes with integer coordinates in their own box, at most 250 nodes and 400 edges.',
+  })
+  sketch!: Record<string, unknown>;
+
+  @ApiProperty({
+    description: 'Content hash of the sketch, computed by the client',
+    maxLength: 64,
+  })
+  signature!: string;
+
+  @ApiProperty({
+    description:
+      'The board version the sketch was drawn at. An older one never replaces a newer one.',
+  })
+  version!: number;
+}
+
+export class BoardThumbnailStateDto {
+  @ApiProperty()
+  signature!: string;
+
+  @ApiProperty({ description: 'Board version the stored sketch was drawn at' })
+  version!: number;
+
+  @ApiProperty()
+  updatedAt!: Date;
+
+  @ApiProperty({
+    description:
+      'False when the stored sketch was kept: the same one, or drawn at a later version',
+  })
+  written!: boolean;
 }

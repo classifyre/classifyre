@@ -905,3 +905,131 @@ function layoutComponent(
     first,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Board sketch: the case card's thumbnail
+//
+// The board drawn small, as shapes rather than pixels. The web board builds it
+// from its own state once an edit settles and stores it with
+// `PUT /cases/:id/board/thumbnail`; the case list draws it on each card.
+// Shapes instead of a screenshot because a DOM capture has to render every
+// off-screen node and blocks the page for as long as it takes, an image cannot
+// follow the viewer's light or dark theme, and a few kilobytes of JSON is all a
+// card needs. It is a likeness, not a record: the board is the record.
+//
+// Coordinates are integers in the sketch's own box, (0,0) to (w,h). Asset,
+// finding and comment shapes are placed by their centre, boxes by their
+// top-left corner.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const BOARD_SKETCH_VERSION = 1;
+/** A card is a few hundred pixels wide; past this many shapes it is texture. */
+export const BOARD_SKETCH_MAX_NODES = 250;
+export const BOARD_SKETCH_MAX_EDGES = 400;
+/** Labels are cut to this; a card shows a line or two at most. */
+export const BOARD_SKETCH_LABEL_MAX_CHARS = 80;
+/** The serialized size the API accepts. Caps above keep a real sketch well under it. */
+export const BOARD_SKETCH_MAX_BYTES = 64 * 1024;
+
+export const BOARD_SKETCH_SEVERITIES = ["critical", "high", "medium", "low", "info"] as const;
+export type BoardSketchSeverity = (typeof BOARD_SKETCH_SEVERITIES)[number];
+
+/**
+ * How an edge is drawn: `c` an asset to one of its findings, `g` the same to a
+ * finding outside the case; `l` lineage, `k` links, `d` duplicates, `s`
+ * look-alikes; `m` a link someone drew, `q` a suspected one; `+`, `-` and `0`
+ * a hypothesis supported, contradicted or neutral.
+ */
+export const BOARD_SKETCH_EDGE_STYLES = ["c", "g", "l", "k", "d", "s", "m", "q", "+", "-", "0"] as const;
+export type BoardSketchEdgeStyle = (typeof BOARD_SKETCH_EDGE_STYLES)[number];
+
+const SKETCH_EXTENT_LIMIT = 2 * COORD_LIMIT;
+const SketchCoord = z.number().int().min(0).max(SKETCH_EXTENT_LIMIT);
+const SketchSize = z.number().int().min(1).max(SIZE_LIMIT);
+const SketchLabel = z.string().max(BOARD_SKETCH_LABEL_MAX_CHARS).optional();
+const SketchSeverity = z.enum(BOARD_SKETCH_SEVERITIES);
+const SketchFlag = z.literal(true).optional();
+
+export const BoardSketchNodeSchema = z.discriminatedUnion("t", [
+  /** An asset. `d`: its findings are folded away, worst severity. `m`: gone from its source. */
+  z.strictObject({
+    t: z.literal("a"),
+    x: SketchCoord,
+    y: SketchCoord,
+    d: SketchSeverity.optional(),
+    m: SketchFlag,
+    h: BoardColorSchema.optional(),
+    l: SketchLabel,
+  }),
+  /** A finding. `o`: resolved, dismissed or gone. `g`: not in the case. */
+  z.strictObject({
+    t: z.literal("f"),
+    x: SketchCoord,
+    y: SketchCoord,
+    s: SketchSeverity,
+    o: SketchFlag,
+    g: SketchFlag,
+  }),
+  /** A hypothesis card, in its colour. `o`: resolved. */
+  z.strictObject({
+    t: z.literal("h"),
+    x: SketchCoord,
+    y: SketchCoord,
+    w: SketchSize,
+    h: SketchSize,
+    c: z.string().regex(/^#[0-9a-f]{6}$/i),
+    l: SketchLabel,
+    o: SketchFlag,
+  }),
+  /** A sticky note. */
+  z.strictObject({
+    t: z.literal("n"),
+    x: SketchCoord,
+    y: SketchCoord,
+    w: SketchSize,
+    h: SketchSize,
+    c: BoardColorSchema,
+    l: SketchLabel,
+  }),
+  /** A frame. `k`: collapsed to its title bar. */
+  z.strictObject({
+    t: z.literal("r"),
+    x: SketchCoord,
+    y: SketchCoord,
+    w: SketchSize,
+    h: SketchSize,
+    c: BoardColorSchema,
+    l: SketchLabel,
+    k: SketchFlag,
+  }),
+  /** A comment pin. */
+  z.strictObject({ t: z.literal("p"), x: SketchCoord, y: SketchCoord }),
+]);
+export type BoardSketchNode = z.infer<typeof BoardSketchNodeSchema>;
+
+const SketchIndex = z.number().int().min(0).max(BOARD_SKETCH_MAX_NODES - 1);
+
+/** An edge between two nodes of the sketch, by their index. */
+export const BoardSketchEdgeSchema = z.strictObject({
+  a: SketchIndex,
+  b: SketchIndex,
+  t: z.enum(BOARD_SKETCH_EDGE_STYLES),
+});
+export type BoardSketchEdge = z.infer<typeof BoardSketchEdgeSchema>;
+
+export const BoardSketchSchema = z
+  .strictObject({
+    v: z.literal(BOARD_SKETCH_VERSION),
+    w: z.number().int().min(0).max(SKETCH_EXTENT_LIMIT),
+    h: z.number().int().min(0).max(SKETCH_EXTENT_LIMIT),
+    nodes: z.array(BoardSketchNodeSchema).max(BOARD_SKETCH_MAX_NODES),
+    edges: z.array(BoardSketchEdgeSchema).max(BOARD_SKETCH_MAX_EDGES),
+  })
+  .superRefine((sketch, ctx) => {
+    sketch.edges.forEach((edge, i) => {
+      if (edge.a >= sketch.nodes.length || edge.b >= sketch.nodes.length) {
+        ctx.addIssue({ code: "custom", path: ["edges", i], message: "edge endpoint is not a node of the sketch" });
+      }
+    });
+  });
+export type BoardSketch = z.infer<typeof BoardSketchSchema>;

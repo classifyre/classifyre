@@ -1,32 +1,26 @@
 
-# CaseBoardMetaDto
+# PutBoardThumbnailDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`id` | string
-`caseId` | string
+`sketch` | { [key: string]: any; }
+`signature` | string
 `version` | number
-`readOnly` | boolean
-`caseStatus` | string
-`thumbnailSignature` | string
 
 ## Example
 
 ```typescript
-import type { CaseBoardMetaDto } from '@workspace/api-client'
+import type { PutBoardThumbnailDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "id": null,
-  "caseId": null,
+  "sketch": null,
+  "signature": null,
   "version": null,
-  "readOnly": null,
-  "caseStatus": null,
-  "thumbnailSignature": null,
-} satisfies CaseBoardMetaDto
+} satisfies PutBoardThumbnailDto
 
 console.log(example)
 
@@ -35,7 +29,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as CaseBoardMetaDto
+const exampleParsed = JSON.parse(exampleJSON) as PutBoardThumbnailDto
 console.log(exampleParsed)
 ```
 

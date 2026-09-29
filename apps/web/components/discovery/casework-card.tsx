@@ -14,8 +14,8 @@ import { useTranslation } from "@/hooks/use-translation";
  * hand-rolled row for each recent case, an inquiries/leads strip — and it drifted
  * from the investigations page it links to: a different badge, a different
  * severity treatment, a different idea of what a case row looks like. The card
- * is now a header over the real `CasesTable`, so the dashboard and the page it
- * sends you to can no longer disagree about how a case is drawn.
+ * is now a header over `CasesTable`, which draws a case with the same status
+ * and severity badges as the cards of the page it sends you to.
  */
 export function CaseworkCard() {
   const router = useRouter();
@@ -39,7 +39,7 @@ export function CaseworkCard() {
         </button>
       </div>
 
-      <CasesTable variant="compact" limit={6} />
+      <CasesTable limit={6} />
     </PanelCard>
   );
 }

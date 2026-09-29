@@ -43,6 +43,7 @@ import { elkLayout } from "./hooks/elk-layout";
 import { layoutBox } from "./hooks/use-auto-place";
 import { boardFileName, exportBoardPng, untilMeasured } from "./hooks/export-board";
 import { useBoardSocket } from "./hooks/use-board-socket";
+import { useBoardThumbnail } from "./hooks/use-board-thumbnail";
 import { useNeighbourhoodLoader, useTraceLoader } from "./hooks/use-trace";
 import { useCaseLeads } from "./hooks/use-case-leads";
 import { useBoardUrlState } from "./hooks/use-board-url-state";
@@ -157,6 +158,8 @@ function BoardShell({ caseId }: { caseId: string }) {
   }, [refreshAll, store, reloadLeads]);
 
   useBoardSocket(caseId);
+  // The case card's thumbnail follows the board once edits settle.
+  useBoardThumbnail(caseId);
   // The tab title and the header's breadcrumb name the case, not its id.
   useEntityDocumentTitle(caseData?.title);
   useTraceLoader(caseId);

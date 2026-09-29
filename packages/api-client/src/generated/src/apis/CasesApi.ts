@@ -280,6 +280,9 @@ export interface CasesControllerListRequest {
     status?: Array<CasesControllerListStatusEnum>;
     severity?: Array<CasesControllerListSeverityEnum>;
     escalated?: boolean;
+    ids?: Array<string>;
+    excludeIds?: Array<string>;
+    withCardDetails?: boolean;
     skip?: number;
     limit?: number;
 }
@@ -1547,6 +1550,18 @@ export class CasesApi extends runtime.BaseAPI {
 
         if (requestParameters['escalated'] != null) {
             queryParameters['escalated'] = requestParameters['escalated'];
+        }
+
+        if (requestParameters['ids'] != null) {
+            queryParameters['ids'] = requestParameters['ids'];
+        }
+
+        if (requestParameters['excludeIds'] != null) {
+            queryParameters['excludeIds'] = requestParameters['excludeIds'];
+        }
+
+        if (requestParameters['withCardDetails'] != null) {
+            queryParameters['withCardDetails'] = requestParameters['withCardDetails'];
         }
 
         if (requestParameters['skip'] != null) {

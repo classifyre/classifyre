@@ -19,6 +19,7 @@ import type { Namespace, NamespaceStats } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import { OpenedBadge } from "@/components/opened-badge";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocalePath } from "@/lib/app-path";
 
@@ -48,11 +49,14 @@ export function WorkspaceCardSkeleton() {
 export function WorkspaceCard({
   namespace: ns,
   stats,
+  openedAt,
   onOpen,
   onDelete,
 }: {
   namespace: Namespace;
   stats?: NamespaceStats;
+  /** When this browser last opened the workspace (`lib/recently-opened.ts`). */
+  openedAt?: number;
   onOpen: (namespace: Namespace) => void;
   /** Omit to render a card with no delete affordance. */
   onDelete?: (namespace: Namespace) => void;
@@ -98,6 +102,9 @@ export function WorkspaceCard({
               {initial}
             </span>
           </div>
+        )}
+        {openedAt !== undefined && (
+          <OpenedBadge at={openedAt} className="absolute top-2.5 left-2.5" />
         )}
       </div>
 
