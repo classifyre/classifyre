@@ -57,7 +57,11 @@ import { CaseBoardService } from './case-board/case-board.service';
 import { CaseBoardReadService } from './case-board/case-board-read.service';
 import { CaseFindingFiltersService } from './cases/case-finding-filters.service';
 import { CaseEscalationService } from './cases/case-escalation.service';
+import { CaseCleanupService } from './cases/case-cleanup.service';
+import { CaseBoardToolsService } from './case-board/case-board-tools.service';
+import { TRACE_KINDS, TRACE_MAX_DEPTH } from './graph-trace';
 import {
+  BOARD_COLORS,
   BOARD_MAX_OPS_PER_BATCH,
   BoardOpSchema,
 } from '@workspace/schemas/case-board';
@@ -266,10 +270,16 @@ resource explains how they compose.
 5. **Build a case** — create_case (or pull_case_from_inquiry), attach verified
    findings (attach_case_findings), add evidence and hypotheses as threads
    (create_case_thread), and link support/contradiction per thread entry
-   (link_case_thread_support). The case graph (get_case_graph) and timeline
-   (get_case_timeline) show structure and history; the board
-   (get_case_board / apply_case_board_ops) is where analysts arrange it —
-   notes, frames, links between findings, stances drawn on hypothesis cards.
+   (link_case_thread_support); set a hypothesis's verdict and confidence
+   with update_case_thread. The timeline (get_case_timeline) shows history.
+   The board is where analysts arrange the case: read it with get_case_board
+   (a labelled summary), change it with apply_case_board_ops (notes, frames,
+   links between findings, stances on hypothesis cards), give new items a
+   spot with place_case_board_items, group them with frame_case_board_items,
+   and see what the evidence connects to beyond the board with
+   trace_case_connections. Keep noise out with finding filters
+   (preview_case_finding_filters, then add_case_finding_filters) and let the
+   case clean itself up (preview_case_cleanup, then update_case).
 6. **Conclude honestly** — close_case with a conclusion the evidence actually
    supports. An empty or speculative case should be closed as such, not
    escalated.
@@ -308,6 +318,8 @@ export class McpServerFactoryService {
     private readonly caseBoardRead: CaseBoardReadService,
     private readonly caseFindingFilters: CaseFindingFiltersService,
     private readonly caseEscalation: CaseEscalationService,
+    private readonly caseCleanup: CaseCleanupService,
+    private readonly caseBoardTools: CaseBoardToolsService,
   ) {}
 
   /**
@@ -340,6 +352,7 @@ export class McpServerFactoryService {
     this.registerAssetTools(srv);
     this.registerInquiryTools(srv);
     this.registerCaseTools(srv);
+    this.registerCaseBoardTools(srv);
     this.registerCorrelationTools(srv);
     this.registerGlossaryTools(srv);
     this.registerCaseLeadTools(srv);
@@ -3478,6 +3491,25 @@ export class McpServerFactoryService {
       async (dto) => jsonResult(await this.casesService.create(dto as any)),
     );
 
+    const cleanupSwitches = {
+      removeGoneFindings: z
+        .boolean()
+        .optional()
+        .describe(
+          'Clean-up: findings the scans no longer see (retired by a run, or deleted) leave the case by themselves',
+        ),
+      removeResolvedFindings: z
+        .boolean()
+        .optional()
+        .describe('Clean-up: findings someone resolved leave the case'),
+      removeGoneAssets: z
+        .boolean()
+        .optional()
+        .describe(
+          'Clean-up: assets deleted from their source leave the case, with their findings',
+        ),
+    };
+
     server.registerTool(
       'update_case',
       {
@@ -3485,8 +3517,11 @@ export class McpServerFactoryService {
         description:
           'Update case metadata, status, severity, AI mode, or its clean-up ' +
           'switches. Switching a clean-up rule on applies it right away: what it ' +
-          'takes out is reported in `cleanup` and written on the case timeline.',
-        inputSchema: {
+          'takes out is reported in `cleanup` and written on the case timeline — ' +
+          'run preview_case_cleanup first to see how much that is. Closing a ' +
+          'case goes through close_case (it needs a conclusion and snapshots ' +
+          'the board), not through status here.',
+        inputSchema: z.strictObject({
           id: z.string().uuid(),
           title: z.string().max(300).optional(),
           description: z.string().optional(),
@@ -3499,31 +3534,69 @@ export class McpServerFactoryService {
           assignee: z.string().optional(),
           conclusion: z.string().optional(),
           aiMode: z.enum(['INHERIT', 'MANAGED', 'OBSERVE_ONLY']).optional(),
-          removeGoneFindings: z
-            .boolean()
-            .optional()
-            .describe(
-              'Clean-up: findings the scans no longer see (retired by a run, or deleted) leave the case by themselves',
-            ),
-          removeResolvedFindings: z
-            .boolean()
-            .optional()
-            .describe('Clean-up: findings someone resolved leave the case'),
-          removeGoneAssets: z
-            .boolean()
-            .optional()
-            .describe(
-              'Clean-up: assets deleted from their source leave the case, with their findings',
-            ),
-        },
+          ...cleanupSwitches,
+        }),
         annotations: {
           readOnlyHint: false,
-          destructiveHint: false,
+          // Turning a clean-up switch on takes findings and assets out.
+          destructiveHint: true,
         },
       },
       async ({ id, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.casesService.update(id, rest));
+        return jsonResult(await this.casesService.update(id, rest, 'mcp'));
+      },
+    );
+
+    server.registerTool(
+      'preview_case_cleanup',
+      {
+        title: 'Preview Case Clean-up',
+        description:
+          "What a case's automatic clean-up would take out right now, without " +
+          'changing anything: findings the scans no longer see ' +
+          '(removeGoneFindings), findings someone resolved ' +
+          '(removeResolvedFindings), and assets deleted from their source, with ' +
+          'their findings (removeGoneAssets). Name the switches to preview, or ' +
+          'leave them all out to preview all three. Returns a count per switch ' +
+          'and a sample. Switching one on (update_case) applies it at once.',
+        inputSchema: {
+          id: z.string().uuid(),
+          ...cleanupSwitches,
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({
+        id,
+        removeGoneFindings,
+        removeResolvedFindings,
+        removeGoneAssets,
+      }) => {
+        const found = await this.casesService.findOne(id);
+        if (!found) throw new NotFoundException(`Case with ID ${id} not found`);
+        const named =
+          removeGoneFindings !== undefined ||
+          removeResolvedFindings !== undefined ||
+          removeGoneAssets !== undefined;
+        const rules = {
+          removeGoneFindings: named ? removeGoneFindings === true : true,
+          removeResolvedFindings: named
+            ? removeResolvedFindings === true
+            : true,
+          removeGoneAssets: named ? removeGoneAssets === true : true,
+        };
+        return jsonResult({
+          previewed: rules,
+          current: {
+            removeGoneFindings: found.removeGoneFindings,
+            removeResolvedFindings: found.removeResolvedFindings,
+            removeGoneAssets: found.removeGoneAssets,
+          },
+          ...(await this.caseCleanup.previewRules(id, rules)),
+        });
       },
     );
 
@@ -3667,6 +3740,68 @@ export class McpServerFactoryService {
             inquiryIds,
             autoPullInquiryIds,
           }),
+        );
+      },
+    );
+
+    server.registerTool(
+      'set_case_inquiry_auto_pull',
+      {
+        title: 'Set Case Watch Auto-add',
+        description:
+          "Turn automatic pulling of a linked question's new matches into a " +
+          "case on or off (the watch's auto-add). On: matches that later scans " +
+          "land join the case by themselves, subject to the case's filters. " +
+          'Off: they wait for pull_case_from_inquiry — escalation rules still ' +
+          'bring matching answers in. The question must be linked already ' +
+          '(link_case_inquiries).',
+        inputSchema: {
+          id: z.string().uuid(),
+          inquiryId: z.string(),
+          autoPull: z.boolean(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: true,
+        },
+      },
+      async ({ id, inquiryId, autoPull }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.casesService.setInquiryAutoPull(
+            id,
+            inquiryId,
+            autoPull === true || String(autoPull) === 'true',
+            'mcp',
+          ),
+        );
+      },
+    );
+
+    server.registerTool(
+      'unlink_case_inquiry',
+      {
+        title: 'Unlink Case Watch',
+        description:
+          'Unlink a question (a watch) from a case: the case stops following ' +
+          'it. The question itself and the evidence it already brought in stay; ' +
+          'the filters and escalation rules scoped to that watch are dropped ' +
+          'with the link. To end a case and archive its questions, use ' +
+          'close_case instead.',
+        inputSchema: z.strictObject({
+          id: z.string().uuid(),
+          inquiryId: z.string(),
+        }),
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+        },
+      },
+      async ({ id, inquiryId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.casesService.unlinkInquiry(id, inquiryId, 'mcp'),
         );
       },
     );
@@ -3828,6 +3963,89 @@ export class McpServerFactoryService {
       },
     );
 
+    const findingRuleSchema = z.strictObject({
+      kind: z.enum(['FINDING_TYPE', 'VALUE_PATTERN']),
+      pattern: z.string().min(1).max(500),
+      description: z.string().max(1000).optional(),
+    });
+
+    server.registerTool(
+      'preview_case_finding_filters',
+      {
+        title: 'Preview Case Finding Rules',
+        description:
+          'What unsaved finding rules would do to a case right now, without ' +
+          'saving anything: how many findings in the case a filter (action ' +
+          'EXCLUDE, the default) would take out or an escalation (ESCALATE) ' +
+          'would mark — in total and per rule — with a sample, why a rule ' +
+          'could not be saved (`problems`, per rule), and for filters how many ' +
+          'assets would be left without a finding in the case (emptiedAssets). ' +
+          'Same rules as add_case_finding_filters; also use it to try a new ' +
+          'pattern before update_case_finding_filter.',
+        inputSchema: z.strictObject({
+          id: z.string().uuid(),
+          action: z.enum(['EXCLUDE', 'ESCALATE']).optional(),
+          inquiryId: z
+            .string()
+            .nullable()
+            .optional()
+            .describe(
+              'A linked question to scope the rules to; omit for the whole case',
+            ),
+          rules: z.array(findingRuleSchema).min(1).max(50),
+        }),
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ id, action, inquiryId, rules }) =>
+        jsonResult(
+          await this.caseFindingFilters.preview(id, {
+            action,
+            inquiryId: inquiryId ?? null,
+            rules,
+          }),
+        ),
+    );
+
+    server.registerTool(
+      'update_case_finding_filter',
+      {
+        title: 'Update Case Finding Rule',
+        description:
+          'Change one finding rule of a case (a filter or an escalation): its ' +
+          'pattern and/or description. A new pattern applies at once — a filter ' +
+          'takes out the findings it now matches (removeEmptiedAssets also takes ' +
+          'out assets left without a finding in the case), an escalation marks ' +
+          'them — and the timeline records the change. Try the new pattern with ' +
+          "preview_case_finding_filters first. A rule's kind, action and scope " +
+          'cannot change: remove it (remove_case_finding_filter) and add another.',
+        inputSchema: z.strictObject({
+          id: z.string().uuid(),
+          filterId: z.string().uuid(),
+          pattern: z.string().min(1).max(500).optional(),
+          description: z.string().max(1000).nullable().optional(),
+          removeEmptiedAssets: z.boolean().optional(),
+        }),
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+        },
+      },
+      async ({ id, filterId, pattern, description, removeEmptiedAssets }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseFindingFilters.update(
+            id,
+            filterId,
+            { pattern, description, removeEmptiedAssets },
+            'mcp',
+          ),
+        );
+      },
+    );
+
     server.registerTool(
       'get_inquiry_timeline',
       {
@@ -3965,7 +4183,12 @@ export class McpServerFactoryService {
       {
         title: 'Add Case Thread Entry',
         description:
-          'Add a note, statement revision, or status entry to a thread.',
+          "Add an entry to a thread's log. NOTE is commentary and leaves the " +
+          'title alone; STATEMENT revises the claim itself, and the thread ' +
+          'title becomes the first 200 characters of its body. STATUS_CHANGE ' +
+          'and CONFIDENCE_CHANGE entries only record a remark — they do not ' +
+          "change the thread: use update_case_thread to change a hypothesis's " +
+          'status or confidence (it logs the change itself).',
         inputSchema: {
           threadId: z.string().uuid(),
           entryType: z.enum([
@@ -3986,6 +4209,50 @@ export class McpServerFactoryService {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
           await this.caseThreadsService.addEntry(threadId, rest),
+        );
+      },
+    );
+
+    server.registerTool(
+      'update_case_thread',
+      {
+        title: 'Update Case Thread',
+        description:
+          'Update a hypothesis or discussion thread: its title, its colour on ' +
+          'the board, its verdict (status PROPOSED, SUPPORTED, REFUTED or ' +
+          'INCONCLUSIVE), its confidence (0–1) or its testable predicate. A ' +
+          "status or confidence change is written into the thread's log " +
+          '(STATUS_CHANGE / CONFIDENCE_CHANGE) and on the case timeline, so ' +
+          'the evolution of a hypothesis stays on record. To revise the claim ' +
+          'itself, add a STATEMENT entry (add_case_thread_entry) instead.',
+        inputSchema: z.strictObject({
+          threadId: z.string().uuid(),
+          title: z.string().min(1).max(200).optional(),
+          status: z
+            .enum(['PROPOSED', 'SUPPORTED', 'REFUTED', 'INCONCLUSIVE'])
+            .optional(),
+          confidence: z.number().min(0).max(1).optional(),
+          color: z
+            .string()
+            .max(32)
+            .nullable()
+            .optional()
+            .describe('A CSS colour such as #3b82f6; null for the default'),
+          testablePredicate: z.string().max(2000).nullable().optional(),
+        }),
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: true,
+        },
+      },
+      async ({ threadId, ...rest }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseThreadsService.update(threadId, {
+            ...rest,
+            actor: 'mcp',
+          }),
         );
       },
     );
@@ -4016,42 +4283,75 @@ export class McpServerFactoryService {
         );
       },
     );
+  }
+
+  /**
+   * The case board: the canvas a case is arranged on (its own token scope,
+   * `case_board`). Reads come as a labelled summary; every write is ops
+   * through CaseBoardService.applyOps, the board's only write path, so the
+   * timeline, version and live push behave as for a person's edit.
+   */
+  private registerCaseBoardTools(server: McpServerCompat) {
+    const endpointHint =
+      'An endpoint is {itemId, findingId?}: a board item, optionally one ' +
+      'finding of an EVIDENCE item.';
 
     server.registerTool(
       'get_case_board',
       {
         title: 'Get Case Board',
         description:
-          "Read a case's board, the canvas analysts arrange the case on: items " +
-          '(EVIDENCE bubbles — one per asset, its attached findings as sides — ' +
-          'HYPOTHESIS cards, NOTE, FRAME and COMMENT pins) with positions, links ' +
-          'drawn between items or single findings, hypothesis stances, thread ' +
-          'summaries and the case evidence. board.version is the baseVersion for ' +
-          'apply_case_board_ops. The lineage/duplicate neighbourhood graph is ' +
-          'left out unless includeGraph is true (it can be large).',
+          "Read a case's board, the canvas the case is arranged on. By default " +
+          'a labelled summary: every item with what it stands for — EVIDENCE ' +
+          '(the asset, and the findings the case holds on it with their state: ' +
+          'open, new, gone, resolved, dismissed or deleted), HYPOTHESIS (title, ' +
+          'status, confidence, stance counts), NOTE (its text), FRAME (title, ' +
+          'number of members) and COMMENT pins (latest text, what they are ' +
+          'pinned to) — plus the links drawn between items or single findings, ' +
+          'hypothesis stances, the platform relations between the evidence ' +
+          '(lineage, duplicates: drawn by the board, not editable) and threads ' +
+          'not on the board. x/y of an item with a parentId (inside a frame, or ' +
+          'a comment pin) are relative to that parent; `unplaced` items have no ' +
+          'position yet (place_case_board_items gives them one). board.version ' +
+          'is the baseVersion for apply_case_board_ops. view "full" returns the ' +
+          'raw board payload instead (large; the neighbourhood graph only with ' +
+          'includeGraph). snapshotId reads a snapshot (list_case_board_snapshots) ' +
+          'in the same shape: the board exactly as it was captured.',
         inputSchema: {
           caseId: z.string().uuid(),
-          includeGraph: z.boolean().optional(),
+          view: z.enum(['summary', 'full']).optional(),
+          includeGraph: z
+            .boolean()
+            .optional()
+            .describe('view "full" only: include the neighbourhood graph'),
+          snapshotId: z.string().uuid().optional(),
         },
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
         },
       },
-      async ({ caseId, includeGraph }) => {
-        const board = await this.caseBoardRead.getBoard(caseId);
-        if (includeGraph) return jsonResult(board);
-        const { graph, ...rest } = board;
-        return jsonResult({
-          ...rest,
-          graph: {
-            omitted: true,
-            nodes: graph.nodes.length,
-            edges: graph.edges.length,
-            truncated: graph.truncated,
-          },
-        });
-      },
+      async ({ caseId, view, includeGraph, snapshotId }) =>
+        jsonResult(
+          await this.caseBoardTools.view(caseId, {
+            view,
+            includeGraph,
+            snapshotId,
+          }),
+        ),
+    );
+
+    // opId only labels an op in `applied` / `rejected`; making it optional
+    // spares a client a UUID per op. Every op object stays strict.
+    const opOptions = BoardOpSchema.options.map((option) =>
+      option.extend({ opId: z.string().min(1).max(100).optional() }),
+    );
+    const mcpBoardOp = z.discriminatedUnion(
+      'type',
+      opOptions as unknown as [
+        (typeof opOptions)[number],
+        ...(typeof opOptions)[number][],
+      ],
     );
 
     server.registerTool(
@@ -4060,18 +4360,31 @@ export class McpServerFactoryService {
         title: 'Apply Case Board Ops',
         description: [
           "Change a case's board with a batch of ops, applied in order in one",
-          'transaction; each op succeeds or is rejected on its own (see `rejected`).',
-          'Ids are yours: every op needs a fresh UUID opId and every new item or',
-          'link a UUID id, so resending a batch is harmless. An endpoint is',
-          '{itemId, findingId?}: an item id from get_case_board, optionally one',
-          'finding of an EVIDENCE item. Ops: item.create (NOTE, FRAME), item.update',
-          '(x, y, width, height, z, parentId, collapsed, style, content), item.delete',
-          'and item.restore (notes, frames, pins and hypothesis cards, never',
-          'evidence), link.create/update/delete/restore, link.promote (copies a',
-          'board link into the global graph), evidence.add/remove,',
-          'finding.attach/detach, hypothesis.create, stance.set/remove (SUPPORTS,',
-          'CONTRADICTS, NEUTRAL), comment.create/resolve and thread.place. Every',
-          'delete can be undone with the matching restore. Closed cases are read-only.',
+          'transaction; each op succeeds or is rejected on its own (`rejected`,',
+          'with a reason and a code such as NOT_FOUND, STALE or ALREADY_ON_BOARD).',
+          'Read the board first (get_case_board) for item ids, and pass its',
+          'board.version as baseVersion. Ids of new things are yours: give every',
+          'new item or link a fresh UUID (id / itemId), so a resent batch is',
+          'harmless and later ops of the same batch can refer to it. opId is',
+          `optional (op-1, op-2, … in the result). ${endpointHint}`,
+          'Ops: item.create (NOTE with content.text, FRAME with content.title),',
+          'item.update (x, y, width, height, z, parentId — a FRAME to put the item',
+          'in, null to take it out —, collapsed, style: color, highlight,',
+          'rowHighlights per finding, findingPositions; content), item.delete and',
+          'item.restore (notes, frames, comment pins and hypothesis cards: a card',
+          'leaves the board, its thread stays; never evidence),',
+          'link.create/update/delete/restore (kind such as related_to,',
+          'same_entity, communicates_with, derived_from, contradicts, precedes or',
+          'your own; certainty CONFIRMED or SUSPECTED; confidence 0–1),',
+          'link.promote (copies a link between evidence into the global graph,',
+          'for every case), evidence.add (an asset, or a finding, which brings its',
+          'asset) and evidence.remove, finding.attach/detach, hypothesis.create',
+          '(optionally with supports), stance.set/remove (SUPPORTS, CONTRADICTS,',
+          'NEUTRAL), comment.create/resolve and thread.place. x/y may be left out',
+          'of evidence.add, hypothesis.create, comment.create and thread.place:',
+          'then call place_case_board_items to give them a spot. x/y inside a',
+          'frame are relative to the frame. Every delete can be undone with the',
+          'matching restore. Closed cases are read-only.',
         ].join(' '),
         inputSchema: z.strictObject({
           caseId: z.string().uuid(),
@@ -4083,7 +4396,7 @@ export class McpServerFactoryService {
             .describe(
               'board.version you read; defaults to the current version',
             ),
-          ops: z.array(BoardOpSchema).min(1).max(BOARD_MAX_OPS_PER_BATCH),
+          ops: z.array(mcpBoardOp).min(1).max(BOARD_MAX_OPS_PER_BATCH),
         }),
         annotations: {
           readOnlyHint: false,
@@ -4098,9 +4411,207 @@ export class McpServerFactoryService {
         return jsonResult(
           await this.caseBoardService.applyOps(
             caseId,
-            { clientId: randomUUID(), baseVersion: version, ops },
+            {
+              clientId: randomUUID(),
+              baseVersion: version,
+              ops: ops.map((op, i) => ({
+                ...op,
+                opId: op.opId ?? `op-${i + 1}`,
+              })),
+            },
             'mcp',
           ),
+        );
+      },
+    );
+
+    server.registerTool(
+      'place_case_board_items',
+      {
+        title: 'Place Case Board Items',
+        description:
+          "Give every item on a case's board that has no position yet — " +
+          'evidence, hypotheses or comments added without x/y, by an agent, a ' +
+          'watch or a lead — a spot next to what it connects to: what the board ' +
+          'does by itself when someone opens it, done now. Comment pins go by ' +
+          'the item they annotate; items with nothing on the board to sit next ' +
+          'to go into one block right of the board; a board with nothing placed ' +
+          'gets one layered layout. Never moves an item that already has a ' +
+          'position. Returns each placed item with its position, and the new ' +
+          'board version.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: true,
+        },
+      },
+      async ({ caseId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(await this.caseBoardTools.place(caseId, 'mcp'));
+      },
+    );
+
+    server.registerTool(
+      'tidy_case_board',
+      {
+        title: 'Tidy Up Case Board',
+        description:
+          "Tidy up a case's board, like the board's own Tidy up: lay everything " +
+          'at the top level out again, left to right along its relations (what ' +
+          'feeds or supports something sits left of it), each connected group ' +
+          'together and the groups packed side by side; items in a frame move ' +
+          'with their frame, dragged findings go back to their spots around ' +
+          'their asset, and items without a position get one. This replaces the ' +
+          'arrangement people made: run it with dryRun first to see the moves, ' +
+          'prefer place_case_board_items when only new items need a spot, and ' +
+          'take_case_board_snapshot first if the current arrangement matters. ' +
+          'Every move says where the item was (`from`); to walk a tidy back, ' +
+          'send those positions as item.update ops (apply_case_board_ops).',
+        inputSchema: z.strictObject({
+          caseId: z.string().uuid(),
+          dryRun: z.boolean().optional(),
+        }),
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ caseId, dryRun }) => {
+        if (!dryRun) this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseBoardTools.tidy(caseId, { dryRun }, 'mcp'),
+        );
+      },
+    );
+
+    server.registerTool(
+      'frame_case_board_items',
+      {
+        title: 'Frame Case Board Items',
+        description:
+          "Group items on a case's board into a frame, a named box whose members " +
+          'move with it. Pass `title` (and optionally `color`) for a new frame, ' +
+          'or `frameId` for one already on the board (a `title` then renames ' +
+          'it). A new frame lays its members out anew inside, relations left to ' +
+          'right, where they were and clear of everything else (arrangement ' +
+          '"compact", the default); "keep" wraps them where they stand. Into an ' +
+          'existing frame each item takes the next free spot and the frame grows ' +
+          'to fit. Items in another frame move over; comment pins stay with the ' +
+          'item they annotate. Returns the frame, where each member landed (x/y ' +
+          'relative to the frame, and where it was), and what was skipped and why.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          itemIds: z.array(z.string().uuid()).min(1).max(100),
+          title: z.string().trim().min(1).max(200).optional(),
+          frameId: z.string().uuid().optional(),
+          color: z.enum(BOARD_COLORS).optional(),
+          arrangement: z.enum(['compact', 'keep']).optional(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({ caseId, itemIds, title, frameId, color, arrangement }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseBoardTools.frame(
+            caseId,
+            { itemIds, title, frameId, color, arrangement },
+            'mcp',
+          ),
+        );
+      },
+    );
+
+    server.registerTool(
+      'trace_case_connections',
+      {
+        title: 'Trace Case Connections',
+        description:
+          'Show connections: what the assets of a case connect to beyond its ' +
+          'board, hop by hop through the global graph — upstream (what feeds ' +
+          'them: lineage), downstream (what they feed) and alongside ' +
+          '(duplicates, look-alikes, drawn links). Traces from every asset in ' +
+          'the case unless assetIds names some. kinds narrows which relations ' +
+          'are followed; depth is hops (1–6, 6 meaning as far as it goes; ' +
+          'default 2); limit caps the nodes returned (default 150, at most ' +
+          '300), and `truncated` says when it was hit. Each node says whether ' +
+          'it is in the case already (inCase, with its board itemId), which ' +
+          'side it is on and which node it was reached from (via). Add one to ' +
+          'the case with apply_case_board_ops evidence.add.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          assetIds: z.array(z.string().min(1).max(200)).max(500).optional(),
+          direction: z.enum(['up', 'down', 'both']).optional(),
+          depth: z.number().int().min(1).max(TRACE_MAX_DEPTH).optional(),
+          kinds: z.array(z.enum(TRACE_KINDS)).min(1).max(4).optional(),
+          limit: z.number().int().min(1).max(300).optional(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ caseId, assetIds, direction, depth, kinds, limit }) =>
+        jsonResult(
+          await this.caseBoardTools.trace(caseId, {
+            assetIds,
+            direction,
+            depth,
+            kinds,
+            limit,
+          }),
+        ),
+    );
+
+    server.registerTool(
+      'list_case_board_snapshots',
+      {
+        title: 'List Case Board Snapshots',
+        description:
+          "A case board's snapshots, newest first: frozen copies of the board " +
+          'taken when the case closed (reason CASE_CLOSED) or on request ' +
+          '(MANUAL). Read one with get_case_board and its snapshotId.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ caseId }) =>
+        jsonResult({
+          snapshots: await this.caseBoardRead.listSnapshots(caseId),
+        }),
+    );
+
+    server.registerTool(
+      'take_case_board_snapshot',
+      {
+        title: 'Take Case Board Snapshot',
+        description:
+          "Capture a case's board as it is now in an immutable snapshot (kept " +
+          'for good; the case timeline records it). Take one before a big ' +
+          'rearrangement (tidy_case_board) or before handing a case over, so ' +
+          'the arrangement a conclusion was drawn from survives later edits.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({ caseId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseBoardRead.takeSnapshot(caseId, 'MANUAL', 'mcp'),
         );
       },
     );

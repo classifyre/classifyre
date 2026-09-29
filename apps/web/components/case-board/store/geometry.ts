@@ -1,4 +1,13 @@
-import { FRAME_TITLE_HEIGHT, HYPOTHESIS_WIDTH } from "@workspace/case-board/lib/geometry";
+import {
+  DEFAULT_FRAME_SIZE,
+  DEFAULT_NOTE_SIZE,
+  FRAME_PADDING,
+  FRAME_TITLE_HEIGHT,
+  HYPOTHESIS_WIDTH,
+  spotInFrame as spotInFrameBox,
+  type Rect,
+  type XY,
+} from "@workspace/schemas/case-board";
 import { ASSET_NODE, evidenceExtent, type Extent } from "./relations";
 import { absolutePosition } from "./ops";
 import type { BoardDomain, BoardItem } from "./types";
@@ -9,23 +18,14 @@ import type { BoardDomain, BoardItem } from "./types";
  * used by auto-placement and the suggested-neighbour layout.
  */
 
-export { FRAME_TITLE_HEIGHT, HYPOTHESIS_WIDTH };
-export const DEFAULT_NOTE = { width: 220, height: 160 };
-export const DEFAULT_FRAME = { width: 640, height: 400 };
-/** Clear space kept between a frame's edge and what is inside it. */
-export const FRAME_PADDING = 24;
+// The sizes and the free-spot search are shared with the API, which lays
+// boards out for the MCP arrange tools (see @workspace/schemas/case-board).
+export { FRAME_PADDING, FRAME_TITLE_HEIGHT, HYPOTHESIS_WIDTH };
+export { freeSpotNear, overlaps, type Rect, type XY } from "@workspace/schemas/case-board";
+export const DEFAULT_NOTE = DEFAULT_NOTE_SIZE;
+export const DEFAULT_FRAME = DEFAULT_FRAME_SIZE;
 /** A suggested neighbour is drawn like any asset. */
 export const SUGGESTED_SIZE = { width: ASSET_NODE.width, height: ASSET_NODE.height };
-
-export interface XY {
-  x: number;
-  y: number;
-}
-
-export interface Rect extends XY {
-  w: number;
-  h: number;
-}
 
 export function estimateItemSize(d: BoardDomain, item: BoardItem): { width: number; height: number } {
   switch (item.kind) {
@@ -71,45 +71,6 @@ export function takenRects(d: BoardDomain, skip?: (item: BoardItem) => boolean):
   return taken;
 }
 
-export function overlaps(a: Rect, b: Rect, gap: number): boolean {
-  return a.x < b.x + b.w + gap && a.x + a.w + gap > b.x && a.y < b.y + b.h + gap && a.y + a.h + gap > b.y;
-}
-
-/**
- * Walk outwards from `anchor` in rings until a spot that overlaps nothing.
- * `prefer` biases the first candidates of each ring (right of the anchor for
- * suggestions, so they read as "next to" what they belong to).
- */
-export function freeSpotNear(
-  anchor: XY,
-  size: { width: number; height: number },
-  taken: readonly Rect[],
-  gap = 48,
-  step = 60,
-): XY {
-  for (let ring = 0; ring < 60; ring += 1) {
-    const d = ring * step;
-    const candidates: XY[] =
-      ring === 0
-        ? [anchor]
-        : [
-            { x: anchor.x + d, y: anchor.y },
-            { x: anchor.x, y: anchor.y + d },
-            { x: anchor.x + d, y: anchor.y + d },
-            { x: anchor.x + d, y: anchor.y - d },
-            { x: anchor.x, y: anchor.y - d },
-            { x: anchor.x - d, y: anchor.y },
-            { x: anchor.x - d, y: anchor.y + d },
-            { x: anchor.x - d, y: anchor.y - d },
-          ];
-    for (const c of candidates) {
-      const r = { x: c.x, y: c.y, w: size.width, h: size.height };
-      if (!taken.some((t) => overlaps(r, t, gap))) return c;
-    }
-  }
-  return anchor;
-}
-
 /**
  * Where an item lands when it is moved into a frame: the first free spot,
  * row by row, inside the frame's padding. With no room left it goes below
@@ -121,32 +82,15 @@ export function spotInFrame(
   frame: BoardItem,
   item: BoardItem,
 ): { at: XY; grow: { width: number; height: number } | null } {
-  const width = frame.width ?? DEFAULT_FRAME.width;
-  const height = frame.height ?? DEFAULT_FRAME.height;
-  const ext = itemExtent(d, item);
-  const top = FRAME_TITLE_HEIGHT + FRAME_PADDING / 2;
   const siblings: Rect[] = [];
   for (const child of d.items.values()) {
     if (child.parentId !== frame.id || child.id === item.id || child.x === null || child.y === null) continue;
     const e = itemExtent(d, child);
     siblings.push({ x: child.x + e.dx, y: child.y + e.dy, w: e.width, h: e.height });
   }
-  const step = 20;
-  for (let y = top; y + ext.height <= height - FRAME_PADDING; y += step) {
-    for (let x = FRAME_PADDING; x + ext.width <= width - FRAME_PADDING; x += step) {
-      const box = { x, y, w: ext.width, h: ext.height };
-      if (!siblings.some((r) => overlaps(box, r, FRAME_PADDING))) {
-        return { at: { x: x - ext.dx, y: y - ext.dy }, grow: null };
-      }
-    }
-  }
-  const x = FRAME_PADDING;
-  const y = Math.max(top, ...siblings.map((r) => r.y + r.h + FRAME_PADDING));
-  return {
-    at: { x: x - ext.dx, y: y - ext.dy },
-    grow: {
-      width: Math.max(width, x + ext.width + FRAME_PADDING),
-      height: Math.max(height, y + ext.height + FRAME_PADDING),
-    },
-  };
+  return spotInFrameBox(
+    { width: frame.width ?? DEFAULT_FRAME.width, height: frame.height ?? DEFAULT_FRAME.height },
+    siblings,
+    itemExtent(d, item),
+  );
 }

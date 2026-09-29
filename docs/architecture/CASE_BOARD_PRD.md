@@ -900,14 +900,36 @@ export class CaseBoardGateway implements OnGatewayDisconnect {
 
 ### 7.6 MCP (the UI assistant = MCP 1:1)
 
-Add two tools in `mcp-server.factory.ts`. The catalog picks them up automatically through `McpToolsCatalogService`.
+The board has its own MCP capability group, **`case_board`** ("Case Board" in
+the token dialog, `apps/api/src/mcp-catalog.ts`); the case domain tools stay in
+**`cases`**. Migration `20260928120000_mcp_case_board_tool_group` gave every
+token scoped to `cases` the new group too, since the two board tools used to
+live there. Every tool reaches the UI assistant through the same catalog, and
+its writes wait for *Confirm* (2026-09-28):
 
-- `get_case_board`: `{ caseId }` → a compact board: items with kind/ref/position/frame, links, stance rows, thread summaries. **No** full graph payload (point to `get_case_graph` for that).
-- `apply_case_board_ops`: `{ caseId, ops: BoardOp[] }` (the same zod schema; mutating, so the UI assistant gates it behind *Confirm*). This lets agents post notes ("Autopilot: 3 new matches since Tuesday"), place hypotheses and draw suspected links. Agent-created items get `createdBy = 'ai-autopilot'` and render with the `AiActorBadge`.
+| Tool | Scope | Kind | Does |
+|---|---|---|---|
+| `get_case_board` | case_board | read | Labelled summary by default (`board-summary.ts`): items joined with their asset, findings and finding state, thread, note text or frame title; links, stances, platform relations, threads off the board. `view: "full"` = raw payload; `snapshotId` reads a snapshot |
+| `apply_case_board_ops` | case_board | destructive | The op endpoint (§7.3); `opId` optional (defaults `op-n`), every op still strict |
+| `place_case_board_items` | case_board | write | Server-side auto-place (§8.9) of unplaced items |
+| `tidy_case_board` | case_board | destructive | Tidy up, server-side; `dryRun`; moves report `from` |
+| `frame_case_board_items` | case_board | write | New frame around items (`compact` / `keep`) or into an existing frame (grows) |
+| `trace_case_connections` | case_board | read | `POST …/board/trace`, seeds default to the case's assets, nodes marked `inCase` + `itemId` |
+| `list_case_board_snapshots` / `take_case_board_snapshot` | case_board | read / write | §7.1 snapshots |
+| `preview_case_cleanup`, `preview_case_finding_filters` | cases | read | Previews the assistant can run in-loop before proposing the write |
+| `update_case_finding_filter`, `set_case_inquiry_auto_pull`, `unlink_case_inquiry`, `update_case_thread` | cases | write | The case file, watches and hypotheses panels |
 
-Update the case section of the MCP instructions (around line 260 of `mcp-server.factory.ts`) so they describe the board.
+Server-side layout: the arrange tools compute plans from one board read
+(`apps/api/src/case-board/board-layout.ts`) and apply them as ordinary
+`item.update` / `item.create` ops through `CaseBoardService.applyOps`, so
+versions, the timeline and socket pushes behave as for a person. Sizes, the
+free-spot search, auto-place and a layered layout (a dependency-free stand-in
+for ELK) live in `@workspace/schemas/case-board`, shared with the web board.
 
----
+Not exposed on purpose: deleting a case or a hypothesis thread with its log,
+*Delete everywhere* on a global relationship, Export PNG. Agents' writes carry
+the actor `mcp`. User docs: `apps/docs/app/investigations/cases/mcp/`; tool
+catalog generated into the MCP Server settings page.
 
 ## 8. Frontend architecture
 
