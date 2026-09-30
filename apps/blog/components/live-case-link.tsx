@@ -43,7 +43,7 @@ function ArrowIcon({ className }: { className?: string }) {
  * Every case-file post links out to its live, inspectable Classifyre
  * namespace. This renders that link twice from one real <a> each: an
  * always-visible slab under the hero, and a compact pill that takes over
- * once the slab scrolls out of view — so the link stays reachable for the
+ * once the slab scrolls out of view, so the link stays reachable for the
  * whole 20+ minute read without ever leaving the DOM (crawlable + no-JS-safe).
  */
 export function LiveCaseLink({ href, caseName, locale = "en" }: LiveCaseLinkProps) {
