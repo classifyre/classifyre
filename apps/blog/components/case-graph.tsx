@@ -6,7 +6,7 @@ import { translate } from "@/i18n";
 import type { Locale } from "@/lib/locale";
 
 /**
- * Animated case graph for case #42 — a classified file emailed to an
+ * Animated case graph for case #42: a classified file emailed to an
  * external address. When the figure enters the viewport, the graph assembles
  * itself in evidence order: case, then hypotheses, then edges, then
  * findings, then the analyst and duplicate links, and finally the autopilot
