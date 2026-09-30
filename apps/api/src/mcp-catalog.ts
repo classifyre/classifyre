@@ -33,7 +33,7 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     id: 'custom_detectors',
     title: 'Custom Detectors',
     description:
-      'Manage regex, classifier, and entity detectors and train them on feedback.',
+      'Manage regex, classifier, entity, AI and code detectors and train them on feedback. Writing a code detector (CUSTOM_DETECTOR) also needs custom_source_code.',
     toolNames: [
       'list_custom_detectors',
       'get_custom_detector',
@@ -253,7 +253,7 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     id: 'custom_source_code',
     title: 'Custom Source Code',
     description:
-      'Author, run, and debug the Python notebook behind a CUSTOM source: cells, packages, local folders, uploaded files, and executions.',
+      'Author, run, and debug Python notebooks: the connector behind a CUSTOM source, and code detectors (CUSTOM_DETECTOR) -- cells, packages, local folders, uploaded files, and executions.',
     toolNames: [
       'get_notebook',
       'add_notebook_cell',
@@ -269,8 +269,13 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'get_notebook_execution',
       'list_notebook_executions',
       'cancel_notebook_execution',
+      'run_custom_detector_notebook',
+      'list_custom_detector_files',
+      'upload_custom_detector_file',
+      'delete_custom_detector_file',
     ],
     operations: [
+      'Author code detectors (CUSTOM_DETECTOR): create/update needs this group, preview detect() on a real asset, manage the files the rule reads',
       'Read and edit notebook cells, packages, and local folders',
       'Upload input files and manage declared dependencies',
       'Run a single cell, a connection test, or the whole notebook, then poll for output and errors',

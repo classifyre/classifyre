@@ -1,0 +1,282 @@
+---
+title: Code detector
+description: Write a detector in Python. detect(asset, ctx) reads an asset's rows, text, bytes and metadata and yields findings with locations, fields and a stable identity.
+---
+
+import { PipelineSchemaTable } from "@/components/pipeline-schema-table"
+import { Badge, Separator } from "@workspace/ui/components"
+import { Callout } from "nextra/components"
+
+# Code detector
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  Python · Rows & metadata · Tests
+</Badge>
+
+A code detector is a notebook that defines one function, `detect(asset, ctx)`,
+and yields a `Finding` for every problem it sees. It runs in the scan's
+detector stage, once per asset, **after every other detector**, and it can read
+the asset's text, pages, raw bytes, rows and metadata — and, if you ask, what
+the other detectors found on the same asset in this run.
+
+It **judges**; it never changes what the connector extracted. To add metadata,
+tags or links to assets, use [augmentation](/sources/augmentation/) instead.
+
+Its pipeline type is `CUSTOM_DETECTOR`.
+
+<Separator className="my-6" />
+
+## When to use
+
+Reach for a code detector when the rule is a **check** that no pattern and no
+model expresses:
+
+| Rule | What the code does |
+| --- | --- |
+| **Totals add up** | Read `asset.rows()`, compare each total with the sum of its parts, report the row. |
+| **List screening** | Load a sanctions or PEP list you uploaded in `setup()`, match names other detectors found. |
+| **Co-occurrence** | "An IBAN and a special-category term in the same document shared with more than 50 people." |
+| **Metadata threshold** | Compare `asset.metadata` with a variable. No payload is fetched at all. |
+| **Checksummed IDs** | A national identifier the platform does not ship yet, validated by its checksum. |
+| **Your own model** | Score each page or row with a scikit-learn or ONNX model you uploaded as a file. |
+
+| Reach for | When |
+| --- | --- |
+| **[Regex](/detectors/custom-detectors/regex/)** | The answer is a fixed token pattern. |
+| **[GLiNER2](/detectors/custom-detectors/gliner2/) / [AI Detector](/detectors/custom-detectors/llm/)** | The answer needs meaning in prose. |
+| **[Tag](/detectors/custom-detectors/tag/)** | A Custom connector already knows the fact. |
+| **Code detector** | The answer is a computation over the asset. |
+
+<Separator className="my-6" />
+
+## Your first rule
+
+*Detectors → New → Code detector*, pick a template (each ships with test
+scenarios), then edit the notebook:
+
+```python
+from classifyre import Finding, Location
+
+
+def setup(ctx):
+    # Once per scan, before the first asset: load lists, models, lookup tables.
+    ctx.state["tolerance"] = float(ctx.var("tolerance", "0.5"))
+
+
+def detect(asset, ctx):
+    for index, row in enumerate(asset.rows()):
+        expected = float(row["male"]) + float(row["female"])
+        actual = float(row["total"])
+        if abs(expected - actual) > ctx.state["tolerance"]:
+            yield Finding(
+                label="total_mismatch",
+                value=f"total {actual:g} != {expected:g}",
+                severity="high",
+                location=Location(row=index, column_name="total"),
+                fields={"expected": expected, "actual": actual},
+                identity=f"row-{row['id']}",
+            )
+```
+
+Then:
+
+1. **Preview** it on a real asset of a source — the editor runs `setup()` and
+   `detect()` exactly as a scan would and shows the findings it *would* record,
+   with locations, fields, warnings and your `ctx.log` lines. Nothing is saved.
+2. **Save the preview as a test** — the asset is captured as a fixture and the
+   findings become the expected outcome.
+3. **Attach** the detector to a source, like any custom detector.
+
+<Separator className="my-6" />
+
+## The contract
+
+- `detect(asset, ctx)` is **required**. It may `yield` findings, `return` a
+  list of them, or return nothing. `detect(asset)` without `ctx` works too.
+- `setup(ctx)` is **optional** and runs once per worker process before the
+  first asset.
+- The contract is checked when you save, before every preview and before every
+  scan. A notebook without a top-level `detect` is refused.
+- Cells run in document order in one fresh process per scan; they share one
+  module, so a helper in one cell is visible in the next.
+
+### `asset` — read-only
+
+| Member | What it returns |
+| --- | --- |
+| `asset.text()` | Extracted text, whole (capped). |
+| `asset.pages()` | Extracted text, page by page. |
+| `asset.rows()` | Dict rows when the raw representation is JSON records — SQL and tabular sources, document stores. Empty otherwise. |
+| `asset.raw_pages()` | The connector's own raw representation, page by page. |
+| `asset.payload()` | Raw bytes for file-shaped sources; `None` for row-shaped ones. |
+| `asset.metadata` | The connector's metadata (read-only mapping). |
+| `asset.id`, `name`, `kind`, `url`, `urn`, `source_type`, `mime_type`, `hash` | Identity. |
+| `asset.findings` | With *needs findings* on: what the other detectors found on this asset in this run — each with `detector`, `type`, `value`, `severity`, `confidence`, `location`. |
+
+Payload is fetched **lazily** and **once**: an accessor you never call costs
+nothing, and augmentation plus any number of code detectors share one fetch per
+asset. `asset.set()`, `tag()`, `link()` and `set_urn()` raise — a detector
+cannot change an asset.
+
+### `Finding`
+
+```python
+Finding(
+    label,                  # the kind of finding; becomes the finding type
+    value,                  # what matched; becomes the matched content
+    severity=None,          # at most the detector's severity (see below)
+    confidence=1.0,
+    location=None,          # Location(...) or a dict with the same keys
+    message=None,           # one line an analyst reads
+    fields=None,            # {"name": value} for declared output fields
+    normalized_value=None,  # what enters the value index (duplicates, entities)
+    identity=None,          # a stable identity across runs
+)
+```
+
+`Location` accepts `path`, `description`, `line`, `column`, `start`, `end`, and
+`row` / `column_name` for table cells (shown the way PII findings in tables are).
+
+### `ctx`
+
+`ctx.var(name)`, `ctx.secret(name)`, `ctx.file(name)`, `ctx.files`,
+`ctx.log(...)`, `ctx.now()`, and `ctx.state` — a per-run dictionary `setup()`
+fills. `ctx.source` names the source being scanned and `ctx.detector` this
+detector.
+
+<Separator className="my-6" />
+
+## What the platform does with a finding
+
+- **Severity is a ceiling.** The detector's severity caps every finding. A
+  finding may ask for less; a request for more is lowered and recorded as
+  `metadata.severity_requested`.
+- **Identity.** With `identity`, the finding's identity comes from it instead of
+  from the matched text: "total 523 != 520" and next run's "total 524 != 520" on
+  row 17 are **one** finding whose value changed, not a resolve plus a new
+  finding. Give every finding an identity — a row id, a list entry id.
+- **Resolution.** When `detect()` returns without error the asset records an OK
+  outcome for the detector, whether or not it found anything, so a finding the
+  rule stops producing is **resolved** on the next scan. A failure records ERROR
+  instead, and nothing the rule found before is resolved.
+- **Fields.** Declare output fields (`name`, `type`, `description`). Keys in
+  `Finding(fields=...)` you did not declare are dropped with one warning per run.
+- **Value index.** Only findings with `normalized_value` enter the value index
+  used by duplicates and entity resolution, under the finding's label. A code
+  detector's matched text is a verdict ("total 523 != 520"), and indexing it
+  would link unrelated assets.
+- **Needs findings.** Code detectors never see each other's findings, only the
+  other engines'.
+
+<Separator className="my-6" />
+
+## Files, packages, variables and secrets
+
+- **Files** — upload lists, models and reference tables to the detector; the rule
+  opens them with `ctx.file("name")`. Uploading a name that exists replaces it.
+  A file's content hash is part of the detector's fingerprint, so a new list
+  re-runs the rule across the corpus on the next scan.
+- **Packages** — installed once per scan (with `uv`) before `setup()`.
+- **Variables** — non-secret settings, `ctx.var("name")`.
+- **Secrets** — `ctx.secret("name")`. Encrypted at rest, never returned by the
+  API (only their names), decrypted into the rule's process only, and redacted
+  from every log.
+
+<Separator className="my-6" />
+
+## Limits and failure containment
+
+| Limit | Default | What happens |
+| --- | --- | --- |
+| `per_asset_timeout_seconds` | 30 | The call is stopped, the process restarted, the asset records ERROR. |
+| `max_findings_per_asset` | 200 | Extra findings are dropped with a warning. |
+| `max_output_bytes` | 2 MiB | Larger output is treated as malformed. |
+| `max_workers` | 1 | Processes judging assets concurrently; each runs `setup()`. |
+| `max_consecutive_failures` | 10 | The rule is disabled for the rest of the run. |
+
+One broken rule never fails a scan or another detector: an exception, a timeout
+or malformed output costs that asset a warning and an ERROR outcome. The
+detector's `budget` applies as for every other engine.
+
+**Scan cache.** An unchanged asset with an unchanged rule is skipped. Changing
+the code, packages, variables, fields, limits or a file re-runs this detector
+alone; rotating a secret does not. Set `deterministic: false` when the verdict
+depends on anything outside the asset (a live list, the clock, the network):
+the rule then always runs.
+
+<Callout type="warning">
+  A code detector is **not a sandbox**. It runs in a separate process with a
+  scrubbed environment — it never sees the scan's credentials or the key that
+  writes results — but it runs whatever Python you write, with network access.
+  Treat writing one like deploying code. Over MCP it needs the
+  `custom_source_code` capability group, and the autopilot can only propose one
+  to a person, never create it.
+</Callout>
+
+<Separator className="my-6" />
+
+## Test scenarios
+
+A scenario is an input and the findings the rule must or must not produce. The
+input is either text, or an **asset fixture**:
+
+```json
+{
+  "name": "population.csv",
+  "kind": "table",
+  "mime_type": "text/csv",
+  "metadata": { "table_code": "12411-0001" },
+  "rows": [
+    { "id": 1, "male": 10, "female": 12, "total": 22 },
+    { "id": 2, "male": 7, "female": 9, "total": 20 }
+  ]
+}
+```
+
+The expected outcome lists findings by label, and optionally identity, value,
+severity and count:
+
+```json
+{ "findings": [{ "label": "total_mismatch", "identity": "row-2", "count": 1 }], "match": "exact" }
+```
+
+`match: "subset"` (the default) allows other findings; `exact` does not.
+`{ "shouldMatch": false }` asserts the rule stays silent.
+
+<Separator className="my-6" />
+
+## From MCP
+
+An agent picks the engine when it calls `create_custom_detector`; the tool's
+description says when a code detector is the right one. The workflow:
+
+1. `list_custom_detector_examples` — copy a `CUSTOM_DETECTOR` template and its `testScenarios`.
+2. `create_custom_detector` with `pipeline_schema.type: "CUSTOM_DETECTOR"`.
+3. `upload_custom_detector_file` if the rule reads one.
+4. `run_custom_detector_notebook` with `mode: "preview_detect"`, a `sourceId`
+   and an `assetId`, then `get_notebook_execution` for the findings.
+5. `create_detector_test_scenario` with an `input_asset`, then `run_detector_tests`.
+
+Writing a code detector needs the `custom_source_code` group on the token.
+
+<Separator className="my-6" />
+
+## Move a Tag rule to a code detector
+
+Rules asserted from a connector or augmentation notebook as
+`Asset(tags={"<key>": "<value>"})` belong to one source, have no location, one
+finding per key per asset, and cannot be tested. To move one:
+
+1. Create a code detector whose `detect()` computes what the notebook computed,
+   yielding a `Finding` with a location and an `identity` instead of a tag.
+2. Attach it to the same sources, preview it, and add test scenarios.
+3. Keep the Tag detector until the new findings are verified on a scan.
+4. Remove the tag assertion from the notebook and deactivate the Tag detector.
+   With the source's `cleanup_removed_detector_findings` option on, the next
+   scan resolves the old tag findings.
+
+<Separator className="my-6" />
+
+## Configuration reference
+
+<PipelineSchemaTable definition="CustomDetectorPipelineSchema" />

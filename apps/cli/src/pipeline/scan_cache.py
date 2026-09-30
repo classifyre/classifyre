@@ -40,7 +40,8 @@ from typing import Any, Literal
 from ..detectors.engine_version import (
     PARSER_ENGINE_VERSION,
     detector_engine_version,
-    is_cacheable_detector_type,
+    is_cacheable_detector,
+    pipeline_engine_version,
 )
 from ..utils.hashing import calculate_checksum
 
@@ -118,6 +119,31 @@ def _without_budget(config: dict[str, Any]) -> dict[str, Any]:
     return config
 
 
+def _code_detector_shape(config: dict[str, Any]) -> dict[str, Any]:
+    """What about a code detector decides its verdict, and nothing else.
+
+    Secrets are dropped (rotating a credential must not re-run the corpus), and
+    each runtime file is reduced to its name and content hash: the download URL
+    and the detector id change with the deployment, not with the rule.
+    """
+    schema = config.get("pipeline_schema")
+    if not isinstance(schema, dict) or str(schema.get("type") or "").upper() != "CUSTOM_DETECTOR":
+        return config
+    kept = {
+        key: value
+        for key, value in schema.items()
+        if key not in {"secrets", "files_runtime", "custom_detector_id"}
+    }
+    files = schema.get("files_runtime")
+    if isinstance(files, list):
+        kept["files"] = sorted(
+            (str(entry.get("name") or ""), str(entry.get("content_hash") or ""))
+            for entry in files
+            if isinstance(entry, dict)
+        )
+    return {**config, "pipeline_schema": kept}
+
+
 def detector_fingerprint(
     detector_type: str,
     config: Any,
@@ -132,8 +158,15 @@ def detector_fingerprint(
     return calculate_checksum(
         {
             "type": detector_type.strip().upper(),
-            "config": _scrub(_without_budget(config) if isinstance(config, dict) else {}),
+            "config": _scrub(
+                _code_detector_shape(_without_budget(config)) if isinstance(config, dict) else {}
+            ),
             "engine": detector_engine_version(detector_type),
+            **(
+                {"pipeline_engine": pipeline_engine_version(config)}
+                if pipeline_engine_version(config)
+                else {}
+            ),
             "parser": PARSER_ENGINE_VERSION,
             "content_shape": content_shape,
         }
@@ -336,7 +369,7 @@ class ScanCache:
                 continue
             config = entry.get("config")
             key = detector_cache_key(detector_type, config)
-            if is_cacheable_detector_type(detector_type):
+            if is_cacheable_detector(detector_type, config):
                 cacheable[key] = detector_fingerprint(detector_type, config, shape)
             else:
                 always_run.add(key)

@@ -15,6 +15,7 @@ _PIPELINE_TYPE_DEFAULTS: dict[str, str] = {
     "RegexPipelineSchema": "REGEX",
     "LLMPipelineSchema": "LLM",
     "TagPipelineSchema": "TAG",
+    "CustomDetectorPipelineSchema": "CUSTOM_DETECTOR",
 }
 
 # Pipeline schema classes whose `severity` field has a string default from JSON schema
@@ -27,6 +28,7 @@ _SEVERITY_ENUM_DEFAULT_CLASSES = {
     "LLMPipelineSchema": "info",
     "TextClassificationPipelineSchema": "info",
     "TagPipelineSchema": "medium",
+    "CustomDetectorPipelineSchema": "medium",
 }
 
 
@@ -58,6 +60,15 @@ def _patch_severity_enum_defaults(source: str) -> str:
         replacement = rf"\1\2.{member}\3"
         source = re.sub(pattern, replacement, source, flags=re.DOTALL)
     return source
+
+
+def _patch_category_enum_defaults(source: str) -> str:
+    """Same fix as the severity one, for the code detector's ``category`` default."""
+    pattern = (
+        r"(class CustomDetectorPipelineSchema\(.*?category: DetectorCategory \| None = Field\(\n\s+)"
+        r"'QUALITY'(\s*,)"
+    )
+    return re.sub(pattern, r"\1DetectorCategory.QUALITY\2", source, flags=re.DOTALL)
 
 
 def run_codegen(input_file):
@@ -107,6 +118,7 @@ def main():
     content = run_codegen(detector_schema)
     content = _patch_pipeline_type_defaults(content)
     content = _patch_severity_enum_defaults(content)
+    content = _patch_category_enum_defaults(content)
     (MODEL_DIR / "generated_detectors.py").write_text(content)
     print("Wrote src/models/generated_detectors.py")
 

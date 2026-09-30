@@ -139,7 +139,12 @@ enum AutoSchedulePhase {
  */
 model NotebookExecution {
   id           String                  @id @default(uuid())
-  sourceId     String                  @map("source_id")
+  // Null for a code detector's cell/all runs, which need no source.
+  sourceId         String?                 @map("source_id")
+  // Set when the notebook is a code detector's (scope DETECTOR).
+  customDetectorId String?                 @map("custom_detector_id")
+  // preview_detect: the asset the detector was run on.
+  assetId          String?                 @map("asset_id")
   revision     Int
   mode         NotebookExecutionMode
   scope        NotebookScope           @default(CONNECTOR)
@@ -159,9 +164,11 @@ model NotebookExecution {
   finishedAt   DateTime?               @map("finished_at")
   createdAt    DateTime                @default(now()) @map("created_at")
 
-  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  source         Source?         @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  customDetector CustomDetector? @relation(fields: [customDetectorId], references: [id], onDelete: Cascade)
 
   @@index([sourceId, createdAt(sort: Desc)])
+  @@index([customDetectorId, createdAt(sort: Desc)])
   @@index([status])
   @@map("notebook_executions")
 }
@@ -172,11 +179,14 @@ enum NotebookExecutionMode {
   TEST_CONNECTION
   PREVIEW_EXTRACT
   PREVIEW_AUGMENT
+  PREVIEW_DETECT
 }
 
 enum NotebookScope {
   CONNECTOR
   AUGMENTATION
+  // A code detector's notebook (custom-detector pipeline type CUSTOM_DETECTOR).
+  DETECTOR
 }
 
 enum NotebookExecutionStatus {
@@ -666,6 +676,8 @@ model CustomDetector {
   trainingExamples CustomDetectorTrainingExample[]
   extractions      CustomDetectorExtraction[]
   testScenarios    CustomDetectorTestScenario[]
+  files            CustomDetectorFile[]
+  notebookRuns     NotebookExecution[]
 
   @@index([isActive])
   @@index([aiProviderConfigId])
@@ -716,6 +728,23 @@ model CustomDetectorTrainingRun {
   @@map("custom_detector_training_runs")
 }
 
+/// A file uploaded to a code detector (CUSTOM_DETECTOR): a screening list, a
+/// model, a reference table. The rule reads it with ctx.file(name).
+model CustomDetectorFile {
+  id               String         @id @default(uuid())
+  customDetectorId String         @map("custom_detector_id")
+  fileName         String         @map("file_name")
+  declaredMimeType String         @map("declared_mime_type")
+  fileSizeBytes    Int            @map("file_size_bytes")
+  contentHash      String         @map("content_hash") @db.VarChar(64)
+  data             Bytes
+  createdAt        DateTime       @default(now()) @map("created_at")
+  customDetector   CustomDetector @relation(fields: [customDetectorId], references: [id], onDelete: Cascade)
+
+  @@unique([customDetectorId, fileName])
+  @@map("custom_detector_files")
+}
+
 model CustomDetectorTestScenario {
   id              String                     @id @default(uuid())
   detectorId      String                     @map("detector_id")
@@ -723,6 +752,9 @@ model CustomDetectorTestScenario {
   name            String
   description     String?                    @db.Text
   inputText       String                     @map("input_text") @db.Text
+  // Code detectors: a whole asset fixture (name, kind, mime_type, metadata,
+  // text / pages / rows). inputText then holds the fixture's text.
+  inputAsset      Json?                      @map("input_asset") @db.JsonB
   expectedOutcome Json                       @map("expected_outcome") @db.JsonB
   createdAt       DateTime                   @default(now()) @map("created_at")
   updatedAt       DateTime                   @updatedAt @map("updated_at")

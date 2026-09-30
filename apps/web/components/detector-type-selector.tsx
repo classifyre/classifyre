@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Layers, Regex, Bot, Brain, Image, ScanSearch, Tag } from "lucide-react";
+import {
+  Layers,
+  Regex,
+  Bot,
+  Brain,
+  Code2,
+  Image,
+  ScanSearch,
+  Tag,
+} from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 
 // ── Detector type cards ────────────────────────────────────────────────────
@@ -16,7 +25,9 @@ export type DetectorKind =
   // Not an engine. A tag detector runs nothing; it names a fact a Custom
   // connector notebook asserts. It gets its own group for that reason --
   // sitting it beside the six engines invites picking it for an ordinary source.
-  | "tag";
+  | "tag"
+  // A rule written in Python: checks no pattern or model expresses.
+  | "custom_detector";
 
 const DETECTOR_ICONS: Record<
   DetectorKind,
@@ -29,6 +40,7 @@ const DETECTOR_ICONS: Record<
   image_classification: Image,
   object_detection: ScanSearch,
   tag: Tag,
+  custom_detector: Code2,
 };
 
 function DetectorTypeCard({
@@ -144,6 +156,21 @@ export function DetectorTypeSelector({
             <DetectorTypeCard key={id} kind={id} onSelect={onSelect} />
           ))}
         </div>
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-center gap-3">
+          <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+            {t("detectors.typeGroups.code")}
+          </div>
+          <div className="flex-1 border-t border-border" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DetectorTypeCard kind="custom_detector" onSelect={onSelect} />
+        </div>
+        <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
+          {t("detectors.typeGroups.codeNote")}
+        </p>
       </div>
 
       <div>

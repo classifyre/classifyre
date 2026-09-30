@@ -21,15 +21,19 @@ describe('DetectorToolset', () => {
   const mockSearch = { customDetectorPrecision: jest.fn() };
   const mockAiProviders = { list: jest.fn() };
 
+  const mockPrisma = {
+    customDetector: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    source: { findMany: jest.fn().mockResolvedValue([]) },
+  };
   const toolset = new DetectorToolset(
     mockDetectors as unknown as CustomDetectorsService,
     mockTests as unknown as CustomDetectorTestsService,
     mockApplier as unknown as DecisionApplierService,
     mockSearch as unknown as AgentSearchService,
-    {
-      customDetector: { findMany: jest.fn().mockResolvedValue([]) },
-      source: { findMany: jest.fn().mockResolvedValue([]) },
-    } as never,
+    mockPrisma as never,
     mockAiProviders as unknown as AiProviderConfigService,
   );
   const tools = toolset.list();
@@ -295,6 +299,57 @@ describe('DetectorToolset', () => {
         }),
       );
       expect(out[0]).not.toHaveProperty('apiKeyPreview');
+    });
+  });
+
+  describe('code detectors (CUSTOM_DETECTOR) are refused (PRD G1 R24)', () => {
+    const codeSchema = {
+      type: 'CUSTOM_DETECTOR',
+      notebook: {
+        cells: [
+          { id: 'c', type: 'code', source: 'def detect(asset):\n    pass\n' },
+        ],
+      },
+    };
+
+    it('refuses to create one and points at operator.notify', async () => {
+      await expect(
+        byName('detector.create').handler(
+          { name: 'rule', pipelineSchema: codeSchema },
+          tc,
+        ),
+      ).rejects.toThrow(/operator\.notify/);
+      expect(mockDetectors.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses to turn a detector into one', async () => {
+      await expect(
+        byName('detector.update').handler(
+          { detectorId: 'd1', pipelineSchema: codeSchema },
+          tc,
+        ),
+      ).rejects.toThrow(/may not create, change/);
+      expect(mockDetectors.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses to change an existing one, even without a schema', async () => {
+      mockPrisma.customDetector.findUnique.mockResolvedValueOnce({
+        pipelineSchema: codeSchema,
+      });
+      await expect(
+        byName('detector.update').handler({ detectorId: 'd1', name: 'x' }, tc),
+      ).rejects.toThrow(/Refused/);
+      expect(mockDetectors.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses to dry-run one', async () => {
+      await expect(
+        byName('detector.test').handler(
+          { pipelineSchema: codeSchema, sampleText: 'x' },
+          tc,
+        ),
+      ).rejects.toThrow(/Refused/);
+      expect(mockTests.evaluateSample).not.toHaveBeenCalled();
     });
   });
 });

@@ -20,6 +20,8 @@ import { FindingsService } from './findings.service';
 import { FindingBulkOperationService } from './findings-bulk/finding-bulk-operation.service';
 import { RetireOutOfScopeService } from './findings-bulk/retire-out-of-scope.service';
 import { MCP_CAPABILITY_GROUPS, MCP_PROMPTS } from './mcp-catalog';
+import { CustomDetectorFilesService } from './custom-detector-files.service';
+import { isCodeDetectorSchema } from './custom-detector-code';
 import { NotebookService } from './notebook/notebook.service';
 import { NotebookExecutionService } from './notebook/notebook-execution.service';
 import { SourceFilesService } from './source-files.service';
@@ -175,6 +177,19 @@ function capValue(
   return value;
 }
 
+/**
+ * When a code detector is the right tool, and how to use one. Repeated in the
+ * create tool's description so an agent sees it at the moment of choosing an
+ * engine, not only when it happens to read a docs resource.
+ */
+const CUSTOM_DETECTOR_GUIDANCE =
+  'CUSTOM_DETECTOR is a code detector: a Python notebook defining detect(asset, ctx) that yields Finding(label, value, severity=, location={row, column_name, line, ...}, fields={...}, identity=, normalized_value=). ' +
+  "Choose it when the rule is a CHECK no pattern or model expresses: totals that must add up (asset.rows()), a value compared with metadata or a threshold (asset.metadata), list screening against an uploaded file (ctx.file), co-occurrence of other detectors' findings (needs_findings: true, asset.findings), checksummed identifiers, or scoring with your own model. " +
+  'Prefer REGEX for a token pattern, GLINER2/LLM for meaning in prose, and TAG only when a CUSTOM connector already knows the fact. ' +
+  'Rules: severity is a ceiling; give every finding a stable identity (row id, list entry) so re-runs update it instead of churning; set normalized_value only when the value should link assets in the value index; declare every key of fields; set deterministic: false if the verdict depends on anything outside the asset. ' +
+  'Workflow: list_custom_detector_examples (copy a CUSTOM_DETECTOR template and its testScenarios) -> create_custom_detector -> upload_custom_detector_file if the rule reads one -> run_custom_detector_notebook mode "preview_detect" on a real asset -> create_detector_test_scenario (input_asset fixtures) and run_detector_tests -> attach it to a source. ' +
+  'Writing one needs the custom_source_code capability group.';
+
 function jsonResult(payload: unknown) {
   let bounded = payload;
   let truncated = false;
@@ -320,6 +335,7 @@ export class McpServerFactoryService {
     private readonly caseEscalation: CaseEscalationService,
     private readonly caseCleanup: CaseCleanupService,
     private readonly caseBoardTools: CaseBoardToolsService,
+    private readonly customDetectorFiles: CustomDetectorFilesService,
   ) {}
 
   /**
@@ -345,7 +361,7 @@ export class McpServerFactoryService {
     this.registerSourceTools(srv);
     this.registerNotebookTools(srv);
     this.registerLineageTools(srv);
-    this.registerCustomDetectorTools(srv);
+    this.registerCustomDetectorTools(srv, options?.toolGroupIds ?? null);
     this.registerExtractionTools(srv);
     this.registerRunTools(srv);
     this.registerFindingTools(srv);
@@ -1897,7 +1913,29 @@ export class McpServerFactoryService {
     );
   }
 
-  private registerCustomDetectorTools(server: McpServerCompat) {
+  private registerCustomDetectorTools(
+    server: McpServerCompat,
+    toolGroupIds: string[] | null = null,
+  ) {
+    /**
+     * A code detector carries Python that runs inside every scan it is
+     * attached to, so writing one is authoring code, not configuration: a
+     * token scoped to custom_detectors alone may create a regex, not a
+     * program. Unscoped tokens (null) keep full access.
+     */
+    const assertMayWriteCode = (schema: unknown) => {
+      if (
+        isCodeDetectorSchema(schema) &&
+        toolGroupIds !== null &&
+        !toolGroupIds.includes('custom_source_code')
+      ) {
+        throw new Error(
+          'Writing a CUSTOM_DETECTOR (code) detector needs the custom_source_code ' +
+            'capability group on this MCP token, because the notebook runs in every ' +
+            'scan the detector is attached to.',
+        );
+      }
+    };
     server.registerTool(
       'list_custom_detectors',
       {
@@ -1941,7 +1979,7 @@ export class McpServerFactoryService {
       {
         title: 'List Custom Detector Examples',
         description:
-          'Return starter examples for ruleset, classifier, and entity detector authoring.',
+          'Return starter examples for every engine: rulesets, classifiers, entity detectors, AI (LLM) detectors and code detectors (CUSTOM_DETECTOR). Code-detector templates include their notebook and ready-made testScenarios -- copy both when creating one.',
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
@@ -1955,7 +1993,8 @@ export class McpServerFactoryService {
       {
         title: 'Create Custom Detector',
         description:
-          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, or TAG. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={"<key>": "<value>"}), and it is not selectable on a source.',
+          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, TAG or CUSTOM_DETECTOR. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={"<key>": "<value>"}), and it is not selectable on a source. ' +
+          CUSTOM_DETECTOR_GUIDANCE,
         inputSchema: {
           key: z.string().optional(),
           name: z.string(),
@@ -1968,7 +2007,7 @@ export class McpServerFactoryService {
               'AI provider credential ID. Required for LLM (AI) detectors.',
             ),
           pipeline_schema: jsonObjectSchema.describe(
-            'Pipeline schema. GLiNER2 example: { type: "GLINER2", entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } } }. LLM (AI) example: { type: "LLM", system_prompt: "Classify the sentiment of the text.", labels: [{ name: "good" }, { name: "bad" }, { name: "violent" }], severity_map: [{ pattern: "violent", severity: "critical" }], output_fields: [{ name: "language", type: "string" }] }. TAG example: { type: "TAG", label: "Cardholder data", severity: "high" }',
+            'Pipeline schema. GLiNER2 example: { type: "GLINER2", entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } } }. LLM (AI) example: { type: "LLM", system_prompt: "Classify the sentiment of the text.", labels: [{ name: "good" }, { name: "bad" }, { name: "violent" }], severity_map: [{ pattern: "violent", severity: "critical" }], output_fields: [{ name: "language", type: "string" }] }. TAG example: { type: "TAG", label: "Cardholder data", severity: "high" }. CUSTOM_DETECTOR example: { type: "CUSTOM_DETECTOR", notebook: { cells: [{ id: "c1", type: "code", source: "def detect(asset, ctx):\\n    for i, row in enumerate(asset.rows()):\\n        if row[\'total\'] != row[\'a\'] + row[\'b\']:\\n            yield Finding(label=\'total_mismatch\', value=str(row[\'total\']), identity=f\'row-{i}\', location={\'row\': i})\\n" }] }, severity: "high", category: "QUALITY", fields: [{ name: "expected", type: "number" }], variables: {}, secrets: {}, needs_findings: false }',
           ),
           isActive: z.boolean().optional(),
         },
@@ -1977,13 +2016,15 @@ export class McpServerFactoryService {
           destructiveHint: false,
         },
       },
-      async ({ pipeline_schema, ...rest }) =>
-        jsonResult(
+      async ({ pipeline_schema, ...rest }) => {
+        assertMayWriteCode(pipeline_schema);
+        return jsonResult(
           await this.mcpToolExecutor.createCustomDetector({
             ...rest,
             pipelineSchema: pipeline_schema,
           }),
-        ),
+        );
+      },
     );
 
     server.registerTool(
@@ -1991,7 +2032,7 @@ export class McpServerFactoryService {
       {
         title: 'Update Custom Detector',
         description:
-          'Update detector metadata, pipeline schema, AI provider credential, or activation status.',
+          'Update detector metadata, pipeline schema, AI provider credential, or activation status. For a CUSTOM_DETECTOR, send the whole pipeline_schema (notebook included); `secrets` is a patch -- a string sets a key, null deletes it, and omitting `secrets` keeps every stored secret (values are never returned, only secretKeys). Saving a changed notebook bumps notebook.revision.',
         inputSchema: {
           id: z.string().uuid(),
           key: z.string().optional(),
@@ -2016,6 +2057,7 @@ export class McpServerFactoryService {
       },
       async ({ id, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
+        assertMayWriteCode((rest as any).pipeline_schema);
         return jsonResult(
           await this.customDetectorsService.update(id, {
             ...rest,
@@ -2188,12 +2230,26 @@ export class McpServerFactoryService {
           'The nested pipeline-output shape ({"classification": {task: {label, confidence}}} / ' +
           '{"entities": {label: [{value}]}}) is also accepted. ' +
           'Labels compare case-insensitively with underscores treated as spaces, so ' +
-          '"market_gaming_instruction" matches "Market gaming instruction".',
+          '"market_gaming_instruction" matches "Market gaming instruction". ' +
+          'CUSTOM_DETECTOR (code) detectors: expected {"findings": [{"label": "total_mismatch", "identity": "row-2", "severity": "high", "count": 1}], "match": "subset"|"exact"} or {"shouldMatch": false}; ' +
+          'and instead of input_text they may take input_asset, a whole asset: ' +
+          '{"name": "t.csv", "kind": "table", "mime_type": "text/csv", "metadata": {...}, "rows": [{...}], "pages": ["..."], "text": "..."}.',
         inputSchema: {
           detector_id: z.string(),
           name: z.string().describe('Short scenario name'),
           description: z.string().optional(),
-          input_text: z.string().describe('Text to test against the detector'),
+          input_text: z
+            .string()
+            .optional()
+            .describe(
+              'Text to test against the detector (or give input_asset)',
+            ),
+          input_asset: z
+            .record(z.string(), z.unknown())
+            .optional()
+            .describe(
+              'CUSTOM_DETECTOR only: an asset fixture { name, kind?, mime_type?, metadata?, text?, pages?, rows? }',
+            ),
           expected_outcome: z
             .record(z.string(), z.unknown())
             .describe(
@@ -2210,6 +2266,7 @@ export class McpServerFactoryService {
         name,
         description,
         input_text,
+        input_asset,
         expected_outcome,
       }) =>
         jsonResult(
@@ -2218,6 +2275,7 @@ export class McpServerFactoryService {
             name,
             description,
             inputText: input_text,
+            inputAsset: input_asset,
             expectedOutcome: expected_outcome,
           }),
         ),
@@ -2278,6 +2336,124 @@ export class McpServerFactoryService {
             scenario_id,
           ),
         ),
+    );
+
+    server.registerTool(
+      'run_custom_detector_notebook',
+      {
+        title: 'Run Code Detector Notebook',
+        description:
+          "Run a CUSTOM_DETECTOR (code) detector's notebook and return immediately -- poll get_notebook_execution for the result. " +
+          '"cell" runs one cell (targetCellId) and "all" replays every cell, with the detector\'s variables, secrets and files but no asset: use them to debug helpers with print(). ' +
+          '"preview_detect" runs setup() and detect() exactly as a scan would on a real asset of sourceId (assetId), or on a small sample of that source when assetId is omitted, and reports the findings it WOULD record (outputs.assets[].findings, outputs.result.logs) without writing anything. ' +
+          'Always preview on a real asset before attaching a new rule to a source. The revision is read from the detector, so save (update_custom_detector) first.',
+        inputSchema: z.strictObject({
+          detectorId: z.string().uuid(),
+          mode: z.enum(['cell', 'all', 'preview_detect']),
+          targetCellId: z.string().optional().describe('Required for "cell".'),
+          sourceId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe('Required for "preview_detect".'),
+          assetId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe('preview_detect: one asset of sourceId; omit to sample.'),
+          maxAssets: z.number().int().min(1).max(10).optional(),
+        }),
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({
+        detectorId,
+        mode,
+        targetCellId,
+        sourceId,
+        assetId,
+        maxAssets,
+      }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        const detector = await this.customDetectorsService.getById(detectorId);
+        const notebook = (detector.pipelineSchema as Record<string, any>)
+          ?.notebook;
+        const execution = await this.notebookExecutionService.createForDetector(
+          detectorId,
+          {
+            revision: Number.isInteger(notebook?.revision)
+              ? notebook.revision
+              : 1,
+            mode,
+            targetCellId,
+            sourceId,
+            assetId,
+            maxAssets,
+          },
+          'mcp',
+        );
+        return jsonResult(this.notebookExecutionService.toDto(execution));
+      },
+    );
+
+    server.registerTool(
+      'list_custom_detector_files',
+      {
+        title: 'List Code Detector Files',
+        description:
+          'Files uploaded to a CUSTOM_DETECTOR detector (lists, models, reference tables); the rule opens them with ctx.file(name).',
+        inputSchema: z.strictObject({ detectorId: z.string().uuid() }),
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ detectorId }) =>
+        jsonResult(await this.customDetectorFiles.list(detectorId)),
+    );
+
+    server.registerTool(
+      'upload_custom_detector_file',
+      {
+        title: 'Upload Code Detector File',
+        description:
+          'Upload a file a CUSTOM_DETECTOR detector reads with ctx.file(fileName) -- a sanctions list CSV, a joblib/ONNX model, a lookup table. A file with the same name is replaced, and the detector version is bumped so the next scan re-runs the rule.',
+        inputSchema: z.strictObject({
+          detectorId: z.string().uuid(),
+          fileName: z.string().min(1),
+          contentBase64: z.string().describe('File bytes, base64-encoded.'),
+          mimeType: z.string().optional(),
+        }),
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ detectorId, fileName, contentBase64, mimeType }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.customDetectorFiles.create({
+            customDetectorId: detectorId,
+            fileName,
+            declaredMimeType: mimeType ?? 'application/octet-stream',
+            data: Buffer.from(contentBase64, 'base64'),
+          }),
+        );
+      },
+    );
+
+    server.registerTool(
+      'delete_custom_detector_file',
+      {
+        title: 'Delete Code Detector File',
+        description: 'Delete one file from a CUSTOM_DETECTOR detector.',
+        inputSchema: z.strictObject({
+          detectorId: z.string().uuid(),
+          fileId: z.string().uuid(),
+        }),
+        annotations: { readOnlyHint: false, destructiveHint: true },
+      },
+      async ({ detectorId, fileId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        await this.customDetectorFiles.delete(detectorId, fileId);
+        return jsonResult({ deleted: true, fileId });
+      },
     );
 
     server.registerTool(

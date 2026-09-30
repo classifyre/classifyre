@@ -71,9 +71,13 @@ class NotebookChildProcess:
         module: str,
         *,
         startup_timeout: float = STARTUP_TIMEOUT_SECONDS,
+        stderr: Any = None,
     ) -> None:
         self._module = module
         self._startup_timeout = startup_timeout
+        # None inherits the parent's stderr (the runner log). A preview passes
+        # a file so it can hand the notebook's own log lines back to the author.
+        self._stderr = stderr
         self._process: subprocess.Popen[str] | None = None
 
     @property
@@ -90,7 +94,7 @@ class NotebookChildProcess:
             env=scrubbed_environment(),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=None,  # inherit: notebook logs belong in the runner log
+            stderr=self._stderr,  # None inherits: notebook logs belong in the runner log
             text=True,
             bufsize=1,
         )

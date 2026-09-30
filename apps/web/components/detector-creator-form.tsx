@@ -9,6 +9,11 @@ import { PipelineDetectorEditor } from "@/components/pipeline-detector-editor";
 import { RegexDetectorEditor } from "@/components/regex-detector-editor";
 import { LLMDetectorEditor } from "@/components/llm-detector-editor";
 import { TagDetectorEditor } from "@/components/tag-detector-editor";
+import { CodeDetectorEditor } from "@/components/code-detector-editor";
+import {
+  CodeDetectorTemplates,
+  type CodeDetectorTemplate,
+} from "@/components/code-detector/code-detector-templates";
 import {
   TransformerDetectorEditor,
   type TransformerPipelineType,
@@ -71,6 +76,9 @@ export function DetectorCreatorForm({
     null,
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [codeTemplate, setCodeTemplate] = useState<CodeDetectorTemplate | null>(
+    null,
+  );
 
   const handleCreate = async (payload: {
     name: string;
@@ -90,6 +98,15 @@ export function DetectorCreatorForm({
         aiProviderConfigId: payload.aiProviderConfigId,
         pipelineSchema: payload.pipelineSchema,
       } as any);
+      // A code template ships with its test scenarios; they arrive with the
+      // detector so the first thing the author can do is run them.
+      if (selectedKind === "custom_detector" && codeTemplate) {
+        for (const scenario of codeTemplate.testScenarios) {
+          await api
+            .createTestScenario(created.id, scenario as never)
+            .catch(() => undefined);
+        }
+      }
       toast.success(t("detectors.created"));
       onCreated?.(created);
     } catch (error) {
@@ -105,10 +122,14 @@ export function DetectorCreatorForm({
     setSelectedKind(kind);
     setExamplePhaseComplete(false);
     setChosenExample(null);
+    setCodeTemplate(null);
   };
 
   const handleBack = () => {
-    if (isTransformerKind(selectedKind) && examplePhaseComplete) {
+    if (
+      (isTransformerKind(selectedKind) || selectedKind === "custom_detector") &&
+      examplePhaseComplete
+    ) {
       setExamplePhaseComplete(false);
     } else if (selectedKind) {
       setSelectedKind(null);
@@ -120,7 +141,8 @@ export function DetectorCreatorForm({
   };
 
   const backLabel =
-    isTransformerKind(selectedKind) && examplePhaseComplete
+    (isTransformerKind(selectedKind) || selectedKind === "custom_detector") &&
+    examplePhaseComplete
       ? t("detectors.chooseTemplate")
       : selectedKind
         ? t("detectors.selectType")
@@ -135,6 +157,8 @@ export function DetectorCreatorForm({
           ? "Build a regex pattern detector. Define precise pattern-matching rules — fast, deterministic, zero ML overhead."
           : selectedKind === "llm"
             ? "Build an AI detector. Write a prompt, define labels and extraction fields, and a configured LLM provider classifies and extracts from content."
+            : selectedKind === "custom_detector"
+              ? t("detectors.code.createSubtitle")
             : selectedKind === "tag"
               ? "Create a tag. It runs no classification and reads no content — it only names a fact a Custom connector notebook already knows, so that fact becomes a finding. Tags are not selectable on a source; every Custom connector can use every active tag by its key."
             : isTransformerKind(selectedKind)
@@ -252,6 +276,30 @@ export function DetectorCreatorForm({
           mode="create"
           submitLabel={t("detectors.create")}
           isSubmitting={isSaving}
+          onSubmit={handleCreate}
+        />
+      )}
+
+      {/* Phase 2a (code): pick a template -- each ships with test scenarios */}
+      {selectedKind === "custom_detector" && !examplePhaseComplete && (
+        <CodeDetectorTemplates
+          onPick={(template) => {
+            setCodeTemplate(template);
+            setExamplePhaseComplete(true);
+          }}
+        />
+      )}
+
+      {/* Phase 2b (code): the notebook editor, pre-filled from the template */}
+      {selectedKind === "custom_detector" && examplePhaseComplete && (
+        <CodeDetectorEditor
+          mode="create"
+          submitLabel={t("detectors.create")}
+          isSubmitting={isSaving}
+          initialName={codeTemplate?.name ?? ""}
+          initialKey={codeTemplate?.key ?? ""}
+          initialDescription={codeTemplate?.detectorDescription ?? ""}
+          initialPipelineSchema={codeTemplate?.pipelineSchema}
           onSubmit={handleCreate}
         />
       )}

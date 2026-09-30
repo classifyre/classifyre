@@ -39,6 +39,7 @@ import { PipelineDetectorEditor } from "@/components/pipeline-detector-editor";
 import { RegexDetectorEditor } from "@/components/regex-detector-editor";
 import { LLMDetectorEditor } from "@/components/llm-detector-editor";
 import { TagDetectorEditor } from "@/components/tag-detector-editor";
+import { CodeDetectorEditor } from "@/components/code-detector-editor";
 import {
   TransformerDetectorEditor,
   type TransformerPipelineType,
@@ -298,6 +299,7 @@ export default function CustomDetectorDetailsPage() {
   const isRegexPipeline = detectorKind === "regex";
   const isLLMPipeline = detectorKind === "llm";
   const isTagPipeline = detectorKind === "tag";
+  const isCodePipeline = detectorKind === "code";
   const isTransformerPipeline = detectorKind === "transformer";
   // Detectors that have no model-training step (regex / LLM / transformer /
   // tag). A tag detector has nothing to train on at all: it never runs.
@@ -468,6 +470,22 @@ export default function CustomDetectorDetailsPage() {
                 aiProviderConfigId: payload.aiProviderConfigId,
               })
             }
+          />
+        ) : isCodePipeline ? (
+          <CodeDetectorEditor
+            mode="edit"
+            detectorId={detectorId}
+            submitLabel={t("common.save")}
+            isSubmitting={isSaving}
+            initialPipelineSchema={detector.pipelineSchema}
+            initialSecretKeys={
+              (detector as { secretKeys?: string[] }).secretKeys ?? []
+            }
+            initialName={detector.name}
+            initialKey={detector.key}
+            initialDescription={detector.description ?? ""}
+            initialIsActive={detector.isActive}
+            onSubmit={(payload) => savePipelineDetector(payload)}
           />
         ) : isTagPipeline ? (
           <TagDetectorEditor

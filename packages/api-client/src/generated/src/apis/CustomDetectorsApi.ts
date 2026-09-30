@@ -17,6 +17,7 @@ import * as runtime from '../runtime';
 import type {
   CreateCustomDetectorDto,
   CustomDetectorExampleDto,
+  CustomDetectorFileDto,
   CustomDetectorResponseDto,
   CustomDetectorTrainingRunDto,
   FindingBulkOperationDto,
@@ -33,6 +34,8 @@ import {
     CreateCustomDetectorDtoToJSON,
     CustomDetectorExampleDtoFromJSON,
     CustomDetectorExampleDtoToJSON,
+    CustomDetectorFileDtoFromJSON,
+    CustomDetectorFileDtoToJSON,
     CustomDetectorResponseDtoFromJSON,
     CustomDetectorResponseDtoToJSON,
     CustomDetectorTrainingRunDtoFromJSON,
@@ -67,9 +70,19 @@ export interface CustomDetectorsControllerDeleteRequest {
     id: string;
 }
 
+export interface CustomDetectorsControllerDeleteFileRequest {
+    id: string;
+    fileId: string;
+}
+
 export interface CustomDetectorsControllerDeleteTrainingExampleRequest {
     id: string;
     exampleId: string;
+}
+
+export interface CustomDetectorsControllerFileContentRequest {
+    id: string;
+    fileId: string;
 }
 
 export interface CustomDetectorsControllerGetByIdRequest {
@@ -78,6 +91,10 @@ export interface CustomDetectorsControllerGetByIdRequest {
 
 export interface CustomDetectorsControllerListRequest {
     includeInactive?: boolean;
+}
+
+export interface CustomDetectorsControllerListFilesRequest {
+    id: string;
 }
 
 export interface CustomDetectorsControllerListTrainingExamplesRequest {
@@ -115,6 +132,11 @@ export interface CustomDetectorsControllerTrainingHistoryRequest {
 export interface CustomDetectorsControllerUpdateRequest {
     id: string;
     updateCustomDetectorDto: UpdateCustomDetectorDto;
+}
+
+export interface CustomDetectorsControllerUploadFileRequest {
+    id: string;
+    file: Blob;
 }
 
 /**
@@ -244,6 +266,50 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
     }
 
     /**
+     * Delete a code detector file
+     */
+    async customDetectorsControllerDeleteFileRaw(requestParameters: CustomDetectorsControllerDeleteFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling customDetectorsControllerDeleteFile().'
+            );
+        }
+
+        if (requestParameters['fileId'] == null) {
+            throw new runtime.RequiredError(
+                'fileId',
+                'Required parameter "fileId" was null or undefined when calling customDetectorsControllerDeleteFile().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/custom-detectors/{id}/files/{fileId}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"fileId"}}`, encodeURIComponent(String(requestParameters['fileId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Delete a code detector file
+     */
+    async customDetectorsControllerDeleteFile(requestParameters: CustomDetectorsControllerDeleteFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.customDetectorsControllerDeleteFileRaw(requestParameters, initOverrides);
+    }
+
+    /**
      * Delete a single training example
      */
     async customDetectorsControllerDeleteTrainingExampleRaw(requestParameters: CustomDetectorsControllerDeleteTrainingExampleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>> {
@@ -290,6 +356,50 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
     async customDetectorsControllerDeleteTrainingExample(requestParameters: CustomDetectorsControllerDeleteTrainingExampleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any> {
         const response = await this.customDetectorsControllerDeleteTrainingExampleRaw(requestParameters, initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Stream a code detector file\'s bytes
+     */
+    async customDetectorsControllerFileContentRaw(requestParameters: CustomDetectorsControllerFileContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling customDetectorsControllerFileContent().'
+            );
+        }
+
+        if (requestParameters['fileId'] == null) {
+            throw new runtime.RequiredError(
+                'fileId',
+                'Required parameter "fileId" was null or undefined when calling customDetectorsControllerFileContent().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/custom-detectors/{id}/files/{fileId}/content`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"fileId"}}`, encodeURIComponent(String(requestParameters['fileId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Stream a code detector file\'s bytes
+     */
+    async customDetectorsControllerFileContent(requestParameters: CustomDetectorsControllerFileContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.customDetectorsControllerFileContentRaw(requestParameters, initOverrides);
     }
 
     /**
@@ -388,6 +498,45 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
      */
     async customDetectorsControllerListExamples(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<CustomDetectorExampleDto>> {
         const response = await this.customDetectorsControllerListExamplesRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Code detectors (CUSTOM_DETECTOR) read these with ctx.file(name).
+     * List a code detector\'s uploaded files
+     */
+    async customDetectorsControllerListFilesRaw(requestParameters: CustomDetectorsControllerListFilesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<CustomDetectorFileDto>>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling customDetectorsControllerListFiles().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/custom-detectors/{id}/files`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(CustomDetectorFileDtoFromJSON));
+    }
+
+    /**
+     * Code detectors (CUSTOM_DETECTOR) read these with ctx.file(name).
+     * List a code detector\'s uploaded files
+     */
+    async customDetectorsControllerListFiles(requestParameters: CustomDetectorsControllerListFilesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<CustomDetectorFileDto>> {
+        const response = await this.customDetectorsControllerListFilesRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -751,6 +900,73 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
      */
     async customDetectorsControllerUpdate(requestParameters: CustomDetectorsControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CustomDetectorResponseDto> {
         const response = await this.customDetectorsControllerUpdateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * A screening list, a model, a reference table. A file with a name the detector already has is replaced. Bumps the detector version.
+     * Upload one file to a code detector
+     */
+    async customDetectorsControllerUploadFileRaw(requestParameters: CustomDetectorsControllerUploadFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CustomDetectorFileDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling customDetectorsControllerUploadFile().'
+            );
+        }
+
+        if (requestParameters['file'] == null) {
+            throw new runtime.RequiredError(
+                'file',
+                'Required parameter "file" was null or undefined when calling customDetectorsControllerUploadFile().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const consumes: runtime.Consume[] = [
+            { contentType: 'multipart/form-data' },
+        ];
+        // @ts-ignore: canConsumeForm may be unused
+        const canConsumeForm = runtime.canConsumeForm(consumes);
+
+        let formParams: { append(param: string, value: any): any };
+        let useForm = false;
+        // use FormData to transmit files using content-type "multipart/form-data"
+        useForm = canConsumeForm;
+        if (useForm) {
+            formParams = new FormData();
+        } else {
+            formParams = new URLSearchParams();
+        }
+
+        if (requestParameters['file'] != null) {
+            formParams.append('file', requestParameters['file'] as any);
+        }
+
+
+        let urlPath = `/custom-detectors/{id}/files`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: formParams,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CustomDetectorFileDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * A screening list, a model, a reference table. A file with a name the detector already has is replaced. Bumps the detector version.
+     * Upload one file to a code detector
+     */
+    async customDetectorsControllerUploadFile(requestParameters: CustomDetectorsControllerUploadFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CustomDetectorFileDto> {
+        const response = await this.customDetectorsControllerUploadFileRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
