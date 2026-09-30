@@ -2,7 +2,7 @@ import * as React from "react";
 
 /**
  * Shared vocabulary for the landing's string boards (hero + closing CTA).
- * Nodes are findings, not sources — the signals Classifyre detectors raise.
+ * Nodes are findings, not sources: the signals Classifyre detectors raise.
  */
 export const FINDING_TAGS: readonly string[] = [
   "leaked email",
@@ -25,7 +25,7 @@ export const FINDING_TAGS: readonly string[] = [
  * Rotates `slots` labels through the pool on an interval so the boards never
  * show the same set twice. Deterministic on first render (SSR-safe); frozen
  * when the reader asked for reduced motion. The pool comes from the t18n
- * dictionaries (`findingTags`, English fallback per key) — pass the page's
+ * dictionaries (`findingTags`, English fallback per key); pass the page's
  * locale list so German boards cycle German labels.
  */
 export function useCyclingTags(
