@@ -15,6 +15,7 @@
 
 import * as runtime from '../runtime';
 import type {
+  CreateDetectorNotebookExecutionDto,
   CreateNotebookExecutionDto,
   NotebookDto,
   NotebookExecutionDto,
@@ -24,6 +25,8 @@ import type {
   UpdateNotebookResponseDto,
 } from '../models/index';
 import {
+    CreateDetectorNotebookExecutionDtoFromJSON,
+    CreateDetectorNotebookExecutionDtoToJSON,
     CreateNotebookExecutionDtoFromJSON,
     CreateNotebookExecutionDtoToJSON,
     NotebookDtoFromJSON,
@@ -44,6 +47,11 @@ export interface NotebookControllerCancelRequest {
     executionId: string;
 }
 
+export interface NotebookControllerCreateDetectorExecutionRequest {
+    detectorId: string;
+    createDetectorNotebookExecutionDto: CreateDetectorNotebookExecutionDto;
+}
+
 export interface NotebookControllerCreateExecutionRequest {
     sourceId: string;
     createNotebookExecutionDto: CreateNotebookExecutionDto;
@@ -61,6 +69,11 @@ export interface NotebookControllerGetRequest {
 
 export interface NotebookControllerGetExecutionRequest {
     executionId: string;
+}
+
+export interface NotebookControllerListDetectorExecutionsRequest {
+    detectorId: string;
+    limit: string;
 }
 
 export interface NotebookControllerListExecutionsRequest {
@@ -123,6 +136,55 @@ export class NotebooksApi extends runtime.BaseAPI {
      */
     async notebookControllerCancel(requestParameters: NotebookControllerCancelRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.notebookControllerCancelRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Code detectors (pipeline type CUSTOM_DETECTOR) only. \"cell\"/\"all\" replay the cells with the detector\'s variables, secrets and files; \"preview_detect\" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.
+     * Run a code detector\'s notebook
+     */
+    async notebookControllerCreateDetectorExecutionRaw(requestParameters: NotebookControllerCreateDetectorExecutionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<NotebookExecutionDto>> {
+        if (requestParameters['detectorId'] == null) {
+            throw new runtime.RequiredError(
+                'detectorId',
+                'Required parameter "detectorId" was null or undefined when calling notebookControllerCreateDetectorExecution().'
+            );
+        }
+
+        if (requestParameters['createDetectorNotebookExecutionDto'] == null) {
+            throw new runtime.RequiredError(
+                'createDetectorNotebookExecutionDto',
+                'Required parameter "createDetectorNotebookExecutionDto" was null or undefined when calling notebookControllerCreateDetectorExecution().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/custom-detectors/{detectorId}/notebook/executions`;
+        urlPath = urlPath.replace(`{${"detectorId"}}`, encodeURIComponent(String(requestParameters['detectorId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateDetectorNotebookExecutionDtoToJSON(requestParameters['createDetectorNotebookExecutionDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => NotebookExecutionDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Code detectors (pipeline type CUSTOM_DETECTOR) only. \"cell\"/\"all\" replay the cells with the detector\'s variables, secrets and files; \"preview_detect\" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.
+     * Run a code detector\'s notebook
+     */
+    async notebookControllerCreateDetectorExecution(requestParameters: NotebookControllerCreateDetectorExecutionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<NotebookExecutionDto> {
+        const response = await this.notebookControllerCreateDetectorExecutionRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -291,6 +353,54 @@ export class NotebooksApi extends runtime.BaseAPI {
      */
     async notebookControllerGetExecution(requestParameters: NotebookControllerGetExecutionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<NotebookExecutionDto> {
         const response = await this.notebookControllerGetExecutionRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Recent executions of a code detector\'s notebook
+     */
+    async notebookControllerListDetectorExecutionsRaw(requestParameters: NotebookControllerListDetectorExecutionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<NotebookExecutionDto>>> {
+        if (requestParameters['detectorId'] == null) {
+            throw new runtime.RequiredError(
+                'detectorId',
+                'Required parameter "detectorId" was null or undefined when calling notebookControllerListDetectorExecutions().'
+            );
+        }
+
+        if (requestParameters['limit'] == null) {
+            throw new runtime.RequiredError(
+                'limit',
+                'Required parameter "limit" was null or undefined when calling notebookControllerListDetectorExecutions().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/custom-detectors/{detectorId}/notebook/executions`;
+        urlPath = urlPath.replace(`{${"detectorId"}}`, encodeURIComponent(String(requestParameters['detectorId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(NotebookExecutionDtoFromJSON));
+    }
+
+    /**
+     * Recent executions of a code detector\'s notebook
+     */
+    async notebookControllerListDetectorExecutions(requestParameters: NotebookControllerListDetectorExecutionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<NotebookExecutionDto>> {
+        const response = await this.notebookControllerListDetectorExecutionsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -484,7 +594,8 @@ export type NotebookControllerGetScopeEnum = typeof NotebookControllerGetScopeEn
  */
 export const NotebookControllerScaffoldScopeEnum = {
     Connector: 'connector',
-    Augmentation: 'augmentation'
+    Augmentation: 'augmentation',
+    Detector: 'detector'
 } as const;
 export type NotebookControllerScaffoldScopeEnum = typeof NotebookControllerScaffoldScopeEnum[keyof typeof NotebookControllerScaffoldScopeEnum];
 /**
@@ -492,7 +603,8 @@ export type NotebookControllerScaffoldScopeEnum = typeof NotebookControllerScaff
  */
 export const NotebookControllerTemplatesScopeEnum = {
     Connector: 'connector',
-    Augmentation: 'augmentation'
+    Augmentation: 'augmentation',
+    Detector: 'detector'
 } as const;
 export type NotebookControllerTemplatesScopeEnum = typeof NotebookControllerTemplatesScopeEnum[keyof typeof NotebookControllerTemplatesScopeEnum];
 /**

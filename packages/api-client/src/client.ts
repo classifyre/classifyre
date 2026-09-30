@@ -139,9 +139,11 @@ export type {
   UpdateNotebookDto,
   UpdateNotebookResponseDto,
   CreateNotebookExecutionDto,
+  CreateDetectorNotebookExecutionDto,
   NotebookExecutionDto,
   NotebookScaffoldDto,
   NotebookTemplateDto,
+  CustomDetectorFileDto,
 } from "./generated/src/models";
 export type {
   EmbeddingReindexResponseDto,
@@ -1088,6 +1090,8 @@ export type CustomDetectorResponseDto = {
   sourcesWithFindingsCount: number;
   recentSourceNames: string[];
   sourcesUsing: Array<{ id: string; name: string }>;
+  /** Code detectors (CUSTOM_DETECTOR): names of the write-only secrets. */
+  secretKeys?: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -1227,12 +1231,29 @@ export type TestResultDto = {
   createdAt: string;
 };
 
+/**
+ * A whole asset for a code detector (CUSTOM_DETECTOR) test: what asset.name,
+ * asset.kind, asset.metadata, asset.text(), asset.pages() and asset.rows()
+ * return inside detect().
+ */
+export type AssetFixtureDto = {
+  name: string;
+  kind?: string;
+  mime_type?: string;
+  url?: string;
+  metadata?: Record<string, unknown>;
+  text?: string;
+  pages?: string[];
+  rows?: Array<Record<string, unknown>>;
+};
+
 export type TestScenarioDto = {
   id: string;
   detectorId: string;
   name: string;
   description?: string | null;
   inputText: string;
+  inputAsset?: AssetFixtureDto | null;
   expectedOutcome: Record<string, unknown>;
   lastResult: TestResultDto | null;
   createdAt: string;
@@ -1242,7 +1263,9 @@ export type TestScenarioDto = {
 export type CreateTestScenarioDto = {
   name: string;
   description?: string;
-  inputText: string;
+  /** Required unless inputAsset is given (code detectors only). */
+  inputText?: string;
+  inputAsset?: AssetFixtureDto;
   expectedOutcome: Record<string, unknown>;
 };
 
@@ -1760,14 +1783,14 @@ export interface MaintenanceCleanupResult {
 export interface MaintenanceCleanupStarted {
   runId: string;
   key: string;
-  status: 'running';
+  status: "running";
 }
 
 /** Pollable progress of a cleanup run. */
 export interface MaintenanceCleanupProgress {
   runId: string;
   key: string;
-  status: 'running' | 'done' | 'failed';
+  status: "running" | "done" | "failed";
   /** Planner guess at start (approximate); null when unknowable. */
   totalEstimate: number | null;
   /** Rows actually removed so far. */
@@ -2447,6 +2470,36 @@ class ApiClient {
     }
 
     return (await response.json()) as AssistantChatResponse;
+  }
+
+  /**
+   * Upload one file a code detector (CUSTOM_DETECTOR) reads with
+   * ctx.file(name). A file with the same name is replaced.
+   */
+  async uploadCustomDetectorFile(
+    detectorId: string,
+    file: File | Blob,
+    fileName?: string,
+  ): Promise<import("./generated/src/models").CustomDetectorFileDto> {
+    const basePath = this.searchBase();
+    const formData = new FormData();
+    const name =
+      fileName ??
+      ("name" in file && typeof file.name === "string" && file.name.length > 0
+        ? file.name
+        : "upload");
+    formData.set("file", file, name);
+    const response = await resilientFetch(
+      `${basePath}/custom-detectors/${encodeURIComponent(detectorId)}/files`,
+      { method: "POST", body: formData },
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(
+        `custom-detectors/${detectorId}/files POST failed (${response.status}): ${message || "Unknown error"}`,
+      );
+    }
+    return (await response.json()) as import("./generated/src/models").CustomDetectorFileDto;
   }
 
   async assistantParseUpload(

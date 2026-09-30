@@ -544,8 +544,21 @@
             }
           ],
           "default": null,
-          "description": "Which extraction strategy was used: REGEX, GLINER, CLASSIFIER_GLINER",
+          "description": "Which extraction strategy was used: REGEX, GLINER, CLASSIFIER_GLINER, CUSTOM_DETECTOR",
           "title": "Extraction Method"
+        },
+        "identity_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Stable identity supplied by the detector (contract C1). When present the API derives the finding's detection identity from it instead of from matched_content, so a value that changes between runs updates one finding instead of resolving it and opening another. At most 256 characters; the API hashes a longer key.",
+          "title": "Identity Key"
         }
       },
       "required": [

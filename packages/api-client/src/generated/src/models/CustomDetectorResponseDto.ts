@@ -83,6 +83,12 @@ export interface CustomDetectorResponseDto {
      */
     answerDimension: string | null;
     /**
+     * Code detectors (CUSTOM_DETECTOR) only: names of the secrets the detector holds. Values are write-only and never returned; send `secrets` as a patch on update (a string sets a key, null deletes it, an absent key is kept).
+     * @type {Array<string>}
+     * @memberof CustomDetectorResponseDto
+     */
+    secretKeys?: Array<string>;
+    /**
      * AI provider credential ID backing this detector (LLM detectors only).
      * @type {string}
      * @memberof CustomDetectorResponseDto
@@ -203,6 +209,7 @@ export function CustomDetectorResponseDtoFromJSONTyped(json: any, ignoreDiscrimi
         'detectorType': json['detectorType'],
         'severity': json['severity'],
         'answerDimension': json['answerDimension'],
+        'secretKeys': json['secretKeys'] == null ? undefined : json['secretKeys'],
         'aiProviderConfigId': json['aiProviderConfigId'] == null ? undefined : json['aiProviderConfigId'],
         'isActive': json['isActive'],
         'version': json['version'],
@@ -238,6 +245,7 @@ export function CustomDetectorResponseDtoToJSONTyped(value?: CustomDetectorRespo
         'detectorType': value['detectorType'],
         'severity': value['severity'],
         'answerDimension': value['answerDimension'],
+        'secretKeys': value['secretKeys'],
         'aiProviderConfigId': value['aiProviderConfigId'],
         'isActive': value['isActive'],
         'version': value['version'],

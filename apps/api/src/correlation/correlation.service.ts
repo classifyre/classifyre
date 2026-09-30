@@ -927,6 +927,15 @@ export class CorrelationService {
 
   // ── Fingerprints ──────────────────────────────────────────────────────────
 
+  /** Keys of the code detectors (pipeline type CUSTOM_DETECTOR). A small table. */
+  private async codeDetectorKeys(): Promise<Set<string>> {
+    const rows = await this.prisma.$queryRaw<Array<{ key: string }>>`
+      SELECT key FROM custom_detectors
+      WHERE pipeline_schema->>'type' = 'CUSTOM_DETECTOR'
+    `;
+    return new Set(Array.isArray(rows) ? rows.map((row) => row.key) : []);
+  }
+
   /** Rebuild an asset's correlation values + signature from its findings. */
   private async rebuildAssetValues(
     assetId: string,
@@ -953,6 +962,12 @@ export class CorrelationService {
         phoneticHash: string | null;
       }
     >();
+    // Code detectors (CUSTOM_DETECTOR) enter the value index only through the
+    // normalized value they declare (contract C2). Their matched text is a
+    // verdict like "total 523 != 520", and indexing it is how templated values
+    // correlated thousands of unrelated assets (GENESIS field report P6).
+    const codeDetectorKeys = await this.codeDetectorKeys();
+    const codeFindingIds: string[] = [];
     let idCursor: string | null = null;
     for (;;) {
       const batch: Array<{
@@ -984,6 +999,10 @@ export class CorrelationService {
       });
       if (!batch.length) break;
       for (const f of batch) {
+        if (f.customDetectorKey && codeDetectorKeys.has(f.customDetectorKey)) {
+          codeFindingIds.push(f.id);
+          continue;
+        }
         const normalized = normalizeValue(f.findingType, f.matchedContent);
         if (!normalized) continue;
         const label = normalizeLabel(f.findingType);
@@ -1002,6 +1021,50 @@ export class CorrelationService {
       if (batch.length < this.batches.findingsPage) break;
 
       idCursor = batch.at(-1)!.id;
+    }
+
+    // Bounded to this asset's open code-detector findings, read by id.
+    for (
+      let offset = 0;
+      offset < codeFindingIds.length;
+      offset += this.batches.findingsPage
+    ) {
+      const chunk = await this.prisma.finding.findMany({
+        where: {
+          id: {
+            in: codeFindingIds.slice(
+              offset,
+              offset + this.batches.findingsPage,
+            ),
+          },
+        },
+        select: {
+          id: true,
+          findingType: true,
+          detectorType: true,
+          customDetectorKey: true,
+          metadata: true,
+        },
+      });
+      for (const f of chunk) {
+        const declared = (f.metadata as Record<string, unknown> | null)
+          ?.normalized_value;
+        if (typeof declared !== 'string' || !declared.trim()) continue;
+        const normalized = normalizeValue(f.findingType, declared);
+        if (!normalized) continue;
+        const label = normalizeLabel(f.findingType);
+        if (cfg.isExcluded(label, normalized)) continue;
+        const hash = valueHash(f.findingType, normalized);
+        if (rows.has(hash)) continue;
+        rows.set(hash, {
+          findingId: f.id,
+          label,
+          detectorType: f.detectorType,
+          customDetectorKey: f.customDetectorKey ?? null,
+          normalizedValue: normalized,
+          phoneticHash: phoneticFingerprint(label, normalized),
+        });
+      }
     }
 
     const componentHashes: Record<string, string[]> = {};

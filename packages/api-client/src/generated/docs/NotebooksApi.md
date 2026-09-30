@@ -5,10 +5,12 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**notebookControllerCancel**](NotebooksApi.md#notebookcontrollercancel) | **POST** /notebook/executions/{executionId}/cancel | Stop a running execution |
+| [**notebookControllerCreateDetectorExecution**](NotebooksApi.md#notebookcontrollercreatedetectorexecution) | **POST** /custom-detectors/{detectorId}/notebook/executions | Run a code detector\&#39;s notebook |
 | [**notebookControllerCreateExecution**](NotebooksApi.md#notebookcontrollercreateexecution) | **POST** /sources/{sourceId}/notebook/executions | Start a notebook execution |
 | [**notebookControllerExportPython**](NotebooksApi.md#notebookcontrollerexportpython) | **GET** /sources/{sourceId}/notebook/export | The notebook as an ordinary Python module |
 | [**notebookControllerGet**](NotebooksApi.md#notebookcontrollerget) | **GET** /sources/{sourceId}/notebook | Read a source\&#39;s notebook |
 | [**notebookControllerGetExecution**](NotebooksApi.md#notebookcontrollergetexecution) | **GET** /notebook/executions/{executionId} | Poll one execution |
+| [**notebookControllerListDetectorExecutions**](NotebooksApi.md#notebookcontrollerlistdetectorexecutions) | **GET** /custom-detectors/{detectorId}/notebook/executions | Recent executions of a code detector\&#39;s notebook |
 | [**notebookControllerListExecutions**](NotebooksApi.md#notebookcontrollerlistexecutions) | **GET** /sources/{sourceId}/notebook/executions | Recent executions for a source |
 | [**notebookControllerScaffold**](NotebooksApi.md#notebookcontrollerscaffold) | **GET** /notebooks/scaffold | The starter cells and the functions a notebook must define |
 | [**notebookControllerTemplates**](NotebooksApi.md#notebookcontrollertemplates) | **GET** /notebooks/templates | Worked notebooks an author can start from or borrow cells out of |
@@ -79,6 +81,76 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## notebookControllerCreateDetectorExecution
+
+> NotebookExecutionDto notebookControllerCreateDetectorExecution(detectorId, createDetectorNotebookExecutionDto)
+
+Run a code detector\&#39;s notebook
+
+Code detectors (pipeline type CUSTOM_DETECTOR) only. \&quot;cell\&quot;/\&quot;all\&quot; replay the cells with the detector\&#39;s variables, secrets and files; \&quot;preview_detect\&quot; runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  NotebooksApi,
+} from '@workspace/api-client';
+import type { NotebookControllerCreateDetectorExecutionRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new NotebooksApi();
+
+  const body = {
+    // string
+    detectorId: detectorId_example,
+    // CreateDetectorNotebookExecutionDto
+    createDetectorNotebookExecutionDto: ...,
+  } satisfies NotebookControllerCreateDetectorExecutionRequest;
+
+  try {
+    const data = await api.notebookControllerCreateDetectorExecution(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **detectorId** | `string` |  | [Defaults to `undefined`] |
+| **createDetectorNotebookExecutionDto** | [CreateDetectorNotebookExecutionDto](CreateDetectorNotebookExecutionDto.md) |  | |
+
+### Return type
+
+[**NotebookExecutionDto**](NotebookExecutionDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **202** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -356,6 +428,74 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## notebookControllerListDetectorExecutions
+
+> Array&lt;NotebookExecutionDto&gt; notebookControllerListDetectorExecutions(detectorId, limit)
+
+Recent executions of a code detector\&#39;s notebook
+
+### Example
+
+```ts
+import {
+  Configuration,
+  NotebooksApi,
+} from '@workspace/api-client';
+import type { NotebookControllerListDetectorExecutionsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new NotebooksApi();
+
+  const body = {
+    // string
+    detectorId: detectorId_example,
+    // string
+    limit: limit_example,
+  } satisfies NotebookControllerListDetectorExecutionsRequest;
+
+  try {
+    const data = await api.notebookControllerListDetectorExecutions(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **detectorId** | `string` |  | [Defaults to `undefined`] |
+| **limit** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**Array&lt;NotebookExecutionDto&gt;**](NotebookExecutionDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## notebookControllerListExecutions
 
 > Array&lt;NotebookExecutionDto&gt; notebookControllerListExecutions(sourceId, limit)
@@ -444,7 +584,7 @@ async function example() {
   const api = new NotebooksApi();
 
   const body = {
-    // 'connector' | 'augmentation' (optional)
+    // 'connector' | 'augmentation' | 'detector' (optional)
     scope: scope_example,
   } satisfies NotebookControllerScaffoldRequest;
 
@@ -465,7 +605,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **scope** | `connector`, `augmentation` |  | [Optional] [Defaults to `undefined`] [Enum: connector, augmentation] |
+| **scope** | `connector`, `augmentation`, `detector` |  | [Optional] [Defaults to `undefined`] [Enum: connector, augmentation, detector] |
 
 ### Return type
 
@@ -509,7 +649,7 @@ async function example() {
   const api = new NotebooksApi();
 
   const body = {
-    // 'connector' | 'augmentation' (optional)
+    // 'connector' | 'augmentation' | 'detector' (optional)
     scope: scope_example,
   } satisfies NotebookControllerTemplatesRequest;
 
@@ -530,7 +670,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **scope** | `connector`, `augmentation` |  | [Optional] [Defaults to `undefined`] [Enum: connector, augmentation] |
+| **scope** | `connector`, `augmentation`, `detector` |  | [Optional] [Defaults to `undefined`] [Enum: connector, augmentation, detector] |
 
 ### Return type
 

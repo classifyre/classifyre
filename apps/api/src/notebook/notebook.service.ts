@@ -27,7 +27,14 @@ export const OPTIONAL_FUNCTIONS = [
 export const AUGMENTATION_REQUIRED_FUNCTIONS = ['augment'];
 export const AUGMENTATION_OPTIONAL_FUNCTIONS = ['setup', 'finalize'];
 
+export const DETECTOR_REQUIRED_FUNCTIONS = ['detect'];
+export const DETECTOR_OPTIONAL_FUNCTIONS = ['setup'];
+
 export type NotebookScope = 'connector' | 'augmentation';
+
+/** Scopes that have a scaffold and templates: every source scope, plus a
+ * code detector's notebook (which lives on the detector, not a source). */
+export type TemplateScope = NotebookScope | 'detector';
 
 const STARTER_EXAMPLE_NAME = 'Starter notebook';
 
@@ -71,9 +78,18 @@ export class NotebookService {
    * keeps the scaffold and the contract from drifting: if the contract gains a
    * required function, the example gains a cell, and every surface follows.
    */
-  scaffold(scope: NotebookScope = 'connector'): {
+  scaffold(scope: TemplateScope = 'connector'): {
     cells: NotebookCellDto[];
   } {
+    if (scope === 'detector') {
+      const [starter] = this.detectorExamples();
+      if (!starter?.cells.length) {
+        throw new Error(
+          'all_detectors_examples.json has no CUSTOM_DETECTOR starter to scaffold from',
+        );
+      }
+      return { cells: starter.cells };
+    }
     // Normalized to one shape: the CUSTOM examples nest the notebook under
     // config.required, the AUGMENTATION templates carry it at the top level.
     const notebooks: Array<{ name?: string; notebook?: any }> =
@@ -103,11 +119,18 @@ export class NotebookService {
    * the SDK gained a method. An example with no cells is skipped rather than
    * served -- an empty template in the picker is worse than a missing one.
    */
-  templates(scope: NotebookScope = 'connector'): Array<{
+  templates(scope: TemplateScope = 'connector'): Array<{
     name: string;
     description: string;
     cells: NotebookCellDto[];
   }> {
+    if (scope === 'detector') {
+      return this.detectorExamples().map(({ name, description, cells }) => ({
+        name,
+        description,
+        cells,
+      }));
+    }
     if (scope === 'augmentation') {
       return this.augmentationExamples()
         .map((entry) => ({
@@ -123,6 +146,35 @@ export class NotebookService {
         description: String(entry.description ?? ''),
         cells: (entry.config?.required?.notebook?.cells ??
           []) as NotebookCellDto[],
+      }))
+      .filter((entry) => entry.name && entry.cells.length > 0);
+  }
+
+  /**
+   * Code-detector templates, from the same file `list_custom_detector_examples`
+   * serves, so the editor's picker and the MCP catalog cannot disagree. The
+   * first one is the starter.
+   */
+  private detectorExamples(): Array<{
+    name: string;
+    description: string;
+    cells: NotebookCellDto[];
+  }> {
+    const path = resolveSchemaFile(__dirname, 'all_detectors_examples.json');
+    const examples = JSON.parse(fs.readFileSync(path, 'utf8')) as Record<
+      string,
+      Array<{ name?: string; description?: string; config?: any }>
+    >;
+    return (examples.CUSTOM ?? [])
+      .filter(
+        (entry) =>
+          entry.config?.pipeline_schema?.type === 'CUSTOM_DETECTOR' &&
+          Array.isArray(entry.config?.pipeline_schema?.notebook?.cells),
+      )
+      .map((entry) => ({
+        name: String(entry.name ?? ''),
+        description: String(entry.description ?? ''),
+        cells: entry.config.pipeline_schema.notebook.cells as NotebookCellDto[],
       }))
       .filter((entry) => entry.name && entry.cells.length > 0);
   }

@@ -1,4 +1,7 @@
-import { TAG_PIPELINE_TYPE } from "./custom-detector-badge";
+import {
+  CUSTOM_DETECTOR_PIPELINE_TYPE,
+  TAG_PIPELINE_TYPE,
+} from "./custom-detector-badge";
 
 /**
  * Single source of truth for "which editor / treatment does this detector
@@ -17,6 +20,8 @@ export type DetectorKind =
   | "regex"
   | "llm"
   | "tag"
+  // A code detector: a Python notebook defining detect(asset, ctx).
+  | "code"
   | "gliner2"
   | "transformer"
   | "legacy";
@@ -54,6 +59,7 @@ export function resolveDetectorKind(
   if (isTransformerPipelineType(type)) return "transformer";
   if (type === "LLM") return "llm";
   if (type === TAG_PIPELINE_TYPE) return "tag";
+  if (type === CUSTOM_DETECTOR_PIPELINE_TYPE) return "code";
   if (type === "REGEX") return "regex";
   // Any other pipeline schema is a GLiNER2-style pipeline detector.
   return "gliner2";
@@ -65,6 +71,7 @@ export function isNonTrainableKind(kind: DetectorKind): boolean {
     kind === "regex" ||
     kind === "llm" ||
     kind === "tag" ||
+    kind === "code" ||
     kind === "transformer"
   );
 }

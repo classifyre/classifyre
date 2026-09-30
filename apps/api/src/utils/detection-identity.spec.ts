@@ -141,4 +141,76 @@ describe('generateDetectionIdentity', () => {
       generateDetectionIdentity(input2),
     );
   });
+
+  describe('identityKey (contract C1)', () => {
+    const base = {
+      assetId: 'asset-123',
+      detectorType: 'CUSTOM',
+      customDetectorKey: 'de_dq_totals',
+      findingType: 'total_mismatch',
+    };
+
+    it('keeps one identity when the value text changes', () => {
+      const run1 = generateDetectionIdentity({
+        ...base,
+        matchedContent: 'total 523 != 520',
+        identityKey: 'row-17',
+      });
+      const run2 = generateDetectionIdentity({
+        ...base,
+        matchedContent: 'total 524 != 520',
+        identityKey: 'row-17',
+      });
+      expect(run1).toBe(run2);
+    });
+
+    it('separates rows by their identity', () => {
+      expect(
+        generateDetectionIdentity({
+          ...base,
+          matchedContent: 'x',
+          identityKey: 'row-17',
+        }),
+      ).not.toBe(
+        generateDetectionIdentity({
+          ...base,
+          matchedContent: 'x',
+          identityKey: 'row-18',
+        }),
+      );
+    });
+
+    it('leaves identities without a key unchanged', () => {
+      const withoutKey = generateDetectionIdentity({
+        ...base,
+        matchedContent: 'Total 523',
+      });
+      expect(
+        generateDetectionIdentity({
+          ...base,
+          matchedContent: 'Total 523',
+          identityKey: null,
+        }),
+      ).toBe(withoutKey);
+      expect(
+        generateDetectionIdentity({
+          ...base,
+          matchedContent: 'Total 523',
+          identityKey: '  ',
+        }),
+      ).toBe(withoutKey);
+    });
+
+    it('never collides with a content key spelling the identity', () => {
+      expect(
+        generateDetectionIdentity({ ...base, matchedContent: 'id:row-17' }),
+      ).not.toBe(
+        generateDetectionIdentity({
+          ...base,
+          matchedContent: 'anything',
+          identityKey: 'row-17',
+        }),
+      );
+    });
+  });
 });

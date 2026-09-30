@@ -31,6 +31,10 @@ class ExecutionMode(StrEnum):
     #: diffs. Unlike preview_extract it needs the real source, so it runs as
     #: its own flow rather than as an in-process cell replay.
     PREVIEW_AUGMENT = "preview_augment"
+    #: Run a code detector's setup()/detect() over one real asset (or a small
+    #: sample of the source's assets) and report the findings it would record,
+    #: without writing anything. Needs the real source, like preview_augment.
+    PREVIEW_DETECT = "preview_detect"
     #: Parse and contract-check only. Runs no cells, so it is cheap enough for
     #: the editor to call on a debounce while someone is typing.
     VALIDATE = "validate"
@@ -42,6 +46,10 @@ class ExecutionMode(StrEnum):
 class NotebookScope(StrEnum):
     CONNECTOR = "connector"
     AUGMENTATION = "augmentation"
+    #: A code detector's notebook (pipeline type CUSTOM_DETECTOR). Its cells,
+    #: variables, secrets and packages travel in the request's ``detector``
+    #: object rather than in a source recipe.
+    DETECTOR = "detector"
 
 
 class ExecutionStatus(StrEnum):
@@ -57,6 +65,7 @@ CONTRACT_MODES = frozenset(
         ExecutionMode.TEST_CONNECTION,
         ExecutionMode.PREVIEW_EXTRACT,
         ExecutionMode.PREVIEW_AUGMENT,
+        ExecutionMode.PREVIEW_DETECT,
     }
 )
 
@@ -74,6 +83,14 @@ class ExecutionRequest:
     max_output_bytes: int = DEFAULT_MAX_OUTPUT_BYTES
     max_assets: int = DEFAULT_PREVIEW_ASSETS
     scope: NotebookScope = NotebookScope.CONNECTOR
+    #: Detector scope only: ``{key, name, pipeline_schema}`` with secrets
+    #: already decrypted by the API.
+    detector: dict[str, Any] | None = None
+    #: preview_detect only: the asset to judge (``hash``, ``externalUrl``,
+    #: ``name``, ``assetKind``, ``metadata``). Absent means "sample the source".
+    asset: dict[str, Any] | None = None
+    #: preview_detect only: the asset's current findings, for needs_findings.
+    prior_findings: list[dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> ExecutionRequest:
@@ -117,6 +134,13 @@ class ExecutionRequest:
             ),
             max_assets=int(raw.get("maxAssets") or raw.get("max_assets") or DEFAULT_PREVIEW_ASSETS),
             scope=scope,
+            detector=raw.get("detector") if isinstance(raw.get("detector"), dict) else None,
+            asset=raw.get("asset") if isinstance(raw.get("asset"), dict) else None,
+            prior_findings=[
+                item
+                for item in (raw.get("priorFindings") or raw.get("prior_findings") or [])
+                if isinstance(item, dict)
+            ],
         )
 
 

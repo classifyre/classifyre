@@ -37,6 +37,18 @@ export interface CustomDetectorExampleDto {
      * @memberof CustomDetectorExampleDto
      */
     pipelineSchema: { [key: string]: any; };
+    /**
+     * Suggested detector key, for templates that ship one (code detectors do).
+     * @type {string}
+     * @memberof CustomDetectorExampleDto
+     */
+    key?: string;
+    /**
+     * Test scenarios the template ships with: { name, inputText | inputAsset, expectedOutcome }.
+     * @type {Array<{ [key: string]: any; }>}
+     * @memberof CustomDetectorExampleDto
+     */
+    testScenarios?: Array<{ [key: string]: any; }>;
 }
 
 /**
@@ -62,6 +74,8 @@ export function CustomDetectorExampleDtoFromJSONTyped(json: any, ignoreDiscrimin
         'name': json['name'],
         'description': json['description'],
         'pipelineSchema': json['pipelineSchema'],
+        'key': json['key'] == null ? undefined : json['key'],
+        'testScenarios': json['testScenarios'] == null ? undefined : json['testScenarios'],
     };
 }
 
@@ -79,6 +93,8 @@ export function CustomDetectorExampleDtoToJSONTyped(value?: CustomDetectorExampl
         'name': value['name'],
         'description': value['description'],
         'pipelineSchema': value['pipelineSchema'],
+        'key': value['key'],
+        'testScenarios': value['testScenarios'],
     };
 }
 

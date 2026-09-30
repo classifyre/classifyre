@@ -18,7 +18,6 @@ silently-degraded run visible.
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
 import logging
 from collections.abc import Mapping
@@ -29,6 +28,7 @@ from ..graph.edges import edge_from_payload
 from ..notebook.child import ChildProcessError, NotebookChildProcess
 from ..notebook.groups import warm_declared_groups
 from ..notebook.packages import install as install_packages
+from ..pipeline.asset_payload_server import AssetPayloadServer
 from ..utils.hashing import unhash_id
 from ..utils.urn import normalize_urn_or_none
 from .contract import validate_augmentation_notebook
@@ -143,10 +143,6 @@ class AugmentationSession:
         self._warnings: list[str] = []
         self._warning_set: set[str] = set()
         self.stats = AugmentationStats()
-        # Run-scoped memo of fetched payloads, keyed by fetch candidate id.
-        # Bounded: one in-flight asset's worth per entry, each capped at
-        # max_payload_bytes, dropped by evict_asset_cache().
-        self._memo: dict[str, dict[str, Any]] = {}
 
     # -- construction ----------------------------------------------------------
 
@@ -295,7 +291,6 @@ class AugmentationSession:
                 slot.child.terminate()
             except Exception:
                 pass
-        self._memo.clear()
 
     # -- per asset -----------------------------------------------------------------
 
@@ -314,163 +309,34 @@ class AugmentationSession:
             "mime_type": None,
         }
 
-    def _candidates(self, asset: Any) -> list[str]:
-        seen: list[str] = []
-        for candidate in (getattr(asset, "external_url", ""), getattr(asset, "hash", "")):
-            value = str(candidate or "").strip()
-            if value and value not in seen:
-                seen.append(value)
-        return seen
+    @property
+    def _payloads(self) -> AssetPayloadServer:
+        """The source's shared payload server.
+
+        Shared with the code detectors that run on the same asset later in the
+        scan, so a payload augmentation fetched is not fetched again (G1 R20).
+        """
+        return AssetPayloadServer.shared(
+            self._source, max_payload_bytes=self._limits["max_payload_bytes"]
+        )
 
     async def _serve_need(self, asset: Any, memo_key: str, frame: dict[str, Any]) -> Any:
-        op = str(frame.get("op") or "")
-        if op == "payload":
-            fetched = await self._fetch_payload(asset)
-            if fetched is None:
-                return {"bytes_b64": None, "mime": None}
-            raw, mime = fetched
-            return {"bytes_b64": base64.b64encode(raw).decode("ascii"), "mime": mime}
-        if op == "raw_pages":
-            pages = await self._fetch_raw_pages(asset)
-            return {"pages": pages}
-        if op == "text":
-            pages = await self._fetch_text_pages(asset)
-            whole = "".join(pages)
-            return {"text": whole, "pages": pages}
-        raise ChildProcessError(f"Unknown payload op {op!r}")
+        try:
+            return await self._payloads.serve(asset, frame)
+        except ValueError as exc:
+            raise ChildProcessError(str(exc)) from exc
 
     async def _fetch_payload(self, asset: Any) -> tuple[bytes, str] | None:
         """Raw bytes for file-shaped sources; None for row-shaped ones."""
-        memo = self._memo_for(asset)
-        if "payload" in memo:
-            cached = memo["payload"]
-            return cached if cached is None else (bytes(cached[0]), str(cached[1]))
-        fetch = getattr(self._source, "fetch_content_bytes", None)
-        result: tuple[bytes, str] | None = None
-        if callable(fetch):
-            for candidate in self._candidates(asset):
-                try:
-                    result = await fetch(candidate)
-                except Exception as exc:
-                    logger.debug("Augmentation payload fetch failed for %s: %s", candidate, exc)
-                    continue
-                if result is not None:
-                    break
-        if result is not None:
-            raw, mime = result
-            cap = self._limits["max_payload_bytes"]
-            if len(raw) > cap:
-                logger.debug("Augmentation payload for %s truncated to %d bytes", candidate, cap)
-                raw = raw[:cap]
-            result = (raw, mime)
-            self._remember_bytes(asset, raw, mime)
-        memo["payload"] = result
-        return result
+        return await self._payloads.payload(asset)
 
     async def _fetch_raw_pages(self, asset: Any) -> list[str]:
         """The connector's own raw representation, page by page (capped)."""
-        memo = self._memo_for(asset)
-        if "raw_pages" in memo:
-            return [str(page) for page in memo["raw_pages"]]
-        pages: list[str] = []
-        fetch = getattr(self._source, "fetch_content_pages", None)
-        cap = self._limits["max_payload_bytes"]
-        used = 0
-        if callable(fetch):
-            for candidate in self._candidates(asset):
-                try:
-                    async for raw, _text in fetch(candidate):
-                        if not raw:
-                            continue
-                        chunk = str(raw)
-                        if used + len(chunk) > cap:
-                            chunk = chunk[: max(0, cap - used)]
-                        if chunk:
-                            pages.append(chunk)
-                            used += len(chunk)
-                        if used >= cap or len(pages) >= 50:
-                            break
-                    if pages:
-                        break
-                except Exception as exc:
-                    logger.debug("Augmentation raw fetch failed for %s: %s", candidate, exc)
-                    continue
-        memo["raw_pages"] = pages
-        return pages
+        return await self._payloads.raw_pages(asset)
 
     async def _fetch_text_pages(self, asset: Any) -> list[str]:
         """Extracted text, page by page (capped)."""
-        memo = self._memo_for(asset)
-        if "text_pages" in memo:
-            return [str(page) for page in memo["text_pages"]]
-        pages: list[str] = []
-        fetch = getattr(self._source, "fetch_content_pages", None)
-        cap = self._limits["max_payload_bytes"]
-        used = 0
-        if callable(fetch):
-            for candidate in self._candidates(asset):
-                try:
-                    async for _raw, text in fetch(candidate):
-                        if not text:
-                            continue
-                        chunk = str(text)
-                        if used + len(chunk) > cap:
-                            chunk = chunk[: max(0, cap - used)]
-                        if chunk:
-                            pages.append(chunk)
-                            used += len(chunk)
-                        if used >= cap or len(pages) >= 50:
-                            break
-                    if pages:
-                        break
-                except Exception as exc:
-                    logger.debug("Augmentation text fetch failed for %s: %s", candidate, exc)
-                    continue
-        if not pages:
-            provider = getattr(self._source, "fetch_content_bytes", None)
-            if callable(provider):
-                fetched = await self._fetch_payload(asset)
-                if fetched is not None:
-                    raw, mime = fetched
-                    try:
-                        text_pages = await asyncio.to_thread(
-                            list, self._source.iter_asset_pages(raw, mime)
-                        )
-                        for page in text_pages[:50]:
-                            chunk = str(page)
-                            if used + len(chunk) > cap:
-                                chunk = chunk[: max(0, cap - used)]
-                            if chunk:
-                                pages.append(chunk)
-                                used += len(chunk)
-                            if used >= cap:
-                                break
-                    except Exception as exc:
-                        logger.debug("Augmentation text fallback failed: %s", exc)
-        memo["text_pages"] = pages
-        return pages
-
-    def _memo_for(self, asset: Any) -> dict[str, Any]:
-        key = str(getattr(asset, "hash", "") or "")
-        return self._memo.setdefault(key, {})
-
-    def _remember_bytes(self, asset: Any, raw: bytes, mime: str) -> None:
-        """Mirror fetched bytes onto the source so the pipeline reuses them.
-
-        ``ParsedContentProvider.fetch_bytes`` consults this memo first instead
-        of re-downloading — the fetch augmentation already paid for is not
-        paid twice. Registered under every candidate id the pipeline tries
-        (external URL, then hash), and dropped by ``evict`` at the end of the
-        asset.
-        """
-        remember = getattr(self._source, "remember_augmentation_bytes", None)
-        if not callable(remember):
-            return
-        for candidate in self._candidates(asset):
-            try:
-                remember(candidate, raw, mime)
-            except Exception:
-                pass
+        return await self._payloads.text_pages(asset)
 
     async def augment(self, asset: Any) -> Any:
         """Enrich one asset. Never raises: failure degrades to a warning."""
@@ -718,13 +584,4 @@ class AugmentationSession:
 
     def evict(self, asset: Any) -> None:
         """Drop one asset's payload memo. Called alongside evict_asset_cache."""
-        self._memo.pop(str(getattr(asset, "hash", "") or ""), None)
-        forget = getattr(self._source, "forget_augmentation_bytes", None)
-        if not callable(forget):
-            return
-        # The bytes were mirrored under every candidate id; drop them all.
-        for candidate in self._candidates(asset):
-            try:
-                forget(candidate)
-            except Exception:
-                pass
+        self._payloads.evict(asset)

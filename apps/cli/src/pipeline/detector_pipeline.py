@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ..detectors.base import BaseDetector
+from ..detectors.custom.runners._custom_detector import CustomDetectorRunner
 from ..detectors.custom.runners._tag import TagRunner
 from ..models.generated_single_asset_scan_results import (
     AssetType as OutputAssetType,
@@ -386,6 +387,19 @@ class DetectorPipeline:
             detector_types_run,
             tag_detector_types_run,
         )
+
+        # Code detectors run last, once per asset: a rule with needs_findings
+        # judges what every other detector found here, and none of them sees
+        # another code detector's findings (no ordering between rules).
+        code_findings, code_warnings, code_types_run = await self._apply_custom_detectors(
+            asset=asset,
+            detectors=active_detectors,
+            prior_findings=list(findings),
+            outcome_sink=outcome_sink,
+        )
+        findings.extend(code_findings)
+        scan_warnings.extend(code_warnings)
+        detector_types_run = self._merge_detector_types(detector_types_run, code_types_run)
 
         scan_duration = int((datetime.now(UTC) - scan_started).total_seconds() * 1000)
 
@@ -1229,6 +1243,113 @@ class DetectorPipeline:
                     types_run = self._merge_detector_types(types_run, [DetectorType.CUSTOM])
 
         return findings, warnings, types_run
+
+    async def _apply_custom_detectors(
+        self,
+        *,
+        asset: SingleAssetScanResults,
+        detectors: list[BaseDetector],
+        prior_findings: list[DetectionResult],
+        outcome_sink: dict[tuple[DetectorType, str | None], DetectorOutcome] | None,
+    ) -> tuple[list[DetectionResult], list[str], list[DetectorType]]:
+        """Run every code detector (``CUSTOM_DETECTOR``) on this asset.
+
+        Scope was already applied to ``detectors`` by kind and metadata; the
+        content-type part is checked here against the asset's declared MIME
+        type, and only when it has one -- a rule is never skipped because a
+        source did not say what its payload was.
+
+        A detect() that returns records an OK outcome whether or not it
+        yielded anything, which is what lets a finding the rule no longer
+        yields resolve (GENESIS P4). Any failure records ERROR instead, so a
+        broken rule never resolves what it found before.
+        """
+        runners = self._custom_detector_runners(detectors)
+        if not runners:
+            return [], [], []
+
+        findings: list[DetectionResult] = []
+        warnings: list[str] = []
+        types_run: list[DetectorType] = []
+        mime = self._asset_declared_mime(asset)
+
+        for detector, runner in runners:
+            label = self._detector_log_label(detector)
+            if mime and not _detector_covers_content_type(detector, mime):
+                continue
+            breaker_key = self._breaker_key_or_default(detector)
+            # The gate covers the check and the record, not the call: a rule
+            # with max_workers > 1 must be able to judge assets concurrently.
+            async with self._breaker.first_contact(breaker_key):
+                skipped = self._breaker.skip_message(breaker_key)
+            if skipped:
+                self._record_outcome(outcome_sink, detector, skipped)
+                continue
+            outcome = await runner.session(self.source).detect(asset, prior_findings)
+            error = RuntimeError(outcome.error) if outcome.error else None
+            async with self._breaker.first_contact(breaker_key):
+                tripped = self._breaker.record(
+                    breaker_key, detector, label, error=error, elapsed_ms=outcome.elapsed_ms
+                )
+            warnings.extend(outcome.warnings)
+            types_run = self._merge_detector_types(types_run, [DetectorType.CUSTOM])
+            if outcome.error:
+                message = f"{label} failed on {asset.name}: {outcome.error}"
+                logger.warning(message)
+                warnings.append(message)
+                self._record_outcome(outcome_sink, detector, f"{label}: {outcome.error}")
+            else:
+                for finding in outcome.findings:
+                    self.content_provider.enrich_finding_location(finding, asset, "")
+                findings.extend(outcome.findings)
+                self._record_outcome(outcome_sink, detector, None)
+            if tripped:
+                logger.warning(
+                    "Detector %s disabled for the rest of this run: %s. Later assets "
+                    "record an ERROR outcome for it and are retried next run.",
+                    label,
+                    tripped,
+                )
+        return findings, warnings, types_run
+
+    @staticmethod
+    def _asset_declared_mime(asset: Any) -> str | None:
+        metadata = getattr(asset, "metadata", None)
+        if isinstance(metadata, dict):
+            for key in ("mime_type", "content_type", "mimeType"):
+                value = metadata.get(key)
+                if isinstance(value, str) and "/" in value:
+                    return value
+        return None
+
+    @staticmethod
+    def _custom_detector_runners(
+        detectors: list[BaseDetector],
+    ) -> list[tuple[BaseDetector, CustomDetectorRunner]]:
+        """Code detectors in this run, in recipe order."""
+        found: list[tuple[BaseDetector, CustomDetectorRunner]] = []
+        for detector in detectors:
+            runner = getattr(detector, "runner", None)
+            if isinstance(runner, CustomDetectorRunner):
+                found.append((detector, runner))
+        return found
+
+    def custom_detector_summaries(self) -> list[dict[str, Any]]:
+        """Per code detector counters, for the run log."""
+        summaries: list[dict[str, Any]] = []
+        for _detector, runner in self._custom_detector_runners(self.detectors):
+            session = getattr(runner, "_session", None)
+            if session is not None:
+                summaries.append(session.summary())
+        return summaries
+
+    def close(self) -> None:
+        """Stop every code detector's child processes."""
+        for _detector, runner in self._custom_detector_runners(self.detectors):
+            try:
+                runner.close()
+            except Exception as exc:  # pragma: no cover - best effort
+                logger.debug("Closing code detector failed: %s", exc)
 
     def _asset_tag_severities(self, asset_hash: str) -> dict[str, str]:
         """Per-tag severities this source asked for, or nothing.

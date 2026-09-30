@@ -1469,6 +1469,242 @@ class TagPipelineSchema(BaseModel):
     )
 
 
+class Type9(StrEnum):
+    code = 'code'
+    markdown = 'markdown'
+
+
+class DetectorNotebookCell(BaseModel):
+    """
+    One notebook cell: Python (`code`) or prose (`markdown`). Code must remain valid standard Python -- IPython magics are rejected.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: str = Field(
+        ...,
+        description='Stable cell identifier, unique within the notebook',
+        pattern='^[A-Za-z0-9_-]{1,64}$',
+    )
+    type: Type9
+    source: str = Field(..., max_length=100000)
+
+
+class DetectorNotebook(BaseModel):
+    """
+    The rule's code. Cells run in document order in one fresh child process per scan. The assembled code cells must define detect(asset, ctx); setup(ctx) is optional and runs once before the first asset.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    revision: int | None = Field(
+        1,
+        description='Monotonic revision, bumped on every save that changes a cell. An execution names the revision it ran.',
+        ge=1,
+    )
+    cells: list[DetectorNotebookCell] = Field(
+        ...,
+        description='Ordered notebook cells. Capped at 50: every attached detector travels inside the scan recipe, which has a 128 KB budget.',
+        max_length=50,
+        min_length=1,
+    )
+
+
+class DetectorNotebookPackage(BaseModel):
+    """
+    A Python distribution installed (once per scan, with uv) before the rule runs.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(
+        ...,
+        description="Distribution name as published on the index (for example 'rapidfuzz').",
+        pattern='^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$',
+    )
+    version: str | None = Field(
+        None,
+        description='Optional version or specifier. Empty means latest.',
+        max_length=64,
+        pattern='^$|^(==|>=|<=|~=|!=|>|<).+$|^[0-9][A-Za-z0-9._*+!-]*$',
+    )
+
+
+class Type10(StrEnum):
+    string = 'string'
+    number = 'number'
+    boolean = 'boolean'
+    date = 'date'
+    list_string_ = 'list[string]'
+    list_number_ = 'list[number]'
+
+
+class DetectorOutputField(BaseModel):
+    """
+    One typed output field a detector writes into extracted_data (contract C3). Shared by code detectors and, later, LLM extraction.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(
+        ...,
+        description='Field name; a key in Finding(fields={...}) and in extracted_data.',
+        pattern='^[A-Za-z_][A-Za-z0-9_]{0,63}$',
+    )
+    type: Type10 | None = 'string'
+    description: str | None = Field('', max_length=1000)
+
+
+class CustomDetectorLimits(BaseModel):
+    """
+    Per-run limits for a code detector. Every limit is contained: exceeding one costs that asset (an ERROR outcome, existing findings kept), never the scan.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    per_asset_timeout_seconds: int | None = Field(
+        30,
+        description='Wall-clock budget for one detect(asset, ctx) call. The child is restarted after a timeout.',
+        ge=1,
+        le=3600,
+    )
+    setup_timeout_seconds: int | None = Field(
+        900,
+        description='Budget for package installation plus setup(ctx).',
+        ge=1,
+        le=3600,
+    )
+    max_findings_per_asset: int | None = Field(
+        200,
+        description='Findings beyond this are dropped with a warning.',
+        ge=1,
+        le=10000,
+    )
+    max_output_bytes: int | None = Field(
+        2097152,
+        description="Serialized size of one asset's findings; larger output is rejected as malformed.",
+        ge=1024,
+        le=67108864,
+    )
+    max_payload_bytes: int | None = Field(
+        33554432,
+        description="How much of an asset's payload asset.payload()/text()/raw_pages() may carry.",
+        ge=1024,
+    )
+    max_workers: int | None = Field(
+        1,
+        description='Child processes running detect() concurrently. Each runs setup() and keeps its own ctx.state.',
+        ge=1,
+        le=8,
+    )
+    max_consecutive_failures: int | None = Field(
+        10,
+        description='Disable the rule for the rest of the run after this many consecutive failed assets.',
+        ge=1,
+        le=10000,
+    )
+
+
+class CustomDetectorFileRuntime(BaseModel):
+    """
+    Runtime-only: one uploaded detector file, injected by the server at dispatch. Clients never send it.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: str
+    name: str
+    content_hash: str
+    size_bytes: int | None = None
+    url: str | None = Field(
+        None, description='Where the scan downloads the bytes from.'
+    )
+
+
+class Type11(StrEnum):
+    CUSTOM_DETECTOR = 'CUSTOM_DETECTOR'
+
+
+class Severity3(StrEnum):
+    """
+    Severity CEILING. A Finding may ask for less; a request for more is clamped and recorded as metadata.severity_requested.
+    """
+
+    critical = 'critical'
+    high = 'high'
+    medium = 'medium'
+    low = 'low'
+    info = 'info'
+
+
+class CustomDetectorPipelineSchema(BaseModel):
+    """
+    A code detector: a Python notebook that defines detect(asset, ctx) and yields Finding(...) objects. It runs once per asset in the scan's detector stage, after every other detector, and can read the asset's text, pages, raw bytes, rows and metadata (and, with needs_findings, the findings other detectors produced on the same asset in this run). It judges; it never rewrites what the connector extracted. Use it for checks and rules a pattern or a model cannot express: totals that must add up, list screening, co-occurrence rules, checksummed identifiers, bring-your-own model scoring.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['CUSTOM_DETECTOR'] = 'CUSTOM_DETECTOR'
+    notebook: DetectorNotebook
+    packages: list[DetectorNotebookPackage] | None = Field(
+        None,
+        description='Extra Python distributions installed once per scan before setup().',
+        max_length=50,
+    )
+    variables: dict[str, str] | None = Field(
+        None, description='Non-secret settings, read with ctx.var(name).', max_length=64
+    )
+    secrets: dict[str, str] | None = Field(
+        None,
+        description='Credentials, read with ctx.secret(name). Write-only over the API, encrypted at rest, decrypted only into the child process, redacted from every log.',
+        max_length=64,
+    )
+    fields: list[DetectorOutputField] | None = Field(
+        None,
+        description='Declared output fields. Keys in Finding(fields=...) that are not declared here are dropped with one warning per run.',
+        max_length=50,
+    )
+    severity: Severity3 | None = Field(
+        Severity3.medium,
+        description='Severity CEILING. A Finding may ask for less; a request for more is clamped and recorded as metadata.severity_requested.',
+    )
+    category: DetectorCategory | None = Field(
+        DetectorCategory.QUALITY, description='Category every finding of this detector carries.'
+    )
+    deterministic: bool | None = Field(
+        True,
+        description='False when the verdict depends on something outside the asset (a live list, the clock, the network). Non-deterministic detectors never use the scan cache.',
+    )
+    needs_findings: bool | None = Field(
+        False,
+        description="Expose asset.findings: what the other detectors found on this asset in this run. Code detectors never see each other's findings.",
+    )
+    limits: CustomDetectorLimits | None = None
+    scope: DetectorScope | None = Field(
+        None,
+        description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
+    )
+    budget: DetectorBudget | None = Field(
+        None,
+        description='Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures.',
+    )
+    files_runtime: list[CustomDetectorFileRuntime] | None = Field(
+        None,
+        description="Runtime-only: the detector's uploaded files, injected by the server at dispatch. Rejected on create/update.",
+    )
+    custom_detector_id: str | None = Field(
+        None,
+        description="Runtime-only: the detector's database id, injected by the server at dispatch.",
+    )
+
+
 class CustomDetectorConfig(DetectorConfig):
     """
     Configuration for user-defined detector execution
@@ -1495,6 +1731,7 @@ class CustomDetectorConfig(DetectorConfig):
         | ImageClassificationPipelineSchema
         | ObjectDetectionPipelineSchema
         | TagPipelineSchema
+        | CustomDetectorPipelineSchema
         | None
     ) = Field(None, discriminator='type', title='AnyPipelineSchema')
     max_findings: int | None = Field(

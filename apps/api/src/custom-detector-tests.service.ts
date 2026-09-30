@@ -22,6 +22,12 @@ import {
   resolveInternalApiBaseUrl,
 } from './internal-api-url';
 import {
+  compareFindingsOutcome,
+  isFindingsExpectation,
+} from './custom-detector-tests.findings-comparator';
+import { isCodeDetectorSchema } from './custom-detector-code';
+import {
+  type AssetFixture,
   createTestScenarioSchema,
   type RunTestsResponseDto,
   type TestResultDto,
@@ -30,6 +36,24 @@ import {
 } from './dto/custom-detector-tests.dto';
 
 const execAsync = promisify(exec);
+
+/** The extension evaluate-file recognises an asset fixture by. */
+const ASSET_FIXTURE_EXTENSION = '.classifyre-asset.json';
+
+function fixtureText(fixture: AssetFixture | undefined): string {
+  if (!fixture) return '';
+  if (typeof fixture.text === 'string') return fixture.text.slice(0, 50_000);
+  if (Array.isArray(fixture.pages))
+    return fixture.pages.join('\n').slice(0, 50_000);
+  if (Array.isArray(fixture.rows)) {
+    return fixture.rows
+      .slice(0, 50)
+      .map((row) => JSON.stringify(row))
+      .join('\n')
+      .slice(0, 50_000);
+  }
+  return fixture.name;
+}
 const MAX_AD_HOC_SAMPLES = 4;
 const MAX_REMOTE_SAMPLE_BYTES = 25 * 1024 * 1024;
 
@@ -91,7 +115,9 @@ export class CustomDetectorTestsService {
         detectorId,
         name: dto.name,
         description: dto.description,
-        inputText: dto.inputText,
+        // For a fixture, the text column keeps something a list can show.
+        inputText: dto.inputText ?? fixtureText(dto.inputAsset),
+        inputAsset: (dto.inputAsset ?? undefined) as any,
         expectedOutcome: dto.expectedOutcome as any,
       },
       include: { results: { take: 0 } },
@@ -118,12 +144,16 @@ export class CustomDetectorTestsService {
   ): Promise<string> {
     const scenario = await this.prisma.customDetectorTestScenario.findFirst({
       where: { id: scenarioId, detectorId },
-      select: { inputText: true },
+      select: { inputText: true, inputAsset: true },
     });
     if (!scenario) {
       throw new NotFoundException(`Test scenario ${scenarioId} not found`);
     }
-    return scenario.inputText;
+    // An asset fixture travels as its JSON; the evaluation job recognises it
+    // by the `.classifyre-asset.json` extension it is dispatched with.
+    return scenario.inputAsset
+      ? JSON.stringify(scenario.inputAsset)
+      : scenario.inputText;
   }
 
   // ── Run ───────────────────────────────────────────────────────────────────
@@ -244,28 +274,39 @@ export class CustomDetectorTestsService {
       aiProviderConfigId: string | null;
       version: number;
     },
-    scenario: { id: string; inputText: string; expectedOutcome: unknown },
+    scenario: {
+      id: string;
+      inputText: string;
+      inputAsset?: unknown;
+      expectedOutcome: unknown;
+    },
     triggeredBy: TestTrigger,
   ) {
     const start = Date.now();
 
     try {
-      // LLM detectors need resolved provider credentials injected before
-      // dispatch — the same step the real scan path performs. Without it the
-      // CLI drops the detector and reports zero findings with no error.
+      // Everything a scan injects at dispatch -- LLM provider credentials, a
+      // code detector's decrypted secrets and file manifest -- is injected
+      // here too. Without it the CLI drops an LLM detector and reports zero
+      // findings with no error, and a code detector cannot open its files.
       const pipelineSchema =
-        await this.customDetectorsService.injectLlmProviderRuntime(
-          detector.pipelineSchema as Record<string, unknown>,
-          detector.aiProviderConfigId,
+        await this.customDetectorsService.prepareRuntimePipelineSchema(
+          detector,
+          { filesBaseUrl: this.namespaceApiBaseUrl() },
         );
+      const fixture =
+        scenario.inputAsset && typeof scenario.inputAsset === 'object'
+          ? (scenario.inputAsset as AssetFixture)
+          : null;
       const actualOutput = await this.evaluateViaCli(
         {
           key: detector.key,
           name: detector.name,
           pipelineSchema,
         },
-        scenario.inputText,
+        fixture ? JSON.stringify(fixture) : scenario.inputText,
         { detectorId: detector.id, scenarioId: scenario.id },
+        fixture ? ASSET_FIXTURE_EXTENSION : '.txt',
       );
 
       const expected = scenario.expectedOutcome as Record<string, unknown>;
@@ -322,6 +363,7 @@ export class CustomDetectorTestsService {
     },
     inputText: string,
     scenario?: { detectorId: string; scenarioId: string },
+    fileExtension = '.txt',
   ): Promise<Record<string, unknown>> {
     const runId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -350,7 +392,7 @@ export class CustomDetectorTestsService {
       const result = await this.kubernetesCliJobService.runFileEvaluationJob({
         evaluationId: scenario.scenarioId,
         inputUrl,
-        fileExtension: '.txt',
+        fileExtension,
         detectors: [detectorEntry],
       });
       if (result.exitCode !== 0) {
@@ -362,7 +404,10 @@ export class CustomDetectorTestsService {
     } else {
       // Local mode: write temp files and run CLI subprocess directly.
       const tmpDir = process.env.TEMP_DIR || os.tmpdir();
-      const textFile = path.join(tmpDir, `detector-test-${runId}.txt`);
+      const textFile = path.join(
+        tmpDir,
+        `detector-test-${runId}${fileExtension}`,
+      );
       const detectorsFile = path.join(
         tmpDir,
         `detector-test-${runId}-detectors.json`,
@@ -709,8 +754,19 @@ export class CustomDetectorTestsService {
     actual: Record<string, unknown>,
   ): { status: 'PASS' | 'FAIL'; explanation: string | null } {
     const schemaType = (pipelineSchema.type as string | undefined) ?? '';
-    const expected = normalizeExpectedOutcome(rawExpected);
     const findings = Array.isArray(actual.findings) ? actual.findings : [];
+
+    // A code detector reports a list of labelled findings; its scenarios say
+    // which ones (and, via identity, which rows) must be there.
+    // An explicit findings list reads the same for every engine.
+    if (
+      Array.isArray(rawExpected.findings) ||
+      (isCodeDetectorSchema(pipelineSchema) &&
+        isFindingsExpectation(rawExpected))
+    ) {
+      return compareFindingsOutcome(rawExpected, findings);
+    }
+    const expected = normalizeExpectedOutcome(rawExpected);
 
     if (schemaType === 'REGEX') {
       const shouldMatch = Boolean(expected.shouldMatch);
@@ -840,6 +896,15 @@ export class CustomDetectorTestsService {
     };
   }
 
+  /** The namespaced API base a CLI job downloads detector files from. */
+  private namespaceApiBaseUrl(): string {
+    const environment = process.env.ENVIRONMENT || 'development';
+    return buildNamespaceApiBaseUrl(
+      resolveInternalApiBaseUrl(environment),
+      this.cls?.get<string>(CLS_NAMESPACE_ID),
+    );
+  }
+
   private async assertDetectorExists(detectorId: string): Promise<void> {
     const exists = await this.prisma.customDetector.findUnique({
       where: { id: detectorId },
@@ -856,6 +921,7 @@ export class CustomDetectorTestsService {
     name: string;
     description?: string | null;
     inputText: string;
+    inputAsset?: unknown;
     expectedOutcome: unknown;
     createdAt: Date;
     updatedAt: Date;
@@ -878,6 +944,7 @@ export class CustomDetectorTestsService {
       name: row.name,
       description: row.description,
       inputText: row.inputText,
+      inputAsset: (row.inputAsset as AssetFixture | null | undefined) ?? null,
       expectedOutcome: row.expectedOutcome as Record<string, unknown>,
       lastResult: lastResult ? this.toResultDto(lastResult) : null,
       createdAt: row.createdAt.toISOString(),

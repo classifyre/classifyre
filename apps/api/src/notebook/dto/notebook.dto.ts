@@ -134,6 +134,62 @@ export const NOTEBOOK_EXECUTION_MODES = [
 
 export const NOTEBOOK_SCOPES = ['connector', 'augmentation'] as const;
 
+/** Modes a code detector's notebook can be executed in. */
+export const DETECTOR_NOTEBOOK_EXECUTION_MODES = [
+  'cell',
+  'all',
+  'preview_detect',
+] as const;
+
+export class CreateDetectorNotebookExecutionDto {
+  @ApiProperty({
+    description:
+      'The detector notebook revision to execute (pipelineSchema.notebook.revision). Save first: an execution runs the stored revision, never unsaved edits.',
+  })
+  @IsInt()
+  @Min(1)
+  revision!: number;
+
+  @ApiProperty({
+    enum: DETECTOR_NOTEBOOK_EXECUTION_MODES,
+    description:
+      '"cell" runs one cell (targetCellId), "all" replays every cell, "preview_detect" runs setup()/detect() on a real asset of `sourceId` (or on a small sample of it) and reports the findings without recording anything.',
+  })
+  @IsIn(DETECTOR_NOTEBOOK_EXECUTION_MODES)
+  mode!: (typeof DETECTOR_NOTEBOOK_EXECUTION_MODES)[number];
+
+  @ApiPropertyOptional({ description: 'Required when mode is "cell"' })
+  @IsOptional()
+  @IsString()
+  @Matches(CELL_ID_PATTERN)
+  targetCellId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'preview_detect: the source whose assets the detector judges. Required.',
+  })
+  @IsOptional()
+  @IsString()
+  sourceId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'preview_detect: one asset of that source to judge. Omit to sample a few of its assets instead.',
+  })
+  @IsOptional()
+  @IsString()
+  assetId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'preview_detect without assetId: how many assets to sample (1-10).',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxAssets?: number;
+}
+
 export class CreateNotebookExecutionDto {
   @ApiPropertyOptional({
     description:
@@ -194,25 +250,45 @@ export class NotebookExecutionDto {
   @ApiProperty()
   id!: string;
 
-  @ApiProperty()
-  sourceId!: string;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description:
+      "Null for a code detector's cell/all runs, which need no source.",
+  })
+  sourceId!: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    description: 'Set when the execution ran a code detector notebook.',
+  })
+  customDetectorId?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    description: 'preview_detect: the asset the detector was run on.',
+  })
+  assetId?: string | null;
 
   @ApiProperty()
   revision!: number;
 
   @ApiProperty({
     enum: [
-      'CELL',
-      'ALL',
-      'TEST_CONNECTION',
-      'PREVIEW_EXTRACT',
-      'PREVIEW_AUGMENT',
+      'cell',
+      'all',
+      'test_connection',
+      'preview_extract',
+      'preview_augment',
+      'preview_detect',
     ],
   })
   mode!: string;
 
   @ApiPropertyOptional({
-    enum: ['CONNECTOR', 'AUGMENTATION'],
+    enum: ['connector', 'augmentation', 'detector'],
     description: 'Which notebook this execution ran.',
   })
   scope?: string;

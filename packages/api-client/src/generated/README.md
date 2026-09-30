@@ -203,10 +203,13 @@ All URIs are relative to *http://localhost*
 *CustomDetectorsApi* | [**customDetectorsControllerClearTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollercleartrainingexamples) | **DELETE** /custom-detectors/{id}/training-examples | Delete all training examples for a detector
 *CustomDetectorsApi* | [**customDetectorsControllerCreate**](docs/CustomDetectorsApi.md#customdetectorscontrollercreate) | **POST** /custom-detectors | Create custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerDelete**](docs/CustomDetectorsApi.md#customdetectorscontrollerdelete) | **DELETE** /custom-detectors/{id} | Delete custom detector
+*CustomDetectorsApi* | [**customDetectorsControllerDeleteFile**](docs/CustomDetectorsApi.md#customdetectorscontrollerdeletefile) | **DELETE** /custom-detectors/{id}/files/{fileId} | Delete a code detector file
 *CustomDetectorsApi* | [**customDetectorsControllerDeleteTrainingExample**](docs/CustomDetectorsApi.md#customdetectorscontrollerdeletetrainingexample) | **DELETE** /custom-detectors/{id}/training-examples/{exampleId} | Delete a single training example
+*CustomDetectorsApi* | [**customDetectorsControllerFileContent**](docs/CustomDetectorsApi.md#customdetectorscontrollerfilecontent) | **GET** /custom-detectors/{id}/files/{fileId}/content | Stream a code detector file\&#39;s bytes
 *CustomDetectorsApi* | [**customDetectorsControllerGetById**](docs/CustomDetectorsApi.md#customdetectorscontrollergetbyid) | **GET** /custom-detectors/{id} | Get custom detector by ID
 *CustomDetectorsApi* | [**customDetectorsControllerList**](docs/CustomDetectorsApi.md#customdetectorscontrollerlist) | **GET** /custom-detectors | List custom detectors
 *CustomDetectorsApi* | [**customDetectorsControllerListExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerlistexamples) | **GET** /custom-detectors/examples | List custom detector starter examples
+*CustomDetectorsApi* | [**customDetectorsControllerListFiles**](docs/CustomDetectorsApi.md#customdetectorscontrollerlistfiles) | **GET** /custom-detectors/{id}/files | List a code detector\&#39;s uploaded files
 *CustomDetectorsApi* | [**customDetectorsControllerListTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerlisttrainingexamples) | **GET** /custom-detectors/{id}/training-examples | List stored training examples for a detector
 *CustomDetectorsApi* | [**customDetectorsControllerParseTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerparsetrainingexamples) | **POST** /custom-detectors/training-examples/parse | Parse uploaded training examples file
 *CustomDetectorsApi* | [**customDetectorsControllerRetireOutOfScopeFindings**](docs/CustomDetectorsApi.md#customdetectorscontrollerretireoutofscopefindings) | **POST** /custom-detectors/{id}/retire-out-of-scope-findings | Retire findings this detector can no longer produce
@@ -215,6 +218,7 @@ All URIs are relative to *http://localhost*
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingExamplesStats**](docs/CustomDetectorsApi.md#customdetectorscontrollertrainingexamplesstats) | **GET** /custom-detectors/{id}/training-examples/stats | Get training example counts grouped by label
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingHistory**](docs/CustomDetectorsApi.md#customdetectorscontrollertraininghistory) | **GET** /custom-detectors/{id}/training-history | List training history for custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUpdate**](docs/CustomDetectorsApi.md#customdetectorscontrollerupdate) | **PATCH** /custom-detectors/{id} | Update custom detector
+*CustomDetectorsApi* | [**customDetectorsControllerUploadFile**](docs/CustomDetectorsApi.md#customdetectorscontrolleruploadfile) | **POST** /custom-detectors/{id}/files | Upload one file to a code detector
 *DataTransferApi* | [**dataTransferControllerCancel**](docs/DataTransferApi.md#datatransfercontrollercancel) | **POST** /data-transfer/jobs/{id}/cancel | Ask a running transfer to stop
 *DataTransferApi* | [**dataTransferControllerDownload**](docs/DataTransferApi.md#datatransfercontrollerdownload) | **GET** /data-transfer/exports/{id}/download | Download a completed export archive
 *DataTransferApi* | [**dataTransferControllerJob**](docs/DataTransferApi.md#datatransfercontrollerjob) | **GET** /data-transfer/jobs/{id} | Poll one transfer job for progress
@@ -302,10 +306,12 @@ All URIs are relative to *http://localhost*
 *NamespacesApi* | [**namespacesControllerUpdate**](docs/NamespacesApi.md#namespacescontrollerupdate) | **PATCH** /namespaces/{id} | Update a namespace
 *NamespacesApi* | [**namespacesControllerUpdateCategory**](docs/NamespacesApi.md#namespacescontrollerupdatecategory) | **PATCH** /namespaces/categories/{categoryId} | Rename or re-describe a workspace category
 *NotebooksApi* | [**notebookControllerCancel**](docs/NotebooksApi.md#notebookcontrollercancel) | **POST** /notebook/executions/{executionId}/cancel | Stop a running execution
+*NotebooksApi* | [**notebookControllerCreateDetectorExecution**](docs/NotebooksApi.md#notebookcontrollercreatedetectorexecution) | **POST** /custom-detectors/{detectorId}/notebook/executions | Run a code detector\&#39;s notebook
 *NotebooksApi* | [**notebookControllerCreateExecution**](docs/NotebooksApi.md#notebookcontrollercreateexecution) | **POST** /sources/{sourceId}/notebook/executions | Start a notebook execution
 *NotebooksApi* | [**notebookControllerExportPython**](docs/NotebooksApi.md#notebookcontrollerexportpython) | **GET** /sources/{sourceId}/notebook/export | The notebook as an ordinary Python module
 *NotebooksApi* | [**notebookControllerGet**](docs/NotebooksApi.md#notebookcontrollerget) | **GET** /sources/{sourceId}/notebook | Read a source\&#39;s notebook
 *NotebooksApi* | [**notebookControllerGetExecution**](docs/NotebooksApi.md#notebookcontrollergetexecution) | **GET** /notebook/executions/{executionId} | Poll one execution
+*NotebooksApi* | [**notebookControllerListDetectorExecutions**](docs/NotebooksApi.md#notebookcontrollerlistdetectorexecutions) | **GET** /custom-detectors/{detectorId}/notebook/executions | Recent executions of a code detector\&#39;s notebook
 *NotebooksApi* | [**notebookControllerListExecutions**](docs/NotebooksApi.md#notebookcontrollerlistexecutions) | **GET** /sources/{sourceId}/notebook/executions | Recent executions for a source
 *NotebooksApi* | [**notebookControllerScaffold**](docs/NotebooksApi.md#notebookcontrollerscaffold) | **GET** /notebooks/scaffold | The starter cells and the functions a notebook must define
 *NotebooksApi* | [**notebookControllerTemplates**](docs/NotebooksApi.md#notebookcontrollertemplates) | **GET** /notebooks/templates | Worked notebooks an author can start from or borrow cells out of
@@ -550,6 +556,7 @@ All URIs are relative to *http://localhost*
 - [CreateCaseEventDto](docs/CreateCaseEventDto.md)
 - [CreateChatBotDto](docs/CreateChatBotDto.md)
 - [CreateCustomDetectorDto](docs/CreateCustomDetectorDto.md)
+- [CreateDetectorNotebookExecutionDto](docs/CreateDetectorNotebookExecutionDto.md)
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
 - [CreateInquiryDto](docs/CreateInquiryDto.md)
@@ -561,6 +568,7 @@ All URIs are relative to *http://localhost*
 - [CreateSupervisorGoalDto](docs/CreateSupervisorGoalDto.md)
 - [CreateThreadDto](docs/CreateThreadDto.md)
 - [CustomDetectorExampleDto](docs/CustomDetectorExampleDto.md)
+- [CustomDetectorFileDto](docs/CustomDetectorFileDto.md)
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
 - [CustomDetectorResponseDtoSourcesUsingInner](docs/CustomDetectorResponseDtoSourcesUsingInner.md)
 - [CustomDetectorTrainingRunDto](docs/CustomDetectorTrainingRunDto.md)
