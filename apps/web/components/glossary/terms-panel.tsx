@@ -462,7 +462,9 @@ export function TermsPanel({
                             {code}
                           </Badge>
                         ))}
-                        {term.aliases.map((alias) => (
+                        {term.aliases
+                          .filter((alias) => !term.codes.includes(alias))
+                          .map((alias) => (
                           <Badge
                             key={`alias-${alias}`}
                             variant="outline"

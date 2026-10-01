@@ -192,7 +192,7 @@ export default function GlossaryTermPage() {
         <div className="min-w-0 space-y-2">
           {term.broaderChain[0]?.length ? (
             <nav aria-label={t("glossary.term.broaderPath")} className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-              {[...term.broaderChain[0]].reverse().map((entry) => (
+              {term.broaderChain[0].map((entry) => (
                 <React.Fragment key={entry.id}>
                   <TermLink termKey={entry.key} className="font-normal">
                     {entry.term}
