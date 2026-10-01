@@ -11,6 +11,11 @@ import { InquiryTimelineResponseDto } from './dto/inquiry-activity.dto';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 import { InquiryMatchers } from './matching/inquiry-matcher';
 import {
+  assertKnownTermKeys,
+  ensureTermSnapshot,
+  resolveTermKeys,
+} from './semantic/term-snapshot';
+import {
   CreateInquiryDto,
   MatchOptionsResponseDto,
   PreviewInquiryDto,
@@ -33,7 +38,9 @@ function touchesMatchers(dto: InquiryMatchersDto): boolean {
     dto.customDetectorKeys !== undefined ||
     dto.findingTypes !== undefined ||
     dto.findingTypeRegex !== undefined ||
-    dto.findingValueRegex !== undefined
+    dto.findingValueRegex !== undefined ||
+    dto.termKeys !== undefined ||
+    dto.termsIncludeNarrower !== undefined
   );
 }
 
@@ -115,8 +122,16 @@ export class InquiriesService {
     },
   } satisfies Prisma.InquiryInclude;
 
+  /** Unknown term keys are rejected, never dropped (SL3 R7.6). */
+  private async assertValidTermKeys(dto: InquiryMatchersDto): Promise<void> {
+    if (!dto.termKeys?.length) return;
+    const snapshot = await ensureTermSnapshot(this.prisma);
+    assertKnownTermKeys(resolveTermKeys(snapshot, dto.termKeys, false).unknown);
+  }
+
   async create(dto: CreateInquiryDto): Promise<InquiryResponseDto> {
     assertValidRegexAll(dto);
+    await this.assertValidTermKeys(dto);
 
     const created = await this.prisma.inquiry.create({
       data: {
@@ -187,6 +202,7 @@ export class InquiriesService {
     const before = await this.prisma.inquiry.findUnique({ where: { id } });
     if (!before) throw new NotFoundException(`Inquiry ${id} not found`);
     assertValidRegexAll(dto);
+    await this.assertValidTermKeys(dto);
 
     const after = await this.prisma.inquiry.update({
       where: { id },
@@ -230,6 +246,8 @@ export class InquiriesService {
     findingTypes: string[];
     findingTypeRegex: string[];
     findingValueRegex: string[];
+    termKeys: string[];
+    termsIncludeNarrower: boolean;
   }): Record<string, unknown> {
     return {
       matchAllSources: row.matchAllSources,
@@ -239,6 +257,8 @@ export class InquiriesService {
       findingTypes: row.findingTypes,
       findingTypeRegex: row.findingTypeRegex,
       findingValueRegex: row.findingValueRegex,
+      termKeys: row.termKeys,
+      termsIncludeNarrower: row.termsIncludeNarrower,
     };
   }
 
@@ -305,6 +325,7 @@ export class InquiriesService {
   /** Preview what a matcher config currently selects, before saving. */
   async preview(dto: PreviewInquiryDto): Promise<PreviewResponseDto> {
     assertValidRegexAll(dto);
+    await this.assertValidTermKeys(dto);
     return this.matching.preview(this.toMatchers(dto));
   }
 
@@ -448,6 +469,8 @@ export class InquiriesService {
     findingTypes?: string[];
     findingTypeRegex?: string[];
     findingValueRegex?: string[];
+    termKeys?: string[];
+    termsIncludeNarrower?: boolean;
   } {
     return {
       matchAllSources: dto.matchAllSources,
@@ -457,6 +480,8 @@ export class InquiriesService {
       findingTypes: dto.findingTypes,
       findingTypeRegex: dto.findingTypeRegex,
       findingValueRegex: dto.findingValueRegex,
+      termKeys: dto.termKeys?.map((key) => key.trim().toLowerCase()),
+      termsIncludeNarrower: dto.termsIncludeNarrower,
     };
   }
 
@@ -469,6 +494,8 @@ export class InquiriesService {
       findingTypes: dto.findingTypes ?? [],
       findingTypeRegex: dto.findingTypeRegex ?? [],
       findingValueRegex: dto.findingValueRegex ?? [],
+      termKeys: dto.termKeys ?? [],
+      termsIncludeNarrower: dto.termsIncludeNarrower ?? false,
     };
   }
 
@@ -502,6 +529,8 @@ export class InquiriesService {
       findingTypes: row.findingTypes,
       findingTypeRegex: row.findingTypeRegex,
       findingValueRegex: row.findingValueRegex,
+      termKeys: row.termKeys,
+      termsIncludeNarrower: row.termsIncludeNarrower,
       matchCount: row.matchCount,
       newMatchCount: row.newMatchCount,
       goneMatchCount: row.goneMatchCount,

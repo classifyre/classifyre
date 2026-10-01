@@ -20,7 +20,12 @@ const MAX_FIELDS_PER_SOURCE = 200;
 const STATEMENT_TIMEOUT_MS = 30_000;
 /** Keys the platform writes itself, never vocabulary (SL2 §5.2). */
 const PLATFORM_FIELDS = new Set(['content_reference']);
-const CATEGORICAL_PIPELINES = new Set(['TAG', 'LLM', 'TEXT_CLASSIFICATION', 'IMAGE_CLASSIFICATION']);
+const CATEGORICAL_PIPELINES = new Set([
+  'TAG',
+  'LLM',
+  'TEXT_CLASSIFICATION',
+  'IMAGE_CLASSIFICATION',
+]);
 
 export type TopValue = { value: string; count: number };
 
@@ -29,7 +34,10 @@ export function categoricalByRunner(
   findingType: string,
   pipelineType: string | null | undefined,
 ): boolean {
-  if (findingType.startsWith('tag:') || findingType.startsWith('classification:')) {
+  if (
+    findingType.startsWith('tag:') ||
+    findingType.startsWith('classification:')
+  ) {
     return true;
   }
   return Boolean(pipelineType && CATEGORICAL_PIPELINES.has(pipelineType));
@@ -93,7 +101,9 @@ export class VocabularyService {
     return { sources: sources.length };
   }
 
-  async refreshSource(sourceId: string): Promise<{ outputs: number; fields: number }> {
+  async refreshSource(
+    sourceId: string,
+  ): Promise<{ outputs: number; fields: number }> {
     const now = new Date();
     const detectors = await this.prisma.customDetector.findMany({
       select: { key: true, name: true, pipelineSchema: true },
@@ -101,22 +111,27 @@ export class VocabularyService {
     const pipelineOf = new Map(
       detectors.map((d) => [
         d.key,
-        ((d.pipelineSchema as Record<string, unknown> | null)?.type as string | undefined) ?? 'GLINER2',
+        ((d.pipelineSchema as Record<string, unknown> | null)?.type as
+          | string
+          | undefined) ?? 'GLINER2',
       ]),
     );
-    const outputs = await withStatementTimeout(this.prisma, STATEMENT_TIMEOUT_MS, (tx) =>
-      tx.$queryRaw<
-        Array<{
-          detector_type: DetectorType;
-          custom_detector_key: string;
-          finding_type: string;
-          custom_detector_name: string | null;
-          open_count: bigint;
-          asset_count: bigint;
-          first_seen: Date | null;
-          last_seen: Date | null;
-        }>
-      >`
+    const outputs = await withStatementTimeout(
+      this.prisma,
+      STATEMENT_TIMEOUT_MS,
+      (tx) =>
+        tx.$queryRaw<
+          Array<{
+            detector_type: DetectorType;
+            custom_detector_key: string;
+            finding_type: string;
+            custom_detector_name: string | null;
+            open_count: bigint;
+            asset_count: bigint;
+            first_seen: Date | null;
+            last_seen: Date | null;
+          }>
+        >`
         SELECT f.detector_type, COALESCE(f.custom_detector_key, '') AS custom_detector_key,
                f.finding_type, max(f.custom_detector_name) AS custom_detector_name,
                count(*) AS open_count, count(DISTINCT f.asset_id) AS asset_count,
@@ -133,7 +148,9 @@ export class VocabularyService {
       const open = Number(output.open_count);
       const runnerCategorical = categoricalByRunner(
         output.finding_type,
-        output.custom_detector_key ? pipelineOf.get(output.custom_detector_key) : null,
+        output.custom_detector_key
+          ? pipelineOf.get(output.custom_detector_key)
+          : null,
       );
       let distinct: number | null = null;
       let top: TopValue[] | null = null;
@@ -157,7 +174,7 @@ export class VocabularyService {
         openCount: open,
         assetCount: Number(output.asset_count),
         distinctValues: distinct,
-        topValues: (top ?? undefined) as Prisma.InputJsonValue | undefined,
+        topValues: top ?? undefined,
         firstSeenAt: output.first_seen ?? now,
         lastSeenAt: output.last_seen ?? now,
         refreshedAt: now,
@@ -175,29 +192,42 @@ export class VocabularyService {
 
   private async outputValueStats(
     sourceId: string,
-    output: { detector_type: DetectorType; custom_detector_key: string; finding_type: string },
+    output: {
+      detector_type: DetectorType;
+      custom_detector_key: string;
+      finding_type: string;
+    },
   ): Promise<{ distinct: number; top: TopValue[] }> {
-    return withStatementTimeout(this.prisma, STATEMENT_TIMEOUT_MS, async (tx) => {
-      const where = Prisma.sql`
+    return withStatementTimeout(
+      this.prisma,
+      STATEMENT_TIMEOUT_MS,
+      async (tx) => {
+        const where = Prisma.sql`
         f.source_id = ${sourceId} AND f.status = 'OPEN'
         AND f.detector_type = ${output.detector_type}::"DetectorType"
         AND COALESCE(f.custom_detector_key, '') = ${output.custom_detector_key}
         AND f.finding_type = ${output.finding_type}`;
-      const [distinct] = await tx.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`
+        const [distinct] = await tx.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`
         SELECT count(*) AS n FROM (
           SELECT DISTINCT glossary_norm(f.matched_content) FROM findings f
            WHERE ${where} LIMIT ${DISTINCT_CAP}
         ) d`);
-      const top = await tx.$queryRaw<Array<{ value: string; count: bigint }>>(Prisma.sql`
+        const top = await tx.$queryRaw<
+          Array<{ value: string; count: bigint }>
+        >(Prisma.sql`
         SELECT mode() WITHIN GROUP (ORDER BY f.matched_content) AS value, count(*) AS count
           FROM findings f WHERE ${where}
          GROUP BY glossary_norm(f.matched_content)
          ORDER BY count(*) DESC LIMIT ${TOP_VALUES}`);
-      return {
-        distinct: Number(distinct?.n ?? 0),
-        top: top.map((row) => ({ value: row.value, count: Number(row.count) })),
-      };
-    });
+        return {
+          distinct: Number(distinct?.n ?? 0),
+          top: top.map((row) => ({
+            value: row.value,
+            count: Number(row.count),
+          })),
+        };
+      },
+    );
   }
 
   private async fieldRows(
@@ -206,8 +236,11 @@ export class VocabularyService {
   ): Promise<Prisma.VocabularyFieldCreateManyInput[]> {
     let paths: Array<{ path: string; asset_count: bigint }> = [];
     try {
-      paths = await withStatementTimeout(this.prisma, STATEMENT_TIMEOUT_MS, (tx) =>
-        tx.$queryRaw<Array<{ path: string; asset_count: bigint }>>`
+      paths = await withStatementTimeout(
+        this.prisma,
+        STATEMENT_TIMEOUT_MS,
+        (tx) =>
+          tx.$queryRaw<Array<{ path: string; asset_count: bigint }>>`
           SELECT path, count(DISTINCT asset_id) AS asset_count FROM (
             SELECT a.id AS asset_id, e.key AS path
               FROM assets a CROSS JOIN LATERAL jsonb_each(a.metadata) e
@@ -230,7 +263,9 @@ export class VocabularyService {
         `,
       );
     } catch (error) {
-      this.logger.warn(`Metadata fields skipped for ${sourceId}: ${String(error)}`);
+      this.logger.warn(
+        `Metadata fields skipped for ${sourceId}: ${String(error)}`,
+      );
       return [];
     }
     const out: Prisma.VocabularyFieldCreateManyInput[] = [];
@@ -240,8 +275,11 @@ export class VocabularyService {
       let top: TopValue[] | null = null;
       try {
         const segments = row.path.split('.');
-        const stats = await withStatementTimeout(this.prisma, STATEMENT_TIMEOUT_MS, async (tx) => {
-          const values = Prisma.sql`(
+        const stats = await withStatementTimeout(
+          this.prisma,
+          STATEMENT_TIMEOUT_MS,
+          async (tx) => {
+            const values = Prisma.sql`(
             SELECT e #>> '{}' AS v FROM assets a
               CROSS JOIN LATERAL jsonb_array_elements(
                 CASE WHEN jsonb_typeof(a.metadata #> ${segments}::text[]) = 'array'
@@ -253,25 +291,33 @@ export class VocabularyService {
              WHERE a.source_id = ${sourceId} AND a.status <> 'DELETED'
                AND jsonb_typeof(a.metadata #> ${segments}::text[]) IN ('string', 'number', 'boolean')
           )`;
-          const [d] = await tx.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`
+            const [d] = await tx.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`
             SELECT count(*) AS n FROM (SELECT DISTINCT glossary_norm(v) FROM ${values} vals LIMIT ${DISTINCT_CAP}) d`);
-          const t = await tx.$queryRaw<Array<{ value: string; count: bigint }>>(Prisma.sql`
+            const t = await tx.$queryRaw<
+              Array<{ value: string; count: bigint }>
+            >(Prisma.sql`
             SELECT mode() WITHIN GROUP (ORDER BY v) AS value, count(*) AS count
               FROM ${values} vals GROUP BY glossary_norm(v)
              ORDER BY count(*) DESC LIMIT ${TOP_VALUES}`);
-          return { distinct: Number(d?.n ?? 0), top: t.map((r) => ({ value: r.value, count: Number(r.count) })) };
-        });
+            return {
+              distinct: Number(d?.n ?? 0),
+              top: t.map((r) => ({ value: r.value, count: Number(r.count) })),
+            };
+          },
+        );
         distinct = stats.distinct;
         top = stats.top;
       } catch (error) {
-        this.logger.debug(`Field statistics skipped for ${row.path}: ${String(error)}`);
+        this.logger.debug(
+          `Field statistics skipped for ${row.path}: ${String(error)}`,
+        );
       }
       out.push({
         sourceId,
         path: row.path,
         assetCount: Number(row.asset_count),
         distinctValues: distinct,
-        topValues: (top ?? undefined) as Prisma.InputJsonValue | undefined,
+        topValues: top ?? undefined,
         refreshedAt: now,
       });
     }
@@ -294,9 +340,15 @@ export class VocabularyService {
     q?: string;
     take?: number;
     skip?: number;
-  }): Promise<{ rows: VocabularyRow[]; total: number; refreshedAt: Date | null }> {
+  }): Promise<{
+    rows: VocabularyRow[];
+    total: number;
+    refreshedAt: Date | null;
+  }> {
     const kind = params.kind ?? 'outputs';
-    const sources = await this.prisma.source.findMany({ select: { id: true, name: true } });
+    const sources = await this.prisma.source.findMany({
+      select: { id: true, name: true },
+    });
     const sourceName = new Map(sources.map((s) => [s.id, s.name]));
     const bindings = await this.prisma.glossaryBinding.findMany({
       where: { status: { in: ['APPROVED', 'DRAFT'] } },
@@ -316,21 +368,33 @@ export class VocabularyService {
       const items = await this.prisma.vocabularyItem.findMany({
         where: {
           ...(params.sourceId ? { sourceId: params.sourceId } : {}),
-          ...(params.detectorType ? { detectorType: params.detectorType as DetectorType } : {}),
-          ...(params.customDetectorKey ? { customDetectorKey: params.customDetectorKey } : {}),
+          ...(params.detectorType
+            ? { detectorType: params.detectorType as DetectorType }
+            : {}),
+          ...(params.customDetectorKey
+            ? { customDetectorKey: params.customDetectorKey }
+            : {}),
         },
       });
-      const merged = new Map<string, VocabularyRow & { topMap: Map<string, TopValue> }>();
+      const merged = new Map<
+        string,
+        VocabularyRow & { topMap: Map<string, TopValue> }
+      >();
       for (const item of items) {
-        if (!refreshedAt || item.refreshedAt > refreshedAt) refreshedAt = item.refreshedAt;
+        if (!refreshedAt || item.refreshedAt > refreshedAt)
+          refreshedAt = item.refreshedAt;
         const id = outputKey(item);
-        const detector = item.customDetectorKey ? detectorByKey.get(item.customDetectorKey) : undefined;
+        const detector = item.customDetectorKey
+          ? detectorByKey.get(item.customDetectorKey)
+          : undefined;
         const pipelineType = detector
-          ? (((detector.pipelineSchema as Record<string, unknown> | null)?.type as string | undefined) ?? 'GLINER2')
+          ? (((detector.pipelineSchema as Record<string, unknown> | null)
+              ?.type as string | undefined) ?? 'GLINER2')
           : null;
         let row = merged.get(id);
         if (!row) {
-          const customDetectorName = detector?.name ?? item.customDetectorName ?? null;
+          const customDetectorName =
+            detector?.name ?? item.customDetectorName ?? null;
           row = {
             kind: 'output',
             id,
@@ -361,13 +425,19 @@ export class VocabularyService {
           };
           merged.set(id, row);
         }
-        row.sources.push({ id: item.sourceId, name: sourceName.get(item.sourceId) ?? item.sourceId });
+        row.sources.push({
+          id: item.sourceId,
+          name: sourceName.get(item.sourceId) ?? item.sourceId,
+        });
         row.openCount += item.openCount;
         row.assetCount += item.assetCount;
         if (item.distinctValues === null || row.distinctValues === null) {
           row.distinctValues = null;
         } else {
-          row.distinctValues = Math.min(DISTINCT_CAP, Math.max(row.distinctValues, item.distinctValues));
+          row.distinctValues = Math.min(
+            DISTINCT_CAP,
+            Math.max(row.distinctValues, item.distinctValues),
+          );
         }
         for (const top of (item.topValues as TopValue[] | null) ?? []) {
           const key = glossaryNorm(top.value);
@@ -375,19 +445,27 @@ export class VocabularyService {
           entry.count += top.count;
           row.topMap.set(key, entry);
         }
-        if (!row.lastSeenAt || item.lastSeenAt > row.lastSeenAt) row.lastSeenAt = item.lastSeenAt;
+        if (!row.lastSeenAt || item.lastSeenAt > row.lastSeenAt)
+          row.lastSeenAt = item.lastSeenAt;
       }
       for (const row of merged.values()) {
-        row.topValues = [...row.topMap.values()].sort((a, b) => b.count - a.count).slice(0, TOP_VALUES);
+        row.topValues = [...row.topMap.values()]
+          .sort((a, b) => b.count - a.count)
+          .slice(0, TOP_VALUES);
         row.categorical =
-          categoricalByRunner(row.output!.findingType, row.output!.pipelineType) ||
-          (row.distinctValues !== null && row.distinctValues <= CATEGORICAL_MAX_DISTINCT);
+          categoricalByRunner(
+            row.output!.findingType,
+            row.output!.pipelineType,
+          ) ||
+          (row.distinctValues !== null &&
+            row.distinctValues <= CATEGORICAL_MAX_DISTINCT);
         row.bindings = bindings
           .filter(
             (b) =>
               isOutputMode(b.mode) &&
               b.detectorType === row.output!.detectorType &&
-              (b.customDetectorKey ?? null) === (row.output!.customDetectorKey ?? null) &&
+              (b.customDetectorKey ?? null) ===
+                (row.output!.customDetectorKey ?? null) &&
               b.findingType === row.output!.findingType,
           )
           .map((b) => this.bindingRef(b));
@@ -402,9 +480,13 @@ export class VocabularyService {
       const fields = await this.prisma.vocabularyField.findMany({
         where: params.sourceId ? { sourceId: params.sourceId } : {},
       });
-      const merged = new Map<string, VocabularyRow & { topMap: Map<string, TopValue> }>();
+      const merged = new Map<
+        string,
+        VocabularyRow & { topMap: Map<string, TopValue> }
+      >();
       for (const field of fields) {
-        if (!refreshedAt || field.refreshedAt > refreshedAt) refreshedAt = field.refreshedAt;
+        if (!refreshedAt || field.refreshedAt > refreshedAt)
+          refreshedAt = field.refreshedAt;
         const id = `field:${field.path}`;
         let row = merged.get(id);
         if (!row) {
@@ -427,10 +509,18 @@ export class VocabularyService {
           };
           merged.set(id, row);
         }
-        row.sources.push({ id: field.sourceId, name: sourceName.get(field.sourceId) ?? field.sourceId });
+        row.sources.push({
+          id: field.sourceId,
+          name: sourceName.get(field.sourceId) ?? field.sourceId,
+        });
         row.assetCount += field.assetCount;
-        if (field.distinctValues === null || row.distinctValues === null) row.distinctValues = null;
-        else row.distinctValues = Math.min(DISTINCT_CAP, Math.max(row.distinctValues, field.distinctValues));
+        if (field.distinctValues === null || row.distinctValues === null)
+          row.distinctValues = null;
+        else
+          row.distinctValues = Math.min(
+            DISTINCT_CAP,
+            Math.max(row.distinctValues, field.distinctValues),
+          );
         for (const top of (field.topValues as TopValue[] | null) ?? []) {
           const key = glossaryNorm(top.value);
           const entry = row.topMap.get(key) ?? { value: top.value, count: 0 };
@@ -439,8 +529,12 @@ export class VocabularyService {
         }
       }
       for (const row of merged.values()) {
-        row.topValues = [...row.topMap.values()].sort((a, b) => b.count - a.count).slice(0, TOP_VALUES);
-        row.categorical = row.distinctValues !== null && row.distinctValues <= CATEGORICAL_MAX_DISTINCT;
+        row.topValues = [...row.topMap.values()]
+          .sort((a, b) => b.count - a.count)
+          .slice(0, TOP_VALUES);
+        row.categorical =
+          row.distinctValues !== null &&
+          row.distinctValues <= CATEGORICAL_MAX_DISTINCT;
         row.bindings = bindings
           .filter((b) => !isOutputMode(b.mode) && b.metadataPath === row.field)
           .map((b) => this.bindingRef(b));
@@ -453,17 +547,26 @@ export class VocabularyService {
 
     let filtered = rows;
     if (params.bound === 'true') filtered = filtered.filter((row) => row.bound);
-    if (params.bound === 'false') filtered = filtered.filter((row) => !row.bound);
+    if (params.bound === 'false')
+      filtered = filtered.filter((row) => !row.bound);
     if (params.q) {
       const needle = glossaryNorm(params.q);
       filtered = filtered.filter((row) =>
-        glossaryNorm(`${row.label.label} ${row.label.detail} ${row.id}`).includes(needle),
+        glossaryNorm(
+          `${row.label.label} ${row.label.detail} ${row.id}`,
+        ).includes(needle),
       );
     }
-    filtered.sort((a, b) => b.openCount - a.openCount || b.assetCount - a.assetCount);
+    filtered.sort(
+      (a, b) => b.openCount - a.openCount || b.assetCount - a.assetCount,
+    );
     const take = Math.min(Math.max(Number(params.take ?? 100) || 100, 1), 500);
     const skip = Math.max(Number(params.skip ?? 0) || 0, 0);
-    return { rows: filtered.slice(skip, skip + take), total: filtered.length, refreshedAt };
+    return {
+      rows: filtered.slice(skip, skip + take),
+      total: filtered.length,
+      refreshedAt,
+    };
   }
 
   private bindingRef(b: {
@@ -501,23 +604,42 @@ export class VocabularyService {
       const rows = await this.prisma.vocabularyField.findMany({
         where: {
           path: params.field,
-          ...(params.sourceIds?.length ? { sourceId: { in: params.sourceIds } } : {}),
+          ...(params.sourceIds?.length
+            ? { sourceId: { in: params.sourceIds } }
+            : {}),
         },
       });
-      return { values: this.mergeTop(rows.map((r) => r.topValues), limit), live: false, distinct: rows[0]?.distinctValues ?? null };
+      return {
+        values: this.mergeTop(
+          rows.map((r) => r.topValues),
+          limit,
+        ),
+        live: false,
+        distinct: rows[0]?.distinctValues ?? null,
+      };
     }
-    if (!params.detectorType || !params.findingType) return { values: [], live: false, distinct: null };
+    if (!params.detectorType || !params.findingType)
+      return { values: [], live: false, distinct: null };
     const items = await this.prisma.vocabularyItem.findMany({
       where: {
         detectorType: params.detectorType,
         customDetectorKey: params.customDetectorKey ?? '',
         findingType: params.findingType,
-        ...(params.sourceIds?.length ? { sourceId: { in: params.sourceIds } } : {}),
+        ...(params.sourceIds?.length
+          ? { sourceId: { in: params.sourceIds } }
+          : {}),
       },
     });
     const open = items.reduce((sum, item) => sum + item.openCount, 0);
     if (items.length && open >= VALUE_STATS_MAX_FINDINGS) {
-      return { values: this.mergeTop(items.map((i) => i.topValues), limit), live: false, distinct: items[0]?.distinctValues ?? null };
+      return {
+        values: this.mergeTop(
+          items.map((i) => i.topValues),
+          limit,
+        ),
+        live: false,
+        distinct: items[0]?.distinctValues ?? null,
+      };
     }
     try {
       const rows = await withStatementTimeout(this.prisma, 3_000, (tx) =>
@@ -532,13 +654,27 @@ export class VocabularyService {
            GROUP BY glossary_norm(f.matched_content)
            ORDER BY count(*) DESC LIMIT ${limit}`),
       );
-      return { values: rows.map((r) => ({ value: r.value, count: Number(r.count) })), live: true, distinct: null };
+      return {
+        values: rows.map((r) => ({ value: r.value, count: Number(r.count) })),
+        live: true,
+        distinct: null,
+      };
     } catch {
-      return { values: this.mergeTop(items.map((i) => i.topValues), limit), live: false, distinct: items[0]?.distinctValues ?? null };
+      return {
+        values: this.mergeTop(
+          items.map((i) => i.topValues),
+          limit,
+        ),
+        live: false,
+        distinct: items[0]?.distinctValues ?? null,
+      };
     }
   }
 
-  private mergeTop(lists: Array<Prisma.JsonValue | null>, limit: number): TopValue[] {
+  private mergeTop(
+    lists: Array<Prisma.JsonValue | null>,
+    limit: number,
+  ): TopValue[] {
     const merged = new Map<string, TopValue>();
     for (const list of lists) {
       for (const top of (list as TopValue[] | null) ?? []) {
@@ -548,13 +684,21 @@ export class VocabularyService {
         merged.set(key, entry);
       }
     }
-    return [...merged.values()].sort((a, b) => b.count - a.count).slice(0, limit);
+    return [...merged.values()]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
   }
 
   /** "Semantic coverage: 73% of open findings carry a meaning" (SL2 §6.3). */
   async coverage() {
-    const latest = await this.prisma.semanticStat.findFirst({ orderBy: { day: 'desc' } });
-    const unbound = await this.list({ kind: 'outputs', bound: 'false', take: 500 });
+    const latest = await this.prisma.semanticStat.findFirst({
+      orderBy: { day: 'desc' },
+    });
+    const unbound = await this.list({
+      kind: 'outputs',
+      bound: 'false',
+      take: 500,
+    });
     return {
       openFindings: latest?.openFindings ?? null,
       findingsWithMeaning: latest?.findingsWithMeaning ?? null,
@@ -565,7 +709,10 @@ export class VocabularyService {
           : null,
       computedAt: latest?.computedAt ?? null,
       unboundOutputs: unbound.total,
-      unboundFindings: unbound.rows.reduce((sum, row) => sum + row.openCount, 0),
+      unboundFindings: unbound.rows.reduce(
+        (sum, row) => sum + row.openCount,
+        0,
+      ),
     };
   }
 

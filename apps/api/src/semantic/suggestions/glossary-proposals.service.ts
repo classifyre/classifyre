@@ -33,7 +33,12 @@ export const PROPOSAL_KINDS = [
   'TERM_REF',
 ] as const;
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
-export type ProposalDecision = 'accept' | 'edit' | 'dismiss' | 'dismiss_forever' | 'skip';
+export type ProposalDecision =
+  | 'accept'
+  | 'edit'
+  | 'dismiss'
+  | 'dismiss_forever'
+  | 'skip';
 export const DISMISS_REASONS = ['wrong concept', 'too broad', 'noise', 'other'];
 
 export interface ProposalItem {
@@ -48,7 +53,13 @@ export interface ProposalItem {
   origin: string;
   createdBy: string | null;
   createdAt: Date | null;
-  term: { id: string; key: string; term: string; kind: string; status: string } | null;
+  term: {
+    id: string;
+    key: string;
+    term: string;
+    kind: string;
+    status: string;
+  } | null;
   asset?: { id: string; name: string } | null;
   payload?: unknown;
   evidence?: unknown;
@@ -80,9 +91,20 @@ export class GlossaryProposalsService {
     return this.suggestions.pendingCounts();
   }
 
-  private termRef(term: { id: string; key: string; term: string; kind: string; status: string } | null | undefined) {
+  private termRef(
+    term:
+      | { id: string; key: string; term: string; kind: string; status: string }
+      | null
+      | undefined,
+  ) {
     return term
-      ? { id: term.id, key: term.key, term: term.term, kind: term.kind, status: term.status }
+      ? {
+          id: term.id,
+          key: term.key,
+          term: term.term,
+          kind: term.kind,
+          status: term.status,
+        }
       : null;
   }
 
@@ -94,15 +116,31 @@ export class GlossaryProposalsService {
     minScore?: number;
     take?: number;
     skip?: number;
-  }): Promise<{ items: ProposalItem[]; total: number; counts: Record<string, number>; embeddings: boolean }> {
+  }): Promise<{
+    items: ProposalItem[];
+    total: number;
+    counts: Record<string, number>;
+    embeddings: boolean;
+  }> {
     const take = Math.min(Math.max(Number(params.take ?? 50) || 50, 1), 200);
     const skip = Math.max(Number(params.skip ?? 0) || 0, 0);
     const want = (kind: ProposalKind) => !params.kind || params.kind === kind;
     const budget = skip + take;
     const items: ProposalItem[] = [];
-    const termSelect = { id: true, key: true, term: true, kind: true, status: true } as const;
+    const termSelect = {
+      id: true,
+      key: true,
+      term: true,
+      kind: true,
+      status: true,
+    } as const;
 
-    if (want('TERM') && (!params.origin || params.origin === 'AGENT' || params.origin === 'OPERATOR')) {
+    if (
+      want('TERM') &&
+      (!params.origin ||
+        params.origin === 'AGENT' ||
+        params.origin === 'OPERATOR')
+    ) {
       const drafts = await this.prisma.glossaryTerm.findMany({
         where: {
           status: 'DRAFT',
@@ -126,7 +164,11 @@ export class GlossaryProposalsService {
           createdBy: term.verifiedBy,
           createdAt: term.createdAt,
           term: this.termRef(term),
-          payload: { aliases: term.aliases, codes: term.codes, definition: term.definition },
+          payload: {
+            aliases: term.aliases,
+            codes: term.codes,
+            definition: term.definition,
+          },
         });
       }
     }
@@ -165,7 +207,14 @@ export class GlossaryProposalsService {
       const drafts = await this.prisma.glossaryRelation.findMany({
         where: {
           status: 'DRAFT',
-          ...(params.termId ? { OR: [{ fromTermId: params.termId }, { toTermId: params.termId }] } : {}),
+          ...(params.termId
+            ? {
+                OR: [
+                  { fromTermId: params.termId },
+                  { toTermId: params.termId },
+                ],
+              }
+            : {}),
         },
         include: { from: { select: termSelect }, to: { select: termSelect } },
         orderBy: { createdAt: 'desc' },
@@ -184,7 +233,13 @@ export class GlossaryProposalsService {
           createdBy: relation.createdBy,
           createdAt: relation.createdAt,
           term: this.termRef(relation.from),
-          payload: { fromTermId: relation.fromTermId, toTermId: relation.toTermId, type: relation.type, label: relation.label, to: this.termRef(relation.to) },
+          payload: {
+            fromTermId: relation.fromTermId,
+            toTermId: relation.toTermId,
+            type: relation.type,
+            label: relation.label,
+            to: this.termRef(relation.to),
+          },
         });
       }
     }
@@ -195,7 +250,10 @@ export class GlossaryProposalsService {
           ...(params.termId ? { termId: params.termId } : {}),
           ...(params.origin ? { origin: params.origin as never } : {}),
         },
-        include: { term: { select: termSelect }, lookupScheme: { select: { id: true, key: true, name: true } } },
+        include: {
+          term: { select: termSelect },
+          lookupScheme: { select: { id: true, key: true, name: true } },
+        },
         orderBy: { createdAt: 'desc' },
         take: budget,
       });
@@ -219,17 +277,24 @@ export class GlossaryProposalsService {
         });
       }
     }
-    const suggestionKinds = (['BINDING', 'RELATION', 'LINK'] as const).filter((k) => want(k));
+    const suggestionKinds = (['BINDING', 'RELATION', 'LINK'] as const).filter(
+      (k) => want(k),
+    );
     if (suggestionKinds.length) {
       const rows = await this.prisma.semanticSuggestion.findMany({
         where: {
           status: 'PROPOSED',
           kind: { in: [...suggestionKinds] },
           ...(params.termId ? { termId: params.termId } : {}),
-          ...(params.minScore !== undefined ? { score: { gte: new Prisma.Decimal(params.minScore) } } : {}),
+          ...(params.minScore !== undefined
+            ? { score: { gte: new Prisma.Decimal(params.minScore) } }
+            : {}),
           ...(params.origin ? { origin: params.origin as never } : {}),
         },
-        include: { term: { select: termSelect }, asset: { select: { id: true, name: true } } },
+        include: {
+          term: { select: termSelect },
+          asset: { select: { id: true, name: true } },
+        },
         orderBy: [{ score: 'desc' }, { createdAt: 'desc' }],
         take: budget,
       });
@@ -238,14 +303,18 @@ export class GlossaryProposalsService {
     if (want('TERM_REF')) {
       const refs = await unknownTermRefs(this.prisma, budget);
       for (const ref of refs) {
-        const near = ref.key ? await this.glossary.lookup(ref.key.replace(/[-_.]+/g, ' '), 3) : [];
+        const near = ref.key
+          ? await this.glossary.lookup(ref.key.replace(/[-_.]+/g, ' '), 3)
+          : [];
         items.push({
           kind: 'TERM_REF',
           id: `ref:${ref.urn}`,
           source: 'ref',
           title: `Unknown term reference "${ref.key ?? ref.urn}"`,
           rationale: `${ref.edges} declaration(s) on ${ref.assets} asset(s) name "${ref.key ?? ref.urn}", which no term has.${
-            near.length ? ` Closest: ${near.map((n) => `${n.term} (${n.key})`).join(', ')}.` : ''
+            near.length
+              ? ` Closest: ${near.map((n) => `${n.term} (${n.key})`).join(', ')}.`
+              : ''
           }`,
           score: null,
           generator: 'references',
@@ -253,7 +322,14 @@ export class GlossaryProposalsService {
           createdBy: null,
           createdAt: null,
           term: null,
-          payload: { urn: ref.urn, key: ref.key, edges: ref.edges, assets: ref.assets, sources: ref.sources, closest: near.map((n) => ({ id: n.id, key: n.key, term: n.term })) },
+          payload: {
+            urn: ref.urn,
+            key: ref.key,
+            edges: ref.edges,
+            assets: ref.assets,
+            sources: ref.sources,
+            closest: near.map((n) => ({ id: n.id, key: n.key, term: n.term })),
+          },
         });
       }
     }
@@ -276,13 +352,20 @@ export class GlossaryProposalsService {
 
   private async suggestionItem(
     row: SemanticSuggestion & {
-      term: { id: string; key: string; term: string; kind: string; status: string } | null;
+      term: {
+        id: string;
+        key: string;
+        term: string;
+        kind: string;
+        status: string;
+      } | null;
       asset: { id: string; name: string } | null;
     },
   ): Promise<ProposalItem> {
     const payload = row.payload as Record<string, unknown>;
     let title = row.rationale;
-    if (row.kind === 'LINK') title = `${row.asset?.name ?? row.assetId} → ${row.term?.term ?? ''}`;
+    if (row.kind === 'LINK')
+      title = `${row.asset?.name ?? row.assetId} → ${row.term?.term ?? ''}`;
     if (row.kind === 'RELATION') {
       const other = await this.prisma.glossaryTerm.findUnique({
         where: { id: String(payload.toTermId) },
@@ -291,14 +374,22 @@ export class GlossaryProposalsService {
       title = `${row.term?.term ?? ''} — related — ${other?.term ?? ''}`;
     }
     if (row.kind === 'BINDING') {
-      const output = payload.output as { detectorType?: string; customDetectorKey?: string | null; findingType?: string } | undefined;
+      const output = payload.output as
+        | {
+            detectorType?: string;
+            customDetectorKey?: string | null;
+            findingType?: string;
+          }
+        | undefined;
       const label = output
         ? vocabularyLabel({
             detectorType: output.detectorType ?? null,
             customDetectorKey: output.customDetectorKey ?? null,
             findingType: output.findingType ?? null,
           }).label
-        : String(payload.field ?? '');
+        : typeof payload.field === 'string'
+          ? payload.field
+          : '';
       title = `${label} → ${row.term?.term ?? 'values in a scheme'}`;
     }
     return {
@@ -330,10 +421,20 @@ export class GlossaryProposalsService {
     edit?: Record<string, unknown>;
     reason?: string;
     actor: Actor;
-  }): Promise<{ kind: string; id: string; decision: string; result?: unknown }> {
+  }): Promise<{
+    kind: string;
+    id: string;
+    decision: string;
+    result?: unknown;
+  }> {
     const { kind, decision, actor } = input;
-    if (!PROPOSAL_KINDS.includes(kind)) throw new BadRequestException(`Unknown kind ${kind}`);
-    if (!['accept', 'edit', 'dismiss', 'dismiss_forever', 'skip'].includes(decision)) {
+    if (!PROPOSAL_KINDS.includes(kind))
+      throw new BadRequestException(`Unknown kind ${kind}`);
+    if (
+      !['accept', 'edit', 'dismiss', 'dismiss_forever', 'skip'].includes(
+        decision,
+      )
+    ) {
       throw new BadRequestException(`Unknown decision ${decision}`);
     }
     if (actor.isAgent && !['BINDING', 'RELATION'].includes(kind)) {
@@ -346,29 +447,53 @@ export class GlossaryProposalsService {
     const ref = rest.join(':');
     let result: unknown;
     if (kind === 'TERM') result = await this.decideTerm(ref, decision, actor);
-    else if (kind === 'ALIAS') result = await this.decideAlias(ref, decision, input.edit, actor);
-    else if (kind === 'TERM_REF') result = await this.decideRef(ref, decision, input.edit, actor);
+    else if (kind === 'ALIAS')
+      result = await this.decideAlias(ref, decision, input.edit, actor);
+    else if (kind === 'TERM_REF')
+      result = await this.decideRef(ref, decision, input.edit, actor);
     else if (prefix === 'draft') {
       result =
         kind === 'RELATION'
           ? await this.decideDraftRelation(ref, decision, actor)
           : await this.decideDraftBinding(ref, decision, input.edit, actor);
     } else if (prefix === 'suggestion') {
-      result = await this.decideSuggestion(ref, kind, decision, input.edit, input.reason, actor);
+      result = await this.decideSuggestion(
+        ref,
+        kind,
+        decision,
+        input.edit,
+        input.reason,
+        actor,
+      );
     } else {
       throw new BadRequestException(`Unknown proposal id ${input.id}`);
     }
     await recordGlossaryActivity(this.prisma, {
       type: 'PROPOSAL_DECIDED',
       actor: actor.name,
-      payload: { kind, id: input.id, decision, reason: input.reason ?? null } as Prisma.InputJsonValue,
+      payload: {
+        kind,
+        id: input.id,
+        decision,
+        reason: input.reason ?? null,
+      },
     });
-    glossaryEvents.emit({ type: 'glossary.proposal_decided', kind, decision, count: 1 });
+    glossaryEvents.emit({
+      type: 'glossary.proposal_decided',
+      kind,
+      decision,
+      count: 1,
+    });
     return { kind, id: input.id, decision, result };
   }
 
-  private async decideTerm(termId: string, decision: ProposalDecision, actor: Actor) {
-    if (decision === 'accept' || decision === 'edit') return this.glossary.approve(termId, actor.name);
+  private async decideTerm(
+    termId: string,
+    decision: ProposalDecision,
+    actor: Actor,
+  ) {
+    if (decision === 'accept' || decision === 'edit')
+      return this.glossary.approve(termId, actor.name);
     // DRAFT ──reject──▶ deleted (deletion remembered).
     return this.glossary.remove(termId, actor.name);
   }
@@ -379,18 +504,32 @@ export class GlossaryProposalsService {
     edit: Record<string, unknown> | undefined,
     actor: Actor,
   ) {
-    const term = await this.prisma.glossaryTerm.findUnique({ where: { id: termId } });
+    const term = await this.prisma.glossaryTerm.findUnique({
+      where: { id: termId },
+    });
     if (!term) throw new NotFoundException(`Glossary term ${termId} not found`);
     if (decision === 'dismiss' || decision === 'dismiss_forever') {
-      return this.prisma.glossaryTerm.update({ where: { id: termId }, data: { proposedAliases: [] } });
+      return this.prisma.glossaryTerm.update({
+        where: { id: termId },
+        data: { proposedAliases: [] },
+      });
     }
     const chosen = Array.isArray(edit?.aliases)
-      ? (edit!.aliases as string[]).filter((a) => term.proposedAliases.includes(a))
+      ? (edit.aliases as string[]).filter((a) =>
+          term.proposedAliases.includes(a),
+        )
       : term.proposedAliases;
-    const asCodes = Array.isArray(edit?.codes) ? (edit!.codes as string[]) : [];
-    const asHidden = Array.isArray(edit?.hiddenAliases) ? (edit!.hiddenAliases as string[]) : [];
-    const aliases = cleanLabels([...term.aliases, ...chosen.filter((a) => !asCodes.includes(a) && !asHidden.includes(a))]);
-    const codes = cleanLabels([...term.codes, ...asCodes], { caseSensitive: true });
+    const asCodes = Array.isArray(edit?.codes) ? (edit.codes as string[]) : [];
+    const asHidden = Array.isArray(edit?.hiddenAliases)
+      ? (edit.hiddenAliases as string[])
+      : [];
+    const aliases = cleanLabels([
+      ...term.aliases,
+      ...chosen.filter((a) => !asCodes.includes(a) && !asHidden.includes(a)),
+    ]);
+    const codes = cleanLabels([...term.codes, ...asCodes], {
+      caseSensitive: true,
+    });
     const hiddenAliases = cleanLabels([...term.hiddenAliases, ...asHidden]);
     const updated = await this.prisma.glossaryTerm.update({
       where: { id: termId },
@@ -399,7 +538,12 @@ export class GlossaryProposalsService {
         codes,
         hiddenAliases,
         proposedAliases: [],
-        matchKeys: matchKeysFor({ term: term.term, aliases, codes, hiddenAliases }),
+        matchKeys: matchKeysFor({
+          term: term.term,
+          aliases,
+          codes,
+          hiddenAliases,
+        }),
       },
     });
     await this.glossary.enqueueEmbedding(updated);
@@ -431,45 +575,73 @@ export class GlossaryProposalsService {
     if (decision === 'dismiss' || decision === 'dismiss_forever') {
       // Nothing to remember: the reference is in the data. Dismissing it
       // drops the declarations, which a later scan re-asserts if it still says so.
-      await this.prisma.$executeRaw`DELETE FROM edges WHERE to_type = 'term_ref' AND to_id = ${urn}`;
+      await this.prisma
+        .$executeRaw`DELETE FROM edges WHERE to_type = 'term_ref' AND to_id = ${urn}`;
       return { removed: true };
     }
-    const mapTo = typeof edit?.mapToTermId === 'string' ? edit.mapToTermId : null;
+    const mapTo =
+      typeof edit?.mapToTermId === 'string' ? edit.mapToTermId : null;
     if (mapTo) {
       const target = await this.glossary.resolveOrThrow(mapTo);
       const clash = await this.prisma.glossaryTerm.findFirst({
-        where: { OR: [{ key }, { previousKeys: { has: key } }], NOT: { id: target.id } },
+        where: {
+          OR: [{ key }, { previousKeys: { has: key } }],
+          NOT: { id: target.id },
+        },
         select: { id: true },
       });
-      if (clash) throw new BadRequestException(`Key "${key}" already belongs to another term`);
+      if (clash)
+        throw new BadRequestException(
+          `Key "${key}" already belongs to another term`,
+        );
       await this.prisma.glossaryTerm.update({
         where: { id: target.id },
-        data: { previousKeys: [...new Set([...target.previousKeys, key])].slice(0, MAX_PREVIOUS_KEYS) },
+        data: {
+          previousKeys: [...new Set([...target.previousKeys, key])].slice(
+            0,
+            MAX_PREVIOUS_KEYS,
+          ),
+        },
       });
       const stitched = await stitchTermRefs(this.prisma, [key]);
       if (stitched.assetIds.length) {
-        await this.jobs.scheduleIncrementalForAssets(stitched.assetIds, `references to ${key} mapped`);
+        await this.jobs.scheduleIncrementalForAssets(
+          stitched.assetIds,
+          `references to ${key} mapped`,
+        );
       }
       return { mappedTo: target.key, ...stitched };
     }
-    const name = typeof edit?.term === 'string' && edit.term.trim() ? edit.term.trim() : key.replace(/[-_.]+/g, ' ');
+    const name =
+      typeof edit?.term === 'string' && edit.term.trim()
+        ? edit.term.trim()
+        : key.replace(/[-_.]+/g, ' ');
     return this.glossary.upsert({
       term: name,
       key,
       kind: edit?.kind === 'ENTITY' ? 'ENTITY' : 'CONCEPT',
       schemeId: typeof edit?.schemeId === 'string' ? edit.schemeId : undefined,
-      definition: typeof edit?.definition === 'string' ? edit.definition : undefined,
+      definition:
+        typeof edit?.definition === 'string' ? edit.definition : undefined,
       origin: 'OPERATOR',
       author: actor.name,
     });
   }
 
-  private async decideDraftRelation(id: string, decision: ProposalDecision, actor: Actor) {
-    const relation = await this.prisma.glossaryRelation.findUnique({ where: { id } });
+  private async decideDraftRelation(
+    id: string,
+    decision: ProposalDecision,
+    actor: Actor,
+  ) {
+    const relation = await this.prisma.glossaryRelation.findUnique({
+      where: { id },
+    });
     if (!relation) throw new NotFoundException(`Relation ${id} not found`);
     if (decision === 'accept' || decision === 'edit') {
       if (actor.isAgent) {
-        throw new ForbiddenException('Agents approve relations through glossary.approve_relation, within its guardrails.');
+        throw new ForbiddenException(
+          'Agents approve relations through glossary.approve_relation, within its guardrails.',
+        );
       }
       return this.relations.approve(id, actor.name);
     }
@@ -483,11 +655,16 @@ export class GlossaryProposalsService {
     actor: Actor,
   ) {
     if (actor.isAgent && decision !== 'dismiss') {
-      throw new ForbiddenException('Agents approve bindings through glossary.approve_binding, within its guardrails.');
+      throw new ForbiddenException(
+        'Agents approve bindings through glossary.approve_binding, within its guardrails.',
+      );
     }
-    if (decision === 'dismiss' || decision === 'dismiss_forever') return this.bindings.remove(id, actor.name);
+    if (decision === 'dismiss' || decision === 'dismiss_forever')
+      return this.bindings.remove(id, actor.name);
     if (decision === 'edit' && edit?.spec) {
-      await this.bindings.update(id, edit.spec as BindingSpec, { actor: actor.name });
+      await this.bindings.update(id, edit.spec as BindingSpec, {
+        actor: actor.name,
+      });
     }
     return this.bindings.approve(id, actor.name);
   }
@@ -500,10 +677,15 @@ export class GlossaryProposalsService {
     reason: string | undefined,
     actor: Actor,
   ) {
-    const row = await this.prisma.semanticSuggestion.findUnique({ where: { id } });
-    if (!row || row.kind !== kind) throw new NotFoundException(`Suggestion ${id} not found`);
+    const row = await this.prisma.semanticSuggestion.findUnique({
+      where: { id },
+    });
+    if (!row || row.kind !== kind)
+      throw new NotFoundException(`Suggestion ${id} not found`);
     if (row.status !== 'PROPOSED') {
-      throw new BadRequestException(`Suggestion ${id} is already ${row.status}`);
+      throw new BadRequestException(
+        `Suggestion ${id} is already ${row.status}`,
+      );
     }
     if (decision === 'dismiss' || decision === 'dismiss_forever') {
       if (reason && !DISMISS_REASONS.some((r) => reason.startsWith(r))) {
@@ -524,9 +706,13 @@ export class GlossaryProposalsService {
     let result: unknown = null;
     if (kind === 'BINDING') {
       if (actor.isAgent) {
-        throw new ForbiddenException('Agents approve binding suggestions through glossary.approve_binding.');
+        throw new ForbiddenException(
+          'Agents approve binding suggestions through glossary.approve_binding.',
+        );
       }
-      const spec = (decision === 'edit' && edit?.spec ? edit.spec : row.payload) as unknown as BindingSpec;
+      const spec = (decision === 'edit' && edit?.spec
+        ? edit.spec
+        : row.payload) as unknown as BindingSpec;
       result = await this.bindings.create(spec, {
         origin: 'OPERATOR',
         status: 'APPROVED',
@@ -535,9 +721,16 @@ export class GlossaryProposalsService {
       });
     } else if (kind === 'RELATION') {
       if (actor.isAgent) {
-        throw new ForbiddenException('Agents approve relations through glossary.approve_relation.');
+        throw new ForbiddenException(
+          'Agents approve relations through glossary.approve_relation.',
+        );
       }
-      const payload = row.payload as { fromTermId: string; toTermId: string; type?: string; label?: string };
+      const payload = row.payload as {
+        fromTermId: string;
+        toTermId: string;
+        type?: string;
+        label?: string;
+      };
       result = await this.relations.create({
         fromTermId: payload.fromTermId,
         toTermId: payload.toTermId,
@@ -550,10 +743,17 @@ export class GlossaryProposalsService {
     }
     await this.prisma.semanticSuggestion.update({
       where: { id },
-      data: { status: 'ACCEPTED', decidedBy: actor.name, decidedAt: new Date() },
+      data: {
+        status: 'ACCEPTED',
+        decidedBy: actor.name,
+        decidedAt: new Date(),
+      },
     });
     if (kind === 'LINK' && row.assetId) {
-      await this.jobs.scheduleIncrementalForAssets([row.assetId], 'link suggestion accepted');
+      await this.jobs.scheduleIncrementalForAssets(
+        [row.assetId],
+        'link suggestion accepted',
+      );
     }
     return result ?? { accepted: true };
   }
@@ -568,8 +768,10 @@ export class GlossaryProposalsService {
     reason?: string;
     actor: Actor;
   }) {
-    if (input.kind !== 'LINK') throw new BadRequestException('Bulk decisions are for LINK groups');
-    if (input.actor.isAgent) throw new ForbiddenException('Agents never decide documents (D7).');
+    if (input.kind !== 'LINK')
+      throw new BadRequestException('Bulk decisions are for LINK groups');
+    if (input.actor.isAgent)
+      throw new ForbiddenException('Agents never decide documents (D7).');
     const where: Prisma.SemanticSuggestionWhereInput = {
       kind: 'LINK',
       status: 'PROPOSED',
@@ -578,21 +780,38 @@ export class GlossaryProposalsService {
         ? { id: { in: input.ids.map((id) => id.replace(/^suggestion:/, '')) } }
         : { score: { gte: new Prisma.Decimal(input.minScore ?? 0.85) } }),
     };
-    const rows = await this.prisma.semanticSuggestion.findMany({ where, select: { id: true, assetId: true } });
+    const rows = await this.prisma.semanticSuggestion.findMany({
+      where,
+      select: { id: true, assetId: true },
+    });
     if (!rows.length) return { decided: 0 };
     await this.prisma.semanticSuggestion.updateMany({
       where: { id: { in: rows.map((r) => r.id) } },
       data:
         input.decision === 'accept'
-          ? { status: 'ACCEPTED', decidedBy: input.actor.name, decidedAt: new Date() }
-          : { status: 'DISMISSED', decidedBy: input.actor.name, decidedAt: new Date(), dismissReason: input.reason ?? null },
+          ? {
+              status: 'ACCEPTED',
+              decidedBy: input.actor.name,
+              decidedAt: new Date(),
+            }
+          : {
+              status: 'DISMISSED',
+              decidedBy: input.actor.name,
+              decidedAt: new Date(),
+              dismissReason: input.reason ?? null,
+            },
     });
     for (const row of rows) {
       await recordGlossaryActivity(this.prisma, {
         type: 'PROPOSAL_DECIDED',
         termId: input.termId,
         actor: input.actor.name,
-        payload: { kind: 'LINK', id: `suggestion:${row.id}`, decision: input.decision, bulk: true },
+        payload: {
+          kind: 'LINK',
+          id: `suggestion:${row.id}`,
+          decision: input.decision,
+          bulk: true,
+        },
       });
     }
     if (input.decision === 'accept') {
@@ -601,14 +820,22 @@ export class GlossaryProposalsService {
         'link suggestions accepted',
       );
     }
-    glossaryEvents.emit({ type: 'glossary.proposal_decided', kind: 'LINK', decision: input.decision, count: rows.length });
+    glossaryEvents.emit({
+      type: 'glossary.proposal_decided',
+      kind: 'LINK',
+      decision: input.decision,
+      count: rows.length,
+    });
     return { decided: rows.length };
   }
 
   /** An agent's supporting note on a proposal it may not decide (SL4 §7). */
   async addAgentNote(suggestionId: string, note: string) {
-    const row = await this.prisma.semanticSuggestion.findUnique({ where: { id: suggestionId.replace(/^suggestion:/, '') } });
-    if (!row) throw new NotFoundException(`Suggestion ${suggestionId} not found`);
+    const row = await this.prisma.semanticSuggestion.findUnique({
+      where: { id: suggestionId.replace(/^suggestion:/, '') },
+    });
+    if (!row)
+      throw new NotFoundException(`Suggestion ${suggestionId} not found`);
     return this.prisma.semanticSuggestion.update({
       where: { id: row.id },
       data: { agentNote: note.slice(0, 2000) },
@@ -618,7 +845,13 @@ export class GlossaryProposalsService {
   /** Link groups for the Documents section: per concept, with a score histogram. */
   async linkGroups() {
     const rows = await this.prisma.$queryRaw<
-      Array<{ term_id: string; term: string; key: string; n: bigint; bands: number[] }>
+      Array<{
+        term_id: string;
+        term: string;
+        key: string;
+        n: bigint;
+        bands: number[];
+      }>
     >`
       SELECT s.term_id, g.term, g.key, count(*) AS n,
              array_agg(floor(s.score * 10)::int ORDER BY s.score) AS bands
@@ -627,8 +860,15 @@ export class GlossaryProposalsService {
        GROUP BY s.term_id, g.term, g.key ORDER BY count(*) DESC`;
     return rows.map((row) => {
       const histogram = Array.from({ length: 11 }, () => 0);
-      for (const band of row.bands) histogram[Math.min(Math.max(band, 0), 10)] += 1;
-      return { termId: row.term_id, term: row.term, key: row.key, count: Number(row.n), histogram };
+      for (const band of row.bands)
+        histogram[Math.min(Math.max(band, 0), 10)] += 1;
+      return {
+        termId: row.term_id,
+        term: row.term,
+        key: row.key,
+        count: Number(row.n),
+        histogram,
+      };
     });
   }
 }

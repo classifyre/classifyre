@@ -153,6 +153,38 @@ export class SearchFindingsFiltersInputDto {
   @ArrayMaxSize(1000)
   @IsString({ each: true })
   excludeIds?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Glossary term keys: findings that are evidence of one of them (an ' +
+      'APPROVED binding of their output, or a manual link). Unknown keys are rejected.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => normalizeToStringArray(value))
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  term?: string[];
+
+  @ApiPropertyOptional({
+    description: 'With term: include the narrower concepts too.',
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  includeNarrower?: boolean;
+
+  @ApiPropertyOptional({
+    enum: ['BINDING', 'MANUAL'],
+    isArray: true,
+    description: 'With term: only evidence by these methods.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => normalizeToStringArray(value, true))
+  @IsArray()
+  @IsString({ each: true })
+  meaningMethod?: string[];
 }
 
 export class SearchFindingsPageDto {

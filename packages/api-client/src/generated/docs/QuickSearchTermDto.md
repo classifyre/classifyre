@@ -1,28 +1,34 @@
 
-# QuickSearchResponseDto
+# QuickSearchTermDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`assets` | [Array&lt;QuickSearchAssetDto&gt;](QuickSearchAssetDto.md)
-`findings` | [Array&lt;QuickSearchFindingDto&gt;](QuickSearchFindingDto.md)
-`terms` | [Array&lt;QuickSearchTermDto&gt;](QuickSearchTermDto.md)
-`truncated` | boolean
+`id` | string
+`key` | string
+`term` | string
+`kind` | string
+`status` | string
+`schemeName` | string
+`matchedOn` | string
 
 ## Example
 
 ```typescript
-import type { QuickSearchResponseDto } from '@workspace/api-client'
+import type { QuickSearchTermDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "assets": null,
-  "findings": null,
-  "terms": null,
-  "truncated": null,
-} satisfies QuickSearchResponseDto
+  "id": null,
+  "key": null,
+  "term": null,
+  "kind": null,
+  "status": null,
+  "schemeName": null,
+  "matchedOn": null,
+} satisfies QuickSearchTermDto
 
 console.log(example)
 
@@ -31,7 +37,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as QuickSearchResponseDto
+const exampleParsed = JSON.parse(exampleJSON) as QuickSearchTermDto
 console.log(exampleParsed)
 ```
 

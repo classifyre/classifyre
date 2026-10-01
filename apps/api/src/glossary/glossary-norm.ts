@@ -127,9 +127,7 @@ export function keyFromTermUrn(urn: string): string | null {
  * (`GES`, `PKS 725000`, `HGB_224_3_A`). Suggested in the editor, never moved
  * automatically.
  */
-export function suggestLabelKind(
-  alias: string,
-): 'hiddenAlias' | 'code' | null {
+export function suggestLabelKind(alias: string): 'hiddenAlias' | 'code' | null {
   const value = alias.trim();
   if (value.length === 1) return 'hiddenAlias';
   if (

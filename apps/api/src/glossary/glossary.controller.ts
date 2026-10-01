@@ -218,7 +218,9 @@ export class GlossaryController {
 
   @Post(':id/deprecate')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'APPROVED → DEPRECATED, optionally with a successor' })
+  @ApiOperation({
+    summary: 'APPROVED → DEPRECATED, optionally with a successor',
+  })
   @ApiOkResponse({ type: GlossaryTermDto })
   deprecate(
     @Param('id') id: string,
@@ -397,10 +399,7 @@ export class GlossaryController {
     });
     void reply
       .header('Content-Type', file.contentType)
-      .header(
-        'Content-Disposition',
-        `attachment; filename="${file.fileName}"`,
-      )
+      .header('Content-Disposition', `attachment; filename="${file.fileName}"`)
       .send(file.body);
   }
 

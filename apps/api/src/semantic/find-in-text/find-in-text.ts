@@ -33,6 +33,9 @@ export interface FindInTextOptions {
 }
 
 /** Escape a literal for both RE2 and Python's `re`. */
+/** A label that starts or ends with a non-ASCII character. */
+const NON_ASCII_EDGE = /^[^ -~]|[^ -~]$/u;
+
 export function escapeRegexLiteral(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -43,13 +46,17 @@ export function defaultLabels(term: {
   aliases: string[];
   codes: string[];
   hiddenAliases: string[];
-}): { labels: LabelChoice[]; excluded: Array<{ value: string; reason: string }> } {
+}): {
+  labels: LabelChoice[];
+  excluded: Array<{ value: string; reason: string }>;
+} {
   const labels: LabelChoice[] = [];
   const seen = new Set<string>();
   const push = (value: string, type: LabelChoice['type']) => {
     const trimmed = value.trim();
     if (!trimmed) return;
-    const identity = type === 'code' ? `c:${trimmed}` : `l:${trimmed.toLowerCase()}`;
+    const identity =
+      type === 'code' ? `c:${trimmed}` : `l:${trimmed.toLowerCase()}`;
     if (seen.has(identity)) return;
     seen.add(identity);
     const short = trimmed.length < 3;
@@ -57,7 +64,12 @@ export function defaultLabels(term: {
       value: trimmed,
       type,
       checked: !short,
-      ...(short ? { reason: 'Shorter than 3 characters: it would match inside too much text.' } : {}),
+      ...(short
+        ? {
+            reason:
+              'Shorter than 3 characters: it would match inside too much text.',
+          }
+        : {}),
     });
   };
   push(term.term, 'term');
@@ -87,15 +99,23 @@ export function buildFindInTextPattern(
   options: FindInTextOptions,
 ): string {
   const chosen = labels.filter((label) => label.checked);
-  const byLength = (a: LabelChoice, b: LabelChoice) => b.value.length - a.value.length;
-  const insensitive = chosen.filter((l) => l.type !== 'code').sort(byLength).map((l) => escapeRegexLiteral(l.value));
-  const codes = chosen.filter((l) => l.type === 'code').sort(byLength).map((l) => escapeRegexLiteral(l.value));
+  const byLength = (a: LabelChoice, b: LabelChoice) =>
+    b.value.length - a.value.length;
+  const insensitive = chosen
+    .filter((l) => l.type !== 'code')
+    .sort(byLength)
+    .map((l) => escapeRegexLiteral(l.value));
+  const codes = chosen
+    .filter((l) => l.type === 'code')
+    .sort(byLength)
+    .map((l) => escapeRegexLiteral(l.value));
   if (!insensitive.length && !codes.length) {
     throw new Error('Choose at least one label to match');
   }
   const cont = options.continuations ? `[${WORD_CHAR_CLASS_PY}]*` : '';
   const parts: string[] = [];
-  if (insensitive.length) parts.push(`(?i:(?:${insensitive.join('|')})${cont})`);
+  if (insensitive.length)
+    parts.push(`(?i:(?:${insensitive.join('|')})${cont})`);
   parts.push(...codes);
   const core = `(${parts.join('|')})`;
   return options.wholeWords
@@ -138,7 +158,7 @@ export function buildFindInTextScenarios(
     });
   }
   for (const label of chosen) {
-    if (/^[^\x00-\x7F]|[^\x00-\x7F]$/.test(label.value)) {
+    if (NON_ASCII_EDGE.test(label.value)) {
       scenarios.push({
         name: `matches "${label.value}" with a non-ASCII edge`,
         inputText: `Bericht: ${label.value} festgestellt.`,
@@ -156,7 +176,10 @@ export function buildFindInTextScenarios(
     }
   }
   for (const hidden of excludedHidden) {
-    if (chosen.some((label) => label.value.toLowerCase() === hidden.toLowerCase())) continue;
+    if (
+      chosen.some((label) => label.value.toLowerCase() === hidden.toLowerCase())
+    )
+      continue;
     scenarios.push({
       name: `does not match the hidden alias "${hidden}"`,
       inputText: `Only the hidden alias ${hidden} appears here.`,
@@ -167,7 +190,10 @@ export function buildFindInTextScenarios(
 }
 
 /** Hash of the labels a detector was generated with ("out of date — regenerate"). */
-export function labelsHash(labels: LabelChoice[], options: FindInTextOptions): string {
+export function labelsHash(
+  labels: LabelChoice[],
+  options: FindInTextOptions,
+): string {
   const canonical = JSON.stringify({
     labels: labels
       .filter((l) => l.checked)

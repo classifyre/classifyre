@@ -32,6 +32,16 @@ import {
   type FindingBulkOperation,
 } from '@prisma/client';
 import {
+  TermMatcher,
+  assertKnownTermKeys,
+  ensureTermSnapshot,
+  resolveTermKeys,
+} from './semantic/term-snapshot';
+import {
+  findingPredicateSql,
+  findingSelectorWhere,
+} from './semantic/bindings/binding-compiler';
+import {
   HistoryEventType,
   type FindingHistoryEntry,
 } from './types/finding-history.types';
@@ -86,6 +96,20 @@ const BULK_STATUS_PAGE_SIZE = 5000;
 
 /** Assets one `assetSeverityCounts` call will answer for — a graph page, not an export. */
 const ASSET_SEVERITY_COUNT_CAP = 500;
+
+/** Methods by which a finding is evidence of a term (SL3 R7.5). */
+const FINDING_MEANING_METHODS = ['BINDING', 'MANUAL'] as const;
+type FindingMeaningMethod = (typeof FINDING_MEANING_METHODS)[number];
+/** Findings a term filter may resolve through value-level bindings. */
+const TERM_VALUE_MATCH_CAP = 20_000;
+
+interface FindingTermFilter {
+  keys: string[];
+  includeNarrower: boolean;
+  methods: FindingMeaningMethod[];
+  sourceIds: string[];
+  assetIds: string[];
+}
 
 @Injectable()
 export class FindingsService {
@@ -200,7 +224,11 @@ export class FindingsService {
    */
   private buildBaseFindingsWhere(
     filters?: SearchFindingsRequestDto['filters'],
-  ): { where: Prisma.FindingWhereInput; search: string } {
+  ): {
+    where: Prisma.FindingWhereInput;
+    search: string;
+    terms: FindingTermFilter | null;
+  } {
     // Every findings query funnels through here, so this one check covers
     // search, charts, detector options and bulk update alike. A key this
     // builder does not read would otherwise drop out and widen the match.
@@ -276,7 +304,112 @@ export class FindingsService {
     }
 
     const search = filters?.search?.trim() ?? '';
-    return { where, search };
+    return { where, search, terms: this.termFilterOf(filters) };
+  }
+
+  /**
+   * The meaning filter (SL3 R7.5), resolved later by {@link applyTermClause}
+   * because it needs the term snapshot. `includeNarrower` and `meaningMethod`
+   * only modify `term`.
+   */
+  private termFilterOf(
+    filters?: SearchFindingsRequestDto['filters'],
+  ): FindingTermFilter | null {
+    const keys = this.normalizeFilterValues(filters?.term);
+    const methods = this.normalizeFilterValues(filters?.meaningMethod).map(
+      (value) => value.toUpperCase(),
+    );
+    const invalid = methods.filter(
+      (method) => !FINDING_MEANING_METHODS.includes(method as never),
+    );
+    if (invalid.length) {
+      throw new BadRequestException(
+        `meaningMethod for findings is one of ${FINDING_MEANING_METHODS.join(', ')}; got ${invalid.join(', ')}`,
+      );
+    }
+    const includeNarrower = Boolean(filters?.includeNarrower);
+    if (!keys.length && !methods.length && !includeNarrower) return null;
+    return {
+      keys,
+      includeNarrower,
+      methods: methods as FindingMeaningMethod[],
+      sourceIds: this.normalizeFilterValues(filters?.sourceId),
+      assetIds: this.normalizeFilterValues(filters?.assetId),
+    };
+  }
+
+  /**
+   * "Evidence of the term": an APPROVED binding of the finding's output (the
+   * compiler's halves) or a MANUAL reference to it. OUTPUT bindings and manual
+   * links translate to Prisma exactly; value and lookup bindings are resolved
+   * to ids in SQL, bounded, and fail closed past the bound rather than
+   * truncating the match.
+   */
+  private async applyTermClause(
+    where: Prisma.FindingWhereInput,
+    terms: FindingTermFilter | null,
+  ): Promise<Prisma.FindingWhereInput> {
+    if (!terms || terms.keys.length === 0) return where;
+    const snapshot = await ensureTermSnapshot(this.prisma);
+    const { termIds, unknown } = resolveTermKeys(
+      snapshot,
+      terms.keys,
+      terms.includeNarrower,
+    );
+    assertKnownTermKeys(unknown);
+    const matcher = new TermMatcher(snapshot, termIds);
+    const methods = terms.methods.length
+      ? new Set(terms.methods)
+      : new Set<FindingMeaningMethod>(FINDING_MEANING_METHODS);
+    const or: Prisma.FindingWhereInput[] = [];
+    if (methods.has('BINDING')) {
+      for (const binding of matcher.outputBindings) {
+        const selector = findingSelectorWhere(binding);
+        if (selector) or.push(selector);
+      }
+      const valueBindings = matcher.valueBindings;
+      if (valueBindings.length) {
+        const predicates = valueBindings
+          .map((binding) =>
+            findingPredicateSql(binding, termIds, { anyStatus: true }),
+          )
+          .filter((sql): sql is Prisma.Sql => sql !== null);
+        if (predicates.length) {
+          const scope: Prisma.Sql[] = [];
+          if (terms.sourceIds.length) {
+            scope.push(
+              Prisma.sql`f.source_id = ANY(${terms.sourceIds}::text[])`,
+            );
+          }
+          if (terms.assetIds.length) {
+            scope.push(Prisma.sql`f.asset_id = ANY(${terms.assetIds}::text[])`);
+          }
+          const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+            SELECT f.id FROM findings f
+             WHERE (${Prisma.join(predicates, ' OR ')})
+               ${scope.length ? Prisma.sql`AND ${Prisma.join(scope, ' AND ')}` : Prisma.empty}
+             LIMIT ${TERM_VALUE_MATCH_CAP + 1}`;
+          if (rows.length > TERM_VALUE_MATCH_CAP) {
+            throw new BadRequestException(
+              `The term filter matches more than ${TERM_VALUE_MATCH_CAP} findings through ` +
+                'value-level bindings. Narrow it with sourceId or assetId.',
+            );
+          }
+          if (rows.length) or.push({ id: { in: rows.map((row) => row.id) } });
+        }
+      }
+    }
+    if (methods.has('MANUAL') && matcher.manualFindingIds.length) {
+      or.push({ id: { in: matcher.manualFindingIds } });
+    }
+    const clause: Prisma.FindingWhereInput =
+      or.length > 0 ? { OR: or } : { id: { in: [] } };
+    const existing = where.AND
+      ? Array.isArray(where.AND)
+        ? where.AND
+        : [where.AND]
+      : [];
+    return { ...where, AND: [...existing, clause] };
   }
 
   /**
@@ -358,17 +491,25 @@ export class FindingsService {
       // plainto_tsquery may reject certain inputs; skip FTS and rely on other OR conditions.
     }
 
+    const existing = where.AND
+      ? Array.isArray(where.AND)
+        ? where.AND
+        : [where.AND]
+      : [];
     return {
       ...where,
-      AND: [{ OR: textOr }],
+      AND: [...existing, { OR: textOr }],
     };
   }
 
   private async buildSearchFindingsWhere(
     filters?: SearchFindingsRequestDto['filters'],
   ): Promise<Prisma.FindingWhereInput> {
-    const { where, search } = this.buildBaseFindingsWhere(filters);
-    return this.applySearchClause(where, search);
+    const { where, search, terms } = this.buildBaseFindingsWhere(filters);
+    return this.applyTermClause(
+      await this.applySearchClause(where, search),
+      terms,
+    );
   }
 
   private shouldRecordFeedbackStatus(status: FindingStatus): boolean {
@@ -555,10 +696,15 @@ export class FindingsService {
     const semanticEnabled =
       Boolean(semantic?.query?.trim()) &&
       semantic?.mode !== SemanticSearchMode.OFF;
-    const { where: baseWhere, search: baseSearch } =
-      this.buildBaseFindingsWhere(
-        semanticEnabled ? { ...filters, search: undefined } : filters,
-      );
+    const {
+      where: plainWhere,
+      search: baseSearch,
+      terms,
+    } = this.buildBaseFindingsWhere(
+      semanticEnabled ? { ...filters, search: undefined } : filters,
+    );
+    // The term clause is resolved once and carried by both arms below.
+    const baseWhere = await this.applyTermClause(plainWhere, terms);
     const where = await this.applySearchClause(baseWhere, baseSearch);
 
     if (semanticEnabled) {

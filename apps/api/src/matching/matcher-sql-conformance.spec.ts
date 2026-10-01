@@ -2,9 +2,14 @@ import { DetectorType, Prisma } from '@prisma/client';
 import {
   candidateWhere,
   CompiledMatcher,
+  exactInWhere,
   FindingCandidate,
   InquiryMatchers,
 } from './inquiry-matcher';
+import { primeTermSnapshot } from '../semantic/term-snapshot';
+import type { CompiledBinding } from '../semantic/bindings/binding-spec';
+import { emptyLookupIndex } from '../semantic/bindings/binding-compiler';
+import { glossaryNorm } from '../glossary/glossary-norm';
 
 /**
  * The two halves of a matcher, run over the same fixtures.
@@ -143,6 +148,10 @@ const base: InquiryMatchers = {
  */
 function evaluate(where: Prisma.FindingWhereInput, row: Row): boolean {
   return Object.entries(where).every(([field, condition]) => {
+    if (field === 'AND') {
+      const parts = condition as Prisma.FindingWhereInput[];
+      return parts.every((part) => evaluate(part, row));
+    }
     if (field === 'OR') {
       const branches = condition as Prisma.FindingWhereInput[];
       return branches.some((branch) => evaluate(branch, row));
@@ -318,6 +327,179 @@ const regexCases: Array<{ name: string; matchers: InquiryMatchers }> = [
     },
   },
 ];
+
+// ── Term dimension (SL3 R7.6) ───────────────────────────────────────────────
+
+function binding(
+  id: string,
+  partial: Partial<CompiledBinding>,
+): CompiledBinding {
+  return {
+    id,
+    mode: 'OUTPUT',
+    detectorType: null,
+    customDetectorKey: null,
+    findingType: null,
+    metadataPath: null,
+    values: [],
+    splitDelimiter: null,
+    termId: null,
+    lookupSchemeId: null,
+    lookupMatch: null,
+    noMeaning: false,
+    sourceIds: [],
+    confidence: 1,
+    ...partial,
+  };
+}
+
+function primeTerms(): void {
+  primeTermSnapshot({
+    active: {
+      bindings: [
+        binding('b-distress', {
+          detectorType: DetectorType.CUSTOM,
+          customDetectorKey: 'fb_distress',
+          findingType: 'tag:Financial distress',
+          termId: 't-distress',
+        }),
+        binding('b-email', {
+          detectorType: DetectorType.PII,
+          findingType: 'email',
+          termId: 't-email',
+        }),
+        // Scoped to one source: s2's emails are not evidence through it.
+        binding('b-email-scoped', {
+          detectorType: DetectorType.PII,
+          findingType: 'email',
+          termId: 't-contact',
+          sourceIds: ['s1'],
+        }),
+        binding('b-shell', {
+          mode: 'OUTPUT_VALUES',
+          detectorType: DetectorType.CUSTOM,
+          customDetectorKey: 'fb_shell_risk',
+          findingType: 'tag:Shell-company risk',
+          values: [glossaryNorm('hoch (5/12): amtswegig gelöscht')],
+          termId: 't-shell',
+        }),
+        binding('b-nomeaning', {
+          detectorType: DetectorType.CUSTOM,
+          customDetectorKey: 'fb_trade_category',
+          findingType: 'tag:Trade category',
+          noMeaning: true,
+        }),
+      ],
+      index: emptyLookupIndex(),
+      terms: new Map(),
+      loadedAt: Date.now(),
+    },
+    keys: new Map([
+      ['financial-distress', 't-distress'],
+      ['email-address', 't-email'],
+      ['personal-data', 't-personal'],
+      ['contact', 't-contact'],
+      ['shell-risk', 't-shell'],
+      ['old-distress-key', 't-distress'],
+    ]),
+    narrower: new Map([['t-personal', ['t-email']]]),
+    manualFindings: new Map([['t-distress', new Set(['secrets-s1'])]]),
+  });
+}
+
+const termCases: Array<{
+  name: string;
+  matchers: InquiryMatchers;
+  expected: string[];
+}> = [
+  {
+    name: 'term via an OUTPUT binding, plus a manual link',
+    matchers: {
+      ...base,
+      matchAllSources: true,
+      termKeys: ['financial-distress'],
+    },
+    expected: ['custom-distress', 'secrets-s1'],
+  },
+  {
+    name: 'a previous key resolves to the same term',
+    matchers: {
+      ...base,
+      matchAllSources: true,
+      termKeys: ['old-distress-key'],
+    },
+    expected: ['custom-distress', 'secrets-s1'],
+  },
+  {
+    name: 'broader term without includeNarrower has no evidence of its own',
+    matchers: { ...base, matchAllSources: true, termKeys: ['personal-data'] },
+    expected: [],
+  },
+  {
+    name: 'broader term with includeNarrower',
+    matchers: {
+      ...base,
+      matchAllSources: true,
+      termKeys: ['personal-data'],
+      termsIncludeNarrower: true,
+    },
+    expected: ['pii-email-s1', 'pii-email-s2'],
+  },
+  {
+    name: 'binding source scope',
+    matchers: { ...base, matchAllSources: true, termKeys: ['contact'] },
+    expected: ['pii-email-s1'],
+  },
+  {
+    name: 'term AND the source dimension',
+    matchers: { ...base, sourceIds: ['s2'], termKeys: ['email-address'] },
+    expected: ['pii-email-s2'],
+  },
+  {
+    name: 'term AND the detector dimension',
+    matchers: {
+      ...base,
+      matchAllSources: true,
+      detectorTypes: [DetectorType.SECRETS],
+      termKeys: ['financial-distress'],
+    },
+    expected: ['secrets-s1'],
+  },
+];
+
+describe('term dimension: candidateWhere ⟷ CompiledMatcher', () => {
+  beforeEach(primeTerms);
+
+  for (const { name, matchers, expected } of termCases) {
+    it(`${name} (exact)`, () => {
+      expect(exactInWhere(matchers)).toBe(true);
+      expect(bySql(matchers).sort()).toEqual([...expected].sort());
+      expect(byMatcher(matchers).sort()).toEqual([...expected].sort());
+    });
+  }
+
+  it('a value binding makes SQL a superset and the matcher exact', () => {
+    const matchers: InquiryMatchers = {
+      ...base,
+      matchAllSources: true,
+      termKeys: ['shell-risk'],
+    };
+    expect(exactInWhere(matchers)).toBe(false);
+    const sql = new Set(bySql(matchers));
+    const exact = byMatcher(matchers);
+    expect(exact).toEqual(['custom-shell-s2']);
+    for (const id of exact) expect(sql.has(id)).toBe(true);
+  });
+
+  it('a "no meaning" binding is never evidence', () => {
+    const matchers: InquiryMatchers = {
+      ...base,
+      matchAllSources: true,
+      termKeys: ['financial-distress'],
+    };
+    expect(bySql(matchers)).not.toContain('custom-trade');
+  });
+});
 
 describe('candidateWhere ⟷ CompiledMatcher conformance', () => {
   describe('no regex dimension: SQL is the answer, so it must be exact', () => {

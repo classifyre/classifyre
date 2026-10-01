@@ -1,4 +1,5 @@
 import { DetectorType, Prisma } from '@prisma/client';
+import { TermMatcher, termMatcherFor } from '../semantic/term-snapshot';
 
 /** A question's matcher configuration (which findings the query selects). */
 export interface InquiryMatchers {
@@ -10,10 +11,20 @@ export interface InquiryMatchers {
   findingTypeRegex: string[];
   /** Regex patterns matched against the finding's matchedContent value. Empty = any. */
   findingValueRegex: string[];
+  /**
+   * Glossary term keys (SL3 R7.6): the finding must be evidence of one of
+   * them. Empty or absent = any. Reading it needs the term snapshot loaded
+   * (`ensureTermSnapshot`) before the matcher is built.
+   */
+  termKeys?: string[];
+  /** Whether `termKeys` include their narrower concepts. */
+  termsIncludeNarrower?: boolean;
 }
 
 /** The minimal finding shape needed to decide a match. */
 export interface FindingCandidate {
+  /** Needed for manually linked findings in the term dimension. */
+  id?: string;
   sourceId: string;
   detectorType: DetectorType;
   findingType: string;
@@ -55,6 +66,7 @@ export class CompiledMatcher {
   private readonly findingTypes: Set<string>;
   private readonly typeRegexes: RegExp[];
   private readonly valueRegexes: RegExp[];
+  private readonly terms: TermMatcher | null;
 
   constructor(m: InquiryMatchers) {
     this.matchAllSources = m.matchAllSources;
@@ -64,6 +76,7 @@ export class CompiledMatcher {
     this.findingTypes = new Set(m.findingTypes);
     this.typeRegexes = compilePatterns(m.findingTypeRegex);
     this.valueRegexes = compilePatterns(m.findingValueRegex);
+    this.terms = termMatcherFor(m);
   }
 
   matches(f: FindingCandidate): boolean {
@@ -106,6 +119,9 @@ export class CompiledMatcher {
       const content = f.matchedContent ?? '';
       if (!this.valueRegexes.some((re) => re.test(content))) return false;
     }
+
+    // 5. Meaning: evidence of one of the named glossary terms (SL3 R7.6).
+    if (this.terms && !this.terms.matches(f)) return false;
 
     return true;
   }
@@ -173,7 +189,31 @@ export function candidateWhere(
   ) {
     where.findingType = { in: m.findingTypes };
   }
+  // Term dimension: exact for OUTPUT bindings and manual links, a superset
+  // (the output selector) for value and lookup bindings — see exactInWhere.
+  const terms = termMatcherFor(m);
+  if (terms) where.AND = [terms.where()];
   return where;
+}
+
+/**
+ * Whether {@link candidateWhere} is the whole answer, so a COUNT over it is
+ * the match count. False when a regex or a value-testing term binding has to
+ * run in memory.
+ */
+export function exactInWhere(m: InquiryMatchers): boolean {
+  if (m.findingTypeRegex.length > 0 || m.findingValueRegex.length > 0) {
+    return false;
+  }
+  const terms = termMatcherFor(m);
+  return !terms || terms.exactInWhere;
+}
+
+/** Whether the in-memory half reads `matchedContent`. */
+export function needsMatchedContent(m: InquiryMatchers): boolean {
+  if (m.findingValueRegex.length > 0) return true;
+  const terms = termMatcherFor(m);
+  return Boolean(terms?.needsContent);
 }
 
 function compilePatterns(patterns: string[]): RegExp[] {

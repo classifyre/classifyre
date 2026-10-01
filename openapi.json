@@ -16773,7 +16773,8 @@
               "type": "string",
               "enum": [
                 "assets",
-                "findings"
+                "findings",
+                "terms"
               ]
             }
           },
@@ -16954,6 +16955,58 @@
           "status"
         ]
       },
+      "QuickSearchTermDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable key; the term page is /glossary/terms/<key>"
+          },
+          "term": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CONCEPT",
+              "ENTITY"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "APPROVED",
+              "DEPRECATED"
+            ]
+          },
+          "schemeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "matchedOn": {
+            "type": "string",
+            "enum": [
+              "term",
+              "code",
+              "alias",
+              "hiddenAlias"
+            ],
+            "description": "Which label matched"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "term",
+          "kind",
+          "status",
+          "matchedOn"
+        ]
+      },
       "QuickSearchResponseDto": {
         "type": "object",
         "properties": {
@@ -16969,6 +17022,13 @@
               "$ref": "#/components/schemas/QuickSearchFindingDto"
             }
           },
+          "terms": {
+            "description": "Glossary terms whose labels match (SL3 R7.5)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuickSearchTermDto"
+            }
+          },
           "truncated": {
             "type": "boolean",
             "description": "True when a query ran out of its time budget and the lists may be short"
@@ -16977,6 +17037,7 @@
         "required": [
           "assets",
           "findings",
+          "terms",
           "truncated"
         ]
       },
@@ -17094,6 +17155,31 @@
                   "AG"
                 ]
               }
+            }
+          },
+          "term": {
+            "description": "Glossary term keys: assets with a current semantic link to one of them (any method). Unknown keys are rejected.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "includeNarrower": {
+            "type": "boolean",
+            "description": "With term: include narrower concepts."
+          },
+          "meaningMethod": {
+            "type": "array",
+            "description": "With term: only links by these methods.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "BINDING",
+                "DECLARED",
+                "MANUAL",
+                "SUGGESTED",
+                "MENTION"
+              ]
             }
           }
         }
@@ -17884,6 +17970,28 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "term": {
+            "description": "Glossary term keys: findings that are evidence of one of them (an APPROVED binding of their output, or a manual link). Unknown keys are rejected.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "includeNarrower": {
+            "type": "boolean",
+            "description": "With term: include the narrower concepts too."
+          },
+          "meaningMethod": {
+            "type": "array",
+            "description": "With term: only evidence by these methods.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "BINDING",
+                "MANUAL"
+              ]
             }
           }
         }
@@ -24343,6 +24451,17 @@
               "type": "string"
             }
           },
+          "termKeys": {
+            "description": "Glossary term keys: the finding must be evidence of one of them (an APPROVED binding of its output, or a manual link). Empty = any. Unknown keys are rejected.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "termsIncludeNarrower": {
+            "type": "boolean",
+            "description": "Include the narrower concepts of termKeys."
+          },
           "title": {
             "type": "string",
             "description": "The question / monitor name"
@@ -24461,6 +24580,15 @@
               "type": "string"
             }
           },
+          "termKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "termsIncludeNarrower": {
+            "type": "boolean"
+          },
           "matchCount": {
             "type": "number",
             "description": "Open findings currently matching this query"
@@ -24501,6 +24629,8 @@
           "findingTypes",
           "findingTypeRegex",
           "findingValueRegex",
+          "termKeys",
+          "termsIncludeNarrower",
           "matchCount",
           "newMatchCount",
           "goneMatchCount",
@@ -24564,6 +24694,17 @@
             "items": {
               "type": "string"
             }
+          },
+          "termKeys": {
+            "description": "Glossary term keys: the finding must be evidence of one of them (an APPROVED binding of its output, or a manual link). Empty = any. Unknown keys are rejected.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "termsIncludeNarrower": {
+            "type": "boolean",
+            "description": "Include the narrower concepts of termKeys."
           }
         }
       },
@@ -24645,6 +24786,7 @@
               "findingTypes",
               "findingTypeRegex",
               "findingValueRegex",
+              "termKeys",
               "corpus"
             ],
             "description": "The matcher dimension this diagnostic is about."
@@ -24902,6 +25044,17 @@
             "items": {
               "type": "string"
             }
+          },
+          "termKeys": {
+            "description": "Glossary term keys: the finding must be evidence of one of them (an APPROVED binding of its output, or a manual link). Empty = any. Unknown keys are rejected.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "termsIncludeNarrower": {
+            "type": "boolean",
+            "description": "Include the narrower concepts of termKeys."
           },
           "title": {
             "type": "string"

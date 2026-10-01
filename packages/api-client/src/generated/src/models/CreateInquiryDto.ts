@@ -62,6 +62,18 @@ export interface CreateInquiryDto {
      */
     findingValueRegex?: Array<string>;
     /**
+     * Glossary term keys: the finding must be evidence of one of them (an APPROVED binding of its output, or a manual link). Empty = any. Unknown keys are rejected.
+     * @type {Array<string>}
+     * @memberof CreateInquiryDto
+     */
+    termKeys?: Array<string>;
+    /**
+     * Include the narrower concepts of termKeys.
+     * @type {boolean}
+     * @memberof CreateInquiryDto
+     */
+    termsIncludeNarrower?: boolean;
+    /**
      * The question / monitor name
      * @type {string}
      * @memberof CreateInquiryDto
@@ -121,6 +133,8 @@ export function CreateInquiryDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'findingTypes': json['findingTypes'] == null ? undefined : json['findingTypes'],
         'findingTypeRegex': json['findingTypeRegex'] == null ? undefined : json['findingTypeRegex'],
         'findingValueRegex': json['findingValueRegex'] == null ? undefined : json['findingValueRegex'],
+        'termKeys': json['termKeys'] == null ? undefined : json['termKeys'],
+        'termsIncludeNarrower': json['termsIncludeNarrower'] == null ? undefined : json['termsIncludeNarrower'],
         'title': json['title'],
         'description': json['description'] == null ? undefined : json['description'],
         'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
@@ -145,6 +159,8 @@ export function CreateInquiryDtoToJSONTyped(value?: CreateInquiryDto | null, ign
         'findingTypes': value['findingTypes'],
         'findingTypeRegex': value['findingTypeRegex'],
         'findingValueRegex': value['findingValueRegex'],
+        'termKeys': value['termKeys'],
+        'termsIncludeNarrower': value['termsIncludeNarrower'],
         'title': value['title'],
         'description': value['description'],
         'createdBy': value['createdBy'],

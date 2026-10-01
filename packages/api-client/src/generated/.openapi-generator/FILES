@@ -345,6 +345,7 @@ docs/QuickSearchFindingDto.md
 docs/QuickSearchRequestDto.md
 docs/QuickSearchResponseDto.md
 docs/QuickSearchSeverityCountsDto.md
+docs/QuickSearchTermDto.md
 docs/RebuildEdgesResponseDto.md
 docs/RebuildIndexResponseDto.md
 docs/RecomputeCorrelationResponseDto.md
@@ -893,6 +894,7 @@ src/models/QuickSearchFindingDto.ts
 src/models/QuickSearchRequestDto.ts
 src/models/QuickSearchResponseDto.ts
 src/models/QuickSearchSeverityCountsDto.ts
+src/models/QuickSearchTermDto.ts
 src/models/RebuildEdgesResponseDto.ts
 src/models/RebuildIndexResponseDto.ts
 src/models/RecomputeCorrelationResponseDto.ts

@@ -79,7 +79,11 @@ describe('GlossaryService', () => {
     updatedAt: new Date(),
   };
 
-  const term = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
+  const term = (
+    id: string,
+    name: string,
+    extra: Record<string, unknown> = {},
+  ) => ({
     ...baseTerm,
     id,
     key: keyBase(name),
@@ -162,7 +166,11 @@ describe('GlossaryService', () => {
 
     it('agents never set keys', async () => {
       await expect(
-        service.upsert({ term: 'Project Aurora', key: 'aurora', origin: 'AGENT' }),
+        service.upsert({
+          term: 'Project Aurora',
+          key: 'aurora',
+          origin: 'AGENT',
+        }),
       ).rejects.toThrow(/never set keys/);
     });
 
@@ -312,23 +320,37 @@ describe('GlossaryService', () => {
       await service.deprecate('old', 'new');
       expect(prisma.glossaryTerm.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: 'DEPRECATED', replacedById: 'new' }),
+          data: expect.objectContaining({
+            status: 'DEPRECATED',
+            replacedById: 'new',
+          }),
         }),
       );
-      await expect(service.deprecate('old', 'entity')).rejects.toThrow(/same kind/);
+      await expect(service.deprecate('old', 'entity')).rejects.toThrow(
+        /same kind/,
+      );
     });
 
     it('refuses DRAFT → DEPRECATED', async () => {
-      prisma.glossaryTerm.findUnique.mockResolvedValue(term('d', 'Draft', { status: 'DRAFT' }));
-      await expect(service.deprecate('d')).rejects.toThrow(/cannot become DEPRECATED/);
+      prisma.glossaryTerm.findUnique.mockResolvedValue(
+        term('d', 'Draft', { status: 'DRAFT' }),
+      );
+      await expect(service.deprecate('d')).rejects.toThrow(
+        /cannot become DEPRECATED/,
+      );
     });
 
     it('verify stays an alias of approve', async () => {
-      prisma.glossaryTerm.findUnique.mockResolvedValue(term('d', 'Draft', { status: 'DRAFT', verifiedAt: null }));
+      prisma.glossaryTerm.findUnique.mockResolvedValue(
+        term('d', 'Draft', { status: 'DRAFT', verifiedAt: null }),
+      );
       await service.verify('d', 'analyst');
       expect(prisma.glossaryTerm.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: 'APPROVED', verifiedBy: 'analyst' }),
+          data: expect.objectContaining({
+            status: 'APPROVED',
+            verifiedBy: 'analyst',
+          }),
         }),
       );
     });
@@ -336,7 +358,9 @@ describe('GlossaryService', () => {
 
   describe('bulk update', () => {
     it('unapproves the selected ids and retypes them in one pass', async () => {
-      prisma.glossaryTerm.findMany.mockResolvedValue([{ id: baseTerm.id, key: baseTerm.key, kind: 'ENTITY' }]);
+      prisma.glossaryTerm.findMany.mockResolvedValue([
+        { id: baseTerm.id, key: baseTerm.key, kind: 'ENTITY' },
+      ]);
       prisma.glossaryTerm.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.bulkUpdate({
@@ -374,38 +398,55 @@ describe('GlossaryService', () => {
     // ordering over a substring match put both of those ahead of the term whose
     // code is literally the query.
     it('ranks an exact code above prefix matches', async () => {
-      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'gmbh' }]).mockResolvedValueOnce([]);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([{ id: 'gmbh' }])
+        .mockResolvedValueOnce([]);
       prisma.glossaryTerm.findMany.mockResolvedValue([
         term('gf', 'Geschäftsführer'),
         term('gs', 'Gesellschafter'),
-        term('gmbh', 'GmbH', { codes: ['GES'], aliases: ['Gesellschaft mit beschränkter Haftung'] }),
+        term('gmbh', 'GmbH', {
+          codes: ['GES'],
+          aliases: ['Gesellschaft mit beschränkter Haftung'],
+        }),
       ]);
 
       const hits = await service.lookup('GES', 5);
 
       expect(hits[0].term).toBe('GmbH');
       expect(hits[0].matchedOn).toBe('code');
-      expect(hits.slice(1).map((h) => h.matchType)).toEqual(['partial', 'partial']);
+      expect(hits.slice(1).map((h) => h.matchType)).toEqual([
+        'partial',
+        'partial',
+      ]);
     });
 
-    it('resolves a hidden alias exactly, never by substring', async () => {
+    it('resolves a hidden alias exactly, never by substring', () => {
       const einzel = term('e', 'Einzelvertretung', { hiddenAliases: ['E'] });
-      expect(lexicalRank('E', einzel)).toEqual({ order: 2, matchedOn: 'hiddenAlias' });
+      expect(lexicalRank('E', einzel)).toEqual({
+        order: 2,
+        matchedOn: 'hiddenAlias',
+      });
       expect(lexicalRank('Ei', { ...einzel, term: 'Vertretung' })).toBeNull();
     });
 
     it('ranks a case-sensitive code above a case-insensitive alias hit', () => {
       const a = term('a', 'Aktiengesellschaft', { codes: ['AG'] });
       const b = term('b', 'Aufsichtsgremium', { aliases: ['ag'] });
-      expect(lexicalRank('AG', a)!.order).toBeLessThan(lexicalRank('AG', b)!.order);
+      expect(lexicalRank('AG', a)!.order).toBeLessThan(
+        lexicalRank('AG', b)!.order,
+      );
     });
 
     // GENESIS field report P10: codes and statute names live in aliases, and a
     // query for part of one found nothing without embeddings.
     it('finds a term through part of a label, ranked by tier then length', async () => {
-      prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'pks' }]);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'pks' }]);
       prisma.glossaryTerm.findMany.mockResolvedValue([
-        term('pks', 'Ausländerrechtliche Verstöße', { aliases: ['PKS 725000'] }),
+        term('pks', 'Ausländerrechtliche Verstöße', {
+          aliases: ['PKS 725000'],
+        }),
         term('code', 'Schlüssel 725000'),
       ]);
 
@@ -418,7 +459,9 @@ describe('GlossaryService', () => {
     });
 
     it('ranks an exact term above an exact alias on another term', async () => {
-      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'other' }, { id: 'self' }]).mockResolvedValueOnce([]);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([{ id: 'other' }, { id: 'self' }])
+        .mockResolvedValueOnce([]);
       prisma.glossaryTerm.findMany.mockResolvedValue([
         term('other', 'Aufsichtsrat', { aliases: ['AR'] }),
         term('self', 'AR'),
@@ -431,7 +474,9 @@ describe('GlossaryService', () => {
     });
 
     it('returns an exact hit on a DEPRECATED term, marked, with its successor', async () => {
-      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'old' }]).mockResolvedValueOnce([]);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([{ id: 'old' }])
+        .mockResolvedValueOnce([]);
       prisma.glossaryTerm.findMany.mockResolvedValue([
         term('old', 'Old name', {
           status: 'DEPRECATED',
@@ -444,7 +489,11 @@ describe('GlossaryService', () => {
 
       expect(hits).toHaveLength(1);
       expect(hits[0].deprecated).toBe(true);
-      expect(hits[0].replacedBy).toEqual({ id: 'new', key: 'new-name', term: 'New name' });
+      expect(hits[0].replacedBy).toEqual({
+        id: 'new',
+        key: 'new-name',
+        term: 'New name',
+      });
     });
   });
 });
@@ -452,23 +501,30 @@ describe('GlossaryService', () => {
 describe('glossary keys and labels (C8, R2, R8)', () => {
   it('transliterates and slugs a key', () => {
     expect(keyBase('Überschuldung')).toBe('ueberschuldung');
-    expect(keyBase('Ausländerrechtliche Verstöße')).toBe('auslaenderrechtliche-verstoesse');
+    expect(keyBase('Ausländerrechtliche Verstöße')).toBe(
+      'auslaenderrechtliche-verstoesse',
+    );
     expect(keyBase('Café São Paulo')).toBe('cafe-sao-paulo');
     expect(keyBase('  ---  ')).toBe('term');
   });
 
   it('appends -2, -3 on collision', async () => {
     const taken = new Set(['gmbh', 'gmbh-2']);
-    await expect(generateKey('GmbH', async (k) => taken.has(k))).resolves.toBe('gmbh-3');
+    await expect(
+      generateKey('GmbH', (k) => Promise.resolve(taken.has(k))),
+    ).resolves.toBe('gmbh-3');
   });
 
   it('normalises like the SQL glossary_norm', () => {
     expect(glossaryNorm('  ＧＥＳ  Haftung ')).toBe('ges haftung');
-    expect(matchKeysFor({ term: 'GmbH', aliases: ['gmbh'], codes: ['GES'], hiddenAliases: ['E'] })).toEqual([
-      'gmbh',
-      'ges',
-      'e',
-    ]);
+    expect(
+      matchKeysFor({
+        term: 'GmbH',
+        aliases: ['gmbh'],
+        codes: ['GES'],
+        hiddenAliases: ['E'],
+      }),
+    ).toEqual(['gmbh', 'ges', 'e']);
   });
 
   it('suggests codes and hidden aliases, never moves them', () => {

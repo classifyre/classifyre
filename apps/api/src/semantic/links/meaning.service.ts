@@ -18,6 +18,7 @@ import {
 import { compileBindingRow } from '../bindings/bindings.service';
 import { isOutputMode, vocabularyLabel } from '../bindings/binding-spec';
 import { GlossaryRelationsService } from '../../glossary/glossary-relations.service';
+import { glossaryEvents } from '../../glossary/glossary-events';
 import { recordGlossaryActivity } from '../../glossary/glossary-activity';
 import { excerpt } from '../semantic-sql';
 import { SemanticJobsScheduler } from '../semantic-jobs.scheduler';
@@ -33,7 +34,12 @@ export interface MeaningItem {
     name: string;
     kind: string;
     status: string;
-    scheme: { id: string; key: string; name: string; color: string | null } | null;
+    scheme: {
+      id: string;
+      key: string;
+      name: string;
+      color: string | null;
+    } | null;
   };
   method: SemanticLinkMethod | 'BROADER';
   confidence: number;
@@ -47,7 +53,11 @@ export interface MeaningItem {
     origin: string;
   } | null;
   declaredBy?: { edgeId: string; evidence: unknown } | null;
-  linkedBy?: { referenceId: string; by: string | null; note: string | null } | null;
+  linkedBy?: {
+    referenceId: string;
+    by: string | null;
+    note: string | null;
+  } | null;
   /** For BROADER items: the narrower term it is implied by. */
   via?: { id: string; key: string; name: string } | null;
   since: Date | null;
@@ -60,7 +70,12 @@ type TermRow = {
   term: string;
   kind: string;
   status: string;
-  scheme: { id: string; key: string; name: string; color: string | null } | null;
+  scheme: {
+    id: string;
+    key: string;
+    name: string;
+    color: string | null;
+  } | null;
 };
 
 /**
@@ -109,7 +124,12 @@ export class MeaningService {
   async findingMeaning(findingId: string): Promise<{
     findingId: string;
     assetId: string;
-    output: { detectorType: string; customDetectorKey: string | null; findingType: string; label: { label: string; detail: string } };
+    output: {
+      detectorType: string;
+      customDetectorKey: string | null;
+      findingType: string;
+      label: { label: string; detail: string };
+    };
     meanings: MeaningItem[];
   }> {
     const finding = await this.prisma.finding.findUnique({
@@ -192,11 +212,19 @@ export class MeaningService {
         entityId: { in: findings.map((f) => f.id) },
       },
     });
-    const pairs: Array<{ findingId: string; termId: string; item: Omit<MeaningItem, 'term'> }> = [];
+    const pairs: Array<{
+      findingId: string;
+      termId: string;
+      item: Omit<MeaningItem, 'term'>;
+    }> = [];
     for (const finding of findings) {
       for (const binding of active.bindings) {
         if (!isOutputMode(binding.mode)) continue;
-        for (const termId of matchFindingTerms(binding, finding, active.index)) {
+        for (const termId of matchFindingTerms(
+          binding,
+          finding,
+          active.index,
+        )) {
           const info = bindingInfo.get(binding.id);
           pairs.push({
             findingId: finding.id,
@@ -248,7 +276,8 @@ export class MeaningService {
       const term = terms.get(pair.termId);
       if (!term) continue;
       // MANUAL links to a DRAFT term are visible but inert (SL-5): shown.
-      if (pair.item.method === 'BINDING' && term.status !== 'APPROVED') continue;
+      if (pair.item.method === 'BINDING' && term.status !== 'APPROVED')
+        continue;
       const list = out.get(pair.findingId) ?? [];
       list.push({ ...pair.item, term: this.termRef(term) });
       out.set(pair.findingId, list);
@@ -257,8 +286,11 @@ export class MeaningService {
       const direct = new Set(list.map((item) => item.term.id));
       const implied = new Map<string, MeaningItem>();
       for (const item of list) {
-        for (const parent of parents.filter((p) => p.fromTermId === item.term.id)) {
-          if (direct.has(parent.toTermId) || implied.has(parent.toTermId)) continue;
+        for (const parent of parents.filter(
+          (p) => p.fromTermId === item.term.id,
+        )) {
+          if (direct.has(parent.toTermId) || implied.has(parent.toTermId))
+            continue;
           const term = parentTerms.get(parent.toTermId);
           if (!term) continue;
           implied.set(parent.toTermId, {
@@ -301,7 +333,9 @@ export class MeaningService {
             term: true,
             kind: true,
             status: true,
-            scheme: { select: { id: true, key: true, name: true, color: true } },
+            scheme: {
+              select: { id: true, key: true, name: true, color: true },
+            },
           },
         },
       },
@@ -327,7 +361,13 @@ export class MeaningService {
           since: Date;
           lastLinkedAt: Date;
           goneAt: Date | null;
-          bindings: Array<{ id: string; mode: string; label: string; approvedBy: string | null; approvedAt: Date | null }>;
+          bindings: Array<{
+            id: string;
+            mode: string;
+            label: string;
+            approvedBy: string | null;
+            approvedAt: Date | null;
+          }>;
         }>;
       }
     >();
@@ -353,7 +393,9 @@ export class MeaningService {
           .map((b) => ({
             id: b.id,
             mode: b.mode,
-            label: isOutputMode(b.mode) ? vocabularyLabel(b).label : (b.metadataPath ?? ''),
+            label: isOutputMode(b.mode)
+              ? vocabularyLabel(b).label
+              : (b.metadataPath ?? ''),
             approvedBy: b.approvedBy,
             approvedAt: b.approvedAt,
           })),
@@ -420,7 +462,7 @@ export class MeaningService {
               : [];
             evidence.push({
               method: 'BINDING',
-              binding: (await this.bindings.get(binding.id)) as unknown,
+              binding: await this.bindings.get(binding.id),
               findings: details.map((f) => ({
                 id: f.id,
                 findingType: f.findingType,
@@ -438,15 +480,24 @@ export class MeaningService {
             });
             evidence.push({
               method: 'BINDING',
-              binding: (await this.bindings.get(binding.id)) as unknown,
+              binding: await this.bindings.get(binding.id),
               field: binding.metadataPath,
-              values: metadataValues(asset?.metadata, binding.metadataPath ?? ''),
+              values: metadataValues(
+                asset?.metadata,
+                binding.metadataPath ?? '',
+              ),
             });
           }
         }
       } else if (row.method === 'DECLARED') {
         const edges = await this.prisma.$queryRaw<
-          Array<{ id: string; evidence: unknown; confidence: Prisma.Decimal; last_seen_at: Date; method: string }>
+          Array<{
+            id: string;
+            evidence: unknown;
+            confidence: Prisma.Decimal;
+            last_seen_at: Date;
+            method: string;
+          }>
         >`
           SELECT e.id, e.evidence, e.confidence, e.last_seen_at, e.method::text AS method
             FROM edges e LEFT JOIN findings f ON e.from_type = 'finding' AND f.id = e.from_id
@@ -465,7 +516,14 @@ export class MeaningService {
         });
       } else if (row.method === 'MANUAL') {
         const refs = await this.prisma.$queryRaw<
-          Array<{ id: string; entity_type: string; entity_id: string; created_by: string | null; note: string | null; created_at: Date }>
+          Array<{
+            id: string;
+            entity_type: string;
+            entity_id: string;
+            created_by: string | null;
+            note: string | null;
+            created_at: Date;
+          }>
         >`
           SELECT r.id, r.entity_type, r.entity_id, r.created_by, r.note, r.created_at
             FROM glossary_references r LEFT JOIN findings f ON r.entity_type = 'finding' AND f.id = r.entity_id
@@ -484,11 +542,21 @@ export class MeaningService {
       } else if (row.method === 'SUGGESTED') {
         const suggestions = await this.prisma.semanticSuggestion.findMany({
           where: { assetId, termId, kind: 'LINK', status: 'ACCEPTED' },
-          select: { id: true, score: true, rationale: true, evidence: true, decidedBy: true, decidedAt: true },
+          select: {
+            id: true,
+            score: true,
+            rationale: true,
+            evidence: true,
+            decidedBy: true,
+            decidedAt: true,
+          },
         });
         evidence.push({
           method: 'SUGGESTED',
-          suggestions: suggestions.map((s) => ({ ...s, score: Number(s.score) })),
+          suggestions: suggestions.map((s) => ({
+            ...s,
+            score: Number(s.score),
+          })),
         });
       }
     }
@@ -509,7 +577,10 @@ export class MeaningService {
 
   // ── Terms ─────────────────────────────────────────────────────────────
 
-  async termIdsFor(termId: string, includeNarrower: boolean): Promise<string[]> {
+  async termIdsFor(
+    termId: string,
+    includeNarrower: boolean,
+  ): Promise<string[]> {
     return includeNarrower
       ? this.relations.narrowerClosure([termId])
       : [termId];
@@ -527,15 +598,24 @@ export class MeaningService {
       pageSize?: number;
     },
   ) {
-    const termIds = await this.termIdsFor(termId, Boolean(params.includeNarrower));
+    const termIds = await this.termIdsFor(
+      termId,
+      Boolean(params.includeNarrower),
+    );
     const pageSize = Math.min(Math.max(params.pageSize ?? 50, 1), 200);
     const page = Math.max(params.page ?? 0, 0);
     const status = params.status ?? 'current';
-    const filters: Prisma.Sql[] = [Prisma.sql`t.term_id = ANY(${termIds}::text[])`];
+    const filters: Prisma.Sql[] = [
+      Prisma.sql`t.term_id = ANY(${termIds}::text[])`,
+    ];
     if (status === 'current') filters.push(Prisma.sql`t.gone_at IS NULL`);
     if (status === 'gone') filters.push(Prisma.sql`t.gone_at IS NOT NULL`);
-    if (params.sourceId) filters.push(Prisma.sql`t.source_id = ${params.sourceId}`);
-    if (params.method) filters.push(Prisma.sql`t.method = ${params.method}::"SemanticLinkMethod"`);
+    if (params.sourceId)
+      filters.push(Prisma.sql`t.source_id = ${params.sourceId}`);
+    if (params.method)
+      filters.push(
+        Prisma.sql`t.method = ${params.method}::"SemanticLinkMethod"`,
+      );
     const where = Prisma.join(filters, ' AND ');
     const rows = await this.prisma.$queryRaw<
       Array<{
@@ -572,9 +652,13 @@ export class MeaningService {
        GROUP BY t.asset_id, a.name, a.external_url, a.asset_type, t.source_id, s.name
        ORDER BY min(t.max_severity) ASC NULLS LAST, sum(t.support_count) DESC, t.asset_id
        LIMIT ${pageSize} OFFSET ${page * pageSize}`);
-    const [count] = await this.prisma.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`
+    const [count] = await this.prisma.$queryRaw<
+      Array<{ n: bigint }>
+    >(Prisma.sql`
       SELECT count(DISTINCT t.asset_id) AS n FROM asset_terms t WHERE ${where}`);
-    const terms = await this.termRows([...new Set(rows.flatMap((r) => r.term_ids))]);
+    const terms = await this.termRows([
+      ...new Set(rows.flatMap((r) => r.term_ids)),
+    ]);
     return {
       termId,
       includeNarrower: Boolean(params.includeNarrower),
@@ -618,20 +702,28 @@ export class MeaningService {
     const [narrowerCount] = await this.prisma.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(DISTINCT asset_id) AS n FROM asset_terms
        WHERE term_id = ANY(${withNarrower}::text[]) AND gone_at IS NULL`;
-    const byMethod = await this.prisma.$queryRaw<Array<{ method: string; assets: bigint }>>`
+    const byMethod = await this.prisma.$queryRaw<
+      Array<{ method: string; assets: bigint }>
+    >`
       SELECT method::text AS method, count(DISTINCT asset_id) AS assets FROM asset_terms
        WHERE term_id = ANY(${ids}::text[]) AND gone_at IS NULL GROUP BY 1`;
-    const bySource = await this.prisma.$queryRaw<Array<{ source_id: string; name: string; assets: bigint }>>`
+    const bySource = await this.prisma.$queryRaw<
+      Array<{ source_id: string; name: string; assets: bigint }>
+    >`
       SELECT t.source_id, s.name, count(DISTINCT t.asset_id) AS assets
         FROM asset_terms t JOIN sources s ON s.id = t.source_id
        WHERE t.term_id = ANY(${ids}::text[]) AND t.gone_at IS NULL
        GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 50`;
-    const bySeverity = await this.prisma.$queryRaw<Array<{ severity: string | null; assets: bigint }>>`
+    const bySeverity = await this.prisma.$queryRaw<
+      Array<{ severity: string | null; assets: bigint }>
+    >`
       SELECT sev::text AS severity, count(*) AS assets FROM (
         SELECT asset_id, min(max_severity) AS sev FROM asset_terms
          WHERE term_id = ANY(${ids}::text[]) AND gone_at IS NULL GROUP BY 1
       ) x GROUP BY 1`;
-    const trend = await this.prisma.$queryRaw<Array<{ week: Date; added: bigint; gone: bigint }>>`
+    const trend = await this.prisma.$queryRaw<
+      Array<{ week: Date; added: bigint; gone: bigint }>
+    >`
       WITH weeks AS (
         SELECT generate_series(date_trunc('week', now()) - interval '25 weeks', date_trunc('week', now()), interval '1 week') AS week
       )
@@ -651,12 +743,27 @@ export class MeaningService {
         direct: Number(directCount?.n ?? 0),
         withNarrower: Number(narrowerCount?.n ?? 0),
       },
-      byMethod: byMethod.map((r) => ({ method: r.method, assets: Number(r.assets) })),
-      bySource: bySource.map((r) => ({ sourceId: r.source_id, name: r.name, assets: Number(r.assets) })),
+      byMethod: byMethod.map((r) => ({
+        method: r.method,
+        assets: Number(r.assets),
+      })),
+      bySource: bySource.map((r) => ({
+        sourceId: r.source_id,
+        name: r.name,
+        assets: Number(r.assets),
+      })),
       bySeverity: bySeverity
         .map((r) => ({ severity: r.severity, assets: Number(r.assets) }))
-        .sort((a, b) => SEVERITY_ORDER.indexOf(a.severity ?? '') - SEVERITY_ORDER.indexOf(b.severity ?? '')),
-      trend: trend.map((r) => ({ week: r.week, added: Number(r.added), gone: Number(r.gone) })),
+        .sort(
+          (a, b) =>
+            SEVERITY_ORDER.indexOf(a.severity ?? '') -
+            SEVERITY_ORDER.indexOf(b.severity ?? ''),
+        ),
+      trend: trend.map((r) => ({
+        week: r.week,
+        added: Number(r.added),
+        gone: Number(r.gone),
+      })),
     };
   }
 
@@ -668,7 +775,13 @@ export class MeaningService {
     });
     if (!term) throw new NotFoundException(`Glossary term ${termId} not found`);
     const cases = await this.prisma.$queryRaw<
-      Array<{ id: string; title: string; status: string; assets: bigint; about: boolean }>
+      Array<{
+        id: string;
+        title: string;
+        status: string;
+        assets: bigint;
+        about: boolean;
+      }>
     >`
       SELECT c.id, c.title, c.status::text AS status,
              count(DISTINCT t.asset_id) AS assets,
@@ -711,12 +824,18 @@ export class MeaningService {
       return finding.assetId;
     }
     if (type === 'asset') {
-      const asset = await this.prisma.asset.findUnique({ where: { id }, select: { id: true } });
+      const asset = await this.prisma.asset.findUnique({
+        where: { id },
+        select: { id: true },
+      });
       if (!asset) throw new BadRequestException(`Asset ${id} not found`);
       return asset.id;
     }
     if (type === 'case') {
-      const found = await this.prisma.case.findUnique({ where: { id }, select: { id: true } });
+      const found = await this.prisma.case.findUnique({
+        where: { id },
+        select: { id: true },
+      });
       if (!found) throw new BadRequestException(`Case ${id} not found`);
       return null;
     }
@@ -734,7 +853,8 @@ export class MeaningService {
       where: { id: input.termId },
       select: { id: true, key: true, kind: true },
     });
-    if (!term) throw new NotFoundException(`Glossary term ${input.termId} not found`);
+    if (!term)
+      throw new NotFoundException(`Glossary term ${input.termId} not found`);
     const assetId = await this.assertTarget(input.target.type, input.target.id);
     const reference = await this.prisma.glossaryReference.upsert({
       where: {
@@ -761,8 +881,18 @@ export class MeaningService {
       actor: input.actor ?? 'operator',
       payload: { referenceId: reference.id, target: input.target },
     });
+    glossaryEvents.emit({
+      type: 'semantic.reference_changed',
+      change: 'linked',
+      termId: term.id,
+      entityType: input.target.type,
+      entityId: input.target.id,
+    });
     if (assetId) {
-      await this.jobs.scheduleIncrementalForAssets([assetId], `manual link to ${term.key}`);
+      await this.jobs.scheduleIncrementalForAssets(
+        [assetId],
+        `manual link to ${term.key}`,
+      );
     }
     return reference;
   }
@@ -779,7 +909,17 @@ export class MeaningService {
       type: 'LINK_REMOVED',
       termId: reference.glossaryTermId,
       actor,
-      payload: { referenceId, target: { type: reference.entityType, id: reference.entityId } },
+      payload: {
+        referenceId,
+        target: { type: reference.entityType, id: reference.entityId },
+      },
+    });
+    glossaryEvents.emit({
+      type: 'semantic.reference_changed',
+      change: 'unlinked',
+      termId: reference.glossaryTermId,
+      entityType: reference.entityType,
+      entityId: reference.entityId,
     });
     let assetId: string | null = null;
     if (reference.entityType === 'asset') assetId = reference.entityId;
@@ -793,14 +933,21 @@ export class MeaningService {
         )?.assetId ?? null;
     }
     if (assetId) {
-      await this.jobs.scheduleIncrementalForAssets([assetId], 'manual link removed');
+      await this.jobs.scheduleIncrementalForAssets(
+        [assetId],
+        'manual link removed',
+      );
     }
     return { deleted: true, id: referenceId };
   }
 
   async caseLinks(caseId: string) {
     const refs = await this.prisma.glossaryReference.findMany({
-      where: { role: GlossaryReferenceRole.ABOUT, entityType: 'case', entityId: caseId },
+      where: {
+        role: GlossaryReferenceRole.ABOUT,
+        entityType: 'case',
+        entityId: caseId,
+      },
       include: {
         term: {
           select: {
@@ -809,7 +956,9 @@ export class MeaningService {
             term: true,
             kind: true,
             status: true,
-            scheme: { select: { id: true, key: true, name: true, color: true } },
+            scheme: {
+              select: { id: true, key: true, name: true, color: true },
+            },
           },
         },
       },
@@ -827,7 +976,9 @@ export class MeaningService {
   async assetTermKeys(assetIds: string[]): Promise<Map<string, string[]>> {
     const out = new Map<string, string[]>();
     if (!assetIds.length) return out;
-    const rows = await this.prisma.$queryRaw<Array<{ asset_id: string; keys: string[] }>>`
+    const rows = await this.prisma.$queryRaw<
+      Array<{ asset_id: string; keys: string[] }>
+    >`
       SELECT t.asset_id, array_agg(DISTINCT g.key ORDER BY g.key) AS keys
         FROM asset_terms t JOIN glossary_terms g ON g.id = t.term_id
        WHERE t.asset_id = ANY(${assetIds}::text[]) AND t.gone_at IS NULL

@@ -80,6 +80,25 @@ export class InquiryMatchersDto {
   @IsArray()
   @IsString({ each: true })
   findingValueRegex?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Glossary term keys: the finding must be evidence of one of them ' +
+      '(an APPROVED binding of its output, or a manual link). Empty = any. ' +
+      'Unknown keys are rejected.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  termKeys?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Include the narrower concepts of termKeys.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  termsIncludeNarrower?: boolean;
 }
 
 export class CreateInquiryDto extends InquiryMatchersDto {
@@ -219,6 +238,12 @@ export class InquiryResponseDto {
 
   @ApiProperty({ type: [String] })
   findingValueRegex!: string[];
+
+  @ApiProperty({ type: [String] })
+  termKeys!: string[];
+
+  @ApiProperty()
+  termsIncludeNarrower!: boolean;
 
   @ApiProperty({
     description: 'Open findings currently matching this query',
@@ -431,6 +456,7 @@ export class PreviewDiagnosticDto {
       'findingTypes',
       'findingTypeRegex',
       'findingValueRegex',
+      'termKeys',
       'corpus',
     ],
     description: 'The matcher dimension this diagnostic is about.',

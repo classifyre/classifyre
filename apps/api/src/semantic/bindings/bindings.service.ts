@@ -39,7 +39,11 @@ import {
   lookupCandidates,
   metadataValues,
 } from './binding-compiler';
-import { excerpt, isStatementTimeout, withStatementTimeout } from '../semantic-sql';
+import {
+  excerpt,
+  isStatementTimeout,
+  withStatementTimeout,
+} from '../semantic-sql';
 
 /** Preview statement timeout (SL2 §6.1). */
 const PREVIEW_TIMEOUT_MS = 5_000;
@@ -117,6 +121,89 @@ function toCompiled(row: GlossaryBinding): CompiledBinding {
 
 export { toCompiled as compileBindingRow };
 
+/**
+ * Load the APPROVED bindings with an APPROVED (or lookup) target and the
+ * lookup index for their schemes. Uncached: {@link BindingsService.active} and
+ * the term snapshot cache it.
+ */
+export async function loadActiveBindings(
+  prisma: PrismaService,
+): Promise<ActiveBindings> {
+  const rows = await prisma.glossaryBinding.findMany({
+    where: {
+      status: 'APPROVED',
+      noMeaning: false,
+      OR: [
+        { term: { status: 'APPROVED' } },
+        { termId: null, lookupSchemeId: { not: null } },
+      ],
+    },
+  });
+  const schemeIds = [
+    ...new Set(
+      rows
+        .map((row) => row.lookupSchemeId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const termIds = rows
+    .map((row) => row.termId)
+    .filter((id): id is string => Boolean(id));
+  const concepts = schemeIds.length
+    ? await prisma.glossaryTerm.findMany({
+        where: {
+          schemeId: { in: schemeIds },
+          kind: 'CONCEPT',
+          status: 'APPROVED',
+        },
+        select: {
+          id: true,
+          key: true,
+          term: true,
+          kind: true,
+          status: true,
+          schemeId: true,
+          replacedById: true,
+          codes: true,
+          matchKeys: true,
+        },
+      })
+    : [];
+  const fixed = termIds.length
+    ? await prisma.glossaryTerm.findMany({
+        where: { id: { in: termIds } },
+        select: {
+          id: true,
+          key: true,
+          term: true,
+          kind: true,
+          status: true,
+          schemeId: true,
+          replacedById: true,
+        },
+      })
+    : [];
+  const terms = new Map<string, BindingTermSummary>();
+  for (const term of [...concepts, ...fixed]) {
+    terms.set(term.id, {
+      id: term.id,
+      key: term.key,
+      term: term.term,
+      kind: term.kind,
+      status: term.status,
+      schemeId: term.schemeId,
+      replacedById: term.replacedById,
+    });
+  }
+  const value: ActiveBindings = {
+    bindings: rows.map(toCompiled),
+    index: buildLookupIndex(concepts),
+    terms,
+    loadedAt: Date.now(),
+  };
+  return value;
+}
+
 /** The process-wide cache of active bindings, per tenant schema. */
 const activeCache = new Map<string, ActiveBindings>();
 let cacheListenerInstalled = false;
@@ -151,7 +238,7 @@ export class BindingsService {
 
   private schemaKey(): string {
     try {
-      return (this.cls.get(CLS_SCHEMA) as string | undefined) ?? 'default';
+      return this.cls.get(CLS_SCHEMA) ?? 'default';
     } catch {
       return 'default';
     }
@@ -171,78 +258,7 @@ export class BindingsService {
     const key = this.schemaKey();
     const cached = activeCache.get(key);
     if (cached && Date.now() - cached.loadedAt < 60_000) return cached;
-    const rows = await this.prisma.glossaryBinding.findMany({
-      where: {
-        status: 'APPROVED',
-        noMeaning: false,
-        OR: [
-          { term: { status: 'APPROVED' } },
-          { termId: null, lookupSchemeId: { not: null } },
-        ],
-      },
-    });
-    const schemeIds = [
-      ...new Set(
-        rows
-          .map((row) => row.lookupSchemeId)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    ];
-    const termIds = rows
-      .map((row) => row.termId)
-      .filter((id): id is string => Boolean(id));
-    const concepts = schemeIds.length
-      ? await this.prisma.glossaryTerm.findMany({
-          where: {
-            schemeId: { in: schemeIds },
-            kind: 'CONCEPT',
-            status: 'APPROVED',
-          },
-          select: {
-            id: true,
-            key: true,
-            term: true,
-            kind: true,
-            status: true,
-            schemeId: true,
-            replacedById: true,
-            codes: true,
-            matchKeys: true,
-          },
-        })
-      : [];
-    const fixed = termIds.length
-      ? await this.prisma.glossaryTerm.findMany({
-          where: { id: { in: termIds } },
-          select: {
-            id: true,
-            key: true,
-            term: true,
-            kind: true,
-            status: true,
-            schemeId: true,
-            replacedById: true,
-          },
-        })
-      : [];
-    const terms = new Map<string, BindingTermSummary>();
-    for (const term of [...concepts, ...fixed]) {
-      terms.set(term.id, {
-        id: term.id,
-        key: term.key,
-        term: term.term,
-        kind: term.kind,
-        status: term.status,
-        schemeId: term.schemeId,
-        replacedById: term.replacedById,
-      });
-    }
-    const value: ActiveBindings = {
-      bindings: rows.map(toCompiled),
-      index: buildLookupIndex(concepts),
-      terms,
-      loadedAt: Date.now(),
-    };
+    const value = await loadActiveBindings(this.prisma);
     activeCache.set(key, value);
     return value;
   }
@@ -476,7 +492,8 @@ export class BindingsService {
         : { label: row.metadataPath ?? '', detail: 'metadata' },
       flags: {
         targetDeprecated: row.term?.status === 'DEPRECATED',
-        retargetTo: row.term?.status === 'DEPRECATED' ? row.term.replacedById : null,
+        retargetTo:
+          row.term?.status === 'DEPRECATED' ? row.term.replacedById : null,
         targetNotApproved: Boolean(row.term && row.term.status !== 'APPROVED'),
         waitingForDetector:
           row.detectorType === 'CUSTOM' &&
@@ -560,7 +577,11 @@ export class BindingsService {
   async update(
     id: string,
     spec: BindingSpec,
-    options: { actor?: string; rationale?: string | null; note?: string | null },
+    options: {
+      actor?: string;
+      rationale?: string | null;
+      note?: string | null;
+    },
   ) {
     const existing = await this.prisma.glossaryBinding.findUnique({
       where: { id },
@@ -599,7 +620,9 @@ export class BindingsService {
         sourceIds: compiled.sourceIds,
         confidence: new Prisma.Decimal(compiled.confidence),
         fingerprint,
-        ...(options.rationale !== undefined ? { rationale: options.rationale } : {}),
+        ...(options.rationale !== undefined
+          ? { rationale: options.rationale }
+          : {}),
         ...(options.note !== undefined ? { note: options.note } : {}),
       },
     });
@@ -611,7 +634,9 @@ export class BindingsService {
     if (!row) throw new NotFoundException(`Binding ${id} not found`);
     if (row.status === 'APPROVED') return this.get(id);
     if (row.status === 'DISABLED') {
-      throw new BadRequestException('A DISABLED binding is enabled, not approved');
+      throw new BadRequestException(
+        'A DISABLED binding is enabled, not approved',
+      );
     }
     const updated = await this.prisma.glossaryBinding.update({
       where: { id },
@@ -673,7 +698,9 @@ export class BindingsService {
       change: 'disabled',
       bindingId: id,
       mode: updated.mode,
-      output: isOutputMode(updated.mode) ? outputKey(updated) : updated.metadataPath ?? undefined,
+      output: isOutputMode(updated.mode)
+        ? outputKey(updated)
+        : (updated.metadataPath ?? undefined),
       termKey: null,
     });
     return this.get(id);
@@ -702,7 +729,11 @@ export class BindingsService {
       include: { term: true },
     });
     if (!row) throw new NotFoundException(`Binding ${id} not found`);
-    if (!row.term || row.term.status !== 'DEPRECATED' || !row.term.replacedById) {
+    if (
+      !row.term ||
+      row.term.status !== 'DEPRECATED' ||
+      !row.term.replacedById
+    ) {
       throw new BadRequestException(
         'Only bindings whose concept was deprecated with a successor can be retargeted',
       );
@@ -725,7 +756,12 @@ export class BindingsService {
         sourceIds: row.sourceIds,
         confidence: Number(row.confidence),
       },
-      { origin: 'OPERATOR', status: 'APPROVED', actor, note: `Retargeted from ${row.term.key}` },
+      {
+        origin: 'OPERATOR',
+        status: 'APPROVED',
+        actor,
+        note: `Retargeted from ${row.term.key}`,
+      },
     );
   }
 
@@ -768,7 +804,9 @@ export class BindingsService {
       change,
       bindingId: row.id,
       mode: row.mode,
-      output: isOutputMode(row.mode) ? outputKey(row) : (row.metadataPath ?? undefined),
+      output: isOutputMode(row.mode)
+        ? outputKey(row)
+        : (row.metadataPath ?? undefined),
       termKey: term?.key ?? null,
     });
   }
@@ -824,7 +862,14 @@ export class BindingsService {
             kind: 'CONCEPT',
             status: 'APPROVED',
           },
-          select: { id: true, key: true, term: true, schemeId: true, codes: true, matchKeys: true },
+          select: {
+            id: true,
+            key: true,
+            term: true,
+            schemeId: true,
+            codes: true,
+            matchKeys: true,
+          },
         })
       : [];
     if (isLookupMode(binding.mode) && concepts.length === 0) {
@@ -837,32 +882,39 @@ export class BindingsService {
     const conceptById = new Map(concepts.map((c) => [c.id, c]));
 
     try {
-      await withStatementTimeout(this.prisma, PREVIEW_TIMEOUT_MS, async (tx) => {
-        if (isOutputMode(binding.mode)) {
-          const rows = findingTermsSql({ ...binding, noMeaning: false, termId: binding.termId ?? '__no_meaning__' });
-          if (rows) {
-            const [counts] = await tx.$queryRaw<
-              Array<{ findings: bigint; assets: bigint; sources: bigint }>
-            >(Prisma.sql`
+      await withStatementTimeout(
+        this.prisma,
+        PREVIEW_TIMEOUT_MS,
+        async (tx) => {
+          if (isOutputMode(binding.mode)) {
+            const rows = findingTermsSql({
+              ...binding,
+              noMeaning: false,
+              termId: binding.termId ?? '__no_meaning__',
+            });
+            if (rows) {
+              const [counts] = await tx.$queryRaw<
+                Array<{ findings: bigint; assets: bigint; sources: bigint }>
+              >(Prisma.sql`
               SELECT count(DISTINCT x.finding_id) AS findings,
                      count(DISTINCT x.asset_id) AS assets,
                      count(DISTINCT x.source_id) AS sources
                 FROM (${rows}) x`);
-            preview.counts = {
-              findings: Number(counts?.findings ?? 0),
-              assets: Number(counts?.assets ?? 0),
-              sources: Number(counts?.sources ?? 0),
-            };
-            const samples = await tx.$queryRaw<
-              Array<{
-                finding_id: string;
-                asset_id: string;
-                asset_name: string;
-                matched_content: string;
-                redacted_content: string | null;
-                term_id: string;
-              }>
-            >(Prisma.sql`
+              preview.counts = {
+                findings: Number(counts?.findings ?? 0),
+                assets: Number(counts?.assets ?? 0),
+                sources: Number(counts?.sources ?? 0),
+              };
+              const samples = await tx.$queryRaw<
+                Array<{
+                  finding_id: string;
+                  asset_id: string;
+                  asset_name: string;
+                  matched_content: string;
+                  redacted_content: string | null;
+                  term_id: string;
+                }>
+              >(Prisma.sql`
               SELECT x.finding_id, x.asset_id, a.name AS asset_name,
                      f.matched_content, f.redacted_content, x.term_id
                 FROM (${rows}) x
@@ -870,60 +922,88 @@ export class BindingsService {
                 JOIN assets a ON a.id = x.asset_id
                ORDER BY x.last_detected_at DESC NULLS LAST
                LIMIT 5`);
-            preview.samples = samples.map((sample) => ({
-              findingId: sample.finding_id,
-              assetId: sample.asset_id,
-              assetName: sample.asset_name,
-              value: excerpt(sample.redacted_content ?? sample.matched_content),
-              term: this.termRef(sample.term_id, conceptById),
-            }));
-          }
-          if (isLookupMode(binding.mode) || binding.mode === 'OUTPUT_VALUES') {
-            const values = await tx.$queryRaw<Array<{ value: string; count: bigint }>>(
-              Prisma.sql`
+              preview.samples = samples.map((sample) => ({
+                findingId: sample.finding_id,
+                assetId: sample.asset_id,
+                assetName: sample.asset_name,
+                value: excerpt(
+                  sample.redacted_content ?? sample.matched_content,
+                ),
+                term: this.termRef(sample.term_id, conceptById),
+              }));
+            }
+            if (
+              isLookupMode(binding.mode) ||
+              binding.mode === 'OUTPUT_VALUES'
+            ) {
+              const values = await tx.$queryRaw<
+                Array<{ value: string; count: bigint }>
+              >(
+                Prisma.sql`
                 SELECT min(f.matched_content) AS value, count(*) AS count
                   FROM findings f
                  WHERE ${findingSelectorSql(binding)}
                  GROUP BY glossary_norm(f.matched_content)
                  ORDER BY count(*) DESC
                  LIMIT 200`,
-            );
-            if (isLookupMode(binding.mode)) {
-              preview.lookup = this.lookupTable(binding, values, index, conceptById);
+              );
+              if (isLookupMode(binding.mode)) {
+                preview.lookup = this.lookupTable(
+                  binding,
+                  values,
+                  index,
+                  conceptById,
+                );
+              }
             }
-          }
-        } else {
-          const rows = assetTermsSql({ ...binding, noMeaning: false, termId: binding.termId ?? '__no_meaning__' });
-          if (rows) {
-            const [counts] = await tx.$queryRaw<
-              Array<{ assets: bigint; sources: bigint }>
-            >(Prisma.sql`
+          } else {
+            const rows = assetTermsSql({
+              ...binding,
+              noMeaning: false,
+              termId: binding.termId ?? '__no_meaning__',
+            });
+            if (rows) {
+              const [counts] = await tx.$queryRaw<
+                Array<{ assets: bigint; sources: bigint }>
+              >(Prisma.sql`
               SELECT count(DISTINCT x.asset_id) AS assets,
                      count(DISTINCT x.source_id) AS sources
                 FROM (${rows}) x`);
-            preview.counts = {
-              findings: 0,
-              assets: Number(counts?.assets ?? 0),
-              sources: Number(counts?.sources ?? 0),
-            };
-            const samples = await tx.$queryRaw<
-              Array<{ asset_id: string; asset_name: string; metadata: unknown; term_id: string }>
-            >(Prisma.sql`
+              preview.counts = {
+                findings: 0,
+                assets: Number(counts?.assets ?? 0),
+                sources: Number(counts?.sources ?? 0),
+              };
+              const samples = await tx.$queryRaw<
+                Array<{
+                  asset_id: string;
+                  asset_name: string;
+                  metadata: unknown;
+                  term_id: string;
+                }>
+              >(Prisma.sql`
               SELECT x.asset_id, a.name AS asset_name, a.metadata, x.term_id
                 FROM (${rows}) x JOIN assets a ON a.id = x.asset_id
                LIMIT 5`);
-            preview.samples = samples.map((sample) => ({
-              findingId: null,
-              assetId: sample.asset_id,
-              assetName: sample.asset_name,
-              value: excerpt(metadataValues(sample.metadata, binding.metadataPath ?? '').join(', ')),
-              term: this.termRef(sample.term_id, conceptById),
-            }));
-          }
-          if (isLookupMode(binding.mode)) {
-            const path = (binding.metadataPath ?? '').split('.');
-            const values = await tx.$queryRaw<Array<{ value: string; count: bigint }>>(
-              Prisma.sql`
+              preview.samples = samples.map((sample) => ({
+                findingId: null,
+                assetId: sample.asset_id,
+                assetName: sample.asset_name,
+                value: excerpt(
+                  metadataValues(
+                    sample.metadata,
+                    binding.metadataPath ?? '',
+                  ).join(', '),
+                ),
+                term: this.termRef(sample.term_id, conceptById),
+              }));
+            }
+            if (isLookupMode(binding.mode)) {
+              const path = (binding.metadataPath ?? '').split('.');
+              const values = await tx.$queryRaw<
+                Array<{ value: string; count: bigint }>
+              >(
+                Prisma.sql`
                 SELECT min(v) AS value, count(*) AS count FROM (
                   SELECT a.metadata #>> ${path}::text[] AS v
                     FROM assets a
@@ -934,11 +1014,17 @@ export class BindingsService {
                 GROUP BY glossary_norm(v)
                 ORDER BY count(*) DESC
                 LIMIT 200`,
-            );
-            preview.lookup = this.lookupTable(binding, values, index, conceptById);
+              );
+              preview.lookup = this.lookupTable(
+                binding,
+                values,
+                index,
+                conceptById,
+              );
+            }
           }
-        }
-      });
+        },
+      );
     } catch (error) {
       if (isStatementTimeout(error)) {
         preview.timedOut = true;
@@ -959,11 +1045,15 @@ export class BindingsService {
     if (binding.noMeaning) {
       warnings.push({
         code: 'NO_MEANING',
-        message: 'A "no meaning" binding links nothing; it marks the vocabulary as deliberately unbound.',
+        message:
+          'A "no meaning" binding links nothing; it marks the vocabulary as deliberately unbound.',
       });
     }
     if (options.withToken) {
-      preview.previewToken = this.issuePreviewToken(binding, preview.counts.findings);
+      preview.previewToken = this.issuePreviewToken(
+        binding,
+        preview.counts.findings,
+      );
     }
     return preview;
   }
@@ -973,7 +1063,9 @@ export class BindingsService {
     concepts: Map<string, { id: string; key: string; term: string }>,
   ): { id: string; key: string; term: string } | null {
     const concept = concepts.get(termId);
-    return concept ? { id: concept.id, key: concept.key, term: concept.term } : null;
+    return concept
+      ? { id: concept.id, key: concept.key, term: concept.term }
+      : null;
   }
 
   private lookupTable(
@@ -987,7 +1079,10 @@ export class BindingsService {
       unmatched: [],
       ambiguous: [],
     };
-    const tally = new Map<string, { value: string; count: number; ids: string[] }>();
+    const tally = new Map<
+      string,
+      { value: string; count: number; ids: string[] }
+    >();
     for (const row of values) {
       for (const part of splitValue(row.value ?? '', binding.splitDelimiter)) {
         const ids = lookupCandidates(binding, part, index);
@@ -1001,7 +1096,8 @@ export class BindingsService {
     for (const entry of [...tally.values()].sort((a, b) => b.count - a.count)) {
       if (entry.ids.length === 1) {
         const term = this.termRef(entry.ids[0], concepts);
-        if (term) table.matched.push({ value: entry.value, count: entry.count, term });
+        if (term)
+          table.matched.push({ value: entry.value, count: entry.count, term });
       } else if (entry.ids.length === 0) {
         table.unmatched.push({ value: entry.value, count: entry.count });
       } else {
@@ -1010,7 +1106,9 @@ export class BindingsService {
           count: entry.count,
           candidates: entry.ids
             .map((id) => this.termRef(id, concepts))
-            .filter((t): t is { id: string; key: string; term: string } => Boolean(t)),
+            .filter((t): t is { id: string; key: string; term: string } =>
+              Boolean(t),
+            ),
         });
       }
     }
@@ -1035,7 +1133,8 @@ export class BindingsService {
       include: { term: { select: { id: true, term: true } } },
     });
     const others = same.filter(
-      (row) => bindingFingerprint(toCompiled(row)) !== bindingFingerprint(binding),
+      (row) =>
+        bindingFingerprint(toCompiled(row)) !== bindingFingerprint(binding),
     );
     for (const other of others) {
       if (other.noMeaning) {
@@ -1059,7 +1158,9 @@ export class BindingsService {
     if (!otherTerms.length) return;
     // Redundant when one target is broader than the other: broader concepts
     // follow from the taxonomy, so bind the narrowest.
-    const related = await this.prisma.$queryRaw<Array<{ broader: string; narrower: string }>>`
+    const related = await this.prisma.$queryRaw<
+      Array<{ broader: string; narrower: string }>
+    >`
       WITH RECURSIVE up(start_id, term_id, depth) AS (
         SELECT t, t, 0 FROM unnest(${[binding.termId, ...otherTerms]}::text[]) t
         UNION
@@ -1073,13 +1174,15 @@ export class BindingsService {
       if (row.narrower === binding.termId && otherTerms.includes(row.broader)) {
         warnings.push({
           code: 'REDUNDANT',
-          message: 'Another binding of this output targets a broader concept; that one is now redundant.',
+          message:
+            'Another binding of this output targets a broader concept; that one is now redundant.',
         });
       }
       if (row.broader === binding.termId && otherTerms.includes(row.narrower)) {
         warnings.push({
           code: 'REDUNDANT',
-          message: 'This output is already bound to a narrower concept; this broader one follows from the taxonomy.',
+          message:
+            'This output is already bound to a narrower concept; this broader one follows from the taxonomy.',
         });
       }
     }
@@ -1104,7 +1207,9 @@ export class BindingsService {
         iat: Date.now(),
       }),
     ).toString('base64url');
-    const mac = createHmac('sha256', this.tokenSecret()).update(body).digest('base64url');
+    const mac = createHmac('sha256', this.tokenSecret())
+      .update(body)
+      .digest('base64url');
     return `${body}.${mac}`;
   }
 
@@ -1116,10 +1221,17 @@ export class BindingsService {
     binding: CompiledBinding,
     token: string | undefined,
   ): Promise<{ ok: true; findings: number } | { ok: false; reason: string }> {
-    if (!token) return { ok: false, reason: 'previewToken is missing: preview the binding first' };
+    if (!token)
+      return {
+        ok: false,
+        reason: 'previewToken is missing: preview the binding first',
+      };
     const [body, mac] = token.split('.');
-    if (!body || !mac) return { ok: false, reason: 'previewToken is malformed' };
-    const expected = createHmac('sha256', this.tokenSecret()).update(body).digest('base64url');
+    if (!body || !mac)
+      return { ok: false, reason: 'previewToken is malformed' };
+    const expected = createHmac('sha256', this.tokenSecret())
+      .update(body)
+      .digest('base64url');
     const a = Buffer.from(mac);
     const b = Buffer.from(expected);
     if (a.length !== b.length || !timingSafeEqual(a, b)) {
@@ -1132,7 +1244,10 @@ export class BindingsService {
       return { ok: false, reason: 'previewToken is malformed' };
     }
     if (Date.now() - payload.iat > PREVIEW_TOKEN_TTL_MS) {
-      return { ok: false, reason: 'previewToken expired (30 minutes): preview again' };
+      return {
+        ok: false,
+        reason: 'previewToken expired (30 minutes): preview again',
+      };
     }
     if (payload.fp !== bindingFingerprint(binding)) {
       return { ok: false, reason: 'previewToken is for a different binding' };
@@ -1164,7 +1279,10 @@ export class BindingsService {
       values: binding.values,
       splitDelimiter: binding.splitDelimiter,
       lookup: binding.lookupSchemeId
-        ? { schemeId: binding.lookupSchemeId, match: binding.lookupMatch ?? 'CODES' }
+        ? {
+            schemeId: binding.lookupSchemeId,
+            match: binding.lookupMatch ?? 'CODES',
+          }
         : null,
       termId: binding.termId,
       noMeaning: binding.noMeaning,

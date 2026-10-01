@@ -296,7 +296,7 @@ const GLOSSARY_DOCTRINE = [
   'state go to memory.write instead. Bad: "aws_supabase_pii_consolidated". Good: term "Aurora',
   'Holdings Ltd" (ENTITY) aliases ["Aurora Holdings", "AHL"].',
   'CODES are exact notations (GES, PKS 725000) and go in codes, not aliases; a single letter (E)',
-  'is a hidden alias, used by lookup and never matched in text. Choose a concept\'s scheme by',
+  "is a hidden alias, used by lookup and never matched in text. Choose a concept's scheme by",
   'glossary.lookup / glossary.list_schemes and never invent a scheme for a single term.',
   'Propose a BROADER relation only when the narrower concept is a kind of the broader one',
   '(GmbH is a kind of Kapitalgesellschaft); otherwise RELATED. When a specific case, inquiry,',

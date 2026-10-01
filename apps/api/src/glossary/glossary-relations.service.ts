@@ -102,8 +102,24 @@ export class GlossaryRelationsService {
       this.prisma.glossaryRelation.findMany({
         where,
         include: {
-          from: { select: { id: true, key: true, term: true, kind: true, status: true } },
-          to: { select: { id: true, key: true, term: true, kind: true, status: true } },
+          from: {
+            select: {
+              id: true,
+              key: true,
+              term: true,
+              kind: true,
+              status: true,
+            },
+          },
+          to: {
+            select: {
+              id: true,
+              key: true,
+              term: true,
+              kind: true,
+              status: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take,
@@ -191,9 +207,7 @@ export class GlossaryRelationsService {
     }
 
     const status: GlossaryStatus =
-      input.origin === 'AGENT'
-        ? 'DRAFT'
-        : (input.status ?? 'APPROVED');
+      input.origin === 'AGENT' ? 'DRAFT' : (input.status ?? 'APPROVED');
     let created: GlossaryRelation;
     try {
       created = await this.prisma.glossaryRelation.create({

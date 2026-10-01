@@ -12,6 +12,9 @@ Name | Type
 `status` | Array&lt;string&gt;
 `sourceTypes` | Array&lt;string&gt;
 `metadata` | object
+`term` | Array&lt;string&gt;
+`includeNarrower` | boolean
+`meaningMethod` | Array&lt;string&gt;
 
 ## Example
 
@@ -26,6 +29,9 @@ const example = {
   "status": null,
   "sourceTypes": null,
   "metadata": {"legal_form_code":{"in":["GES","AG"]}},
+  "term": null,
+  "includeNarrower": null,
+  "meaningMethod": null,
 } satisfies SearchAssetsFiltersDto
 
 console.log(example)

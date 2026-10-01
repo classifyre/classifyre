@@ -15,6 +15,7 @@ import {
 
 import { CorrelationJobScheduler } from '../correlation/correlation-job-scheduler.service';
 import { CompiledMatcher } from '../matching/inquiry-matcher';
+import { ensureTermSnapshotFor } from '../semantic/term-snapshot';
 import { InquiryMatchingService } from '../matching/inquiry-matching.service';
 import { PrismaService } from '../prisma.service';
 import { FindingStatsScheduler } from '../stats/finding-stats-scheduler.service';
@@ -567,8 +568,11 @@ export class RetireOutOfScopeService {
         findingTypes: true,
         findingTypeRegex: true,
         findingValueRegex: true,
+        termKeys: true,
+        termsIncludeNarrower: true,
       },
     });
+    await ensureTermSnapshotFor(this.prisma, fresh);
     return fresh.map((inquiry) => new CompiledMatcher(inquiry));
   }
 
@@ -706,8 +710,11 @@ export class RetireOutOfScopeService {
         findingTypes: true,
         findingTypeRegex: true,
         findingValueRegex: true,
+        termKeys: true,
+        termsIncludeNarrower: true,
       },
     });
+    await ensureTermSnapshotFor(this.prisma, inquiries);
     return inquiries.map((inquiry) => ({
       id: inquiry.id,
       title: inquiry.title,

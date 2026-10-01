@@ -61,6 +61,18 @@ export interface PreviewInquiryDto {
      * @memberof PreviewInquiryDto
      */
     findingValueRegex?: Array<string>;
+    /**
+     * Glossary term keys: the finding must be evidence of one of them (an APPROVED binding of its output, or a manual link). Empty = any. Unknown keys are rejected.
+     * @type {Array<string>}
+     * @memberof PreviewInquiryDto
+     */
+    termKeys?: Array<string>;
+    /**
+     * Include the narrower concepts of termKeys.
+     * @type {boolean}
+     * @memberof PreviewInquiryDto
+     */
+    termsIncludeNarrower?: boolean;
 }
 
 
@@ -102,6 +114,8 @@ export function PreviewInquiryDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'findingTypes': json['findingTypes'] == null ? undefined : json['findingTypes'],
         'findingTypeRegex': json['findingTypeRegex'] == null ? undefined : json['findingTypeRegex'],
         'findingValueRegex': json['findingValueRegex'] == null ? undefined : json['findingValueRegex'],
+        'termKeys': json['termKeys'] == null ? undefined : json['termKeys'],
+        'termsIncludeNarrower': json['termsIncludeNarrower'] == null ? undefined : json['termsIncludeNarrower'],
     };
 }
 
@@ -123,6 +137,8 @@ export function PreviewInquiryDtoToJSONTyped(value?: PreviewInquiryDto | null, i
         'findingTypes': value['findingTypes'],
         'findingTypeRegex': value['findingTypeRegex'],
         'findingValueRegex': value['findingValueRegex'],
+        'termKeys': value['termKeys'],
+        'termsIncludeNarrower': value['termsIncludeNarrower'],
     };
 }
 

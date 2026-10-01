@@ -30,7 +30,11 @@ export interface BindingSpec {
   /** *_VALUES: the chosen values (normalised on save). */
   values?: string[];
   splitDelimiter?: string | null;
-  lookup?: { schemeId?: string; schemeKey?: string; match: GlossaryLookupMatch } | null;
+  lookup?: {
+    schemeId?: string;
+    schemeKey?: string;
+    match: GlossaryLookupMatch;
+  } | null;
   /** The target concept (by key, C8), or termId. */
   termKey?: string | null;
   termId?: string | null;
@@ -60,10 +64,13 @@ export interface CompiledBinding {
 
 export const MAX_BINDING_VALUES = 1_000;
 export const MAX_BINDINGS = 5_000;
-const METADATA_PATH = /^[A-Za-z0-9_\-:@$ ]{1,100}(\.[A-Za-z0-9_\-:@$ ]{1,100})?$/;
+const METADATA_PATH =
+  /^[A-Za-z0-9_\-:@$ ]{1,100}(\.[A-Za-z0-9_\-:@$ ]{1,100})?$/;
 
 export function isOutputMode(mode: GlossaryBindingMode): boolean {
-  return mode === 'OUTPUT' || mode === 'OUTPUT_VALUES' || mode === 'OUTPUT_LOOKUP';
+  return (
+    mode === 'OUTPUT' || mode === 'OUTPUT_VALUES' || mode === 'OUTPUT_LOOKUP'
+  );
 }
 
 export function isLookupMode(mode: GlossaryBindingMode): boolean {
@@ -143,7 +150,9 @@ export function validateBindingShape(
 
   const rawValues = spec.values ?? [];
   const values = [
-    ...new Set(rawValues.map((value) => glossaryNorm(String(value))).filter(Boolean)),
+    ...new Set(
+      rawValues.map((value) => glossaryNorm(String(value))).filter(Boolean),
+    ),
   ];
   if (isValuesMode(mode)) {
     if (values.length < 1) {
@@ -182,7 +191,9 @@ export function validateBindingShape(
       throw new BadRequestException('termKey is required');
     }
     if (noMeaning && (spec.termId || spec.termKey)) {
-      throw new BadRequestException('termKey: a "no meaning" binding has no term');
+      throw new BadRequestException(
+        'termKey: a "no meaning" binding has no term',
+      );
     }
   }
   const splitDelimiter = spec.splitDelimiter ? spec.splitDelimiter : null;
@@ -243,9 +254,36 @@ export function outputKey(output: {
 
 /** Kept upper-case when humanising built-in type names. */
 const ACRONYMS = new Set([
-  'IBAN', 'IP', 'URL', 'NHS', 'SSN', 'VAT', 'ABN', 'ACN', 'UEN', 'NIF', 'NIE',
-  'AHV', 'NRP', 'ID', 'AU', 'US', 'UK', 'EU', 'IT', 'ES', 'CH', 'DE', 'AT',
-  'PL', 'FI', 'SVNR', 'PESEL', 'AWS', 'JWT', 'API',
+  'IBAN',
+  'IP',
+  'URL',
+  'NHS',
+  'SSN',
+  'VAT',
+  'ABN',
+  'ACN',
+  'UEN',
+  'NIF',
+  'NIE',
+  'AHV',
+  'NRP',
+  'ID',
+  'AU',
+  'US',
+  'UK',
+  'EU',
+  'IT',
+  'ES',
+  'CH',
+  'DE',
+  'AT',
+  'PL',
+  'FI',
+  'SVNR',
+  'PESEL',
+  'AWS',
+  'JWT',
+  'API',
 ]);
 
 const BUILTIN_LABELS: Record<string, string> = {
@@ -271,7 +309,9 @@ export function vocabularyLabel(output: {
   const detector =
     output.detectorType === 'CUSTOM'
       ? (output.customDetectorName ?? output.customDetectorKey ?? 'custom')
-      : (BUILTIN_LABELS[output.detectorType ?? ''] ?? output.detectorType ?? '');
+      : (BUILTIN_LABELS[output.detectorType ?? ''] ??
+        output.detectorType ??
+        '');
   if (type.startsWith('tag:')) {
     return { label: type.slice(4), detail: 'tag' };
   }
@@ -283,15 +323,19 @@ export function vocabularyLabel(output: {
       detail: detector,
     };
   }
-  if (type.startsWith('entity:')) return { label: type.slice(7), detail: detector };
-  if (type.startsWith('regex:')) return { label: type.slice(6), detail: detector };
+  if (type.startsWith('entity:'))
+    return { label: type.slice(7), detail: detector };
+  if (type.startsWith('regex:'))
+    return { label: type.slice(6), detail: detector };
   if (output.detectorType !== 'CUSTOM' && /^[A-Z0-9_]+$/.test(type)) {
     const words = type.split('_').filter(Boolean);
     const human = words
       .map((word, index) => {
         if (ACRONYMS.has(word)) return word;
         const lower = word.toLowerCase();
-        return index === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
+        return index === 0
+          ? lower.charAt(0).toUpperCase() + lower.slice(1)
+          : lower;
       })
       .join(' ');
     return { label: human, detail: detector };

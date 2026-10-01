@@ -78,7 +78,9 @@ export class SemanticEventsListener {
       await this.scheduler.scheduleMapRebuild(reason);
       await this.scheduler.scheduleSuggestions({ reason });
     };
-    glossaryEvents.on('glossary.imported', () => everything('glossary imported'));
+    glossaryEvents.on('glossary.imported', () =>
+      everything('glossary imported'),
+    );
     glossaryEvents.on('glossary.pack_installed', (event) =>
       everything(`pack ${event.packKey} installed`),
     );

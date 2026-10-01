@@ -47,7 +47,9 @@ export class GlossarySemanticController {
     @Query('skip') skip?: string,
   ) {
     if (kind && !PROPOSAL_KINDS.includes(kind as ProposalKind)) {
-      throw new BadRequestException(`kind is one of ${PROPOSAL_KINDS.join(', ')}`);
+      throw new BadRequestException(
+        `kind is one of ${PROPOSAL_KINDS.join(', ')}`,
+      );
     }
     return this.proposals.list({
       kind: kind as ProposalKind | undefined,
@@ -67,14 +69,19 @@ export class GlossarySemanticController {
   }
 
   @Get('proposals/link-groups')
-  @ApiOperation({ summary: 'Document suggestions grouped per concept, with a score histogram' })
+  @ApiOperation({
+    summary: 'Document suggestions grouped per concept, with a score histogram',
+  })
   linkGroups() {
     return this.proposals.linkGroups();
   }
 
   @Post('proposals/decide')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Accept, edit and accept, dismiss, dismiss forever or skip one proposal' })
+  @ApiOperation({
+    summary:
+      'Accept, edit and accept, dismiss, dismiss forever or skip one proposal',
+  })
   decide(
     @Body()
     body: {
@@ -91,13 +98,19 @@ export class GlossarySemanticController {
     }
     const allowed = new Set(['kind', 'id', 'decision', 'edit', 'reason']);
     const unknown = Object.keys(body).filter((key) => !allowed.has(key));
-    if (unknown.length) throw new BadRequestException(`Unknown field(s): ${unknown.join(', ')}`);
-    return this.proposals.decide({ ...body, actor: { name: actor ?? 'operator' } });
+    if (unknown.length)
+      throw new BadRequestException(`Unknown field(s): ${unknown.join(', ')}`);
+    return this.proposals.decide({
+      ...body,
+      actor: { name: actor ?? 'operator' },
+    });
   }
 
   @Post('proposals/decide-bulk')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Bulk accept or dismiss a group of document (LINK) suggestions' })
+  @ApiOperation({
+    summary: 'Bulk accept or dismiss a group of document (LINK) suggestions',
+  })
   decideBulk(
     @Body()
     body: {
@@ -113,11 +126,17 @@ export class GlossarySemanticController {
     if (body?.decision !== 'accept' && body?.decision !== 'dismiss') {
       throw new BadRequestException('decision is accept or dismiss');
     }
-    return this.proposals.decideBulk({ ...body, actor: { name: actor ?? 'operator' } });
+    return this.proposals.decideBulk({
+      ...body,
+      actor: { name: actor ?? 'operator' },
+    });
   }
 
   @Get('terms/:idOrKey/find-in-text')
-  @ApiOperation({ summary: '"Find in text": the labels, pattern and tests a detector would get' })
+  @ApiOperation({
+    summary:
+      '"Find in text": the labels, pattern and tests a detector would get',
+  })
   findInTextPreview(@Param('idOrKey') idOrKey: string) {
     return this.findInText.preview(idOrKey);
   }
@@ -125,22 +144,32 @@ export class GlossarySemanticController {
   @Post('terms/:idOrKey/find-in-text/preview')
   @HttpCode(HttpStatus.OK)
   @AllowInDemoMode()
-  findInTextPreviewWith(@Param('idOrKey') idOrKey: string, @Body() body: FindInTextInput) {
+  findInTextPreviewWith(
+    @Param('idOrKey') idOrKey: string,
+    @Body() body: FindInTextInput,
+  ) {
     return this.findInText.preview(idOrKey, body ?? {});
   }
 
   @Post('terms/:idOrKey/find-in-text')
-  @ApiOperation({ summary: '"Find in text": create a tested REGEX detector bound to the term' })
+  @ApiOperation({
+    summary: '"Find in text": create a tested REGEX detector bound to the term',
+  })
   findInTextCreate(
     @Param('idOrKey') idOrKey: string,
     @Body() body: FindInTextInput,
     @ActorName() actor?: string,
   ) {
-    return this.findInText.create(idOrKey, { ...(body ?? {}), actor: actor ?? 'operator' });
+    return this.findInText.create(idOrKey, {
+      ...(body ?? {}),
+      actor: actor ?? 'operator',
+    });
   }
 
   @Get('terms/:idOrKey/find-in-text/detectors')
-  @ApiOperation({ summary: 'Detectors generated from a term, with out-of-date flags' })
+  @ApiOperation({
+    summary: 'Detectors generated from a term, with out-of-date flags',
+  })
   findInTextStatus(@Param('idOrKey') idOrKey: string) {
     return this.findInText.status(idOrKey);
   }

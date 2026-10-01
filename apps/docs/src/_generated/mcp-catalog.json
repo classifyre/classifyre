@@ -1050,6 +1050,28 @@
               "description": "Leave out these finding ids."
             },
             {
+              "name": "filters.term",
+              "type": "string[]",
+              "required": false,
+              "description": "Glossary term keys: only findings that are evidence of one of these concepts (an APPROVED binding of their detector output, or a manual link). Prefer this over regex on values when a concept exists. Unknown keys are rejected."
+            },
+            {
+              "name": "filters.includeNarrower",
+              "type": "boolean",
+              "required": false,
+              "description": "With term: include the narrower concepts too."
+            },
+            {
+              "name": "filters.meaningMethod",
+              "type": "enum[]",
+              "required": false,
+              "description": "With term: only evidence by these methods.",
+              "enumValues": [
+                "BINDING",
+                "MANUAL"
+              ]
+            },
+            {
               "name": "page",
               "type": "object",
               "required": false,
@@ -1291,6 +1313,28 @@
               "type": "string[]",
               "required": false,
               "description": "Leave out these finding ids."
+            },
+            {
+              "name": "filters.term",
+              "type": "string[]",
+              "required": false,
+              "description": "Glossary term keys: only findings that are evidence of one of these concepts (an APPROVED binding of their detector output, or a manual link). Prefer this over regex on values when a concept exists. Unknown keys are rejected."
+            },
+            {
+              "name": "filters.includeNarrower",
+              "type": "boolean",
+              "required": false,
+              "description": "With term: include the narrower concepts too."
+            },
+            {
+              "name": "filters.meaningMethod",
+              "type": "enum[]",
+              "required": false,
+              "description": "With term: only evidence by these methods.",
+              "enumValues": [
+                "BINDING",
+                "MANUAL"
+              ]
             },
             {
               "name": "status",
@@ -1601,6 +1645,31 @@
               "type": "object",
               "required": false,
               "description": "Match connector-authored metadata exactly, e.g. {\"legal_form_code\": {\"in\": [\"GES\", \"AG\"]}}. Values compare as JSON: a number matches only a number. Keys may be nested with dots."
+            },
+            {
+              "name": "assets.term",
+              "type": "string[]",
+              "required": false,
+              "description": "Glossary term keys: assets with a current semantic link to one of these concepts (any method). Unknown keys are rejected."
+            },
+            {
+              "name": "assets.includeNarrower",
+              "type": "boolean",
+              "required": false,
+              "description": "With term: include the narrower concepts too."
+            },
+            {
+              "name": "assets.meaningMethod",
+              "type": "enum[]",
+              "required": false,
+              "description": "With term: only links by these methods.",
+              "enumValues": [
+                "BINDING",
+                "DECLARED",
+                "MANUAL",
+                "SUGGESTED",
+                "MENTION"
+              ]
             },
             {
               "name": "findings",

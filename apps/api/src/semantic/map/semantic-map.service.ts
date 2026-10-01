@@ -16,7 +16,12 @@ export interface SemanticMapNode {
   name: string;
   kind: string;
   definition: string | null;
-  scheme: { id: string; key: string; name: string; color: string | null } | null;
+  scheme: {
+    id: string;
+    key: string;
+    name: string;
+    color: string | null;
+  } | null;
   directAssetCount: number;
   totalAssetCount: number;
   findingCount: number;
@@ -38,7 +43,21 @@ export interface SemanticMapLink {
   lift: number | null;
 }
 
-const sourceCountCache = new Map<string, { at: number; rows: Map<string, { total: number; direct: number; severity: SeverityCounts; sources: number }> }>();
+const sourceCountCache = new Map<
+  string,
+  {
+    at: number;
+    rows: Map<
+      string,
+      {
+        total: number;
+        direct: number;
+        severity: SeverityCounts;
+        sources: number;
+      }
+    >;
+  }
+>();
 
 /**
  * The workspace semantic map (SL5 Part B): concepts sized by evidence, ringed
@@ -56,19 +75,30 @@ export class SemanticMapService {
   ) {}
 
   async isBuilt(): Promise<boolean> {
-    const state = await this.prisma.termGraphState.findUnique({ where: { id: 'singleton' } });
+    const state = await this.prisma.termGraphState.findUnique({
+      where: { id: 'singleton' },
+    });
     return Boolean(state?.isBuilt);
   }
 
   /** Rebuild every rollup. ≤ 30 s at 4 M asset_terms rows (SL5 B6). */
-  async rebuild(): Promise<{ nodes: number; links: number; durationMs: number }> {
+  async rebuild(): Promise<{
+    nodes: number;
+    links: number;
+    durationMs: number;
+  }> {
     const started = Date.now();
-    const settings = await this.prisma.instanceSettings.findUnique({ where: { id: 1 } });
+    const settings = await this.prisma.instanceSettings.findUnique({
+      where: { id: 1 },
+    });
     const minSupport = settings?.suggestionCooccurrenceMinSupport ?? 20;
-    const result = await withStatementTimeout(this.prisma, REBUILD_TIMEOUT_MS, async (tx) => {
-      await tx.$executeRaw`TRUNCATE TABLE term_graph_nodes`;
-      await tx.$executeRaw`TRUNCATE TABLE term_graph_links`;
-      const nodes = await tx.$executeRaw`
+    const result = await withStatementTimeout(
+      this.prisma,
+      REBUILD_TIMEOUT_MS,
+      async (tx) => {
+        await tx.$executeRaw`TRUNCATE TABLE term_graph_nodes`;
+        await tx.$executeRaw`TRUNCATE TABLE term_graph_links`;
+        const nodes = await tx.$executeRaw`
         INSERT INTO term_graph_nodes (term_id, scheme_id, direct_asset_count, total_asset_count,
                                       finding_count, source_count, severity_counts, last_linked_at)
         WITH RECURSIVE closure(root, term_id, depth) AS (
@@ -113,7 +143,7 @@ export class SemanticMapService {
           LEFT JOIN rolled r ON r.root = g.id
           LEFT JOIN severities s ON s.root = g.id
          WHERE g.status = 'APPROVED'`;
-      const relations = await tx.$executeRaw`
+        const relations = await tx.$executeRaw`
         INSERT INTO term_graph_links (term_a_id, term_b_id, kind, label, asset_count, lift)
         SELECT r.from_term_id, r.to_term_id, r.type::text, r.label, 0, NULL
           FROM glossary_relations r
@@ -121,7 +151,7 @@ export class SemanticMapService {
           JOIN glossary_terms b ON b.id = r.to_term_id AND b.status = 'APPROVED'
          WHERE r.status = 'APPROVED'
         ON CONFLICT DO NOTHING`;
-      const cooccurrence = await tx.$executeRaw`
+        const cooccurrence = await tx.$executeRaw`
         INSERT INTO term_graph_links (term_a_id, term_b_id, kind, label, asset_count, lift)
         WITH current AS (
           SELECT DISTINCT t.asset_id, t.term_id FROM asset_terms t
@@ -148,16 +178,24 @@ export class SemanticMapService {
         SELECT a, b, 'CO_OCCURRENCE', '', support, round(lift::numeric, 3)
           FROM ranked WHERE ra <= ${COOCCURRENCE_PER_NODE} OR rb <= ${COOCCURRENCE_PER_NODE}
         ON CONFLICT DO NOTHING`;
-      return { nodes, links: relations + cooccurrence };
-    });
+        return { nodes, links: relations + cooccurrence };
+      },
+    );
     const durationMs = Date.now() - started;
     await this.prisma.termGraphState.upsert({
       where: { id: 'singleton' },
-      create: { id: 'singleton', isBuilt: true, refreshedAt: new Date(), durationMs },
+      create: {
+        id: 'singleton',
+        isBuilt: true,
+        refreshedAt: new Date(),
+        durationMs,
+      },
       update: { isBuilt: true, refreshedAt: new Date(), durationMs },
     });
     sourceCountCache.clear();
-    this.logger.log(`Semantic map rebuilt: ${result.nodes} nodes, ${result.links} links in ${durationMs} ms.`);
+    this.logger.log(
+      `Semantic map rebuilt: ${result.nodes} nodes, ${result.links} links in ${durationMs} ms.`,
+    );
     return { ...result, durationMs };
   }
 
@@ -165,9 +203,20 @@ export class SemanticMapService {
   private async sourceCounts(sourceIds: string[]) {
     const key = [...sourceIds].sort().join(',');
     const cached = sourceCountCache.get(key);
-    if (cached && Date.now() - cached.at < SOURCE_FILTER_CACHE_MS) return cached.rows;
-    const rows = await withStatementTimeout(this.prisma, SOURCE_FILTER_TIMEOUT_MS, (tx) =>
-      tx.$queryRaw<Array<{ root: string; direct: boolean; severity: string | null; n: bigint }>>`
+    if (cached && Date.now() - cached.at < SOURCE_FILTER_CACHE_MS)
+      return cached.rows;
+    const rows = await withStatementTimeout(
+      this.prisma,
+      SOURCE_FILTER_TIMEOUT_MS,
+      (tx) =>
+        tx.$queryRaw<
+          Array<{
+            root: string;
+            direct: boolean;
+            severity: string | null;
+            n: bigint;
+          }>
+        >`
         WITH RECURSIVE closure(root, term_id, depth) AS (
           SELECT id, id, 0 FROM glossary_terms WHERE status = 'APPROVED'
           UNION
@@ -185,9 +234,22 @@ export class SemanticMapService {
         SELECT root, direct, severity::text AS severity, count(*) AS n
           FROM per_asset GROUP BY root, direct, severity`,
     );
-    const out = new Map<string, { total: number; direct: number; severity: SeverityCounts; sources: number }>();
+    const out = new Map<
+      string,
+      {
+        total: number;
+        direct: number;
+        severity: SeverityCounts;
+        sources: number;
+      }
+    >();
     for (const row of rows) {
-      const entry = out.get(row.root) ?? { total: 0, direct: 0, severity: {}, sources: 0 };
+      const entry = out.get(row.root) ?? {
+        total: 0,
+        direct: 0,
+        severity: {},
+        sources: 0,
+      };
       const n = Number(row.n);
       entry.total += n;
       if (row.direct) entry.direct += n;
@@ -219,7 +281,9 @@ export class SemanticMapService {
         where: {
           status: 'APPROVED',
           kind: params.includeEntities ? undefined : 'CONCEPT',
-          ...(params.schemeIds?.length ? { schemeId: { in: params.schemeIds } } : {}),
+          ...(params.schemeIds?.length
+            ? { schemeId: { in: params.schemeIds } }
+            : {}),
         },
         select: {
           id: true,
@@ -238,18 +302,28 @@ export class SemanticMapService {
         _count: { _all: true },
       }),
     ]);
-    const filtered = params.sourceIds?.length ? await this.sourceCounts(params.sourceIds).catch(() => null) : null;
+    const filtered = params.sourceIds?.length
+      ? await this.sourceCounts(params.sourceIds).catch(() => null)
+      : null;
     const rowById = new Map(rows.map((row) => [row.termId, row]));
-    const pendingById = new Map(pending.map((p) => [p.termId ?? '', p._count._all]));
+    const pendingById = new Map(
+      pending.map((p) => [p.termId ?? '', p._count._all]),
+    );
     const broaderOf = new Map<string, string[]>();
     for (const link of relations) {
       if (link.kind === 'BROADER') {
-        broaderOf.set(link.termAId, [...(broaderOf.get(link.termAId) ?? []), link.termBId]);
+        broaderOf.set(link.termAId, [
+          ...(broaderOf.get(link.termAId) ?? []),
+          link.termBId,
+        ]);
       }
     }
     const nodes = new Map<string, SemanticMapNode>();
     const termById = new Map(terms.map((t) => [t.id, t]));
-    const build = (termId: string, context: boolean): SemanticMapNode | null => {
+    const build = (
+      termId: string,
+      context: boolean,
+    ): SemanticMapNode | null => {
       const term = termById.get(termId);
       if (!term) return null;
       const row = rowById.get(termId);
@@ -261,11 +335,19 @@ export class SemanticMapService {
         kind: term.kind,
         definition: term.definition ? term.definition.slice(0, 300) : null,
         scheme: term.scheme,
-        directAssetCount: filtered ? (live?.direct ?? 0) : (row?.directAssetCount ?? 0),
-        totalAssetCount: filtered ? (live?.total ?? 0) : (row?.totalAssetCount ?? 0),
+        directAssetCount: filtered
+          ? (live?.direct ?? 0)
+          : (row?.directAssetCount ?? 0),
+        totalAssetCount: filtered
+          ? (live?.total ?? 0)
+          : (row?.totalAssetCount ?? 0),
         findingCount: row?.findingCount ?? 0,
-        sourceCount: filtered ? (params.sourceIds?.length ?? 0) : (row?.sourceCount ?? 0),
-        severityCounts: filtered ? (live?.severity ?? {}) : ((row?.severityCounts as SeverityCounts | null) ?? {}),
+        sourceCount: filtered
+          ? (params.sourceIds?.length ?? 0)
+          : (row?.sourceCount ?? 0),
+        severityCounts: filtered
+          ? (live?.severity ?? {})
+          : ((row?.severityCounts as SeverityCounts | null) ?? {}),
         lastLinkedAt: row?.lastLinkedAt ?? null,
         pendingProposals: pendingById.get(termId) ?? 0,
         broaderIds: broaderOf.get(termId) ?? [],
@@ -302,19 +384,26 @@ export class SemanticMapService {
       }));
     let overlay: { caseId: string; termIds: string[] } | undefined;
     if (params.caseId) {
-      const overlayRows = await this.prisma.$queryRaw<Array<{ term_id: string }>>`
+      const overlayRows = await this.prisma.$queryRaw<
+        Array<{ term_id: string }>
+      >`
         SELECT DISTINCT t.term_id FROM case_evidence ce
           JOIN asset_terms t ON t.asset_id = ce.entity_id AND t.gone_at IS NULL
          WHERE ce.case_id = ${params.caseId} AND ce.entity_type = 'asset'
         UNION
         SELECT r.glossary_term_id FROM glossary_references r
          WHERE r.role = 'ABOUT' AND r.entity_type = 'case' AND r.entity_id = ${params.caseId}`;
-      overlay = { caseId: params.caseId, termIds: overlayRows.map((r) => r.term_id) };
+      overlay = {
+        caseId: params.caseId,
+        termIds: overlayRows.map((r) => r.term_id),
+      };
     }
     const coverage = await this.vocabulary.coverage().catch(() => null);
     const [conceptCount, linkedTerms] = await Promise.all([
       this.prisma.glossaryTerm.count({ where: { kind: 'CONCEPT' } }),
-      this.prisma.termGraphNode.count({ where: { directAssetCount: { gt: 0 } } }),
+      this.prisma.termGraphNode.count({
+        where: { directAssetCount: { gt: 0 } },
+      }),
     ]);
     return {
       nodes: [...nodes.values()],
@@ -325,16 +414,26 @@ export class SemanticMapService {
         findings: coverage?.unboundFindings ?? 0,
       },
       coverage: coverage
-        ? { share: coverage.share, openFindings: coverage.openFindings, findingsWithMeaning: coverage.findingsWithMeaning }
+        ? {
+            share: coverage.share,
+            openFindings: coverage.openFindings,
+            findingsWithMeaning: coverage.findingsWithMeaning,
+          }
         : null,
       freshness: {
         refreshedAt: state?.refreshedAt ?? null,
         durationMs: state?.durationMs ?? null,
         isBuilt: Boolean(state?.isBuilt),
         liveBuild,
-        sourceFilterTimedOut: Boolean(params.sourceIds?.length) && filtered === null,
+        sourceFilterTimedOut:
+          Boolean(params.sourceIds?.length) && filtered === null,
       },
-      empty: conceptCount === 0 ? 'NO_CONCEPTS' : linkedTerms === 0 ? 'NO_LINKS' : null,
+      empty:
+        conceptCount === 0
+          ? 'NO_CONCEPTS'
+          : linkedTerms === 0
+            ? 'NO_LINKS'
+            : null,
     };
   }
 
@@ -353,26 +452,38 @@ export class SemanticMapService {
       },
     });
     if (!term) throw new NotFoundException(`Glossary term ${termId} not found`);
-    const [node, bySource, bindings, narrower, cooccurring, pending] = await Promise.all([
-      this.prisma.termGraphNode.findUnique({ where: { termId } }),
-      this.prisma.$queryRaw<Array<{ source_id: string; name: string; assets: bigint }>>`
+    const [node, bySource, bindings, narrower, cooccurring, pending] =
+      await Promise.all([
+        this.prisma.termGraphNode.findUnique({ where: { termId } }),
+        this.prisma.$queryRaw<
+          Array<{ source_id: string; name: string; assets: bigint }>
+        >`
         SELECT t.source_id, s.name, count(DISTINCT t.asset_id) AS assets
           FROM asset_terms t JOIN sources s ON s.id = t.source_id
          WHERE t.term_id = ${termId} AND t.gone_at IS NULL
          GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 20`,
-      this.prisma.glossaryBinding.count({ where: { termId, status: 'APPROVED' } }),
-      this.prisma.glossaryRelation.findMany({
-        where: { toTermId: termId, type: 'BROADER', status: 'APPROVED' },
-        include: { from: { select: { id: true, key: true, term: true } } },
-      }),
-      this.prisma.termGraphLink.findMany({
-        where: { kind: 'CO_OCCURRENCE', OR: [{ termAId: termId }, { termBId: termId }] },
-        orderBy: { lift: 'desc' },
-        take: 5,
-      }),
-      this.prisma.semanticSuggestion.count({ where: { termId, status: 'PROPOSED' } }),
-    ]);
-    const otherIds = cooccurring.map((c) => (c.termAId === termId ? c.termBId : c.termAId));
+        this.prisma.glossaryBinding.count({
+          where: { termId, status: 'APPROVED' },
+        }),
+        this.prisma.glossaryRelation.findMany({
+          where: { toTermId: termId, type: 'BROADER', status: 'APPROVED' },
+          include: { from: { select: { id: true, key: true, term: true } } },
+        }),
+        this.prisma.termGraphLink.findMany({
+          where: {
+            kind: 'CO_OCCURRENCE',
+            OR: [{ termAId: termId }, { termBId: termId }],
+          },
+          orderBy: { lift: 'desc' },
+          take: 5,
+        }),
+        this.prisma.semanticSuggestion.count({
+          where: { termId, status: 'PROPOSED' },
+        }),
+      ]);
+    const otherIds = cooccurring.map((c) =>
+      c.termAId === termId ? c.termBId : c.termAId,
+    );
     const others = await this.prisma.glossaryTerm.findMany({
       where: { id: { in: otherIds } },
       select: { id: true, key: true, term: true },
@@ -386,11 +497,16 @@ export class SemanticMapService {
         findings: node?.findingCount ?? 0,
         sources: node?.sourceCount ?? 0,
       },
-      bySource: bySource.map((r) => ({ sourceId: r.source_id, name: r.name, assets: Number(r.assets) })),
+      bySource: bySource.map((r) => ({
+        sourceId: r.source_id,
+        name: r.name,
+        assets: Number(r.assets),
+      })),
       bindings,
       narrower: narrower.map((r) => r.from),
       cooccurring: cooccurring.map((c) => ({
-        term: otherById.get(c.termAId === termId ? c.termBId : c.termAId) ?? null,
+        term:
+          otherById.get(c.termAId === termId ? c.termBId : c.termAId) ?? null,
         assets: c.assetCount,
         lift: c.lift === null ? null : Number(c.lift),
       })),
@@ -401,7 +517,9 @@ export class SemanticMapService {
   /** A compact summary for agents (MCP get_semantic_map). */
   async summary(limit = 30) {
     const map = await this.map({ minAssets: 1, cooccurrence: true });
-    const top = [...map.nodes].sort((a, b) => b.totalAssetCount - a.totalAssetCount).slice(0, limit);
+    const top = [...map.nodes]
+      .sort((a, b) => b.totalAssetCount - a.totalAssetCount)
+      .slice(0, limit);
     const ids = new Set(top.map((n) => n.termId));
     const name = new Map(map.nodes.map((n) => [n.termId, n.name]));
     return {
@@ -417,7 +535,14 @@ export class SemanticMapService {
       relations: map.links
         .filter((l) => ids.has(l.a) || ids.has(l.b))
         .slice(0, 100)
-        .map((l) => ({ from: name.get(l.a), to: name.get(l.b), kind: l.kind, label: l.label || undefined, assets: l.assetCount || undefined, lift: l.lift ?? undefined })),
+        .map((l) => ({
+          from: name.get(l.a),
+          to: name.get(l.b),
+          kind: l.kind,
+          label: l.label || undefined,
+          assets: l.assetCount || undefined,
+          lift: l.lift ?? undefined,
+        })),
       unbound: map.unbound,
       coverage: map.coverage,
       freshness: map.freshness,

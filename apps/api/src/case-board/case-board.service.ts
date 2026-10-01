@@ -1,3 +1,4 @@
+import { glossaryEvents } from '../glossary/glossary-events';
 import {
   BadRequestException,
   ConflictException,
@@ -1576,7 +1577,11 @@ export class CaseBoardService {
     });
     if (!term) throw new BoardOpRejected('Term not found', 'NOT_FOUND');
     const existing = await ctx.tx.caseBoardItem.findFirst({
-      where: { boardId: ctx.boardId, kind: CaseBoardItemKind.TERM, refId: term.id },
+      where: {
+        boardId: ctx.boardId,
+        kind: CaseBoardItemKind.TERM,
+        refId: term.id,
+      },
     });
     if (existing) {
       const placed = existing.deletedAt
@@ -1598,7 +1603,11 @@ export class CaseBoardService {
           restored: true,
         });
       }
-      return { id: updated.id, updatedAt: updated.updatedAt, arranged: !existing.deletedAt };
+      return {
+        id: updated.id,
+        updatedAt: updated.updatedAt,
+        arranged: !existing.deletedAt,
+      };
     }
     const item = await ctx.tx.caseBoardItem.create({
       data: {
@@ -1646,7 +1655,8 @@ export class CaseBoardService {
           }),
         ),
       );
-      if (!from || !to) throw new BoardOpRejected('Term not found', 'NOT_FOUND');
+      if (!from || !to)
+        throw new BoardOpRejected('Term not found', 'NOT_FOUND');
       if (from.kind === 'ENTITY' && to.kind === 'ENTITY') {
         throw new BoardOpRejected(
           'Links between entities become facts with the Entities release (G5).',
@@ -1686,15 +1696,23 @@ export class CaseBoardService {
       return {
         id: link.id,
         updatedAt: link.updatedAt,
-        note: relation.status === 'APPROVED' ? 'Relation created' : 'Relation proposed',
+        note:
+          relation.status === 'APPROVED'
+            ? 'Relation created'
+            : 'Relation proposed',
       };
     }
     const termItem = termItems[0];
-    const evidenceItem = termItem.id === sourceItem.id ? targetItem : sourceItem;
+    const evidenceItem =
+      termItem.id === sourceItem.id ? targetItem : sourceItem;
     const findingId =
-      termItem.id === sourceItem.id ? link.targetFindingId : link.sourceFindingId;
+      termItem.id === sourceItem.id
+        ? link.targetFindingId
+        : link.sourceFindingId;
     if (evidenceItem.kind !== CaseBoardItemKind.EVIDENCE) {
-      throw new BoardOpRejected('Only evidence or a finding can be linked to a term');
+      throw new BoardOpRejected(
+        'Only evidence or a finding can be linked to a term',
+      );
     }
     const term = await ctx.tx.glossaryTerm.findUnique({
       where: { id: termItem.refId ?? '' },
@@ -1729,7 +1747,9 @@ export class CaseBoardService {
     if (agent) {
       // D7: agents never create links directly; it becomes a LINK proposal.
       if (!assetId || !this.suggestions) {
-        throw new BoardOpRejected('Agents propose links; the review queue is not available here');
+        throw new BoardOpRejected(
+          'Agents propose links; the review queue is not available here',
+        );
       }
       await this.suggestions.proposeAgentLink({
         termId: term.id,
@@ -1737,7 +1757,11 @@ export class CaseBoardService {
         note: link.note ?? link.label ?? undefined,
         agent: ctx.actor ?? 'agent',
       });
-      return { id: link.id, updatedAt: link.updatedAt, note: 'Link proposed for review' };
+      return {
+        id: link.id,
+        updatedAt: link.updatedAt,
+        note: 'Link proposed for review',
+      };
     }
     const reference = await ctx.tx.glossaryReference.upsert({
       where: {
@@ -1772,13 +1796,24 @@ export class CaseBoardService {
       referenceId: reference.id,
       target,
     });
+    glossaryEvents.emit({
+      type: 'semantic.reference_changed',
+      change: 'linked',
+      termId: term.id,
+      entityType: target.type,
+      entityId: target.id,
+    });
     if (assetId && this.semanticJobs) {
       await this.semanticJobs.scheduleIncrementalForAssets(
         [assetId],
         `board link promoted to ${term.key}`,
       );
     }
-    return { id: link.id, updatedAt: link.updatedAt, note: 'Manual link created' };
+    return {
+      id: link.id,
+      updatedAt: link.updatedAt,
+      note: 'Manual link created',
+    };
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────

@@ -16,7 +16,11 @@ import {
 } from './semantic.constants';
 
 type BossLike = {
-  send(queue: string, data: object, options: Record<string, unknown>): Promise<unknown>;
+  send(
+    queue: string,
+    data: object,
+    options: Record<string, unknown>,
+  ): Promise<unknown>;
 };
 
 /**
@@ -124,7 +128,10 @@ export class SemanticJobsScheduler {
   }
 
   /** After a run finalises: the assets the run touched. */
-  scheduleIncrementalForRun(runId: string, sourceId: string): Promise<string | null> {
+  scheduleIncrementalForRun(
+    runId: string,
+    sourceId: string,
+  ): Promise<string | null> {
     return this.scheduleLinks('INCREMENTAL', {
       runId,
       sourceId,

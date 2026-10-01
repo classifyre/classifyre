@@ -49,6 +49,7 @@ export const PreviewDiagnosticDtoDimensionEnum = {
     FindingTypes: 'findingTypes',
     FindingTypeRegex: 'findingTypeRegex',
     FindingValueRegex: 'findingValueRegex',
+    TermKeys: 'termKeys',
     Corpus: 'corpus'
 } as const;
 export type PreviewDiagnosticDtoDimensionEnum = typeof PreviewDiagnosticDtoDimensionEnum[keyof typeof PreviewDiagnosticDtoDimensionEnum];
