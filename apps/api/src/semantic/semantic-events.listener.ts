@@ -73,11 +73,23 @@ export class SemanticEventsListener {
     });
 
     const everything = async (reason: string) => {
+      await this.scheduler.scheduleVocabularyRefresh(null, reason);
       await this.scheduler.scheduleBackfill({ all: true, reason });
       await this.stitchAll();
       await this.scheduler.scheduleMapRebuild(reason);
       await this.scheduler.scheduleSuggestions({ reason });
     };
+    glossaryEvents.on('semantic.derived_cleared', async (event) => {
+      const reason = `${event.dataset} cleaned up`;
+      if (event.dataset === 'vocabulary') {
+        await this.scheduler.scheduleVocabularyRefresh(null, reason);
+      } else if (event.dataset === 'semanticLinks') {
+        await this.scheduler.scheduleBackfill({ all: true, reason });
+      } else if (event.dataset === 'semanticMap') {
+        await this.scheduler.scheduleMapRebuild(reason);
+      }
+    });
+
     glossaryEvents.on('glossary.imported', () =>
       everything('glossary imported'),
     );

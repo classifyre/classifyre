@@ -64,6 +64,10 @@ export type CleanupKey =
   | 'scheduler'
   | 'stats'
   | 'graph'
+  | 'vocabulary'
+  | 'semanticLinks'
+  | 'suggestions'
+  | 'semanticMap'
   | 'transfers';
 
 export const CLEANUP_KEYS: readonly CleanupKey[] = [
@@ -74,6 +78,10 @@ export const CLEANUP_KEYS: readonly CleanupKey[] = [
   'scheduler',
   'stats',
   'graph',
+  'vocabulary',
+  'semanticLinks',
+  'suggestions',
+  'semanticMap',
   'transfers',
 ];
 
@@ -128,9 +136,18 @@ export const PROTECTED_DATASETS: readonly ProtectedDataset[] = [
     key: 'inquiries',
     tables: ['inquiries'],
   },
+  // Curated meaning (SL-9): terms, schemes, relations, bindings, manual
+  // links and the history of all of it.
   {
     key: 'glossary',
-    tables: ['glossary_terms', 'glossary_references'],
+    tables: [
+      'glossary_terms',
+      'glossary_schemes',
+      'glossary_relations',
+      'glossary_bindings',
+      'glossary_references',
+      'glossary_activities',
+    ],
   },
 ];
 
@@ -220,6 +237,21 @@ export const CLEANABLE_DATASETS: readonly CleanableDataset[] = [
       'source_graph_boundary_assets',
       'source_graph_state',
     ],
+  },
+  // The semantic layer's derived tables (SL-9), each rebuilt from the curated
+  // glossary and the scanned data. The vocabulary inventory is refreshed from
+  // findings and assets; semantic links are re-derived by a backfill.
+  { key: 'vocabulary', tables: ['vocabulary_items', 'vocabulary_fields'] },
+  {
+    key: 'semanticLinks',
+    tables: ['asset_terms', 'semantic_stats', 'semantic_link_jobs'],
+  },
+  // Pending suggestions only: decided rows are the operator's decisions and
+  // stay, so a dismissed suggestion is not proposed again.
+  { key: 'suggestions', tables: ['semantic_suggestions'] },
+  {
+    key: 'semanticMap',
+    tables: ['term_graph_nodes', 'term_graph_links', 'term_graph_state'],
   },
   // Finished transfers (uploads waiting for import are staged, not finished,
   // and stay). Chunks cascade from their job.

@@ -2,6 +2,7 @@ import type {
   McpCapabilityGroupDto,
   McpPromptSummaryDto,
 } from './dto/mcp-settings.dto';
+import { SEMANTIC_MCP_TOOL_NAMES } from './semantic/semantic-mcp-tools';
 
 export const MCP_TOKEN_PREFIX = 'inmcp';
 
@@ -323,14 +324,13 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     title: 'Glossary',
     description:
       'The shared vocabulary of concepts and entities: list, look up and curate terms, schemes and relations; bind detector outputs to meaning; read the semantic links (Meaning) derived from findings; review proposals and see the semantic map.',
-    toolNames: [
-      'list_glossary_terms',
-      'lookup_glossary',
-      'upsert_glossary_term',
-    ],
+    toolNames: [...SEMANTIC_MCP_TOOL_NAMES],
     operations: [
-      'List and look up glossary terms',
-      'Add or update a term definition',
+      'List and look up concepts and entities, schemes and relations',
+      'Curate terms, schemes and relations; import and export CSV or SKOS',
+      'Bind detector outputs and metadata fields to meaning; install packs',
+      'Read what a finding, asset or concept means, and link by hand',
+      'Work the review queue and see the semantic map',
     ],
   },
   {

@@ -28,6 +28,7 @@ import {
   type CleanableDataset,
   type CleanupKey,
 } from './maintenance.datasets';
+import { glossaryEvents } from '../glossary/glossary-events';
 
 export interface TableStat {
   table: string;
@@ -542,6 +543,29 @@ export class MaintenanceService {
         );
         touched = [...dataset.tables];
         break;
+      case 'vocabulary':
+      case 'semanticLinks':
+      case 'semanticMap':
+        result = await this.wipeTables(
+          dataset,
+          [],
+          this.tick(run, dataset.tables[0] ?? key),
+        );
+        touched = [...dataset.tables];
+        glossaryEvents.emit({ type: 'semantic.derived_cleared', dataset: key });
+        break;
+      case 'suggestions': {
+        const deleted = await this.deleteChunks(
+          'semantic_suggestions',
+          `WHERE status IN ('PROPOSED', 'EXPIRED')`,
+          false,
+          'ctid',
+          this.tick(run, 'semantic_suggestions'),
+        );
+        result = { deleted: { semantic_suggestions: deleted }, skipped: {} };
+        touched = ['semantic_suggestions'];
+        break;
+      }
       case 'transfers':
         result = await this.cleanupTransfers(this.tick(run, 'transfers'));
         touched = ['data_transfer_jobs', 'data_transfer_chunks'];
