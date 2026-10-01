@@ -42,6 +42,7 @@ from ..graph.edges import (
     UsageType,
     contains,
     flow,
+    means,
     references,
     same_as,
     uses,
@@ -843,6 +844,7 @@ def build_module(context: Context) -> types.ModuleType:
     module.flow = flow  # type: ignore[attr-defined]
     module.contains = contains  # type: ignore[attr-defined]
     module.references = references  # type: ignore[attr-defined]
+    module.means = means  # type: ignore[attr-defined]
     module.same_as = same_as  # type: ignore[attr-defined]
     module.uses = uses  # type: ignore[attr-defined]
     module.urn_for = urn_for  # type: ignore[attr-defined]
@@ -873,6 +875,7 @@ def build_module(context: Context) -> types.ModuleType:
         "contains",
         "ctx",
         "flow",
+        "means",
         "pages",
         "parse",
         "references",
@@ -910,6 +913,7 @@ def namespace(context: Context) -> dict[str, Any]:
         "flow": flow,
         "contains": contains,
         "references": references,
+        "means": means,
         "same_as": same_as,
         "uses": uses,
         "urn_for": urn_for,
@@ -959,7 +963,7 @@ def iter_relationships(value: Any) -> Iterable[Edge]:
         else:
             raise TypeError(
                 "relationships() must yield edges built with flow(), contains(), "
-                "references(), same_as() or uses() -- got "
+                "references(), means(), same_as() or uses() -- got "
                 f"{type(item).__name__}. These are not interchangeable: only "
                 "flow() is lineage, and only it answers 'what breaks if this changes'."
             )

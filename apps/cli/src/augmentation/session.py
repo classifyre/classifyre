@@ -463,6 +463,11 @@ class AugmentationSession:
 
         self._ingest_edges(patch, asset_hash=asset_hash or None)
 
+        # asset.means(): declarations, already built as MEANS edges by the SDK.
+        declared = patch.get("means")
+        if isinstance(declared, list) and declared:
+            self._ingest_edges({"edges": declared}, asset_hash=asset_hash or None)
+
         for message in patch.get("warnings") or []:
             self._warn(f"Augmentation on {getattr(asset, 'name', asset_hash)}: {message}")
 

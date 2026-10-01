@@ -320,6 +320,13 @@
             "insertText": "link(${1:other_hash})"
           },
           {
+            "label": "means",
+            "kind": "method",
+            "detail": "(key: 'str', *, evidence: 'Mapping[str, Any] | None' = None, confidence: 'float | None' = None) -> 'None'",
+            "documentation": "Declare that this asset is about a glossary concept or entity, by key.\n\nAdditive, like ``tag()`` and ``link()``: a DECLARED semantic link. The\nterm need not exist yet; the declaration links once it is defined. An\ninvalid key is skipped with a warning.",
+            "insertText": "means(${1:key})"
+          },
+          {
             "label": "metadata",
             "kind": "property",
             "detail": "Mapping[str, Any]",
@@ -623,6 +630,13 @@
           "detail": "(other_hash: 'str') -> 'None'",
           "documentation": "Record an untyped \"related\" link to another asset by its hash.",
           "insertText": "link(${1:other_hash})"
+        },
+        {
+          "label": "means",
+          "kind": "method",
+          "detail": "(key: 'str', *, evidence: 'Mapping[str, Any] | None' = None, confidence: 'float | None' = None) -> 'None'",
+          "documentation": "Declare that this asset is about a glossary concept or entity, by key.\n\nAdditive, like ``tag()`` and ``link()``: a DECLARED semantic link. The\nterm need not exist yet; the declaration links once it is defined. An\ninvalid key is skipped with a warning.",
+          "insertText": "means(${1:key})"
         },
         {
           "label": "metadata",
