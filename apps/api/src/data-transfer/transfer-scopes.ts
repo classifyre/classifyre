@@ -24,6 +24,8 @@
  *   CorrelationPairStaging — scratch space for one correlation run.
  *   Notification — an inbox, meaningless once detached from its instance.
  *   DataTransferJob — the transfer history itself; exporting it would nest.
+ *   NotebookExecution — disposable run records (cell outputs, previews) of a
+ *     notebook the archive already carries; they can always be run again.
  */
 
 import type { IdRemapper } from './id-remap';
@@ -172,6 +174,12 @@ export interface TransferTableSpec {
   redact?: readonly string[];
   /** Strip `config.masked`, where source connection secrets live. */
   redactMaskedConfig?: boolean;
+  /**
+   * Strip `pipelineSchema.secrets`, where a code detector (CODE_DETECTOR)
+   * keeps its encrypted credentials. The rest of the pipeline -- the notebook,
+   * variables, fields -- is configuration and travels.
+   */
+  redactPipelineSecrets?: boolean;
   /**
    * Values forced onto every imported row. Used to land connectors in a safe
    * disabled state, because their credentials were stripped on the way out.
@@ -337,6 +345,7 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
     order: 200,
     keys: ['id'],
     optionalRefs: { aiProviderConfigId: 'instanceConfig' },
+    redactPipelineSecrets: true,
   },
   {
     model: 'customDetectorTrainingExample',
@@ -365,6 +374,15 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
     idRefs: ['id', 'scenarioId', 'detectorId'],
     scope: 'customDetectors',
     order: 240,
+    keys: ['id'],
+  },
+  // A code detector's lists, models and reference tables, bytes included:
+  // without them the rule runs against an empty ctx.files after import.
+  {
+    model: 'customDetectorFile',
+    idRefs: ['id', 'customDetectorId'],
+    scope: 'customDetectors',
+    order: 245,
     keys: ['id'],
   },
 

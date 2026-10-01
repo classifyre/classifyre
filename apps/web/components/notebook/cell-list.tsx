@@ -9,6 +9,8 @@ import { useTranslation } from "@/hooks/use-translation";
 import {
   addCell,
   appendCells,
+  DETECTOR_REQUIRED_FUNCTIONS,
+  REQUIRED_FUNCTIONS,
   deleteCell,
   duplicateCell,
   moveCell,
@@ -44,7 +46,7 @@ export interface CellListProps {
   onRunCell?: (cellId: string) => void;
   runState?: (cellId: string) => CellRunState;
   /** Which template library the footer's Templates button reads. */
-  scope?: "connector" | "augmentation";
+  scope?: "connector" | "augmentation" | "detector";
 }
 
 const IDLE: CellRunState = { status: "idle", outputs: [] };
@@ -70,7 +72,16 @@ export function CellList({
   scope = "connector",
 }: CellListProps) {
   const { t } = useTranslation();
-  const locked = React.useMemo(() => protectedCellIds(cells), [cells]);
+  // The contract whose last defining cell may not be deleted: a connector's
+  // test_connection/extract, or a code detector's detect.
+  const locked = React.useMemo(
+    () =>
+      protectedCellIds(
+        cells,
+        scope === "detector" ? DETECTOR_REQUIRED_FUNCTIONS : REQUIRED_FUNCTIONS,
+      ),
+    [cells, scope],
+  );
   const noop = React.useCallback(() => undefined, []);
 
   return (

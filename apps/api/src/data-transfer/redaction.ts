@@ -85,6 +85,15 @@ export function redactRow(
     }
   }
 
+  if (spec.redactPipelineSecrets) {
+    const schema = cleaned['pipelineSchema'];
+    if (isPlainObject(schema) && Object.hasOwn(schema, 'secrets')) {
+      const { secrets: _secrets, ...rest } = schema;
+      cleaned['pipelineSchema'] = rest;
+      stripped.push('pipelineSchema.secrets');
+    }
+  }
+
   return { row: cleaned, stripped };
 }
 

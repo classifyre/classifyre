@@ -927,6 +927,30 @@ export class CorrelationService {
 
   // ── Fingerprints ──────────────────────────────────────────────────────────
 
+  /** Keys of the code detectors (pipeline type CODE_DETECTOR). A small table. */
+  private codeDetectorKeysCache: { at: number; keys: Set<string> } | null =
+    null;
+
+  private async codeDetectorKeys(): Promise<Set<string>> {
+    // One query per recompute run, not per asset: the set changes only when a
+    // detector is created/renamed/deleted, so a 60s TTL is plenty and turns
+    // N asset rebuilds from N queries into one.
+    const now = Date.now();
+    if (
+      this.codeDetectorKeysCache &&
+      now - this.codeDetectorKeysCache.at < 60_000
+    ) {
+      return this.codeDetectorKeysCache.keys;
+    }
+    const rows = await this.prisma.$queryRaw<Array<{ key: string }>>`
+      SELECT key FROM custom_detectors
+      WHERE pipeline_schema->>'type' = 'CODE_DETECTOR'
+    `;
+    const keys = new Set(Array.isArray(rows) ? rows.map((row) => row.key) : []);
+    this.codeDetectorKeysCache = { at: now, keys };
+    return keys;
+  }
+
   /** Rebuild an asset's correlation values + signature from its findings. */
   private async rebuildAssetValues(
     assetId: string,
@@ -953,6 +977,12 @@ export class CorrelationService {
         phoneticHash: string | null;
       }
     >();
+    // Code detectors (CODE_DETECTOR) enter the value index only through the
+    // normalized value they declare (contract C2). Their matched text is a
+    // verdict like "total 523 != 520", and indexing it is how templated values
+    // correlated thousands of unrelated assets (GENESIS field report P6).
+    const codeDetectorKeys = await this.codeDetectorKeys();
+    const codeFindingIds: string[] = [];
     let idCursor: string | null = null;
     for (;;) {
       const batch: Array<{
@@ -960,6 +990,7 @@ export class CorrelationService {
         findingType: string;
         matchedContent: string;
         detectorType: DetectorType;
+        customDetectorId: string | null;
         customDetectorKey: string | null;
       }> = await this.prisma.finding.findMany({
         // OPEN only. A fingerprint asserts that this asset CURRENTLY carries
@@ -977,6 +1008,7 @@ export class CorrelationService {
           findingType: true,
           matchedContent: true,
           detectorType: true,
+          customDetectorId: true,
           customDetectorKey: true,
         },
         orderBy: { id: 'asc' },
@@ -984,6 +1016,18 @@ export class CorrelationService {
       });
       if (!batch.length) break;
       for (const f of batch) {
+        // A finding that carries a code-detector id (or a code-detector key
+        // the live set still knows) enters the index only through its
+        // declared normalized_value (contract C2). Matching on the id as
+        // well as the key keeps a renamed detector out of the P6 fallback:
+        // its key misses the live set, but its id still proves it is code.
+        if (
+          f.customDetectorId ||
+          (f.customDetectorKey && codeDetectorKeys.has(f.customDetectorKey))
+        ) {
+          codeFindingIds.push(f.id);
+          continue;
+        }
         const normalized = normalizeValue(f.findingType, f.matchedContent);
         if (!normalized) continue;
         const label = normalizeLabel(f.findingType);
@@ -1002,6 +1046,50 @@ export class CorrelationService {
       if (batch.length < this.batches.findingsPage) break;
 
       idCursor = batch.at(-1)!.id;
+    }
+
+    // Bounded to this asset's open code-detector findings, read by id.
+    for (
+      let offset = 0;
+      offset < codeFindingIds.length;
+      offset += this.batches.findingsPage
+    ) {
+      const chunk = await this.prisma.finding.findMany({
+        where: {
+          id: {
+            in: codeFindingIds.slice(
+              offset,
+              offset + this.batches.findingsPage,
+            ),
+          },
+        },
+        select: {
+          id: true,
+          findingType: true,
+          detectorType: true,
+          customDetectorKey: true,
+          metadata: true,
+        },
+      });
+      for (const f of chunk) {
+        const declared = (f.metadata as Record<string, unknown> | null)
+          ?.normalized_value;
+        if (typeof declared !== 'string' || !declared.trim()) continue;
+        const normalized = normalizeValue(f.findingType, declared);
+        if (!normalized) continue;
+        const label = normalizeLabel(f.findingType);
+        if (cfg.isExcluded(label, normalized)) continue;
+        const hash = valueHash(f.findingType, normalized);
+        if (rows.has(hash)) continue;
+        rows.set(hash, {
+          findingId: f.id,
+          label,
+          detectorType: f.detectorType,
+          customDetectorKey: f.customDetectorKey ?? null,
+          normalizedValue: normalized,
+          phoneticHash: phoneticFingerprint(label, normalized),
+        });
+      }
     }
 
     const componentHashes: Record<string, string[]> = {};

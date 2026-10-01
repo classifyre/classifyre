@@ -5,6 +5,9 @@
  */
 export const TAG_PIPELINE_TYPE = "TAG";
 
+/** A code detector: a Python notebook that defines detect(asset, ctx). */
+export const CODE_DETECTOR_PIPELINE_TYPE = "CODE_DETECTOR";
+
 /** Whether a detector row is a Tag placeholder rather than a real engine. */
 export function isTagDetector(detector: unknown): boolean {
   const schema = (detector as { pipelineSchema?: { type?: unknown } } | null)
@@ -26,7 +29,8 @@ export type PipelineSubtype =
   | "TEXT_CLASSIFICATION"
   | "IMAGE_CLASSIFICATION"
   | "OBJECT_DETECTION"
-  | "TAG";
+  | "TAG"
+  | "CODE_DETECTOR";
 
 export type DetectorMethod = "RULESET" | "CLASSIFIER" | "ENTITY";
 
@@ -123,6 +127,7 @@ export function detectorTypeIconName(
   if (normalizedPipeline === "IMAGE_CLASSIFICATION") return "Image";
   if (normalizedPipeline === "OBJECT_DETECTION") return "ScanSearch";
   if (normalizedPipeline === TAG_PIPELINE_TYPE) return "Tag";
+  if (normalizedPipeline === CODE_DETECTOR_PIPELINE_TYPE) return "Code2";
 
   if (normalizedMethod === "SECRETS" || normalizedMethod === "CODE_SECURITY")
     return "Shield";
