@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface BulkUpdateGlossaryFiltersDto {
     /**
-     * Free-text filter over term, aliases and notes (ILIKE).
+     * 
      * @type {string}
      * @memberof BulkUpdateGlossaryFiltersDto
      */
@@ -31,6 +31,30 @@ export interface BulkUpdateGlossaryFiltersDto {
      * @memberof BulkUpdateGlossaryFiltersDto
      */
     entityType?: BulkUpdateGlossaryFiltersDtoEntityTypeEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof BulkUpdateGlossaryFiltersDto
+     */
+    kind?: BulkUpdateGlossaryFiltersDtoKindEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof BulkUpdateGlossaryFiltersDto
+     */
+    schemeId?: string;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof BulkUpdateGlossaryFiltersDto
+     */
+    status?: Array<BulkUpdateGlossaryFiltersDtoStatusEnum>;
+    /**
+     * 
+     * @type {string}
+     * @memberof BulkUpdateGlossaryFiltersDto
+     */
+    steward?: string;
 }
 
 
@@ -46,6 +70,25 @@ export const BulkUpdateGlossaryFiltersDtoEntityTypeEnum = {
     Other: 'OTHER'
 } as const;
 export type BulkUpdateGlossaryFiltersDtoEntityTypeEnum = typeof BulkUpdateGlossaryFiltersDtoEntityTypeEnum[keyof typeof BulkUpdateGlossaryFiltersDtoEntityTypeEnum];
+
+/**
+ * @export
+ */
+export const BulkUpdateGlossaryFiltersDtoKindEnum = {
+    Concept: 'CONCEPT',
+    Entity: 'ENTITY'
+} as const;
+export type BulkUpdateGlossaryFiltersDtoKindEnum = typeof BulkUpdateGlossaryFiltersDtoKindEnum[keyof typeof BulkUpdateGlossaryFiltersDtoKindEnum];
+
+/**
+ * @export
+ */
+export const BulkUpdateGlossaryFiltersDtoStatusEnum = {
+    Draft: 'DRAFT',
+    Approved: 'APPROVED',
+    Deprecated: 'DEPRECATED'
+} as const;
+export type BulkUpdateGlossaryFiltersDtoStatusEnum = typeof BulkUpdateGlossaryFiltersDtoStatusEnum[keyof typeof BulkUpdateGlossaryFiltersDtoStatusEnum];
 
 
 /**
@@ -67,6 +110,10 @@ export function BulkUpdateGlossaryFiltersDtoFromJSONTyped(json: any, ignoreDiscr
         
         'query': json['query'] == null ? undefined : json['query'],
         'entityType': json['entityType'] == null ? undefined : json['entityType'],
+        'kind': json['kind'] == null ? undefined : json['kind'],
+        'schemeId': json['schemeId'] == null ? undefined : json['schemeId'],
+        'status': json['status'] == null ? undefined : json['status'],
+        'steward': json['steward'] == null ? undefined : json['steward'],
     };
 }
 
@@ -83,6 +130,10 @@ export function BulkUpdateGlossaryFiltersDtoToJSONTyped(value?: BulkUpdateGlossa
         
         'query': value['query'],
         'entityType': value['entityType'],
+        'kind': value['kind'],
+        'schemeId': value['schemeId'],
+        'status': value['status'],
+        'steward': value['steward'],
     };
 }
 

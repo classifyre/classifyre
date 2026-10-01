@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface VerifyGlossaryTermDto {
     /**
-     * Operator identity recorded as verifiedBy. Defaults to "operator".
+     * 
      * @type {string}
      * @memberof VerifyGlossaryTermDto
      */

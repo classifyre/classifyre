@@ -60,8 +60,8 @@ const EMPTY_IMPACT: DetectionImpact = {
  *
  * A source's detector list is not a setting, it is the schema of its evidence
  * base: taking a detector out of the config resolves every open finding it
- * produced, and inquiries, cases, fingerprints and glossary terms are all built
- * on those findings. The config agent had no way to see that. Its tool returned
+ * produced. Inquiries, cases and fingerprints are built on those findings, and
+ * the semantic links that say what the data means are derived from them. The config agent had no way to see that. Its tool returned
  * `{ok: true}` whether a change touched nothing or resolved 44,174 findings, so
  * every reduction looked free and it made 22 of them in three days.
  *

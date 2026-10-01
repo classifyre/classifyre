@@ -322,7 +322,7 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     id: 'glossary',
     title: 'Glossary',
     description:
-      'The shared term glossary findings and detectors resolve abbreviations and jargon against.',
+      'The shared vocabulary of concepts and entities: list, look up and curate terms, schemes and relations; bind detector outputs to meaning; read the semantic links (Meaning) derived from findings; review proposals and see the semantic map.',
     toolNames: [
       'list_glossary_terms',
       'lookup_glossary',

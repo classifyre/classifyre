@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `updatedCount` | number
 `ids` | Array&lt;string&gt;
+`refused` | Array&lt;object&gt;
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { BulkUpdateGlossaryTermsResponseDto } from '@workspace/api-client'
 const example = {
   "updatedCount": null,
   "ids": null,
+  "refused": null,
 } satisfies BulkUpdateGlossaryTermsResponseDto
 
 console.log(example)

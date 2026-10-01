@@ -29,6 +29,7 @@ import { DataTransferWorker } from '../data-transfer/data-transfer.worker';
 import { FindingBulkOperationWorker } from '../findings-bulk/finding-bulk-operation.worker';
 import { FindingStatsWorker } from '../stats/finding-stats.worker';
 import { SourceGraphWorker } from '../stats/source-graph.worker';
+import { SemanticWorker } from '../semantic/semantic.worker';
 import { CaseLeadsWorker } from '../cases/case-leads.worker';
 import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { NotificationEventsGateway } from '../websocket/notification-events.gateway';
@@ -116,6 +117,7 @@ export class NamespaceWorkerManager
     private readonly findingBulkOperations: FindingBulkOperationWorker,
     private readonly findingStats: FindingStatsWorker,
     private readonly sourceGraph: SourceGraphWorker,
+    private readonly semantic: SemanticWorker,
     private readonly runnerEvents: RunnerEventsGateway,
     private readonly notificationEvents: NotificationEventsGateway,
     private readonly leadership: WorkerLeadershipService,
@@ -326,6 +328,7 @@ export class NamespaceWorkerManager
         await this.findingBulkOperations.registerForNamespace();
         await this.findingStats.registerForNamespace();
         await this.sourceGraph.registerForNamespace();
+        await this.semantic.registerForNamespace();
         await this.caseLeads?.registerForNamespace();
         this.dataTransfer.schedulePurge(e.schemaName);
         await this.mcpClient

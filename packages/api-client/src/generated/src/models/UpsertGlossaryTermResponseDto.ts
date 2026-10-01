@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { GlossarySchemeRefDto } from './GlossarySchemeRefDto';
+import {
+    GlossarySchemeRefDtoFromJSON,
+    GlossarySchemeRefDtoFromJSONTyped,
+    GlossarySchemeRefDtoToJSON,
+    GlossarySchemeRefDtoToJSONTyped,
+} from './GlossarySchemeRefDto';
+
 /**
  * 
  * @export
@@ -26,6 +34,18 @@ export interface UpsertGlossaryTermResponseDto {
      */
     id: string;
     /**
+     * Stable key (C8).
+     * @type {string}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    key: string;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    previousKeys: Array<string>;
+    /**
      * 
      * @type {string}
      * @memberof UpsertGlossaryTermResponseDto
@@ -33,16 +53,46 @@ export interface UpsertGlossaryTermResponseDto {
     term: string;
     /**
      * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    kind: UpsertGlossaryTermResponseDtoKindEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    status: UpsertGlossaryTermResponseDtoStatusEnum;
+    /**
+     * 
      * @type {Array<string>}
      * @memberof UpsertGlossaryTermResponseDto
      */
     aliases: Array<string>;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    codes: Array<string>;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    hiddenAliases: Array<string>;
     /**
      * Unverified aliases suggested by agents for operator review
      * @type {Array<string>}
      * @memberof UpsertGlossaryTermResponseDto
      */
     proposedAliases: Array<string>;
+    /**
+     * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    definition?: string | null;
     /**
      * 
      * @type {string}
@@ -56,13 +106,55 @@ export interface UpsertGlossaryTermResponseDto {
      */
     notes?: string | null;
     /**
-     * AGENT proposals are unverified hypotheses
+     * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    steward?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    schemeId?: string | null;
+    /**
+     * 
+     * @type {GlossarySchemeRefDto}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    scheme?: GlossarySchemeRefDto | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    replacedById?: string | null;
+    /**
+     * 
+     * @type {Date}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    deprecatedAt?: Date | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    sourceIri?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    packKey?: string | null;
+    /**
+     * AGENT proposals are DRAFT hypotheses
      * @type {string}
      * @memberof UpsertGlossaryTermResponseDto
      */
     origin: string;
     /**
-     * 
+     * True when APPROVED (kept for compatibility).
      * @type {boolean}
      * @memberof UpsertGlossaryTermResponseDto
      */
@@ -73,6 +165,12 @@ export interface UpsertGlossaryTermResponseDto {
      * @memberof UpsertGlossaryTermResponseDto
      */
     verifiedBy?: string | null;
+    /**
+     * 
+     * @type {Date}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    approvedAt?: Date | null;
     /**
      * 
      * @type {Date}
@@ -97,6 +195,25 @@ export interface UpsertGlossaryTermResponseDto {
 /**
  * @export
  */
+export const UpsertGlossaryTermResponseDtoKindEnum = {
+    Concept: 'CONCEPT',
+    Entity: 'ENTITY'
+} as const;
+export type UpsertGlossaryTermResponseDtoKindEnum = typeof UpsertGlossaryTermResponseDtoKindEnum[keyof typeof UpsertGlossaryTermResponseDtoKindEnum];
+
+/**
+ * @export
+ */
+export const UpsertGlossaryTermResponseDtoStatusEnum = {
+    Draft: 'DRAFT',
+    Approved: 'APPROVED',
+    Deprecated: 'DEPRECATED'
+} as const;
+export type UpsertGlossaryTermResponseDtoStatusEnum = typeof UpsertGlossaryTermResponseDtoStatusEnum[keyof typeof UpsertGlossaryTermResponseDtoStatusEnum];
+
+/**
+ * @export
+ */
 export const UpsertGlossaryTermResponseDtoEntityTypeEnum = {
     Person: 'PERSON',
     Organization: 'ORGANIZATION',
@@ -113,8 +230,14 @@ export type UpsertGlossaryTermResponseDtoEntityTypeEnum = typeof UpsertGlossaryT
  */
 export function instanceOfUpsertGlossaryTermResponseDto(value: object): value is UpsertGlossaryTermResponseDto {
     if (!('id' in value) || value['id'] === undefined) return false;
+    if (!('key' in value) || value['key'] === undefined) return false;
+    if (!('previousKeys' in value) || value['previousKeys'] === undefined) return false;
     if (!('term' in value) || value['term'] === undefined) return false;
+    if (!('kind' in value) || value['kind'] === undefined) return false;
+    if (!('status' in value) || value['status'] === undefined) return false;
     if (!('aliases' in value) || value['aliases'] === undefined) return false;
+    if (!('codes' in value) || value['codes'] === undefined) return false;
+    if (!('hiddenAliases' in value) || value['hiddenAliases'] === undefined) return false;
     if (!('proposedAliases' in value) || value['proposedAliases'] === undefined) return false;
     if (!('entityType' in value) || value['entityType'] === undefined) return false;
     if (!('origin' in value) || value['origin'] === undefined) return false;
@@ -135,14 +258,29 @@ export function UpsertGlossaryTermResponseDtoFromJSONTyped(json: any, ignoreDisc
     return {
         
         'id': json['id'],
+        'key': json['key'],
+        'previousKeys': json['previousKeys'],
         'term': json['term'],
+        'kind': json['kind'],
+        'status': json['status'],
         'aliases': json['aliases'],
+        'codes': json['codes'],
+        'hiddenAliases': json['hiddenAliases'],
         'proposedAliases': json['proposedAliases'],
+        'definition': json['definition'] == null ? undefined : json['definition'],
         'entityType': json['entityType'],
         'notes': json['notes'] == null ? undefined : json['notes'],
+        'steward': json['steward'] == null ? undefined : json['steward'],
+        'schemeId': json['schemeId'] == null ? undefined : json['schemeId'],
+        'scheme': json['scheme'] == null ? undefined : GlossarySchemeRefDtoFromJSON(json['scheme']),
+        'replacedById': json['replacedById'] == null ? undefined : json['replacedById'],
+        'deprecatedAt': json['deprecatedAt'] == null ? undefined : (new Date(json['deprecatedAt'])),
+        'sourceIri': json['sourceIri'] == null ? undefined : json['sourceIri'],
+        'packKey': json['packKey'] == null ? undefined : json['packKey'],
         'origin': json['origin'],
         'verified': json['verified'],
         'verifiedBy': json['verifiedBy'] == null ? undefined : json['verifiedBy'],
+        'approvedAt': json['approvedAt'] == null ? undefined : (new Date(json['approvedAt'])),
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
         'merged': json['merged'] == null ? undefined : json['merged'],
@@ -161,14 +299,29 @@ export function UpsertGlossaryTermResponseDtoToJSONTyped(value?: UpsertGlossaryT
     return {
         
         'id': value['id'],
+        'key': value['key'],
+        'previousKeys': value['previousKeys'],
         'term': value['term'],
+        'kind': value['kind'],
+        'status': value['status'],
         'aliases': value['aliases'],
+        'codes': value['codes'],
+        'hiddenAliases': value['hiddenAliases'],
         'proposedAliases': value['proposedAliases'],
+        'definition': value['definition'],
         'entityType': value['entityType'],
         'notes': value['notes'],
+        'steward': value['steward'],
+        'schemeId': value['schemeId'],
+        'scheme': GlossarySchemeRefDtoToJSON(value['scheme']),
+        'replacedById': value['replacedById'],
+        'deprecatedAt': value['deprecatedAt'] == null ? value['deprecatedAt'] : value['deprecatedAt'].toISOString(),
+        'sourceIri': value['sourceIri'],
+        'packKey': value['packKey'],
         'origin': value['origin'],
         'verified': value['verified'],
         'verifiedBy': value['verifiedBy'],
+        'approvedAt': value['approvedAt'] == null ? value['approvedAt'] : value['approvedAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
         'merged': value['merged'],

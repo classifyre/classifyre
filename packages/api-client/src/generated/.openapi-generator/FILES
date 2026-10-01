@@ -185,6 +185,7 @@ docs/CreateCustomDetectorDto.md
 docs/CreateDetectorNotebookExecutionDto.md
 docs/CreateExternalRunnerDto.md
 docs/CreateFindingDto.md
+docs/CreateGlossaryRelationDto.md
 docs/CreateInquiryDto.md
 docs/CreateManualEdgeDto.md
 docs/CreateMcpServerDto.md
@@ -211,6 +212,7 @@ docs/DecisionsToInquiryResponseDto.md
 docs/DeleteDataTransferJobResponseDto.md
 docs/DeleteGlossaryTermResponseDto.md
 docs/DeleteRunnerResponseDto.md
+docs/DeprecateGlossaryTermDto.md
 docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
 docs/EdgeDetailDto.md
@@ -255,8 +257,11 @@ docs/FindingsDiscoveryTotalsDto.md
 docs/FindingsRankingDto.md
 docs/GenerateCaseLeadsResponseDto.md
 docs/GlossaryApi.md
+docs/GlossaryImportDto.md
 docs/GlossaryListResponseDto.md
 docs/GlossaryLookupHitDto.md
+docs/GlossarySchemeDto.md
+docs/GlossarySchemeRefDto.md
 docs/GlossaryTermDto.md
 docs/GraphApi.md
 docs/GraphEdgeDto.md
@@ -442,6 +447,7 @@ docs/SearchSourcesPageDto.md
 docs/SearchSourcesRequestDto.md
 docs/SearchSourcesResponseDto.md
 docs/SearchSourcesTotalsDto.md
+docs/SemanticApi.md
 docs/SemanticFindingsSearchDto.md
 docs/SetInquiryAutoPullDto.md
 docs/SetWorkerQueuePausedDto.md
@@ -523,6 +529,7 @@ docs/UpdateSupervisorGoalDto.md
 docs/UpdateSystemBriefDto.md
 docs/UpdateThreadDto.md
 docs/UploadedSourceFileDto.md
+docs/UpsertGlossarySchemeDto.md
 docs/UpsertGlossaryTermDto.md
 docs/UpsertGlossaryTermResponseDto.md
 docs/ValueOccurrenceAssetDto.md
@@ -560,6 +567,7 @@ src/apis/NamespacesApi.ts
 src/apis/NotebooksApi.ts
 src/apis/NotificationsApi.ts
 src/apis/RunnersApi.ts
+src/apis/SemanticApi.ts
 src/apis/SitemapApi.ts
 src/apis/SourcesApi.ts
 src/apis/ThreadsApi.ts
@@ -740,6 +748,7 @@ src/models/CreateCustomDetectorDto.ts
 src/models/CreateDetectorNotebookExecutionDto.ts
 src/models/CreateExternalRunnerDto.ts
 src/models/CreateFindingDto.ts
+src/models/CreateGlossaryRelationDto.ts
 src/models/CreateInquiryDto.ts
 src/models/CreateManualEdgeDto.ts
 src/models/CreateMcpServerDto.ts
@@ -762,6 +771,7 @@ src/models/DecisionsToInquiryResponseDto.ts
 src/models/DeleteDataTransferJobResponseDto.ts
 src/models/DeleteGlossaryTermResponseDto.ts
 src/models/DeleteRunnerResponseDto.ts
+src/models/DeprecateGlossaryTermDto.ts
 src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
 src/models/EdgeDetailDto.ts
@@ -803,8 +813,11 @@ src/models/FindingsDiscoveryTopAssetDto.ts
 src/models/FindingsDiscoveryTotalsDto.ts
 src/models/FindingsRankingDto.ts
 src/models/GenerateCaseLeadsResponseDto.ts
+src/models/GlossaryImportDto.ts
 src/models/GlossaryListResponseDto.ts
 src/models/GlossaryLookupHitDto.ts
+src/models/GlossarySchemeDto.ts
+src/models/GlossarySchemeRefDto.ts
 src/models/GlossaryTermDto.ts
 src/models/GraphEdgeDto.ts
 src/models/GraphNodeDto.ts
@@ -1059,6 +1072,7 @@ src/models/UpdateSupervisorGoalDto.ts
 src/models/UpdateSystemBriefDto.ts
 src/models/UpdateThreadDto.ts
 src/models/UploadedSourceFileDto.ts
+src/models/UpsertGlossarySchemeDto.ts
 src/models/UpsertGlossaryTermDto.ts
 src/models/UpsertGlossaryTermResponseDto.ts
 src/models/ValueOccurrenceAssetDto.ts

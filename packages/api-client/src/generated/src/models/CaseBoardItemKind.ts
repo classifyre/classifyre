@@ -22,7 +22,8 @@ export const CaseBoardItemKind = {
     Hypothesis: 'HYPOTHESIS',
     Comment: 'COMMENT',
     Note: 'NOTE',
-    Frame: 'FRAME'
+    Frame: 'FRAME',
+    Term: 'TERM'
 } as const;
 export type CaseBoardItemKind = typeof CaseBoardItemKind[keyof typeof CaseBoardItemKind];
 
