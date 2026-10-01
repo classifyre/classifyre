@@ -14,6 +14,7 @@ Name | Type
 `detectorType` | string
 `severity` | string
 `answerDimension` | string
+`secretKeys` | Array&lt;string&gt;
 `aiProviderConfigId` | string
 `isActive` | boolean
 `version` | number
@@ -43,6 +44,7 @@ const example = {
   "detectorType": null,
   "severity": null,
   "answerDimension": null,
+  "secretKeys": null,
   "aiProviderConfigId": null,
   "isActive": null,
   "version": null,

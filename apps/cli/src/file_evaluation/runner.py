@@ -11,6 +11,13 @@ from typing import Any
 from ..models.generated_single_asset_scan_results import DetectionResult, Location
 from ..utils.embedded_files import has_embedded_files, iter_embedded_files
 from ..utils.file_parser import ParsedFile, parse_file
+from .asset_fixture import (
+    StaticPayloadServer,
+    fixture_asset,
+    fixture_text,
+    is_asset_fixture,
+    load_asset_fixture,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,18 +97,115 @@ class FileEvaluationRunner:
         return False
 
     async def run_async(self, file_path: Path) -> tuple[ParsedFile, list[DetectionResult]]:
-        """Parse the file and run all enabled detectors."""
-        parsed = parse_file(file_path)
+        """Parse the file (or load an asset fixture) and run all enabled detectors.
+
+        Code detectors (``CODE_DETECTOR``) run last, once, over the whole
+        input as one asset -- the same order a scan uses -- and see the other
+        detectors' findings when they ask for them.
+        """
+        fixture: dict[str, Any] | None = None
+        if is_asset_fixture(file_path):
+            fixture = load_asset_fixture(file_path)
+            text = fixture_text(fixture)
+            parsed = ParsedFile(
+                mime_type=str(fixture.get("mime_type") or "text/plain"),
+                text_content=text,
+                is_binary=False,
+                file_size_bytes=len(text.encode("utf-8")),
+            )
+        else:
+            parsed = parse_file(file_path)
 
         detectors = self._build_detectors()
         if not detectors:
             return parsed, []
+        code_detectors = [d for d in detectors if self._code_runner(d) is not None]
+        detectors = [d for d in detectors if self._code_runner(d) is None]
+
+        findings = await self._run_standard(file_path, parsed, detectors, fixture is not None)
+        if code_detectors:
+            findings.extend(
+                await self._run_code_detectors(
+                    file_path, parsed, fixture, code_detectors, prior=findings
+                )
+            )
+        return parsed, findings
+
+    @staticmethod
+    def _code_runner(detector: Any) -> Any:
+        from ..detectors.custom.runners._custom_detector import CustomDetectorRunner
+
+        runner = getattr(detector, "runner", None)
+        return runner if isinstance(runner, CustomDetectorRunner) else None
+
+    async def _run_code_detectors(
+        self,
+        file_path: Path,
+        parsed: ParsedFile,
+        fixture: dict[str, Any] | None,
+        detectors: list[Any],
+        *,
+        prior: list[DetectionResult],
+    ) -> list[DetectionResult]:
+        from ..detectors.custom_detector.session import CustomDetectorSession
+
+        if fixture is not None:
+            asset = fixture_asset(fixture, file_path.name)
+            payloads = StaticPayloadServer.from_fixture(fixture)
+        else:
+            asset = fixture_asset({"name": file_path.name, "mime_type": parsed.mime_type}, "")
+            payloads = StaticPayloadServer.from_file(
+                file_path.read_bytes(), parsed.mime_type, parsed.text_content
+            )
+
+        detected_at = datetime.now(UTC)
+        findings: list[DetectionResult] = []
+        for detector in detectors:
+            runner = self._code_runner(detector)
+            label = self._detector_label(detector)
+            session = CustomDetectorSession(
+                key=runner._detector_key,
+                name=runner._detector_name,
+                schema=runner.schema,
+                payloads=payloads,
+            )
+            try:
+                outcome = await session.detect(asset, prior)
+            finally:
+                session.close()
+            for warning in outcome.warnings:
+                logger.warning("File evaluation: '%s': %s", label, warning)
+            if outcome.error:
+                logger.error("File evaluation: '%s' failed: %s", label, outcome.error)
+                self.detector_errors.append(f"{label}: {outcome.error}")
+                continue
+            logger.info(
+                "File evaluation: '%s' on asset → %d finding(s)", label, len(outcome.findings)
+            )
+            findings.extend(
+                finding.model_copy(
+                    update={"runner_id": "file-evaluation", "detected_at": detected_at}
+                )
+                for finding in outcome.findings
+            )
+        return findings
+
+    async def _run_standard(
+        self,
+        file_path: Path,
+        parsed: ParsedFile,
+        detectors: list[Any],
+        is_fixture: bool,
+    ) -> list[DetectionResult]:
+        if not detectors:
+            return []
 
         tasks = []
         active_detectors = []
 
         mime_type = parsed.mime_type
-        file_mime = self._is_file_mime(mime_type)
+        # A fixture's bytes are its JSON envelope, never the asset's payload.
+        file_mime = self._is_file_mime(mime_type) and not is_fixture
 
         # Content is delivered whole — never truncated. Truncation corrupts
         # binary files (images/PDFs) and drops potentially-important text, and
@@ -158,14 +262,14 @@ class FileEvaluationRunner:
         # Files that embed whole other files (parquet/Arrow file columns, office media)
         # get each embedded file run through the binary detectors directly, with
         # findings tagged by the embedded location so the UI can group them.
-        embedded_files = has_embedded_files(mime_type)
+        embedded_files = has_embedded_files(mime_type) and not is_fixture
         if not tasks and not embedded_files:
             if not text.strip() and not file_mime:
                 logger.warning(
                     "No text content extracted from %s file; skipping text detectors.",
                     mime_type,
                 )
-            return parsed, []
+            return []
 
         detected_at = datetime.now(UTC)
         all_findings: list[DetectionResult] = []
@@ -203,7 +307,7 @@ class FileEvaluationRunner:
                 )
             )
 
-        return parsed, all_findings
+        return all_findings
 
     async def _run_embedded_file_detectors(
         self,

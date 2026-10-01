@@ -332,4 +332,30 @@ describe('transfer scope registry', () => {
     ]);
     expect(missingDependencies(['sources', 'assets', 'findings'])).toEqual([]);
   });
+
+  describe('code detector secrets (CODE_DETECTOR)', () => {
+    it('strips pipelineSchema.secrets and keeps the notebook', () => {
+      const spec = TRANSFER_TABLES.find(
+        (table) => table.model === 'customDetector',
+      )!;
+      const { row, stripped } = redactRow(spec, {
+        id: 'd1',
+        pipelineSchema: {
+          type: 'CODE_DETECTOR',
+          notebook: {
+            cells: [{ id: 'c', type: 'code', source: 'def detect(a): pass' }],
+          },
+          secrets: { api_token: 'enc::v1::abc' },
+        },
+      });
+      expect(stripped).toEqual(['pipelineSchema.secrets']);
+      expect(row.pipelineSchema).toEqual({
+        type: 'CODE_DETECTOR',
+        notebook: {
+          cells: [{ id: 'c', type: 'code', source: 'def detect(a): pass' }],
+        },
+      });
+      expect(() => assertNoSecrets('customDetector', row)).not.toThrow();
+    });
+  });
 });

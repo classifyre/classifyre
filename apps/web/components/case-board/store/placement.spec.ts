@@ -1,5 +1,5 @@
 import { overlaps, type Rect } from "./geometry";
-import { placeNearNeighbours, type PlaceRequest } from "./placement";
+import { pairEdges, placeNearNeighbours, type PlaceRequest } from "./placement";
 
 const box = (width = 200, height = 120) => ({ dx: 0, dy: 0, width, height });
 const req = (id: string, b = box()): PlaceRequest => ({ id, box: b });
@@ -75,5 +75,22 @@ describe("placeNearNeighbours", () => {
     const e = positions.get("E")!;
     const boxRect = { x: e.x - 80, y: e.y - 40, w: 300, h: 200 };
     expect(overlaps(boxRect, hyp, 0)).toBe(false);
+  });
+});
+
+describe("pairEdges", () => {
+  it("lays out each related pair once, though both ends list it", () => {
+    const neighbours = graph([
+      ["A", "B"],
+      ["B", "C"],
+      ["A", "C"],
+    ]);
+    const edges = pairEdges(["A", "B", "C"], neighbours);
+    expect(edges.map((e) => `${e.source}${e.target}`)).toEqual(["AB", "AC", "BC"]);
+  });
+
+  it("skips relations to items outside the layout and to the item itself", () => {
+    const edges = pairEdges(["A", "B"], (id) => (id === "A" ? ["A", "B", "Z"] : ["A"]));
+    expect(edges).toEqual([{ id: "A->B", source: "A", target: "B" }]);
   });
 });

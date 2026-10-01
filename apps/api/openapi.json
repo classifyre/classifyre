@@ -2888,6 +2888,154 @@
         ]
       }
     },
+    "/custom-detectors/{id}/files": {
+      "get": {
+        "description": "Code detectors (CODE_DETECTOR) read these with ctx.file(name).",
+        "operationId": "CustomDetectorsController_listFiles",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomDetectorFileDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List a code detector's uploaded files",
+        "tags": [
+          "Custom Detectors"
+        ]
+      },
+      "post": {
+        "description": "A screening list, a model, a reference table. A file with a name the detector already has is replaced. Bumps the detector version.",
+        "operationId": "CustomDetectorsController_uploadFile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomDetectorFileDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Upload one file to a code detector",
+        "tags": [
+          "Custom Detectors"
+        ]
+      }
+    },
+    "/custom-detectors/{id}/files/{fileId}/content": {
+      "get": {
+        "operationId": "CustomDetectorsController_fileContent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Stream a code detector file's bytes",
+        "tags": [
+          "Custom Detectors"
+        ]
+      }
+    },
+    "/custom-detectors/{id}/files/{fileId}": {
+      "delete": {
+        "operationId": "CustomDetectorsController_deleteFile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a code detector file",
+        "tags": [
+          "Custom Detectors"
+        ]
+      }
+    },
     "/custom-detectors/{id}/retire-out-of-scope-findings": {
       "post": {
         "description": "After narrowing scope.asset_kinds or removing regex patterns, the old findings stay OPEN. Both steps run in the background; follow the returned operation with GET /findings/bulk-operations/:operationId. (1) dryRun (default) counts candidates by reason, case citations and inquiry matches. (2) dryRun: false with fromOperationId, expectedCount and confirm: true resolves them. Findings a case cites are never retired; findings an ACTIVE inquiry watches only with includeInquiryWatched.",
@@ -9694,7 +9842,8 @@
             "schema": {
               "enum": [
                 "connector",
-                "augmentation"
+                "augmentation",
+                "detector"
               ],
               "type": "string"
             }
@@ -9729,7 +9878,8 @@
             "schema": {
               "enum": [
                 "connector",
-                "augmentation"
+                "augmentation",
+                "detector"
               ],
               "type": "string"
             }
@@ -9968,6 +10118,88 @@
           }
         },
         "summary": "Recent executions for a source",
+        "tags": [
+          "Notebooks"
+        ]
+      }
+    },
+    "/custom-detectors/{detectorId}/notebook/executions": {
+      "post": {
+        "description": "Code detectors (pipeline type CODE_DETECTOR) only. \"cell\"/\"all\" replay the cells with the detector's variables, secrets and files; \"preview_detect\" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.",
+        "operationId": "NotebookController_createDetectorExecution",
+        "parameters": [
+          {
+            "name": "detectorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDetectorNotebookExecutionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotebookExecutionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Run a code detector's notebook",
+        "tags": [
+          "Notebooks"
+        ]
+      },
+      "get": {
+        "operationId": "NotebookController_listDetectorExecutions",
+        "parameters": [
+          {
+            "name": "detectorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotebookExecutionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Recent executions of a code detector's notebook",
         "tags": [
           "Notebooks"
         ]
@@ -16384,6 +16616,18 @@
           "pipelineSchema": {
             "type": "object",
             "additionalProperties": true
+          },
+          "key": {
+            "type": "string",
+            "description": "Suggested detector key, for templates that ship one (code detectors do)."
+          },
+          "testScenarios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Test scenarios the template ships with: { name, inputText | inputAsset, expectedOutcome }."
           }
         },
         "required": [
@@ -16500,6 +16744,13 @@
             "type": "string",
             "nullable": true,
             "description": "Which dimension of this detector's findings carries the answer — `findingType` for classifiers (the predicted label IS the answer), `matchedContent` for TAG and REGEX (the type names the rule, the value is the answer). The same distinction /inquiries/match-options reports, repeated here so a detector audit and a question author see one story."
+          },
+          "secretKeys": {
+            "description": "Code detectors (CODE_DETECTOR) only: names of the secrets the detector holds. Values are write-only and never returned; send `secrets` as a patch on update (a string sets a key, null deletes it, an absent key is kept).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "aiProviderConfigId": {
             "type": "string",
@@ -16766,6 +17017,44 @@
             "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION | TAG). TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={\"<key>\": \"<value>\"}), and it is not selectable on a source."
           }
         }
+      },
+      "CustomDetectorFileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "customDetectorId": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "The name ctx.file(name) finds it by"
+          },
+          "declaredMimeType": {
+            "type": "string"
+          },
+          "fileSizeBytes": {
+            "type": "number"
+          },
+          "contentHash": {
+            "type": "string",
+            "description": "SHA-256 of the bytes; part of the scan-cache fingerprint"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "customDetectorId",
+          "fileName",
+          "declaredMimeType",
+          "fileSizeBytes",
+          "contentHash",
+          "createdAt"
+        ]
       },
       "RetireOutOfScopeFindingsDto": {
         "type": "object",
@@ -27707,7 +27996,19 @@
             "type": "string"
           },
           "sourceId": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "Null for a code detector's cell/all runs, which need no source."
+          },
+          "customDetectorId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Set when the execution ran a code detector notebook."
+          },
+          "assetId": {
+            "type": "string",
+            "nullable": true,
+            "description": "preview_detect: the asset the detector was run on."
           },
           "revision": {
             "type": "number"
@@ -27715,18 +28016,20 @@
           "mode": {
             "type": "string",
             "enum": [
-              "CELL",
-              "ALL",
-              "TEST_CONNECTION",
-              "PREVIEW_EXTRACT",
-              "PREVIEW_AUGMENT"
+              "cell",
+              "all",
+              "test_connection",
+              "preview_extract",
+              "preview_augment",
+              "preview_detect"
             ]
           },
           "scope": {
             "type": "string",
             "enum": [
-              "CONNECTOR",
-              "AUGMENTATION"
+              "connector",
+              "augmentation",
+              "detector"
             ],
             "description": "Which notebook this execution ran."
           },
@@ -27778,6 +28081,44 @@
           "mode",
           "status",
           "createdAt"
+        ]
+      },
+      "CreateDetectorNotebookExecutionDto": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "number",
+            "description": "The detector notebook revision to execute (pipelineSchema.notebook.revision). Save first: an execution runs the stored revision, never unsaved edits."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "cell",
+              "all",
+              "preview_detect"
+            ],
+            "description": "\"cell\" runs one cell (targetCellId), \"all\" replays every cell, \"preview_detect\" runs setup()/detect() on a real asset of `sourceId` (or on a small sample of it) and reports the findings without recording anything."
+          },
+          "targetCellId": {
+            "type": "string",
+            "description": "Required when mode is \"cell\""
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "preview_detect: the source whose assets the detector judges. Required."
+          },
+          "assetId": {
+            "type": "string",
+            "description": "preview_detect: one asset of that source to judge. Omit to sample a few of its assets instead."
+          },
+          "maxAssets": {
+            "type": "number",
+            "description": "preview_detect without assetId: how many assets to sample (1-10)."
+          }
+        },
+        "required": [
+          "revision",
+          "mode"
         ]
       },
       "TriggerAutopilotDto": {

@@ -27,12 +27,37 @@ export const expectedOutcomeSchema = z.object({
 
 // ── Request DTOs ─────────────────────────────────────────────────────────────
 
-export const createTestScenarioSchema = z.object({
-  name: z.string().min(1).max(200),
-  description: z.string().max(1000).optional(),
-  inputText: z.string().min(1).max(50000),
-  expectedOutcome: z.record(z.string(), z.unknown()),
+/**
+ * A whole asset for a code detector (CODE_DETECTOR) to judge: what
+ * `asset.name`, `asset.kind`, `asset.metadata`, `asset.text()`, `asset.pages()`
+ * and `asset.rows()` return. Strict, so a typo is a 400 rather than a key the
+ * rule silently never sees.
+ */
+export const assetFixtureSchema = z.strictObject({
+  name: z.string().min(1).max(500),
+  kind: z.string().max(64).optional(),
+  mime_type: z.string().max(200).optional(),
+  url: z.string().max(2000).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  text: z.string().max(1_000_000).optional(),
+  pages: z.array(z.string()).max(200).optional(),
+  rows: z.array(z.record(z.string(), z.unknown())).max(10_000).optional(),
 });
+
+export type AssetFixture = z.infer<typeof assetFixtureSchema>;
+
+export const createTestScenarioSchema = z
+  .object({
+    name: z.string().min(1).max(200),
+    description: z.string().max(1000).optional(),
+    inputText: z.string().min(1).max(50000).optional(),
+    inputAsset: assetFixtureSchema.optional(),
+    expectedOutcome: z.record(z.string(), z.unknown()),
+  })
+  .refine((dto) => Boolean(dto.inputText) || Boolean(dto.inputAsset), {
+    message: 'Provide inputText, or inputAsset for a code detector',
+    path: ['inputText'],
+  });
 
 export type CreateTestScenarioDto = z.infer<typeof createTestScenarioSchema>;
 export type ExpectedOutcomeDto = z.infer<typeof expectedOutcomeSchema>;
@@ -60,6 +85,7 @@ export interface TestScenarioDto {
   name: string;
   description?: string | null;
   inputText: string;
+  inputAsset?: AssetFixture | null;
   expectedOutcome: Record<string, unknown>;
   lastResult?: TestResultDto | null;
   createdAt: string;

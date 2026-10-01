@@ -2120,6 +2120,299 @@
       },
       "additionalProperties": false
     },
+    "DetectorNotebookCell": {
+      "title": "DetectorNotebookCell",
+      "type": "object",
+      "description": "One notebook cell: Python (`code`) or prose (`markdown`). Code must remain valid standard Python -- IPython magics are rejected.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "description": "Stable cell identifier, unique within the notebook"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["code", "markdown"]
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 100000
+        }
+      },
+      "required": ["id", "type", "source"],
+      "additionalProperties": false
+    },
+    "DetectorNotebook": {
+      "title": "DetectorNotebook",
+      "type": "object",
+      "description": "The rule's code. Cells run in document order in one fresh child process per scan. The assembled code cells must define detect(asset, ctx); setup(ctx) is optional and runs once before the first asset.",
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Monotonic revision, bumped on every save that changes a cell. An execution names the revision it ran."
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/definitions/DetectorNotebookCell"
+          },
+          "description": "Ordered notebook cells. Capped at 50: every attached detector travels inside the scan recipe, which has a 128 KB budget."
+        }
+      },
+      "required": ["cells"],
+      "additionalProperties": false
+    },
+    "DetectorNotebookPackage": {
+      "title": "DetectorNotebookPackage",
+      "type": "object",
+      "description": "A Python distribution installed (once per scan, with uv) before the rule runs.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+          "description": "Distribution name as published on the index (for example 'rapidfuzz')."
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^$|^(==|>=|<=|~=|!=|>|<).+$|^[0-9][A-Za-z0-9._*+!-]*$",
+          "description": "Optional version or specifier. Empty means latest."
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "DetectorOutputField": {
+      "title": "DetectorOutputField",
+      "type": "object",
+      "description": "One typed output field a detector writes into extracted_data. Shared by code detectors and, later, LLM extraction.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Field name; a key in Finding(fields={...}) and in extracted_data."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "date",
+            "list[string]",
+            "list[number]"
+          ],
+          "default": "string"
+        },
+        "description": {
+          "type": "string",
+          "default": "",
+          "maxLength": 1000
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "CodeDetectorLimits": {
+      "title": "CodeDetectorLimits",
+      "type": "object",
+      "description": "Per-run limits for a code detector. Every limit is contained: exceeding one costs that asset (an ERROR outcome, existing findings kept), never the scan.",
+      "properties": {
+        "per_asset_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 30,
+          "description": "Wall-clock budget for one detect(asset, ctx) call. The child is restarted after a timeout."
+        },
+        "setup_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 900,
+          "description": "Budget for package installation plus setup(ctx)."
+        },
+        "max_findings_per_asset": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 200,
+          "description": "Findings beyond this are dropped with a warning."
+        },
+        "max_output_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 67108864,
+          "default": 2097152,
+          "description": "Serialized size of one asset's findings; larger output is rejected as malformed."
+        },
+        "max_payload_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "default": 33554432,
+          "description": "How much of an asset's payload asset.payload()/text()/raw_pages() may carry."
+        },
+        "max_workers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "default": 1,
+          "description": "Child processes running detect() concurrently. Each runs setup() and keeps its own ctx.state."
+        },
+        "max_consecutive_failures": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 10,
+          "description": "Disable the rule for the rest of the run after this many consecutive failed assets."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CodeDetectorFileRuntime": {
+      "title": "CodeDetectorFileRuntime",
+      "type": "object",
+      "description": "Runtime-only: one uploaded detector file, injected by the server at dispatch. Clients never send it.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "content_hash": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string",
+          "description": "Where the scan downloads the bytes from."
+        }
+      },
+      "required": ["id", "name", "content_hash"],
+      "additionalProperties": false
+    },
+    "CodeDetectorPipelineSchema": {
+      "title": "CodeDetectorPipelineSchema",
+      "type": "object",
+      "description": "A code detector: a Python notebook that defines detect(asset, ctx) and yields Finding(...) objects. It runs once per asset in the scan's detector stage, after every other detector, and can read the asset's text, pages, raw bytes, rows and metadata (and, with needs_findings, the findings other detectors produced on the same asset in this run). It judges; it never rewrites what the connector extracted. Use it for checks and rules a pattern or a model cannot express: totals that must add up, list screening, co-occurrence rules, checksummed identifiers, bring-your-own model scoring.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["CODE_DETECTOR"],
+          "default": "CODE_DETECTOR"
+        },
+        "notebook": {
+          "$ref": "#/definitions/DetectorNotebook"
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DetectorNotebookPackage"
+          },
+          "maxItems": 50,
+          "description": "Extra Python distributions installed once per scan before setup()."
+        },
+        "variables": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "maxLength": 8192 },
+          "maxProperties": 64,
+          "description": "Non-secret settings, read with ctx.var(name)."
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8192
+          },
+          "maxProperties": 64,
+          "description": "Credentials, read with ctx.secret(name). Write-only over the API, encrypted at rest, decrypted only into the child process, redacted from every log."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DetectorOutputField"
+          },
+          "maxItems": 50,
+          "description": "Declared output fields. Keys in Finding(fields=...) that are not declared here are dropped with one warning per run."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low", "info"],
+          "default": "medium",
+          "description": "Severity CEILING. A Finding may ask for less; a request for more is clamped and recorded as metadata.severity_requested."
+        },
+        "category": {
+          "$ref": "#/definitions/DetectorCategory",
+          "default": "QUALITY",
+          "description": "Category every finding of this detector carries."
+        },
+        "deterministic": {
+          "type": "boolean",
+          "default": true,
+          "description": "False when the verdict depends on something outside the asset (a live list, the clock, the network). Non-deterministic detectors never use the scan cache."
+        },
+        "needs_findings": {
+          "type": "boolean",
+          "default": false,
+          "description": "Expose asset.findings: what the other detectors found on this asset in this run. Code detectors never see each other's findings."
+        },
+        "limits": {
+          "$ref": "#/definitions/CodeDetectorLimits"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DetectorScope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
+        "budget": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DetectorBudget"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures."
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "description": "Ids of uploaded detector files (custom_detector_files rows) this rule reads with ctx.file(name). Managed through the detector files endpoints; the server injects name, content hash and download URL as files_runtime at dispatch."
+        },
+        "files_runtime": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CodeDetectorFileRuntime"
+          },
+          "description": "Runtime-only: the detector's uploaded files, injected by the server at dispatch. Rejected on create/update."
+        },
+        "custom_detector_id": {
+          "type": "string",
+          "description": "Runtime-only: the detector's database id, injected by the server at dispatch."
+        }
+      },
+      "required": ["type", "notebook"],
+      "additionalProperties": false
+    },
     "AnyPipelineSchema": {
       "title": "AnyPipelineSchema",
       "oneOf": [
@@ -2143,6 +2436,9 @@
         },
         {
           "$ref": "#/definitions/TagPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/CodeDetectorPipelineSchema"
         }
       ],
       "discriminator": {

@@ -25,7 +25,7 @@ import {
   type BoardEdge,
   type ProjectionView,
 } from "./projection";
-import { findingNodeId, MAX_FINDING_NODES, SOURCE_PORT, TARGET_PORT } from "./relations";
+import { FINDING_NODE, findingNodeId, MAX_FINDING_NODES, SOURCE_PORT, TARGET_PORT } from "./relations";
 import { FRAME_PADDING, FRAME_TITLE_HEIGHT, itemExtent, overlaps, spotInFrame } from "./geometry";
 import { evidenceStatus } from "./selectors";
 import type { BoardDomain, BoardItem, BoardLink, Bubble, BubbleRow, SeverityKey } from "./types";
@@ -307,6 +307,15 @@ describe("projection: assets and their findings as nodes", () => {
     expect(contains).toHaveLength(3);
     expect(contains.every((e) => e.source === "E")).toBe(true);
     expect(edges.find((e) => e.id === "lnk:L2")?.target).toBe(findingNodeId("E", "f1"));
+  });
+
+  it("declares each finding node's size and ports, so React Flow never mounts one just to measure it", () => {
+    const findings = projectNodes(fixture(), view()).filter((n) => n.type === "finding");
+    expect(findings.length).toBeGreaterThan(0);
+    for (const n of findings) {
+      expect(n.measured).toEqual({ width: FINDING_NODE.width, height: FINDING_NODE.height });
+      expect(n.handles?.map((h) => h.id).sort()).toEqual([SOURCE_PORT, TARGET_PORT, "b", "t"].sort());
+    }
   });
 
   it("carries a round shape on asset and finding nodes, none on cards", () => {
