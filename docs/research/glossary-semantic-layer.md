@@ -6,6 +6,12 @@
 
 **Short answer.** Yes, and the instinct is right: a glossary term should be reached by **semantic lineage**, meaning links from evidence to meaning that carry their own proof. It shouldn't be a tag. Today the glossary is not connected to the evidence at all.
 
+**Status: decided on 2026-10-01.** §11 records the decisions. The PRDs that follow from them are [SL0–SL5](../prd/SL0-semantic-layer-architecture.md). Two answers changed the original proposal:
+- **No separate GLOSSARY detector.** Bindings over existing detectors are the main path. A "Find in text" action generates an ordinary REGEX detector for concepts that appear only as words.
+- **Agents may approve their own bindings and relations,** within guardrails.
+
+The sections below still describe the proposal as written; §11 says what changed.
+
 ---
 
 ## The answer first
@@ -44,7 +50,7 @@ TAG keeps its job. It is a detector: the way a connector asserts a fact. The glo
    Also fix the four places that claim more than the code does (§1.4).
 2. **Bindings.** Say once what a detector output means: a finding type, label, tag value or metadata value maps to a concept. Linking is retroactive, with no re-scan.
 3. **Semantic links.** A per-asset rollup of which terms the evidence supports, how, and since when. Every surface reads it.
-4. **Glossary detection.** A GLOSSARY pipeline that finds term names, aliases and codes in content and records them as findings.
+4. **Glossary detection.** A GLOSSARY pipeline that finds term names, aliases and codes in content and records them as findings. *(Replaced by decision D10: "Find in text" generates an ordinary REGEX detector bound to the term.)*
 5. **Surfaces:**
    - a term page;
    - *Meaning* on findings, assets and detectors;
@@ -55,7 +61,7 @@ TAG keeps its job. It is a detector: the way a connector asserts a fact. The glo
 
 **What this is not.** No object types with editable properties, no functions, no actions, no write-back. Palantir's ontology is operational: you act on its objects. Classifyre's is evidentiary: every link points to the finding that justifies it. That is also what an auditor, a data-protection officer or a court asks for.
 
-**Nine decisions are open** (§11). Each has a recommended option.
+**Ten decisions** are recorded in §11.
 
 ---
 
@@ -177,7 +183,7 @@ What to take from Palantir, and where we stop on purpose:
 | Examples | *Eigenmittelquote*, *Bank account*, *Health data (GDPR Art. 9)*, *Contract*, *GmbH* | *ACME Holding GmbH*, *Jane Doe*, *Clinton Foundation*, FOIA case F-2014-20439 |
 | Answers | What does this mean? | Which one is it? |
 | How it shows up in data | Finding types, labels, tag values, metadata, words and codes in text | Values: names, identifiers, URNs, e-mail addresses |
-| Linked by | Bindings; glossary detection | Mentions in the value index: exact alias or URN automatically; phonetic and semantic matches as candidates |
+| Linked by | Bindings, including bindings on "Find in text" detectors (D10) | Mentions in the value index: exact alias or URN automatically; phonetic and semantic matches as candidates |
 | How many | Tens to a few thousand | Thousands to millions |
 | Curated by | A steward, or a pack | Mostly derived, then reviewed |
 | A wrong link means | A mislabelled class of data | The wrong person in a case |
@@ -293,7 +299,7 @@ New fields on `glossary_terms`:
 | `schemeId` | The vocabulary the term belongs to: *Rechtsformen*, *GDPR special categories*, *PKS* |
 | `status`: DRAFT, APPROVED or DEPRECATED | The lifecycle. Only approved terms drive linking |
 | `steward` | Who answers for the definition. Free text until the enterprise edition has identities |
-| `detection`: OFF, TERM or TERM_AND_ALIASES | Whether glossary detection looks for the term in text |
+| ~~`detection`~~ | *Dropped by D10: the generated "Find in text" detector carries its own patterns* |
 
 Existing rows migrate as follows:
 - PERSON, ORGANIZATION and LOCATION become ENTITY; everything else becomes CONCEPT.
@@ -344,7 +350,7 @@ The links are kept as a per-asset rollup: asset × term × method. Each row carr
 | Method | Source |
 |---|---|
 | BINDING | A binding matched findings or asset metadata |
-| DETECTED | Glossary detection found the term in content |
+| ~~DETECTED~~ | *Dropped by D10: a "Find in text" match is an ordinary BINDING on the generated detector's output* |
 | MENTION | A value-index value matched an entity alias or URN (G5) |
 | DECLARED | A connector stated it |
 | MANUAL | A person linked a finding, asset or case |
@@ -354,7 +360,9 @@ Finding-level questions, such as "which findings on this asset make it about *Ba
 
 The existing `glossary_references` table becomes the store for MANUAL links, and keeps its provenance role.
 
-### 6.5 Glossary detection
+### 6.5 Glossary detection (superseded by D10)
+
+> **Decided otherwise.** There is no GLOSSARY pipeline. Concepts that appear only as words get a *Find in text* action that generates an ordinary REGEX custom detector from the term's labels, with tests, bound to the term ([SL2 §7](../prd/SL2-bindings-and-vocabulary.md)). The matching rules below (word boundaries, case-sensitive codes, hidden aliases excluded) carry over to the generated pattern.
 
 A GLOSSARY pipeline type joins REGEX, GLINER2, LLM and TAG, and attaches to sources like any custom detector.
 
@@ -403,7 +411,7 @@ What it emits: one finding per match, typed `term:<key>`, carrying the term id, 
 | Surface | Change |
 |---|---|
 | **API** | Glossary model, schemes, relations, bindings; the semantic linker (incremental after each run, plus backfill when a binding changes); `asset_terms`; a term evidence API; graph node type `term`; trace kind `meaning`; a `term` dimension for watches and finding/asset search (narrower terms included on request); events |
-| **CLI and SDK** | GLOSSARY pipeline and runner; a glossary snapshot in the run recipe; `Ref.term(key)` for connectors that want to reference a term explicitly |
+| **CLI and SDK** | `Ref.term(key)` and `means()` for connectors and augmentation (D3). No new detector engine: "Find in text" generates REGEX detectors (D10) |
 | **Glossary page** | Tabs for Concepts, Entities, Schemes, *Unbound vocabulary* and Proposals. *Unbound vocabulary* lists the finding types and labels with open findings but no meaning, by volume: the data-dictionary worklist |
 | **Term page** (new) | Definition, codes, taxonomy breadcrumb, bindings, evidence over time by source, cases and watches that use it, relations, history. Actions: watch, add to case, detect in content, approve, deprecate |
 | **Finding, asset, detector pages** | A *Meaning* card: the terms linked and how, plus *Link to term…*. Detector page: what this detector's outputs mean, and which are unbound |
@@ -464,7 +472,7 @@ What it emits: one finding per match, typed `term:<key>`, carrying the term id, 
 
 | Risk | Containment |
 |---|---|
-| Glossary detection floods findings: short codes such as `E` | A detection policy per term; a minimum alias length; codes matched case-sensitively as whole tokens; hidden aliases; a passing test scenario before enabling; a cap per term per asset |
+| "Find in text" detectors flood findings: short codes such as `E` | A detection policy per term; a minimum alias length; codes matched case-sensitively as whole tokens; hidden aliases; a passing test scenario before enabling; a cap per term per asset |
 | Concept hubs: *Personal data* touches everything | Rollups and counts rather than edges; the trace's existing hub caps (P13); bundles on the map |
 | Wrong entity links | G5's rule: only exact alias or URN matches link automatically, everything else is reviewed, and entities never auto-merge |
 | Taxonomy sprawl and stale definitions | Steward, status and DEPRECATED; schemes; packs. Agent proposals stay DRAFT |
@@ -477,35 +485,39 @@ What it emits: one finding per match, typed `term:<key>`, carrying the term id, 
 
 ## 11. Decisions
 
-Each has a recommendation (✅). Answers go into §12 and into the PRDs.
+Decided with the product owner on 2026-10-01. The *Recommended* column is what this research proposed. Where the decision differs, the *Consequence* column says what changed.
 
-| # | Decision | Options | Recommendation and why |
-|---|---|---|---|
-| **D1** | Concepts and entities | **A** One glossary with two kinds and shared machinery · **B** Two separate models · **C** One undifferentiated list, which G5 turns into entities | ✅ **A.** One lookup, one review flow, one set of MCP tools, and the distinction made explicitly. B duplicates machinery. C repeats the mistake the Firmenbuch run warned about |
-| **D2** | How data links to terms | **A** Semantic links with method, evidence and lifecycle, plus manual links · **B** Tags on assets | ✅ **A.** It matches your own suggestion. B duplicates TAG and has no provenance |
-| **D3** | Linking mechanisms in the first release | Bindings · glossary detection · connector declarations (`Ref.term`) · semantic suggestions from embeddings | ✅ **Bindings and glossary detection.** Resolve-by-code bindings over TAG values already cover connectors. Embedding suggestions come second, because they need a review queue (G5 builds one) |
-| **D4** | How far the ontology goes | **A** Taxonomy and relations (broader, related, part of, instance of, custom verbs between concepts) · **B** A plus concept properties bound to typed finding fields · **C** Taxonomy only | ✅ **A now**, B after G4. B gives "Contract has penalty_pct" but depends on G4's finding fields |
-| **D5** | The canvas | **A** Case-board lens and workspace semantic map · **B** Case board only · **C** Map only | ✅ **A.** The board is where investigators work; the map is the overview you asked for, and the strongest demo |
-| **D6** | Order relative to G5 | **A** Foundation first (SL1 now; SL2 and SL3 by M3), then G5 on top in M4 · **B** Fold everything into G5 · **C** After G5 | ✅ **A.** G5 would otherwise harden "term = entity" before concepts exist. SL1 has no dependencies |
-| **D7** | What agents may do | **A** Propose terms, aliases, bindings, relations and links as DRAFT; only approved items drive linking · **B** Agents may approve their own bindings in MANAGED mode, with undo · **C** Read-only | ✅ **A.** It matches today's glossary gate and keeps operator trust. B can follow once proposals are measured (G7) |
-| **D8** | Starter content and formats | **A** Starter packs bound to built-in detectors (personal data with Art. 9, secrets, financial identifiers, DACH company law); CSV and SKOS JSON-LD import/export · **B** CSV only, no packs · **C** Neither in v1 | ✅ **A.** A first scan then shows a non-empty map, which is the traction demo. SKOS is the European public-sector format |
-| **D9** | Names in the UI | Keep "Glossary" for curation, "Meaning" on findings and assets, "Semantic map" for the canvas · or rename Glossary to "Vocabulary" or "Ontology" | ✅ **Keep "Glossary".** Users know it; "ontology" oversells |
+| # | Decision | Options offered | Recommended | **Decided** | Consequence |
+|---|---|---|---|---|---|
+| **D1** | Concepts and entities | **A** One glossary, two kinds · **B** Two models · **C** One list, which G5 turns into entities | A | **A: one glossary, two kinds** | SL1. G5 builds on the ENTITY kind (SL0 §9) |
+| **D2** | How data links to terms | **A** Semantic links with method, evidence and lifecycle · **B** Tags on assets | A | **A**, the product owner's own framing | SL3 |
+| **D3** | Linking in the first release | Bindings · glossary detection · connector declarations · semantic suggestions | Bindings + glossary detection | **Bindings, connector declarations and semantic suggestions. No separate GLOSSARY detector**, and the binding UX must be well thought through: "is it regex on the value, or can any finding be mapped without a value?" | SL2 builds bindings from the *observed* vocabulary (types and values with counts), never from regex (rule SL-7). SL3 adds `Ref.term` and `means()`. Suggestions and their review queue move from G5 into SL4 |
+| **D4** | How far the ontology goes | **A** Taxonomy + relations · **B** + concept properties · **C** Taxonomy only | A | **A** | SL1 R5. Properties wait for G4 |
+| **D5** | The canvas | **A** Board lens + semantic map · **B** Board only · **C** Map only | A | **A** | SL5 |
+| **D6** | Order relative to G5 | **A** Foundation first, G5 on top · **B** Fold into G5 · **C** After G5 | A | **A** | SL0 §6: SL1 in M1; SL2 and SL3 in M2; SL4 and SL5 in M3; G5′ in M4 |
+| **D7** | What agents may do | **A** Propose only · **B** Approve their own bindings in MANAGED mode · **C** Read-only | A | **B: agents may approve their own bindings and relations** | Guardrails in SL2 §9 and SL0 §8: impact preview with a token, impact limit (5,000 findings), daily budget (20), never touching operator items, decision log and undo. Terms, aliases and links stay operator decisions |
+| **D8** | Starter content and formats | **A** Packs + CSV + SKOS · **B** CSV only · **C** Neither | A | **A** | SL1 R12 (formats), SL2 §8 (packs) |
+| **D9** | Names in the UI | Keep "Glossary", "Meaning", "Semantic map" · or rename | Keep | Not asked; recommendation adopted | Cheap to revisit before the UI work |
+| **D10** | Text-only concepts, once there is no GLOSSARY detector | *Find in text* shortcut · suggestions only · leave it to users | *Find in text* | **"Find in text"** | SL2 §7: one action generates an ordinary REGEX custom detector from the term's labels, with tests, bound to the term. No new engine |
+
+What changed from the proposal:
+- §6.5 ("Glossary detection") is replaced by D10.
+- The DETECTED method in §6.4 becomes an ordinary BINDING on the generated detector's output.
+- The `detection` field in §6.1 is dropped; the generated detector carries its own patterns.
 
 ---
 
-## 12. Proposed PRDs (final after the decisions)
+## 12. PRDs
 
-| # | PRD | Size | Depends on |
-|---|---|---|---|
-| SL0 | How the semantic-layer PRDs fit: model, contracts, order, scenarios | — | — |
-| SL1 | Glossary model: kinds, keys, schemes, status, taxonomy and relations; import/export; the four claims fixed | S–M | — |
-| SL2 | Bindings and semantic links: the linker, `asset_terms`, *Meaning* surfaces, term page, filters and watches | M | SL1 |
-| SL3 | Glossary detection: GLOSSARY pipeline, snapshot, runner; SDK `Ref.term` | M | SL1 |
-| SL4 | Semantic canvas: case-board lens, term cards, workspace semantic map | M–L | SL2 |
-| SL5 | Agents and MCP on the semantic layer | S | SL1, SL2 |
-| G5′ | Entities, amended to build on SL1 and SL2 | L | SL1, SL2 |
-
-Suggested order: SL1 alongside M1; SL2 and SL3 in M2–M3; SL4 in M3; G5′ in M4.
+| # | PRD | Size | Milestone | Depends on |
+|---|---|---|---|---|
+| [SL0](../prd/SL0-semantic-layer-architecture.md) | How the semantic-layer PRDs fit: decisions, model, foundations F8–F10, contracts C8–C12, order, scenarios D–G, changes to G5 and the other PRDs | — | — | — |
+| [SL1](../prd/SL1-glossary-model.md) | Glossary model: kinds, keys, schemes, status, taxonomy and relations; CSV and SKOS import/export; the four claims fixed | S–M | M1 | — |
+| [SL2](../prd/SL2-bindings-and-vocabulary.md) | Bindings and vocabulary: the observed data dictionary, five binding modes without regex, the dialog, *Unbound vocabulary*, "Find in text", packs, agent approvals | M | M2 | SL1 |
+| [SL3](../prd/SL3-semantic-links.md) | Semantic links: the linker, `asset_terms`, Meaning surfaces, term evidence, filters, watches, exports, connector declarations | M | M2 | SL1, SL2 |
+| [SL4](../prd/SL4-suggestions-and-review.md) | Suggestions and the review queue: binding, document and relation suggestions; one queue for every proposal | M | M3 | SL1–SL3 |
+| [SL5](../prd/SL5-semantic-canvas.md) | Semantic canvas: the case-board Meaning lens and term cards; the workspace semantic map | M–L | M3 | SL1, SL3 |
+| G5′ | Entities, amended to build on SL1, SL3 and SL4 (SL0 §9) | L | M4 | SL1, SL3, SL4 |
 
 ---
 
