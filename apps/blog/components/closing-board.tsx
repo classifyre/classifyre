@@ -7,14 +7,15 @@ import { translate, translateList } from "@/i18n";
 import type { Locale } from "@/lib/locale";
 
 /**
- * Interactive backdrop for the closing CTA: a detective's string board —
- * evidence pins joined by dashed threads on the black signal panel.
+ * Interactive backdrop for the closing CTA and the hero: a detective's
+ * string board: evidence pins joined by dashed threads on the black signal
+ * panel.
  *
- * A lime spotlight follows the pointer across the board (CSS vars updated
- * through a ref, so no re-renders), the pins breathe on a staggered loop,
- * and the classification labels rotate through fresh findings every few
- * seconds, so the panel feels alive even without a pointer. Everything is
- * decorative and pointer-transparent; the CTAs stay clickable.
+ * The pins breathe on a staggered loop and the classification labels rotate
+ * through fresh findings every few seconds, so the panel feels alive
+ * without any pointer interaction (the lime spotlight that used to follow
+ * the pointer is gone on purpose). Everything is decorative and
+ * pointer-transparent; the CTAs stay clickable.
  */
 
 const PINS: readonly { x: number; y: number }[] = [
@@ -54,40 +55,10 @@ const THREADS: readonly (readonly [number, number])[] = [
 ];
 
 export function ClosingBoard({ locale = "en" }: { locale?: Locale }) {
-  const ref = React.useRef<HTMLDivElement | null>(null);
   const tags = useCyclingTags(TAGGED.length, translateList(locale, "findingTags"));
 
-  // Track the pointer across the whole CTA section, not just the board
-  // itself — the board is click-transparent so it never sees the events.
-  React.useEffect(() => {
-    const board = ref.current;
-    const section = board?.closest("section");
-    if (!board || !section) return;
-    const onMove = (event: PointerEvent) => {
-      const rect = section.getBoundingClientRect();
-      const mx = ((event.clientX - rect.left) / rect.width) * 100;
-      const my = ((event.clientY - rect.top) / rect.height) * 100;
-      board.style.setProperty("--mx", `${mx.toFixed(1)}%`);
-      board.style.setProperty("--my", `${my.toFixed(1)}%`);
-      board.dataset.lit = "true";
-    };
-    const onLeave = () => {
-      board.dataset.lit = "false";
-    };
-    section.addEventListener("pointermove", onMove);
-    section.addEventListener("pointerleave", onLeave);
-    return () => {
-      section.removeEventListener("pointermove", onMove);
-      section.removeEventListener("pointerleave", onLeave);
-    };
-  }, []);
-
   return (
-    <div
-      ref={ref}
-      aria-hidden="true"
-      className="cl-net pointer-events-none absolute inset-0"
-    >
+    <div aria-hidden="true" className="cl-net pointer-events-none absolute inset-0">
       <svg
         viewBox="0 0 1000 520"
         preserveAspectRatio="xMidYMid slice"
@@ -152,8 +123,6 @@ export function ClosingBoard({ locale = "en" }: { locale?: Locale }) {
       <span className="cl-exhibit bottom-6 right-6 hidden rotate-3 md:block">
         {translate(locale, "closingBoard.confirmed")}
       </span>
-      {/* The pointer spotlight — fades in on first move, out on leave. */}
-      <div className="cl-net-spot absolute inset-0" />
     </div>
   );
 }
