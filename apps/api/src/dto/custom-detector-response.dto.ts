@@ -48,6 +48,15 @@ export class CustomDetectorResponseDto {
   answerDimension: 'findingType' | 'matchedContent' | null;
 
   @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Code detectors (CODE_DETECTOR) only: names of the secrets the detector ' +
+      'holds. Values are write-only and never returned; send `secrets` as a ' +
+      'patch on update (a string sets a key, null deletes it, an absent key is kept).',
+  })
+  secretKeys?: string[];
+
+  @ApiPropertyOptional({
     description:
       'AI provider credential ID backing this detector (LLM detectors only).',
     nullable: true,

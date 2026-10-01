@@ -4,6 +4,7 @@ import {
   Regex,
   Bot,
   Brain,
+  Code2,
   Image,
   ScanSearch,
   Tag,
@@ -22,6 +23,7 @@ type DetectorKind =
   | "text_classification"
   | "image_classification"
   | "object_detection"
+  | "custom_detector"
   | "tag";
 
 const DETECTOR_ICONS: Record<
@@ -34,6 +36,7 @@ const DETECTOR_ICONS: Record<
   text_classification: Brain,
   image_classification: Image,
   object_detection: ScanSearch,
+  custom_detector: Code2,
   tag: Tag,
 };
 
@@ -95,6 +98,14 @@ const DETECTOR_DATA: Record<
     tags: ["Bounding boxes", "Object labels", "Severity map"],
     slug: "object-detection",
   },
+  custom_detector: {
+    title: "Code detector",
+    tagline: "Rules and checks in Python",
+    description:
+      "A notebook that defines detect(asset, ctx) and yields findings. For checks a pattern or a model cannot express: totals that must add up, list screening, co-occurrence of other findings, checksummed IDs, your own model.",
+    tags: ["Python", "Rows & metadata", "Tests"],
+    slug: "code",
+  },
   tag: {
     title: "Tag",
     tagline: "Manual, no classification",
@@ -111,6 +122,8 @@ const TRANSFORMER_KINDS: DetectorKind[] = [
   "image_classification",
   "object_detection",
 ];
+// Code detectors run the author's Python rather than a model or a pattern.
+const CODE_KINDS: DetectorKind[] = ["custom_detector"];
 // Its own group on purpose: a tag is not an engine, and sitting it beside the
 // six that are invites picking it for an ordinary source.
 const MANUAL_KINDS: DetectorKind[] = ["tag"];
@@ -258,6 +271,26 @@ export function CustomDetectorTypesGrid({
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {TRANSFORMER_KINDS.map((kind) => (
+            <DetectorMethodCard
+              key={kind}
+              kind={kind}
+              href={makeHref(DETECTOR_DATA[kind].slug)}
+              variant={variant}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Code group — the author's Python */}
+      <div>
+        <div className="mb-3 flex items-center gap-3">
+          <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+            Code
+          </div>
+          <div className="flex-1 border-t border-border" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {CODE_KINDS.map((kind) => (
             <DetectorMethodCard
               key={kind}
               kind={kind}

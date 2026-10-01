@@ -26,11 +26,23 @@ export interface NotebookExecutionDto {
      */
     id: string;
     /**
-     * 
+     * Null for a code detector's cell/all runs, which need no source.
      * @type {string}
      * @memberof NotebookExecutionDto
      */
-    sourceId: string;
+    sourceId: string | null;
+    /**
+     * Set when the execution ran a code detector notebook.
+     * @type {string}
+     * @memberof NotebookExecutionDto
+     */
+    customDetectorId?: string | null;
+    /**
+     * preview_detect: the asset the detector was run on.
+     * @type {string}
+     * @memberof NotebookExecutionDto
+     */
+    assetId?: string | null;
     /**
      * 
      * @type {number}
@@ -110,11 +122,12 @@ export interface NotebookExecutionDto {
  * @export
  */
 export const NotebookExecutionDtoModeEnum = {
-    Cell: 'CELL',
-    All: 'ALL',
-    TestConnection: 'TEST_CONNECTION',
-    PreviewExtract: 'PREVIEW_EXTRACT',
-    PreviewAugment: 'PREVIEW_AUGMENT'
+    Cell: 'cell',
+    All: 'all',
+    TestConnection: 'test_connection',
+    PreviewExtract: 'preview_extract',
+    PreviewAugment: 'preview_augment',
+    PreviewDetect: 'preview_detect'
 } as const;
 export type NotebookExecutionDtoModeEnum = typeof NotebookExecutionDtoModeEnum[keyof typeof NotebookExecutionDtoModeEnum];
 
@@ -122,8 +135,9 @@ export type NotebookExecutionDtoModeEnum = typeof NotebookExecutionDtoModeEnum[k
  * @export
  */
 export const NotebookExecutionDtoScopeEnum = {
-    Connector: 'CONNECTOR',
-    Augmentation: 'AUGMENTATION'
+    Connector: 'connector',
+    Augmentation: 'augmentation',
+    Detector: 'detector'
 } as const;
 export type NotebookExecutionDtoScopeEnum = typeof NotebookExecutionDtoScopeEnum[keyof typeof NotebookExecutionDtoScopeEnum];
 
@@ -166,6 +180,8 @@ export function NotebookExecutionDtoFromJSONTyped(json: any, ignoreDiscriminator
         
         'id': json['id'],
         'sourceId': json['sourceId'],
+        'customDetectorId': json['customDetectorId'] == null ? undefined : json['customDetectorId'],
+        'assetId': json['assetId'] == null ? undefined : json['assetId'],
         'revision': json['revision'],
         'mode': json['mode'],
         'scope': json['scope'] == null ? undefined : json['scope'],
@@ -194,6 +210,8 @@ export function NotebookExecutionDtoToJSONTyped(value?: NotebookExecutionDto | n
         
         'id': value['id'],
         'sourceId': value['sourceId'],
+        'customDetectorId': value['customDetectorId'],
+        'assetId': value['assetId'],
         'revision': value['revision'],
         'mode': value['mode'],
         'scope': value['scope'],

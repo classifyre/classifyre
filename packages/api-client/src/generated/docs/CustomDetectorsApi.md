@@ -7,10 +7,13 @@ All URIs are relative to *http://localhost*
 | [**customDetectorsControllerClearTrainingExamples**](CustomDetectorsApi.md#customdetectorscontrollercleartrainingexamples) | **DELETE** /custom-detectors/{id}/training-examples | Delete all training examples for a detector |
 | [**customDetectorsControllerCreate**](CustomDetectorsApi.md#customdetectorscontrollercreate) | **POST** /custom-detectors | Create custom detector |
 | [**customDetectorsControllerDelete**](CustomDetectorsApi.md#customdetectorscontrollerdelete) | **DELETE** /custom-detectors/{id} | Delete custom detector |
+| [**customDetectorsControllerDeleteFile**](CustomDetectorsApi.md#customdetectorscontrollerdeletefile) | **DELETE** /custom-detectors/{id}/files/{fileId} | Delete a code detector file |
 | [**customDetectorsControllerDeleteTrainingExample**](CustomDetectorsApi.md#customdetectorscontrollerdeletetrainingexample) | **DELETE** /custom-detectors/{id}/training-examples/{exampleId} | Delete a single training example |
+| [**customDetectorsControllerFileContent**](CustomDetectorsApi.md#customdetectorscontrollerfilecontent) | **GET** /custom-detectors/{id}/files/{fileId}/content | Stream a code detector file\&#39;s bytes |
 | [**customDetectorsControllerGetById**](CustomDetectorsApi.md#customdetectorscontrollergetbyid) | **GET** /custom-detectors/{id} | Get custom detector by ID |
 | [**customDetectorsControllerList**](CustomDetectorsApi.md#customdetectorscontrollerlist) | **GET** /custom-detectors | List custom detectors |
 | [**customDetectorsControllerListExamples**](CustomDetectorsApi.md#customdetectorscontrollerlistexamples) | **GET** /custom-detectors/examples | List custom detector starter examples |
+| [**customDetectorsControllerListFiles**](CustomDetectorsApi.md#customdetectorscontrollerlistfiles) | **GET** /custom-detectors/{id}/files | List a code detector\&#39;s uploaded files |
 | [**customDetectorsControllerListTrainingExamples**](CustomDetectorsApi.md#customdetectorscontrollerlisttrainingexamples) | **GET** /custom-detectors/{id}/training-examples | List stored training examples for a detector |
 | [**customDetectorsControllerParseTrainingExamples**](CustomDetectorsApi.md#customdetectorscontrollerparsetrainingexamples) | **POST** /custom-detectors/training-examples/parse | Parse uploaded training examples file |
 | [**customDetectorsControllerRetireOutOfScopeFindings**](CustomDetectorsApi.md#customdetectorscontrollerretireoutofscopefindings) | **POST** /custom-detectors/{id}/retire-out-of-scope-findings | Retire findings this detector can no longer produce |
@@ -19,6 +22,7 @@ All URIs are relative to *http://localhost*
 | [**customDetectorsControllerTrainingExamplesStats**](CustomDetectorsApi.md#customdetectorscontrollertrainingexamplesstats) | **GET** /custom-detectors/{id}/training-examples/stats | Get training example counts grouped by label |
 | [**customDetectorsControllerTrainingHistory**](CustomDetectorsApi.md#customdetectorscontrollertraininghistory) | **GET** /custom-detectors/{id}/training-history | List training history for custom detector |
 | [**customDetectorsControllerUpdate**](CustomDetectorsApi.md#customdetectorscontrollerupdate) | **PATCH** /custom-detectors/{id} | Update custom detector |
+| [**customDetectorsControllerUploadFile**](CustomDetectorsApi.md#customdetectorscontrolleruploadfile) | **POST** /custom-detectors/{id}/files | Upload one file to a code detector |
 
 
 
@@ -217,6 +221,74 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## customDetectorsControllerDeleteFile
+
+> customDetectorsControllerDeleteFile(id, fileId)
+
+Delete a code detector file
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CustomDetectorsApi,
+} from '@workspace/api-client';
+import type { CustomDetectorsControllerDeleteFileRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CustomDetectorsApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string
+    fileId: fileId_example,
+  } satisfies CustomDetectorsControllerDeleteFileRequest;
+
+  try {
+    const data = await api.customDetectorsControllerDeleteFile(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **fileId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## customDetectorsControllerDeleteTrainingExample
 
 > any customDetectorsControllerDeleteTrainingExample(id, exampleId)
@@ -275,6 +347,74 @@ No authorization required
 
 - **Content-Type**: Not defined
 - **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## customDetectorsControllerFileContent
+
+> customDetectorsControllerFileContent(id, fileId)
+
+Stream a code detector file\&#39;s bytes
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CustomDetectorsApi,
+} from '@workspace/api-client';
+import type { CustomDetectorsControllerFileContentRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CustomDetectorsApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string
+    fileId: fileId_example,
+  } satisfies CustomDetectorsControllerFileContentRequest;
+
+  try {
+    const data = await api.customDetectorsControllerFileContent(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **fileId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
 
 
 ### HTTP response details
@@ -453,6 +593,73 @@ This endpoint does not need any parameter.
 ### Return type
 
 [**Array&lt;CustomDetectorExampleDto&gt;**](CustomDetectorExampleDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## customDetectorsControllerListFiles
+
+> Array&lt;CustomDetectorFileDto&gt; customDetectorsControllerListFiles(id)
+
+List a code detector\&#39;s uploaded files
+
+Code detectors (CODE_DETECTOR) read these with ctx.file(name).
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CustomDetectorsApi,
+} from '@workspace/api-client';
+import type { CustomDetectorsControllerListFilesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CustomDetectorsApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies CustomDetectorsControllerListFilesRequest;
+
+  try {
+    const data = await api.customDetectorsControllerListFiles(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**Array&lt;CustomDetectorFileDto&gt;**](CustomDetectorFileDto.md)
 
 ### Authorization
 
@@ -1009,6 +1216,76 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## customDetectorsControllerUploadFile
+
+> CustomDetectorFileDto customDetectorsControllerUploadFile(id, file)
+
+Upload one file to a code detector
+
+A screening list, a model, a reference table. A file with a name the detector already has is replaced. Bumps the detector version.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CustomDetectorsApi,
+} from '@workspace/api-client';
+import type { CustomDetectorsControllerUploadFileRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CustomDetectorsApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // Blob
+    file: BINARY_DATA_HERE,
+  } satisfies CustomDetectorsControllerUploadFileRequest;
+
+  try {
+    const data = await api.customDetectorsControllerUploadFile(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **file** | `Blob` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**CustomDetectorFileDto**](CustomDetectorFileDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `multipart/form-data`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

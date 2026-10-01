@@ -9,6 +9,8 @@ Name | Type
 `name` | string
 `description` | string
 `pipelineSchema` | { [key: string]: any; }
+`key` | string
+`testScenarios` | Array&lt;{ [key: string]: any; }&gt;
 
 ## Example
 
@@ -20,6 +22,8 @@ const example = {
   "name": null,
   "description": null,
   "pipelineSchema": null,
+  "key": null,
+  "testScenarios": null,
 } satisfies CustomDetectorExampleDto
 
 console.log(example)

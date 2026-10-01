@@ -1256,10 +1256,23 @@ export class CliRunnerService {
 
     let sourceWithDecryptedConfig: typeof source;
     try {
+      const environment = process.env.ENVIRONMENT || 'development';
+      const namespaceId = this.currentNamespaceId();
       const decryptedConfig = this.toDecryptedRecipeConfig(source.config);
+      // The manifest URLs need the namespaced API base, which only exists
+      // inside a namespace context. Without one (detached dequeue paths, unit
+      // tests) hydrate without it: files travel without download URLs, exactly
+      // as before manifests existed.
+      let filesBaseUrl: string | undefined;
+      try {
+        filesBaseUrl = this.resolveOutputRestUrl(environment, namespaceId);
+      } catch {
+        filesBaseUrl = undefined;
+      }
       const recipeWithFeedback = await this.hydrateCustomDetectorsForRun(
         sourceId,
         decryptedConfig,
+        filesBaseUrl,
       );
       sourceWithDecryptedConfig = {
         ...source,
@@ -1345,6 +1358,7 @@ export class CliRunnerService {
   private async hydrateCustomDetectorsForRun(
     sourceId: string,
     recipe: Record<string, any>,
+    filesBaseUrl?: string,
   ): Promise<Record<string, any>> {
     const configuredDetectors = Array.isArray(recipe.detectors)
       ? recipe.detectors
@@ -1360,6 +1374,7 @@ export class CliRunnerService {
     const runtimeByIds =
       await this.customDetectorsService.buildRuntimeCustomDetectors(
         recipe.custom_detectors,
+        { filesBaseUrl },
       );
 
     // New path: CUSTOM entries in recipe.detectors carry custom_detector_key at
@@ -1382,6 +1397,7 @@ export class CliRunnerService {
       customKeysFromDetectors.length > 0
         ? await this.customDetectorsService.buildRuntimeCustomDetectorsByKeys(
             customKeysFromDetectors,
+            { filesBaseUrl },
           )
         : [];
 
@@ -2231,6 +2247,201 @@ export class CliRunnerService {
   }
 
   /**
+   * Run one execution of a code detector's notebook (scope `detector`).
+   *
+   * The request carries the detector's runtime pipeline schema -- secrets
+   * decrypted here, exactly as a scan receives them -- and, for
+   * `preview_detect`, the source's decrypted recipe plus what the API knows
+   * of the chosen asset and its open findings (for needs_findings). The
+   * detector's uploaded files are delivered the way a notebook's are: written
+   * to a local directory, or handed to the Job's init container as URLs.
+   */
+  async runDetectorNotebookExecution(params: {
+    detectorId: string;
+    sourceId: string | null;
+    assetId: string | null;
+    request: Record<string, any>;
+    onJobCreated?: (job: {
+      jobName: string;
+      namespace: string;
+    }) => void | Promise<void>;
+  }): Promise<{
+    payload: Record<string, any> | null;
+    stderr: string;
+    exitCode: number;
+  }> {
+    const detector = await this.prisma.customDetector.findUnique({
+      where: { id: params.detectorId },
+    });
+    if (!detector) {
+      throw new NotFoundException(
+        `Custom detector ${params.detectorId} not found`,
+      );
+    }
+    const pipelineSchema =
+      await this.customDetectorsService.prepareRuntimePipelineSchema(detector);
+    // The runtime manifest is for scans; a notebook run gets the files on disk.
+    delete pipelineSchema.files_runtime;
+
+    let recipe: Record<string, any> = {};
+    if (params.sourceId) {
+      const source = await this.prisma.source.findUnique({
+        where: { id: params.sourceId },
+      });
+      if (!source) {
+        throw new NotFoundException(`Source ${params.sourceId} not found`);
+      }
+      // The CLI's SANDBOX connector lists uploads by source id; the stored
+      // config does not carry it, so it travels alongside the recipe.
+      recipe = {
+        ...this.toDecryptedRecipeConfig(source.config),
+        source_id: source.id,
+      };
+    }
+
+    let asset: Record<string, unknown> | null = null;
+    let priorFindings: Array<Record<string, unknown>> = [];
+    if (params.assetId) {
+      const row = await this.prisma.asset.findUnique({
+        where: { id: params.assetId },
+        select: {
+          hash: true,
+          name: true,
+          externalUrl: true,
+          // The catalog kind (file, page, table, ...), which is what a
+          // detector's scope and asset.kind mean.
+          assetType: true,
+          metadata: true,
+        },
+      });
+      if (row) {
+        asset = {
+          hash: row.hash,
+          name: row.name,
+          externalUrl: row.externalUrl,
+          assetKind: row.assetType,
+          metadata: row.metadata ?? {},
+        };
+        // Bounded: needs_findings is about "what else is on this asset",
+        // and an asset with a million findings must not be read whole.
+        const findings = await this.prisma.finding.findMany({
+          where: { assetId: params.assetId, status: 'OPEN' },
+          select: {
+            detectorType: true,
+            customDetectorKey: true,
+            findingType: true,
+            matchedContent: true,
+            severity: true,
+            confidence: true,
+            location: true,
+          },
+          orderBy: { detectedAt: 'desc' },
+          take: 200,
+        });
+        priorFindings = findings
+          .filter((finding) => finding.customDetectorKey !== detector.key)
+          .map((finding) => ({
+            detector: finding.detectorType,
+            custom_detector_key: finding.customDetectorKey,
+            type: finding.findingType,
+            value: finding.matchedContent ?? '',
+            severity: String(finding.severity).toLowerCase(),
+            confidence: Number(finding.confidence ?? 0),
+            location: finding.location ?? {},
+          }));
+      }
+    }
+
+    const request = {
+      ...params.request,
+      scope: 'detector',
+      recipe,
+      detector: {
+        key: detector.key,
+        name: detector.name,
+        pipeline_schema: pipelineSchema,
+      },
+      ...(asset ? { asset, priorFindings } : {}),
+    };
+    const environment = process.env.ENVIRONMENT || 'development';
+
+    if (this.isKubernetesExecutionEnabled(environment)) {
+      const files = await this.prisma.customDetectorFile.findMany({
+        where: { customDetectorId: detector.id },
+        select: { id: true, fileName: true },
+        orderBy: { fileName: 'asc' },
+      });
+      const base = this.resolveOutputRestUrl(environment);
+      return this.runNotebookInKubernetes(
+        params.sourceId ?? detector.id,
+        request,
+        params.onJobCreated,
+        files.map((file) => ({
+          url: `${base}/custom-detectors/${encodeURIComponent(detector.id)}/files/${encodeURIComponent(file.id)}/content`,
+          name: file.fileName,
+        })),
+        base,
+      );
+    }
+
+    const cliPath = this.getCliPath(environment);
+    const venvPath = this.getVenvPath(environment);
+    const requestFile = await this.createTempJsonFile('notebook', request);
+    const filesDir = await this.writeDetectorFiles(detector.id);
+    try {
+      const command =
+        `cd ${this.shellEscape(cliPath)} && ` +
+        `uv run --locked --no-dev --python ${this.shellEscape(this.getVenvPython(venvPath))} ` +
+        `python -m src.main notebook ${this.shellEscape(requestFile)}`;
+      const { stdout, stderr, exitCode } = await this.executeCli(
+        command,
+        (chunk) => {
+          const trimmed = chunk.trim();
+          if (trimmed) {
+            this.logger.debug(`[detector-notebook] ${trimmed.slice(0, 500)}`);
+          }
+        },
+        undefined,
+        undefined,
+        { mode: 'head', maxBytes: 8 * 1024 * 1024, maxLines: 50_000 },
+        buildNotebookEnvironment(
+          process.env,
+          filesDir ? { CLASSIFYRE_NOTEBOOK_FILES_DIR: filesDir } : {},
+        ),
+      );
+      return { payload: parseNotebookResult(stdout), stderr, exitCode };
+    } finally {
+      await fs.unlink(requestFile).catch(() => undefined);
+      if (filesDir) {
+        await fs
+          .rm(filesDir, { recursive: true, force: true })
+          .catch(() => undefined);
+      }
+    }
+  }
+
+  /** A code detector's uploaded files, on local disk, for a notebook run. */
+  private async writeDetectorFiles(detectorId: string): Promise<string | null> {
+    const files = await this.prisma.customDetectorFile.findMany({
+      where: { customDetectorId: detectorId },
+      select: { fileName: true, data: true },
+      orderBy: { fileName: 'asc' },
+    });
+    if (files.length === 0) return null;
+    const directory = path.join(
+      process.env.TEMP_DIR || '/tmp',
+      `detector-files-${randomUUID()}`,
+    );
+    await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+    for (const file of files) {
+      // Names are unique per detector, so no collision handling is needed.
+      const name = path.basename(file.fileName || 'upload') || 'upload';
+      await fs.writeFile(path.join(directory, name), Buffer.from(file.data));
+    }
+    return directory;
+  }
+
+  /**
    * URLs an init container can stream this source's uploaded files from.
    *
    * The notebook job holds neither the callback key nor an API URL by design,
@@ -2299,6 +2510,7 @@ export class CliRunnerService {
       namespace: string;
     }) => void | Promise<void>,
     files: NotebookInputFile[] = [],
+    outputRestUrl?: string,
   ): Promise<{
     payload: Record<string, any> | null;
     stderr: string;
@@ -2314,6 +2526,7 @@ export class CliRunnerService {
       request,
       onJobCreated,
       files,
+      outputRestUrl,
     );
     return {
       // A pod log interleaves everything that wrote to the stream, so the
@@ -5396,10 +5609,21 @@ export class CliRunnerService {
 
     try {
       const source = pending.source;
+      const namespaceId = this.currentNamespaceId();
       const decryptedConfig = this.toDecryptedRecipeConfig(source.config);
+      let filesBaseUrl: string | undefined;
+      try {
+        filesBaseUrl = this.resolveOutputRestUrl(
+          process.env.ENVIRONMENT || 'development',
+          namespaceId,
+        );
+      } catch {
+        filesBaseUrl = undefined;
+      }
       const recipeWithFeedback = await this.hydrateCustomDetectorsForRun(
         source.id,
         decryptedConfig,
+        filesBaseUrl,
       );
       const sourceWithDecryptedConfig = {
         ...source,

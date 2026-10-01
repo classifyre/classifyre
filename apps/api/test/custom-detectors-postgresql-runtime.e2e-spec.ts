@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { Client } from 'pg';
 import { createTestApp, TestApp } from './create-test-app';
 
-const SHOULD_RUN = process.env.RUN_CUSTOM_DETECTOR_PG_E2E === '1';
+const SHOULD_RUN = process.env.RUN_CODE_DETECTOR_PG_E2E === '1';
 const describeIfEnabled = SHOULD_RUN ? describe : describe.skip;
 
 const PG_HOST = process.env.E2E_PG_HOST ?? 'localhost';

@@ -13,6 +13,7 @@ from ._base import (
     BaseRunner,
     _resolve_pipeline_severity,
 )
+from ._custom_detector import CustomDetectorRunner
 from ._factory import create_runner
 from ._gliner2 import (
     GLiNER2Runner,
@@ -35,6 +36,7 @@ __all__ = [
     "_IMAGE_CONTENT_TYPES",
     "_TEXT_CONTENT_TYPES",
     "BaseRunner",
+    "CustomDetectorRunner",
     "GLiNER2Runner",
     "ImageClassificationRunner",
     "LLMRunner",
