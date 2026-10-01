@@ -1,4 +1,4 @@
-"""Code detectors (``CUSTOM_DETECTOR``) against a real child process.
+"""Code detectors (``CODE_DETECTOR``) against a real child process.
 
 Each test earns its process: the wire (handshake, detect round trip, lazy
 payload, setup), the parent-side enforcement (severity ceiling, declared
@@ -102,7 +102,7 @@ def _asset(**overrides: Any) -> SimpleNamespace:
 
 def _schema(source: str, **overrides: Any) -> dict[str, Any]:
     schema: dict[str, Any] = {
-        "type": "CUSTOM_DETECTOR",
+        "type": "CODE_DETECTOR",
         "notebook": {"revision": 1, "cells": [{"id": "c1", "type": "code", "source": source}]},
         "severity": "high",
         "fields": [
@@ -140,7 +140,7 @@ async def test_rows_rule_maps_findings_with_ceiling_fields_identity_and_location
     assert mismatch.detector_type == DetectorType.CUSTOM
     assert mismatch.custom_detector_key == "de_dq_totals"
     assert mismatch.category == "QUALITY"
-    assert mismatch.extraction_method == "CUSTOM_DETECTOR"
+    assert mismatch.extraction_method == "CODE_DETECTOR"
     # Severity is a ceiling: "critical" was asked for, "high" is the cap.
     assert mismatch.severity == Severity.high
     assert mismatch.metadata is not None

@@ -85,7 +85,7 @@ export class NotebookService {
       const [starter] = this.detectorExamples();
       if (!starter?.cells.length) {
         throw new Error(
-          'all_detectors_examples.json has no CUSTOM_DETECTOR starter to scaffold from',
+          'all_detectors_examples.json has no CODE_DETECTOR starter to scaffold from',
         );
       }
       return { cells: starter.cells };
@@ -168,7 +168,7 @@ export class NotebookService {
     return (examples.CUSTOM ?? [])
       .filter(
         (entry) =>
-          entry.config?.pipeline_schema?.type === 'CUSTOM_DETECTOR' &&
+          entry.config?.pipeline_schema?.type === 'CODE_DETECTOR' &&
           Array.isArray(entry.config?.pipeline_schema?.notebook?.cells),
       )
       .map((entry) => ({

@@ -302,9 +302,9 @@ describe('DetectorToolset', () => {
     });
   });
 
-  describe('code detectors (CUSTOM_DETECTOR) are refused (PRD G1 R24)', () => {
+  describe('code detectors (CODE_DETECTOR) are refused (PRD G1 R24)', () => {
     const codeSchema = {
-      type: 'CUSTOM_DETECTOR',
+      type: 'CODE_DETECTOR',
       notebook: {
         cells: [
           { id: 'c', type: 'code', source: 'def detect(asset):\n    pass\n' },
@@ -350,6 +350,20 @@ describe('DetectorToolset', () => {
         ),
       ).rejects.toThrow(/Refused/);
       expect(mockTests.evaluateSample).not.toHaveBeenCalled();
+    });
+
+    it('refuses to deactivate or delete one', async () => {
+      mockPrisma.customDetector.findUnique.mockResolvedValue({
+        pipelineSchema: codeSchema,
+      });
+      await expect(
+        byName('detector.deactivate').handler({ detectorId: 'd1' }, tc),
+      ).rejects.toThrow(/Refused/);
+      await expect(
+        byName('detector.delete').handler({ detectorId: 'd1' }, tc),
+      ).rejects.toThrow(/Refused/);
+      expect(mockDetectors.update).not.toHaveBeenCalled();
+      expect(mockDetectors.delete).not.toHaveBeenCalled();
     });
   });
 });

@@ -46,7 +46,7 @@ class ExecutionMode(StrEnum):
 class NotebookScope(StrEnum):
     CONNECTOR = "connector"
     AUGMENTATION = "augmentation"
-    #: A code detector's notebook (pipeline type CUSTOM_DETECTOR). Its cells,
+    #: A code detector's notebook (pipeline type CODE_DETECTOR). Its cells,
     #: variables, secrets and packages travel in the request's ``detector``
     #: object rather than in a source recipe.
     DETECTOR = "detector"

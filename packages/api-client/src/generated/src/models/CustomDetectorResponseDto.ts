@@ -83,7 +83,7 @@ export interface CustomDetectorResponseDto {
      */
     answerDimension: string | null;
     /**
-     * Code detectors (CUSTOM_DETECTOR) only: names of the secrets the detector holds. Values are write-only and never returned; send `secrets` as a patch on update (a string sets a key, null deletes it, an absent key is kept).
+     * Code detectors (CODE_DETECTOR) only: names of the secrets the detector holds. Values are write-only and never returned; send `secrets` as a patch on update (a string sets a key, null deletes it, an absent key is kept).
      * @type {Array<string>}
      * @memberof CustomDetectorResponseDto
      */

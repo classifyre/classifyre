@@ -18,7 +18,7 @@ export interface NotebookCell {
 export const REQUIRED_FUNCTIONS = ["test_connection", "extract"] as const;
 
 /**
- * What a code detector's notebook (custom-detector pipeline CUSTOM_DETECTOR)
+ * What a code detector's notebook (custom-detector pipeline CODE_DETECTOR)
  * must define. Mirrors apps/cli/src/detectors/custom_detector/contract.py.
  */
 export const DETECTOR_REQUIRED_FUNCTIONS = ["detect"] as const;

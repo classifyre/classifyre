@@ -26,7 +26,7 @@ def _templates() -> list[dict[str, Any]]:
     return [
         entry
         for entry in data["CUSTOM"]
-        if entry["config"]["pipeline_schema"].get("type") == "CUSTOM_DETECTOR"
+        if entry["config"]["pipeline_schema"].get("type") == "CODE_DETECTOR"
     ]
 
 

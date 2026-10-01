@@ -26,6 +26,7 @@ import {
   isFindingsExpectation,
 } from './custom-detector-tests.findings-comparator';
 import { isCodeDetectorSchema } from './custom-detector-code';
+import { redactDeepWithSecrets } from './cli-runner/runner-error-safety';
 import {
   type AssetFixture,
   createTestScenarioSchema,
@@ -317,12 +318,19 @@ export class CustomDetectorTestsService {
         actualOutput,
       );
 
+      // A rule that echoes ctx.secret(...) into a finding value must not
+      // persist the value: redact the stored output against the detector's
+      // decrypted secrets before the test result reaches Postgres.
+      const storedOutput = redactDeepWithSecrets(
+        actualOutput,
+        this.secretValues(pipelineSchema),
+      );
       const result = await this.prisma.customDetectorTestResult.create({
         data: {
           scenarioId: scenario.id,
           detectorId: detector.id,
           status,
-          actualOutput: actualOutput as any,
+          actualOutput: storedOutput as any,
           // On FAIL, errorMessage carries the expected-vs-actual explanation so
           // the result is diagnosable without reverse-engineering the comparator.
           errorMessage: status === 'FAIL' ? explanation : null,
@@ -748,6 +756,23 @@ export class CustomDetectorTestsService {
   // ({shouldMatch}, {label, minConfidence}, {entities: [{label, text}]}) and
   // the nested pipeline-output shape
   // ({classification: {task: {label, confidence}}}, {entities: {label: [{value}]}}).
+  /**
+   * The decrypted secret values in a runtime pipeline schema (dispatch-time
+   * shape from prepareRuntimePipelineSchema). For redacting stored outputs.
+   */
+  private secretValues(
+    pipelineSchema: Record<string, unknown>,
+  ): string[] {
+    const secrets = pipelineSchema?.secrets;
+    if (!secrets || typeof secrets !== 'object' || Array.isArray(secrets)) {
+      return [];
+    }
+    return Object.values(secrets as Record<string, unknown>).filter(
+      (value): value is string =>
+        typeof value === 'string' && value.length > 0,
+    );
+  }
+
   private compareOutcome(
     pipelineSchema: Record<string, unknown>,
     rawExpected: Record<string, unknown>,

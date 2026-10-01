@@ -1,4 +1,4 @@
-"""End to end: a code detector (``CUSTOM_DETECTOR``) inside a real scan pipeline.
+"""End to end: a code detector (``CODE_DETECTOR``) inside a real scan pipeline.
 
 A local folder source, the detector pipeline built from a recipe exactly as a
 scan builds it, and the rule judging each asset after every other detector.
@@ -33,7 +33,7 @@ def _detector(source: str, key: str = "card_rule", **schema: Any) -> dict[str, A
             "custom_detector_key": key,
             "name": key.replace("_", " ").title(),
             "pipeline_schema": {
-                "type": "CUSTOM_DETECTOR",
+                "type": "CODE_DETECTOR",
                 "notebook": {
                     "revision": 1,
                     "cells": [{"id": "rule", "type": "code", "source": source}],

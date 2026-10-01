@@ -15,7 +15,7 @@ _PIPELINE_TYPE_DEFAULTS: dict[str, str] = {
     "RegexPipelineSchema": "REGEX",
     "LLMPipelineSchema": "LLM",
     "TagPipelineSchema": "TAG",
-    "CustomDetectorPipelineSchema": "CUSTOM_DETECTOR",
+    "CodeDetectorPipelineSchema": "CODE_DETECTOR",
 }
 
 # Pipeline schema classes whose `severity` field has a string default from JSON schema
@@ -28,7 +28,7 @@ _SEVERITY_ENUM_DEFAULT_CLASSES = {
     "LLMPipelineSchema": "info",
     "TextClassificationPipelineSchema": "info",
     "TagPipelineSchema": "medium",
-    "CustomDetectorPipelineSchema": "medium",
+    "CodeDetectorPipelineSchema": "medium",
 }
 
 
@@ -65,7 +65,7 @@ def _patch_severity_enum_defaults(source: str) -> str:
 def _patch_category_enum_defaults(source: str) -> str:
     """Same fix as the severity one, for the code detector's ``category`` default."""
     pattern = (
-        r"(class CustomDetectorPipelineSchema\(.*?category: DetectorCategory \| None = Field\(\n\s+)"
+        r"(class CodeDetectorPipelineSchema\(.*?category: DetectorCategory \| None = Field\(\n\s+)"
         r"'QUALITY'(\s*,)"
     )
     return re.sub(pattern, r"\1DetectorCategory.QUALITY\2", source, flags=re.DOTALL)

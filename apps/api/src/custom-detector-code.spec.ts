@@ -14,7 +14,7 @@ const DETECT =
 
 function schema(overrides: Record<string, unknown> = {}) {
   return {
-    type: 'CUSTOM_DETECTOR',
+    type: 'CODE_DETECTOR',
     notebook: {
       revision: 1,
       cells: [
@@ -62,7 +62,7 @@ describe('code detector schema rules', () => {
     );
   });
 
-  it('only counts a top-level def detect in a code cell', () => {
+  it('only counts a top-level def detect(asset[, ctx]) in a code cell', () => {
     expect(definesDetect(schema())).toBe(true);
     expect(
       definesDetect(
@@ -76,6 +76,47 @@ describe('code detector schema rules', () => {
         }),
       ),
     ).toBe(false);
+    expect(
+      definesDetect(
+        schema({
+          notebook: {
+            cells: [
+              { id: 'a', type: 'code', source: 'def detect(): pass' },
+              {
+                id: 'b',
+                type: 'code',
+                source: 'def detect(a, b, c): pass',
+              },
+            ],
+          },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      definesDetect(
+        schema({
+          notebook: {
+            cells: [
+              { id: 'a', type: 'code', source: 'def detect(asset): pass' },
+            ],
+          },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts the files key and normalizes severity/category case', () => {
+    expect(() =>
+      validateCodeDetectorSchema(schema({ files: ['file-id-1'] })),
+    ).not.toThrow();
+    expect(() =>
+      validateCodeDetectorSchema(schema({ files: [42] })),
+    ).toThrow(/files/);
+    expect(() =>
+      validateCodeDetectorSchema(
+        schema({ severity: 'High', category: 'quality' }),
+      ),
+    ).not.toThrow();
   });
 
   it('masks secret values but keeps their names', () => {

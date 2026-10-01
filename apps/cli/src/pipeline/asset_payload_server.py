@@ -1,6 +1,6 @@
 """Lazy, per-asset payload for notebook children: fetched once, shared.
 
-Augmentation and code detectors (``CUSTOM_DETECTOR``) both run user code in a
+Augmentation and code detectors (``CODE_DETECTOR``) both run user code in a
 child process that asks for an asset's payload mid-call — ``payload``,
 ``raw_pages`` or ``text`` — through the ``need``/``provide`` protocol. Both
 consumers can run on the same asset in the same scan: augmentation before the

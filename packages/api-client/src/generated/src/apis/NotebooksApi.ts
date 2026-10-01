@@ -139,7 +139,7 @@ export class NotebooksApi extends runtime.BaseAPI {
     }
 
     /**
-     * Code detectors (pipeline type CUSTOM_DETECTOR) only. \"cell\"/\"all\" replay the cells with the detector\'s variables, secrets and files; \"preview_detect\" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.
+     * Code detectors (pipeline type CODE_DETECTOR) only. \"cell\"/\"all\" replay the cells with the detector\'s variables, secrets and files; \"preview_detect\" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.
      * Run a code detector\'s notebook
      */
     async notebookControllerCreateDetectorExecutionRaw(requestParameters: NotebookControllerCreateDetectorExecutionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<NotebookExecutionDto>> {
@@ -179,7 +179,7 @@ export class NotebooksApi extends runtime.BaseAPI {
     }
 
     /**
-     * Code detectors (pipeline type CUSTOM_DETECTOR) only. \"cell\"/\"all\" replay the cells with the detector\'s variables, secrets and files; \"preview_detect\" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.
+     * Code detectors (pipeline type CODE_DETECTOR) only. \"cell\"/\"all\" replay the cells with the detector\'s variables, secrets and files; \"preview_detect\" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.
      * Run a code detector\'s notebook
      */
     async notebookControllerCreateDetectorExecution(requestParameters: NotebookControllerCreateDetectorExecutionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<NotebookExecutionDto> {

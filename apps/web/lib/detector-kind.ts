@@ -1,5 +1,5 @@
 import {
-  CUSTOM_DETECTOR_PIPELINE_TYPE,
+  CODE_DETECTOR_PIPELINE_TYPE,
   TAG_PIPELINE_TYPE,
 } from "./custom-detector-badge";
 
@@ -59,7 +59,7 @@ export function resolveDetectorKind(
   if (isTransformerPipelineType(type)) return "transformer";
   if (type === "LLM") return "llm";
   if (type === TAG_PIPELINE_TYPE) return "tag";
-  if (type === CUSTOM_DETECTOR_PIPELINE_TYPE) return "code";
+  if (type === CODE_DETECTOR_PIPELINE_TYPE) return "code";
   if (type === "REGEX") return "regex";
   // Any other pipeline schema is a GLiNER2-style pipeline detector.
   return "gliner2";

@@ -1,14 +1,14 @@
 import { BadRequestException } from '@nestjs/common';
 
 /**
- * Code detectors: the custom-detector pipeline type `CUSTOM_DETECTOR` (PRD G1).
+ * Code detectors: the custom-detector pipeline type `CODE_DETECTOR` (PRD G1).
  *
  * A notebook that defines `detect(asset, ctx)` and yields findings. Unlike
  * every other engine it carries code, secrets and uploaded files, so it has
  * rules no other pipeline type needs; they live here as plain functions so the
  * service, the MCP tools and the specs share one copy.
  */
-export const CUSTOM_DETECTOR_PIPELINE_TYPE = 'CUSTOM_DETECTOR';
+export const CODE_DETECTOR_PIPELINE_TYPE = 'CODE_DETECTOR';
 
 /** Fields the server injects at dispatch; a client that sends one is refused. */
 export const CODE_DETECTOR_RUNTIME_FIELDS = [
@@ -56,6 +56,7 @@ const KNOWN_KEYS = new Set([
   'packages',
   'variables',
   'secrets',
+  'files',
   'fields',
   'severity',
   'category',
@@ -76,7 +77,7 @@ export function isCodeDetectorSchema(schema: unknown): boolean {
   return (
     isRecord(schema) &&
     typeof schema.type === 'string' &&
-    schema.type.toUpperCase() === CUSTOM_DETECTOR_PIPELINE_TYPE
+    schema.type.toUpperCase() === CODE_DETECTOR_PIPELINE_TYPE
   );
 }
 
@@ -92,30 +93,32 @@ export function codeCells(schema: JsonRecord): Array<{
 }
 
 /**
- * Whether the code cells define a top-level `detect` function.
+ * Whether the code cells define a top-level `detect(asset, ctx)` function.
  *
  * The API cannot parse Python, and asking the CLI on every save would start a
- * process (a Kubernetes Job, in a cluster) per keystroke-debounced save. A
- * notebook without `def detect(` at column 0 is certainly wrong, and that is
- * the mistake worth refusing here; the CLI's AST check before every preview
- * and every scan catches the rest (syntax errors, a `detect` that is not a
- * function).
+ * process (a Kubernetes Job, in a cluster) per keystroke-debounced save. The
+ * CLI's AST check before every preview and every scan catches what this
+ * cannot (syntax errors, a `detect` that is not a function); this refuses the
+ * mistakes worth refusing here: no `detect` at all, and a `detect` with the
+ * wrong arity (the runner calls `detect(asset, ctx)` or `detect(asset)`).
  */
 export function definesDetect(schema: JsonRecord): boolean {
   return codeCells(schema).some(
     (cell) =>
       cell?.type === 'code' &&
       typeof cell.source === 'string' &&
-      /^(async\s+)?def\s+detect\s*\(/m.test(cell.source),
+      /^(async\s+)?def\s+detect\s*\(\s*[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)?\s*\)/m.test(
+        cell.source,
+      ),
   );
 }
 
 function fail(message: string): never {
-  throw new BadRequestException(`CUSTOM_DETECTOR: ${message}`);
+  throw new BadRequestException(`CODE_DETECTOR: ${message}`);
 }
 
 /**
- * Structural validation of a CUSTOM_DETECTOR pipeline schema. Fails closed on
+ * Structural validation of a CODE_DETECTOR pipeline schema. Fails closed on
  * unknown keys (there is no global ValidationPipe).
  */
 export function validateCodeDetectorSchema(schema: JsonRecord): void {
@@ -170,6 +173,20 @@ export function validateCodeDetectorSchema(schema: JsonRecord): void {
     fail(
       'the notebook must define a top-level function detect(asset, ctx) that yields Finding(...) objects',
     );
+  }
+
+  if (schema.files !== undefined) {
+    if (
+      !Array.isArray(schema.files) ||
+      schema.files.length > 64 ||
+      !(schema.files as unknown[]).every(
+        (entry) => typeof entry === 'string' && entry.length > 0,
+      )
+    ) {
+      fail(
+        'files must be an array of at most 64 detector file ids (upload through POST /custom-detectors/:id/files)',
+      );
+    }
   }
 
   if (schema.packages !== undefined) {
@@ -243,15 +260,23 @@ export function validateCodeDetectorSchema(schema: JsonRecord): void {
     }
   }
 
+  const severity =
+    typeof schema.severity === 'string'
+      ? schema.severity.trim().toLowerCase()
+      : schema.severity;
   if (
     schema.severity !== undefined &&
-    (typeof schema.severity !== 'string' || !SEVERITIES.has(schema.severity))
+    (typeof severity !== 'string' || !SEVERITIES.has(severity))
   ) {
     fail(`severity must be one of ${Array.from(SEVERITIES).join(', ')}`);
   }
+  const category =
+    typeof schema.category === 'string'
+      ? schema.category.trim().toUpperCase()
+      : schema.category;
   if (
     schema.category !== undefined &&
-    (typeof schema.category !== 'string' || !CATEGORIES.has(schema.category))
+    (typeof category !== 'string' || !CATEGORIES.has(category))
   ) {
     fail(`category must be one of ${Array.from(CATEGORIES).join(', ')}`);
   }

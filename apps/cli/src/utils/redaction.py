@@ -68,7 +68,7 @@ def _leaves_at_path(recipe: Mapping[str, Any], path: str) -> list[str]:
 
 
 def _code_detector_secret_leaves(recipe: Mapping[str, Any]) -> list[str]:
-    """Secrets of every code detector (``CUSTOM_DETECTOR``) in the recipe.
+    """Secrets of every code detector (``CODE_DETECTOR``) in the recipe.
 
     The API decrypts them into ``detectors[].config.pipeline_schema.secrets`` at
     dispatch, so the scan process holds them in plain text; anything it logs
@@ -82,7 +82,7 @@ def _code_detector_secret_leaves(recipe: Mapping[str, Any]) -> list[str]:
         config = entry.get("config") if isinstance(entry, Mapping) else None
         schema = config.get("pipeline_schema") if isinstance(config, Mapping) else None
         if isinstance(schema, Mapping) and str(schema.get("type") or "").upper() == (
-            "CUSTOM_DETECTOR"
+            "CODE_DETECTOR"
         ):
             leaves.extend(_leaf_strings(schema.get("secrets")))
     return leaves

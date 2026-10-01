@@ -22,7 +22,7 @@ the other detectors found on the same asset in this run.
 It **judges**; it never changes what the connector extracted. To add metadata,
 tags or links to assets, use [augmentation](/sources/augmentation/) instead.
 
-Its pipeline type is `CUSTOM_DETECTOR`.
+Its pipeline type is `CODE_DETECTOR`.
 
 <Separator className="my-6" />
 
@@ -106,7 +106,7 @@ Then:
 | --- | --- |
 | `asset.text()` | Extracted text, whole (capped). |
 | `asset.pages()` | Extracted text, page by page. |
-| `asset.rows()` | Dict rows when the raw representation is JSON records — SQL and tabular sources, document stores. Empty otherwise. |
+| `asset.rows()` | Dict rows when the raw representation is JSON records — SQL and tabular sources, document stores. Empty for file uploads like CSV, whose pages arrive as rendered text (`row_1:\n  item: acme…`); parse `asset.text()` for those. |
 | `asset.raw_pages()` | The connector's own raw representation, page by page. |
 | `asset.payload()` | Raw bytes for file-shaped sources; `None` for row-shaped ones. |
 | `asset.metadata` | The connector's metadata (read-only mapping). |
@@ -250,8 +250,8 @@ severity and count:
 An agent picks the engine when it calls `create_custom_detector`; the tool's
 description says when a code detector is the right one. The workflow:
 
-1. `list_custom_detector_examples` — copy a `CUSTOM_DETECTOR` template and its `testScenarios`.
-2. `create_custom_detector` with `pipeline_schema.type: "CUSTOM_DETECTOR"`.
+1. `list_custom_detector_examples` — copy a `CODE_DETECTOR` template and its `testScenarios`.
+2. `create_custom_detector` with `pipeline_schema.type: "CODE_DETECTOR"`.
 3. `upload_custom_detector_file` if the rule reads one.
 4. `run_custom_detector_notebook` with `mode: "preview_detect"`, a `sourceId`
    and an `assetId`, then `get_notebook_execution` for the findings.

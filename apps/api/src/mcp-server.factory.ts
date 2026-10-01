@@ -182,12 +182,12 @@ function capValue(
  * create tool's description so an agent sees it at the moment of choosing an
  * engine, not only when it happens to read a docs resource.
  */
-const CUSTOM_DETECTOR_GUIDANCE =
-  'CUSTOM_DETECTOR is a code detector: a Python notebook defining detect(asset, ctx) that yields Finding(label, value, severity=, location={row, column_name, line, ...}, fields={...}, identity=, normalized_value=). ' +
+const CODE_DETECTOR_GUIDANCE =
+  'CODE_DETECTOR is a code detector: a Python notebook defining detect(asset, ctx) that yields Finding(label, value, severity=, location={row, column_name, line, ...}, fields={...}, identity=, normalized_value=). ' +
   "Choose it when the rule is a CHECK no pattern or model expresses: totals that must add up (asset.rows()), a value compared with metadata or a threshold (asset.metadata), list screening against an uploaded file (ctx.file), co-occurrence of other detectors' findings (needs_findings: true, asset.findings), checksummed identifiers, or scoring with your own model. " +
   'Prefer REGEX for a token pattern, GLINER2/LLM for meaning in prose, and TAG only when a CUSTOM connector already knows the fact. ' +
   'Rules: severity is a ceiling; give every finding a stable identity (row id, list entry) so re-runs update it instead of churning; set normalized_value only when the value should link assets in the value index; declare every key of fields; set deterministic: false if the verdict depends on anything outside the asset. ' +
-  'Workflow: list_custom_detector_examples (copy a CUSTOM_DETECTOR template and its testScenarios) -> create_custom_detector -> upload_custom_detector_file if the rule reads one -> run_custom_detector_notebook mode "preview_detect" on a real asset -> create_detector_test_scenario (input_asset fixtures) and run_detector_tests -> attach it to a source. ' +
+  'Workflow: list_custom_detector_examples (copy a CODE_DETECTOR template and its testScenarios) -> create_custom_detector -> upload_custom_detector_file if the rule reads one -> run_custom_detector_notebook mode "preview_detect" on a real asset -> create_detector_test_scenario (input_asset fixtures) and run_detector_tests -> attach it to a source. ' +
   'Writing one needs the custom_source_code capability group.';
 
 function jsonResult(payload: unknown) {
@@ -1930,7 +1930,7 @@ export class McpServerFactoryService {
         !toolGroupIds.includes('custom_source_code')
       ) {
         throw new Error(
-          'Writing a CUSTOM_DETECTOR (code) detector needs the custom_source_code ' +
+          'Writing a CODE_DETECTOR (code) detector needs the custom_source_code ' +
             'capability group on this MCP token, because the notebook runs in every ' +
             'scan the detector is attached to.',
         );
@@ -1979,7 +1979,7 @@ export class McpServerFactoryService {
       {
         title: 'List Custom Detector Examples',
         description:
-          'Return starter examples for every engine: rulesets, classifiers, entity detectors, AI (LLM) detectors and code detectors (CUSTOM_DETECTOR). Code-detector templates include their notebook and ready-made testScenarios -- copy both when creating one.',
+          'Return starter examples for every engine: rulesets, classifiers, entity detectors, AI (LLM) detectors and code detectors (CODE_DETECTOR). Code-detector templates include their notebook and ready-made testScenarios -- copy both when creating one.',
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
@@ -1993,8 +1993,8 @@ export class McpServerFactoryService {
       {
         title: 'Create Custom Detector',
         description:
-          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, TAG or CUSTOM_DETECTOR. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={"<key>": "<value>"}), and it is not selectable on a source. ' +
-          CUSTOM_DETECTOR_GUIDANCE,
+          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, TAG or CODE_DETECTOR. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={"<key>": "<value>"}), and it is not selectable on a source. ' +
+          CODE_DETECTOR_GUIDANCE,
         inputSchema: {
           key: z.string().optional(),
           name: z.string(),
@@ -2007,7 +2007,7 @@ export class McpServerFactoryService {
               'AI provider credential ID. Required for LLM (AI) detectors.',
             ),
           pipeline_schema: jsonObjectSchema.describe(
-            'Pipeline schema. GLiNER2 example: { type: "GLINER2", entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } } }. LLM (AI) example: { type: "LLM", system_prompt: "Classify the sentiment of the text.", labels: [{ name: "good" }, { name: "bad" }, { name: "violent" }], severity_map: [{ pattern: "violent", severity: "critical" }], output_fields: [{ name: "language", type: "string" }] }. TAG example: { type: "TAG", label: "Cardholder data", severity: "high" }. CUSTOM_DETECTOR example: { type: "CUSTOM_DETECTOR", notebook: { cells: [{ id: "c1", type: "code", source: "def detect(asset, ctx):\\n    for i, row in enumerate(asset.rows()):\\n        if row[\'total\'] != row[\'a\'] + row[\'b\']:\\n            yield Finding(label=\'total_mismatch\', value=str(row[\'total\']), identity=f\'row-{i}\', location={\'row\': i})\\n" }] }, severity: "high", category: "QUALITY", fields: [{ name: "expected", type: "number" }], variables: {}, secrets: {}, needs_findings: false }',
+            'Pipeline schema. GLiNER2 example: { type: "GLINER2", entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } } }. LLM (AI) example: { type: "LLM", system_prompt: "Classify the sentiment of the text.", labels: [{ name: "good" }, { name: "bad" }, { name: "violent" }], severity_map: [{ pattern: "violent", severity: "critical" }], output_fields: [{ name: "language", type: "string" }] }. TAG example: { type: "TAG", label: "Cardholder data", severity: "high" }. CODE_DETECTOR example: { type: "CODE_DETECTOR", notebook: { cells: [{ id: "c1", type: "code", source: "def detect(asset, ctx):\\n    for i, row in enumerate(asset.rows()):\\n        if row[\'total\'] != row[\'a\'] + row[\'b\']:\\n            yield Finding(label=\'total_mismatch\', value=str(row[\'total\']), identity=f\'row-{i}\', location={\'row\': i})\\n" }] }, severity: "high", category: "QUALITY", fields: [{ name: "expected", type: "number" }], variables: {}, secrets: {}, needs_findings: false }',
           ),
           isActive: z.boolean().optional(),
         },
@@ -2032,7 +2032,7 @@ export class McpServerFactoryService {
       {
         title: 'Update Custom Detector',
         description:
-          'Update detector metadata, pipeline schema, AI provider credential, or activation status. For a CUSTOM_DETECTOR, send the whole pipeline_schema (notebook included); `secrets` is a patch -- a string sets a key, null deletes it, and omitting `secrets` keeps every stored secret (values are never returned, only secretKeys). Saving a changed notebook bumps notebook.revision.',
+          'Update detector metadata, pipeline schema, AI provider credential, or activation status. For a CODE_DETECTOR, send the whole pipeline_schema (notebook included); `secrets` is a patch -- a string sets a key, null deletes it, and omitting `secrets` keeps every stored secret (values are never returned, only secretKeys). Saving a changed notebook bumps notebook.revision.',
         inputSchema: {
           id: z.string().uuid(),
           key: z.string().optional(),
@@ -2058,6 +2058,13 @@ export class McpServerFactoryService {
       async ({ id, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         assertMayWriteCode((rest as any).pipeline_schema);
+        if (!(rest as any).pipeline_schema) {
+          // A rename or activation flip carries no schema, but changing a
+          // rule that runs Python in every scan is still a code-affecting
+          // write: check the stored detector too.
+          const stored = await this.customDetectorsService.getById(id);
+          assertMayWriteCode((stored as any)?.pipelineSchema);
+        }
         return jsonResult(
           await this.customDetectorsService.update(id, {
             ...rest,
@@ -2082,6 +2089,8 @@ export class McpServerFactoryService {
       },
       async ({ id }) => {
         this.mcpToolExecutor.assertNotDemoMode();
+        const stored = await this.customDetectorsService.getById(id);
+        assertMayWriteCode((stored as any)?.pipelineSchema);
         return jsonResult(await this.customDetectorsService.delete(id));
       },
     );
@@ -2231,7 +2240,7 @@ export class McpServerFactoryService {
           '{"entities": {label: [{value}]}}) is also accepted. ' +
           'Labels compare case-insensitively with underscores treated as spaces, so ' +
           '"market_gaming_instruction" matches "Market gaming instruction". ' +
-          'CUSTOM_DETECTOR (code) detectors: expected {"findings": [{"label": "total_mismatch", "identity": "row-2", "severity": "high", "count": 1}], "match": "subset"|"exact"} or {"shouldMatch": false}; ' +
+          'CODE_DETECTOR (code) detectors: expected {"findings": [{"label": "total_mismatch", "identity": "row-2", "severity": "high", "count": 1}], "match": "subset"|"exact"} or {"shouldMatch": false}; ' +
           'and instead of input_text they may take input_asset, a whole asset: ' +
           '{"name": "t.csv", "kind": "table", "mime_type": "text/csv", "metadata": {...}, "rows": [{...}], "pages": ["..."], "text": "..."}.',
         inputSchema: {
@@ -2248,7 +2257,7 @@ export class McpServerFactoryService {
             .record(z.string(), z.unknown())
             .optional()
             .describe(
-              'CUSTOM_DETECTOR only: an asset fixture { name, kind?, mime_type?, metadata?, text?, pages?, rows? }',
+              'CODE_DETECTOR only: an asset fixture { name, kind?, mime_type?, metadata?, text?, pages?, rows? }',
             ),
           expected_outcome: z
             .record(z.string(), z.unknown())
@@ -2343,7 +2352,7 @@ export class McpServerFactoryService {
       {
         title: 'Run Code Detector Notebook',
         description:
-          "Run a CUSTOM_DETECTOR (code) detector's notebook and return immediately -- poll get_notebook_execution for the result. " +
+          "Run a CODE_DETECTOR (code) detector's notebook and return immediately -- poll get_notebook_execution for the result. " +
           '"cell" runs one cell (targetCellId) and "all" replays every cell, with the detector\'s variables, secrets and files but no asset: use them to debug helpers with print(). ' +
           '"preview_detect" runs setup() and detect() exactly as a scan would on a real asset of sourceId (assetId), or on a small sample of that source when assetId is omitted, and reports the findings it WOULD record (outputs.assets[].findings, outputs.result.logs) without writing anything. ' +
           'Always preview on a real asset before attaching a new rule to a source. The revision is read from the detector, so save (update_custom_detector) first.',
@@ -2403,7 +2412,7 @@ export class McpServerFactoryService {
       {
         title: 'List Code Detector Files',
         description:
-          'Files uploaded to a CUSTOM_DETECTOR detector (lists, models, reference tables); the rule opens them with ctx.file(name).',
+          'Files uploaded to a CODE_DETECTOR detector (lists, models, reference tables); the rule opens them with ctx.file(name).',
         inputSchema: z.strictObject({ detectorId: z.string().uuid() }),
         annotations: { readOnlyHint: true, idempotentHint: true },
       },
@@ -2416,7 +2425,7 @@ export class McpServerFactoryService {
       {
         title: 'Upload Code Detector File',
         description:
-          'Upload a file a CUSTOM_DETECTOR detector reads with ctx.file(fileName) -- a sanctions list CSV, a joblib/ONNX model, a lookup table. A file with the same name is replaced, and the detector version is bumped so the next scan re-runs the rule.',
+          'Upload a file a CODE_DETECTOR detector reads with ctx.file(fileName) -- a sanctions list CSV, a joblib/ONNX model, a lookup table. A file with the same name is replaced, and the detector version is bumped so the next scan re-runs the rule.',
         inputSchema: z.strictObject({
           detectorId: z.string().uuid(),
           fileName: z.string().min(1),
@@ -2442,7 +2451,7 @@ export class McpServerFactoryService {
       'delete_custom_detector_file',
       {
         title: 'Delete Code Detector File',
-        description: 'Delete one file from a CUSTOM_DETECTOR detector.',
+        description: 'Delete one file from a CODE_DETECTOR detector.',
         inputSchema: z.strictObject({
           detectorId: z.string().uuid(),
           fileId: z.string().uuid(),

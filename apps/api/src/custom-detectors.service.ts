@@ -23,7 +23,7 @@ import { AiProviderConfigService } from './ai-provider-config.service';
 // silently resolve to undefined (see nest-type-import-breaks-optional-di).
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import {
-  CUSTOM_DETECTOR_PIPELINE_TYPE,
+  CODE_DETECTOR_PIPELINE_TYPE,
   isCodeDetectorSchema,
   withNotebookRevision,
   maskCodeDetectorSchema,
@@ -169,7 +169,7 @@ function answerDimensionFor(
   switch (pipelineType.toUpperCase()) {
     // A code detector's label names the problem ("total_mismatch"); its value
     // is the evidence ("total 523 != 520").
-    case 'CUSTOM_DETECTOR':
+    case 'CODE_DETECTOR':
     case 'LLM':
     case 'TEXT_CLASSIFICATION':
     case 'IMAGE_CLASSIFICATION':
@@ -771,7 +771,7 @@ export class CustomDetectorsService {
       'IMAGE_CLASSIFICATION',
       'OBJECT_DETECTION',
       CustomDetectorsService.TAG_PIPELINE_TYPE,
-      CUSTOM_DETECTOR_PIPELINE_TYPE,
+      CODE_DETECTOR_PIPELINE_TYPE,
     ];
     if (!validTypes.includes(schemaType)) {
       throw new BadRequestException(
@@ -779,7 +779,7 @@ export class CustomDetectorsService {
       );
     }
 
-    if (schemaType === CUSTOM_DETECTOR_PIPELINE_TYPE) {
+    if (schemaType === CODE_DETECTOR_PIPELINE_TYPE) {
       // Its own rules: code, packages, variables, secrets, fields, limits.
       // None of the numeric knobs below mean anything to a notebook.
       validateCodeDetectorSchema(schema);
@@ -970,6 +970,12 @@ export class CustomDetectorsService {
    * decrypted secrets, its database id and its uploaded files (name + content
    * hash, and a download URL when the caller knows the namespaced API base).
    * Public: scans, test scenarios and notebook previews all dispatch through it.
+   *
+   * `filesBaseUrl` is required for every dispatch that reaches a CLI process
+   * (scan, test, preview): without it files_runtime carries no download URL
+   * and the CLI downloads nothing, so the rule runs against an empty
+   * ctx.files. Callers that stage the bytes themselves (notebook runs on local
+   * disk) delete files_runtime after this returns.
    */
   async prepareRuntimePipelineSchema(
     row: {
@@ -1829,7 +1835,10 @@ export class CustomDetectorsService {
     return config;
   }
 
-  async buildRuntimeCustomDetectors(ids: unknown): Promise<
+  async buildRuntimeCustomDetectors(
+    ids: unknown,
+    options: { filesBaseUrl?: string | null } = {},
+  ): Promise<
     Array<{
       id: string;
       key: string;
@@ -1868,7 +1877,7 @@ export class CustomDetectorsService {
       .map((id) => byId.get(id))
       .filter((row): row is CustomDetector => Boolean(row));
     const entries = await Promise.all(
-      orderedRows.map((row) => this.toRuntimeEntry(row)),
+      orderedRows.map((row) => this.toRuntimeEntry(row, options)),
     );
     return entries.filter((entry): entry is NonNullable<typeof entry> =>
       Boolean(entry),
@@ -1880,7 +1889,10 @@ export class CustomDetectorsService {
    * Used when sources store CUSTOM detectors as { type, custom_detector_key } in
    * their detectors array rather than the legacy custom_detectors ID array.
    */
-  async buildRuntimeCustomDetectorsByKeys(keys: string[]): Promise<
+  async buildRuntimeCustomDetectorsByKeys(
+    keys: string[],
+    options: { filesBaseUrl?: string | null } = {},
+  ): Promise<
     Array<{
       id: string;
       key: string;
@@ -1910,10 +1922,10 @@ export class CustomDetectorsService {
     const orderedRows = normalizedKeys
       .map((key) => byKey.get(key))
       .filter((row): row is CustomDetector => Boolean(row));
-    const entries = await Promise.all(
-      orderedRows.map((row) => this.toRuntimeEntry(row)),
+    const entriesByKey = await Promise.all(
+      orderedRows.map((row) => this.toRuntimeEntry(row, options)),
     );
-    return entries.filter((entry): entry is NonNullable<typeof entry> =>
+    return entriesByKey.filter((entry): entry is NonNullable<typeof entry> =>
       Boolean(entry),
     );
   }
@@ -1970,7 +1982,10 @@ export class CustomDetectorsService {
    * provider credential cannot be resolved (missing key/model/credential) so a
    * single misconfigured detector is skipped rather than failing the whole run.
    */
-  private async toRuntimeEntry(row: CustomDetector): Promise<{
+  private async toRuntimeEntry(
+    row: CustomDetector,
+    options: { filesBaseUrl?: string | null } = {},
+  ): Promise<{
     id: string;
     key: string;
     name: string;
@@ -1982,11 +1997,14 @@ export class CustomDetectorsService {
   } | null> {
     let pipelineSchema: Record<string, unknown>;
     try {
-      pipelineSchema = await this.prepareRuntimePipelineSchema({
-        id: row.id,
-        pipelineSchema: (row as any).pipelineSchema,
-        aiProviderConfigId: (row as any).aiProviderConfigId ?? null,
-      });
+      pipelineSchema = await this.prepareRuntimePipelineSchema(
+        {
+          id: row.id,
+          pipelineSchema: (row as any).pipelineSchema,
+          aiProviderConfigId: (row as any).aiProviderConfigId ?? null,
+        },
+        options,
+      );
     } catch (error) {
       this.logger.warn(
         `Skipping custom detector "${row.key}" (${row.id}): unable to resolve AI provider credential — ${String(

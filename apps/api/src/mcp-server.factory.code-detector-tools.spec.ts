@@ -8,7 +8,7 @@ type RegisteredTool = {
 };
 
 const CODE_SCHEMA = {
-  type: 'CUSTOM_DETECTOR',
+  type: 'CODE_DETECTOR',
   notebook: {
     cells: [
       { id: 'c', type: 'code', source: 'def detect(asset):\n    pass\n' },
@@ -21,7 +21,7 @@ const CODE_SCHEMA = {
  * writing one over MCP needs the code-authoring group, not only the detector
  * group -- and an agent choosing an engine must be told when to pick it.
  */
-describe('McpServerFactoryService code detectors (CUSTOM_DETECTOR)', () => {
+describe('McpServerFactoryService code detectors (CODE_DETECTOR)', () => {
   const mcpToolExecutor = {
     assertNotDemoMode: jest.fn(),
     createCustomDetector: jest.fn().mockResolvedValue({ id: 'd1' }),
@@ -68,6 +68,35 @@ describe('McpServerFactoryService code detectors (CUSTOM_DETECTOR)', () => {
     expect(mcpToolExecutor.createCustomDetector).not.toHaveBeenCalled();
   });
 
+  it('refuses a metadata-only update of a code detector without custom_source_code', async () => {
+    const registered = tools(['custom_detectors']);
+    await expect(
+      registered.update_custom_detector.handler({ id: 'd1', name: 'renamed' }),
+    ).rejects.toThrow(/custom_source_code/);
+    expect(customDetectorsService.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses to delete a code detector without custom_source_code', async () => {
+    const registered = tools(['custom_detectors']);
+    // delete is registered on the executor-mocked factory; reach through the
+    // compat server registry like the other tools.
+    await expect(
+      registered.delete_custom_detector.handler({ id: 'd1' }),
+    ).rejects.toThrow(/custom_source_code/);
+  });
+
+  it('lets a detector-only token rename a regex detector', async () => {
+    customDetectorsService.getById.mockResolvedValueOnce({
+      id: 'd9',
+      pipelineSchema: { type: 'REGEX', patterns: { a: { pattern: 'x' } } },
+    });
+    const registered = tools(['custom_detectors']);
+    await registered.update_custom_detector.handler({
+      id: 'd9',
+      name: 'renamed',
+    });
+    expect(customDetectorsService.update).toHaveBeenCalled();
+  });
   it('still lets a detector-only token create a regex detector', async () => {
     const registered = tools(['custom_detectors']);
     await registered.create_custom_detector.handler({
@@ -94,7 +123,7 @@ describe('McpServerFactoryService code detectors (CUSTOM_DETECTOR)', () => {
 
   it('guides the engine choice where the agent chooses', () => {
     const description = tools(null).create_custom_detector.description ?? '';
-    expect(description).toContain('CUSTOM_DETECTOR');
+    expect(description).toContain('CODE_DETECTOR');
     expect(description).toContain('Choose it when');
     expect(description).toContain('preview_detect');
   });

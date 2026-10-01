@@ -1,4 +1,7 @@
-import { generateDetectionIdentity } from './detection-identity';
+import {
+  generateDetectionIdentity,
+  hashIdentityKey,
+} from './detection-identity';
 
 describe('generateDetectionIdentity', () => {
   it('should generate consistent hash for same input', () => {
@@ -209,6 +212,27 @@ describe('generateDetectionIdentity', () => {
           ...base,
           matchedContent: 'anything',
           identityKey: 'row-17',
+        }),
+      );
+    });
+
+    it('hashes an overlong identity key instead of truncating it', () => {
+      const long = `row-${'1'.repeat(300)}`;
+      expect(hashIdentityKey(long)).toHaveLength(64);
+      expect(hashIdentityKey(long)).toBe(hashIdentityKey(long));
+      expect(hashIdentityKey('row-17')).toBe('row-17');
+      // Same finding either way: the CLI hashes with the same function.
+      expect(
+        generateDetectionIdentity({
+          ...base,
+          matchedContent: 'x',
+          identityKey: long,
+        }),
+      ).toBe(
+        generateDetectionIdentity({
+          ...base,
+          matchedContent: 'y',
+          identityKey: long,
         }),
       );
     });

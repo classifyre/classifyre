@@ -927,13 +927,28 @@ export class CorrelationService {
 
   // ── Fingerprints ──────────────────────────────────────────────────────────
 
-  /** Keys of the code detectors (pipeline type CUSTOM_DETECTOR). A small table. */
+  /** Keys of the code detectors (pipeline type CODE_DETECTOR). A small table. */
+  private codeDetectorKeysCache: { at: number; keys: Set<string> } | null =
+    null;
+
   private async codeDetectorKeys(): Promise<Set<string>> {
+    // One query per recompute run, not per asset: the set changes only when a
+    // detector is created/renamed/deleted, so a 60s TTL is plenty and turns
+    // N asset rebuilds from N queries into one.
+    const now = Date.now();
+    if (
+      this.codeDetectorKeysCache &&
+      now - this.codeDetectorKeysCache.at < 60_000
+    ) {
+      return this.codeDetectorKeysCache.keys;
+    }
     const rows = await this.prisma.$queryRaw<Array<{ key: string }>>`
       SELECT key FROM custom_detectors
-      WHERE pipeline_schema->>'type' = 'CUSTOM_DETECTOR'
+      WHERE pipeline_schema->>'type' = 'CODE_DETECTOR'
     `;
-    return new Set(Array.isArray(rows) ? rows.map((row) => row.key) : []);
+    const keys = new Set(Array.isArray(rows) ? rows.map((row) => row.key) : []);
+    this.codeDetectorKeysCache = { at: now, keys };
+    return keys;
   }
 
   /** Rebuild an asset's correlation values + signature from its findings. */
@@ -962,7 +977,7 @@ export class CorrelationService {
         phoneticHash: string | null;
       }
     >();
-    // Code detectors (CUSTOM_DETECTOR) enter the value index only through the
+    // Code detectors (CODE_DETECTOR) enter the value index only through the
     // normalized value they declare (contract C2). Their matched text is a
     // verdict like "total 523 != 520", and indexing it is how templated values
     // correlated thousands of unrelated assets (GENESIS field report P6).
@@ -975,6 +990,7 @@ export class CorrelationService {
         findingType: string;
         matchedContent: string;
         detectorType: DetectorType;
+        customDetectorId: string | null;
         customDetectorKey: string | null;
       }> = await this.prisma.finding.findMany({
         // OPEN only. A fingerprint asserts that this asset CURRENTLY carries
@@ -992,6 +1008,7 @@ export class CorrelationService {
           findingType: true,
           matchedContent: true,
           detectorType: true,
+          customDetectorId: true,
           customDetectorKey: true,
         },
         orderBy: { id: 'asc' },
@@ -999,7 +1016,15 @@ export class CorrelationService {
       });
       if (!batch.length) break;
       for (const f of batch) {
-        if (f.customDetectorKey && codeDetectorKeys.has(f.customDetectorKey)) {
+        // A finding that carries a code-detector id (or a code-detector key
+        // the live set still knows) enters the index only through its
+        // declared normalized_value (contract C2). Matching on the id as
+        // well as the key keeps a renamed detector out of the P6 fallback:
+        // its key misses the live set, but its id still proves it is code.
+        if (
+          f.customDetectorId ||
+          (f.customDetectorKey && codeDetectorKeys.has(f.customDetectorKey))
+        ) {
           codeFindingIds.push(f.id);
           continue;
         }

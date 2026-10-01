@@ -47,7 +47,7 @@ NON_CACHEABLE_DETECTOR_TYPES: Final[frozenset[str]] = frozenset({"BROKEN_LINKS"}
 # custom detector. These stamp one pipeline type instead.
 PIPELINE_ENGINE_VERSION: Final[dict[str, int]] = {
     # The code-detector runtime: SDK surface, finding mapping, payload shapes.
-    "CUSTOM_DETECTOR": 1,
+    "CODE_DETECTOR": 1,
 }
 
 
@@ -62,7 +62,7 @@ def is_cacheable_detector_type(detector_type: str) -> bool:
 
 
 def pipeline_type_of(config: Any) -> str | None:
-    """A custom detector's pipeline type (``CUSTOM_DETECTOR``, ``LLM``, ...)."""
+    """A custom detector's pipeline type (``CODE_DETECTOR``, ``LLM``, ...)."""
     if not isinstance(config, dict):
         return None
     schema = config.get("pipeline_schema")
@@ -87,7 +87,7 @@ def is_cacheable_detector(detector_type: str, config: Any) -> bool:
     """
     if not is_cacheable_detector_type(detector_type):
         return False
-    if pipeline_type_of(config) == "CUSTOM_DETECTOR":
+    if pipeline_type_of(config) == "CODE_DETECTOR":
         schema = config.get("pipeline_schema") if isinstance(config, dict) else None
         return not (isinstance(schema, dict) and schema.get("deterministic") is False)
     return True

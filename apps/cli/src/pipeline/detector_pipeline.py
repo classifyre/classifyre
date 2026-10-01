@@ -1252,7 +1252,7 @@ class DetectorPipeline:
         prior_findings: list[DetectionResult],
         outcome_sink: dict[tuple[DetectorType, str | None], DetectorOutcome] | None,
     ) -> tuple[list[DetectionResult], list[str], list[DetectorType]]:
-        """Run every code detector (``CUSTOM_DETECTOR``) on this asset.
+        """Run every code detector (``CODE_DETECTOR``) on this asset.
 
         Scope was already applied to ``detectors`` by kind and metadata; the
         content-type part is checked here against the asset's declared MIME
