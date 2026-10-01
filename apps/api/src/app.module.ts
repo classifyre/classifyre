@@ -34,6 +34,7 @@ import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 import { ExportModule } from './export/export.module';
 import { DataTransferModule } from './data-transfer/data-transfer.module';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
+import { CustomDetectorFilesService } from './custom-detector-files.service';
 import { InstanceSettingsService } from './instance-settings.service';
 import { AiProviderConfigService } from './ai-provider-config.service';
 import { AiClientService } from './ai';
@@ -189,6 +190,7 @@ import {
     NotificationsService,
     ValidationService,
     CustomDetectorsService,
+    CustomDetectorFilesService,
     CustomDetectorExtractionsService,
     CustomDetectorTestsService,
     MaskedConfigCryptoService,

@@ -61,7 +61,23 @@ function isTerminal(status: ExecutionStatus): boolean {
  * waiting for. A recursive timeout rather than an interval, so a slow response
  * cannot stack requests on a struggling API.
  */
-export function useNotebookExecution(sourceId: string) {
+/** What a caller hands the hook to start an execution somewhere else. */
+export type ExecutionStarter = (
+  request: Record<string, unknown>,
+) => Promise<ExecutionRecord>;
+
+export function useNotebookExecution(
+  sourceId: string,
+  options: {
+    /**
+     * Start the execution through another endpoint -- a code detector's
+     * notebook runs through /custom-detectors/:id/notebook/executions -- while
+     * polling, cancelling and the live view stay the same.
+     */
+    start?: ExecutionStarter;
+  } = {},
+) {
+  const startOverride = options.start;
   const [execution, setExecution] = React.useState<ExecutionRecord | null>(
     null,
   );
@@ -114,18 +130,23 @@ export function useNotebookExecution(sourceId: string) {
         | "all"
         | "test_connection"
         | "preview_extract"
-        | "preview_augment";
+        | "preview_augment"
+        | "preview_detect";
       scope?: "connector" | "augmentation";
       targetCellId?: string;
       maxAssets?: number;
+      sourceId?: string;
+      assetId?: string;
     }) => {
       stopPolling();
       setStarting(true);
       try {
-        const started = (await api.notebooks.notebookControllerCreateExecution({
-          sourceId,
-          createNotebookExecutionDto: request as never,
-        })) as unknown as ExecutionRecord;
+        const started = startOverride
+          ? await startOverride(request)
+          : ((await api.notebooks.notebookControllerCreateExecution({
+              sourceId,
+              createNotebookExecutionDto: request as never,
+            })) as unknown as ExecutionRecord);
         setExecution(started);
         poll(started.id);
         return started;
@@ -133,7 +154,7 @@ export function useNotebookExecution(sourceId: string) {
         setStarting(false);
       }
     },
-    [sourceId, poll, stopPolling],
+    [sourceId, poll, stopPolling, startOverride],
   );
 
   const cancel = React.useCallback(async () => {

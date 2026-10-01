@@ -966,28 +966,54 @@
         "custom_detector_key": "control_evasion_intent",
         "name": "Control-Evasion Intent Detector",
         "description": "Detect contextual requests to conceal activity or deliberately bypass controls",
-        "languages": ["en"],
+        "languages": [
+          "en"
+        ],
         "pipeline_schema": {
           "type": "LLM",
           "system_prompt": "Classify whether the content contains an explicit request, agreement, or instruction to conceal activity, bypass an approval or monitoring control, or evade a stated policy. Use only evidence present in the content. Ordinary urgency, confidentiality, disagreement with policy, or a hypothetical discussion is benign unless the text connects an actor and action to deliberate circumvention or concealment. Return an empty labels array for benign content; otherwise return the strongest applicable label and quote the shortest supporting passage.",
           "response_example": "{\"labels\":[{\"name\":\"control_evasion\",\"confidence\":0.96,\"matched_content\":\"Keep each invoice below 10k so compliance does not review it.\"}],\"fields\":{\"actor\":\"regional manager\",\"requested_action\":\"split the invoice to avoid approval\",\"control_or_policy\":\"purchase approval threshold\",\"evidence_quote\":\"Keep each invoice below 10k so compliance does not review it.\"}}",
           "temperature": 0,
           "labels": [
-            { "name": "control_evasion", "description": "Deliberate bypass of an approval, monitoring, reporting, or policy control" },
-            { "name": "concealment", "description": "Deliberate hiding, deletion, disguising, or off-channel movement intended to prevent discovery" }
+            {
+              "name": "control_evasion",
+              "description": "Deliberate bypass of an approval, monitoring, reporting, or policy control"
+            },
+            {
+              "name": "concealment",
+              "description": "Deliberate hiding, deletion, disguising, or off-channel movement intended to prevent discovery"
+            }
           ],
           "multi_label": false,
           "severity": "info",
           "severity_map": [
-            { "pattern": "control_evasion", "severity": "high" },
-            { "pattern": "concealment", "severity": "high" }
+            {
+              "pattern": "control_evasion",
+              "severity": "high"
+            },
+            {
+              "pattern": "concealment",
+              "severity": "high"
+            }
           ],
           "confidence_threshold": 0.75,
           "output_fields": [
-            { "name": "actor", "description": "Person or role requesting or agreeing to the action" },
-            { "name": "requested_action", "description": "Action intended to bypass or conceal" },
-            { "name": "control_or_policy", "description": "Control, review, reporting duty, or policy being evaded" },
-            { "name": "evidence_quote", "description": "Shortest exact supporting passage" }
+            {
+              "name": "actor",
+              "description": "Person or role requesting or agreeing to the action"
+            },
+            {
+              "name": "requested_action",
+              "description": "Action intended to bypass or conceal"
+            },
+            {
+              "name": "control_or_policy",
+              "description": "Control, review, reporting duty, or policy being evaded"
+            },
+            {
+              "name": "evidence_quote",
+              "description": "Shortest exact supporting passage"
+            }
           ],
           "content_limit": 8000
         }
@@ -1000,7 +1026,10 @@
         "custom_detector_key": "cust_support_ticket",
         "name": "Support Ticket Extractor",
         "description": "Extract order IDs, amounts, and intent from support tickets",
-        "languages": ["de", "en"],
+        "languages": [
+          "de",
+          "en"
+        ],
         "pipeline_schema": {
           "type": "GLINER2",
           "model": {
@@ -1008,13 +1037,29 @@
             "path": null
           },
           "entities": {
-            "order_id": { "description": "Order ID like ORD-123", "required": true },
-            "amount": { "description": "Monetary value like 50€", "required": false }
+            "order_id": {
+              "description": "Order ID like ORD-123",
+              "required": true
+            },
+            "amount": {
+              "description": "Monetary value like 50€",
+              "required": false
+            }
           },
           "classification": {
-            "intent": { "labels": ["refund", "bug", "question"], "multi_label": false }
+            "intent": {
+              "labels": [
+                "refund",
+                "bug",
+                "question"
+              ],
+              "multi_label": false
+            }
           },
-          "validation": { "confidence_threshold": 0.8, "rules": [] }
+          "validation": {
+            "confidence_threshold": 0.8,
+            "rules": []
+          }
         }
       }
     },
@@ -1025,16 +1070,31 @@
         "custom_detector_key": "cust_dach_entity_extractor",
         "name": "DACH Regulatory Entity Extractor",
         "description": "Extract regulatory entities (GDPR articles, supervisory bodies, risk terms)",
-        "languages": ["de", "en"],
+        "languages": [
+          "de",
+          "en"
+        ],
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {
-            "regulatory_body": { "description": "Supervisory authority like BaFin, FINMA, FMA", "required": false },
-            "gdpr_article": { "description": "GDPR article reference like 'Art. 6 DSGVO'", "required": false },
-            "risk_term": { "description": "Legal risk term like 'Haftung ausgeschlossen'", "required": false }
+            "regulatory_body": {
+              "description": "Supervisory authority like BaFin, FINMA, FMA",
+              "required": false
+            },
+            "gdpr_article": {
+              "description": "GDPR article reference like 'Art. 6 DSGVO'",
+              "required": false
+            },
+            "risk_term": {
+              "description": "Legal risk term like 'Haftung ausgeschlossen'",
+              "required": false
+            }
           },
           "classification": {},
-          "validation": { "confidence_threshold": 0.72, "rules": [] }
+          "validation": {
+            "confidence_threshold": 0.72,
+            "rules": []
+          }
         }
       }
     },
@@ -1045,17 +1105,29 @@
         "custom_detector_key": "cust_dach_contract_risk",
         "name": "DACH Contract Risk Terms",
         "description": "Detect legal/compliance risk language in DACH contracts",
-        "languages": ["de", "en"],
+        "languages": [
+          "de",
+          "en"
+        ],
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {},
           "classification": {
             "risk_category": {
-              "labels": ["liability", "data_protection", "termination", "indemnification", "none"],
+              "labels": [
+                "liability",
+                "data_protection",
+                "termination",
+                "indemnification",
+                "none"
+              ],
               "multi_label": true
             }
           },
-          "validation": { "confidence_threshold": 0.75, "rules": [] }
+          "validation": {
+            "confidence_threshold": 0.75,
+            "rules": []
+          }
         }
       }
     },
@@ -1066,7 +1138,10 @@
         "custom_detector_key": "internal_product_codes",
         "name": "Internal Product Code Detector",
         "description": "Detect internal SKU and project code leakage in public docs",
-        "languages": ["en", "de"],
+        "languages": [
+          "en",
+          "de"
+        ],
         "pipeline_schema": {
           "type": "REGEX",
           "patterns": {
@@ -1090,7 +1165,10 @@
       "config": {
         "custom_detector_key": "cust_invoice_pii_ruleset",
         "name": "German Invoice PII Ruleset",
-        "languages": ["de", "en"],
+        "languages": [
+          "de",
+          "en"
+        ],
         "pipeline_schema": {
           "type": "REGEX",
           "patterns": {
@@ -1120,7 +1198,9 @@
         "custom_detector_key": "api_key_leakage",
         "name": "API Key Leakage Detector",
         "description": "Detect leaked API keys, tokens, and secrets in documents and code snippets",
-        "languages": ["en"],
+        "languages": [
+          "en"
+        ],
         "pipeline_schema": {
           "type": "REGEX",
           "patterns": {
@@ -1154,17 +1234,27 @@
         "custom_detector_key": "sarcasm_detector",
         "name": "Sarcasm & Irony Detector",
         "description": "Detect sarcasm and irony in user-generated content",
-        "languages": ["en", "de"],
+        "languages": [
+          "en",
+          "de"
+        ],
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {},
           "classification": {
             "tone": {
-              "labels": ["sarcastic", "ironic", "sincere"],
+              "labels": [
+                "sarcastic",
+                "ironic",
+                "sincere"
+              ],
               "multi_label": false
             }
           },
-          "validation": { "confidence_threshold": 0.72, "rules": [] }
+          "validation": {
+            "confidence_threshold": 0.72,
+            "rules": []
+          }
         }
       }
     },
@@ -1178,12 +1268,24 @@
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {
-            "vendor_name": { "description": "Company or vendor name", "required": false },
-            "contract_value": { "description": "Contract value like 50.000 EUR", "required": false },
-            "delivery_term": { "description": "Incoterms like FOB, CIF, DDP", "required": false }
+            "vendor_name": {
+              "description": "Company or vendor name",
+              "required": false
+            },
+            "contract_value": {
+              "description": "Contract value like 50.000 EUR",
+              "required": false
+            },
+            "delivery_term": {
+              "description": "Incoterms like FOB, CIF, DDP",
+              "required": false
+            }
           },
           "classification": {},
-          "validation": { "confidence_threshold": 0.55, "rules": [] }
+          "validation": {
+            "confidence_threshold": 0.55,
+            "rules": []
+          }
         }
       }
     },
@@ -1199,7 +1301,10 @@
           "device": "cpu",
           "confidence_threshold": 0.8,
           "severity_map": [
-            { "pattern": "spam", "severity": "high" }
+            {
+              "pattern": "spam",
+              "severity": "high"
+            }
           ]
         }
       }
@@ -1216,8 +1321,14 @@
           "device": "cpu",
           "confidence_threshold": 0.85,
           "severity_map": [
-            { "pattern": "negative", "severity": "medium" },
-            { "pattern": "positive", "severity": "info" }
+            {
+              "pattern": "negative",
+              "severity": "medium"
+            },
+            {
+              "pattern": "positive",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1235,10 +1346,22 @@
           "top_k": 5,
           "confidence_threshold": 0.7,
           "severity_map": [
-            { "pattern": "nsfw", "severity": "critical" },
-            { "pattern": "explicit", "severity": "critical" },
-            { "pattern": "suggestive", "severity": "high" },
-            { "pattern": "normal", "severity": "info" }
+            {
+              "pattern": "nsfw",
+              "severity": "critical"
+            },
+            {
+              "pattern": "explicit",
+              "severity": "critical"
+            },
+            {
+              "pattern": "suggestive",
+              "severity": "high"
+            },
+            {
+              "pattern": "normal",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1257,8 +1380,14 @@
           "top_k": 2,
           "confidence_threshold": 0.7,
           "severity_map": [
-            { "pattern": "nsfw", "severity": "critical" },
-            { "pattern": "normal", "severity": "info" }
+            {
+              "pattern": "nsfw",
+              "severity": "critical"
+            },
+            {
+              "pattern": "normal",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1304,9 +1433,18 @@
           "device": "cpu",
           "confidence_threshold": 0.6,
           "severity_map": [
-            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
-            { "pattern": "person|human", "severity": "high" },
-            { "pattern": "car|truck|motorcycle", "severity": "medium" }
+            {
+              "pattern": "knife|weapon|gun|rifle|pistol",
+              "severity": "critical"
+            },
+            {
+              "pattern": "person|human",
+              "severity": "high"
+            },
+            {
+              "pattern": "car|truck|motorcycle",
+              "severity": "medium"
+            }
           ]
         }
       }
@@ -1333,7 +1471,9 @@
         "custom_detector_key": "finbert_sentiment",
         "name": "Financial Sentiment (FinBERT)",
         "description": "Detect negative or uncertain sentiment in financial documents",
-        "languages": ["en"],
+        "languages": [
+          "en"
+        ],
         "pipeline_schema": {
           "type": "TEXT_CLASSIFICATION",
           "model": "ProsusAI/finbert",
@@ -1341,9 +1481,18 @@
           "confidence_threshold": 0.75,
           "severity": "info",
           "severity_map": [
-            { "pattern": "negative", "severity": "high" },
-            { "pattern": "neutral", "severity": "low" },
-            { "pattern": "positive", "severity": "info" }
+            {
+              "pattern": "negative",
+              "severity": "high"
+            },
+            {
+              "pattern": "neutral",
+              "severity": "low"
+            },
+            {
+              "pattern": "positive",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1355,7 +1504,9 @@
         "custom_detector_key": "twitter_roberta_sentiment",
         "name": "Social Media Sentiment (RoBERTa)",
         "description": "Detect negative or neutral sentiment in social media and user-generated content",
-        "languages": ["en"],
+        "languages": [
+          "en"
+        ],
         "pipeline_schema": {
           "type": "TEXT_CLASSIFICATION",
           "model": "cardiffnlp/twitter-roberta-base-sentiment-latest",
@@ -1363,9 +1514,18 @@
           "confidence_threshold": 0.7,
           "severity": "info",
           "severity_map": [
-            { "pattern": "negative", "severity": "medium" },
-            { "pattern": "neutral", "severity": "low" },
-            { "pattern": "positive", "severity": "info" }
+            {
+              "pattern": "negative",
+              "severity": "medium"
+            },
+            {
+              "pattern": "neutral",
+              "severity": "low"
+            },
+            {
+              "pattern": "positive",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1377,7 +1537,19 @@
         "custom_detector_key": "language_detector",
         "name": "Language Detector (XLM-RoBERTa)",
         "description": "Detect the language of document content for routing and compliance",
-        "languages": ["en", "de", "fr", "es", "it", "nl", "pt", "ru", "zh", "ja", "ar"],
+        "languages": [
+          "en",
+          "de",
+          "fr",
+          "es",
+          "it",
+          "nl",
+          "pt",
+          "ru",
+          "zh",
+          "ja",
+          "ar"
+        ],
         "pipeline_schema": {
           "type": "TEXT_CLASSIFICATION",
           "model": "papluca/xlm-roberta-base-language-detection",
@@ -1395,7 +1567,9 @@
         "custom_detector_key": "toxic_content_detector",
         "name": "Toxic Content Detector",
         "description": "Detect toxic and abusive language in user-generated content using a binary RoBERTa-base toxicity classifier",
-        "languages": ["en"],
+        "languages": [
+          "en"
+        ],
         "pipeline_schema": {
           "type": "TEXT_CLASSIFICATION",
           "model": "s-nlp/roberta_toxicity_classifier",
@@ -1403,8 +1577,14 @@
           "confidence_threshold": 0.75,
           "severity": "info",
           "severity_map": [
-            { "pattern": "toxic", "severity": "high" },
-            { "pattern": "neutral", "severity": "info" }
+            {
+              "pattern": "toxic",
+              "severity": "high"
+            },
+            {
+              "pattern": "neutral",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1471,9 +1651,18 @@
           "confidence_threshold": 0.5,
           "top_k": 20,
           "severity_map": [
-            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
-            { "pattern": "person|human", "severity": "high" },
-            { "pattern": "car|truck|bus|motorcycle", "severity": "medium" }
+            {
+              "pattern": "knife|weapon|gun|rifle|pistol",
+              "severity": "critical"
+            },
+            {
+              "pattern": "person|human",
+              "severity": "high"
+            },
+            {
+              "pattern": "car|truck|bus|motorcycle",
+              "severity": "medium"
+            }
           ]
         }
       }
@@ -1492,9 +1681,18 @@
           "confidence_threshold": 0.5,
           "top_k": 20,
           "severity_map": [
-            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
-            { "pattern": "person|human", "severity": "high" },
-            { "pattern": "car|truck|bus|motorcycle", "severity": "medium" }
+            {
+              "pattern": "knife|weapon|gun|rifle|pistol",
+              "severity": "critical"
+            },
+            {
+              "pattern": "person|human",
+              "severity": "high"
+            },
+            {
+              "pattern": "car|truck|bus|motorcycle",
+              "severity": "medium"
+            }
           ]
         }
       }
@@ -1513,12 +1711,483 @@
           "confidence_threshold": 0.5,
           "top_k": 30,
           "severity_map": [
-            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
-            { "pattern": "person|human", "severity": "high" },
-            { "pattern": "car|truck|bus|motorcycle", "severity": "medium" }
+            {
+              "pattern": "knife|weapon|gun|rifle|pistol",
+              "severity": "critical"
+            },
+            {
+              "pattern": "person|human",
+              "severity": "high"
+            },
+            {
+              "pattern": "car|truck|bus|motorcycle",
+              "severity": "medium"
+            }
           ]
         }
       }
+    },
+    {
+      "name": "Starter code detector",
+      "description": "Code detector starter: a minimal detect(asset, ctx) that flags configured words, with the SDK summarised in a markdown cell. Start here to write your own rule in Python.",
+      "config": {
+        "custom_detector_key": "starter_code_detector",
+        "name": "Starter code detector",
+        "description": "Flags assets that mention a configured word",
+        "pipeline_schema": {
+          "type": "CODE_DETECTOR",
+          "notebook": {
+            "revision": 1,
+            "cells": [
+              {
+                "id": "cell-1",
+                "type": "markdown",
+                "source": "# Code detector\n\n`detect(asset, ctx)` runs once per asset, after every other detector, and yields a\n`Finding` for each problem it sees. It judges; it never changes the asset.\n\n- Read: `asset.text()`, `asset.pages()`, `asset.rows()` (records), `asset.payload()` (bytes),\n  `asset.metadata`, `asset.kind`, `asset.name`; with *needs findings* on, `asset.findings`.\n- Configure: `ctx.var(name)`, `ctx.secret(name)`, uploaded files with `ctx.file(name)`.\n- Report: `Finding(label, value, severity=, location=Location(row=, column_name=),\n  fields={...}, identity=, normalized_value=)`. The detector's severity is a ceiling.\n- `identity` keeps one finding stable when its value text changes between runs.\n"
+              },
+              {
+                "id": "cell-2",
+                "type": "code",
+                "source": "from classifyre import Finding, Location\n\n\ndef setup(ctx):\n    \"\"\"Runs once per scan, before the first asset. Load lists or models into ctx.state.\"\"\"\n    ctx.state[\"words\"] = [w.strip().lower() for w in ctx.var(\"words\", \"confidential\").split(\",\") if w.strip()]\n\n\ndef detect(asset, ctx):\n    \"\"\"Judge one asset: yield a Finding for every problem.\"\"\"\n    text = asset.text().lower()\n    for word in ctx.state[\"words\"]:\n        if word in text:\n            yield Finding(\n                label=\"word_present\",\n                value=word,\n                message=f\"{asset.name} mentions {word!r}\",\n                identity=word,\n            )\n"
+              }
+            ]
+          },
+          "severity": "medium",
+          "category": "CONTENT",
+          "variables": {
+            "words": "confidential"
+          }
+        }
+      },
+      "test_scenarios": [
+        {
+          "name": "Configured word is flagged",
+          "inputText": "This memo is CONFIDENTIAL.",
+          "expectedOutcome": {
+            "findings": [
+              {
+                "label": "word_present",
+                "identity": "confidential"
+              }
+            ],
+            "match": "exact"
+          }
+        },
+        {
+          "name": "Other text is not",
+          "inputText": "Lunch at noon.",
+          "expectedOutcome": {
+            "shouldMatch": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Row integrity (totals add up)",
+      "description": "Code detector: flags table rows whose total column differs from the sum of its parts, with row locations and expected/actual/deviation fields. Starter for statistics integrity checks.",
+      "config": {
+        "custom_detector_key": "row_integrity",
+        "name": "Row integrity (totals add up)",
+        "description": "Every total equals the sum of its parts",
+        "pipeline_schema": {
+          "type": "CODE_DETECTOR",
+          "notebook": {
+            "revision": 1,
+            "cells": [
+              {
+                "id": "cell-1",
+                "type": "markdown",
+                "source": "# Row integrity: every total equals the sum of its parts\n\nReads the asset's rows (`asset.rows()` works on SQL/tabular sources, JSON records and CSVs\na connector exposes as records) and flags every row whose total column differs from the\nsum of its part columns.\n\n- `total_column` names the total; `part_columns` lists the parts (comma separated). Leave\n  `part_columns` empty to use every other numeric column except `ignore_columns`.\n- Each finding carries a row location and the fields `expected`, `actual`, `deviation_pct`.\n- `identity` is the row id, so a total that is still wrong next run updates the same finding.\n"
+              },
+              {
+                "id": "cell-2",
+                "type": "code",
+                "source": "from classifyre import Finding, Location\n\n\ndef _number(value):\n    if value is None or isinstance(value, bool):\n        return None\n    try:\n        return float(str(value).replace(\" \", \"\").replace(\",\", \".\"))\n    except ValueError:\n        return None\n\n\ndef _names(raw):\n    return [name.strip() for name in raw.split(\",\") if name.strip()]\n\n\ndef setup(ctx):\n    ctx.state[\"total\"] = ctx.var(\"total_column\", \"total\")\n    ctx.state[\"parts\"] = _names(ctx.var(\"part_columns\", \"\"))\n    ctx.state[\"ignore\"] = set(_names(ctx.var(\"ignore_columns\", \"id,year\")))\n    ctx.state[\"tolerance\"] = float(ctx.var(\"tolerance\", \"0.5\"))\n"
+              },
+              {
+                "id": "cell-3",
+                "type": "code",
+                "source": "def detect(asset, ctx):\n    total_column = ctx.state[\"total\"]\n    for index, row in enumerate(asset.rows()):\n        total = _number(row.get(total_column))\n        if total is None:\n            continue\n        parts = ctx.state[\"parts\"] or [\n            name\n            for name in row\n            if name != total_column\n            and name not in ctx.state[\"ignore\"]\n            and _number(row[name]) is not None\n        ]\n        values = [_number(row.get(name)) for name in parts]\n        if not values or any(value is None for value in values):\n            continue\n        expected = sum(values)\n        if abs(expected - total) <= ctx.state[\"tolerance\"]:\n            continue\n        deviation = abs(total - expected) / abs(expected) * 100 if expected else 100.0\n        yield Finding(\n            label=\"total_mismatch\",\n            value=f\"{total_column} = {total:g}, parts sum to {expected:g}\",\n            severity=\"high\" if deviation >= 20 else \"medium\",\n            location=Location(row=index, column_name=total_column),\n            message=f\"Row {index}: {total_column} differs from the sum of {', '.join(parts)}\",\n            fields={\"expected\": expected, \"actual\": total, \"deviation_pct\": round(deviation, 2)},\n            identity=f\"row-{row.get('id', index)}\",\n        )\n"
+              }
+            ]
+          },
+          "severity": "high",
+          "category": "QUALITY",
+          "variables": {
+            "total_column": "total",
+            "part_columns": "",
+            "ignore_columns": "id,year",
+            "tolerance": "0.5"
+          },
+          "fields": [
+            {
+              "name": "expected",
+              "type": "number",
+              "description": "Sum of the part columns"
+            },
+            {
+              "name": "actual",
+              "type": "number",
+              "description": "Value of the total column"
+            },
+            {
+              "name": "deviation_pct",
+              "type": "number",
+              "description": "Relative deviation in percent"
+            }
+          ],
+          "scope": {
+            "asset_kinds": [
+              "table",
+              "record"
+            ]
+          }
+        }
+      },
+      "test_scenarios": [
+        {
+          "name": "Wrong total is flagged, right total is not",
+          "inputAsset": {
+            "name": "population.csv",
+            "kind": "table",
+            "mime_type": "text/csv",
+            "rows": [
+              {
+                "id": 1,
+                "male": 10,
+                "female": 12,
+                "total": 22
+              },
+              {
+                "id": 2,
+                "male": 7,
+                "female": 9,
+                "total": 20
+              }
+            ]
+          },
+          "expectedOutcome": {
+            "findings": [
+              {
+                "label": "total_mismatch",
+                "identity": "row-2",
+                "count": 1
+              }
+            ],
+            "match": "exact"
+          }
+        },
+        {
+          "name": "Consistent table produces nothing",
+          "inputAsset": {
+            "name": "ok.csv",
+            "kind": "table",
+            "rows": [
+              {
+                "id": 1,
+                "male": 1,
+                "female": 2,
+                "total": 3
+              }
+            ]
+          },
+          "expectedOutcome": {
+            "shouldMatch": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "List screening (sanctions / PEP)",
+      "description": "Code detector: screens person and organisation names against an uploaded CSV list (or a names variable), fuzzy matching other detectors' findings and searching the text. Hits carry the list entry id as normalized value.",
+      "config": {
+        "custom_detector_key": "list_screening",
+        "name": "List screening (sanctions / PEP)",
+        "description": "Names that appear on a screening list",
+        "pipeline_schema": {
+          "type": "CODE_DETECTOR",
+          "notebook": {
+            "revision": 1,
+            "cells": [
+              {
+                "id": "cell-1",
+                "type": "markdown",
+                "source": "# List screening\n\nScreens names against a list you upload as a detector file (a CSV with `id` and `name`\ncolumns, for example a sanctions or PEP export) or type into the `names` variable\n(separated by `;`).\n\nTwo passes per asset:\n1. the person and organisation findings other detectors produced on this asset\n   (`needs_findings` is on, so attach a PII or GLiNER2 detector to the same source), fuzzy\n   matched against the list;\n2. an exact, accent-insensitive search of the asset's text.\n\nA hit carries the list entry id as `normalized_value`, so the same entry found in many\ndocuments links them in the value index.\n"
+              },
+              {
+                "id": "cell-2",
+                "type": "code",
+                "source": "import csv\nimport io\nimport unicodedata\nfrom difflib import SequenceMatcher\n\nfrom classifyre import Finding\n\nPERSON_OR_ORG = (\"PERSON\", \"PER\", \"ORGANIZATION\", \"ORG\", \"COMPANY\")\n\n\ndef _normalize(text):\n    folded = unicodedata.normalize(\"NFKD\", str(text)).encode(\"ascii\", \"ignore\").decode()\n    return \" \".join(folded.lower().split())\n\n\ndef setup(ctx):\n    entries = []\n    file_name = ctx.var(\"list_file\", \"screening_list.csv\")\n    try:\n        reader = csv.DictReader(io.StringIO(ctx.file(file_name).read_text()))\n        for row in reader:\n            name = (row.get(\"name\") or \"\").strip()\n            if name:\n                entries.append({\"id\": (row.get(\"id\") or name).strip(), \"name\": name})\n    except KeyError:\n        ctx.log(f\"No uploaded file {file_name!r}; using the 'names' variable only\")\n    for name in ctx.var(\"names\", \"\").split(\";\"):\n        if name.strip():\n            entries.append({\"id\": name.strip(), \"name\": name.strip()})\n    for entry in entries:\n        entry[\"key\"] = _normalize(entry[\"name\"])\n    ctx.state[\"entries\"] = [entry for entry in entries if entry[\"key\"]]\n    ctx.state[\"threshold\"] = float(ctx.var(\"threshold\", \"0.92\"))\n    ctx.log(f\"Screening against {len(ctx.state['entries'])} list entries\")\n"
+              },
+              {
+                "id": "cell-3",
+                "type": "code",
+                "source": "def detect(asset, ctx):\n    hits = {}\n    for prior in asset.findings:\n        kind = prior.type.split(\":\")[-1].upper()\n        if kind not in PERSON_OR_ORG:\n            continue\n        candidate = _normalize(prior.value)\n        for entry in ctx.state[\"entries\"]:\n            score = SequenceMatcher(None, candidate, entry[\"key\"]).ratio()\n            if score >= ctx.state[\"threshold\"] and score > hits.get(entry[\"id\"], (0,))[0]:\n                hits[entry[\"id\"]] = (score, prior.value, entry)\n\n    text = _normalize(asset.text())\n    for entry in ctx.state[\"entries\"]:\n        if entry[\"id\"] not in hits and entry[\"key\"] in text:\n            hits[entry[\"id\"]] = (1.0, entry[\"name\"], entry)\n\n    for entry_id, (score, matched, entry) in hits.items():\n        yield Finding(\n            label=\"list_match\",\n            value=matched,\n            confidence=round(score, 3),\n            message=f\"Matches list entry {entry['name']!r}\",\n            fields={\"list_entry\": entry[\"name\"], \"score\": round(score, 3)},\n            normalized_value=entry_id,\n            identity=entry_id,\n        )\n"
+              }
+            ]
+          },
+          "severity": "high",
+          "category": "COMPLIANCE",
+          "needs_findings": true,
+          "variables": {
+            "list_file": "screening_list.csv",
+            "names": "Ivan Petrov",
+            "threshold": "0.92"
+          },
+          "fields": [
+            {
+              "name": "list_entry",
+              "type": "string",
+              "description": "The list entry that matched"
+            },
+            {
+              "name": "score",
+              "type": "number",
+              "description": "Similarity, 1.0 for an exact hit"
+            }
+          ]
+        }
+      },
+      "test_scenarios": [
+        {
+          "name": "Listed name in the text is found",
+          "inputText": "Payment approved for Ivan Petrov via ACME Shell Ltd.",
+          "expectedOutcome": {
+            "findings": [
+              {
+                "label": "list_match",
+                "identity": "Ivan Petrov"
+              }
+            ],
+            "match": "subset"
+          }
+        },
+        {
+          "name": "Unlisted names are ignored",
+          "inputText": "Payment approved for Maria Schmidt.",
+          "expectedOutcome": {
+            "shouldMatch": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "IBAN next to special-category data",
+      "description": "Code detector: a composite rule that fires when a document holds an IBAN and a GDPR Art. 9 special-category term, optionally only when it is shared widely. Uses other detectors' findings (needs_findings) with a regex fallback.",
+      "config": {
+        "custom_detector_key": "iban_special_category",
+        "name": "IBAN next to special-category data",
+        "description": "Bank details next to special-category personal data",
+        "pipeline_schema": {
+          "type": "CODE_DETECTOR",
+          "notebook": {
+            "revision": 1,
+            "cells": [
+              {
+                "id": "cell-1",
+                "type": "markdown",
+                "source": "# Composite rule: an IBAN and a special-category term in the same document\n\nA rule no single detector can express: it fires when a document holds bank details *and*\na GDPR Art. 9 special-category term, optionally only when the document is shared widely.\n\n- IBANs come from the findings other detectors produced on this asset (`needs_findings`),\n  with a regex fallback so the rule also works without a PII detector.\n- `terms` is a comma separated list; `min_shared` compares against the asset metadata key\n  `shared_with_key` (leave it at 0 to ignore sharing).\n"
+              },
+              {
+                "id": "cell-2",
+                "type": "code",
+                "source": "import re\n\nfrom classifyre import Finding\n\nIBAN = re.compile(r\"\\b[A-Z]{2}\\d{2}(?:[ ]?[A-Z0-9]{4}){3,7}(?:[ ]?[A-Z0-9]{1,3})?\\b\")\n\n\ndef setup(ctx):\n    terms = ctx.var(\"terms\", \"diagnosis,diagnose,therapy,therapie,hiv,pregnant,schwanger,religion,trade union,gewerkschaft\")\n    ctx.state[\"terms\"] = [term.strip().lower() for term in terms.split(\",\") if term.strip()]\n    ctx.state[\"min_shared\"] = int(ctx.var(\"min_shared\", \"0\"))\n    ctx.state[\"shared_key\"] = ctx.var(\"shared_with_key\", \"shared_with_count\")\n\n\ndef detect(asset, ctx):\n    ibans = {prior.value for prior in asset.findings if \"IBAN\" in prior.type.upper()}\n    text = asset.text()\n    if not ibans:\n        ibans = set(IBAN.findall(text))\n    lowered = text.lower()\n    terms = sorted({term for term in ctx.state[\"terms\"] if term in lowered})\n    if not ibans or not terms:\n        return\n    try:\n        shared = int(asset.metadata.get(ctx.state[\"shared_key\"], 0) or 0)\n    except (TypeError, ValueError):\n        shared = 0\n    if shared < ctx.state[\"min_shared\"]:\n        return\n    yield Finding(\n        label=\"iban_with_special_category\",\n        value=f\"{len(ibans)} IBAN(s) with: {', '.join(terms)}\",\n        severity=\"high\",\n        message=\"Bank details appear next to special-category personal data\",\n        fields={\"iban_count\": len(ibans), \"terms\": terms, \"shared_with\": shared},\n        identity=\"document\",\n    )\n"
+              }
+            ]
+          },
+          "severity": "high",
+          "category": "PRIVACY",
+          "needs_findings": true,
+          "variables": {
+            "terms": "diagnosis,diagnose,therapy,therapie,hiv,pregnant,schwanger,religion,trade union,gewerkschaft",
+            "min_shared": "0",
+            "shared_with_key": "shared_with_count"
+          },
+          "fields": [
+            {
+              "name": "iban_count",
+              "type": "number"
+            },
+            {
+              "name": "terms",
+              "type": "list[string]"
+            },
+            {
+              "name": "shared_with",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "test_scenarios": [
+        {
+          "name": "IBAN with a diagnosis fires",
+          "inputText": "Refund to DE89 3704 0044 0532 0130 00 after the HIV diagnosis was confirmed.",
+          "expectedOutcome": {
+            "findings": [
+              {
+                "label": "iban_with_special_category",
+                "severity": "high"
+              }
+            ],
+            "match": "exact"
+          }
+        },
+        {
+          "name": "IBAN alone does not fire",
+          "inputText": "Refund to DE89 3704 0044 0532 0130 00.",
+          "expectedOutcome": {
+            "shouldMatch": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Metadata threshold",
+      "description": "Code detector: compares one asset-metadata value (dotted path) with a threshold, e.g. documents shared with more than 50 people. Reads metadata only.",
+      "config": {
+        "custom_detector_key": "metadata_threshold",
+        "name": "Metadata threshold",
+        "description": "An asset-metadata value past a threshold",
+        "pipeline_schema": {
+          "type": "CODE_DETECTOR",
+          "notebook": {
+            "revision": 1,
+            "cells": [
+              {
+                "id": "cell-1",
+                "type": "markdown",
+                "source": "# Metadata threshold\n\nCompares one asset-metadata value with a threshold: \"shared with more than 50 people\",\n\"file older than 7 years\", \"row count above 1 million\". Reads metadata only, so it costs no\npayload fetch at all.\n\n- `metadata_key` may be a dotted path (`sharing.count`).\n- `operator` is one of `>`, `>=`, `<`, `<=`, `==`, `!=`.\n"
+              },
+              {
+                "id": "cell-2",
+                "type": "code",
+                "source": "import operator\n\nfrom classifyre import Finding\n\nOPERATORS = {\">\": operator.gt, \">=\": operator.ge, \"<\": operator.lt,\n             \"<=\": operator.le, \"==\": operator.eq, \"!=\": operator.ne}\n\n\ndef _lookup(metadata, dotted):\n    node = metadata\n    for part in dotted.split(\".\"):\n        if not isinstance(node, dict) or part not in node:\n            return None\n        node = node[part]\n    return node\n\n\ndef detect(asset, ctx):\n    key = ctx.var(\"metadata_key\", \"shared_with_count\")\n    op = ctx.var(\"operator\", \">\")\n    threshold = float(ctx.var(\"threshold\", \"50\"))\n    raw = _lookup(dict(asset.metadata), key)\n    try:\n        value = float(raw)\n    except (TypeError, ValueError):\n        return\n    if OPERATORS[op](value, threshold):\n        yield Finding(\n            label=f\"{key.replace('.', '_')}_threshold\",\n            value=f\"{key} = {value:g} ({op} {threshold:g})\",\n            fields={\"value\": value, \"threshold\": threshold},\n            identity=key,\n        )\n"
+              }
+            ]
+          },
+          "severity": "medium",
+          "category": "COMPLIANCE",
+          "variables": {
+            "metadata_key": "shared_with_count",
+            "operator": ">",
+            "threshold": "50"
+          },
+          "fields": [
+            {
+              "name": "value",
+              "type": "number"
+            },
+            {
+              "name": "threshold",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "test_scenarios": [
+        {
+          "name": "Widely shared document fires",
+          "inputAsset": {
+            "name": "plan.docx",
+            "kind": "document",
+            "metadata": {
+              "shared_with_count": 120
+            },
+            "text": "Q3 plan"
+          },
+          "expectedOutcome": {
+            "findings": [
+              {
+                "label": "shared_with_count_threshold",
+                "identity": "shared_with_count"
+              }
+            ],
+            "match": "exact"
+          }
+        },
+        {
+          "name": "Small audience does not fire",
+          "inputAsset": {
+            "name": "memo.docx",
+            "kind": "document",
+            "metadata": {
+              "shared_with_count": 3
+            },
+            "text": "memo"
+          },
+          "expectedOutcome": {
+            "shouldMatch": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bring your own model",
+      "description": "Code detector: scores each page with an uploaded scikit-learn (or ONNX) model and reports pages above a threshold, with the score as a field. Falls back to a keyword score until a model is uploaded.",
+      "config": {
+        "custom_detector_key": "byo_model",
+        "name": "Bring your own model",
+        "description": "Pages an uploaded model scores as positive",
+        "pipeline_schema": {
+          "type": "CODE_DETECTOR",
+          "notebook": {
+            "revision": 1,
+            "cells": [
+              {
+                "id": "cell-1",
+                "type": "markdown",
+                "source": "# Bring your own model\n\nScores every page of an asset with a model you upload as a detector file, and reports the\npages at or above `threshold`.\n\n- Upload a scikit-learn pipeline saved with `joblib.dump(pipeline, \"model.joblib\")` (text in,\n  `predict_proba` out) and add `scikit-learn` and `joblib` under Packages. For ONNX, add\n  `onnxruntime` and replace `_load`/`_score`.\n- Without an uploaded model the rule falls back to a keyword score, so you can try it first.\n"
+              },
+              {
+                "id": "cell-2",
+                "type": "code",
+                "source": "from classifyre import Finding\n\n\ndef _load(ctx):\n    name = ctx.var(\"model_file\", \"model.joblib\")\n    try:\n        path = ctx.file(name).path\n    except KeyError:\n        ctx.log(f\"No uploaded model {name!r}; using the keyword stand-in\")\n        return None\n    import joblib\n\n    return joblib.load(path)\n\n\ndef setup(ctx):\n    ctx.state[\"model\"] = _load(ctx)\n    ctx.state[\"threshold\"] = float(ctx.var(\"threshold\", \"0.8\"))\n    keywords = ctx.var(\"keywords\", \"urgent,wire transfer,gift card,password\")\n    ctx.state[\"keywords\"] = [word.strip().lower() for word in keywords.split(\",\") if word.strip()]\n\n\ndef _score(ctx, page):\n    model = ctx.state[\"model\"]\n    if model is not None:\n        return float(model.predict_proba([page])[0][1])\n    lowered = page.lower()\n    hits = sum(1 for word in ctx.state[\"keywords\"] if word in lowered)\n    return min(1.0, hits / 2)\n"
+              },
+              {
+                "id": "cell-3",
+                "type": "code",
+                "source": "def detect(asset, ctx):\n    pages = asset.pages() or [asset.text()]\n    for index, page in enumerate(pages):\n        if not page.strip():\n            continue\n        score = _score(ctx, page)\n        if score >= ctx.state[\"threshold\"]:\n            yield Finding(\n                label=\"model_positive\",\n                value=page.strip()[:200],\n                confidence=round(score, 4),\n                location={\"description\": f\"page {index + 1}\"},\n                fields={\"score\": round(score, 4)},\n                identity=f\"page-{index + 1}\",\n            )\n"
+              }
+            ]
+          },
+          "severity": "medium",
+          "category": "CONTENT",
+          "variables": {
+            "model_file": "model.joblib",
+            "threshold": "0.8",
+            "keywords": "urgent,wire transfer,gift card,password"
+          },
+          "fields": [
+            {
+              "name": "score",
+              "type": "number",
+              "description": "Model score for the page"
+            }
+          ]
+        }
+      },
+      "test_scenarios": [
+        {
+          "name": "Keyword stand-in flags a suspicious page",
+          "inputText": "URGENT: please send a wire transfer and buy a gift card today.",
+          "expectedOutcome": {
+            "findings": [
+              {
+                "label": "model_positive",
+                "identity": "page-1"
+              }
+            ],
+            "match": "exact"
+          }
+        },
+        {
+          "name": "Ordinary text is not flagged",
+          "inputText": "The meeting moved to Thursday afternoon.",
+          "expectedOutcome": {
+            "shouldMatch": false
+          }
+        }
+      ]
     }
   ]
 }

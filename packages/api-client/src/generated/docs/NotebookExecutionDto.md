@@ -8,6 +8,8 @@ Name | Type
 ------------ | -------------
 `id` | string
 `sourceId` | string
+`customDetectorId` | string
+`assetId` | string
 `revision` | number
 `mode` | string
 `scope` | string
@@ -30,6 +32,8 @@ import type { NotebookExecutionDto } from '@workspace/api-client'
 const example = {
   "id": null,
   "sourceId": null,
+  "customDetectorId": null,
+  "assetId": null,
   "revision": null,
   "mode": null,
   "scope": null,

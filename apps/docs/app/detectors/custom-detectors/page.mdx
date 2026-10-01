@@ -26,7 +26,7 @@ import {
 
 Custom detectors let you extend Classifyre with signals that are specific to your team, domain, or compliance requirements. You define what to detect — a business policy, a content category, an image label — and pick the method that fits the job.
 
-Each custom detector runs one of six detection engines — plus **Tag**, which runs nothing at all and instead records a fact a [Custom connector](/sources/custom-connectors/) already knows. This page describes each and links to its configuration reference.
+Each custom detector runs one of six detection engines, or your own Python as a **[code detector](/detectors/custom-detectors/code/)** — plus **Tag**, which runs nothing at all and instead records a fact a [Custom connector](/sources/custom-connectors/) already knows. This page describes each and links to its configuration reference.
 
 <Separator className="my-8" />
 
@@ -49,6 +49,7 @@ Each custom detector runs one of six detection engines — plus **Tag**, which r
 | **Text Classification**  | Text     | Fine-tuned HF model       | Spam, toxicity, sentiment, topic labels           |
 | **Image Classification** | Image    | Fine-tuned HF model       | NSFW, content moderation, custom image categories |
 | **Object Detection**     | Image    | Object-detection HF model | Bounding-box localisation, label-based severity   |
+| **Code detector**        | Any      | No (bring your own)       | Checks and rules: totals, lists, co-occurrence    |
 | **Tag**                  | —        | No                        | Recording a fact the source system already holds  |
 
 ## When to use which method
@@ -62,6 +63,8 @@ Each custom detector runs one of six detection engines — plus **Tag**, which r
 **Use Text or Image Classification** when you have a specific HuggingFace model already suited to your task. You get full control over the model checkpoint, device, and confidence threshold.
 
 **Use Object Detection** when you need to locate objects in images with bounding boxes and map specific labels to severity levels.
+
+**Use a [code detector](/detectors/custom-detectors/code/)** when the rule is a *check* no pattern or model expresses: a total that must equal the sum of its parts, a name on a sanctions list, an IBAN next to a diagnosis, a metadata value past a threshold, a checksummed national ID, or scores from a model you trained yourself. You write `detect(asset, ctx)` in Python; it reads rows, text, bytes and metadata, and every finding carries a location and a stable identity.
 
 **Use a [Tag](/detectors/custom-detectors/tag/)** when there is nothing to detect — the source system already knows the answer, and a classifier could only re-derive it less reliably. A Tag detector is applied from a Custom connector notebook by its key, and does not appear in a source's detector list.
 

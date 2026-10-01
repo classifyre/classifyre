@@ -158,7 +158,8 @@ export class McpToolExecutorService {
     detectorId: string;
     name: string;
     description?: string;
-    inputText: string;
+    inputText?: string;
+    inputAsset?: Record<string, unknown>;
     expectedOutcome: Record<string, unknown>;
   }) {
     this.assertNotDemoMode();

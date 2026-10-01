@@ -11,6 +11,7 @@ import {
   Post,
   Query,
   Req,
+  Res,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -22,7 +23,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import '@fastify/multipart';
-import type { FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import { ListCustomDetectorsQueryDto } from '../dto/list-custom-detectors-query.dto';
 import { CustomDetectorResponseDto } from '../dto/custom-detector-response.dto';
@@ -43,6 +44,8 @@ import { FindingBulkOperationDto } from '../findings-bulk/finding-bulk-operation
 import { FindingBulkOperationService } from '../findings-bulk/finding-bulk-operation.service';
 import { RetireOutOfScopeService } from '../findings-bulk/retire-out-of-scope.service';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
+import { CustomDetectorFilesService } from '../custom-detector-files.service';
+import { CustomDetectorFileDto } from '../dto/custom-detector-file.dto';
 
 @ApiTags('Custom Detectors')
 @Controller('custom-detectors')
@@ -51,6 +54,7 @@ export class CustomDetectorsController {
     private readonly customDetectorsService: CustomDetectorsService,
     private readonly retireOutOfScope: RetireOutOfScopeService,
     private readonly findingBulkOperations: FindingBulkOperationService,
+    private readonly detectorFiles: CustomDetectorFilesService,
   ) {}
 
   @Get('examples')
@@ -178,6 +182,82 @@ export class CustomDetectorsController {
   @ApiResponse({ status: 200, schema: { example: { deleted: true } } })
   async delete(@Param('id') id: string): Promise<{ deleted: true }> {
     return this.customDetectorsService.delete(id);
+  }
+
+  @Get(':id/files')
+  @ApiOperation({
+    summary: "List a code detector's uploaded files",
+    description:
+      'Code detectors (CODE_DETECTOR) read these with ctx.file(name).',
+  })
+  @ApiResponse({ status: 200, type: [CustomDetectorFileDto] })
+  listFiles(@Param('id') id: string) {
+    return this.detectorFiles.list(id);
+  }
+
+  @Post(':id/files')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Upload one file to a code detector',
+    description:
+      'A screening list, a model, a reference table. A file with a name the detector already has is replaced. Bumps the detector version.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiResponse({ status: 201, type: CustomDetectorFileDto })
+  async uploadFile(@Param('id') id: string, @Req() request: FastifyRequest) {
+    let upload:
+      | { data: Buffer; fileName: string; declaredMimeType: string }
+      | undefined;
+    for await (const part of request.parts()) {
+      if (part.type !== 'file') continue;
+      if (upload) {
+        throw new BadRequestException('Upload exactly one file per request');
+      }
+      upload = {
+        data: await part.toBuffer(),
+        fileName: part.filename ?? 'upload',
+        declaredMimeType: part.mimetype ?? 'application/octet-stream',
+      };
+    }
+    if (!upload) throw new BadRequestException('No file uploaded');
+    return this.detectorFiles.create({ customDetectorId: id, ...upload });
+  }
+
+  // The scan jobs' init containers (and the API itself on their behalf)
+  // stream these bytes with the internal key; operator traffic uses the
+  // normal session. The endpoint accepts both: @InternalOnly would lock
+  // operators out of their own lists and models.
+  @Get(':id/files/:fileId/content')
+  @ApiOperation({ summary: "Stream a code detector file's bytes" })
+  async fileContent(
+    @Param('id') id: string,
+    @Param('fileId') fileId: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const file = await this.detectorFiles.content(id, fileId);
+    const data = Buffer.from(file.data);
+    await reply
+      .header('Content-Type', file.declaredMimeType)
+      .header('Content-Length', String(data.length))
+      .header(
+        'Content-Disposition',
+        `attachment; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
+      )
+      .send(data);
+  }
+
+  @Delete(':id/files/:fileId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a code detector file' })
+  deleteFile(@Param('id') id: string, @Param('fileId') fileId: string) {
+    return this.detectorFiles.delete(id, fileId);
   }
 
   @Post(':id/retire-out-of-scope-findings')

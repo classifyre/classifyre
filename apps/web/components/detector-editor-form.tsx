@@ -22,6 +22,10 @@ import { LLMDetectorEditor } from "@/components/llm-detector-editor";
 import type { LLMDetectorEditorHandle } from "@/components/llm-detector-editor";
 import { TagDetectorEditor } from "@/components/tag-detector-editor";
 import type { TagDetectorEditorHandle } from "@/components/tag-detector-editor";
+import {
+  CodeDetectorEditor,
+  type CodeDetectorEditorHandle,
+} from "@/components/code-detector-editor";
 import { resolveDetectorKind } from "@/lib/detector-kind";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -58,6 +62,7 @@ export const DetectorEditorForm = React.forwardRef<
   const llmRef = React.useRef<LLMDetectorEditorHandle>(null);
   const tagRef = React.useRef<TagDetectorEditorHandle>(null);
   const customRef = React.useRef<CustomDetectorEditorHandle>(null);
+  const codeRef = React.useRef<CodeDetectorEditorHandle>(null);
 
   // Resolved through the shared helper so this form and the details page
   // can never disagree about which editor a detector gets.
@@ -71,6 +76,7 @@ export const DetectorEditorForm = React.forwardRef<
   const isRegexPipeline = detectorKind === "regex";
   const isLLMPipeline = detectorKind === "llm";
   const isTagPipeline = detectorKind === "tag";
+  const isCodePipeline = detectorKind === "code";
   const isTransformerPipeline = detectorKind === "transformer";
 
   const handleSave = useCallback(
@@ -128,6 +134,10 @@ export const DetectorEditorForm = React.forwardRef<
             await tagRef.current?.submit();
             return true;
           }
+          if (isCodePipeline) {
+            await codeRef.current?.submit();
+            return true;
+          }
           if (isRegexPipeline) {
             await regexRef.current?.submit();
             return true;
@@ -148,6 +158,7 @@ export const DetectorEditorForm = React.forwardRef<
       isRegexPipeline,
       isLLMPipeline,
       isTagPipeline,
+      isCodePipeline,
       isTransformerPipeline,
     ],
   );
@@ -221,6 +232,36 @@ export const DetectorEditorForm = React.forwardRef<
         isSubmitting={isSaving}
         embedded={embedded}
         initialPipelineSchema={detector.pipelineSchema}
+        initialName={detector.name}
+        initialKey={detector.key}
+        initialDescription={detector.description ?? ""}
+        initialIsActive={detector.isActive}
+        onSubmit={async (payload) => {
+          await handleSave({
+            name: payload.name,
+            key: payload.key,
+            description: payload.description,
+            isActive: payload.isActive,
+            pipelineSchema: payload.pipelineSchema,
+          });
+        }}
+      />
+    );
+  }
+
+  if (isCodePipeline) {
+    return (
+      <CodeDetectorEditor
+        ref={codeRef}
+        mode="edit"
+        detectorId={detector.id}
+        submitLabel={t("common.save")}
+        isSubmitting={isSaving}
+        embedded={embedded}
+        initialPipelineSchema={detector.pipelineSchema}
+        initialSecretKeys={
+          (detector as { secretKeys?: string[] }).secretKeys ?? []
+        }
         initialName={detector.name}
         initialKey={detector.key}
         initialDescription={detector.description ?? ""}
