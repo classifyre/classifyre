@@ -217,7 +217,10 @@
       "type": "Type",
       "verification": "Origin",
       "notes": "Notes",
-      "actions": "Actions"
+      "actions": "Actions",
+      "scheme": "Scheme",
+      "labels": "Labels",
+      "status": "Status"
     },
     "unverifiedAgent": "Unverified · agent",
     "verified": "Verified",
@@ -264,7 +267,354 @@
       "unverify": "Unverify",
       "changeType": "Change type",
       "applied": "{{count}} term(s) updated",
-      "failed": "Failed to update the selected terms"
+      "failed": "Failed to update the selected terms",
+      "approve": "Approve",
+      "done": "Updated",
+      "moveScheme": "Move to scheme",
+      "makeEntities": "Make entities",
+      "makeConcepts": "Make concepts"
+    },
+    "loadFailed": "Failed to load the glossary",
+    "actionFailed": "That did not work",
+    "allStatuses": "All statuses",
+    "allSchemes": "All schemes",
+    "approve": "Approve",
+    "approved": "Approved",
+    "proposedByAgent": "Proposed by an agent",
+    "transfer": "Import / export",
+    "kinds": {
+      "CONCEPT": "Concept",
+      "ENTITY": "Entity"
+    },
+    "statuses": {
+      "APPROVED": "Approved",
+      "DRAFT": "Draft",
+      "DEPRECATED": "Deprecated"
+    },
+    "methods": {
+      "BINDING": "Binding",
+      "DECLARED": "Declared",
+      "MANUAL": "By hand",
+      "SUGGESTED": "Suggested",
+      "MENTION": "Mention",
+      "BROADER": "Broader"
+    },
+    "tabs": {
+      "concepts": "Concepts",
+      "entities": "Entities",
+      "schemes": "Schemes",
+      "vocabulary": "Unbound vocabulary",
+      "proposals": "Proposals"
+    },
+    "banner": {
+      "text": "We sorted your existing terms: {{concepts}} became concepts and {{entities}} entities. Review the split under Concepts and Entities — Change kind fixes any mistake.",
+      "dismiss": "Dismiss"
+    },
+    "empty": {
+      "concepts": "No concepts yet",
+      "conceptsHint": "Concepts are kinds of things — GmbH, IBAN, Force majeure. Add one, or install a starter pack.",
+      "entities": "No entities yet",
+      "entitiesHint": "Entities are particular things — ACME Holding GmbH, Jane Doe."
+    },
+    "editor": {
+      "conceptHint": "A concept is a kind of thing. Give it a definition and put it in a scheme.",
+      "entityHint": "An entity is one particular thing: a company, a person, a place.",
+      "kindHelp": {
+        "CONCEPT": "A kind of thing (GmbH, IBAN)",
+        "ENTITY": "One particular thing (ACME Holding GmbH)"
+      },
+      "conceptPlaceholder": "e.g. Gesellschaft mit beschränkter Haftung",
+      "keyLabel": "Key",
+      "keyHelp": "The stable identifier connectors and bindings use. Renaming keeps the old key working.",
+      "definitionLabel": "Definition",
+      "definitionPlaceholder": "One or two sentences: what makes something this concept.",
+      "schemeLabel": "Scheme",
+      "noScheme": "No scheme",
+      "codesLabel": "Codes",
+      "codesHelp": "Exact notations, matched case-sensitively (GES, AT_SVNR).",
+      "hiddenAliasesLabel": "Hidden aliases",
+      "hiddenAliasesHelp": "Matched only exactly, never as a word in text — for single letters and abbreviations.",
+      "singleLetterWarning": "“{{letters}}” would match almost every document as an alias. Move it to hidden aliases.",
+      "stewardLabel": "Steward"
+    },
+    "picker": {
+      "placeholder": "Search the glossary…",
+      "change": "Change",
+      "noMatch": "No matching term"
+    },
+    "schemes": {
+      "add": "Add scheme",
+      "edit": "Edit scheme",
+      "delete": "Delete scheme",
+      "deleted": "Scheme deleted",
+      "deleteFailed": "Could not delete the scheme",
+      "notEmpty": "Only an empty scheme can be deleted",
+      "none": "No schemes yet.",
+      "name": "Name",
+      "namePlaceholder": "e.g. Rechtsformen",
+      "nameRequired": "A scheme needs a name",
+      "description": "Description",
+      "color": "Colour",
+      "fromPack": "from pack {{pack}}",
+      "emptyTree": "No concepts in this scheme yet.",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "pick": "Pick a scheme",
+      "pickHint": "A scheme is a controlled vocabulary, like the legal forms of a register."
+    },
+    "vocabulary": {
+      "coverage": "Semantic coverage: {{share}}% of open findings carry a meaning · {{outputs}} outputs unbound ({{findings}} findings)",
+      "search": "Search outputs and fields…",
+      "unbound": "Unbound",
+      "bound": "Bound",
+      "everything": "Everything",
+      "outputs": "Detector outputs",
+      "fields": "Metadata fields",
+      "both": "Outputs and fields",
+      "refresh": "Refresh",
+      "refreshQueued": "Refreshing the vocabulary…",
+      "refreshedAt": "Counted {{when}}",
+      "allBound": "Everything has a meaning",
+      "empty": "No vocabulary yet",
+      "emptyHint": "The vocabulary is counted from findings and assets after each scan.",
+      "unboundShort": "Unbound",
+      "bind": "Bind…",
+      "more": "Showing {{shown}} of {{total}}",
+      "columns": {
+        "vocabulary": "Vocabulary",
+        "sources": "Sources",
+        "open": "Open",
+        "values": "Values",
+        "means": "Means"
+      }
+    },
+    "bind": {
+      "title": "What does this mean?",
+      "description": "Say once what this output or field means; every matching finding gets that meaning, without a re-scan.",
+      "searchVocabulary": "Search detector outputs and fields…",
+      "noVocabulary": "Nothing matches.",
+      "step1": "What the data says",
+      "step2": "Which findings",
+      "step3": "What it means",
+      "allSources": "All sources",
+      "onlySource": "Only {{name}}",
+      "observed": "{{findings}} open findings · {{assets}} assets · {{values}} distinct values",
+      "openValued": "open-valued",
+      "alreadyMeans": "Already means {{terms}} — this adds another meaning.",
+      "choice": {
+        "every": "Every finding of this kind",
+        "values": "Only these values",
+        "lookup": "Each value names a term"
+      },
+      "noValues": "No values observed yet.",
+      "pickScheme": "Scheme…",
+      "matchCodes": "Match codes",
+      "matchAny": "Codes and labels",
+      "searchConcepts": "Search concepts…",
+      "termNotApproved": "This concept is still a draft: the binding links nothing until it is approved.",
+      "preview": "Preview",
+      "completeToPreview": "Choose the findings and the meaning to see what it would link.",
+      "previewFailed": "Preview failed",
+      "willLink": "Will give meaning to {{findings}} open findings on {{assets}} assets in {{sources}} sources.",
+      "timedOut": "(counting timed out; numbers are partial)",
+      "unmatched": "Unmatched:",
+      "ambiguous": "Ambiguous:",
+      "samples": "Samples:",
+      "noMeaning": "No meaning",
+      "noMeaningShort": "— no meaning —",
+      "noMeaningHelp": "Mark as deliberately unbound (e.g. DATE_TIME). Counts as covered; undo like any binding.",
+      "markedNoMeaning": "Marked as having no meaning",
+      "saveDraft": "Save as draft",
+      "save": "Save binding",
+      "saved": "Binding saved — linking {{assets}} assets…",
+      "savedDraft": "Draft binding saved",
+      "saveFailed": "Could not save the binding"
+    },
+    "proposals": {
+      "all": "All",
+      "kinds": {
+        "BINDING": "Bindings",
+        "TERM": "Terms",
+        "ALIAS": "Aliases",
+        "RELATION": "Relations",
+        "LINK": "Documents",
+        "TERM_REF": "Unknown references"
+      },
+      "refresh": "Look for suggestions",
+      "refreshQueued": "Looking for suggestions…",
+      "needsEmbeddings": "Document and meaning-based suggestions need embeddings (Settings → Cleanup › Features).",
+      "empty": "Nothing to review",
+      "emptyHint": "Agent proposals, suggested bindings and unknown term references land here.",
+      "score": "score {{score}}",
+      "term": "Term",
+      "agentNote": "Agent note: {{note}}",
+      "accept": "Accept",
+      "dismiss": "Dismiss",
+      "dismissForever": "Dismiss forever",
+      "accepted": "Accepted",
+      "dismissed": "Dismissed",
+      "reasons": {
+        "wrong_concept": "Wrong concept",
+        "too_broad": "Too broad",
+        "noise": "Noise",
+        "other": "Other"
+      }
+    },
+    "packs": {
+      "open": "Starter packs",
+      "title": "Starter packs",
+      "description": "Schemes, concepts and bindings for common needs. Preview first; nothing an operator curated is overwritten.",
+      "counts": "{{schemes}} schemes · {{terms}} terms · {{bindings}} bindings",
+      "installedVersion": "installed v{{version}}",
+      "preview": "Preview",
+      "install": "Install",
+      "reinstall": "Upgrade",
+      "dryRun": "Would create {{create}}, update {{update}}, skip {{skip}} terms and add {{bindings}} bindings.",
+      "installed": "Pack installed",
+      "failed": "Pack could not be installed"
+    },
+    "export": {
+      "csv": "Export CSV",
+      "skos": "Export SKOS (JSON-LD)"
+    },
+    "import": {
+      "title": "Import",
+      "description": "CSV or SKOS. Run a dry run first to see what would change.",
+      "conflictSkip": "Skip existing keys",
+      "conflictMerge": "Merge labels",
+      "conflictOverwrite": "Overwrite",
+      "asDraft": "Import as drafts",
+      "placeholder": "Paste the file's contents, or choose a file above.",
+      "report": "Report",
+      "counts": "Create {{create}} · update {{update}} · skip {{skip}} · conflicts {{conflict}} · refused {{refused}}",
+      "dryRun": "Dry run",
+      "run": "Import",
+      "done": "Import finished",
+      "failed": "Import failed"
+    },
+    "term": {
+      "notFound": "Term not found",
+      "broaderPath": "Broader concepts",
+      "replacedBy": "Replaced by",
+      "unapprove": "Back to draft",
+      "unapproved": "Back to draft",
+      "deprecate": "Deprecate",
+      "deprecated": "Deprecated",
+      "reinstate": "Reinstate",
+      "reinstated": "Reinstated",
+      "tabs": {
+        "overview": "Overview",
+        "evidence": "Evidence",
+        "bindings": "Bindings",
+        "activity": "Activity"
+      },
+      "noDefinition": "No definition yet.",
+      "steward": "Steward: {{steward}}",
+      "aliases": "Aliases",
+      "codes": "Codes",
+      "hiddenAliases": "Hidden aliases",
+      "proposedAliases": "Proposed aliases",
+      "narrower": "Narrower concepts",
+      "relations": "Relations",
+      "generatedDetectors": "Detectors made from this term",
+      "noActivity": "No activity yet."
+    },
+    "relations": {
+      "out": {
+        "BROADER": "is a kind of",
+        "RELATED": "is related to",
+        "PART_OF": "is part of",
+        "INSTANCE_OF": "is an instance of",
+        "CUSTOM": "custom"
+      },
+      "in": {
+        "BROADER": "has narrower",
+        "RELATED": "is related to",
+        "PART_OF": "has part",
+        "INSTANCE_OF": "has instance",
+        "CUSTOM": "custom (from)"
+      },
+      "none": "No relations yet.",
+      "add": "Add a relation",
+      "addButton": "Add relation",
+      "labelPlaceholder": "verb, e.g. regulates",
+      "remove": "Remove relation",
+      "failed": "Could not add the relation"
+    },
+    "evidence": {
+      "assets": "Assets",
+      "findings": "Findings",
+      "sources": "Sources",
+      "includeNarrower": "Include narrower concepts",
+      "none": "No evidence yet",
+      "noneHint": "Bind a detector output to this concept, or link a document by hand.",
+      "notApproved": "Only approved terms carry evidence. Approve this one first.",
+      "asset": "Asset",
+      "source": "Source",
+      "method": "Method",
+      "via": "Via",
+      "support": "Support",
+      "severity": "Severity",
+      "page": "{{from}}–{{to}} of {{total}}"
+    },
+    "bindings": {
+      "hint": "Detector outputs and fields bound to this concept.",
+      "add": "Add binding",
+      "none": "No bindings",
+      "noneHint": "Bind an output (a PII type, a tag, an LLM label) so its findings mean this concept.",
+      "entitiesHint": "Entities link through mentions, not bindings.",
+      "vocabulary": "Vocabulary",
+      "mode": "Mode",
+      "by": "By",
+      "disable": "Disable",
+      "enable": "Enable",
+      "modes": {
+        "OUTPUT": "Every finding",
+        "OUTPUT_VALUES": "Only these values",
+        "OUTPUT_LOOKUP": "Value names a term",
+        "METADATA_VALUES": "Field values",
+        "METADATA_LOOKUP": "Field value names a term"
+      }
+    },
+    "findInText": {
+      "open": "Find in text",
+      "title": "Find in text",
+      "description": "Make a tested REGEX detector from this concept's labels and bind its output here — for concepts that appear only as words.",
+      "labels": "Labels",
+      "pattern": "Pattern",
+      "tests": "{{count}} generated tests",
+      "existing": "Already generated: {{names}}",
+      "severity": "Severity",
+      "create": "Create detector",
+      "created": "Detector created and bound",
+      "failed": "Could not create the detector",
+      "openDetector": "Open the detector"
+    },
+    "meaning": {
+      "title": "Meaning",
+      "none": "This finding carries no meaning yet.",
+      "noneAsset": "No concepts yet.",
+      "assetHint": "Concepts this asset is evidence of.",
+      "impliedBy": "implied by {{term}}",
+      "throughBinding": "through {{label}}",
+      "linkedBy": "linked by {{by}}",
+      "unlink": "Remove link",
+      "whatDoesThisMean": "What does this mean?",
+      "linkByHand": "Link to a term",
+      "notePlaceholder": "Why (optional)",
+      "link": "Link",
+      "linked": "Linked",
+      "support": "{{count}} findings",
+      "gone": "No longer supported",
+      "history": "Earlier",
+      "showHistory": "Show earlier concepts",
+      "hideHistory": "Hide earlier concepts"
+    },
+    "inquiry": {
+      "aboutLabel": "About",
+      "aboutHint": "Only findings that are evidence of one of these concepts (a binding of their output, or a manual link).",
+      "includeNarrower": "Include narrower concepts",
+      "remove": "Remove {{term}}"
     }
   },
   "common": {
@@ -4145,6 +4495,17 @@
           "body": "Someone made this link a relationship of the whole workspace: every case that holds both sees it."
         }
       }
+    },
+    "term": {
+      "unknown": "Concept",
+      "concept": "Concept",
+      "linked": "{{count}} on the board"
+    },
+    "meaning": {
+      "title": "Meaning",
+      "place": "Place",
+      "show": "Move here",
+      "truncated": "{{count}} more concepts not shown"
     }
   },
   "caseCleanup": {
@@ -5997,5 +6358,36 @@
     "linkFailed": "Created, but could not link it to: {{titles}}",
     "open": "Open “{{title}}” at this watch",
     "more": "+{{count}} more"
+  },
+  "semanticMap": {
+    "title": "Meaning",
+    "subtitle": "{{concepts}} concepts · {{unbound}} outputs unbound",
+    "loading": "Loading…",
+    "loadFailed": "The semantic map could not be loaded",
+    "assets": "{{count}} assets",
+    "minAssets": "Min assets",
+    "cooccurrence": "Co-occurrence",
+    "layouts": {
+      "taxonomy": "Taxonomy",
+      "network": "Network"
+    },
+    "modes": {
+      "sources": "Sources",
+      "meaning": "Meaning"
+    },
+    "rebuild": "Rebuild",
+    "rebuildQueued": "Rebuilding the map…",
+    "empty": {
+      "noConcepts": "Your glossary has no concepts yet.",
+      "noConceptsHint": "Install a starter pack, or import SKOS or CSV.",
+      "openGlossary": "Open the glossary",
+      "noLinks": "Nothing is bound yet.",
+      "noLinksHint": "Bind detector outputs to concepts and the map fills in.",
+      "bindOutputs": "Bind detector outputs"
+    },
+    "unbound": "Unbound vocabulary: {{outputs}} outputs · {{findings}} open findings without meaning.",
+    "review": "Review",
+    "pending": "{{count}} pending proposals",
+    "openTerm": "Open term"
   }
 }

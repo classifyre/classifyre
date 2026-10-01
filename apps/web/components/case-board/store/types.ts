@@ -14,7 +14,14 @@ import type { FindingVisualState, SeverityKey } from "@workspace/case-board/lib/
  * bubble re-renders that bubble and nothing else.
  */
 
-export type ItemKind = "EVIDENCE" | "HYPOTHESIS" | "COMMENT" | "NOTE" | "FRAME";
+export type ItemKind =
+  | "EVIDENCE"
+  | "HYPOTHESIS"
+  | "COMMENT"
+  | "NOTE"
+  | "FRAME"
+  /** A glossary term pinned to the board (SL5 A3); `refId` is the term id. */
+  | "TERM";
 
 export interface BoardItemStyle {
   color?: BoardColor;
@@ -209,4 +216,36 @@ export interface BoardDomain {
   /** Recently removed items/links, so a local undo can bring them back. */
   graveyard: { items: Map<string, BoardItem>; links: Map<string, BoardLink> };
   truncated: boolean;
+}
+
+/** A concept in the board's Meaning layer (SL5 A2), as the read serves it. */
+export interface BoardSemanticTerm {
+  termId: string;
+  key: string;
+  name: string;
+  kind: string;
+  status: string;
+  definition: string | null;
+  scheme: { id: string; key: string; name: string; color: string | null } | null;
+  replacedBy: { id: string; key: string; name: string } | null;
+  linkedItems: Array<{
+    itemId: string;
+    findingIds: string[];
+    methods: string[];
+    supportCount: number;
+  }>;
+  totalLinked: number;
+  isHub: boolean;
+  caseAbout: boolean;
+  placedItemId: string | null;
+  deleted?: boolean;
+}
+
+/** The board's Meaning layer: concepts its evidence is about. */
+export interface BoardSemantic {
+  terms: BoardSemanticTerm[];
+  relations: Array<{ fromTermId: string; toTermId: string; type: string; label: string }>;
+  gone: Array<{ termId: string; key: string; name: string; itemId: string }>;
+  caseLinks: Array<{ referenceId: string; termId: string; key: string; name: string }>;
+  truncated: number;
 }

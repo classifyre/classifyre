@@ -66,6 +66,7 @@ import { WhereElseFound } from "@/components/where-else-found";
 import { SimilarFindingsCard } from "@/components/similar-findings-card";
 import { FindingExtractionCard } from "@/components/finding-extraction-card";
 import { FindingMetadataCard } from "@/components/finding-metadata-card";
+import { FindingMeaningCard } from "@/components/glossary/meaning-card";
 import { useTranslation } from "@/hooks/use-translation";
 
 type FindingHistoryEntry = NonNullable<FindingResponseDto["history"]>[number];
@@ -548,6 +549,9 @@ export default function FindingDetailPage() {
           currentAssetId={finding.asset?.id || finding.assetId}
         />
       )}
+
+      {/* ── Meaning (glossary semantic links) ── */}
+      <FindingMeaningCard findingId={finding.id} />
 
       {/* ── Extracted data (CUSTOM detector only) ── */}
       {finding.detectorType === "CUSTOM" && (
