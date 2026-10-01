@@ -36,7 +36,7 @@ export function TemplatePicker({
 }: {
   onInsert: (cells: NotebookCell[]) => void;
   disabled?: boolean;
-  scope?: "connector" | "augmentation";
+  scope?: "connector" | "augmentation" | "detector";
 }) {
   const { t } = useTranslation();
   const [templates, setTemplates] = React.useState<NotebookTemplate[] | null>(

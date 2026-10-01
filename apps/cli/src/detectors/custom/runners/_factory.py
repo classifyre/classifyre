@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ....models.generated_detectors import (
+    CodeDetectorPipelineSchema,
     GLiNER2PipelineSchema,
     ImageClassificationPipelineSchema,
     LLMPipelineSchema,
@@ -12,6 +13,7 @@ from ....models.generated_detectors import (
     TextClassificationPipelineSchema,
 )
 from ._base import BaseRunner
+from ._custom_detector import CustomDetectorRunner
 from ._gliner2 import GLiNER2Runner
 from ._image_classification import ImageClassificationRunner
 from ._llm import LLMRunner
@@ -30,6 +32,7 @@ def create_runner(
         | ImageClassificationPipelineSchema
         | ObjectDetectionPipelineSchema
         | TagPipelineSchema
+        | CodeDetectorPipelineSchema
     ),
     detector_key: str = "",
     detector_name: str = "",
@@ -50,5 +53,8 @@ def create_runner(
     # detector that is not supposed to run anything at all.
     if isinstance(schema, TagPipelineSchema):
         return TagRunner(schema, detector_key, detector_name)
+    # Same reason as TAG: a code detector must never fall through to GLiNER2.
+    if isinstance(schema, CodeDetectorPipelineSchema):
+        return CustomDetectorRunner(schema, detector_key, detector_name)
     # GLiNER2PipelineSchema is the default / backward-compat path
     return GLiNER2Runner(schema, detector_key, detector_name)

@@ -182,6 +182,7 @@ docs/CreateCaseDto.md
 docs/CreateCaseEventDto.md
 docs/CreateChatBotDto.md
 docs/CreateCustomDetectorDto.md
+docs/CreateDetectorNotebookExecutionDto.md
 docs/CreateExternalRunnerDto.md
 docs/CreateFindingDto.md
 docs/CreateInquiryDto.md
@@ -194,6 +195,7 @@ docs/CreateSupervisorGoalDto.md
 docs/CreateThreadDto.md
 docs/CustomDetectorExampleDto.md
 docs/CustomDetectorExtractionsApi.md
+docs/CustomDetectorFileDto.md
 docs/CustomDetectorResponseDto.md
 docs/CustomDetectorResponseDtoSourcesUsingInner.md
 docs/CustomDetectorTestsApi.md
@@ -735,6 +737,7 @@ src/models/CreateCaseDto.ts
 src/models/CreateCaseEventDto.ts
 src/models/CreateChatBotDto.ts
 src/models/CreateCustomDetectorDto.ts
+src/models/CreateDetectorNotebookExecutionDto.ts
 src/models/CreateExternalRunnerDto.ts
 src/models/CreateFindingDto.ts
 src/models/CreateInquiryDto.ts
@@ -746,6 +749,7 @@ src/models/CreateSourceDto.ts
 src/models/CreateSupervisorGoalDto.ts
 src/models/CreateThreadDto.ts
 src/models/CustomDetectorExampleDto.ts
+src/models/CustomDetectorFileDto.ts
 src/models/CustomDetectorResponseDto.ts
 src/models/CustomDetectorResponseDtoSourcesUsingInner.ts
 src/models/CustomDetectorTrainingRunDto.ts
