@@ -111,6 +111,9 @@ def augment(asset):
     # Links — untyped "related" edges by asset hash.
     asset.link(other_hash)
 
+    # Meaning — a declared link to a glossary concept, by key.
+    asset.means("gmbh", evidence={"field": "Rechtsform", "value": "GES"})
+
     # URN — kept only when the connector left it empty.
     asset.set_urn(urn_for("snowflake", "acme", "PROD", "PUBLIC", "ORDERS"))
 
