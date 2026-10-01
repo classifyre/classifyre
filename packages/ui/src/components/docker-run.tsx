@@ -93,7 +93,10 @@ export function DockerRunBlock({
         <span
           className={cn(
             "font-mono text-[10px] font-bold uppercase tracking-[0.2em]",
-            dark ? "text-primary-foreground/55" : "text-muted-foreground",
+            // `dark` means a black panel in *both* themes, so its ink is
+            // literal white — `primary-foreground` flips with the theme and
+            // went invisible on black in dark mode.
+            dark ? "text-white/55" : "text-muted-foreground",
           )}
         >
           {label}
@@ -110,7 +113,7 @@ export function DockerRunBlock({
           className={cn(
             "absolute right-1.5 top-1.5 z-10 h-7 px-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em]",
             dark
-              ? "text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+              ? "text-white/70 hover:bg-white/10 hover:text-white"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -124,7 +127,7 @@ export function DockerRunBlock({
           className={cn(
             "min-w-0 overflow-x-auto border-2 py-3 pl-3 pr-12 font-mono text-[11px] leading-6 sm:text-xs",
             dark
-              ? "border-primary-foreground/20 bg-primary-foreground/8 text-primary-foreground/85"
+              ? "border-white/20 bg-white/8 text-white/85"
               : "border-border bg-muted/40 text-foreground/85",
           )}
         >
@@ -138,7 +141,7 @@ export function DockerRunBlock({
                     className={cn(
                       "ml-auto hidden shrink-0 select-none whitespace-nowrap text-[10px] italic md:inline",
                       dark
-                        ? "text-primary-foreground/40"
+                        ? "text-white/45"
                         : "text-muted-foreground/70",
                     )}
                   >
