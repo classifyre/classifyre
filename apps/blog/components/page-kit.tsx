@@ -12,7 +12,7 @@ import { Illustration, type IllustrationName } from "@/components/illustration";
  * started needing the same case-file visual language.
  *
  * `tone="signal"` paints a section with `bg-foreground`, which *flips* with
- * the theme — near-black in light mode, near-white in dark. Anything placed
+ * the theme: near-black in light mode, near-white in dark. Anything placed
  * on it has to flip too; see `surface="inverted"` on Illustration and the
  * `dark:text-accent-foreground` pairs below.
  */
@@ -46,7 +46,7 @@ export function SectionShell({
         // position:sticky descendant, so only the tinted sections (which
         // need it to clip the grid overlay) get it.
         tone === "signal" && "overflow-hidden",
-        // Full-bleed sections break out of `main`'s max width — see
+        // Full-bleed sections break out of `main`'s max width; see
         // `.cl-bleed` in landing.css for why this isn't plain `w-screen`.
         fullWidth
           ? "cl-bleed rounded-none border-0"
