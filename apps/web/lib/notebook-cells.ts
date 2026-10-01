@@ -17,6 +17,12 @@ export interface NotebookCell {
  */
 export const REQUIRED_FUNCTIONS = ["test_connection", "extract"] as const;
 
+/**
+ * What a code detector's notebook (custom-detector pipeline CODE_DETECTOR)
+ * must define. Mirrors apps/cli/src/detectors/custom_detector/contract.py.
+ */
+export const DETECTOR_REQUIRED_FUNCTIONS = ["detect"] as const;
+
 /** Whether a cell's source defines `name` at the top level. */
 export function definesFunction(source: string, name: string): boolean {
   return new RegExp(`^(?:async\\s+)?def\\s+${name}\\s*\\(`, "m").test(source);
@@ -30,9 +36,12 @@ export function definesFunction(source: string, name: string): boolean {
  * into two cells, or move it, and the lock follows the code rather than
  * standing in the way of a rewrite.
  */
-export function protectedCellIds(cells: NotebookCell[]): Set<string> {
+export function protectedCellIds(
+  cells: NotebookCell[],
+  required: readonly string[] = REQUIRED_FUNCTIONS,
+): Set<string> {
   const locked = new Set<string>();
-  for (const name of REQUIRED_FUNCTIONS) {
+  for (const name of required) {
     const definers = cells.filter(
       (cell) => cell.type === "code" && definesFunction(cell.source, name),
     );
@@ -42,8 +51,11 @@ export function protectedCellIds(cells: NotebookCell[]): Set<string> {
 }
 
 /** Which required functions no cell defines yet. */
-export function missingFunctions(cells: NotebookCell[]): string[] {
-  return REQUIRED_FUNCTIONS.filter(
+export function missingFunctions(
+  cells: NotebookCell[],
+  required: readonly string[] = REQUIRED_FUNCTIONS,
+): string[] {
+  return required.filter(
     (name) =>
       !cells.some(
         (cell) => cell.type === "code" && definesFunction(cell.source, name),

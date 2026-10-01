@@ -16,14 +16,18 @@ import type { FastifyReply } from 'fastify';
 import {
   AUGMENTATION_OPTIONAL_FUNCTIONS,
   AUGMENTATION_REQUIRED_FUNCTIONS,
+  DETECTOR_OPTIONAL_FUNCTIONS,
+  DETECTOR_REQUIRED_FUNCTIONS,
   NotebookService,
   OPTIONAL_FUNCTIONS,
   REQUIRED_FUNCTIONS,
   type NotebookScope,
+  type TemplateScope,
 } from './notebook.service';
 import { NotebookExecutionService } from './notebook-execution.service';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import {
+  CreateDetectorNotebookExecutionDto,
   CreateNotebookExecutionDto,
   NotebookDto,
   NotebookExecutionDto,
@@ -49,19 +53,20 @@ export class NotebookController {
   @ApiQuery({
     name: 'scope',
     required: false,
-    enum: ['connector', 'augmentation'],
+    enum: ['connector', 'augmentation', 'detector'],
   })
-  scaffold(@Query('scope') scope?: NotebookScope): NotebookScaffoldDto {
-    const resolved = this.resolveScope(scope);
-    const isAugmentation = resolved === 'augmentation';
+  scaffold(@Query('scope') scope?: TemplateScope): NotebookScaffoldDto {
+    const resolved = this.resolveTemplateScope(scope);
+    const [required, optional] =
+      resolved === 'augmentation'
+        ? [AUGMENTATION_REQUIRED_FUNCTIONS, AUGMENTATION_OPTIONAL_FUNCTIONS]
+        : resolved === 'detector'
+          ? [DETECTOR_REQUIRED_FUNCTIONS, DETECTOR_OPTIONAL_FUNCTIONS]
+          : [REQUIRED_FUNCTIONS, OPTIONAL_FUNCTIONS];
     return {
       ...this.notebooks.scaffold(resolved),
-      requiredFunctions: isAugmentation
-        ? AUGMENTATION_REQUIRED_FUNCTIONS
-        : REQUIRED_FUNCTIONS,
-      optionalFunctions: isAugmentation
-        ? AUGMENTATION_OPTIONAL_FUNCTIONS
-        : OPTIONAL_FUNCTIONS,
+      requiredFunctions: required,
+      optionalFunctions: optional,
     };
   }
 
@@ -73,10 +78,10 @@ export class NotebookController {
   @ApiQuery({
     name: 'scope',
     required: false,
-    enum: ['connector', 'augmentation'],
+    enum: ['connector', 'augmentation', 'detector'],
   })
-  templates(@Query('scope') scope?: NotebookScope): NotebookTemplateDto[] {
-    return this.notebooks.templates(this.resolveScope(scope));
+  templates(@Query('scope') scope?: TemplateScope): NotebookTemplateDto[] {
+    return this.notebooks.templates(this.resolveTemplateScope(scope));
   }
 
   @Get('sources/:sourceId/notebook')
@@ -141,6 +146,10 @@ export class NotebookController {
       .send(source);
   }
 
+  private resolveTemplateScope(scope?: string): TemplateScope {
+    return scope === 'detector' ? 'detector' : this.resolveScope(scope);
+  }
+
   private resolveScope(scope?: string): NotebookScope {
     if (scope === undefined || scope === 'connector') return 'connector';
     if (scope === 'augmentation') return 'augmentation';
@@ -175,6 +184,37 @@ export class NotebookController {
   ) {
     const executions = await this.notebooks.listExecutions(
       sourceId,
+      limit ? Number(limit) : undefined,
+    );
+    return executions.map((execution) => this.executions.toDto(execution));
+  }
+
+  @BlockWhenPaused()
+  @Post('custom-detectors/:detectorId/notebook/executions')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: "Run a code detector's notebook",
+    description:
+      'Code detectors (pipeline type CODE_DETECTOR) only. "cell"/"all" replay the cells with the detector\'s variables, secrets and files; "preview_detect" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.',
+  })
+  @ApiResponse({ status: 202, type: NotebookExecutionDto })
+  async createDetectorExecution(
+    @Param('detectorId') detectorId: string,
+    @Body() dto: CreateDetectorNotebookExecutionDto,
+  ) {
+    const execution = await this.executions.createForDetector(detectorId, dto);
+    return this.executions.toDto(execution);
+  }
+
+  @Get('custom-detectors/:detectorId/notebook/executions')
+  @ApiOperation({ summary: "Recent executions of a code detector's notebook" })
+  @ApiResponse({ status: 200, type: [NotebookExecutionDto] })
+  async listDetectorExecutions(
+    @Param('detectorId') detectorId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const executions = await this.executions.listForDetector(
+      detectorId,
       limit ? Number(limit) : undefined,
     );
     return executions.map((execution) => this.executions.toDto(execution));

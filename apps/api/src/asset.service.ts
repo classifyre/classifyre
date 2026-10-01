@@ -3243,6 +3243,7 @@ export class AssetService {
                 findingType: finding.finding_type,
                 matchedContent: finding.matched_content,
                 customDetectorKey: finding.custom_detector_key,
+                identityKey: finding.identity_key,
               });
 
               // Deduplicate within same scan

@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   CustomDetector,
@@ -18,6 +19,18 @@ import * as os from 'os';
 import * as path from 'path';
 import { PrismaService } from './prisma.service';
 import { AiProviderConfigService } from './ai-provider-config.service';
+// Value import: injected with @Optional(), and a type-only import would
+// silently resolve to undefined (see nest-type-import-breaks-optional-di).
+import { MaskedConfigCryptoService } from './masked-config-crypto.service';
+import {
+  CODE_DETECTOR_PIPELINE_TYPE,
+  isCodeDetectorSchema,
+  withNotebookRevision,
+  maskCodeDetectorSchema,
+  mergeCodeDetectorSecrets,
+  validateCodeDetectorSchema,
+  versionedShape,
+} from './custom-detector-code';
 import { stableStringify } from './utils/masked-config.utils';
 import { resolveSchemaFile } from './utils/schema-path';
 import { CreateCustomDetectorDto } from './dto/create-custom-detector.dto';
@@ -154,6 +167,9 @@ function answerDimensionFor(
 ): 'findingType' | 'matchedContent' | null {
   if (!pipelineType) return null;
   switch (pipelineType.toUpperCase()) {
+    // A code detector's label names the problem ("total_mismatch"); its value
+    // is the evidence ("total 523 != 520").
+    case 'CODE_DETECTOR':
     case 'LLM':
     case 'TEXT_CLASSIFICATION':
     case 'IMAGE_CLASSIFICATION':
@@ -171,7 +187,14 @@ export class CustomDetectorsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly aiProviderConfigService: AiProviderConfigService,
+    @Optional() private readonly maskedCrypto?: MaskedConfigCryptoService,
   ) {}
+
+  private get crypto(): MaskedConfigCryptoService {
+    // Stateless (it only holds the application key), so a spec that builds
+    // the service by hand gets a working one without wiring it.
+    return this.maskedCrypto ?? new MaskedConfigCryptoService();
+  }
 
   private parseDelimitedLine(line: string, delimiter: string): string[] {
     const cells: string[] = [];
@@ -748,11 +771,19 @@ export class CustomDetectorsService {
       'IMAGE_CLASSIFICATION',
       'OBJECT_DETECTION',
       CustomDetectorsService.TAG_PIPELINE_TYPE,
+      CODE_DETECTOR_PIPELINE_TYPE,
     ];
     if (!validTypes.includes(schemaType)) {
       throw new BadRequestException(
         `Unknown pipeline schema type '${schemaType}'. Must be one of: ${validTypes.join(', ')}`,
       );
+    }
+
+    if (schemaType === CODE_DETECTOR_PIPELINE_TYPE) {
+      // Its own rules: code, packages, variables, secrets, fields, limits.
+      // None of the numeric knobs below mean anything to a notebook.
+      validateCodeDetectorSchema(schema);
+      return;
     }
 
     // Numeric range checks apply only to fields the client actually supplied;
@@ -906,6 +937,99 @@ export class CustomDetectorsService {
   }
 
   /**
+   * The pipeline schema as it is stored: a code detector's secrets encrypted,
+   * merged as a patch onto what is already stored (see
+   * mergeCodeDetectorSecrets). Other pipeline types pass through untouched.
+   */
+  private withStoredSecrets(
+    incoming: Record<string, unknown>,
+    existing: Record<string, unknown> | null,
+  ): Record<string, unknown> {
+    if (!isCodeDetectorSchema(incoming)) {
+      return incoming;
+    }
+    const stored = isCodeDetectorSchema(existing)
+      ? existing?.secrets
+      : undefined;
+    const secrets = mergeCodeDetectorSecrets(
+      stored,
+      incoming.secrets,
+      (value) => this.crypto.encryptString(value),
+    );
+    const next: Record<string, unknown> = { ...incoming };
+    delete next.secrets;
+    if (Object.keys(secrets).length > 0) {
+      next.secrets = secrets;
+    }
+    return next;
+  }
+
+  /**
+   * Everything a CLI process needs to run a detector, injected at dispatch and
+   * never stored: LLM provider credentials, and for a code detector its
+   * decrypted secrets, its database id and its uploaded files (name + content
+   * hash, and a download URL when the caller knows the namespaced API base).
+   * Public: scans, test scenarios and notebook previews all dispatch through it.
+   *
+   * `filesBaseUrl` is required for every dispatch that reaches a CLI process
+   * (scan, test, preview): without it files_runtime carries no download URL
+   * and the CLI downloads nothing, so the rule runs against an empty
+   * ctx.files. Callers that stage the bytes themselves (notebook runs on local
+   * disk) delete files_runtime after this returns.
+   */
+  async prepareRuntimePipelineSchema(
+    row: {
+      id: string;
+      pipelineSchema: unknown;
+      aiProviderConfigId?: string | null;
+    },
+    options: { filesBaseUrl?: string | null } = {},
+  ): Promise<Record<string, unknown>> {
+    const schema = await this.injectLlmProviderRuntime(
+      asRecord(row.pipelineSchema),
+      row.aiProviderConfigId ?? null,
+    );
+    if (!isCodeDetectorSchema(schema)) {
+      return schema;
+    }
+    const secrets = asRecord(schema.secrets);
+    const decrypted: Record<string, string> = {};
+    for (const [key, value] of Object.entries(secrets)) {
+      if (typeof value !== 'string') continue;
+      decrypted[key] = this.crypto.isEncryptedValue(value)
+        ? this.crypto.decryptString(value)
+        : value;
+    }
+    const files = await this.prisma.customDetectorFile.findMany({
+      where: { customDetectorId: row.id },
+      select: {
+        id: true,
+        fileName: true,
+        contentHash: true,
+        fileSizeBytes: true,
+      },
+      orderBy: { fileName: 'asc' },
+    });
+    const base = options.filesBaseUrl?.replace(/\/+$/, '');
+    return {
+      ...schema,
+      secrets: decrypted,
+      custom_detector_id: row.id,
+      files_runtime: files.map((file) => ({
+        id: file.id,
+        name: file.fileName,
+        content_hash: file.contentHash,
+        size_bytes: file.fileSizeBytes,
+        ...(base
+          ? {
+              url: `${base}/custom-detectors/${encodeURIComponent(row.id)}/files/${encodeURIComponent(file.id)}/content`,
+            }
+          : {}),
+      })),
+    };
+  }
+
+  /**
    * For LLM detectors, resolve the configured provider credential (decrypting the
    * API key) and inject a runtime-only `provider_runtime` block into the pipeline
    * schema so the CLI worker can call the provider directly. No-op for other types.
@@ -971,7 +1095,10 @@ export class CustomDetectorsService {
     usage?: DetectorUsageStats,
   ): CustomDetectorResponseDto {
     const latestRun = detector.trainingRuns?.[0] ?? null;
-    const pipelineSchema = asRecord((detector as any).pipelineSchema);
+    // Secret values are write-only: a response carries their names only.
+    const { schema: pipelineSchema, secretKeys } = maskCodeDetectorSchema(
+      asRecord((detector as any).pipelineSchema),
+    );
     const detectorType =
       typeof pipelineSchema.type === 'string' && pipelineSchema.type
         ? pipelineSchema.type
@@ -990,6 +1117,7 @@ export class CustomDetectorsService {
           ? pipelineSchema.severity
           : null,
       answerDimension: answerDimensionFor(detectorType),
+      ...(isCodeDetectorSchema(pipelineSchema) ? { secretKeys } : {}),
       aiProviderConfigId: (detector as any).aiProviderConfigId ?? null,
       isActive: detector.isActive,
       version: detector.version,
@@ -1159,6 +1287,10 @@ export class CustomDetectorsService {
       dto.pipelineSchema,
       dto.aiProviderConfigId,
     );
+    const pipelineSchema = withNotebookRevision(
+      this.withStoredSecrets(dto.pipelineSchema, null),
+      null,
+    );
 
     let detector;
     try {
@@ -1167,7 +1299,7 @@ export class CustomDetectorsService {
           key,
           name: dto.name,
           description: dto.description,
-          pipelineSchema: dto.pipelineSchema as Prisma.InputJsonValue,
+          pipelineSchema: pipelineSchema as Prisma.InputJsonValue,
           aiProviderConfigId,
           isActive: dto.isActive ?? true,
         } as any,
@@ -1205,17 +1337,17 @@ export class CustomDetectorsService {
     const nextName = dto.name ?? existing.name;
     const nextDescription =
       dto.description !== undefined ? dto.description : existing.description;
+    const existingSchema = asRecord((existing as any).pipelineSchema);
+    if (dto.pipelineSchema !== undefined) {
+      this.validatePipelineSchema(dto.pipelineSchema);
+    }
     const nextPipelineSchema =
       dto.pipelineSchema !== undefined
-        ? dto.pipelineSchema
-        : (asRecord((existing as any).pipelineSchema) as Record<
-            string,
-            unknown
-          >);
-
-    if (dto.pipelineSchema !== undefined) {
-      this.validatePipelineSchema(nextPipelineSchema);
-    }
+        ? withNotebookRevision(
+            this.withStoredSecrets(dto.pipelineSchema, existingSchema),
+            existingSchema,
+          )
+        : (existingSchema as Record<string, unknown>);
 
     const requestedProviderId =
       dto.aiProviderConfigId !== undefined
@@ -1226,9 +1358,11 @@ export class CustomDetectorsService {
       requestedProviderId,
     );
 
+    // Secrets are left out: rotating a credential is not a new detector, and
+    // encryption with a fresh IV would otherwise bump the version on every save.
     const nextVersion =
-      stableStringify(nextPipelineSchema) !==
-      stableStringify((existing as any).pipelineSchema)
+      stableStringify(versionedShape(nextPipelineSchema)) !==
+      stableStringify(versionedShape(existingSchema))
         ? existing.version + 1
         : existing.version;
 
@@ -1464,11 +1598,20 @@ export class CustomDetectorsService {
           'GLINER2';
         return schemaType === wanted;
       })
-      .map((example) => ({
-        name: asString(example.name) ?? 'Custom Detector Example',
-        description: asString(example.description) ?? 'Custom detector example',
-        pipelineSchema: asRecord(example.pipelineSchema ?? example.config),
-      }));
+      .map((example) => {
+        const scenarios = Array.isArray(example.test_scenarios)
+          ? (example.test_scenarios as Array<Record<string, unknown>>)
+          : undefined;
+        const key = asString(asRecord(example.config).custom_detector_key);
+        return {
+          name: asString(example.name) ?? 'Custom Detector Example',
+          description:
+            asString(example.description) ?? 'Custom detector example',
+          pipelineSchema: asRecord(example.pipelineSchema ?? example.config),
+          ...(key ? { key } : {}),
+          ...(scenarios ? { testScenarios: scenarios } : {}),
+        };
+      });
   }
 
   /** One-line "when to use" guidance per pipeline engine, in author order. */
@@ -1692,7 +1835,10 @@ export class CustomDetectorsService {
     return config;
   }
 
-  async buildRuntimeCustomDetectors(ids: unknown): Promise<
+  async buildRuntimeCustomDetectors(
+    ids: unknown,
+    options: { filesBaseUrl?: string | null } = {},
+  ): Promise<
     Array<{
       id: string;
       key: string;
@@ -1731,7 +1877,7 @@ export class CustomDetectorsService {
       .map((id) => byId.get(id))
       .filter((row): row is CustomDetector => Boolean(row));
     const entries = await Promise.all(
-      orderedRows.map((row) => this.toRuntimeEntry(row)),
+      orderedRows.map((row) => this.toRuntimeEntry(row, options)),
     );
     return entries.filter((entry): entry is NonNullable<typeof entry> =>
       Boolean(entry),
@@ -1743,7 +1889,10 @@ export class CustomDetectorsService {
    * Used when sources store CUSTOM detectors as { type, custom_detector_key } in
    * their detectors array rather than the legacy custom_detectors ID array.
    */
-  async buildRuntimeCustomDetectorsByKeys(keys: string[]): Promise<
+  async buildRuntimeCustomDetectorsByKeys(
+    keys: string[],
+    options: { filesBaseUrl?: string | null } = {},
+  ): Promise<
     Array<{
       id: string;
       key: string;
@@ -1773,10 +1922,10 @@ export class CustomDetectorsService {
     const orderedRows = normalizedKeys
       .map((key) => byKey.get(key))
       .filter((row): row is CustomDetector => Boolean(row));
-    const entries = await Promise.all(
-      orderedRows.map((row) => this.toRuntimeEntry(row)),
+    const entriesByKey = await Promise.all(
+      orderedRows.map((row) => this.toRuntimeEntry(row, options)),
     );
-    return entries.filter((entry): entry is NonNullable<typeof entry> =>
+    return entriesByKey.filter((entry): entry is NonNullable<typeof entry> =>
       Boolean(entry),
     );
   }
@@ -1833,7 +1982,10 @@ export class CustomDetectorsService {
    * provider credential cannot be resolved (missing key/model/credential) so a
    * single misconfigured detector is skipped rather than failing the whole run.
    */
-  private async toRuntimeEntry(row: CustomDetector): Promise<{
+  private async toRuntimeEntry(
+    row: CustomDetector,
+    options: { filesBaseUrl?: string | null } = {},
+  ): Promise<{
     id: string;
     key: string;
     name: string;
@@ -1845,9 +1997,13 @@ export class CustomDetectorsService {
   } | null> {
     let pipelineSchema: Record<string, unknown>;
     try {
-      pipelineSchema = await this.injectLlmProviderRuntime(
-        asRecord((row as any).pipelineSchema),
-        (row as any).aiProviderConfigId ?? null,
+      pipelineSchema = await this.prepareRuntimePipelineSchema(
+        {
+          id: row.id,
+          pipelineSchema: (row as any).pipelineSchema,
+          aiProviderConfigId: (row as any).aiProviderConfigId ?? null,
+        },
+        options,
       );
     } catch (error) {
       this.logger.warn(
