@@ -36,7 +36,7 @@ import {
 import { useTranslation } from "@/hooks/use-translation";
 import { StatsFreshness } from "@/components/stats-freshness";
 import { CaseworkCard } from "@/components/discovery/casework-card";
-import { ConnectionsCanvas } from "@/components/discovery/connections-canvas";
+import { DiscoveryMapCard } from "@/components/discovery/discovery-map-card";
 import type { TranslationKey } from "@/i18n";
 
 type DiscoveryWindowDays = 7 | 30 | 90;
@@ -663,7 +663,7 @@ export default function DiscoveryPage() {
         </PanelCard>
 
         {/* ── CONNECTIONS ─── */}
-        <ConnectionsCanvas topAssets={topAssets} />
+        <DiscoveryMapCard topAssets={topAssets} />
       </div>
 
     </div>

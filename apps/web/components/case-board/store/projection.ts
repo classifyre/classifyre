@@ -52,7 +52,8 @@ export type BoardNodeType =
   | "frame"
   | "comment"
   | "suggested"
-  | "trace";
+  | "trace"
+  | "term";
 
 /** Round nodes (assets) carry the circle their edges attach to. */
 export type ItemNodeData = { itemId: string; round?: RoundShape };

@@ -170,7 +170,10 @@ function sourceBubble(
 
 export function ConnectionsCanvas({
   topAssets,
+  headerSlot,
 }: {
+  /** Rendered beside the title: the Sources | Meaning toggle (SL5 B1). */
+  headerSlot?: React.ReactNode;
   /**
    * The assets carrying the most findings. Rendered in the rail rather than in
    * a card of its own — the map answers "where is the material" spatially, and
@@ -505,6 +508,7 @@ export function ConnectionsCanvas({
               : t("connections.loading")}
           </p>
         </div>
+        {headerSlot}
 
         {/* Five toggle chips took more width than the title and still gave no
             hint that they were one control. One multi-select says so, starts

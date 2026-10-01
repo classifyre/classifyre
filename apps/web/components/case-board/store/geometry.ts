@@ -7,6 +7,7 @@ import {
   spotInFrame as spotInFrameBox,
   type Rect,
   type XY,
+  TERM_CARD_SIZE,
 } from "@workspace/schemas/case-board";
 import { ASSET_NODE, evidenceExtent, type Extent } from "./relations";
 import { absolutePosition } from "./ops";
@@ -40,6 +41,8 @@ export function estimateItemSize(d: BoardDomain, item: BoardItem): { width: numb
       return { width: item.width ?? DEFAULT_FRAME.width, height: item.height ?? DEFAULT_FRAME.height };
     case "NOTE":
       return { width: item.width ?? DEFAULT_NOTE.width, height: item.height ?? DEFAULT_NOTE.height };
+    case "TERM":
+      return { ...TERM_CARD_SIZE };
   }
 }
 

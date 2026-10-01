@@ -217,7 +217,10 @@
       "type": "Typ",
       "verification": "Herkunft",
       "notes": "Notizen",
-      "actions": "Aktionen"
+      "actions": "Aktionen",
+      "scheme": "Schema",
+      "labels": "Bezeichnungen",
+      "status": "Status"
     },
     "unverifiedAgent": "Ungeprüft · Agent",
     "verified": "Geprüft",
@@ -264,7 +267,354 @@
       "unverify": "Prüfung aufheben",
       "changeType": "Typ ändern",
       "applied": "{{count}} Begriff(e) aktualisiert",
-      "failed": "Ausgewählte Begriffe konnten nicht aktualisiert werden"
+      "failed": "Ausgewählte Begriffe konnten nicht aktualisiert werden",
+      "approve": "Freigeben",
+      "done": "Aktualisiert",
+      "moveScheme": "In Schema verschieben",
+      "makeEntities": "Zu Entitäten machen",
+      "makeConcepts": "Zu Konzepten machen"
+    },
+    "loadFailed": "Glossar konnte nicht geladen werden",
+    "actionFailed": "Das hat nicht geklappt",
+    "allStatuses": "Alle Status",
+    "allSchemes": "Alle Schemata",
+    "approve": "Freigeben",
+    "approved": "Freigegeben",
+    "proposedByAgent": "Von einem Agenten vorgeschlagen",
+    "transfer": "Import / Export",
+    "kinds": {
+      "CONCEPT": "Konzept",
+      "ENTITY": "Entität"
+    },
+    "statuses": {
+      "APPROVED": "Freigegeben",
+      "DRAFT": "Entwurf",
+      "DEPRECATED": "Veraltet"
+    },
+    "methods": {
+      "BINDING": "Bindung",
+      "DECLARED": "Deklariert",
+      "MANUAL": "Manuell",
+      "SUGGESTED": "Vorgeschlagen",
+      "MENTION": "Erwähnung",
+      "BROADER": "Übergeordnet"
+    },
+    "tabs": {
+      "concepts": "Konzepte",
+      "entities": "Entitäten",
+      "schemes": "Schemata",
+      "vocabulary": "Ungebundenes Vokabular",
+      "proposals": "Vorschläge"
+    },
+    "banner": {
+      "text": "Wir haben Ihre bestehenden Begriffe eingeordnet: {{concepts}} wurden zu Konzepten und {{entities}} zu Entitäten. Prüfen Sie die Aufteilung unter Konzepte und Entitäten — „Art ändern“ korrigiert Fehler.",
+      "dismiss": "Ausblenden"
+    },
+    "empty": {
+      "concepts": "Noch keine Konzepte",
+      "conceptsHint": "Konzepte sind Arten von Dingen — GmbH, IBAN, höhere Gewalt. Legen Sie eines an oder installieren Sie ein Startpaket.",
+      "entities": "Noch keine Entitäten",
+      "entitiesHint": "Entitäten sind bestimmte Dinge — ACME Holding GmbH, Erika Mustermann."
+    },
+    "editor": {
+      "conceptHint": "Ein Konzept ist eine Art von Dingen. Geben Sie eine Definition an und ordnen Sie es einem Schema zu.",
+      "entityHint": "Eine Entität ist ein bestimmtes Ding: ein Unternehmen, eine Person, ein Ort.",
+      "kindHelp": {
+        "CONCEPT": "Eine Art von Dingen (GmbH, IBAN)",
+        "ENTITY": "Ein bestimmtes Ding (ACME Holding GmbH)"
+      },
+      "conceptPlaceholder": "z. B. Gesellschaft mit beschränkter Haftung",
+      "keyLabel": "Schlüssel",
+      "keyHelp": "Der stabile Bezeichner für Konnektoren und Bindungen. Beim Umbenennen funktioniert der alte Schlüssel weiter.",
+      "definitionLabel": "Definition",
+      "definitionPlaceholder": "Ein bis zwei Sätze: Was etwas zu diesem Konzept macht.",
+      "schemeLabel": "Schema",
+      "noScheme": "Kein Schema",
+      "codesLabel": "Codes",
+      "codesHelp": "Exakte Notationen, mit Groß-/Kleinschreibung (GES, AT_SVNR).",
+      "hiddenAliasesLabel": "Versteckte Synonyme",
+      "hiddenAliasesHelp": "Nur exakt abgeglichen, nie als Wort im Text — für Einzelbuchstaben und Abkürzungen.",
+      "singleLetterWarning": "„{{letters}}“ würde als Synonym fast jedes Dokument treffen. Verschieben Sie es zu den versteckten Synonymen.",
+      "stewardLabel": "Verantwortlich"
+    },
+    "picker": {
+      "placeholder": "Glossar durchsuchen…",
+      "change": "Ändern",
+      "noMatch": "Kein passender Begriff"
+    },
+    "schemes": {
+      "add": "Schema hinzufügen",
+      "edit": "Schema bearbeiten",
+      "delete": "Schema löschen",
+      "deleted": "Schema gelöscht",
+      "deleteFailed": "Schema konnte nicht gelöscht werden",
+      "notEmpty": "Nur ein leeres Schema kann gelöscht werden",
+      "none": "Noch keine Schemata.",
+      "name": "Name",
+      "namePlaceholder": "z. B. Rechtsformen",
+      "nameRequired": "Ein Schema braucht einen Namen",
+      "description": "Beschreibung",
+      "color": "Farbe",
+      "fromPack": "aus Paket {{pack}}",
+      "emptyTree": "Noch keine Konzepte in diesem Schema.",
+      "expand": "Aufklappen",
+      "collapse": "Zuklappen",
+      "pick": "Wählen Sie ein Schema",
+      "pickHint": "Ein Schema ist ein kontrolliertes Vokabular, etwa die Rechtsformen eines Registers."
+    },
+    "vocabulary": {
+      "coverage": "Semantische Abdeckung: {{share}} % der offenen Funde haben eine Bedeutung · {{outputs}} Ausgaben ungebunden ({{findings}} Funde)",
+      "search": "Ausgaben und Felder durchsuchen…",
+      "unbound": "Ungebunden",
+      "bound": "Gebunden",
+      "everything": "Alles",
+      "outputs": "Detektor-Ausgaben",
+      "fields": "Metadatenfelder",
+      "both": "Ausgaben und Felder",
+      "refresh": "Aktualisieren",
+      "refreshQueued": "Vokabular wird aktualisiert…",
+      "refreshedAt": "Gezählt {{when}}",
+      "allBound": "Alles hat eine Bedeutung",
+      "empty": "Noch kein Vokabular",
+      "emptyHint": "Das Vokabular wird nach jedem Scan aus Funden und Assets gezählt.",
+      "unboundShort": "Ungebunden",
+      "bind": "Binden…",
+      "more": "{{shown}} von {{total}} angezeigt",
+      "columns": {
+        "vocabulary": "Vokabular",
+        "sources": "Quellen",
+        "open": "Offen",
+        "values": "Werte",
+        "means": "Bedeutet"
+      }
+    },
+    "bind": {
+      "title": "Was bedeutet das?",
+      "description": "Legen Sie einmal fest, was diese Ausgabe oder dieses Feld bedeutet; jeder passende Fund erhält die Bedeutung, ohne neuen Scan.",
+      "searchVocabulary": "Detektor-Ausgaben und Felder durchsuchen…",
+      "noVocabulary": "Nichts gefunden.",
+      "step1": "Was die Daten sagen",
+      "step2": "Welche Funde",
+      "step3": "Was es bedeutet",
+      "allSources": "Alle Quellen",
+      "onlySource": "Nur {{name}}",
+      "observed": "{{findings}} offene Funde · {{assets}} Assets · {{values}} verschiedene Werte",
+      "openValued": "offene Werte",
+      "alreadyMeans": "Bedeutet bereits {{terms}} — dies fügt eine weitere Bedeutung hinzu.",
+      "choice": {
+        "every": "Jeder Fund dieser Art",
+        "values": "Nur diese Werte",
+        "lookup": "Jeder Wert benennt einen Begriff"
+      },
+      "noValues": "Noch keine Werte beobachtet.",
+      "pickScheme": "Schema…",
+      "matchCodes": "Codes abgleichen",
+      "matchAny": "Codes und Bezeichnungen",
+      "searchConcepts": "Konzepte suchen…",
+      "termNotApproved": "Dieses Konzept ist noch ein Entwurf: Die Bindung verknüpft nichts, bis es freigegeben ist.",
+      "preview": "Vorschau",
+      "completeToPreview": "Wählen Sie Funde und Bedeutung, um zu sehen, was verknüpft würde.",
+      "previewFailed": "Vorschau fehlgeschlagen",
+      "willLink": "Gibt {{findings}} offenen Funden auf {{assets}} Assets in {{sources}} Quellen eine Bedeutung.",
+      "timedOut": "(Zählung abgebrochen; Zahlen sind unvollständig)",
+      "unmatched": "Ohne Treffer:",
+      "ambiguous": "Mehrdeutig:",
+      "samples": "Beispiele:",
+      "noMeaning": "Keine Bedeutung",
+      "noMeaningShort": "— keine Bedeutung —",
+      "noMeaningHelp": "Als bewusst ungebunden markieren (z. B. DATE_TIME). Zählt als abgedeckt; rückgängig wie jede Bindung.",
+      "markedNoMeaning": "Als bedeutungslos markiert",
+      "saveDraft": "Als Entwurf speichern",
+      "save": "Bindung speichern",
+      "saved": "Bindung gespeichert — {{assets}} Assets werden verknüpft…",
+      "savedDraft": "Bindungsentwurf gespeichert",
+      "saveFailed": "Bindung konnte nicht gespeichert werden"
+    },
+    "proposals": {
+      "all": "Alle",
+      "kinds": {
+        "BINDING": "Bindungen",
+        "TERM": "Begriffe",
+        "ALIAS": "Synonyme",
+        "RELATION": "Beziehungen",
+        "LINK": "Dokumente",
+        "TERM_REF": "Unbekannte Verweise"
+      },
+      "refresh": "Nach Vorschlägen suchen",
+      "refreshQueued": "Suche nach Vorschlägen…",
+      "needsEmbeddings": "Dokument- und bedeutungsbasierte Vorschläge benötigen Embeddings (Einstellungen → Bereinigung › Funktionen).",
+      "empty": "Nichts zu prüfen",
+      "emptyHint": "Vorschläge von Agenten, empfohlene Bindungen und unbekannte Begriffsverweise erscheinen hier.",
+      "score": "Wert {{score}}",
+      "term": "Begriff",
+      "agentNote": "Notiz des Agenten: {{note}}",
+      "accept": "Annehmen",
+      "dismiss": "Verwerfen",
+      "dismissForever": "Endgültig verwerfen",
+      "accepted": "Angenommen",
+      "dismissed": "Verworfen",
+      "reasons": {
+        "wrong_concept": "Falsches Konzept",
+        "too_broad": "Zu allgemein",
+        "noise": "Rauschen",
+        "other": "Sonstiges"
+      }
+    },
+    "packs": {
+      "open": "Startpakete",
+      "title": "Startpakete",
+      "description": "Schemata, Konzepte und Bindungen für häufige Anforderungen. Erst Vorschau ansehen; von Bedienern gepflegte Einträge werden nicht überschrieben.",
+      "counts": "{{schemes}} Schemata · {{terms}} Begriffe · {{bindings}} Bindungen",
+      "installedVersion": "installiert v{{version}}",
+      "preview": "Vorschau",
+      "install": "Installieren",
+      "reinstall": "Aktualisieren",
+      "dryRun": "Würde {{create}} Begriffe anlegen, {{update}} aktualisieren, {{skip}} überspringen und {{bindings}} Bindungen hinzufügen.",
+      "installed": "Paket installiert",
+      "failed": "Paket konnte nicht installiert werden"
+    },
+    "export": {
+      "csv": "CSV exportieren",
+      "skos": "SKOS exportieren (JSON-LD)"
+    },
+    "import": {
+      "title": "Importieren",
+      "description": "CSV oder SKOS. Führen Sie zuerst einen Probelauf durch, um die Änderungen zu sehen.",
+      "conflictSkip": "Vorhandene Schlüssel überspringen",
+      "conflictMerge": "Bezeichnungen zusammenführen",
+      "conflictOverwrite": "Überschreiben",
+      "asDraft": "Als Entwürfe importieren",
+      "placeholder": "Dateiinhalt einfügen oder oben eine Datei wählen.",
+      "report": "Bericht",
+      "counts": "Anlegen {{create}} · aktualisieren {{update}} · überspringen {{skip}} · Konflikte {{conflict}} · abgelehnt {{refused}}",
+      "dryRun": "Probelauf",
+      "run": "Importieren",
+      "done": "Import abgeschlossen",
+      "failed": "Import fehlgeschlagen"
+    },
+    "term": {
+      "notFound": "Begriff nicht gefunden",
+      "broaderPath": "Übergeordnete Konzepte",
+      "replacedBy": "Ersetzt durch",
+      "unapprove": "Zurück zum Entwurf",
+      "unapproved": "Zurück zum Entwurf",
+      "deprecate": "Als veraltet markieren",
+      "deprecated": "Als veraltet markiert",
+      "reinstate": "Wiederherstellen",
+      "reinstated": "Wiederhergestellt",
+      "tabs": {
+        "overview": "Übersicht",
+        "evidence": "Belege",
+        "bindings": "Bindungen",
+        "activity": "Verlauf"
+      },
+      "noDefinition": "Noch keine Definition.",
+      "steward": "Verantwortlich: {{steward}}",
+      "aliases": "Synonyme",
+      "codes": "Codes",
+      "hiddenAliases": "Versteckte Synonyme",
+      "proposedAliases": "Vorgeschlagene Synonyme",
+      "narrower": "Untergeordnete Konzepte",
+      "relations": "Beziehungen",
+      "generatedDetectors": "Aus diesem Begriff erzeugte Detektoren",
+      "noActivity": "Noch kein Verlauf."
+    },
+    "relations": {
+      "out": {
+        "BROADER": "ist eine Art von",
+        "RELATED": "ist verwandt mit",
+        "PART_OF": "ist Teil von",
+        "INSTANCE_OF": "ist eine Instanz von",
+        "CUSTOM": "benutzerdefiniert"
+      },
+      "in": {
+        "BROADER": "hat untergeordnet",
+        "RELATED": "ist verwandt mit",
+        "PART_OF": "hat Teil",
+        "INSTANCE_OF": "hat Instanz",
+        "CUSTOM": "benutzerdefiniert (von)"
+      },
+      "none": "Noch keine Beziehungen.",
+      "add": "Beziehung hinzufügen",
+      "addButton": "Beziehung hinzufügen",
+      "labelPlaceholder": "Verb, z. B. reguliert",
+      "remove": "Beziehung entfernen",
+      "failed": "Beziehung konnte nicht hinzugefügt werden"
+    },
+    "evidence": {
+      "assets": "Assets",
+      "findings": "Funde",
+      "sources": "Quellen",
+      "includeNarrower": "Untergeordnete Konzepte einbeziehen",
+      "none": "Noch keine Belege",
+      "noneHint": "Binden Sie eine Detektor-Ausgabe an dieses Konzept oder verknüpfen Sie ein Dokument manuell.",
+      "notApproved": "Nur freigegebene Begriffe haben Belege. Geben Sie diesen zuerst frei.",
+      "asset": "Asset",
+      "source": "Quelle",
+      "method": "Methode",
+      "via": "Über",
+      "support": "Stützung",
+      "severity": "Schweregrad",
+      "page": "{{from}}–{{to}} von {{total}}"
+    },
+    "bindings": {
+      "hint": "An dieses Konzept gebundene Detektor-Ausgaben und Felder.",
+      "add": "Bindung hinzufügen",
+      "none": "Keine Bindungen",
+      "noneHint": "Binden Sie eine Ausgabe (PII-Typ, Tag, LLM-Label), damit deren Funde dieses Konzept bedeuten.",
+      "entitiesHint": "Entitäten werden über Erwähnungen verknüpft, nicht über Bindungen.",
+      "vocabulary": "Vokabular",
+      "mode": "Modus",
+      "by": "Von",
+      "disable": "Deaktivieren",
+      "enable": "Aktivieren",
+      "modes": {
+        "OUTPUT": "Jeder Fund",
+        "OUTPUT_VALUES": "Nur diese Werte",
+        "OUTPUT_LOOKUP": "Wert benennt Begriff",
+        "METADATA_VALUES": "Feldwerte",
+        "METADATA_LOOKUP": "Feldwert benennt Begriff"
+      }
+    },
+    "findInText": {
+      "open": "Im Text finden",
+      "title": "Im Text finden",
+      "description": "Erzeugt aus den Bezeichnungen dieses Konzepts einen getesteten REGEX-Detektor und bindet dessen Ausgabe hier — für Konzepte, die nur als Wörter vorkommen.",
+      "labels": "Bezeichnungen",
+      "pattern": "Muster",
+      "tests": "{{count}} erzeugte Tests",
+      "existing": "Bereits erzeugt: {{names}}",
+      "severity": "Schweregrad",
+      "create": "Detektor erstellen",
+      "created": "Detektor erstellt und gebunden",
+      "failed": "Detektor konnte nicht erstellt werden",
+      "openDetector": "Detektor öffnen"
+    },
+    "meaning": {
+      "title": "Bedeutung",
+      "none": "Dieser Fund hat noch keine Bedeutung.",
+      "noneAsset": "Noch keine Konzepte.",
+      "assetHint": "Konzepte, für die dieses Asset ein Beleg ist.",
+      "impliedBy": "abgeleitet aus {{term}}",
+      "throughBinding": "über {{label}}",
+      "linkedBy": "verknüpft von {{by}}",
+      "unlink": "Verknüpfung entfernen",
+      "whatDoesThisMean": "Was bedeutet das?",
+      "linkByHand": "Mit Begriff verknüpfen",
+      "notePlaceholder": "Warum (optional)",
+      "link": "Verknüpfen",
+      "linked": "Verknüpft",
+      "support": "{{count}} Funde",
+      "gone": "Nicht mehr gestützt",
+      "history": "Früher",
+      "showHistory": "Frühere Konzepte zeigen",
+      "hideHistory": "Frühere Konzepte ausblenden"
+    },
+    "inquiry": {
+      "aboutLabel": "Über",
+      "aboutHint": "Nur Funde, die Belege für eines dieser Konzepte sind (Bindung ihrer Ausgabe oder manuelle Verknüpfung).",
+      "includeNarrower": "Untergeordnete Konzepte einbeziehen",
+      "remove": "{{term}} entfernen"
     }
   },
   "common": {
@@ -4145,6 +4495,17 @@
           "body": "Jemand hat diese Verbindung zu einer Beziehung des ganzen Arbeitsbereichs gemacht: Jeder Fall mit beiden sieht sie."
         }
       }
+    },
+    "term": {
+      "unknown": "Konzept",
+      "concept": "Konzept",
+      "linked": "{{count}} auf dem Board"
+    },
+    "meaning": {
+      "title": "Bedeutung",
+      "place": "Platzieren",
+      "show": "Hierher holen",
+      "truncated": "{{count}} weitere Konzepte nicht angezeigt"
     }
   },
   "caseCleanup": {
@@ -5997,5 +6358,36 @@
     "linkFailed": "Angelegt, konnte aber nicht verknüpft werden mit: {{titles}}",
     "open": "„{{title}}“ bei dieser Beobachtung öffnen",
     "more": "+{{count}} weitere"
+  },
+  "semanticMap": {
+    "title": "Bedeutung",
+    "subtitle": "{{concepts}} Konzepte · {{unbound}} Ausgaben ungebunden",
+    "loading": "Lädt…",
+    "loadFailed": "Die semantische Karte konnte nicht geladen werden",
+    "assets": "{{count}} Assets",
+    "minAssets": "Min. Assets",
+    "cooccurrence": "Gemeinsames Auftreten",
+    "layouts": {
+      "taxonomy": "Taxonomie",
+      "network": "Netzwerk"
+    },
+    "modes": {
+      "sources": "Quellen",
+      "meaning": "Bedeutung"
+    },
+    "rebuild": "Neu aufbauen",
+    "rebuildQueued": "Karte wird neu aufgebaut…",
+    "empty": {
+      "noConcepts": "Ihr Glossar hat noch keine Konzepte.",
+      "noConceptsHint": "Installieren Sie ein Startpaket oder importieren Sie SKOS oder CSV.",
+      "openGlossary": "Glossar öffnen",
+      "noLinks": "Noch ist nichts gebunden.",
+      "noLinksHint": "Binden Sie Detektor-Ausgaben an Konzepte, dann füllt sich die Karte.",
+      "bindOutputs": "Detektor-Ausgaben binden"
+    },
+    "unbound": "Ungebundenes Vokabular: {{outputs}} Ausgaben · {{findings}} offene Funde ohne Bedeutung.",
+    "review": "Prüfen",
+    "pending": "{{count}} offene Vorschläge",
+    "openTerm": "Begriff öffnen"
   }
 }
