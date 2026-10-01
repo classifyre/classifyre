@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ....models.generated_detectors import (
-    CustomDetectorPipelineSchema,
+    CodeDetectorPipelineSchema,
     GLiNER2PipelineSchema,
     ImageClassificationPipelineSchema,
     LLMPipelineSchema,
@@ -32,7 +32,7 @@ def create_runner(
         | ImageClassificationPipelineSchema
         | ObjectDetectionPipelineSchema
         | TagPipelineSchema
-        | CustomDetectorPipelineSchema
+        | CodeDetectorPipelineSchema
     ),
     detector_key: str = "",
     detector_name: str = "",
@@ -54,7 +54,7 @@ def create_runner(
     if isinstance(schema, TagPipelineSchema):
         return TagRunner(schema, detector_key, detector_name)
     # Same reason as TAG: a code detector must never fall through to GLiNER2.
-    if isinstance(schema, CustomDetectorPipelineSchema):
+    if isinstance(schema, CodeDetectorPipelineSchema):
         return CustomDetectorRunner(schema, detector_key, detector_name)
     # GLiNER2PipelineSchema is the default / backward-compat path
     return GLiNER2Runner(schema, detector_key, detector_name)

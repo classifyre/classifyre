@@ -502,7 +502,7 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Code detectors (CUSTOM_DETECTOR) read these with ctx.file(name).
+     * Code detectors (CODE_DETECTOR) read these with ctx.file(name).
      * List a code detector\'s uploaded files
      */
     async customDetectorsControllerListFilesRaw(requestParameters: CustomDetectorsControllerListFilesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<CustomDetectorFileDto>>> {
@@ -532,7 +532,7 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Code detectors (CUSTOM_DETECTOR) read these with ctx.file(name).
+     * Code detectors (CODE_DETECTOR) read these with ctx.file(name).
      * List a code detector\'s uploaded files
      */
     async customDetectorsControllerListFiles(requestParameters: CustomDetectorsControllerListFilesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<CustomDetectorFileDto>> {

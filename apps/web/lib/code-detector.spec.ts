@@ -8,7 +8,7 @@ import { isNonTrainableKind, resolveDetectorKind } from "./detector-kind";
 const DETECT = "def detect(asset, ctx):\n    yield Finding(label='x', value='y')\n";
 
 const stored = {
-  type: "CUSTOM_DETECTOR",
+  type: "CODE_DETECTOR",
   notebook: { revision: 4, cells: [{ id: "c1", type: "code", source: DETECT }] },
   variables: { limit: "5" },
   fields: [{ name: "expected", type: "number" }],
@@ -22,8 +22,8 @@ const stored = {
 };
 
 describe("code detector drafts", () => {
-  it("resolves CUSTOM_DETECTOR to the code editor, with nothing to train", () => {
-    expect(resolveDetectorKind({ type: "CUSTOM_DETECTOR" })).toBe("code");
+  it("resolves CODE_DETECTOR to the code editor, with nothing to train", () => {
+    expect(resolveDetectorKind({ type: "CODE_DETECTOR" })).toBe("code");
     expect(isNonTrainableKind("code")).toBe(true);
   });
 

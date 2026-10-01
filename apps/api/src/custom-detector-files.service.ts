@@ -22,7 +22,7 @@ const fileMetadataSelect = {
 } as const;
 
 /**
- * Files a code detector (CUSTOM_DETECTOR) reads with `ctx.file(name)`: a
+ * Files a code detector (CODE_DETECTOR) reads with `ctx.file(name)`: a
  * screening list, a scikit-learn model, a reference table.
  *
  * Stored in Postgres like source files, one per name: uploading a file with a
@@ -47,7 +47,7 @@ export class CustomDetectorFilesService {
     }
     if (!isCodeDetectorSchema(detector.pipelineSchema)) {
       throw new BadRequestException(
-        'Files can only be uploaded to code detectors (pipeline type CUSTOM_DETECTOR).',
+        'Files can only be uploaded to code detectors (pipeline type CODE_DETECTOR).',
       );
     }
   }

@@ -1,4 +1,4 @@
--- Code detectors (custom-detector pipeline type CUSTOM_DETECTOR, PRD G1).
+-- Code detectors (custom-detector pipeline type CODE_DETECTOR, PRD G1).
 --
 -- 1. Uploaded detector files (lists, models, reference tables) read with
 --    ctx.file(name). Bytes live in Postgres like source files do.

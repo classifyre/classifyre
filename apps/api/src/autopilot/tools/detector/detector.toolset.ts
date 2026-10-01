@@ -23,7 +23,7 @@ const PIPELINE_REQUIREMENTS = [
   'LLM → system_prompt + labels[] (and an aiProviderConfigId; never provider_runtime)',
   'TEXT_CLASSIFICATION / IMAGE_CLASSIFICATION / OBJECT_DETECTION → model (HuggingFace id; IMAGE_CLASSIFICATION has a default)',
   'TAG → not authorable here: a TAG detector runs nothing and only records a fact a CUSTOM connector notebook asserts, so it can never find anything you have not already been told',
-  `CUSTOM_DETECTOR → not authorable here: ${'a code detector runs Python inside every scan it is attached to'}; propose the rule to a person with operator.notify (include the notebook code) instead`,
+  `CODE_DETECTOR → not authorable here: ${'a code detector runs Python inside every scan it is attached to'}; propose the rule to a person with operator.notify (include the notebook code) instead`,
 ].join('; ');
 
 /**
@@ -32,7 +32,7 @@ const PIPELINE_REQUIREMENTS = [
  * changing one is a code change that a person reviews and makes.
  */
 const CODE_DETECTOR_REFUSAL =
-  'Refused: CUSTOM_DETECTOR (code) detectors run Python inside every scan they are attached to, ' +
+  'Refused: CODE_DETECTOR (code) detectors run Python inside every scan they are attached to, ' +
   'so the autopilot may not create, change, activate or dry-run one. Propose the rule to a person ' +
   'instead: call operator.notify with what it should catch, why, and the full detect(asset, ctx) ' +
   'notebook code for them to review and paste.';
@@ -550,6 +550,7 @@ export class DetectorToolset {
         decisionAction: AgentDecisionAction.UPDATE_DETECTOR,
         resolveGate: this.detectorGate,
         handler: async (input) => {
+          await this.assertNotCodeDetector(String(input.detectorId));
           const updated = await this.detectors.update(
             String(input.detectorId),
             {
@@ -578,6 +579,7 @@ export class DetectorToolset {
         decisionAction: AgentDecisionAction.DELETE_DETECTOR,
         resolveGate: this.detectorGate,
         handler: async (input) => {
+          await this.assertNotCodeDetector(String(input.detectorId));
           return this.detectors.delete(String(input.detectorId));
         },
       },

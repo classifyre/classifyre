@@ -195,7 +195,7 @@ export class NotebookController {
   @ApiOperation({
     summary: "Run a code detector's notebook",
     description:
-      'Code detectors (pipeline type CUSTOM_DETECTOR) only. "cell"/"all" replay the cells with the detector\'s variables, secrets and files; "preview_detect" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.',
+      'Code detectors (pipeline type CODE_DETECTOR) only. "cell"/"all" replay the cells with the detector\'s variables, secrets and files; "preview_detect" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.',
   })
   @ApiResponse({ status: 202, type: NotebookExecutionDto })
   async createDetectorExecution(

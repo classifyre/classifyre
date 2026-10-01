@@ -1,6 +1,6 @@
 """What a code detector sees: ``detect(asset, ctx)``, ``Finding`` and ``ctx``.
 
-A code detector (pipeline type ``CUSTOM_DETECTOR``) is the judging half of the
+A code detector (pipeline type ``CODE_DETECTOR``) is the judging half of the
 notebook story. Augmentation *adds* to an asset; a detector *judges* it. So the
 surface here is the augmentation one with the writers taken away:
 

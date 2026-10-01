@@ -2189,7 +2189,7 @@
     "DetectorOutputField": {
       "title": "DetectorOutputField",
       "type": "object",
-      "description": "One typed output field a detector writes into extracted_data (contract C3). Shared by code detectors and, later, LLM extraction.",
+      "description": "One typed output field a detector writes into extracted_data. Shared by code detectors and, later, LLM extraction.",
       "properties": {
         "name": {
           "type": "string",
@@ -2217,8 +2217,8 @@
       "required": ["name"],
       "additionalProperties": false
     },
-    "CustomDetectorLimits": {
-      "title": "CustomDetectorLimits",
+    "CodeDetectorLimits": {
+      "title": "CodeDetectorLimits",
       "type": "object",
       "description": "Per-run limits for a code detector. Every limit is contained: exceeding one costs that asset (an ERROR outcome, existing findings kept), never the scan.",
       "properties": {
@@ -2273,8 +2273,8 @@
       },
       "additionalProperties": false
     },
-    "CustomDetectorFileRuntime": {
-      "title": "CustomDetectorFileRuntime",
+    "CodeDetectorFileRuntime": {
+      "title": "CodeDetectorFileRuntime",
       "type": "object",
       "description": "Runtime-only: one uploaded detector file, injected by the server at dispatch. Clients never send it.",
       "properties": {
@@ -2298,15 +2298,15 @@
       "required": ["id", "name", "content_hash"],
       "additionalProperties": false
     },
-    "CustomDetectorPipelineSchema": {
-      "title": "CustomDetectorPipelineSchema",
+    "CodeDetectorPipelineSchema": {
+      "title": "CodeDetectorPipelineSchema",
       "type": "object",
       "description": "A code detector: a Python notebook that defines detect(asset, ctx) and yields Finding(...) objects. It runs once per asset in the scan's detector stage, after every other detector, and can read the asset's text, pages, raw bytes, rows and metadata (and, with needs_findings, the findings other detectors produced on the same asset in this run). It judges; it never rewrites what the connector extracted. Use it for checks and rules a pattern or a model cannot express: totals that must add up, list screening, co-occurrence rules, checksummed identifiers, bring-your-own model scoring.",
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["CUSTOM_DETECTOR"],
-          "default": "CUSTOM_DETECTOR"
+          "enum": ["CODE_DETECTOR"],
+          "default": "CODE_DETECTOR"
         },
         "notebook": {
           "$ref": "#/definitions/DetectorNotebook"
@@ -2321,14 +2321,15 @@
         },
         "variables": {
           "type": "object",
-          "additionalProperties": { "type": "string" },
+          "additionalProperties": { "type": "string", "maxLength": 8192 },
           "maxProperties": 64,
           "description": "Non-secret settings, read with ctx.var(name)."
         },
         "secrets": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 8192
           },
           "maxProperties": 64,
           "description": "Credentials, read with ctx.secret(name). Write-only over the API, encrypted at rest, decrypted only into the child process, redacted from every log."
@@ -2363,7 +2364,7 @@
           "description": "Expose asset.findings: what the other detectors found on this asset in this run. Code detectors never see each other's findings."
         },
         "limits": {
-          "$ref": "#/definitions/CustomDetectorLimits"
+          "$ref": "#/definitions/CodeDetectorLimits"
         },
         "scope": {
           "anyOf": [
@@ -2389,10 +2390,18 @@
           "default": null,
           "description": "Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures."
         },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "description": "Ids of uploaded detector files (custom_detector_files rows) this rule reads with ctx.file(name). Managed through the detector files endpoints; the server injects name, content hash and download URL as files_runtime at dispatch."
+        },
         "files_runtime": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/CustomDetectorFileRuntime"
+            "$ref": "#/definitions/CodeDetectorFileRuntime"
           },
           "description": "Runtime-only: the detector's uploaded files, injected by the server at dispatch. Rejected on create/update."
         },
@@ -2429,7 +2438,7 @@
           "$ref": "#/definitions/TagPipelineSchema"
         },
         {
-          "$ref": "#/definitions/CustomDetectorPipelineSchema"
+          "$ref": "#/definitions/CodeDetectorPipelineSchema"
         }
       ],
       "discriminator": {

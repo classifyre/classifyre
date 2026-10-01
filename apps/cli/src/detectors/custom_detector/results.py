@@ -17,6 +17,7 @@ That is where the detector's configuration is enforced:
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Iterable, Mapping
 from datetime import UTC, datetime
 from typing import Any
@@ -28,7 +29,7 @@ from ...models.generated_single_asset_scan_results import (
     Location,
 )
 
-RUNNER = "CUSTOM_DETECTOR"
+RUNNER = "CODE_DETECTOR"
 
 _SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
 _DEFAULT_SEVERITY = "medium"
@@ -37,6 +38,18 @@ _DEFAULT_SEVERITY = "medium"
 MAX_MESSAGE_CHARS = 2000
 MAX_VALUE_CHARS = 10_000
 MAX_IDENTITY_CHARS = 256
+
+
+def _identity_key(identity: str) -> str:
+    """A wire ``identity_key`` of at most 256 chars; longer keys hash.
+
+    Mirrors ``generateDetectionIdentity``'s ``hashIdentityKey`` on the API:
+    short keys travel verbatim (readable in the UI), long ones as their
+    SHA-256 hex digest, so every layer keys the same finding the same way.
+    """
+    if len(identity) <= MAX_IDENTITY_CHARS:
+        return identity
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
 
 def _severity_name(value: Any) -> str | None:
@@ -199,7 +212,12 @@ class FindingMapper:
         extracted = self._fields(payload.get("fields"))
 
         identity = payload.get("identity")
-        identity_key = str(identity)[:MAX_IDENTITY_CHARS] if identity not in (None, "") else None
+        # Overlong keys are hashed, never truncated: truncation collides
+        # ("row-111..." vs "row-111..." with a different tail become one
+        # finding), and the API applies the same hash, so both sides agree.
+        identity_key = (
+            _identity_key(str(identity)) if identity not in (None, "") else None
+        )
         if identity_key is not None:
             metadata["identity"] = identity_key
 
@@ -245,4 +263,4 @@ class FindingMapper:
         return kept or None
 
 
-__all__ = ["RUNNER", "FindingMapper", "bound_severity"]
+__all__ = ["RUNNER", "FindingMapper", "bound_severity", "_identity_key"]

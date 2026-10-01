@@ -28,7 +28,7 @@ def _detector(source: str = RULE) -> dict[str, Any]:
         "key": "needle_rule",
         "name": "Needle rule",
         "pipeline_schema": {
-            "type": "CUSTOM_DETECTOR",
+            "type": "CODE_DETECTOR",
             "notebook": {"revision": 3, "cells": [{"id": "c1", "type": "code", "source": source}]},
             "variables": {"needle": "haystack-needle"},
         },

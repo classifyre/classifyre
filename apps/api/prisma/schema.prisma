@@ -185,7 +185,7 @@ enum NotebookExecutionMode {
 enum NotebookScope {
   CONNECTOR
   AUGMENTATION
-  // A code detector's notebook (custom-detector pipeline type CUSTOM_DETECTOR).
+  // A code detector's notebook (custom-detector pipeline type CODE_DETECTOR).
   DETECTOR
 }
 
@@ -728,7 +728,7 @@ model CustomDetectorTrainingRun {
   @@map("custom_detector_training_runs")
 }
 
-/// A file uploaded to a code detector (CUSTOM_DETECTOR): a screening list, a
+/// A file uploaded to a code detector (CODE_DETECTOR): a screening list, a
 /// model, a reference table. The rule reads it with ctx.file(name).
 model CustomDetectorFile {
   id               String         @id @default(uuid())

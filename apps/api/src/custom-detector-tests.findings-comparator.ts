@@ -1,5 +1,5 @@
 /**
- * Expected-outcome matching for code detectors (CUSTOM_DETECTOR).
+ * Expected-outcome matching for code detectors (CODE_DETECTOR).
  *
  * A code detector reports a *list* of findings, each named by its label and
  * made stable by its identity, so a scenario asserts a list too:

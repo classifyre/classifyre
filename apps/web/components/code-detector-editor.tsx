@@ -92,7 +92,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * A code detector (pipeline type CUSTOM_DETECTOR): a Python notebook that
+ * A code detector (pipeline type CODE_DETECTOR): a Python notebook that
  * defines `detect(asset, ctx)` and yields findings.
  *
  * Built from the notebook editor's parts -- cells, packages, variables and
@@ -461,6 +461,38 @@ export const CodeDetectorEditor = React.forwardRef<
         </div>
       </Card>
 
+      {/* ── Packages, variables, secrets (before the code: cells read them via ctx) ── */}
+      <Card className="p-6 space-y-4 border-2 border-border">
+        <SectionTitle>{t("detectors.code.environmentTitle")}</SectionTitle>
+        <KeyValueField
+          entries={draft.variables}
+          onChange={(variables) => update({ variables })}
+          label={t("notebook.config.variablesTitle")}
+          description={t("detectors.code.variablesHint")}
+          emptyHint={t("notebook.config.variablesEmpty")}
+          addLabel={t("notebook.config.addVariable")}
+          keyPlaceholder="threshold"
+          valuePlaceholder="0.9"
+          testId="code-detector-variables"
+        />
+        <KeyValueField
+          entries={draft.secrets}
+          onChange={(secrets) => update({ secrets })}
+          secret
+          label={t("notebook.config.secretsTitle")}
+          description={t("detectors.code.secretsHint")}
+          emptyHint={t("notebook.config.secretsEmpty")}
+          addLabel={t("notebook.config.addSecret")}
+          keyPlaceholder="api_token"
+          testId="code-detector-secrets"
+        />
+        <PackageTable
+          packages={draft.packages}
+          onChange={(packages) => update({ packages })}
+        />
+        <AvailablePackages />
+      </Card>
+
       {/* ── The code ── */}
       <Card className="p-6 space-y-4 border-2 border-border">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -536,38 +568,6 @@ export const CodeDetectorEditor = React.forwardRef<
               execution?.failedCellId === cellId &&
               execution.targetCellId !== cellId,
           })}
-        />
-      </Card>
-
-      {/* ── Packages, variables, secrets ── */}
-      <Card className="p-6 space-y-4 border-2 border-border">
-        <SectionTitle>{t("detectors.code.environmentTitle")}</SectionTitle>
-        <PackageTable
-          packages={draft.packages}
-          onChange={(packages) => update({ packages })}
-        />
-        <AvailablePackages />
-        <KeyValueField
-          entries={draft.variables}
-          onChange={(variables) => update({ variables })}
-          label={t("notebook.config.variablesTitle")}
-          description={t("detectors.code.variablesHint")}
-          emptyHint={t("notebook.config.variablesEmpty")}
-          addLabel={t("notebook.config.addVariable")}
-          keyPlaceholder="threshold"
-          valuePlaceholder="0.9"
-          testId="code-detector-variables"
-        />
-        <KeyValueField
-          entries={draft.secrets}
-          onChange={(secrets) => update({ secrets })}
-          secret
-          label={t("notebook.config.secretsTitle")}
-          description={t("detectors.code.secretsHint")}
-          emptyHint={t("notebook.config.secretsEmpty")}
-          addLabel={t("notebook.config.addSecret")}
-          keyPlaceholder="api_token"
-          testId="code-detector-secrets"
         />
       </Card>
 

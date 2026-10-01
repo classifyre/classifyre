@@ -163,8 +163,8 @@ async def preview_detect(request: ExecutionRequest) -> ExecutionResponse:
         response.duration_ms = int((time.monotonic() - started) * 1000)
         return response
 
-    if str(schema.get("type") or "").upper() != "CUSTOM_DETECTOR":
-        return fail("NotACodeDetector", "preview_detect needs a CUSTOM_DETECTOR detector.")
+    if str(schema.get("type") or "").upper() != "CODE_DETECTOR":
+        return fail("NotACodeDetector", "preview_detect needs a CODE_DETECTOR detector.")
 
     report = validate_detector_notebook(detector_cells(detector))
     if not report.ok:
@@ -187,7 +187,9 @@ async def preview_detect(request: ExecutionRequest) -> ExecutionResponse:
     from ...sources import get_source
 
     try:
-        source = get_source(sampled)
+        # The recipe carries the source's id (the API decrypts it into the
+        # request); SANDBOX needs it to list the uploaded files.
+        source = get_source(sampled, source_id=sampled.get("source_id"))
     except Exception as exc:
         return fail("SourceBuildFailed", f"Could not build the source: {exc}")
 

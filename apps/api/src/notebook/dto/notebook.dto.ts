@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -24,7 +25,7 @@ export const CELL_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
  * (`ctx.var("api_base")`), so a key that is not a Python identifier would be
  * unreachable from the code that needs it.
  */
-export const CONFIG_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
+export const CONFIG_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 
 export class NotebookCellDto {
   @ApiProperty({ example: 'extract', pattern: CELL_ID_PATTERN.source })
@@ -187,6 +188,7 @@ export class CreateDetectorNotebookExecutionDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(10)
   maxAssets?: number;
 }
 

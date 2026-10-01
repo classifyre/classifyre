@@ -2890,7 +2890,7 @@
     },
     "/custom-detectors/{id}/files": {
       "get": {
-        "description": "Code detectors (CUSTOM_DETECTOR) read these with ctx.file(name).",
+        "description": "Code detectors (CODE_DETECTOR) read these with ctx.file(name).",
         "operationId": "CustomDetectorsController_listFiles",
         "parameters": [
           {
@@ -10125,7 +10125,7 @@
     },
     "/custom-detectors/{detectorId}/notebook/executions": {
       "post": {
-        "description": "Code detectors (pipeline type CUSTOM_DETECTOR) only. \"cell\"/\"all\" replay the cells with the detector's variables, secrets and files; \"preview_detect\" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.",
+        "description": "Code detectors (pipeline type CODE_DETECTOR) only. \"cell\"/\"all\" replay the cells with the detector's variables, secrets and files; \"preview_detect\" runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.",
         "operationId": "NotebookController_createDetectorExecution",
         "parameters": [
           {
@@ -16746,7 +16746,7 @@
             "description": "Which dimension of this detector's findings carries the answer — `findingType` for classifiers (the predicted label IS the answer), `matchedContent` for TAG and REGEX (the type names the rule, the value is the answer). The same distinction /inquiries/match-options reports, repeated here so a detector audit and a question author see one story."
           },
           "secretKeys": {
-            "description": "Code detectors (CUSTOM_DETECTOR) only: names of the secrets the detector holds. Values are write-only and never returned; send `secrets` as a patch on update (a string sets a key, null deletes it, an absent key is kept).",
+            "description": "Code detectors (CODE_DETECTOR) only: names of the secrets the detector holds. Values are write-only and never returned; send `secrets` as a patch on update (a string sets a key, null deletes it, an absent key is kept).",
             "type": "array",
             "items": {
               "type": "string"

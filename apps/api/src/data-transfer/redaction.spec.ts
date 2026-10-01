@@ -333,7 +333,7 @@ describe('transfer scope registry', () => {
     expect(missingDependencies(['sources', 'assets', 'findings'])).toEqual([]);
   });
 
-  describe('code detector secrets (CUSTOM_DETECTOR)', () => {
+  describe('code detector secrets (CODE_DETECTOR)', () => {
     it('strips pipelineSchema.secrets and keeps the notebook', () => {
       const spec = TRANSFER_TABLES.find(
         (table) => table.model === 'customDetector',
@@ -341,7 +341,7 @@ describe('transfer scope registry', () => {
       const { row, stripped } = redactRow(spec, {
         id: 'd1',
         pipelineSchema: {
-          type: 'CUSTOM_DETECTOR',
+          type: 'CODE_DETECTOR',
           notebook: {
             cells: [{ id: 'c', type: 'code', source: 'def detect(a): pass' }],
           },
@@ -350,7 +350,7 @@ describe('transfer scope registry', () => {
       });
       expect(stripped).toEqual(['pipelineSchema.secrets']);
       expect(row.pipelineSchema).toEqual({
-        type: 'CUSTOM_DETECTOR',
+        type: 'CODE_DETECTOR',
         notebook: {
           cells: [{ id: 'c', type: 'code', source: 'def detect(a): pass' }],
         },

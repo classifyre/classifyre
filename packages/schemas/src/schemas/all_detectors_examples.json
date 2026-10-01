@@ -966,28 +966,54 @@
         "custom_detector_key": "control_evasion_intent",
         "name": "Control-Evasion Intent Detector",
         "description": "Detect contextual requests to conceal activity or deliberately bypass controls",
-        "languages": ["en"],
+        "languages": [
+          "en"
+        ],
         "pipeline_schema": {
           "type": "LLM",
           "system_prompt": "Classify whether the content contains an explicit request, agreement, or instruction to conceal activity, bypass an approval or monitoring control, or evade a stated policy. Use only evidence present in the content. Ordinary urgency, confidentiality, disagreement with policy, or a hypothetical discussion is benign unless the text connects an actor and action to deliberate circumvention or concealment. Return an empty labels array for benign content; otherwise return the strongest applicable label and quote the shortest supporting passage.",
           "response_example": "{\"labels\":[{\"name\":\"control_evasion\",\"confidence\":0.96,\"matched_content\":\"Keep each invoice below 10k so compliance does not review it.\"}],\"fields\":{\"actor\":\"regional manager\",\"requested_action\":\"split the invoice to avoid approval\",\"control_or_policy\":\"purchase approval threshold\",\"evidence_quote\":\"Keep each invoice below 10k so compliance does not review it.\"}}",
           "temperature": 0,
           "labels": [
-            { "name": "control_evasion", "description": "Deliberate bypass of an approval, monitoring, reporting, or policy control" },
-            { "name": "concealment", "description": "Deliberate hiding, deletion, disguising, or off-channel movement intended to prevent discovery" }
+            {
+              "name": "control_evasion",
+              "description": "Deliberate bypass of an approval, monitoring, reporting, or policy control"
+            },
+            {
+              "name": "concealment",
+              "description": "Deliberate hiding, deletion, disguising, or off-channel movement intended to prevent discovery"
+            }
           ],
           "multi_label": false,
           "severity": "info",
           "severity_map": [
-            { "pattern": "control_evasion", "severity": "high" },
-            { "pattern": "concealment", "severity": "high" }
+            {
+              "pattern": "control_evasion",
+              "severity": "high"
+            },
+            {
+              "pattern": "concealment",
+              "severity": "high"
+            }
           ],
           "confidence_threshold": 0.75,
           "output_fields": [
-            { "name": "actor", "description": "Person or role requesting or agreeing to the action" },
-            { "name": "requested_action", "description": "Action intended to bypass or conceal" },
-            { "name": "control_or_policy", "description": "Control, review, reporting duty, or policy being evaded" },
-            { "name": "evidence_quote", "description": "Shortest exact supporting passage" }
+            {
+              "name": "actor",
+              "description": "Person or role requesting or agreeing to the action"
+            },
+            {
+              "name": "requested_action",
+              "description": "Action intended to bypass or conceal"
+            },
+            {
+              "name": "control_or_policy",
+              "description": "Control, review, reporting duty, or policy being evaded"
+            },
+            {
+              "name": "evidence_quote",
+              "description": "Shortest exact supporting passage"
+            }
           ],
           "content_limit": 8000
         }
@@ -1000,7 +1026,10 @@
         "custom_detector_key": "cust_support_ticket",
         "name": "Support Ticket Extractor",
         "description": "Extract order IDs, amounts, and intent from support tickets",
-        "languages": ["de", "en"],
+        "languages": [
+          "de",
+          "en"
+        ],
         "pipeline_schema": {
           "type": "GLINER2",
           "model": {
@@ -1008,13 +1037,29 @@
             "path": null
           },
           "entities": {
-            "order_id": { "description": "Order ID like ORD-123", "required": true },
-            "amount": { "description": "Monetary value like 50€", "required": false }
+            "order_id": {
+              "description": "Order ID like ORD-123",
+              "required": true
+            },
+            "amount": {
+              "description": "Monetary value like 50€",
+              "required": false
+            }
           },
           "classification": {
-            "intent": { "labels": ["refund", "bug", "question"], "multi_label": false }
+            "intent": {
+              "labels": [
+                "refund",
+                "bug",
+                "question"
+              ],
+              "multi_label": false
+            }
           },
-          "validation": { "confidence_threshold": 0.8, "rules": [] }
+          "validation": {
+            "confidence_threshold": 0.8,
+            "rules": []
+          }
         }
       }
     },
@@ -1025,16 +1070,31 @@
         "custom_detector_key": "cust_dach_entity_extractor",
         "name": "DACH Regulatory Entity Extractor",
         "description": "Extract regulatory entities (GDPR articles, supervisory bodies, risk terms)",
-        "languages": ["de", "en"],
+        "languages": [
+          "de",
+          "en"
+        ],
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {
-            "regulatory_body": { "description": "Supervisory authority like BaFin, FINMA, FMA", "required": false },
-            "gdpr_article": { "description": "GDPR article reference like 'Art. 6 DSGVO'", "required": false },
-            "risk_term": { "description": "Legal risk term like 'Haftung ausgeschlossen'", "required": false }
+            "regulatory_body": {
+              "description": "Supervisory authority like BaFin, FINMA, FMA",
+              "required": false
+            },
+            "gdpr_article": {
+              "description": "GDPR article reference like 'Art. 6 DSGVO'",
+              "required": false
+            },
+            "risk_term": {
+              "description": "Legal risk term like 'Haftung ausgeschlossen'",
+              "required": false
+            }
           },
           "classification": {},
-          "validation": { "confidence_threshold": 0.72, "rules": [] }
+          "validation": {
+            "confidence_threshold": 0.72,
+            "rules": []
+          }
         }
       }
     },
@@ -1045,17 +1105,29 @@
         "custom_detector_key": "cust_dach_contract_risk",
         "name": "DACH Contract Risk Terms",
         "description": "Detect legal/compliance risk language in DACH contracts",
-        "languages": ["de", "en"],
+        "languages": [
+          "de",
+          "en"
+        ],
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {},
           "classification": {
             "risk_category": {
-              "labels": ["liability", "data_protection", "termination", "indemnification", "none"],
+              "labels": [
+                "liability",
+                "data_protection",
+                "termination",
+                "indemnification",
+                "none"
+              ],
               "multi_label": true
             }
           },
-          "validation": { "confidence_threshold": 0.75, "rules": [] }
+          "validation": {
+            "confidence_threshold": 0.75,
+            "rules": []
+          }
         }
       }
     },
@@ -1066,7 +1138,10 @@
         "custom_detector_key": "internal_product_codes",
         "name": "Internal Product Code Detector",
         "description": "Detect internal SKU and project code leakage in public docs",
-        "languages": ["en", "de"],
+        "languages": [
+          "en",
+          "de"
+        ],
         "pipeline_schema": {
           "type": "REGEX",
           "patterns": {
@@ -1090,7 +1165,10 @@
       "config": {
         "custom_detector_key": "cust_invoice_pii_ruleset",
         "name": "German Invoice PII Ruleset",
-        "languages": ["de", "en"],
+        "languages": [
+          "de",
+          "en"
+        ],
         "pipeline_schema": {
           "type": "REGEX",
           "patterns": {
@@ -1120,7 +1198,9 @@
         "custom_detector_key": "api_key_leakage",
         "name": "API Key Leakage Detector",
         "description": "Detect leaked API keys, tokens, and secrets in documents and code snippets",
-        "languages": ["en"],
+        "languages": [
+          "en"
+        ],
         "pipeline_schema": {
           "type": "REGEX",
           "patterns": {
@@ -1154,17 +1234,27 @@
         "custom_detector_key": "sarcasm_detector",
         "name": "Sarcasm & Irony Detector",
         "description": "Detect sarcasm and irony in user-generated content",
-        "languages": ["en", "de"],
+        "languages": [
+          "en",
+          "de"
+        ],
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {},
           "classification": {
             "tone": {
-              "labels": ["sarcastic", "ironic", "sincere"],
+              "labels": [
+                "sarcastic",
+                "ironic",
+                "sincere"
+              ],
               "multi_label": false
             }
           },
-          "validation": { "confidence_threshold": 0.72, "rules": [] }
+          "validation": {
+            "confidence_threshold": 0.72,
+            "rules": []
+          }
         }
       }
     },
@@ -1178,12 +1268,24 @@
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {
-            "vendor_name": { "description": "Company or vendor name", "required": false },
-            "contract_value": { "description": "Contract value like 50.000 EUR", "required": false },
-            "delivery_term": { "description": "Incoterms like FOB, CIF, DDP", "required": false }
+            "vendor_name": {
+              "description": "Company or vendor name",
+              "required": false
+            },
+            "contract_value": {
+              "description": "Contract value like 50.000 EUR",
+              "required": false
+            },
+            "delivery_term": {
+              "description": "Incoterms like FOB, CIF, DDP",
+              "required": false
+            }
           },
           "classification": {},
-          "validation": { "confidence_threshold": 0.55, "rules": [] }
+          "validation": {
+            "confidence_threshold": 0.55,
+            "rules": []
+          }
         }
       }
     },
@@ -1199,7 +1301,10 @@
           "device": "cpu",
           "confidence_threshold": 0.8,
           "severity_map": [
-            { "pattern": "spam", "severity": "high" }
+            {
+              "pattern": "spam",
+              "severity": "high"
+            }
           ]
         }
       }
@@ -1216,8 +1321,14 @@
           "device": "cpu",
           "confidence_threshold": 0.85,
           "severity_map": [
-            { "pattern": "negative", "severity": "medium" },
-            { "pattern": "positive", "severity": "info" }
+            {
+              "pattern": "negative",
+              "severity": "medium"
+            },
+            {
+              "pattern": "positive",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1235,10 +1346,22 @@
           "top_k": 5,
           "confidence_threshold": 0.7,
           "severity_map": [
-            { "pattern": "nsfw", "severity": "critical" },
-            { "pattern": "explicit", "severity": "critical" },
-            { "pattern": "suggestive", "severity": "high" },
-            { "pattern": "normal", "severity": "info" }
+            {
+              "pattern": "nsfw",
+              "severity": "critical"
+            },
+            {
+              "pattern": "explicit",
+              "severity": "critical"
+            },
+            {
+              "pattern": "suggestive",
+              "severity": "high"
+            },
+            {
+              "pattern": "normal",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1257,8 +1380,14 @@
           "top_k": 2,
           "confidence_threshold": 0.7,
           "severity_map": [
-            { "pattern": "nsfw", "severity": "critical" },
-            { "pattern": "normal", "severity": "info" }
+            {
+              "pattern": "nsfw",
+              "severity": "critical"
+            },
+            {
+              "pattern": "normal",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1304,9 +1433,18 @@
           "device": "cpu",
           "confidence_threshold": 0.6,
           "severity_map": [
-            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
-            { "pattern": "person|human", "severity": "high" },
-            { "pattern": "car|truck|motorcycle", "severity": "medium" }
+            {
+              "pattern": "knife|weapon|gun|rifle|pistol",
+              "severity": "critical"
+            },
+            {
+              "pattern": "person|human",
+              "severity": "high"
+            },
+            {
+              "pattern": "car|truck|motorcycle",
+              "severity": "medium"
+            }
           ]
         }
       }
@@ -1333,7 +1471,9 @@
         "custom_detector_key": "finbert_sentiment",
         "name": "Financial Sentiment (FinBERT)",
         "description": "Detect negative or uncertain sentiment in financial documents",
-        "languages": ["en"],
+        "languages": [
+          "en"
+        ],
         "pipeline_schema": {
           "type": "TEXT_CLASSIFICATION",
           "model": "ProsusAI/finbert",
@@ -1341,9 +1481,18 @@
           "confidence_threshold": 0.75,
           "severity": "info",
           "severity_map": [
-            { "pattern": "negative", "severity": "high" },
-            { "pattern": "neutral", "severity": "low" },
-            { "pattern": "positive", "severity": "info" }
+            {
+              "pattern": "negative",
+              "severity": "high"
+            },
+            {
+              "pattern": "neutral",
+              "severity": "low"
+            },
+            {
+              "pattern": "positive",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1355,7 +1504,9 @@
         "custom_detector_key": "twitter_roberta_sentiment",
         "name": "Social Media Sentiment (RoBERTa)",
         "description": "Detect negative or neutral sentiment in social media and user-generated content",
-        "languages": ["en"],
+        "languages": [
+          "en"
+        ],
         "pipeline_schema": {
           "type": "TEXT_CLASSIFICATION",
           "model": "cardiffnlp/twitter-roberta-base-sentiment-latest",
@@ -1363,9 +1514,18 @@
           "confidence_threshold": 0.7,
           "severity": "info",
           "severity_map": [
-            { "pattern": "negative", "severity": "medium" },
-            { "pattern": "neutral", "severity": "low" },
-            { "pattern": "positive", "severity": "info" }
+            {
+              "pattern": "negative",
+              "severity": "medium"
+            },
+            {
+              "pattern": "neutral",
+              "severity": "low"
+            },
+            {
+              "pattern": "positive",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1377,7 +1537,19 @@
         "custom_detector_key": "language_detector",
         "name": "Language Detector (XLM-RoBERTa)",
         "description": "Detect the language of document content for routing and compliance",
-        "languages": ["en", "de", "fr", "es", "it", "nl", "pt", "ru", "zh", "ja", "ar"],
+        "languages": [
+          "en",
+          "de",
+          "fr",
+          "es",
+          "it",
+          "nl",
+          "pt",
+          "ru",
+          "zh",
+          "ja",
+          "ar"
+        ],
         "pipeline_schema": {
           "type": "TEXT_CLASSIFICATION",
           "model": "papluca/xlm-roberta-base-language-detection",
@@ -1395,7 +1567,9 @@
         "custom_detector_key": "toxic_content_detector",
         "name": "Toxic Content Detector",
         "description": "Detect toxic and abusive language in user-generated content using a binary RoBERTa-base toxicity classifier",
-        "languages": ["en"],
+        "languages": [
+          "en"
+        ],
         "pipeline_schema": {
           "type": "TEXT_CLASSIFICATION",
           "model": "s-nlp/roberta_toxicity_classifier",
@@ -1403,8 +1577,14 @@
           "confidence_threshold": 0.75,
           "severity": "info",
           "severity_map": [
-            { "pattern": "toxic", "severity": "high" },
-            { "pattern": "neutral", "severity": "info" }
+            {
+              "pattern": "toxic",
+              "severity": "high"
+            },
+            {
+              "pattern": "neutral",
+              "severity": "info"
+            }
           ]
         }
       }
@@ -1471,9 +1651,18 @@
           "confidence_threshold": 0.5,
           "top_k": 20,
           "severity_map": [
-            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
-            { "pattern": "person|human", "severity": "high" },
-            { "pattern": "car|truck|bus|motorcycle", "severity": "medium" }
+            {
+              "pattern": "knife|weapon|gun|rifle|pistol",
+              "severity": "critical"
+            },
+            {
+              "pattern": "person|human",
+              "severity": "high"
+            },
+            {
+              "pattern": "car|truck|bus|motorcycle",
+              "severity": "medium"
+            }
           ]
         }
       }
@@ -1492,9 +1681,18 @@
           "confidence_threshold": 0.5,
           "top_k": 20,
           "severity_map": [
-            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
-            { "pattern": "person|human", "severity": "high" },
-            { "pattern": "car|truck|bus|motorcycle", "severity": "medium" }
+            {
+              "pattern": "knife|weapon|gun|rifle|pistol",
+              "severity": "critical"
+            },
+            {
+              "pattern": "person|human",
+              "severity": "high"
+            },
+            {
+              "pattern": "car|truck|bus|motorcycle",
+              "severity": "medium"
+            }
           ]
         }
       }
@@ -1513,9 +1711,18 @@
           "confidence_threshold": 0.5,
           "top_k": 30,
           "severity_map": [
-            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
-            { "pattern": "person|human", "severity": "high" },
-            { "pattern": "car|truck|bus|motorcycle", "severity": "medium" }
+            {
+              "pattern": "knife|weapon|gun|rifle|pistol",
+              "severity": "critical"
+            },
+            {
+              "pattern": "person|human",
+              "severity": "high"
+            },
+            {
+              "pattern": "car|truck|bus|motorcycle",
+              "severity": "medium"
+            }
           ]
         }
       }
@@ -1528,7 +1735,7 @@
         "name": "Starter code detector",
         "description": "Flags assets that mention a configured word",
         "pipeline_schema": {
-          "type": "CUSTOM_DETECTOR",
+          "type": "CODE_DETECTOR",
           "notebook": {
             "revision": 1,
             "cells": [
@@ -1582,7 +1789,7 @@
         "name": "Row integrity (totals add up)",
         "description": "Every total equals the sum of its parts",
         "pipeline_schema": {
-          "type": "CUSTOM_DETECTOR",
+          "type": "CODE_DETECTOR",
           "notebook": {
             "revision": 1,
             "cells": [
@@ -1697,7 +1904,7 @@
         "name": "List screening (sanctions / PEP)",
         "description": "Names that appear on a screening list",
         "pipeline_schema": {
-          "type": "CUSTOM_DETECTOR",
+          "type": "CODE_DETECTOR",
           "notebook": {
             "revision": 1,
             "cells": [
@@ -1771,7 +1978,7 @@
         "name": "IBAN next to special-category data",
         "description": "Bank details next to special-category personal data",
         "pipeline_schema": {
-          "type": "CUSTOM_DETECTOR",
+          "type": "CODE_DETECTOR",
           "notebook": {
             "revision": 1,
             "cells": [
@@ -1842,7 +2049,7 @@
         "name": "Metadata threshold",
         "description": "An asset-metadata value past a threshold",
         "pipeline_schema": {
-          "type": "CUSTOM_DETECTOR",
+          "type": "CODE_DETECTOR",
           "notebook": {
             "revision": 1,
             "cells": [
@@ -1922,7 +2129,7 @@
         "name": "Bring your own model",
         "description": "Pages an uploaded model scores as positive",
         "pipeline_schema": {
-          "type": "CUSTOM_DETECTOR",
+          "type": "CODE_DETECTOR",
           "notebook": {
             "revision": 1,
             "cells": [

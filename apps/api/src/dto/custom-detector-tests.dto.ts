@@ -28,7 +28,7 @@ export const expectedOutcomeSchema = z.object({
 // ── Request DTOs ─────────────────────────────────────────────────────────────
 
 /**
- * A whole asset for a code detector (CUSTOM_DETECTOR) to judge: what
+ * A whole asset for a code detector (CODE_DETECTOR) to judge: what
  * `asset.name`, `asset.kind`, `asset.metadata`, `asset.text()`, `asset.pages()`
  * and `asset.rows()` return. Strict, so a typo is a 400 rather than a key the
  * rule silently never sees.

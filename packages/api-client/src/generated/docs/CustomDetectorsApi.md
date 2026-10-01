@@ -618,7 +618,7 @@ No authorization required
 
 List a code detector\&#39;s uploaded files
 
-Code detectors (CUSTOM_DETECTOR) read these with ctx.file(name).
+Code detectors (CODE_DETECTOR) read these with ctx.file(name).
 
 ### Example
 

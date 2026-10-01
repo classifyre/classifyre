@@ -36,6 +36,29 @@ const llmSchema = { type: 'LLM' };
 const glinerSchema = { type: 'GLINER2' };
 const regexSchema = { type: 'REGEX' };
 
+describe('secretValues — redaction input', () => {
+  it('returns decrypted secret strings and nothing else', () => {
+    const service = new CustomDetectorTestsService(
+      null as never,
+      null as never,
+      undefined,
+    );
+    const values = (
+      service as unknown as {
+        secretValues: (s: Record<string, unknown>) => string[];
+      }
+    ).secretValues({ secrets: { a: 's3cr3t', b: '', c: 42 } });
+    expect(values).toEqual(['s3cr3t']);
+    expect(
+      (
+        service as unknown as {
+          secretValues: (s: Record<string, unknown>) => string[];
+        }
+      ).secretValues({}),
+    ).toEqual([]);
+  });
+});
+
 describe('compareOutcome — REGEX shouldMatch', () => {
   it('PASS when shouldMatch and matched agree', () => {
     expect(

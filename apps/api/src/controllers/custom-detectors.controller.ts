@@ -188,7 +188,7 @@ export class CustomDetectorsController {
   @ApiOperation({
     summary: "List a code detector's uploaded files",
     description:
-      'Code detectors (CUSTOM_DETECTOR) read these with ctx.file(name).',
+      'Code detectors (CODE_DETECTOR) read these with ctx.file(name).',
   })
   @ApiResponse({ status: 200, type: [CustomDetectorFileDto] })
   listFiles(@Param('id') id: string) {
@@ -230,6 +230,10 @@ export class CustomDetectorsController {
     return this.detectorFiles.create({ customDetectorId: id, ...upload });
   }
 
+  // The scan jobs' init containers (and the API itself on their behalf)
+  // stream these bytes with the internal key; operator traffic uses the
+  // normal session. The endpoint accepts both: @InternalOnly would lock
+  // operators out of their own lists and models.
   @Get(':id/files/:fileId/content')
   @ApiOperation({ summary: "Stream a code detector file's bytes" })
   async fileContent(

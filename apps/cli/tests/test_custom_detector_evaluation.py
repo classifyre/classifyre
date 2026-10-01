@@ -26,7 +26,7 @@ DETECTORS = [
             "custom_detector_key": "totals",
             "name": "Totals",
             "pipeline_schema": {
-                "type": "CUSTOM_DETECTOR",
+                "type": "CODE_DETECTOR",
                 "notebook": {"cells": [{"id": "c", "type": "code", "source": RULE}]},
             },
         },

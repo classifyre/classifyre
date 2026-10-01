@@ -1,5 +1,5 @@
 /**
- * Code detectors: the custom-detector pipeline type `CUSTOM_DETECTOR`.
+ * Code detectors: the custom-detector pipeline type `CODE_DETECTOR`.
  *
  * Pure translation between the stored pipeline schema and the editor's form
  * state, kept out of the component so the rules (secret patches, preserved
@@ -15,7 +15,7 @@ import {
 import { definesFunction, type NotebookCell } from "./notebook-cells";
 import { packagesToConfig, type NotebookPackage } from "./notebook-packages";
 
-export const CUSTOM_DETECTOR_PIPELINE_TYPE = "CUSTOM_DETECTOR";
+export const CODE_DETECTOR_PIPELINE_TYPE = "CODE_DETECTOR";
 
 export const CODE_DETECTOR_FIELD_TYPES = [
   "string",
@@ -88,7 +88,7 @@ export function isCodeDetectorSchema(schema: unknown): boolean {
   return (
     isRecord(schema) &&
     typeof schema.type === "string" &&
-    schema.type.toUpperCase() === CUSTOM_DETECTOR_PIPELINE_TYPE
+    schema.type.toUpperCase() === CODE_DETECTOR_PIPELINE_TYPE
   );
 }
 
@@ -185,7 +185,7 @@ export function draftToSchema(
   else delete scope.asset_kinds;
 
   const schema: Json = {
-    type: CUSTOM_DETECTOR_PIPELINE_TYPE,
+    type: CODE_DETECTOR_PIPELINE_TYPE,
     notebook: { revision: draft.revision, cells: draft.cells },
     packages: packagesToConfig(draft.packages),
     variables: entriesToRecord(draft.variables),

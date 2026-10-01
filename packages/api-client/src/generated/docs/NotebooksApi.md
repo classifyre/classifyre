@@ -91,7 +91,7 @@ No authorization required
 
 Run a code detector\&#39;s notebook
 
-Code detectors (pipeline type CUSTOM_DETECTOR) only. \&quot;cell\&quot;/\&quot;all\&quot; replay the cells with the detector\&#39;s variables, secrets and files; \&quot;preview_detect\&quot; runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.
+Code detectors (pipeline type CODE_DETECTOR) only. \&quot;cell\&quot;/\&quot;all\&quot; replay the cells with the detector\&#39;s variables, secrets and files; \&quot;preview_detect\&quot; runs setup()/detect() on a real asset of sourceId (or a small sample) and reports the findings without recording anything. Returns immediately; poll GET /notebook/executions/:id.
 
 ### Example
 

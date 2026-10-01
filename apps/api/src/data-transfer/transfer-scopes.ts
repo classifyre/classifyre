@@ -175,7 +175,7 @@ export interface TransferTableSpec {
   /** Strip `config.masked`, where source connection secrets live. */
   redactMaskedConfig?: boolean;
   /**
-   * Strip `pipelineSchema.secrets`, where a code detector (CUSTOM_DETECTOR)
+   * Strip `pipelineSchema.secrets`, where a code detector (CODE_DETECTOR)
    * keeps its encrypted credentials. The rest of the pipeline -- the notebook,
    * variables, fields -- is configuration and travels.
    */

@@ -19,6 +19,8 @@ import {
   type CreateNotebookExecutionDto,
 } from './dto/notebook.dto';
 import { codeCells, isCodeDetectorSchema } from '../custom-detector-code';
+import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
+import { redactDeepWithSecrets } from '../cli-runner/runner-error-safety';
 
 const MODE_BY_DTO: Record<string, NotebookExecutionMode> = {
   cell: NotebookExecutionMode.CELL,
@@ -54,6 +56,7 @@ export class NotebookExecutionService {
     private readonly prisma: PrismaService,
     private readonly notebooks: NotebookService,
     private readonly cliRunner: CliRunnerService,
+    private readonly crypto: MaskedConfigCryptoService,
   ) {}
 
   /**
@@ -200,6 +203,13 @@ export class NotebookExecutionService {
     }
 
     const failed = payload.status !== 'success';
+    // A rule that prints ctx.secret(...) (or echoes it into a preview
+    // finding) must not persist the value: redact stored outputs against the
+    // detector's own secret values before they reach Postgres.
+    const outputs =
+      executionId != null
+        ? await this.redactedDetectorOutputs(executionId, this.buildOutputs(payload))
+        : this.buildOutputs(payload);
     await this.prisma.notebookExecution.update({
       where: { id: executionId },
       data: {
@@ -208,7 +218,7 @@ export class NotebookExecutionService {
             ? NotebookExecutionStatus.TIMEOUT
             : NotebookExecutionStatus.ERROR
           : NotebookExecutionStatus.SUCCESS,
-        outputs: this.buildOutputs(payload),
+        outputs,
         failedCellId: payload.failedCellId ?? null,
         error: (payload.error ?? null) as Prisma.InputJsonValue,
         durationMs:
@@ -224,13 +234,63 @@ export class NotebookExecutionService {
    * Kept as one JSON column rather than a table: outputs are read as a whole,
    * by one editor, and are disposable — the notebook can always be run again.
    */
-  private buildOutputs(payload: Record<string, any>): Prisma.InputJsonValue {
-    return {
+  private buildOutputs(payload: Record<string, any>): Prisma.InputJsonValue {    return {
       cells: payload.cells ?? [],
       ...(payload.result !== undefined ? { result: payload.result } : {}),
       ...(payload.assets !== undefined ? { assets: payload.assets } : {}),
       ...(payload.contract !== undefined ? { contract: payload.contract } : {}),
     };
+  }
+
+  /**
+   * The detector's decrypted secret values, for redacting stored outputs.
+   * Best-effort: a redaction miss must not fail the execution write.
+   */
+  private async detectorSecretValues(
+    executionId: string,
+  ): Promise<string[]> {
+    try {
+      const execution = await this.prisma.notebookExecution.findUnique({
+        where: { id: executionId },
+        select: {
+          customDetector: { select: { pipelineSchema: true } },
+        },
+      });
+      const schema = (execution?.customDetector?.pipelineSchema ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const secrets =
+        schema && typeof schema === 'object'
+          ? (schema.secrets as Record<string, unknown> | undefined)
+          : undefined;
+      if (!secrets || typeof secrets !== 'object') return [];
+      const values: string[] = [];
+      for (const value of Object.values(secrets)) {
+        if (typeof value !== 'string' || !value) continue;
+        try {
+          values.push(
+            this.crypto.isEncryptedValue(value)
+              ? this.crypto.decryptString(value)
+              : value,
+          );
+        } catch {
+          // An undecryptable leaf is not a live credential; skip it.
+        }
+      }
+      return values;
+    } catch {
+      return [];
+    }
+  }
+
+  private async redactedDetectorOutputs(
+    executionId: string,
+    outputs: Prisma.InputJsonValue,
+  ): Promise<Prisma.InputJsonValue> {
+    const secrets = await this.detectorSecretValues(executionId);
+    if (secrets.length === 0) return outputs;
+    return redactDeepWithSecrets(outputs, secrets) as Prisma.InputJsonValue;
   }
 
   private async markFailed(
@@ -311,7 +371,7 @@ export class NotebookExecutionService {
     }
     if (!isCodeDetectorSchema(detector.pipelineSchema)) {
       throw new BadRequestException(
-        'Only code detectors (pipeline type CUSTOM_DETECTOR) have a notebook to run.',
+        'Only code detectors (pipeline type CODE_DETECTOR) have a notebook to run.',
       );
     }
     const schema = detector.pipelineSchema as Record<string, any>;
@@ -385,7 +445,12 @@ export class NotebookExecutionService {
       revision: current,
       sourceId,
       assetId,
-      maxAssets: dto.maxAssets,
+      // No global ValidationPipe on this route, so the DTO's @Max(10) never
+      // runs: clamp here so a preview cannot sample the whole source.
+      maxAssets:
+        typeof dto.maxAssets === 'number'
+          ? Math.min(10, Math.max(1, Math.floor(dto.maxAssets)))
+          : undefined,
     });
     return execution;
   }

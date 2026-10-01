@@ -316,7 +316,7 @@
     {
       "id": "custom_detectors",
       "title": "Custom Detectors",
-      "description": "Manage regex, classifier, entity, AI and code detectors and train them on feedback. Writing a code detector (CUSTOM_DETECTOR) also needs custom_source_code.",
+      "description": "Manage regex, classifier, entity, AI and code detectors and train them on feedback. Writing a code detector (CODE_DETECTOR) also needs custom_source_code.",
       "operations": [
         "Create detectors for rulesets, classifiers, and entities",
         "Inspect starter examples before authoring a detector",
@@ -357,7 +357,7 @@
         {
           "name": "list_custom_detector_examples",
           "title": "List Custom Detector Examples",
-          "description": "Return starter examples for every engine: rulesets, classifiers, entity detectors, AI (LLM) detectors and code detectors (CUSTOM_DETECTOR). Code-detector templates include their notebook and ready-made testScenarios -- copy both when creating one.",
+          "description": "Return starter examples for every engine: rulesets, classifiers, entity detectors, AI (LLM) detectors and code detectors (CODE_DETECTOR). Code-detector templates include their notebook and ready-made testScenarios -- copy both when creating one.",
           "readOnly": true,
           "destructive": false,
           "idempotent": true,
@@ -366,7 +366,7 @@
         {
           "name": "create_custom_detector",
           "title": "Create Custom Detector",
-          "description": "Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, TAG or CUSTOM_DETECTOR. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={\"<key>\": \"<value>\"}), and it is not selectable on a source. CUSTOM_DETECTOR is a code detector: a Python notebook defining detect(asset, ctx) that yields Finding(label, value, severity=, location={row, column_name, line, ...}, fields={...}, identity=, normalized_value=). Choose it when the rule is a CHECK no pattern or model expresses: totals that must add up (asset.rows()), a value compared with metadata or a threshold (asset.metadata), list screening against an uploaded file (ctx.file), co-occurrence of other detectors' findings (needs_findings: true, asset.findings), checksummed identifiers, or scoring with your own model. Prefer REGEX for a token pattern, GLINER2/LLM for meaning in prose, and TAG only when a CUSTOM connector already knows the fact. Rules: severity is a ceiling; give every finding a stable identity (row id, list entry) so re-runs update it instead of churning; set normalized_value only when the value should link assets in the value index; declare every key of fields; set deterministic: false if the verdict depends on anything outside the asset. Workflow: list_custom_detector_examples (copy a CUSTOM_DETECTOR template and its testScenarios) -> create_custom_detector -> upload_custom_detector_file if the rule reads one -> run_custom_detector_notebook mode \"preview_detect\" on a real asset -> create_detector_test_scenario (input_asset fixtures) and run_detector_tests -> attach it to a source. Writing one needs the custom_source_code capability group.",
+          "description": "Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, TAG or CODE_DETECTOR. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={\"<key>\": \"<value>\"}), and it is not selectable on a source. CODE_DETECTOR is a code detector: a Python notebook defining detect(asset, ctx) that yields Finding(label, value, severity=, location={row, column_name, line, ...}, fields={...}, identity=, normalized_value=). Choose it when the rule is a CHECK no pattern or model expresses: totals that must add up (asset.rows()), a value compared with metadata or a threshold (asset.metadata), list screening against an uploaded file (ctx.file), co-occurrence of other detectors' findings (needs_findings: true, asset.findings), checksummed identifiers, or scoring with your own model. Prefer REGEX for a token pattern, GLINER2/LLM for meaning in prose, and TAG only when a CUSTOM connector already knows the fact. Rules: severity is a ceiling; give every finding a stable identity (row id, list entry) so re-runs update it instead of churning; set normalized_value only when the value should link assets in the value index; declare every key of fields; set deterministic: false if the verdict depends on anything outside the asset. Workflow: list_custom_detector_examples (copy a CODE_DETECTOR template and its testScenarios) -> create_custom_detector -> upload_custom_detector_file if the rule reads one -> run_custom_detector_notebook mode \"preview_detect\" on a real asset -> create_detector_test_scenario (input_asset fixtures) and run_detector_tests -> attach it to a source. Writing one needs the custom_source_code capability group.",
           "readOnly": false,
           "destructive": false,
           "idempotent": false,
@@ -397,7 +397,7 @@
               "name": "pipeline_schema",
               "type": "object",
               "required": true,
-              "description": "Pipeline schema. GLiNER2 example: { type: \"GLINER2\", entities: { order_id: { description: \"Order ID like ORD-123\", required: true } }, classification: { intent: { labels: [\"refund\", \"bug\"], multi_label: false } } }. LLM (AI) example: { type: \"LLM\", system_prompt: \"Classify the sentiment of the text.\", labels: [{ name: \"good\" }, { name: \"bad\" }, { name: \"violent\" }], severity_map: [{ pattern: \"violent\", severity: \"critical\" }], output_fields: [{ name: \"language\", type: \"string\" }] }. TAG example: { type: \"TAG\", label: \"Cardholder data\", severity: \"high\" }. CUSTOM_DETECTOR example: { type: \"CUSTOM_DETECTOR\", notebook: { cells: [{ id: \"c1\", type: \"code\", source: \"def detect(asset, ctx):\\n    for i, row in enumerate(asset.rows()):\\n        if row['total'] != row['a'] + row['b']:\\n            yield Finding(label='total_mismatch', value=str(row['total']), identity=f'row-{i}', location={'row': i})\\n\" }] }, severity: \"high\", category: \"QUALITY\", fields: [{ name: \"expected\", type: \"number\" }], variables: {}, secrets: {}, needs_findings: false }"
+              "description": "Pipeline schema. GLiNER2 example: { type: \"GLINER2\", entities: { order_id: { description: \"Order ID like ORD-123\", required: true } }, classification: { intent: { labels: [\"refund\", \"bug\"], multi_label: false } } }. LLM (AI) example: { type: \"LLM\", system_prompt: \"Classify the sentiment of the text.\", labels: [{ name: \"good\" }, { name: \"bad\" }, { name: \"violent\" }], severity_map: [{ pattern: \"violent\", severity: \"critical\" }], output_fields: [{ name: \"language\", type: \"string\" }] }. TAG example: { type: \"TAG\", label: \"Cardholder data\", severity: \"high\" }. CODE_DETECTOR example: { type: \"CODE_DETECTOR\", notebook: { cells: [{ id: \"c1\", type: \"code\", source: \"def detect(asset, ctx):\\n    for i, row in enumerate(asset.rows()):\\n        if row['total'] != row['a'] + row['b']:\\n            yield Finding(label='total_mismatch', value=str(row['total']), identity=f'row-{i}', location={'row': i})\\n\" }] }, severity: \"high\", category: \"QUALITY\", fields: [{ name: \"expected\", type: \"number\" }], variables: {}, secrets: {}, needs_findings: false }"
             },
             {
               "name": "isActive",
@@ -409,7 +409,7 @@
         {
           "name": "update_custom_detector",
           "title": "Update Custom Detector",
-          "description": "Update detector metadata, pipeline schema, AI provider credential, or activation status. For a CUSTOM_DETECTOR, send the whole pipeline_schema (notebook included); `secrets` is a patch -- a string sets a key, null deletes it, and omitting `secrets` keeps every stored secret (values are never returned, only secretKeys). Saving a changed notebook bumps notebook.revision.",
+          "description": "Update detector metadata, pipeline schema, AI provider credential, or activation status. For a CODE_DETECTOR, send the whole pipeline_schema (notebook included); `secrets` is a patch -- a string sets a key, null deletes it, and omitting `secrets` keeps every stored secret (values are never returned, only secretKeys). Saving a changed notebook bumps notebook.revision.",
           "readOnly": false,
           "destructive": false,
           "idempotent": false,
@@ -595,7 +595,7 @@
         {
           "name": "create_detector_test_scenario",
           "title": "Create Detector Test Scenario",
-          "description": "Create a test scenario for a custom detector. Expected outcome shapes by detector type: REGEX/RULESET {\"shouldMatch\": true|false}; classifier/LLM {\"label\": \"...\", \"minConfidence\": 0.6}; entity {\"entities\": [{\"label\": \"PersonName\", \"text\": \"Ostap\"}]}. The nested pipeline-output shape ({\"classification\": {task: {label, confidence}}} / {\"entities\": {label: [{value}]}}) is also accepted. Labels compare case-insensitively with underscores treated as spaces, so \"market_gaming_instruction\" matches \"Market gaming instruction\". CUSTOM_DETECTOR (code) detectors: expected {\"findings\": [{\"label\": \"total_mismatch\", \"identity\": \"row-2\", \"severity\": \"high\", \"count\": 1}], \"match\": \"subset\"|\"exact\"} or {\"shouldMatch\": false}; and instead of input_text they may take input_asset, a whole asset: {\"name\": \"t.csv\", \"kind\": \"table\", \"mime_type\": \"text/csv\", \"metadata\": {...}, \"rows\": [{...}], \"pages\": [\"...\"], \"text\": \"...\"}.",
+          "description": "Create a test scenario for a custom detector. Expected outcome shapes by detector type: REGEX/RULESET {\"shouldMatch\": true|false}; classifier/LLM {\"label\": \"...\", \"minConfidence\": 0.6}; entity {\"entities\": [{\"label\": \"PersonName\", \"text\": \"Ostap\"}]}. The nested pipeline-output shape ({\"classification\": {task: {label, confidence}}} / {\"entities\": {label: [{value}]}}) is also accepted. Labels compare case-insensitively with underscores treated as spaces, so \"market_gaming_instruction\" matches \"Market gaming instruction\". CODE_DETECTOR (code) detectors: expected {\"findings\": [{\"label\": \"total_mismatch\", \"identity\": \"row-2\", \"severity\": \"high\", \"count\": 1}], \"match\": \"subset\"|\"exact\"} or {\"shouldMatch\": false}; and instead of input_text they may take input_asset, a whole asset: {\"name\": \"t.csv\", \"kind\": \"table\", \"mime_type\": \"text/csv\", \"metadata\": {...}, \"rows\": [{...}], \"pages\": [\"...\"], \"text\": \"...\"}.",
           "readOnly": false,
           "destructive": false,
           "idempotent": false,
@@ -626,7 +626,7 @@
               "name": "input_asset",
               "type": "object",
               "required": false,
-              "description": "CUSTOM_DETECTOR only: an asset fixture { name, kind?, mime_type?, metadata?, text?, pages?, rows? }"
+              "description": "CODE_DETECTOR only: an asset fixture { name, kind?, mime_type?, metadata?, text?, pages?, rows? }"
             },
             {
               "name": "expected_outcome",
@@ -4087,9 +4087,9 @@
     {
       "id": "custom_source_code",
       "title": "Custom Source Code",
-      "description": "Author, run, and debug Python notebooks: the connector behind a CUSTOM source, and code detectors (CUSTOM_DETECTOR) -- cells, packages, local folders, uploaded files, and executions.",
+      "description": "Author, run, and debug Python notebooks: the connector behind a CUSTOM source, and code detectors (CODE_DETECTOR) -- cells, packages, local folders, uploaded files, and executions.",
       "operations": [
-        "Author code detectors (CUSTOM_DETECTOR): create/update needs this group, preview detect() on a real asset, manage the files the rule reads",
+        "Author code detectors (CODE_DETECTOR): create/update needs this group, preview detect() on a real asset, manage the files the rule reads",
         "Read and edit notebook cells, packages, and local folders",
         "Upload input files and manage declared dependencies",
         "Run a single cell, a connection test, or the whole notebook, then poll for output and errors"
@@ -4509,7 +4509,7 @@
         {
           "name": "run_custom_detector_notebook",
           "title": "Run Code Detector Notebook",
-          "description": "Run a CUSTOM_DETECTOR (code) detector's notebook and return immediately -- poll get_notebook_execution for the result. \"cell\" runs one cell (targetCellId) and \"all\" replays every cell, with the detector's variables, secrets and files but no asset: use them to debug helpers with print(). \"preview_detect\" runs setup() and detect() exactly as a scan would on a real asset of sourceId (assetId), or on a small sample of that source when assetId is omitted, and reports the findings it WOULD record (outputs.assets[].findings, outputs.result.logs) without writing anything. Always preview on a real asset before attaching a new rule to a source. The revision is read from the detector, so save (update_custom_detector) first.",
+          "description": "Run a CODE_DETECTOR (code) detector's notebook and return immediately -- poll get_notebook_execution for the result. \"cell\" runs one cell (targetCellId) and \"all\" replays every cell, with the detector's variables, secrets and files but no asset: use them to debug helpers with print(). \"preview_detect\" runs setup() and detect() exactly as a scan would on a real asset of sourceId (assetId), or on a small sample of that source when assetId is omitted, and reports the findings it WOULD record (outputs.assets[].findings, outputs.result.logs) without writing anything. Always preview on a real asset before attaching a new rule to a source. The revision is read from the detector, so save (update_custom_detector) first.",
           "readOnly": false,
           "destructive": false,
           "idempotent": false,
@@ -4560,7 +4560,7 @@
         {
           "name": "list_custom_detector_files",
           "title": "List Code Detector Files",
-          "description": "Files uploaded to a CUSTOM_DETECTOR detector (lists, models, reference tables); the rule opens them with ctx.file(name).",
+          "description": "Files uploaded to a CODE_DETECTOR detector (lists, models, reference tables); the rule opens them with ctx.file(name).",
           "readOnly": true,
           "destructive": false,
           "idempotent": true,
@@ -4576,7 +4576,7 @@
         {
           "name": "upload_custom_detector_file",
           "title": "Upload Code Detector File",
-          "description": "Upload a file a CUSTOM_DETECTOR detector reads with ctx.file(fileName) -- a sanctions list CSV, a joblib/ONNX model, a lookup table. A file with the same name is replaced, and the detector version is bumped so the next scan re-runs the rule.",
+          "description": "Upload a file a CODE_DETECTOR detector reads with ctx.file(fileName) -- a sanctions list CSV, a joblib/ONNX model, a lookup table. A file with the same name is replaced, and the detector version is bumped so the next scan re-runs the rule.",
           "readOnly": false,
           "destructive": false,
           "idempotent": false,
@@ -4608,7 +4608,7 @@
         {
           "name": "delete_custom_detector_file",
           "title": "Delete Code Detector File",
-          "description": "Delete one file from a CUSTOM_DETECTOR detector.",
+          "description": "Delete one file from a CODE_DETECTOR detector.",
           "readOnly": false,
           "destructive": true,
           "idempotent": false,

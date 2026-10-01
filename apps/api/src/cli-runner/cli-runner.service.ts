@@ -1256,10 +1256,23 @@ export class CliRunnerService {
 
     let sourceWithDecryptedConfig: typeof source;
     try {
+      const environment = process.env.ENVIRONMENT || 'development';
+      const namespaceId = this.currentNamespaceId();
       const decryptedConfig = this.toDecryptedRecipeConfig(source.config);
+      // The manifest URLs need the namespaced API base, which only exists
+      // inside a namespace context. Without one (detached dequeue paths, unit
+      // tests) hydrate without it: files travel without download URLs, exactly
+      // as before manifests existed.
+      let filesBaseUrl: string | undefined;
+      try {
+        filesBaseUrl = this.resolveOutputRestUrl(environment, namespaceId);
+      } catch {
+        filesBaseUrl = undefined;
+      }
       const recipeWithFeedback = await this.hydrateCustomDetectorsForRun(
         sourceId,
         decryptedConfig,
+        filesBaseUrl,
       );
       sourceWithDecryptedConfig = {
         ...source,
@@ -1345,6 +1358,7 @@ export class CliRunnerService {
   private async hydrateCustomDetectorsForRun(
     sourceId: string,
     recipe: Record<string, any>,
+    filesBaseUrl?: string,
   ): Promise<Record<string, any>> {
     const configuredDetectors = Array.isArray(recipe.detectors)
       ? recipe.detectors
@@ -1360,6 +1374,7 @@ export class CliRunnerService {
     const runtimeByIds =
       await this.customDetectorsService.buildRuntimeCustomDetectors(
         recipe.custom_detectors,
+        { filesBaseUrl },
       );
 
     // New path: CUSTOM entries in recipe.detectors carry custom_detector_key at
@@ -1382,6 +1397,7 @@ export class CliRunnerService {
       customKeysFromDetectors.length > 0
         ? await this.customDetectorsService.buildRuntimeCustomDetectorsByKeys(
             customKeysFromDetectors,
+            { filesBaseUrl },
           )
         : [];
 
@@ -2275,7 +2291,12 @@ export class CliRunnerService {
       if (!source) {
         throw new NotFoundException(`Source ${params.sourceId} not found`);
       }
-      recipe = this.toDecryptedRecipeConfig(source.config);
+      // The CLI's SANDBOX connector lists uploads by source id; the stored
+      // config does not carry it, so it travels alongside the recipe.
+      recipe = {
+        ...this.toDecryptedRecipeConfig(source.config),
+        source_id: source.id,
+      };
     }
 
     let asset: Record<string, unknown> | null = null;
@@ -2359,6 +2380,7 @@ export class CliRunnerService {
           url: `${base}/custom-detectors/${encodeURIComponent(detector.id)}/files/${encodeURIComponent(file.id)}/content`,
           name: file.fileName,
         })),
+        base,
       );
     }
 
@@ -2488,6 +2510,7 @@ export class CliRunnerService {
       namespace: string;
     }) => void | Promise<void>,
     files: NotebookInputFile[] = [],
+    outputRestUrl?: string,
   ): Promise<{
     payload: Record<string, any> | null;
     stderr: string;
@@ -2503,6 +2526,7 @@ export class CliRunnerService {
       request,
       onJobCreated,
       files,
+      outputRestUrl,
     );
     return {
       // A pod log interleaves everything that wrote to the stream, so the
@@ -5585,10 +5609,21 @@ export class CliRunnerService {
 
     try {
       const source = pending.source;
+      const namespaceId = this.currentNamespaceId();
       const decryptedConfig = this.toDecryptedRecipeConfig(source.config);
+      let filesBaseUrl: string | undefined;
+      try {
+        filesBaseUrl = this.resolveOutputRestUrl(
+          process.env.ENVIRONMENT || 'development',
+          namespaceId,
+        );
+      } catch {
+        filesBaseUrl = undefined;
+      }
       const recipeWithFeedback = await this.hydrateCustomDetectorsForRun(
         source.id,
         decryptedConfig,
+        filesBaseUrl,
       );
       const sourceWithDecryptedConfig = {
         ...source,

@@ -1544,7 +1544,7 @@ class Type10(StrEnum):
 
 class DetectorOutputField(BaseModel):
     """
-    One typed output field a detector writes into extracted_data (contract C3). Shared by code detectors and, later, LLM extraction.
+    One typed output field a detector writes into extracted_data. Shared by code detectors and, later, LLM extraction.
     """
 
     model_config = ConfigDict(
@@ -1559,7 +1559,7 @@ class DetectorOutputField(BaseModel):
     description: str | None = Field('', max_length=1000)
 
 
-class CustomDetectorLimits(BaseModel):
+class CodeDetectorLimits(BaseModel):
     """
     Per-run limits for a code detector. Every limit is contained: exceeding one costs that asset (an ERROR outcome, existing findings kept), never the scan.
     """
@@ -1610,7 +1610,7 @@ class CustomDetectorLimits(BaseModel):
     )
 
 
-class CustomDetectorFileRuntime(BaseModel):
+class CodeDetectorFileRuntime(BaseModel):
     """
     Runtime-only: one uploaded detector file, injected by the server at dispatch. Clients never send it.
     """
@@ -1628,7 +1628,15 @@ class CustomDetectorFileRuntime(BaseModel):
 
 
 class Type11(StrEnum):
-    CUSTOM_DETECTOR = 'CUSTOM_DETECTOR'
+    CODE_DETECTOR = 'CODE_DETECTOR'
+
+
+class Variables(RootModel[str]):
+    root: str = Field(..., max_length=8192)
+
+
+class Secrets(RootModel[str]):
+    root: str = Field(..., max_length=8192)
 
 
 class Severity3(StrEnum):
@@ -1643,7 +1651,7 @@ class Severity3(StrEnum):
     info = 'info'
 
 
-class CustomDetectorPipelineSchema(BaseModel):
+class CodeDetectorPipelineSchema(BaseModel):
     """
     A code detector: a Python notebook that defines detect(asset, ctx) and yields Finding(...) objects. It runs once per asset in the scan's detector stage, after every other detector, and can read the asset's text, pages, raw bytes, rows and metadata (and, with needs_findings, the findings other detectors produced on the same asset in this run). It judges; it never rewrites what the connector extracted. Use it for checks and rules a pattern or a model cannot express: totals that must add up, list screening, co-occurrence rules, checksummed identifiers, bring-your-own model scoring.
     """
@@ -1651,17 +1659,17 @@ class CustomDetectorPipelineSchema(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    type: Literal['CUSTOM_DETECTOR'] = 'CUSTOM_DETECTOR'
+    type: Literal['CODE_DETECTOR'] = 'CODE_DETECTOR'
     notebook: DetectorNotebook
     packages: list[DetectorNotebookPackage] | None = Field(
         None,
         description='Extra Python distributions installed once per scan before setup().',
         max_length=50,
     )
-    variables: dict[str, str] | None = Field(
+    variables: dict[str, Variables] | None = Field(
         None, description='Non-secret settings, read with ctx.var(name).', max_length=64
     )
-    secrets: dict[str, str] | None = Field(
+    secrets: dict[str, Secrets] | None = Field(
         None,
         description='Credentials, read with ctx.secret(name). Write-only over the API, encrypted at rest, decrypted only into the child process, redacted from every log.',
         max_length=64,
@@ -1686,7 +1694,7 @@ class CustomDetectorPipelineSchema(BaseModel):
         False,
         description="Expose asset.findings: what the other detectors found on this asset in this run. Code detectors never see each other's findings.",
     )
-    limits: CustomDetectorLimits | None = None
+    limits: CodeDetectorLimits | None = None
     scope: DetectorScope | None = Field(
         None,
         description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
@@ -1695,7 +1703,12 @@ class CustomDetectorPipelineSchema(BaseModel):
         None,
         description='Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures.',
     )
-    files_runtime: list[CustomDetectorFileRuntime] | None = Field(
+    files: list[str] | None = Field(
+        None,
+        description='Ids of uploaded detector files (custom_detector_files rows) this rule reads with ctx.file(name). Managed through the detector files endpoints; the server injects name, content hash and download URL as files_runtime at dispatch.',
+        max_length=64,
+    )
+    files_runtime: list[CodeDetectorFileRuntime] | None = Field(
         None,
         description="Runtime-only: the detector's uploaded files, injected by the server at dispatch. Rejected on create/update.",
     )
@@ -1731,7 +1744,7 @@ class CustomDetectorConfig(DetectorConfig):
         | ImageClassificationPipelineSchema
         | ObjectDetectionPipelineSchema
         | TagPipelineSchema
-        | CustomDetectorPipelineSchema
+        | CodeDetectorPipelineSchema
         | None
     ) = Field(None, discriminator='type', title='AnyPipelineSchema')
     max_findings: int | None = Field(

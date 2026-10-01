@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-/** A file uploaded to a code detector (CUSTOM_DETECTOR), read with ctx.file(name). */
+/** A file uploaded to a code detector (CODE_DETECTOR), read with ctx.file(name). */
 export class CustomDetectorFileDto {
   @ApiProperty()
   id: string;

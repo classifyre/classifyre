@@ -54,10 +54,17 @@ ScanMode = Literal["full", "partial", "skip"]
 _INCOMPLETE_TEXT_EXTRACTION_STATUSES = frozenset({"ENGINE_UNAVAILABLE", "ZERO_FRAMES", "FAILED"})
 
 # Credential material the API injects into detector config at dispatch time
-# (``provider_runtime.api_key`` for LLM detectors, for example).  Rotating a
-# secret must not invalidate the corpus, so these are dropped before hashing.
-# Everything else about a provider — model, context size, vision support — stays
-# in, because it does change what the detector reports.
+# (``provider_runtime.api_key`` for LLM detectors, a code detector's
+# ``pipeline_schema.secrets``). Rotating a secret must not invalidate the
+# corpus, so these are dropped before hashing. Everything else about a provider
+# — model, context size, vision support — stays in, because it does change
+# what the detector reports.
+#
+# Only ``secrets`` subtrees and freestanding credential leaves are dropped: a
+# code detector's *variable* named e.g. ``api_key`` is author configuration
+# (it can change what the rule reports), and dropping it from the fingerprint
+# meant rotating that variable silently did not re-run the rule.
+_SECRET_SUBTREES = frozenset({"secrets"})
 _SECRET_CONFIG_KEYS = frozenset(
     {
         "access_token",
@@ -77,16 +84,27 @@ _SECRET_CONFIG_KEYS = frozenset(
 )
 
 
-def _scrub(value: Any) -> Any:
-    """Drop credential material anywhere in a detector config tree."""
+def _scrub(value: Any, in_secret_subtree: bool = False) -> Any:
+    """Drop credential material in a detector config tree.
+
+    ``secrets`` subtrees and freestanding credential leaves (an LLM
+    ``provider_runtime.api_key``) are dropped; ordinary configuration keeps
+    its keys even when they sound secret-like — including the rest of
+    ``provider_runtime`` (model, context size), which does change what the
+    detector reports.
+    """
     if isinstance(value, dict):
-        return {
-            key: _scrub(item)
-            for key, item in value.items()
-            if str(key).strip().lower() not in _SECRET_CONFIG_KEYS
-        }
+        scrubbed: dict[str, Any] = {}
+        for key, item in value.items():
+            lowered = str(key).strip().lower()
+            if lowered in _SECRET_SUBTREES or (
+                not in_secret_subtree and lowered in _SECRET_CONFIG_KEYS
+            ):
+                continue
+            scrubbed[key] = _scrub(item, in_secret_subtree or lowered in _SECRET_SUBTREES)
+        return scrubbed
     if isinstance(value, list):
-        return [_scrub(item) for item in value]
+        return [_scrub(item, in_secret_subtree) for item in value]
     return value
 
 
@@ -127,7 +145,7 @@ def _code_detector_shape(config: dict[str, Any]) -> dict[str, Any]:
     and the detector id change with the deployment, not with the rule.
     """
     schema = config.get("pipeline_schema")
-    if not isinstance(schema, dict) or str(schema.get("type") or "").upper() != "CUSTOM_DETECTOR":
+    if not isinstance(schema, dict) or str(schema.get("type") or "").upper() != "CODE_DETECTOR":
         return config
     kept = {
         key: value

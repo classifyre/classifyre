@@ -99,7 +99,7 @@ class FileEvaluationRunner:
     async def run_async(self, file_path: Path) -> tuple[ParsedFile, list[DetectionResult]]:
         """Parse the file (or load an asset fixture) and run all enabled detectors.
 
-        Code detectors (``CUSTOM_DETECTOR``) run last, once, over the whole
+        Code detectors (``CODE_DETECTOR``) run last, once, over the whole
         input as one asset -- the same order a scan uses -- and see the other
         detectors' findings when they ask for them.
         """

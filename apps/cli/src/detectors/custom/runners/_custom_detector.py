@@ -1,4 +1,4 @@
-"""Runner for the ``CUSTOM_DETECTOR`` pipeline type: a code detector.
+"""Runner for the ``CODE_DETECTOR`` pipeline type: a code detector.
 
 Like ``TAG`` it never runs over a page of text: ``detect()`` returns nothing and
 no content type is advertised, so the text, binary and link passes never
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ....models.generated_detectors import CustomDetectorPipelineSchema, PipelineResult
+from ....models.generated_detectors import CodeDetectorPipelineSchema, PipelineResult
 from ....models.generated_single_asset_scan_results import DetectionResult
 from ._base import BaseRunner
 
@@ -27,7 +27,7 @@ class CustomDetectorRunner(BaseRunner):
 
     def __init__(
         self,
-        schema: CustomDetectorPipelineSchema,
+        schema: CodeDetectorPipelineSchema,
         detector_key: str = "",
         detector_name: str = "",
     ) -> None:
@@ -37,7 +37,7 @@ class CustomDetectorRunner(BaseRunner):
         self._session: Any = None
 
     def run(self, text: str) -> PipelineResult:
-        return PipelineResult(metadata={"runner": "CUSTOM_DETECTOR"})
+        return PipelineResult(metadata={"runner": "CODE_DETECTOR"})
 
     def detect(self, content: str | bytes, content_type: str) -> list[DetectionResult]:
         """Never called per page. The pipeline calls ``session().detect(asset)``."""

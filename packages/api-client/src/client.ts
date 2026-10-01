@@ -1090,7 +1090,7 @@ export type CustomDetectorResponseDto = {
   sourcesWithFindingsCount: number;
   recentSourceNames: string[];
   sourcesUsing: Array<{ id: string; name: string }>;
-  /** Code detectors (CUSTOM_DETECTOR): names of the write-only secrets. */
+  /** Code detectors (CODE_DETECTOR): names of the write-only secrets. */
   secretKeys?: string[];
   createdAt: string;
   updatedAt: string;
@@ -1232,7 +1232,7 @@ export type TestResultDto = {
 };
 
 /**
- * A whole asset for a code detector (CUSTOM_DETECTOR) test: what asset.name,
+ * A whole asset for a code detector (CODE_DETECTOR) test: what asset.name,
  * asset.kind, asset.metadata, asset.text(), asset.pages() and asset.rows()
  * return inside detect().
  */
@@ -2473,7 +2473,7 @@ class ApiClient {
   }
 
   /**
-   * Upload one file a code detector (CUSTOM_DETECTOR) reads with
+   * Upload one file a code detector (CODE_DETECTOR) reads with
    * ctx.file(name). A file with the same name is replaced.
    */
   async uploadCustomDetectorFile(
