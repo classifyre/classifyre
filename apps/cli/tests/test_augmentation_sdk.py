@@ -72,6 +72,7 @@ def test_empty_writes_are_warnings_not_errors() -> None:
         "metadata": {},
         "tags": {},
         "links": [],
+        "means": [],
         "urn": None,
         "warnings": asset.warnings,
     }

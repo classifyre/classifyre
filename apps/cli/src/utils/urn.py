@@ -20,11 +20,22 @@ character for character -- a test in each language pins the same table of cases.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-__all__ = ["CasePolicy", "Urn", "UrnError", "normalize_urn", "normalize_urn_or_none"]
+__all__ = [
+    "TERM_KEY_PATTERN",
+    "CasePolicy",
+    "Urn",
+    "UrnError",
+    "normalize_urn",
+    "normalize_urn_or_none",
+]
+
+#: A glossary term key (contract C8), the same pattern as the API's.
+TERM_KEY_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{0,99}")
 
 
 logger = logging.getLogger(__name__)
@@ -94,6 +105,10 @@ _register(_Platform("tableau"))
 _register(_Platform("powerbi"))
 _register(_Platform("kafka"))
 _register(_Platform("file"))
+
+# Glossary terms (contract C8): ``term://glossary/<key>``. Keys are lower-case
+# by definition, so both halves fold.
+_register(_Platform("term", path_case=CasePolicy.LOWER))
 
 _DEFAULT_PLATFORM = _Platform("", authority_case=CasePolicy.LOWER, path_case=CasePolicy.PRESERVE)
 
@@ -253,6 +268,18 @@ class Urn:
     @classmethod
     def kafka(cls, bootstrap: str, topic: str) -> Urn:
         return cls.of("kafka", bootstrap, topic)
+
+    @classmethod
+    def term(cls, key: str) -> Urn:
+        """A glossary term by its key (C8): ``term://glossary/<key>``."""
+        value = (key or "").strip().lower()
+        if not TERM_KEY_PATTERN.fullmatch(value):
+            raise UrnError(
+                f"Not a glossary term key: {key!r}. Keys are lower-case letters, digits, "
+                "'.', '_' and '-', starting with a letter or digit, at most 100 characters "
+                "(e.g. 'gmbh', 'bank-account-iban')."
+            )
+        return cls.of("term", "glossary", value)
 
 
 def _host_port(host: str, port: int | str | None) -> str:

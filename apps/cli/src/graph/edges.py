@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, ClassVar
 
-from ..utils.urn import Urn
+from ..utils.urn import Urn, UrnError
 
 __all__ = [
     "ContainmentType",
@@ -189,6 +189,10 @@ class _RefMeta(type):
         "uri": "Ref.urn(<a urn like 'company://at/firmenbuchnummer/606601k'>)",
         "url": "Ref.urn(<a urn like 'company://at/firmenbuchnummer/606601k'>)",
         "external": "Ref.urn(<a urn naming the object in its own system>)",
+        "terms": "Ref.term(<a glossary key like 'gmbh'>)",
+        "concept": "Ref.term(<a glossary key like 'gmbh'>)",
+        "glossary": "Ref.term(<a glossary key like 'gmbh'>)",
+        "meaning": "Ref.term(<a glossary key like 'gmbh'>)",
     }
 
     def __getattr__(cls, name: str) -> Any:
@@ -196,7 +200,8 @@ class _RefMeta(type):
         hint = f" Did you mean {suggestion}?" if suggestion else ""
         raise AttributeError(
             f"Ref has no '{name}'. An edge endpoint is one of "
-            f"Ref.asset(<asset id>), Ref.urn(<urn>) or Ref.finding(<finding id>)."
+            f"Ref.asset(<asset id>), Ref.urn(<urn>), Ref.finding(<finding id>) "
+            f"or Ref.term(<glossary key>)."
             f"{hint}"
         )
 
@@ -231,6 +236,18 @@ class Ref(metaclass=_RefMeta):
         if not value:
             raise ValueError("Ref.finding() needs a finding id")
         return Ref("finding", value)
+
+    @staticmethod
+    def term(key: str) -> Ref:
+        """A glossary concept or entity by key: ``Ref("urn", "term://glossary/<key>")``.
+
+        The term need not exist yet: an unknown key is kept as a pending
+        reference and links once someone defines it.
+        """
+        try:
+            return Ref("urn", str(Urn.term(key)))
+        except UrnError as error:
+            raise ValueError(str(error)) from error
 
 
 @dataclass(frozen=True)
@@ -444,6 +461,38 @@ def references(
         to=to,
         edge_class=EdgeClass.REFERENCE,
         relation_type=str(type),
+        method=method,
+        confidence=_confidence(method, confidence),
+        evidence=dict(evidence or {}),
+    )
+
+
+#: Relation type of a meaning declaration (C12), class REFERENCE.
+MEANS = "MEANS"
+
+
+def means(
+    subject: Ref,
+    term: Ref | str,
+    *,
+    confidence: float | None = None,
+    evidence: dict[str, Any] | None = None,
+    method: Method = Method.SYSTEM_CATALOG,
+) -> Edge:
+    """``subject`` is about a glossary concept or entity (a DECLARED link).
+
+    ``subject`` is an asset, a URN or a finding; ``term`` is ``Ref.term(key)``
+    or the bare key. ``evidence`` says where the meaning came from, e.g.
+    ``{"field": "Rechtsform", "value": "GES"}``.
+    """
+    target = Ref.term(term) if isinstance(term, str) else term
+    if target.kind != "urn" or not target.value.startswith("term://"):
+        raise ValueError("means() points at a glossary term: pass Ref.term(<key>) or the key")
+    return Edge(
+        frm=subject,
+        to=target,
+        edge_class=EdgeClass.REFERENCE,
+        relation_type=MEANS,
         method=method,
         confidence=_confidence(method, confidence),
         evidence=dict(evidence or {}),

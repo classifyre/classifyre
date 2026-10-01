@@ -44,11 +44,13 @@ from ..graph.edges import (
     FlowType,
     Ref,
     contains,
+    edge_to_payload,
     flow,
     references,
     same_as,
     uses,
 )
+from ..graph.edges import means as means_edge
 from ..notebook.files import ParsedContent, pages, parse
 from ..notebook.sdk import (
     MODULE_NAME,
@@ -141,6 +143,7 @@ class AugmentedAsset:
         self._added_metadata: dict[str, Any] = {}
         self._tags: dict[str, str] = {}
         self._links: list[str] = []
+        self._means: list[dict[str, Any]] = []
         self._new_urn: str | None = None
         self.warnings: list[str] = []
 
@@ -313,6 +316,33 @@ class AugmentedAsset:
         if target not in self._links:
             self._links.append(target)
 
+    def means(
+        self,
+        key: str,
+        *,
+        evidence: Mapping[str, Any] | None = None,
+        confidence: float | None = None,
+    ) -> None:
+        """Declare that this asset is about a glossary concept or entity, by key.
+
+        Additive, like ``tag()`` and ``link()``: a DECLARED semantic link. The
+        term need not exist yet; the declaration links once it is defined. An
+        invalid key is skipped with a warning.
+        """
+        try:
+            edge = means_edge(
+                Ref.asset(self._hash),
+                Ref.term(str(key or "")),
+                evidence=dict(evidence or {}),
+                confidence=confidence,
+            )
+        except ValueError as exc:
+            self.warnings.append(f"Ignoring asset.means({key!r}): {exc}")
+            return
+        payload = edge_to_payload(edge)
+        if payload not in self._means:
+            self._means.append(payload)
+
     def set_urn(self, urn: str) -> None:
         """Set the asset's cross-system identity, only if the connector left it empty.
 
@@ -337,6 +367,7 @@ class AugmentedAsset:
             "metadata": dict(self._added_metadata),
             "tags": dict(self._tags),
             "links": list(self._links),
+            "means": list(self._means),
             "urn": self._new_urn,
             "warnings": list(self.warnings),
         }
@@ -418,6 +449,7 @@ def build_augmentation_module(context: AugmentContext) -> types.ModuleType:
     module.flow = flow  # type: ignore[attr-defined]
     module.contains = contains  # type: ignore[attr-defined]
     module.references = references  # type: ignore[attr-defined]
+    module.means = means_edge  # type: ignore[attr-defined]
     module.same_as = same_as  # type: ignore[attr-defined]
     module.uses = uses  # type: ignore[attr-defined]
     module.urn_for = urn_for  # type: ignore[attr-defined]
@@ -439,6 +471,7 @@ def build_augmentation_module(context: AugmentContext) -> types.ModuleType:
         "contains",
         "ctx",
         "flow",
+        "means",
         "pages",
         "parse",
         "references",
@@ -470,6 +503,7 @@ def augmentation_namespace(context: AugmentContext) -> dict[str, Any]:
         "flow": flow,
         "contains": contains,
         "references": references,
+        "means": means_edge,
         "same_as": same_as,
         "uses": uses,
         "urn_for": urn_for,
