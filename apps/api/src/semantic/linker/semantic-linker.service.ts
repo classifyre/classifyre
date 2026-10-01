@@ -96,7 +96,10 @@ export class SemanticLinkerService {
       select: { assetId: true, termId: true, method: true, goneAt: true },
     });
     const existingByKey = new Map(
-      existing.map((row) => [linkKey(row.assetId, row.termId, row.method), row]),
+      existing.map((row) => [
+        linkKey(row.assetId, row.termId, row.method),
+        row,
+      ]),
     );
     const bump = (termId: string, field: 'added' | 'gone') => {
       const entry = result.perTerm.get(termId) ?? { added: 0, gone: 0 };
@@ -107,7 +110,9 @@ export class SemanticLinkerService {
 
     const rows = [...desired.values()];
     for (const row of rows) {
-      const before = existingByKey.get(linkKey(row.assetId, row.termId, row.method));
+      const before = existingByKey.get(
+        linkKey(row.assetId, row.termId, row.method),
+      );
       if (!before || before.goneAt) bump(row.termId, 'added');
     }
     const goneKeys = existing.filter(
@@ -189,7 +194,9 @@ export class SemanticLinkerService {
         return;
       }
       current.supportCount += link.supportCount;
-      current.bindingIds = [...new Set([...current.bindingIds, ...link.bindingIds])];
+      current.bindingIds = [
+        ...new Set([...current.bindingIds, ...link.bindingIds]),
+      ];
       current.confidence = Math.max(current.confidence, link.confidence);
       const better =
         link.maxSeverity &&
@@ -197,15 +204,19 @@ export class SemanticLinkerService {
           SEVERITY_RANK[link.maxSeverity] < SEVERITY_RANK[current.maxSeverity]);
       if (better) {
         current.maxSeverity = link.maxSeverity;
-        current.sampleFindingId = link.sampleFindingId ?? current.sampleFindingId;
+        current.sampleFindingId =
+          link.sampleFindingId ?? current.sampleFindingId;
       }
-      if (!current.sampleFindingId) current.sampleFindingId = link.sampleFindingId;
+      if (!current.sampleFindingId)
+        current.sampleFindingId = link.sampleFindingId;
     };
 
     // BINDING, from findings and from asset metadata.
     const active = await this.bindings.active();
     const findingBindings = active.bindings.filter((b) => isOutputMode(b.mode));
-    const metadataBindings = active.bindings.filter((b) => !isOutputMode(b.mode));
+    const metadataBindings = active.bindings.filter(
+      (b) => !isOutputMode(b.mode),
+    );
     const scope = Prisma.sql`f.asset_id = ANY(${presentIds}::text[])`;
     for (let i = 0; i < findingBindings.length; i += LINKER_BINDING_CHUNK) {
       const chunk = findingBindings.slice(i, i + LINKER_BINDING_CHUNK);
@@ -257,9 +268,10 @@ export class SemanticLinkerService {
     for (const binding of metadataBindings) {
       const sql = assetTermsSql(binding, assetScope);
       if (!sql) continue;
-      const rows = await this.prisma.$queryRaw<
-        Array<{ asset_id: string; term_id: string }>
-      >(sql);
+      const rows =
+        await this.prisma.$queryRaw<
+          Array<{ asset_id: string; term_id: string }>
+        >(sql);
       for (const row of rows) {
         if (!active.terms.has(row.term_id)) continue;
         add({
@@ -279,7 +291,12 @@ export class SemanticLinkerService {
     // DECLARED: MEANS edges a connector emitted from the asset (or one of its
     // findings) to an APPROVED term. Declarations to DRAFT terms wait (SL-5).
     const declared = await this.prisma.$queryRaw<
-      Array<{ asset_id: string; term_id: string; support: bigint; confidence: Prisma.Decimal }>
+      Array<{
+        asset_id: string;
+        term_id: string;
+        support: bigint;
+        confidence: Prisma.Decimal;
+      }>
     >`
       SELECT COALESCE(fa.asset_id, e.from_id) AS asset_id, e.to_id AS term_id,
              count(*) AS support, max(e.confidence) AS confidence
@@ -372,7 +389,8 @@ export class SemanticLinkerService {
       });
     }
     for (const link of desired.values()) {
-      link.confidence = Math.round(Math.min(Math.max(link.confidence, 0), 1) * 100) / 100;
+      link.confidence =
+        Math.round(Math.min(Math.max(link.confidence, 0), 1) * 100) / 100;
     }
     return desired;
   }
@@ -380,7 +398,11 @@ export class SemanticLinkerService {
   // ── Which assets a job visits ───────────────────────────────────────────
 
   /** Assets a run touched: its assets, and the assets of findings it changed. */
-  async assetsOfRun(runId: string, afterId: string, limit: number): Promise<string[]> {
+  async assetsOfRun(
+    runId: string,
+    afterId: string,
+    limit: number,
+  ): Promise<string[]> {
     const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
       SELECT id FROM (
         (SELECT a.id FROM assets a WHERE a.runner_id = ${runId} AND a.id > ${afterId} ORDER BY a.id LIMIT ${limit})
@@ -406,7 +428,9 @@ export class SemanticLinkerService {
     let bindingRows: CompiledBinding[] = [];
     if (trigger.all) {
       bindingRows = (
-        await this.prisma.glossaryBinding.findMany({ where: { noMeaning: false } })
+        await this.prisma.glossaryBinding.findMany({
+          where: { noMeaning: false },
+        })
       ).map(compileBindingRow);
     } else {
       const termIds = trigger.termIds ?? [];
@@ -431,7 +455,9 @@ export class SemanticLinkerService {
               OR: [
                 ...(bindingIds.length ? [{ id: { in: bindingIds } }] : []),
                 ...(termIds.length ? [{ termId: { in: termIds } }] : []),
-                ...(schemes.length ? [{ lookupSchemeId: { in: schemes } }] : []),
+                ...(schemes.length
+                  ? [{ lookupSchemeId: { in: schemes } }]
+                  : []),
               ],
             },
           })
@@ -485,13 +511,17 @@ export class SemanticLinkerService {
          WHERE (${Prisma.join(selectors, ' OR ')}) AND f.asset_id > ${afterId}
          ORDER BY 1 LIMIT ${limit})`);
     }
-    const metadata = bindingRows.filter((binding) => !isOutputMode(binding.mode));
+    const metadata = bindingRows.filter(
+      (binding) => !isOutputMode(binding.mode),
+    );
     if (metadata.length) {
       const scoped = metadata.every((binding) => binding.sourceIds.length > 0)
         ? Prisma.sql`a.source_id = ANY(${[...new Set(metadata.flatMap((b) => b.sourceIds))]}::text[])`
         : Prisma.sql`TRUE`;
       const keys = [
-        ...new Set(metadata.map((binding) => (binding.metadataPath ?? '').split('.')[0])),
+        ...new Set(
+          metadata.map((binding) => (binding.metadataPath ?? '').split('.')[0]),
+        ),
       ];
       branches.push(Prisma.sql`(
         SELECT a.id FROM assets a
@@ -514,7 +544,9 @@ export class SemanticLinkerService {
   async drain(): Promise<void> {
     // Claimed atomically, so two workers never run the same job. A job left
     // RUNNING by a worker that died resumes from its cursor after 30 minutes.
-    const jobs = await this.prisma.$queryRaw<Array<{ id: string; kind: string }>>`
+    const jobs = await this.prisma.$queryRaw<
+      Array<{ id: string; kind: string }>
+    >`
       UPDATE semantic_link_jobs SET status = 'RUNNING', started_at = now()
        WHERE id IN (
          SELECT id FROM semantic_link_jobs
@@ -531,13 +563,18 @@ export class SemanticLinkerService {
     const backfills = jobs.filter((job) => job.kind === 'BACKFILL');
     const reconciles = jobs.filter((job) => job.kind === 'RECONCILE');
     for (const job of incremental) await this.runIncremental(job.id);
-    if (backfills.length) await this.runBackfills(backfills.map((job) => job.id));
+    if (backfills.length)
+      await this.runBackfills(backfills.map((job) => job.id));
     if (reconciles.length) {
       await this.runReconcile(reconciles[0].id);
       if (reconciles.length > 1) {
         await this.prisma.semanticLinkJob.updateMany({
           where: { id: { in: reconciles.slice(1).map((job) => job.id) } },
-          data: { status: 'DONE', finishedAt: new Date(), error: 'merged into an earlier reconcile' },
+          data: {
+            status: 'DONE',
+            finishedAt: new Date(),
+            error: 'merged into an earlier reconcile',
+          },
         });
       }
     }
@@ -569,7 +606,13 @@ export class SemanticLinkerService {
         gone: totals.gone,
       },
     });
-    await this.emitUpdated(ids[0], totals, Date.now() - started, trigger, runId);
+    await this.emitUpdated(
+      ids[0],
+      totals,
+      Date.now() - started,
+      trigger,
+      runId,
+    );
     await this.recordCoverage().catch((error) =>
       this.logger.warn(`Coverage stats failed: ${String(error)}`),
     );
@@ -581,7 +624,8 @@ export class SemanticLinkerService {
       data: {
         status: 'FAILED',
         finishedAt: new Date(),
-        error: error instanceof Error ? error.message.slice(0, 2000) : String(error),
+        error:
+          error instanceof Error ? error.message.slice(0, 2000) : String(error),
       },
     });
   }
@@ -618,7 +662,9 @@ export class SemanticLinkerService {
   }
 
   async runIncremental(jobId: string): Promise<RelinkResult> {
-    const job = await this.prisma.semanticLinkJob.findUnique({ where: { id: jobId } });
+    const job = await this.prisma.semanticLinkJob.findUnique({
+      where: { id: jobId },
+    });
     if (!job) return this.emptyResult();
     const trigger = (job.trigger ?? {}) as SemanticLinkTrigger;
     const started = Date.now();
@@ -627,23 +673,40 @@ export class SemanticLinkerService {
     try {
       if (trigger.assetIds?.length) {
         for (let i = 0; i < trigger.assetIds.length; i += LINKER_BATCH) {
-          this.merge(totals, await this.safeRelink(trigger.assetIds.slice(i, i + LINKER_BATCH)));
+          this.merge(
+            totals,
+            await this.safeRelink(trigger.assetIds.slice(i, i + LINKER_BATCH)),
+          );
         }
       } else if (trigger.runId) {
-        let cursor = ((job.cursor as { after?: string } | null)?.after) ?? '';
+        let cursor = (job.cursor as { after?: string } | null)?.after ?? '';
         for (;;) {
-          const page = await this.assetsOfRun(trigger.runId, cursor, LINKER_BATCH);
+          const page = await this.assetsOfRun(
+            trigger.runId,
+            cursor,
+            LINKER_BATCH,
+          );
           if (!page.length) break;
           this.merge(totals, await this.safeRelink(page));
           cursor = page[page.length - 1];
           await this.prisma.semanticLinkJob.update({
             where: { id: jobId },
-            data: { cursor: { after: cursor }, added: totals.added, gone: totals.gone },
+            data: {
+              cursor: { after: cursor },
+              added: totals.added,
+              gone: totals.gone,
+            },
           });
           if (page.length < LINKER_BATCH) break;
         }
       }
-      await this.finish([jobId], totals, started, trigger.reason ?? 'incremental', trigger.runId);
+      await this.finish(
+        [jobId],
+        totals,
+        started,
+        trigger.reason ?? 'incremental',
+        trigger.runId,
+      );
     } catch (error) {
       await this.fail([jobId], error);
       throw error;
@@ -655,13 +718,19 @@ export class SemanticLinkerService {
     const jobs = await this.prisma.semanticLinkJob.findMany({
       where: { id: { in: jobIds } },
     });
-    const triggers = jobs.map((job) => (job.trigger ?? {}) as SemanticLinkTrigger);
+    const triggers = jobs.map(
+      (job) => (job.trigger ?? {}) as SemanticLinkTrigger,
+    );
     // Several pending changes merge into one walk (SL3 R2).
     const merged: SemanticLinkTrigger = {
       all: triggers.some((t) => t.all),
       bindingIds: [...new Set(triggers.flatMap((t) => t.bindingIds ?? []))],
       termIds: [...new Set(triggers.flatMap((t) => t.termIds ?? []))],
-      reason: triggers.map((t) => t.reason).filter(Boolean).join('; ').slice(0, 500),
+      reason: triggers
+        .map((t) => t.reason)
+        .filter(Boolean)
+        .join('; ')
+        .slice(0, 500),
     };
     const resumeFrom = jobs
       .map((job) => (job.cursor as { after?: string } | null)?.after ?? '')
@@ -696,7 +765,9 @@ export class SemanticLinkerService {
     return totals;
   }
 
-  private async estimateBackfill(trigger: SemanticLinkTrigger): Promise<number> {
+  private async estimateBackfill(
+    trigger: SemanticLinkTrigger,
+  ): Promise<number> {
     try {
       if (trigger.all) return await this.prisma.asset.count();
       const [row] = await this.prisma.$queryRaw<Array<{ n: bigint }>>`
@@ -714,13 +785,18 @@ export class SemanticLinkerService {
    * Compare the rollup with a recomputation for a sample of assets (1%, at
    * least 1,000) and repair drift. Purges GONE rows past retention.
    */
-  async runReconcile(jobId: string): Promise<RelinkResult & { purged: number }> {
+  async runReconcile(
+    jobId: string,
+  ): Promise<RelinkResult & { purged: number }> {
     const started = Date.now();
     await this.start([jobId]);
     const totals = this.emptyResult();
     try {
       const total = await this.prisma.asset.count();
-      const sampleSize = Math.min(total, Math.max(1000, Math.ceil(total * 0.01)));
+      const sampleSize = Math.min(
+        total,
+        Math.max(1000, Math.ceil(total * 0.01)),
+      );
       const sample = await this.prisma.$queryRaw<Array<{ id: string }>>`
         SELECT id FROM (
           (SELECT DISTINCT asset_id AS id FROM asset_terms WHERE gone_at IS NULL ORDER BY random() LIMIT ${Math.ceil(sampleSize / 2)})
@@ -729,7 +805,10 @@ export class SemanticLinkerService {
         ) x`;
       const ids = sample.map((row) => row.id);
       for (let i = 0; i < ids.length; i += LINKER_BATCH) {
-        this.merge(totals, await this.safeRelink(ids.slice(i, i + LINKER_BATCH)));
+        this.merge(
+          totals,
+          await this.safeRelink(ids.slice(i, i + LINKER_BATCH)),
+        );
       }
       const purged = await this.prisma.$executeRaw`
         DELETE FROM asset_terms
@@ -738,7 +817,13 @@ export class SemanticLinkerService {
       `;
       await this.prisma.semanticLinkJob.update({
         where: { id: jobId },
-        data: { cursor: { repaired: totals.added + totals.gone, purged, sampled: ids.length } },
+        data: {
+          cursor: {
+            repaired: totals.added + totals.gone,
+            purged,
+            sampled: ids.length,
+          },
+        },
       });
       await this.finish([jobId], totals, started, 'reconcile');
       if (totals.added + totals.gone > 0) {
@@ -788,7 +873,9 @@ export class SemanticLinkerService {
    */
   async recordCoverage(): Promise<void> {
     const bindings = (
-      await this.prisma.glossaryBinding.findMany({ where: { status: 'APPROVED' } })
+      await this.prisma.glossaryBinding.findMany({
+        where: { status: 'APPROVED' },
+      })
     ).map(compileBindingRow);
     const predicates = bindings
       .map((binding) => findingCoveredSql(binding))

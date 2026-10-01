@@ -128,7 +128,8 @@ export function lexicalRank(
   const needle = glossaryNorm(raw);
   if (!needle) return null;
   const trimmed = raw.trim();
-  if (glossaryNorm(term.term) === needle) return { order: 0, matchedOn: 'term' };
+  if (glossaryNorm(term.term) === needle)
+    return { order: 0, matchedOn: 'term' };
   if (term.codes.includes(trimmed)) return { order: 1, matchedOn: 'code' };
   if (term.aliases.some((alias) => glossaryNorm(alias) === needle)) {
     return { order: 2, matchedOn: 'alias' };
@@ -223,10 +224,12 @@ export class GlossaryService {
         ? null
         : params.schemeId
       : params.schemeKey
-        ? ((await this.prisma.glossaryScheme.findUnique({
-            where: { key: params.schemeKey },
-            select: { id: true },
-          })) ?? { id: '__missing__' }).id
+        ? (
+            (await this.prisma.glossaryScheme.findUnique({
+              where: { key: params.schemeKey },
+              select: { id: true },
+            })) ?? { id: '__missing__' }
+          ).id
         : undefined;
     return {
       ...(params.entityType ? { entityType: params.entityType } : {}),
@@ -292,7 +295,8 @@ export class GlossaryService {
 
   async resolveOrThrow(idOrKey: string): Promise<TermWithScheme> {
     const term = await this.resolve(idOrKey);
-    if (!term) throw new NotFoundException(`Glossary term ${idOrKey} not found`);
+    if (!term)
+      throw new NotFoundException(`Glossary term ${idOrKey} not found`);
     return term;
   }
 
@@ -522,7 +526,11 @@ export class GlossaryService {
     // They are deliberately excluded from lexical and semantic lookup until
     // an operator accepts them by saving the term. Agents never edit operator
     // items (rule SL-8).
-    if (existing && existing.origin === 'OPERATOR' && input.origin === 'AGENT') {
+    if (
+      existing &&
+      existing.origin === 'OPERATOR' &&
+      input.origin === 'AGENT'
+    ) {
       const proposedAliases = [
         ...new Set([
           ...existing.proposedAliases,
@@ -950,9 +958,7 @@ export class GlossaryService {
               replacedById: null,
             }
           : {}),
-        ...(next === 'DRAFT'
-          ? { verifiedAt: null, verifiedBy: null }
-          : {}),
+        ...(next === 'DRAFT' ? { verifiedAt: null, verifiedBy: null } : {}),
         ...(next === 'DEPRECATED'
           ? { deprecatedAt: new Date(), replacedById }
           : {}),
@@ -1107,9 +1113,7 @@ export class GlossaryService {
       ...(status === 'DRAFT'
         ? { status, verifiedAt: null, verifiedBy: null }
         : {}),
-      ...(status === 'DEPRECATED'
-        ? { status, deprecatedAt: new Date() }
-        : {}),
+      ...(status === 'DEPRECATED' ? { status, deprecatedAt: new Date() } : {}),
     };
     let updated: { count: number };
     try {
@@ -1130,15 +1134,16 @@ export class GlossaryService {
     }
     for (const id of ids) {
       await recordGlossaryActivity(this.prisma, {
-        type: status === 'APPROVED'
-          ? 'TERM_APPROVED'
-          : status === 'DRAFT'
-            ? 'TERM_UNAPPROVED'
-            : status === 'DEPRECATED'
-              ? 'TERM_DEPRECATED'
-              : input.kind
-                ? 'TERM_KIND_CHANGED'
-                : 'TERM_UPDATED',
+        type:
+          status === 'APPROVED'
+            ? 'TERM_APPROVED'
+            : status === 'DRAFT'
+              ? 'TERM_UNAPPROVED'
+              : status === 'DEPRECATED'
+                ? 'TERM_DEPRECATED'
+                : input.kind
+                  ? 'TERM_KIND_CHANGED'
+                  : 'TERM_UPDATED',
         termId: id,
         actor,
         payload: {
@@ -1279,10 +1284,7 @@ export class GlossaryService {
        LIMIT ${LEXICAL_FETCH_CAP}
     `;
     const exactIds = new Set(exactRows.map((row) => row.id));
-    const candidateIds = [
-      ...exactIds,
-      ...labelRows.map((row) => row.id),
-    ];
+    const candidateIds = [...exactIds, ...labelRows.map((row) => row.id)];
     const lexical = await this.prisma.glossaryTerm.findMany({
       where: {
         AND: [
@@ -1516,9 +1518,7 @@ export class GlossaryService {
    * first, at most 5 paths of depth ≤ 10 (poly-hierarchy allows several).
    */
   private async broaderChain(termId: string): Promise<TermWithScheme[][]> {
-    const relations = await this.prisma.$queryRaw<
-      Array<{ path: string[] }>
-    >`
+    const relations = await this.prisma.$queryRaw<Array<{ path: string[] }>>`
       WITH RECURSIVE up(term_id, path, depth) AS (
         SELECT r.to_term_id, ARRAY[r.to_term_id], 1
           FROM glossary_relations r
@@ -1592,8 +1592,7 @@ export class GlossaryService {
       this.prisma.glossaryTerm.count({ where: { ...where, kind: 'ENTITY' } }),
     ]);
     return {
-      show:
-        !settings?.glossaryKindBannerDismissedAt && concepts + entities > 0,
+      show: !settings?.glossaryKindBannerDismissedAt && concepts + entities > 0,
       concepts,
       entities,
       migratedAt: appliedAt,
@@ -1686,7 +1685,8 @@ export class GlossaryService {
         input.description !== undefined
           ? input.description
           : (existing?.description ?? null),
-      color: input.color !== undefined ? input.color : (existing?.color ?? null),
+      color:
+        input.color !== undefined ? input.color : (existing?.color ?? null),
       ...(input.packKey !== undefined ? { packKey: input.packKey } : {}),
       ...(input.packVersion !== undefined
         ? { packVersion: input.packVersion }
@@ -1815,9 +1815,7 @@ export class GlossaryService {
     };
   }
 
-  schemeDto(
-    scheme: GlossaryScheme & { _count?: { terms: number } },
-  ): {
+  schemeDto(scheme: GlossaryScheme & { _count?: { terms: number } }): {
     id: string;
     key: string;
     name: string;

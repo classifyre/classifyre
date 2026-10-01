@@ -19,7 +19,13 @@ import {
   RunnerAssetStatus,
   Severity,
   TextExtractionStatus,
+  SemanticLinkMethod,
 } from '@prisma/client';
+import {
+  assertKnownTermKeys,
+  ensureTermSnapshot,
+  resolveTermKeys,
+} from './semantic/term-snapshot';
 import { generateDetectionIdentity } from './utils/detection-identity';
 import { heapOverThreshold } from './utils/heap-guard';
 import { computeScopeFingerprint } from './utils/scope-fingerprint';
@@ -1353,6 +1359,45 @@ export class AssetService {
     );
     if (metadataPredicates.length > 0) {
       where.AND = metadataPredicatePrisma(metadataPredicates);
+    }
+
+    // Meaning (SL3 R7.5): a current link of any (or the given) method.
+    const termKeys = (assetFilters as { term?: unknown }).term;
+    if (Array.isArray(termKeys) && termKeys.length > 0) {
+      const snapshot = await ensureTermSnapshot(this.prisma);
+      const { termIds, unknown } = resolveTermKeys(
+        snapshot,
+        termKeys.map(String),
+        Boolean(
+          (assetFilters as { includeNarrower?: unknown }).includeNarrower,
+        ),
+      );
+      assertKnownTermKeys(unknown);
+      const rawMethods = (assetFilters as { meaningMethod?: unknown })
+        .meaningMethod;
+      const methods = Array.isArray(rawMethods)
+        ? rawMethods.map((value) => String(value).toUpperCase())
+        : [];
+      const invalid = methods.filter(
+        (method) =>
+          !Object.values(SemanticLinkMethod).includes(
+            method as SemanticLinkMethod,
+          ),
+      );
+      if (invalid.length) {
+        throw new BadRequestException(
+          `meaningMethod is one of ${Object.values(SemanticLinkMethod).join(', ')}; got ${invalid.join(', ')}`,
+        );
+      }
+      where.assetTerms = {
+        some: {
+          termId: { in: termIds },
+          goneAt: null,
+          ...(methods.length
+            ? { method: { in: methods as SemanticLinkMethod[] } }
+            : {}),
+        },
+      };
     }
 
     const findingWhere = excludeFindings

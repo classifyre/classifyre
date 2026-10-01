@@ -16,7 +16,9 @@ export const MEANS_RELATION = 'MEANS';
 export const MEANING_NODE_TYPES = [TERM_NODE, TERM_REF_NODE] as const;
 
 export function isTermUrn(urn: string | null | undefined): boolean {
-  return typeof urn === 'string' && urn.trim().toLowerCase().startsWith('term://');
+  return (
+    typeof urn === 'string' && urn.trim().toLowerCase().startsWith('term://')
+  );
 }
 
 /**
@@ -67,9 +69,12 @@ export async function stitchTermRefs(
   let stitched = 0;
   const assetIds = new Set<string>();
   for (const [urn, termId] of resolved) {
-    const touched = await prisma.$queryRaw<Array<{ from_type: string; from_id: string }>>`
+    const touched = await prisma.$queryRaw<
+      Array<{ from_type: string; from_id: string }>
+    >`
       SELECT from_type, from_id FROM edges WHERE to_type = ${TERM_REF_NODE} AND to_id = ${urn}`;
-    for (const row of touched) if (row.from_type === 'asset') assetIds.add(row.from_id);
+    for (const row of touched)
+      if (row.from_type === 'asset') assetIds.add(row.from_id);
     stitched += await prisma.$transaction(async (tx) => {
       const incoming = await tx.$executeRaw`
         UPDATE edges SET to_type = ${TERM_NODE}, to_id = ${termId}
@@ -102,7 +107,13 @@ export async function unknownTermRefs(
   prisma: PrismaService,
   limit = 200,
 ): Promise<
-  Array<{ urn: string; key: string | null; edges: number; assets: number; sources: string[] }>
+  Array<{
+    urn: string;
+    key: string | null;
+    edges: number;
+    assets: number;
+    sources: string[];
+  }>
 > {
   const rows = await prisma.$queryRaw<
     Array<{ urn: string; edges: bigint; assets: bigint; sources: string[] }>

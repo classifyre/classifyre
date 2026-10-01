@@ -34,7 +34,6 @@ import {
   toSkosJsonLd,
 } from './glossary-formats';
 import { validateRelationKinds } from './glossary-relations.service';
-import { recordGlossaryActivity } from './glossary-activity';
 import { glossaryEvents } from './glossary-events';
 
 /** R12 limits. */
@@ -60,7 +59,12 @@ export interface GlossaryImportOptions {
   resolutions?: Record<string, 'skip' | 'overwrite'>;
 }
 
-export type ImportAction = 'create' | 'update' | 'skip' | 'conflict' | 'refused';
+export type ImportAction =
+  | 'create'
+  | 'update'
+  | 'skip'
+  | 'conflict'
+  | 'refused';
 
 export interface GlossaryImportReport {
   jobId: string | null;
@@ -218,8 +222,7 @@ export class GlossaryImportExportService {
     const planned: PlannedTerm[] = [];
     const fileKeys = new Set<string>();
     for (const item of terms) {
-      const wantedKey =
-        item.key && isValidKey(item.key) ? item.key : undefined;
+      const wantedKey = item.key && isValidKey(item.key) ? item.key : undefined;
       const schemeId = item.schemeKey
         ? (schemeIdByKey.get(item.schemeKey) ?? `new:${item.schemeKey}`)
         : '';
@@ -268,7 +271,8 @@ export class GlossaryImportExportService {
       const id = `${plan.item.schemeKey ?? ''}\u0000${plan.item.term.toLowerCase()}`;
       if (seenNames.has(id)) {
         plan.action = 'refused';
-        plan.reason = 'The same concept name appears twice in this scheme in the file';
+        plan.reason =
+          'The same concept name appears twice in this scheme in the file';
       }
       seenNames.add(id);
     }
@@ -296,13 +300,28 @@ export class GlossaryImportExportService {
       if (plan.action === 'refused' || plan.action === 'conflict') continue;
       const item = plan.item;
       for (const to of item.broader) {
-        relationPlans.push({ from: plan.key, to: resolveKey(to), type: 'BROADER', label: '' });
+        relationPlans.push({
+          from: plan.key,
+          to: resolveKey(to),
+          type: 'BROADER',
+          label: '',
+        });
       }
       for (const to of item.related) {
-        relationPlans.push({ from: plan.key, to: resolveKey(to), type: 'RELATED', label: '' });
+        relationPlans.push({
+          from: plan.key,
+          to: resolveKey(to),
+          type: 'RELATED',
+          label: '',
+        });
       }
       for (const to of item.instanceOf) {
-        relationPlans.push({ from: plan.key, to: resolveKey(to), type: 'INSTANCE_OF', label: '' });
+        relationPlans.push({
+          from: plan.key,
+          to: resolveKey(to),
+          type: 'INSTANCE_OF',
+          label: '',
+        });
       }
       for (const custom of item.custom) {
         relationPlans.push({
@@ -344,7 +363,8 @@ export class GlossaryImportExportService {
         if (node === target) return true;
         if (seen.has(node)) continue;
         seen.add(node);
-        for (const next of graph.get(edgeKey(type, node)) ?? []) stack.push(next);
+        for (const next of graph.get(edgeKey(type, node)) ?? [])
+          stack.push(next);
       }
       return false;
     };
@@ -467,7 +487,13 @@ export class GlossaryImportExportService {
       const aliases = cleanLabels(item.aliases);
       const codes = cleanLabels(item.codes, { caseSensitive: true });
       const hiddenAliases = cleanLabels(item.hiddenAliases);
-      const text = [item.term, ...aliases, ...codes, item.definition ?? '', item.notes ?? '']
+      const text = [
+        item.term,
+        ...aliases,
+        ...codes,
+        item.definition ?? '',
+        item.notes ?? '',
+      ]
         .filter(Boolean)
         .join('\n');
       const hash = embeddingContentHash(text);
@@ -485,12 +511,19 @@ export class GlossaryImportExportService {
         aliases,
         codes,
         hiddenAliases,
-        matchKeys: matchKeysFor({ term: item.term, aliases, codes, hiddenAliases }),
+        matchKeys: matchKeysFor({
+          term: item.term,
+          aliases,
+          codes,
+          hiddenAliases,
+        }),
         definition: item.definition ?? null,
         notes: item.notes ?? null,
         steward: item.steward ?? null,
         entityType: this.entityType(item),
-        schemeId: item.schemeKey ? (schemeIdByKey.get(item.schemeKey) ?? null) : null,
+        schemeId: item.schemeKey
+          ? (schemeIdByKey.get(item.schemeKey) ?? null)
+          : null,
         status: itemStatus,
         origin: 'OPERATOR',
         verifiedAt: itemStatus === 'APPROVED' ? now : null,
@@ -513,17 +546,30 @@ export class GlossaryImportExportService {
       const existing = plan.existing;
       const policy = options.resolutions?.[existing.key] ?? options.conflict;
       const merge = policy === 'merge-labels';
-      const aliases = cleanLabels(merge ? [...existing.aliases, ...item.aliases] : item.aliases);
-      const codes = cleanLabels(merge ? [...existing.codes, ...item.codes] : item.codes, {
-        caseSensitive: true,
-      });
+      const aliases = cleanLabels(
+        merge ? [...existing.aliases, ...item.aliases] : item.aliases,
+      );
+      const codes = cleanLabels(
+        merge ? [...existing.codes, ...item.codes] : item.codes,
+        {
+          caseSensitive: true,
+        },
+      );
       const hiddenAliases = cleanLabels(
-        merge ? [...existing.hiddenAliases, ...item.hiddenAliases] : item.hiddenAliases,
+        merge
+          ? [...existing.hiddenAliases, ...item.hiddenAliases]
+          : item.hiddenAliases,
       );
       const definition = merge
         ? (existing.definition ?? item.definition ?? null)
         : (item.definition ?? existing.definition);
-      const text = [item.term, ...aliases, ...codes, definition ?? '', existing.notes ?? '']
+      const text = [
+        item.term,
+        ...aliases,
+        ...codes,
+        definition ?? '',
+        existing.notes ?? '',
+      ]
         .filter(Boolean)
         .join('\n');
       const hash = embeddingContentHash(text);
@@ -549,7 +595,10 @@ export class GlossaryImportExportService {
                 steward: item.steward ?? existing.steward,
               }),
           ...(item.schemeKey && !merge
-            ? { schemeId: schemeIdByKey.get(item.schemeKey) ?? existing.schemeId }
+            ? {
+                schemeId:
+                  schemeIdByKey.get(item.schemeKey) ?? existing.schemeId,
+              }
             : {}),
           sourceIri: existing.sourceIri ?? item.sourceIri ?? null,
           embedContentHash: hash,
@@ -558,7 +607,9 @@ export class GlossaryImportExportService {
       idByKey.set(plan.key, existing.id);
     }
 
-    const relationStatus: GlossaryStatus = options.asDraft ? 'DRAFT' : 'APPROVED';
+    const relationStatus: GlossaryStatus = options.asDraft
+      ? 'DRAFT'
+      : 'APPROVED';
     const relationRows: Prisma.GlossaryRelationCreateManyInput[] = [];
     for (const relation of acceptedRelations) {
       const fromTermId = idByKey.get(relation.from);
@@ -632,7 +683,14 @@ export class GlossaryImportExportService {
   }
 
   private entityType(item: ImportTerm): GlossaryTerm['entityType'] {
-    const allowed = ['PERSON', 'ORGANIZATION', 'LOCATION', 'REFERENCE', 'TERM', 'OTHER'];
+    const allowed = [
+      'PERSON',
+      'ORGANIZATION',
+      'LOCATION',
+      'REFERENCE',
+      'TERM',
+      'OTHER',
+    ];
     if (item.entityType && allowed.includes(item.entityType)) {
       return item.entityType as GlossaryTerm['entityType'];
     }
@@ -654,7 +712,10 @@ export class GlossaryImportExportService {
   async exportTerms(params: {
     schemeId?: string;
     kinds?: Array<'CONCEPT' | 'ENTITY'>;
-  }): Promise<{ terms: ExportTerm[]; schemes: Array<{ key: string; name: string; description: string | null }> }> {
+  }): Promise<{
+    terms: ExportTerm[];
+    schemes: Array<{ key: string; name: string; description: string | null }>;
+  }> {
     const kinds = params.kinds?.length ? params.kinds : ['CONCEPT', 'ENTITY'];
     const terms = await this.prisma.glossaryTerm.findMany({
       where: {
@@ -673,9 +734,15 @@ export class GlossaryImportExportService {
       : [];
     const byFrom = new Map<string, typeof relations>();
     for (const relation of relations) {
-      byFrom.set(relation.fromTermId, [...(byFrom.get(relation.fromTermId) ?? []), relation]);
+      byFrom.set(relation.fromTermId, [
+        ...(byFrom.get(relation.fromTermId) ?? []),
+        relation,
+      ]);
     }
-    const schemes = new Map<string, { key: string; name: string; description: string | null }>();
+    const schemes = new Map<
+      string,
+      { key: string; name: string; description: string | null }
+    >();
     const exportTerms: ExportTerm[] = terms.map((term) => {
       if (term.scheme) {
         schemes.set(term.scheme.key, {
@@ -686,7 +753,9 @@ export class GlossaryImportExportService {
       }
       const own = byFrom.get(term.id) ?? [];
       const of = (type: GlossaryRelationType) =>
-        own.filter((relation) => relation.type === type).map((relation) => relation.to.key);
+        own
+          .filter((relation) => relation.type === type)
+          .map((relation) => relation.to.key);
       return {
         key: term.key,
         term: term.term,
@@ -748,8 +817,12 @@ export class GlossaryImportExportService {
         body: toGlossaryCsv(terms),
       };
     }
-    const slug = (this.cls.get(CLS_SLUG) as string | undefined) ?? 'workspace';
-    const host = (params.baseUrl ?? process.env.CLASSIFYRE_PUBLIC_URL ?? 'https://classifyre.local').replace(/\/+$/, '');
+    const slug = this.cls.get(CLS_SLUG) ?? 'workspace';
+    const host = (
+      params.baseUrl ??
+      process.env.CLASSIFYRE_PUBLIC_URL ??
+      'https://classifyre.local'
+    ).replace(/\/+$/, '');
     return {
       fileName: `glossary-${stamp}.jsonld`,
       contentType: 'application/ld+json; charset=utf-8',

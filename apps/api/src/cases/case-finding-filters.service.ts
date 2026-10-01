@@ -17,8 +17,10 @@ import { isReadOnlyCase } from '../case-board/board-rows';
 import {
   candidateWhere,
   CompiledMatcher,
+  exactInWhere,
   type InquiryMatchers,
 } from '../matching/inquiry-matcher';
+import { ensureTermSnapshotFor } from '../semantic/term-snapshot';
 import { CaseCleanupService, type FilterSummary } from './case-cleanup.service';
 import { CaseEscalationService } from './case-escalation.service';
 import { filterPatternProblem } from './case-cleanup.rules';
@@ -47,6 +49,8 @@ const MATCHER_SELECT = {
   findingTypes: true,
   findingTypeRegex: true,
   findingValueRegex: true,
+  termKeys: true,
+  termsIncludeNarrower: true,
 } as const;
 
 type FilterRow = CaseFindingFilter & {
@@ -383,6 +387,10 @@ export class CaseFindingFiltersService {
       },
     });
     let counted = cited;
+    await ensureTermSnapshotFor(
+      this.prisma,
+      watches.map((w) => w.inquiry),
+    );
     if (link) {
       const matcher = watches[0]
         ? new CompiledMatcher(watches[0].inquiry)
@@ -417,6 +425,14 @@ export class CaseFindingFiltersService {
     for (const watch of watches) {
       const m: InquiryMatchers = watch.inquiry;
       if (m.findingValueRegex.length > 0) approximate = true;
+      // A term binding that tests values, or a manual link, cannot be applied
+      // to a group either: the group is narrowed by the term's output
+      // selectors in SQL, and its count is an estimate.
+      if (
+        !exactInWhere({ ...m, findingTypeRegex: [], findingValueRegex: [] })
+      ) {
+        approximate = true;
+      }
       const groups = await this.prisma.finding.groupBy({
         by: [
           'sourceId',
@@ -428,7 +444,11 @@ export class CaseFindingFiltersService {
         where: candidateWhere(m, 'OPEN'),
         _count: { _all: true },
       });
-      const typeMatcher = new CompiledMatcher({ ...m, findingValueRegex: [] });
+      const typeMatcher = new CompiledMatcher({
+        ...m,
+        findingValueRegex: [],
+        termKeys: [],
+      });
       for (const g of groups) {
         if (
           !typeMatcher.matches({

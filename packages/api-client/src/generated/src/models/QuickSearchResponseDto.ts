@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { QuickSearchTermDto } from './QuickSearchTermDto';
+import {
+    QuickSearchTermDtoFromJSON,
+    QuickSearchTermDtoFromJSONTyped,
+    QuickSearchTermDtoToJSON,
+    QuickSearchTermDtoToJSONTyped,
+} from './QuickSearchTermDto';
 import type { QuickSearchAssetDto } from './QuickSearchAssetDto';
 import {
     QuickSearchAssetDtoFromJSON,
@@ -47,6 +54,12 @@ export interface QuickSearchResponseDto {
      */
     findings: Array<QuickSearchFindingDto>;
     /**
+     * Glossary terms whose labels match (SL3 R7.5)
+     * @type {Array<QuickSearchTermDto>}
+     * @memberof QuickSearchResponseDto
+     */
+    terms: Array<QuickSearchTermDto>;
+    /**
      * True when a query ran out of its time budget and the lists may be short
      * @type {boolean}
      * @memberof QuickSearchResponseDto
@@ -60,6 +73,7 @@ export interface QuickSearchResponseDto {
 export function instanceOfQuickSearchResponseDto(value: object): value is QuickSearchResponseDto {
     if (!('assets' in value) || value['assets'] === undefined) return false;
     if (!('findings' in value) || value['findings'] === undefined) return false;
+    if (!('terms' in value) || value['terms'] === undefined) return false;
     if (!('truncated' in value) || value['truncated'] === undefined) return false;
     return true;
 }
@@ -76,6 +90,7 @@ export function QuickSearchResponseDtoFromJSONTyped(json: any, ignoreDiscriminat
         
         'assets': ((json['assets'] as Array<any>).map(QuickSearchAssetDtoFromJSON)),
         'findings': ((json['findings'] as Array<any>).map(QuickSearchFindingDtoFromJSON)),
+        'terms': ((json['terms'] as Array<any>).map(QuickSearchTermDtoFromJSON)),
         'truncated': json['truncated'],
     };
 }
@@ -93,6 +108,7 @@ export function QuickSearchResponseDtoToJSONTyped(value?: QuickSearchResponseDto
         
         'assets': ((value['assets'] as Array<any>).map(QuickSearchAssetDtoToJSON)),
         'findings': ((value['findings'] as Array<any>).map(QuickSearchFindingDtoToJSON)),
+        'terms': ((value['terms'] as Array<any>).map(QuickSearchTermDtoToJSON)),
         'truncated': value['truncated'],
     };
 }

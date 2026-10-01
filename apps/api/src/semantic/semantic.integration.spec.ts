@@ -15,6 +15,13 @@ import { SemanticMapService } from './map/semantic-map.service';
 import { GlossaryPacksService } from './packs/glossary-packs.service';
 import { SemanticBoardLayerService } from './board/semantic-board-layer.service';
 import { stitchTermRefs, unknownTermRefs } from './term-refs';
+import {
+  TermMatcher,
+  dropTermSnapshots,
+  ensureTermSnapshot,
+  resolveTermKeys,
+} from './term-snapshot';
+import { ASSET_TERMS_SQL, FINDING_TERMS_SQL } from './export-terms-sql';
 
 /**
  * The semantic layer end to end against Postgres: a pack installs schemes,
@@ -62,23 +69,34 @@ describeDb('semantic layer (integration)', () => {
     raw.searchParams.delete('schema');
     prisma = new PrismaClient({
       adapter: new PrismaPg(
-        { connectionString: raw.toString(), options: `-c search_path=${schema},public` },
+        {
+          connectionString: raw.toString(),
+          options: `-c search_path=${schema},public`,
+        },
         { schema },
       ),
     });
     const cls = { get: () => schema };
     const boss = {
-      getBossAsync: async () => ({
-        send: async (queue: string, data: unknown) => {
-          sent.push({ queue, data });
-          return 'job';
-        },
-      }),
+      getBossAsync: () =>
+        Promise.resolve({
+          send: (queue: string, data: unknown) => {
+            sent.push({ queue, data });
+            return Promise.resolve('job');
+          },
+        }),
     };
     const queue = { enqueue: jest.fn() };
-    const noEmbeddings = { embed: jest.fn().mockRejectedValue(new Error('off')) };
+    const noEmbeddings = {
+      embed: jest.fn().mockRejectedValue(new Error('off')),
+    };
     const db = prisma as never;
-    glossary = new GlossaryService(db, queue as never, {} as never, noEmbeddings as never);
+    glossary = new GlossaryService(
+      db,
+      queue as never,
+      {} as never,
+      noEmbeddings as never,
+    );
     relations = new GlossaryRelationsService(db);
     bindings = new BindingsService(db, cls as never);
     scheduler = new SemanticJobsScheduler(db, boss as never);
@@ -86,9 +104,20 @@ describeDb('semantic layer (integration)', () => {
     meaning = new MeaningService(db, bindings, relations, scheduler);
     vocabulary = new VocabularyService(db);
     suggestions = new SemanticSuggestionsService(db, vocabulary);
-    proposals = new GlossaryProposalsService(db, glossary, relations, bindings, suggestions, scheduler);
+    proposals = new GlossaryProposalsService(
+      db,
+      glossary,
+      relations,
+      bindings,
+      suggestions,
+      scheduler,
+    );
     map = new SemanticMapService(db, vocabulary);
-    transfer = new GlossaryImportExportService(db, queue as never, cls as never);
+    transfer = new GlossaryImportExportService(
+      db,
+      queue as never,
+      cls as never,
+    );
     packs = new GlossaryPacksService(db, transfer, bindings);
     layer = new SemanticBoardLayerService(db, meaning);
 
@@ -99,7 +128,12 @@ describeDb('semantic layer (integration)', () => {
       term_graph_state, semantic_stats, instance_settings CASCADE`);
     await prisma.instanceSettings.create({ data: { id: 1 } });
     await prisma.source.create({
-      data: { id: ids.source, name: 'Firmenbuch', type: 'CUSTOM' as never, config: {} },
+      data: {
+        id: ids.source,
+        name: 'Firmenbuch',
+        type: 'CUSTOM' as never,
+        config: {},
+      },
     });
     for (const [id, name, metadata] of [
       [ids.a1, 'FN 606601k', { legal_form: 'GES', doc_type: 'register' }],
@@ -149,11 +183,33 @@ describeDb('semantic layer (integration)', () => {
         },
       });
     };
-    await finding('ges', ids.a1, 'CUSTOM', 'tag:legal_form', 'GES', 'legal_form');
+    await finding(
+      'ges',
+      ids.a1,
+      'CUSTOM',
+      'tag:legal_form',
+      'GES',
+      'legal_form',
+    );
     await finding('ag', ids.a2, 'CUSTOM', 'tag:legal_form', 'AG', 'legal_form');
     await finding('eu', ids.a3, 'CUSTOM', 'tag:legal_form', 'EU', 'legal_form');
-    await finding('iban', ids.a1, 'PII', 'IBAN_CODE', 'AT61 1904 3002 3457 3201', null, 'HIGH');
-    await finding('fm', ids.a2, 'CUSTOM', 'force_majeure', 'force majeure clause', 'supplier-mail');
+    await finding(
+      'iban',
+      ids.a1,
+      'PII',
+      'IBAN_CODE',
+      'AT61 1904 3002 3457 3201',
+      null,
+      'HIGH',
+    );
+    await finding(
+      'fm',
+      ids.a2,
+      'CUSTOM',
+      'force_majeure',
+      'force majeure clause',
+      'supplier-mail',
+    );
   }, 60_000);
 
   afterAll(async () => {
@@ -165,19 +221,28 @@ describeDb('semantic layer (integration)', () => {
     expect(dry.terms.counts.create).toBeGreaterThan(10);
     expect(await prisma.glossaryTerm.count()).toBe(0);
 
-    const real = await packs.install({ key: 'dach-company-law', dryRun: false });
+    const real = await packs.install({
+      key: 'dach-company-law',
+      dryRun: false,
+    });
     expect(real.bindings.counts.waiting).toBe(2);
     const gmbh = await glossary.resolveOrThrow('gmbh');
     expect(gmbh.codes).toEqual(['GES']);
     expect(gmbh.status).toBe('APPROVED');
     expect(await relations.broaderClosure(gmbh.id)).toHaveLength(3);
-    const waiting = await prisma.glossaryBinding.findMany({ where: { packKey: 'dach-company-law' } });
+    const waiting = await prisma.glossaryBinding.findMany({
+      where: { packKey: 'dach-company-law' },
+    });
     expect(waiting.every((b) => b.status === 'DRAFT')).toBe(true);
   });
 
   it('activates the waiting binding once the TAG detector exists, and links without a re-scan', async () => {
     await prisma.customDetector.create({
-      data: { key: 'legal_form', name: 'legal_form', pipelineSchema: { type: 'TAG' } },
+      data: {
+        key: 'legal_form',
+        name: 'legal_form',
+        pipelineSchema: { type: 'TAG' },
+      },
     });
     expect(await packs.activateWaitingBindings()).toBe(1);
     await scheduler.scheduleBackfill({ all: true, reason: 'test' });
@@ -189,14 +254,18 @@ describeDb('semantic layer (integration)', () => {
         [ids.a2, 'aktiengesellschaft', 'BINDING'],
       ].sort(),
     );
-    const job = await prisma.semanticLinkJob.findFirst({ orderBy: { createdAt: 'desc' } });
+    const job = await prisma.semanticLinkJob.findFirst({
+      orderBy: { createdAt: 'desc' },
+    });
     expect(job?.status).toBe('DONE');
   });
 
   it('rolls evidence up the taxonomy on read (include narrower)', async () => {
     const kap = await glossary.resolveOrThrow('kapitalgesellschaft');
     const direct = await meaning.termEvidence(kap.id, {});
-    const rolled = await meaning.termEvidence(kap.id, { includeNarrower: true });
+    const rolled = await meaning.termEvidence(kap.id, {
+      includeNarrower: true,
+    });
     expect(direct.total).toBe(0);
     expect(rolled.total).toBe(2);
     const summary = await meaning.termSummary(kap.id, true);
@@ -207,7 +276,9 @@ describeDb('semantic layer (integration)', () => {
   it('explains a finding: the binding, and the broader concept implied', async () => {
     const result = await meaning.findingMeaning(findings.ges);
     const keys = result.meanings.map((m) => `${m.term.key}:${m.method}`);
-    expect(keys).toEqual(expect.arrayContaining(['gmbh:BINDING', 'kapitalgesellschaft:BROADER']));
+    expect(keys).toEqual(
+      expect.arrayContaining(['gmbh:BINDING', 'kapitalgesellschaft:BROADER']),
+    );
     const unmatched = await meaning.findingMeaning(findings.eu);
     expect(unmatched.meanings).toEqual([]);
   });
@@ -215,11 +286,18 @@ describeDb('semantic layer (integration)', () => {
   it('previews a lookup binding: the value table with unmatched values', async () => {
     const preview = await bindings.preview({
       mode: 'OUTPUT_LOOKUP',
-      output: { detectorType: 'CUSTOM', customDetectorKey: 'legal_form', findingType: 'tag:legal_form' },
+      output: {
+        detectorType: 'CUSTOM',
+        customDetectorKey: 'legal_form',
+        findingType: 'tag:legal_form',
+      },
       lookup: { schemeKey: 'rechtsformen', match: 'CODES' },
     });
     expect(preview.counts.findings).toBe(2);
-    expect(preview.lookup?.matched.map((m) => m.value).sort()).toEqual(['AG', 'GES']);
+    expect(preview.lookup?.matched.map((m) => m.value).sort()).toEqual([
+      'AG',
+      'GES',
+    ]);
     expect(preview.lookup?.unmatched.map((m) => m.value)).toEqual(['EU']);
   });
 
@@ -227,55 +305,108 @@ describeDb('semantic layer (integration)', () => {
     const binding = await prisma.glossaryBinding.findFirstOrThrow({
       where: { packKey: 'dach-company-law', status: 'APPROVED' },
     });
-    const before = await prisma.assetTerm.findFirstOrThrow({ where: { assetId: ids.a1 } });
+    const before = await prisma.assetTerm.findFirstOrThrow({
+      where: { assetId: ids.a1 },
+    });
     await bindings.disable(binding.id);
     await scheduler.scheduleBackfill({ bindingIds: [binding.id] });
     await linker.drain();
-    const gone = await prisma.assetTerm.findFirstOrThrow({ where: { assetId: ids.a1 } });
+    const gone = await prisma.assetTerm.findFirstOrThrow({
+      where: { assetId: ids.a1 },
+    });
     expect(gone.goneAt).not.toBeNull();
     expect(gone.supportCount).toBe(0);
 
     await bindings.enable(binding.id);
     await scheduler.scheduleBackfill({ bindingIds: [binding.id] });
     await linker.drain();
-    const revived = await prisma.assetTerm.findFirstOrThrow({ where: { assetId: ids.a1 } });
+    const revived = await prisma.assetTerm.findFirstOrThrow({
+      where: { assetId: ids.a1 },
+    });
     expect(revived.goneAt).toBeNull();
-    expect(revived.firstLinkedAt.getTime()).toBe(before.firstLinkedAt.getTime());
+    expect(revived.firstLinkedAt.getTime()).toBe(
+      before.firstLinkedAt.getTime(),
+    );
   });
 
   it('adds MANUAL and DECLARED links, and stitches a declaration made before its term existed', async () => {
     const stammkapital = await glossary.resolveOrThrow('stammkapital');
-    await meaning.link({ termId: stammkapital.id, target: { type: 'finding', id: findings.ges } });
+    await meaning.link({
+      termId: stammkapital.id,
+      target: { type: 'finding', id: findings.ges },
+    });
     const euid = await glossary.resolveOrThrow('euid');
     await prisma.edge.create({
-      data: { fromType: 'asset', fromId: ids.a2, toType: 'term', toId: euid.id, relationType: 'MEANS', origin: 'SOURCE_DERIVED' as never },
+      data: {
+        fromType: 'asset',
+        fromId: ids.a2,
+        toType: 'term',
+        toId: euid.id,
+        relationType: 'MEANS',
+        origin: 'SOURCE_DERIVED' as never,
+      },
     });
     // A declaration to a key nobody has defined yet.
     await prisma.edge.create({
-      data: { fromType: 'asset', fromId: ids.a3, toType: 'term_ref', toId: 'term://glossary/einzelunternehmen', relationType: 'MEANS', origin: 'SOURCE_DERIVED' as never },
+      data: {
+        fromType: 'asset',
+        fromId: ids.a3,
+        toType: 'term_ref',
+        toId: 'term://glossary/einzelunternehmen',
+        relationType: 'MEANS',
+        origin: 'SOURCE_DERIVED' as never,
+      },
     });
-    expect((await unknownTermRefs(prisma as never)).map((r) => r.key)).toEqual(['einzelunternehmen']);
-    await glossary.upsert({ term: 'Einzelunternehmen', key: 'einzelunternehmen', origin: 'OPERATOR' });
-    const stitched = await stitchTermRefs(prisma as never, ['einzelunternehmen']);
+    expect((await unknownTermRefs(prisma as never)).map((r) => r.key)).toEqual([
+      'einzelunternehmen',
+    ]);
+    await glossary.upsert({
+      term: 'Einzelunternehmen',
+      key: 'einzelunternehmen',
+      origin: 'OPERATOR',
+    });
+    const stitched = await stitchTermRefs(prisma as never, [
+      'einzelunternehmen',
+    ]);
     expect(stitched.assetIds).toEqual([ids.a3]);
 
     await linker.relinkAssets([ids.a1, ids.a2, ids.a3]);
-    const rows = await prisma.assetTerm.findMany({ where: { goneAt: null }, include: { term: true } });
+    const rows = await prisma.assetTerm.findMany({
+      where: { goneAt: null },
+      include: { term: true },
+    });
     const view = rows.map((r) => `${r.term.key}:${r.method}`).sort();
     expect(view).toEqual(
-      expect.arrayContaining(['stammkapital:MANUAL', 'euid:DECLARED', 'einzelunternehmen:DECLARED']),
+      expect.arrayContaining([
+        'stammkapital:MANUAL',
+        'euid:DECLARED',
+        'einzelunternehmen:DECLARED',
+      ]),
     );
   });
 
   it('keeps DRAFT terms inert (rule SL-5)', async () => {
-    const draft = await glossary.upsert({ term: 'Scheinfirma', kind: 'CONCEPT', origin: 'AGENT' });
-    await meaning.link({ termId: draft.id, target: { type: 'asset', id: ids.a2 } });
+    const draft = await glossary.upsert({
+      term: 'Scheinfirma',
+      kind: 'CONCEPT',
+      origin: 'AGENT',
+    });
+    await meaning.link({
+      termId: draft.id,
+      target: { type: 'asset', id: ids.a2 },
+    });
     await linker.relinkAssets([ids.a2]);
-    expect(await prisma.assetTerm.count({ where: { termId: draft.id } })).toBe(0);
+    expect(await prisma.assetTerm.count({ where: { termId: draft.id } })).toBe(
+      0,
+    );
   });
 
   it('suggests a binding for unbound vocabulary and accepting it links the findings', async () => {
-    await glossary.upsert({ term: 'Force majeure', kind: 'CONCEPT', origin: 'OPERATOR' });
+    await glossary.upsert({
+      term: 'Force majeure',
+      kind: 'CONCEPT',
+      origin: 'OPERATOR',
+    });
     await vocabulary.refreshSource(ids.source);
     const unbound = await vocabulary.list({ kind: 'outputs', bound: 'false' });
     expect(unbound.rows.map((r) => r.output?.findingType)).toEqual(
@@ -285,20 +416,34 @@ describeDb('semantic layer (integration)', () => {
     const queue = await proposals.list({ kind: 'BINDING' });
     const item = queue.items.find((i) => i.title.startsWith('force_majeure'));
     expect(item?.score).toBeGreaterThanOrEqual(0.9);
-    await proposals.decide({ kind: 'BINDING', id: item!.id, decision: 'accept', actor: { name: 'tester' } });
+    await proposals.decide({
+      kind: 'BINDING',
+      id: item!.id,
+      decision: 'accept',
+      actor: { name: 'tester' },
+    });
     await linker.relinkAssets([ids.a2]);
     const fm = await glossary.resolveOrThrow('force-majeure');
-    expect(await prisma.assetTerm.count({ where: { termId: fm.id, goneAt: null } })).toBe(1);
+    expect(
+      await prisma.assetTerm.count({ where: { termId: fm.id, goneAt: null } }),
+    ).toBe(1);
 
     // Accepted: never proposed again.
     await suggestions.runAll({ generators: ['binding'] });
-    const again = await prisma.semanticSuggestion.count({ where: { generator: 'binding', status: 'PROPOSED', termId: fm.id } });
+    const again = await prisma.semanticSuggestion.count({
+      where: { generator: 'binding', status: 'PROPOSED', termId: fm.id },
+    });
     expect(again).toBe(0);
   });
 
   it('refuses agent decisions on documents, terms and aliases (D7)', async () => {
     await expect(
-      proposals.decide({ kind: 'TERM', id: 'draft:x', decision: 'accept', actor: { name: 'agent:CASE', isAgent: true } }),
+      proposals.decide({
+        kind: 'TERM',
+        id: 'draft:x',
+        decision: 'accept',
+        actor: { name: 'agent:CASE', isAgent: true },
+      }),
     ).rejects.toThrow(/operator decisions/);
   });
 
@@ -307,11 +452,76 @@ describeDb('semantic layer (integration)', () => {
     await scheduler.scheduleBackfill({ all: true });
     await linker.drain();
     const iban = await glossary.resolveOrThrow('bank-account-iban');
-    expect(await prisma.assetTerm.count({ where: { termId: iban.id, goneAt: null } })).toBe(1);
+    expect(
+      await prisma.assetTerm.count({
+        where: { termId: iban.id, goneAt: null },
+      }),
+    ).toBe(1);
     const stat = await prisma.semanticStat.findFirst();
     expect(stat?.openFindings).toBe(5);
     // GES, AG, IBAN and force_majeure carry meaning; EU does not resolve.
     expect(stat?.findingsWithMeaning).toBe(4);
+  });
+
+  it('the term filter, the watch dimension and the export column agree on evidence', async () => {
+    dropTermSnapshots();
+    const snapshot = await ensureTermSnapshot(prisma as never);
+    const exported = await prisma.$queryRawUnsafe<
+      Array<{ id: string; terms: string | null }>
+    >(`SELECT f.id, ${FINDING_TERMS_SQL} AS terms FROM findings f`);
+    const column = new Map(
+      exported.map((row) => [row.id, row.terms?.split('; ') ?? []]),
+    );
+    expect(column.get(findings.ges)).toEqual(
+      expect.arrayContaining(['gmbh', 'stammkapital']),
+    );
+    expect(column.get(findings.eu)).toEqual([]);
+    const all = await prisma.finding.findMany();
+    for (const key of [
+      'gmbh',
+      'aktiengesellschaft',
+      'bank-account-iban',
+      'stammkapital',
+      'force-majeure',
+    ]) {
+      const { termIds, unknown } = resolveTermKeys(snapshot, [key], false);
+      expect(unknown).toEqual([]);
+      const matcher = new TermMatcher(snapshot, termIds);
+      const bySql = (
+        await prisma.$queryRaw<
+          Array<{ id: string }>
+        >`SELECT f.id FROM findings f WHERE ${matcher.sql()}`
+      )
+        .map((row) => row.id)
+        .sort();
+      const inMemory = all
+        .filter((f) => matcher.matches(f))
+        .map((f) => f.id)
+        .sort();
+      expect(bySql).toEqual(inMemory);
+      expect(inMemory.length).toBeGreaterThan(0);
+      const byColumn = all
+        .filter((f) => (column.get(f.id) ?? []).includes(key))
+        .map((f) => f.id)
+        .sort();
+      expect(byColumn).toEqual(inMemory);
+    }
+    const narrower = resolveTermKeys(snapshot, ['kapitalgesellschaft'], true);
+    const rolled = new TermMatcher(snapshot, narrower.termIds);
+    expect(all.filter((f) => rolled.matches(f)).map((f) => f.id)).toEqual(
+      expect.arrayContaining([findings.ges, findings.ag]),
+    );
+    expect(resolveTermKeys(snapshot, ['no-such-term'], false).unknown).toEqual([
+      'no-such-term',
+    ]);
+
+    const assetsExport = await prisma.$queryRawUnsafe<
+      Array<{ id: string; terms: string | null }>
+    >(`SELECT a.id, ${ASSET_TERMS_SQL} AS terms FROM assets a`);
+    const a1 = assetsExport.find((row) => row.id === ids.a1);
+    expect(a1?.terms?.split('; ')).toEqual(
+      expect.arrayContaining(['gmbh', 'stammkapital', 'bank-account-iban']),
+    );
   });
 
   it('builds the semantic map with taxonomy roll-up and a case overlay', async () => {
@@ -325,29 +535,50 @@ describeDb('semantic layer (integration)', () => {
   });
 
   it('computes the board Meaning layer for a case', async () => {
-    const caseRow = await prisma.case.create({ data: { title: 'Counterparty' } });
+    const caseRow = await prisma.case.create({
+      data: { title: 'Counterparty' },
+    });
     const evidence = await prisma.caseEvidence.create({
       data: { caseId: caseRow.id, entityType: 'asset', entityId: ids.a1 },
     });
-    const board = await prisma.caseBoard.create({ data: { caseId: caseRow.id } });
-    const item = await prisma.caseBoardItem.create({
-      data: { id: randomUUID(), boardId: board.id, kind: 'EVIDENCE', refId: evidence.id },
+    const board = await prisma.caseBoard.create({
+      data: { caseId: caseRow.id },
     });
-    const semantic = await layer.compute(caseRow.id, [{ id: item.id, kind: 'EVIDENCE', refId: evidence.id }]);
+    const item = await prisma.caseBoardItem.create({
+      data: {
+        id: randomUUID(),
+        boardId: board.id,
+        kind: 'EVIDENCE',
+        refId: evidence.id,
+      },
+    });
+    const semantic = await layer.compute(caseRow.id, [
+      { id: item.id, kind: 'EVIDENCE', refId: evidence.id },
+    ]);
     const keys = semantic.terms.map((t) => t.key);
-    expect(keys).toEqual(expect.arrayContaining(['gmbh', 'bank-account-iban', 'stammkapital']));
-    expect(semantic.broader.some((b) => b.parent.key === 'kapitalgesellschaft')).toBe(true);
+    expect(keys).toEqual(
+      expect.arrayContaining(['gmbh', 'bank-account-iban', 'stammkapital']),
+    );
+    expect(
+      semantic.broader.some((b) => b.parent.key === 'kapitalgesellschaft'),
+    ).toBe(true);
     const trace = await layer.meaningTrace([ids.a1], 10);
     expect(trace.edges.every((e) => String(e.id).startsWith('sl:'))).toBe(true);
   });
 
   it('round-trips SKOS: export, then a dry-run import skips every term', async () => {
     const file = await transfer.exportFile({ format: 'skos' });
-    const report = await transfer.importFile('skos', file.body, { dryRun: true, conflict: 'skip' });
+    const report = await transfer.importFile('skos', file.body, {
+      dryRun: true,
+      conflict: 'skip',
+    });
     expect(report.counts.create).toBe(0);
     expect(report.counts.skip).toBeGreaterThan(30);
     const csv = await transfer.exportFile({ format: 'csv' });
-    const csvReport = await transfer.importFile('csv', csv.body, { dryRun: true, conflict: 'skip' });
+    const csvReport = await transfer.importFile('csv', csv.body, {
+      dryRun: true,
+      conflict: 'skip',
+    });
     expect(csvReport.counts.create).toBe(0);
   });
 });

@@ -92,8 +92,10 @@ export class SemanticWorker {
       {},
       { tz: 'UTC' },
     );
-    await this.pgBoss.work(SEMANTIC_MAP_QUEUE, { localConcurrency: 1 }, () =>
-      this.map?.rebuild() ?? Promise.resolve(),
+    await this.pgBoss.work(
+      SEMANTIC_MAP_QUEUE,
+      { localConcurrency: 1 },
+      () => this.map?.rebuild() ?? Promise.resolve(),
     );
 
     // First boot after the migration: build what nothing else would trigger.
@@ -140,9 +142,13 @@ export class SemanticWorker {
       }
     }
     // Pack bindings waiting for a detector go live once it exists (SL2 §4.5).
-    await this.packs?.activateWaitingBindings().catch((error) =>
-      this.logger.warn(`Activating waiting pack bindings failed: ${String(error)}`),
-    );
+    await this.packs
+      ?.activateWaitingBindings()
+      .catch((error) =>
+        this.logger.warn(
+          `Activating waiting pack bindings failed: ${String(error)}`,
+        ),
+      );
     // Binding suggestions read the inventory (SL4 G-1).
     await this.scheduler.scheduleSuggestions({
       generators: ['binding'],
@@ -155,7 +161,10 @@ export class SemanticWorker {
     const generators = new Set<string>();
     const termIds = new Set<string>();
     for (const job of jobs) {
-      const data = (job.data ?? {}) as { generators?: string[]; termIds?: string[] };
+      const data = (job.data ?? {}) as {
+        generators?: string[];
+        termIds?: string[];
+      };
       for (const generator of data.generators ?? []) generators.add(generator);
       for (const termId of data.termIds ?? []) termIds.add(termId);
     }

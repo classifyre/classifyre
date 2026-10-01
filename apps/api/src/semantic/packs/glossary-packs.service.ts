@@ -10,7 +10,10 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { resolveSchemasDir } from '../../utils/schema-path';
 import { isValidKey } from '../../glossary/glossary-norm';
-import { ImportTerm, ParsedGlossaryFile } from '../../glossary/glossary-formats';
+import {
+  ImportTerm,
+  ParsedGlossaryFile,
+} from '../../glossary/glossary-formats';
 import { GlossaryImportExportService } from '../../glossary/glossary-import-export.service';
 import { glossaryEvents } from '../../glossary/glossary-events';
 import { recordGlossaryActivity } from '../../glossary/glossary-activity';
@@ -28,7 +31,12 @@ export interface GlossaryPack {
   description?: string;
   language?: string;
   sources?: string[];
-  schemes?: Array<{ key: string; name: string; description?: string; color?: string }>;
+  schemes?: Array<{
+    key: string;
+    name: string;
+    description?: string;
+    color?: string;
+  }>;
   terms?: Array<{
     key: string;
     kind?: 'CONCEPT' | 'ENTITY';
@@ -43,7 +51,15 @@ export interface GlossaryPack {
     notes?: string;
   }>;
   relations?: Array<{ from: string; to: string; type: string; label?: string }>;
-  bindings?: Array<BindingSpec & { lookup?: { schemeKey?: string; schemeId?: string; match: 'CODES' | 'ANY' } | null }>;
+  bindings?: Array<
+    BindingSpec & {
+      lookup?: {
+        schemeKey?: string;
+        schemeId?: string;
+        match: 'CODES' | 'ANY';
+      } | null;
+    }
+  >;
 }
 
 /** Two seconds of slack between createdAt and updatedAt still count as untouched. */
@@ -80,7 +96,12 @@ export class GlossaryPacksService {
       return readdirSync(this.packsDir())
         .filter((file) => file.endsWith('.json'))
         .sort()
-        .map((file) => JSON.parse(readFileSync(join(this.packsDir(), file), 'utf8')) as GlossaryPack);
+        .map(
+          (file) =>
+            JSON.parse(
+              readFileSync(join(this.packsDir(), file), 'utf8'),
+            ) as GlossaryPack,
+        );
     } catch (error) {
       this.logger.warn(`Starter packs unavailable: ${String(error)}`);
       return [];
@@ -88,16 +109,40 @@ export class GlossaryPacksService {
   }
 
   validate(pack: unknown): GlossaryPack {
-    if (!pack || typeof pack !== 'object') throw new BadRequestException('A pack is a JSON object');
+    if (!pack || typeof pack !== 'object')
+      throw new BadRequestException('A pack is a JSON object');
     const p = pack as GlossaryPack;
-    if (p.format !== PACK_FORMAT) throw new BadRequestException(`format must be ${PACK_FORMAT}`);
-    if (!p.key || !isValidKey(p.key)) throw new BadRequestException('key must match ^[a-z0-9][a-z0-9._-]{0,99}$');
-    if (!p.version || !p.name) throw new BadRequestException('version and name are required');
-    const allowed = new Set(['format', 'key', 'version', 'name', 'description', 'language', 'sources', 'schemes', 'terms', 'relations', 'bindings']);
+    if (p.format !== PACK_FORMAT)
+      throw new BadRequestException(`format must be ${String(PACK_FORMAT)}`);
+    if (!p.key || !isValidKey(p.key))
+      throw new BadRequestException(
+        'key must match ^[a-z0-9][a-z0-9._-]{0,99}$',
+      );
+    if (!p.version || !p.name)
+      throw new BadRequestException('version and name are required');
+    const allowed = new Set([
+      'format',
+      'key',
+      'version',
+      'name',
+      'description',
+      'language',
+      'sources',
+      'schemes',
+      'terms',
+      'relations',
+      'bindings',
+    ]);
     const unknown = Object.keys(p).filter((k) => !allowed.has(k));
-    if (unknown.length) throw new BadRequestException(`Unknown pack field(s): ${unknown.join(', ')}`);
+    if (unknown.length)
+      throw new BadRequestException(
+        `Unknown pack field(s): ${unknown.join(', ')}`,
+      );
     for (const term of p.terms ?? []) {
-      if (!isValidKey(term.key)) throw new BadRequestException(`Term key "${term.key}" is not a valid key`);
+      if (!isValidKey(term.key))
+        throw new BadRequestException(
+          `Term key "${term.key}" is not a valid key`,
+        );
     }
     return p;
   }
@@ -117,15 +162,29 @@ export class GlossaryPacksService {
       entityType: term.entityType,
       steward: term.steward,
       notes: term.notes,
-      broader: relations.filter((r) => r.from === term.key && r.type === 'BROADER').map((r) => r.to),
-      related: relations.filter((r) => r.from === term.key && r.type === 'RELATED').map((r) => r.to),
-      instanceOf: relations.filter((r) => r.from === term.key && r.type === 'INSTANCE_OF').map((r) => r.to),
+      broader: relations
+        .filter((r) => r.from === term.key && r.type === 'BROADER')
+        .map((r) => r.to),
+      related: relations
+        .filter((r) => r.from === term.key && r.type === 'RELATED')
+        .map((r) => r.to),
+      instanceOf: relations
+        .filter((r) => r.from === term.key && r.type === 'INSTANCE_OF')
+        .map((r) => r.to),
       custom: relations
-        .filter((r) => r.from === term.key && (r.type === 'CUSTOM' || r.type === 'PART_OF'))
+        .filter(
+          (r) =>
+            r.from === term.key &&
+            (r.type === 'CUSTOM' || r.type === 'PART_OF'),
+        )
         .map((r) => ({ to: r.to, label: r.label ?? r.type.toLowerCase() })),
     }));
     return {
-      schemes: (pack.schemes ?? []).map((s) => ({ key: s.key, name: s.name, description: s.description })),
+      schemes: (pack.schemes ?? []).map((s) => ({
+        key: s.key,
+        name: s.name,
+        description: s.description,
+      })),
       terms,
       refused: [],
     };
@@ -133,10 +192,25 @@ export class GlossaryPacksService {
 
   async installed() {
     const [schemes, terms, bindings, installs] = await Promise.all([
-      this.prisma.glossaryScheme.groupBy({ by: ['packKey', 'packVersion'], where: { packKey: { not: null } }, _count: { _all: true } }),
-      this.prisma.glossaryTerm.groupBy({ by: ['packKey'], where: { packKey: { not: null } }, _count: { _all: true } }),
-      this.prisma.glossaryBinding.groupBy({ by: ['packKey'], where: { packKey: { not: null } }, _count: { _all: true } }),
-      this.prisma.glossaryActivity.findMany({ where: { type: 'PACK_INSTALLED' }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.glossaryScheme.groupBy({
+        by: ['packKey', 'packVersion'],
+        where: { packKey: { not: null } },
+        _count: { _all: true },
+      }),
+      this.prisma.glossaryTerm.groupBy({
+        by: ['packKey'],
+        where: { packKey: { not: null } },
+        _count: { _all: true },
+      }),
+      this.prisma.glossaryBinding.groupBy({
+        by: ['packKey'],
+        where: { packKey: { not: null } },
+        _count: { _all: true },
+      }),
+      this.prisma.glossaryActivity.findMany({
+        where: { type: 'PACK_INSTALLED' },
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
     const keys = new Set<string>([
       ...schemes.map((s) => s.packKey!),
@@ -144,15 +218,25 @@ export class GlossaryPacksService {
       ...bindings.map((b) => b.packKey!),
     ]);
     return [...keys].map((key) => {
-      const last = installs.find((row) => (row.payload as { packKey?: string } | null)?.packKey === key);
-      const payload = last?.payload as { pack?: GlossaryPack; packVersion?: string } | null;
+      const last = installs.find(
+        (row) => (row.payload as { packKey?: string } | null)?.packKey === key,
+      );
+      const payload = last?.payload as {
+        pack?: GlossaryPack;
+        packVersion?: string;
+      } | null;
       return {
         key,
         name: payload?.pack?.name ?? key,
-        version: schemes.find((s) => s.packKey === key)?.packVersion ?? payload?.packVersion ?? null,
+        version:
+          schemes.find((s) => s.packKey === key)?.packVersion ??
+          payload?.packVersion ??
+          null,
         installedAt: last?.createdAt ?? null,
         counts: {
-          schemes: schemes.filter((s) => s.packKey === key).reduce((n, s) => n + s._count._all, 0),
+          schemes: schemes
+            .filter((s) => s.packKey === key)
+            .reduce((n, s) => n + s._count._all, 0),
           terms: terms.find((t) => t.packKey === key)?._count._all ?? 0,
           bindings: bindings.find((b) => b.packKey === key)?._count._all ?? 0,
         },
@@ -176,7 +260,8 @@ export class GlossaryPacksService {
           relations: pack.relations?.length ?? 0,
           bindings: pack.bindings?.length ?? 0,
         },
-        installedVersion: installed.find((i) => i.key === pack.key)?.version ?? null,
+        installedVersion:
+          installed.find((i) => i.key === pack.key)?.version ?? null,
       })),
     };
   }
@@ -217,43 +302,82 @@ export class GlossaryPacksService {
           packVersion: pack.version,
           pack: pack as unknown as Prisma.InputJsonValue,
           counts: { ...report.counts, ...bindings.counts },
-        } as Prisma.InputJsonValue,
+        },
       });
       glossaryEvents.emit({
         type: 'glossary.pack_installed',
         packKey: pack.key,
         version: pack.version,
-        counts: { terms: report.counts.create + report.counts.update, bindings: bindings.counts.created },
+        counts: {
+          terms: report.counts.create + report.counts.update,
+          bindings: bindings.counts.created,
+        },
       });
     }
-    return { pack: { key: pack.key, name: pack.name, version: pack.version }, dryRun, terms: report, bindings };
+    return {
+      pack: { key: pack.key, name: pack.name, version: pack.version },
+      dryRun,
+      terms: report,
+      bindings,
+    };
   }
 
-  private async installBindings(pack: GlossaryPack, dryRun: boolean, actor: string) {
-    const items: Array<{ index: number; action: string; reason?: string; bindingId?: string }> = [];
+  private async installBindings(
+    pack: GlossaryPack,
+    dryRun: boolean,
+    actor: string,
+  ) {
+    const items: Array<{
+      index: number;
+      action: string;
+      reason?: string;
+      bindingId?: string;
+    }> = [];
     const counts = { created: 0, waiting: 0, skipped: 0, refused: 0 };
-    const keys = [...new Set((pack.bindings ?? []).map((b) => b.termKey).filter((k): k is string => Boolean(k)))];
+    const keys = [
+      ...new Set(
+        (pack.bindings ?? [])
+          .map((b) => b.termKey)
+          .filter((k): k is string => Boolean(k)),
+      ),
+    ];
     const fileTermKeys = new Set((pack.terms ?? []).map((t) => t.key));
     const existingTerms = await this.prisma.glossaryTerm.findMany({
-      where: { OR: [{ key: { in: keys } }, { previousKeys: { hasSome: keys } }] },
+      where: {
+        OR: [{ key: { in: keys } }, { previousKeys: { hasSome: keys } }],
+      },
       select: { id: true, key: true, previousKeys: true },
     });
     for (const [index, spec] of (pack.bindings ?? []).entries()) {
       const termKnown =
         !spec.termKey ||
         fileTermKeys.has(spec.termKey) ||
-        existingTerms.some((t) => t.key === spec.termKey || t.previousKeys.includes(spec.termKey!));
+        existingTerms.some(
+          (t) =>
+            t.key === spec.termKey || t.previousKeys.includes(spec.termKey!),
+        );
       if (!termKnown) {
-        items.push({ index, action: 'refused', reason: `Unknown term key ${spec.termKey}` });
+        items.push({
+          index,
+          action: 'refused',
+          reason: `Unknown term key ${spec.termKey}`,
+        });
         counts.refused += 1;
         continue;
       }
       const missingDetector =
         spec.output?.detectorType === 'CUSTOM' && spec.output.customDetectorKey
-          ? !(await this.prisma.customDetector.findUnique({ where: { key: spec.output.customDetectorKey }, select: { id: true } }))
+          ? !(await this.prisma.customDetector.findUnique({
+              where: { key: spec.output.customDetectorKey },
+              select: { id: true },
+            }))
           : false;
       if (dryRun) {
-        items.push({ index, action: missingDetector ? 'waiting' : 'create', ...(missingDetector ? { reason: 'waiting for detector' } : {}) });
+        items.push({
+          index,
+          action: missingDetector ? 'waiting' : 'create',
+          ...(missingDetector ? { reason: 'waiting for detector' } : {}),
+        });
         if (missingDetector) counts.waiting += 1;
         else counts.created += 1;
         continue;
@@ -265,7 +389,12 @@ export class GlossaryPacksService {
           select: { id: true },
         });
         if (duplicate) {
-          items.push({ index, action: 'skip', reason: 'Already bound', bindingId: duplicate.id });
+          items.push({
+            index,
+            action: 'skip',
+            reason: 'Already bound',
+            bindingId: duplicate.id,
+          });
           counts.skipped += 1;
           continue;
         }
@@ -274,13 +403,23 @@ export class GlossaryPacksService {
           status: missingDetector ? 'DRAFT' : 'APPROVED',
           actor,
           packKey: pack.key,
-          rationale: missingDetector ? 'Waiting for detector: installs APPROVED when it exists.' : null,
+          rationale: missingDetector
+            ? 'Waiting for detector: installs APPROVED when it exists.'
+            : null,
         });
-        items.push({ index, action: missingDetector ? 'waiting' : 'create', bindingId: created.id });
+        items.push({
+          index,
+          action: missingDetector ? 'waiting' : 'create',
+          bindingId: created.id,
+        });
         if (missingDetector) counts.waiting += 1;
         else counts.created += 1;
       } catch (error) {
-        items.push({ index, action: 'refused', reason: error instanceof Error ? error.message : String(error) });
+        items.push({
+          index,
+          action: 'refused',
+          reason: error instanceof Error ? error.message : String(error),
+        });
         counts.refused += 1;
       }
     }
@@ -293,7 +432,12 @@ export class GlossaryPacksService {
    */
   async activateWaitingBindings(): Promise<number> {
     const waiting = await this.prisma.glossaryBinding.findMany({
-      where: { status: 'DRAFT', origin: 'PACK', detectorType: 'CUSTOM', customDetectorKey: { not: null } },
+      where: {
+        status: 'DRAFT',
+        origin: 'PACK',
+        detectorType: 'CUSTOM',
+        customDetectorKey: { not: null },
+      },
     });
     let activated = 0;
     for (const binding of waiting) {
@@ -313,11 +457,17 @@ export class GlossaryPacksService {
    * locally are kept and flagged; items the new version dropped are removed if
    * untouched.
    */
-  async upgrade(key: string, input: { pack?: unknown; dryRun?: boolean; actor?: string }) {
+  async upgrade(
+    key: string,
+    input: { pack?: unknown; dryRun?: boolean; actor?: string },
+  ) {
     const pack = this.resolvePack({ pack: input.pack, key });
-    if (pack.key !== key) throw new BadRequestException('The pack key does not match');
+    if (pack.key !== key)
+      throw new BadRequestException('The pack key does not match');
     const dryRun = input.dryRun !== false;
-    const ownTerms = await this.prisma.glossaryTerm.findMany({ where: { packKey: key } });
+    const ownTerms = await this.prisma.glossaryTerm.findMany({
+      where: { packKey: key },
+    });
     const resolutions: Record<string, 'skip' | 'overwrite'> = {};
     const flagged: string[] = [];
     for (const term of ownTerms) {
@@ -330,18 +480,35 @@ export class GlossaryPacksService {
     }
     const newKeys = new Set((pack.terms ?? []).map((t) => t.key));
     const dropped = ownTerms.filter((t) => !newKeys.has(t.key) && !edited(t));
-    const result = await this.install({ pack, dryRun, resolutions, actor: input.actor });
+    const result = await this.install({
+      pack,
+      dryRun,
+      resolutions,
+      actor: input.actor,
+    });
     if (!dryRun && dropped.length) {
-      await this.prisma.glossaryTerm.deleteMany({ where: { id: { in: dropped.map((t) => t.id) } } });
+      await this.prisma.glossaryTerm.deleteMany({
+        where: { id: { in: dropped.map((t) => t.id) } },
+      });
     }
     if (!dryRun) {
-      await this.prisma.glossaryScheme.updateMany({ where: { packKey: key }, data: { packVersion: pack.version } });
+      await this.prisma.glossaryScheme.updateMany({
+        where: { packKey: key },
+        data: { packVersion: pack.version },
+      });
     }
-    return { ...result, keptEdited: flagged, removed: dropped.map((t) => t.key) };
+    return {
+      ...result,
+      keptEdited: flagged,
+      removed: dropped.map((t) => t.key),
+    };
   }
 
   /** Remove pack items nobody edited; keep and detach the rest. */
-  async uninstall(key: string, input: { dryRun?: boolean; actor?: string } = {}) {
+  async uninstall(
+    key: string,
+    input: { dryRun?: boolean; actor?: string } = {},
+  ) {
     const dryRun = input.dryRun !== false;
     const [terms, bindings, schemes] = await Promise.all([
       this.prisma.glossaryTerm.findMany({ where: { packKey: key } }),
@@ -353,35 +520,62 @@ export class GlossaryPacksService {
     }
     const termsRemove = terms.filter((t) => !edited(t));
     const termsKeep = terms.filter((t) => edited(t));
-    const bindingsRemove = bindings.filter((b) => !edited(b) && b.status !== 'DISABLED');
+    const bindingsRemove = bindings.filter(
+      (b) => !edited(b) && b.status !== 'DISABLED',
+    );
     const bindingsKeep = bindings.filter((b) => !bindingsRemove.includes(b));
     const plan = {
-      terms: { remove: termsRemove.map((t) => t.key), detach: termsKeep.map((t) => t.key) },
+      terms: {
+        remove: termsRemove.map((t) => t.key),
+        detach: termsKeep.map((t) => t.key),
+      },
       bindings: { remove: bindingsRemove.length, detach: bindingsKeep.length },
       schemes: schemes.map((s) => s.key),
     };
     if (dryRun) return { key, dryRun, plan };
     await this.prisma.$transaction(async (tx) => {
-      await tx.glossaryBinding.deleteMany({ where: { id: { in: bindingsRemove.map((b) => b.id) } } });
-      await tx.glossaryBinding.updateMany({ where: { id: { in: bindingsKeep.map((b) => b.id) } }, data: { packKey: null } });
-      await tx.glossaryTerm.deleteMany({ where: { id: { in: termsRemove.map((t) => t.id) } } });
-      await tx.glossaryTerm.updateMany({ where: { id: { in: termsKeep.map((t) => t.id) } }, data: { packKey: null } });
+      await tx.glossaryBinding.deleteMany({
+        where: { id: { in: bindingsRemove.map((b) => b.id) } },
+      });
+      await tx.glossaryBinding.updateMany({
+        where: { id: { in: bindingsKeep.map((b) => b.id) } },
+        data: { packKey: null },
+      });
+      await tx.glossaryTerm.deleteMany({
+        where: { id: { in: termsRemove.map((t) => t.id) } },
+      });
+      await tx.glossaryTerm.updateMany({
+        where: { id: { in: termsKeep.map((t) => t.id) } },
+        data: { packKey: null },
+      });
       for (const scheme of schemes) {
-        const left = await tx.glossaryTerm.count({ where: { schemeId: scheme.id } });
+        const left = await tx.glossaryTerm.count({
+          where: { schemeId: scheme.id },
+        });
         if (left === 0) {
-          await tx.glossaryBinding.deleteMany({ where: { lookupSchemeId: scheme.id } });
+          await tx.glossaryBinding.deleteMany({
+            where: { lookupSchemeId: scheme.id },
+          });
           await tx.glossaryScheme.delete({ where: { id: scheme.id } });
         } else {
-          await tx.glossaryScheme.update({ where: { id: scheme.id }, data: { packKey: null, packVersion: null } });
+          await tx.glossaryScheme.update({
+            where: { id: scheme.id },
+            data: { packKey: null, packVersion: null },
+          });
         }
       }
     });
     await recordGlossaryActivity(this.prisma, {
       type: 'PACK_UNINSTALLED',
       actor: input.actor ?? 'operator',
-      payload: { packKey: key, ...plan } as unknown as Prisma.InputJsonValue,
+      payload: { packKey: key, ...plan },
     });
-    glossaryEvents.emit({ type: 'glossary.pack_installed', packKey: key, version: 'uninstalled', counts: { removedTerms: termsRemove.length } });
+    glossaryEvents.emit({
+      type: 'glossary.pack_installed',
+      packKey: key,
+      version: 'uninstalled',
+      counts: { removedTerms: termsRemove.length },
+    });
     return { key, dryRun, plan };
   }
 }

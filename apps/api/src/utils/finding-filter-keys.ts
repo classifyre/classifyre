@@ -34,6 +34,9 @@ export const FINDING_FILTER_KEYS = [
   'firstDetectedAfter',
   'lastDetectedBefore',
   'excludeIds',
+  'term',
+  'includeNarrower',
+  'meaningMethod',
 ] as const;
 
 export type FindingFilterKey = (typeof FINDING_FILTER_KEYS)[number];
@@ -50,6 +53,9 @@ const NON_NARROWING = new Set<FindingFilterKey>([
   'status',
   'includeResolved',
   'excludeIds',
+  // Modifiers of `term`, which is the narrowing key.
+  'includeNarrower',
+  'meaningMethod',
 ]);
 
 /** The known key an unknown one most plausibly meant, if any. */

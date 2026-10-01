@@ -5,6 +5,10 @@ import type {
   ExportFindingsQueryDto,
   ExportRunnerAssetsQueryDto,
 } from '../dto/export-query.dto';
+import {
+  ASSET_TERMS_SQL,
+  FINDING_TERMS_SQL,
+} from '../semantic/export-terms-sql';
 
 export interface ExportQuery {
   sql: string;
@@ -380,7 +384,8 @@ const FINDINGS_SELECT = `
   f.redacted_content AS redacted_content,
   f.first_detected_at AS first_detected_at,
   f.last_detected_at AS last_detected_at,
-  f.metadata::text AS metadata`;
+  f.metadata::text AS metadata,
+  ${FINDING_TERMS_SQL} AS terms`;
 
 const FINDINGS_COLUMNS: CsvStreamColumn[] = [
   { key: 'category', header: 'Category' },
@@ -397,6 +402,7 @@ const FINDINGS_COLUMNS: CsvStreamColumn[] = [
   { key: 'first_detected_at', header: 'First Detected' },
   { key: 'last_detected_at', header: 'Last Detected' },
   { key: 'metadata', header: 'Metadata' },
+  { key: 'terms', header: 'Terms' },
 ];
 
 const ASSETS_SELECT = `
@@ -407,7 +413,8 @@ const ASSETS_SELECT = `
   s.name AS source_name,
   a.status AS asset_status,
   a.last_scanned_at AS last_scanned_at,
-  a.metadata::text AS metadata`;
+  a.metadata::text AS metadata,
+  ${ASSET_TERMS_SQL} AS terms`;
 
 const ASSETS_COLUMNS: CsvStreamColumn[] = [
   { key: 'asset_name', header: 'Asset' },
@@ -424,6 +431,7 @@ const ASSETS_COLUMNS: CsvStreamColumn[] = [
   { key: 'confidence', header: 'Confidence' },
   { key: 'matched_content', header: 'Matched Content' },
   { key: 'metadata', header: 'Metadata' },
+  { key: 'terms', header: 'Terms' },
 ];
 
 const RUNNER_ASSETS_SELECT = `

@@ -772,6 +772,7 @@ All URIs are relative to *http://localhost*
 - [QuickSearchRequestDto](docs/QuickSearchRequestDto.md)
 - [QuickSearchResponseDto](docs/QuickSearchResponseDto.md)
 - [QuickSearchSeverityCountsDto](docs/QuickSearchSeverityCountsDto.md)
+- [QuickSearchTermDto](docs/QuickSearchTermDto.md)
 - [RebuildEdgesResponseDto](docs/RebuildEdgesResponseDto.md)
 - [RebuildIndexResponseDto](docs/RebuildIndexResponseDto.md)
 - [RecomputeCorrelationResponseDto](docs/RecomputeCorrelationResponseDto.md)

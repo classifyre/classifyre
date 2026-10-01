@@ -44,7 +44,9 @@ export interface GlossaryActivityEntry {
   payload?: Prisma.InputJsonValue;
 }
 
-type ActivityWriter = Pick<PrismaService, 'glossaryActivity'> | Prisma.TransactionClient;
+type ActivityWriter =
+  | Pick<PrismaService, 'glossaryActivity'>
+  | Prisma.TransactionClient;
 
 /**
  * Append to `glossary_activities` (SL1 R11): every change to a term, scheme,

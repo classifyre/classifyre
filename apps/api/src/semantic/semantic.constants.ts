@@ -8,7 +8,8 @@ export const SEMANTIC_LINKS_QUEUE = 'semantic-links';
 export const SEMANTIC_LINKS_RECONCILE_QUEUE = 'semantic-links-reconcile';
 export const VOCABULARY_REFRESH_QUEUE = 'vocabulary-refresh';
 export const SEMANTIC_SUGGESTIONS_QUEUE = 'semantic-suggestions';
-export const SEMANTIC_SUGGESTIONS_NIGHTLY_QUEUE = 'semantic-suggestions-nightly';
+export const SEMANTIC_SUGGESTIONS_NIGHTLY_QUEUE =
+  'semantic-suggestions-nightly';
 export const SEMANTIC_MAP_QUEUE = 'semantic-map-rebuild';
 
 /** Coalescing windows. */

@@ -31,6 +31,9 @@ export const ASSET_FILTER_KEYS = [
   'status',
   'sourceTypes',
   'metadata',
+  'term',
+  'includeNarrower',
+  'meaningMethod',
 ] as const;
 
 const KNOWN_SECTIONS = new Set<string>(ASSET_SEARCH_SECTIONS);

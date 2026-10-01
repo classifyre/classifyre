@@ -69,6 +69,14 @@ export type GlossaryEvent =
       counts: Record<string, number>;
     }
   | {
+      /** A manual ABOUT reference was added or removed (SL3 R5). */
+      type: 'semantic.reference_changed';
+      change: 'linked' | 'unlinked';
+      termId: string;
+      entityType: string;
+      entityId: string;
+    }
+  | {
       type: 'semantic.links_updated';
       jobId: string;
       runId?: string | null;

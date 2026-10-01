@@ -55,6 +55,24 @@ export interface SearchAssetsFiltersDto {
      * @memberof SearchAssetsFiltersDto
      */
     metadata?: object;
+    /**
+     * Glossary term keys: assets with a current semantic link to one of them (any method). Unknown keys are rejected.
+     * @type {Array<string>}
+     * @memberof SearchAssetsFiltersDto
+     */
+    term?: Array<string>;
+    /**
+     * With term: include narrower concepts.
+     * @type {boolean}
+     * @memberof SearchAssetsFiltersDto
+     */
+    includeNarrower?: boolean;
+    /**
+     * With term: only links by these methods.
+     * @type {Array<string>}
+     * @memberof SearchAssetsFiltersDto
+     */
+    meaningMethod?: Array<SearchAssetsFiltersDtoMeaningMethodEnum>;
 }
 
 
@@ -121,6 +139,18 @@ export const SearchAssetsFiltersDtoSourceTypesEnum = {
 } as const;
 export type SearchAssetsFiltersDtoSourceTypesEnum = typeof SearchAssetsFiltersDtoSourceTypesEnum[keyof typeof SearchAssetsFiltersDtoSourceTypesEnum];
 
+/**
+ * @export
+ */
+export const SearchAssetsFiltersDtoMeaningMethodEnum = {
+    Binding: 'BINDING',
+    Declared: 'DECLARED',
+    Manual: 'MANUAL',
+    Suggested: 'SUGGESTED',
+    Mention: 'MENTION'
+} as const;
+export type SearchAssetsFiltersDtoMeaningMethodEnum = typeof SearchAssetsFiltersDtoMeaningMethodEnum[keyof typeof SearchAssetsFiltersDtoMeaningMethodEnum];
+
 
 /**
  * Check if a given object implements the SearchAssetsFiltersDto interface.
@@ -145,6 +175,9 @@ export function SearchAssetsFiltersDtoFromJSONTyped(json: any, ignoreDiscriminat
         'status': json['status'] == null ? undefined : json['status'],
         'sourceTypes': json['sourceTypes'] == null ? undefined : json['sourceTypes'],
         'metadata': json['metadata'] == null ? undefined : json['metadata'],
+        'term': json['term'] == null ? undefined : json['term'],
+        'includeNarrower': json['includeNarrower'] == null ? undefined : json['includeNarrower'],
+        'meaningMethod': json['meaningMethod'] == null ? undefined : json['meaningMethod'],
     };
 }
 
@@ -165,6 +198,9 @@ export function SearchAssetsFiltersDtoToJSONTyped(value?: SearchAssetsFiltersDto
         'status': value['status'],
         'sourceTypes': value['sourceTypes'],
         'metadata': value['metadata'],
+        'term': value['term'],
+        'includeNarrower': value['includeNarrower'],
+        'meaningMethod': value['meaningMethod'],
     };
 }
 

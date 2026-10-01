@@ -12,7 +12,10 @@ import { QueryEmbeddingService } from '../../embedding/query-embedding.service';
 import { vectorCast } from '../../embedding/embedding-vector';
 import { glossaryNorm } from '../../glossary/glossary-norm';
 import { glossaryEvents } from '../../glossary/glossary-events';
-import { VocabularyService, VocabularyRow } from '../vocabulary/vocabulary.service';
+import {
+  VocabularyService,
+  VocabularyRow,
+} from '../vocabulary/vocabulary.service';
 import {
   BindingSpec,
   CompiledBinding,
@@ -25,7 +28,10 @@ export type GeneratorName = 'binding' | 'link' | 'relation';
 export const GENERATORS: GeneratorName[] = ['binding', 'link', 'relation'];
 
 /** Defaults (SL4 §4, §9). */
-export const DEFAULT_MIN_SCORE: Record<'binding' | 'link' | 'relation', number> = {
+export const DEFAULT_MIN_SCORE: Record<
+  'binding' | 'link' | 'relation',
+  number
+> = {
   binding: 0.6,
   link: 0.78,
   relation: 0.5,
@@ -48,7 +54,11 @@ type Concept = {
   status: string;
 };
 
-type Signal = { termId: string; score: number; kind: 'lexical' | 'meaning' | 'content' | 'lookup' };
+type Signal = {
+  termId: string;
+  score: number;
+  kind: 'lexical' | 'meaning' | 'content' | 'lookup';
+};
 
 function tokens(value: string): Set<string> {
   return new Set(
@@ -66,7 +76,10 @@ export function jaccard(a: Set<string>, b: Set<string>): number {
 }
 
 /** Lexical signal (SL4 G-1): 0.9 exact, else 0.6 + 0.3 × Jaccard when ≥ 0.5. */
-export function lexicalScore(label: string, concept: Pick<Concept, 'matchKeys'>): number {
+export function lexicalScore(
+  label: string,
+  concept: Pick<Concept, 'matchKeys'>,
+): number {
   const normalized = glossaryNorm(label);
   if (!normalized) return 0;
   if (concept.matchKeys.includes(normalized)) return 0.9;
@@ -100,7 +113,9 @@ function linkFingerprint(assetId: string, termId: string): string {
 
 function relationFingerprint(a: string, b: string, type: string): string {
   const [x, y] = a < b ? [a, b] : [b, a];
-  return createHash('sha256').update(`relation:${x}:${y}:${type}`).digest('hex');
+  return createHash('sha256')
+    .update(`relation:${x}:${y}:${type}`)
+    .digest('hex');
 }
 
 /**
@@ -123,7 +138,9 @@ export class SemanticSuggestionsService {
   ) {}
 
   async settings() {
-    const row = await this.prisma.instanceSettings.findUnique({ where: { id: 1 } });
+    const row = await this.prisma.instanceSettings.findUnique({
+      where: { id: 1 },
+    });
     const generators = {
       binding: true,
       link: true,
@@ -160,19 +177,39 @@ export class SemanticSuggestionsService {
       where: { id: 1 },
       data: {
         ...(input.generators
-          ? { suggestionGenerators: { ...current.generators, ...input.generators } }
+          ? {
+              suggestionGenerators: {
+                ...current.generators,
+                ...input.generators,
+              },
+            }
           : {}),
         ...(input.minScore
           ? { suggestionMinScore: { ...current.minScore, ...input.minScore } }
           : {}),
         ...(input.linkCapPerConcept !== undefined
-          ? { suggestionLinkCapPerConcept: Math.max(1, Math.trunc(input.linkCapPerConcept)) }
+          ? {
+              suggestionLinkCapPerConcept: Math.max(
+                1,
+                Math.trunc(input.linkCapPerConcept),
+              ),
+            }
           : {}),
         ...(input.cooccurrenceMinSupport !== undefined
-          ? { suggestionCooccurrenceMinSupport: Math.max(1, Math.trunc(input.cooccurrenceMinSupport)) }
+          ? {
+              suggestionCooccurrenceMinSupport: Math.max(
+                1,
+                Math.trunc(input.cooccurrenceMinSupport),
+              ),
+            }
           : {}),
         ...(input.cooccurrenceMinLift !== undefined
-          ? { suggestionCooccurrenceMinLift: Math.max(1, input.cooccurrenceMinLift) }
+          ? {
+              suggestionCooccurrenceMinLift: Math.max(
+                1,
+                input.cooccurrenceMinLift,
+              ),
+            }
           : {}),
       },
     });
@@ -181,27 +218,39 @@ export class SemanticSuggestionsService {
 
   async embeddingsOn(): Promise<boolean> {
     try {
-      return Boolean(this.embeddingSettings && (await this.embeddingSettings.enabledNow()));
+      return Boolean(
+        this.embeddingSettings && (await this.embeddingSettings.enabledNow()),
+      );
     } catch {
       return false;
     }
   }
 
-  async runAll(options: {
-    generators?: string[];
-    termIds?: string[];
-    nightly?: boolean;
-  } = {}): Promise<Record<string, number>> {
+  async runAll(
+    options: {
+      generators?: string[];
+      termIds?: string[];
+      nightly?: boolean;
+    } = {},
+  ): Promise<Record<string, number>> {
     const settings = await this.settings();
-    const wanted = new Set(options.generators?.length ? options.generators : GENERATORS);
+    const wanted = new Set(
+      options.generators?.length ? options.generators : GENERATORS,
+    );
     const out: Record<string, number> = {};
     await this.expire();
     if (wanted.has('binding') && settings.generators.binding) {
-      out.binding = await this.safe('binding', () => this.generateBindings(settings.minScore.binding));
+      out.binding = await this.safe('binding', () =>
+        this.generateBindings(settings.minScore.binding),
+      );
     }
     if (wanted.has('link') && settings.generators.link) {
       out.link = await this.safe('link', () =>
-        this.generateLinks(settings.minScore.link, settings.linkCapPerConcept, options.termIds),
+        this.generateLinks(
+          settings.minScore.link,
+          settings.linkCapPerConcept,
+          options.termIds,
+        ),
       );
     }
     // Co-occurrence is nightly (SL4 G-3), or on demand.
@@ -268,13 +317,15 @@ export class SemanticSuggestionsService {
         },
       });
     }
-    if (history.some((row) => row.status === 'ACCEPTED' || row.suppressed)) return null;
+    if (history.some((row) => row.status === 'ACCEPTED' || row.suppressed))
+      return null;
     const dismissed = history.find((row) => row.status === 'DISMISSED');
     let rationale = input.rationale;
     if (dismissed) {
       const scoreUp = input.score >= Number(dismissed.score) + 0.1;
       const supportDoubled =
-        dismissed.supportCount > 0 && input.supportCount >= dismissed.supportCount * 2;
+        dismissed.supportCount > 0 &&
+        input.supportCount >= dismissed.supportCount * 2;
       if (!scoreUp && !supportDoubled) return null;
       const when = dismissed.decidedAt?.toISOString().slice(0, 10) ?? 'earlier';
       rationale = `${input.rationale} (Dismissed on ${when}${
@@ -301,7 +352,10 @@ export class SemanticSuggestionsService {
       });
     } catch (error) {
       // The partial unique index raced another generator run: fine.
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         return null;
       }
       throw error;
@@ -368,7 +422,12 @@ export class SemanticSuggestionsService {
   lookupSignal(
     row: Pick<VocabularyRow, 'topValues' | 'categorical'>,
     concepts: Concept[],
-  ): { schemeId: string; share: number; match: 'CODES' | 'ANY'; matched: number } | null {
+  ): {
+    schemeId: string;
+    share: number;
+    match: 'CODES' | 'ANY';
+    matched: number;
+  } | null {
     if (!row.categorical || !row.topValues.length) return null;
     const total = row.topValues.reduce((sum, v) => sum + v.count, 0);
     if (!total) return null;
@@ -382,19 +441,32 @@ export class SemanticSuggestionsService {
       for (const concept of concepts) {
         if (!concept.schemeId) continue;
         if (concept.codes.includes(trimmed)) codeSchemes.add(concept.schemeId);
-        if (concept.matchKeys.includes(normalized)) anySchemes.add(concept.schemeId);
+        if (concept.matchKeys.includes(normalized))
+          anySchemes.add(concept.schemeId);
       }
-      for (const scheme of codeSchemes) bySchemeCodes.set(scheme, (bySchemeCodes.get(scheme) ?? 0) + value.count);
-      for (const scheme of anySchemes) bySchemeAny.set(scheme, (bySchemeAny.get(scheme) ?? 0) + value.count);
+      for (const scheme of codeSchemes)
+        bySchemeCodes.set(
+          scheme,
+          (bySchemeCodes.get(scheme) ?? 0) + value.count,
+        );
+      for (const scheme of anySchemes)
+        bySchemeAny.set(scheme, (bySchemeAny.get(scheme) ?? 0) + value.count);
     }
-    let best: { schemeId: string; share: number; match: 'CODES' | 'ANY'; matched: number } | null = null;
+    let best: {
+      schemeId: string;
+      share: number;
+      match: 'CODES' | 'ANY';
+      matched: number;
+    } | null = null;
     for (const [schemeId, count] of bySchemeCodes) {
       const share = count / total;
-      if (!best || share > best.share) best = { schemeId, share, match: 'CODES', matched: count };
+      if (!best || share > best.share)
+        best = { schemeId, share, match: 'CODES', matched: count };
     }
     for (const [schemeId, count] of bySchemeAny) {
       const share = count / total;
-      if (!best || share > best.share + 0.05) best = { schemeId, share, match: 'ANY', matched: count };
+      if (!best || share > best.share + 0.05)
+        best = { schemeId, share, match: 'ANY', matched: count };
     }
     return best && best.share >= 0.5 ? best : null;
   }
@@ -407,25 +479,37 @@ export class SemanticSuggestionsService {
     if (!concepts.length) return 0;
     const embeddingsOn = await this.embeddingsOn();
     const conceptById = new Map(concepts.map((c) => [c.id, c]));
-    const schemes = await this.prisma.glossaryScheme.findMany({ select: { id: true, key: true, name: true } });
+    const schemes = await this.prisma.glossaryScheme.findMany({
+      select: { id: true, key: true, name: true },
+    });
     const schemeById = new Map(schemes.map((s) => [s.id, s]));
     let written = 0;
     for (const row of inventory.rows) {
-      if (row.bindings.some((b) => b.noMeaning || b.status === 'APPROVED')) continue;
-      const label = row.output ? humaniseOutput(row.output.findingType) : glossaryNorm(row.field ?? '');
+      if (row.bindings.some((b) => b.noMeaning || b.status === 'APPROVED'))
+        continue;
+      const label = row.output
+        ? humaniseOutput(row.output.findingType)
+        : glossaryNorm(row.field ?? '');
       const signals: Signal[] = [];
       for (const concept of concepts) {
         const score = lexicalScore(label, concept);
-        if (score > 0) signals.push({ termId: concept.id, score, kind: 'lexical' });
+        if (score > 0)
+          signals.push({ termId: concept.id, score, kind: 'lexical' });
       }
       let meaningVector: number[] | null = null;
       if (embeddingsOn && this.queryEmbedding) {
         try {
           meaningVector = await this.queryEmbedding.embed(
-            [label, row.label.detail, row.output?.customDetectorName ?? ''].filter(Boolean).join(' · '),
+            [label, row.label.detail, row.output?.customDetectorName ?? '']
+              .filter(Boolean)
+              .join(' · '),
           );
           for (const hit of await this.nearestConcepts(meaningVector, 3)) {
-            signals.push({ termId: hit.termId, score: hit.score, kind: 'meaning' });
+            signals.push({
+              termId: hit.termId,
+              score: hit.score,
+              kind: 'meaning',
+            });
           }
         } catch {
           meaningVector = null;
@@ -434,30 +518,57 @@ export class SemanticSuggestionsService {
       // Content: do sampled findings of this output sit near the candidate?
       const content = new Map<string, number>();
       if (embeddingsOn && row.output) {
-        const candidates = [...new Set(signals.map((s) => s.termId))].slice(0, 5);
+        const candidates = [...new Set(signals.map((s) => s.termId))].slice(
+          0,
+          5,
+        );
         for (const termId of candidates) {
-          const cos = await this.contentCosine(row, conceptById.get(termId)!).catch(() => null);
+          const cos = await this.contentCosine(
+            row,
+            conceptById.get(termId)!,
+          ).catch(() => null);
           if (cos !== null) {
             content.set(termId, cos);
-            if (cos >= CONTENT_FLOOR) signals.push({ termId, score: cos, kind: 'content' });
+            if (cos >= CONTENT_FLOOR)
+              signals.push({ termId, score: cos, kind: 'content' });
           }
         }
       }
       const lookup = this.lookupSignal(row, concepts);
 
-      let best: { score: number; spec: BindingSpec; compiled: CompiledBinding; termId: string | null; rationale: string } | null = null;
+      let best: {
+        score: number;
+        spec: BindingSpec;
+        compiled: CompiledBinding;
+        termId: string | null;
+        rationale: string;
+      } | null = null;
       const termIds = [...new Set(signals.map((s) => s.termId))];
       for (const termId of termIds) {
-        const contradicts = content.has(termId) && content.get(termId)! < CONTENT_FLOOR;
+        const contradicts =
+          content.has(termId) && content.get(termId)! < CONTENT_FLOOR;
         const score = combineSignals(signals, termId, contradicts);
         if (score < minScore || (best && best.score >= score)) continue;
         const concept = conceptById.get(termId)!;
         const parts: string[] = [];
-        const lex = signals.find((s) => s.termId === termId && s.kind === 'lexical');
-        if (lex) parts.push(`'${label}' matches ${concept.term} (lexical ${lex.score.toFixed(2)})`);
-        const meaning = signals.find((s) => s.termId === termId && s.kind === 'meaning');
-        if (meaning) parts.push(`the label means ${concept.term} (meaning ${meaning.score.toFixed(2)})`);
-        if (content.has(termId)) parts.push(`sampled findings are ${content.get(termId)! >= CONTENT_FLOOR ? 'close' : 'not close'} (content ${content.get(termId)!.toFixed(2)})`);
+        const lex = signals.find(
+          (s) => s.termId === termId && s.kind === 'lexical',
+        );
+        if (lex)
+          parts.push(
+            `'${label}' matches ${concept.term} (lexical ${lex.score.toFixed(2)})`,
+          );
+        const meaning = signals.find(
+          (s) => s.termId === termId && s.kind === 'meaning',
+        );
+        if (meaning)
+          parts.push(
+            `the label means ${concept.term} (meaning ${meaning.score.toFixed(2)})`,
+          );
+        if (content.has(termId))
+          parts.push(
+            `sampled findings are ${content.get(termId)! >= CONTENT_FLOOR ? 'close' : 'not close'} (content ${content.get(termId)!.toFixed(2)})`,
+          );
         const spec: BindingSpec = row.output
           ? {
               mode: 'OUTPUT',
@@ -469,7 +580,13 @@ export class SemanticSuggestionsService {
               termId,
               termKey: concept.key,
             }
-          : { mode: 'METADATA_VALUES', field: row.field, values: row.topValues.slice(0, 1).map((v) => v.value), termId, termKey: concept.key };
+          : {
+              mode: 'METADATA_VALUES',
+              field: row.field,
+              values: row.topValues.slice(0, 1).map((v) => v.value),
+              termId,
+              termKey: concept.key,
+            };
         if (!row.output && !row.topValues.length) continue;
         best = {
           score,
@@ -479,7 +596,11 @@ export class SemanticSuggestionsService {
           rationale: `${parts.join('. ')}.`,
         };
       }
-      if (lookup && lookup.share >= minScore && (!best || lookup.share >= best.score)) {
+      if (
+        lookup &&
+        lookup.share >= minScore &&
+        (!best || lookup.share >= best.score)
+      ) {
         const scheme = schemeById.get(lookup.schemeId);
         const spec: BindingSpec = row.output
           ? {
@@ -489,9 +610,21 @@ export class SemanticSuggestionsService {
                 customDetectorKey: row.output.customDetectorKey,
                 findingType: row.output.findingType,
               },
-              lookup: { schemeId: lookup.schemeId, schemeKey: scheme?.key, match: lookup.match },
+              lookup: {
+                schemeId: lookup.schemeId,
+                schemeKey: scheme?.key,
+                match: lookup.match,
+              },
             }
-          : { mode: 'METADATA_LOOKUP', field: row.field, lookup: { schemeId: lookup.schemeId, schemeKey: scheme?.key, match: lookup.match } };
+          : {
+              mode: 'METADATA_LOOKUP',
+              field: row.field,
+              lookup: {
+                schemeId: lookup.schemeId,
+                schemeKey: scheme?.key,
+                match: lookup.match,
+              },
+            };
         best = {
           score: Math.round(lookup.share * 1000) / 1000,
           spec,
@@ -515,7 +648,7 @@ export class SemanticSuggestionsService {
           openCount: row.openCount,
           assetCount: row.assetCount,
           topValues: row.topValues.slice(0, 5),
-        } as unknown as Prisma.InputJsonValue,
+        },
         supportCount: row.openCount || row.assetCount,
       });
       if (written1) written += 1;
@@ -523,7 +656,11 @@ export class SemanticSuggestionsService {
     return written;
   }
 
-  private compileLocal(spec: BindingSpec, termId: string | null, lookupSchemeId: string | null): CompiledBinding {
+  private compileLocal(
+    spec: BindingSpec,
+    termId: string | null,
+    lookupSchemeId: string | null,
+  ): CompiledBinding {
     return {
       id: '',
       mode: spec.mode,
@@ -531,7 +668,10 @@ export class SemanticSuggestionsService {
       customDetectorKey: spec.output?.customDetectorKey ?? null,
       findingType: spec.output?.findingType ?? null,
       metadataPath: spec.field ?? null,
-      values: (spec.values ?? []).map((v) => glossaryNorm(v)).filter(Boolean).sort(),
+      values: (spec.values ?? [])
+        .map((v) => glossaryNorm(v))
+        .filter(Boolean)
+        .sort(),
       splitDelimiter: null,
       termId,
       lookupSchemeId,
@@ -548,27 +688,40 @@ export class SemanticSuggestionsService {
   }
 
   /** Nearest APPROVED concepts to a vector, by the terms' own embeddings. */
-  private async nearestConcepts(vector: number[], limit: number): Promise<Array<{ termId: string; score: number }>> {
+  private async nearestConcepts(
+    vector: number[],
+    limit: number,
+  ): Promise<Array<{ termId: string; score: number }>> {
     const space = await this.space();
     const dim = Prisma.raw(String(space.dim));
     const vecType = Prisma.raw(vectorCast(space.dim).type);
-    const rows = await this.prisma.$queryRaw<Array<{ id: string; score: number }>>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<
+      Array<{ id: string; score: number }>
+    >(Prisma.sql`
       SELECT gt.id, 1 - (ce.vec::public.${vecType}(${dim}) <=> ${JSON.stringify(vector)}::public.${vecType}(${dim})) AS score
         FROM glossary_terms gt
         JOIN content_embeddings ce ON ce.content_hash = gt.embed_content_hash AND ce.space_id = ${space.id}
        WHERE gt.kind = 'CONCEPT' AND gt.status = 'APPROVED'
        ORDER BY ce.vec::public.${vecType}(${dim}) <=> ${JSON.stringify(vector)}::public.${vecType}(${dim})
        LIMIT ${limit}`);
-    return rows.map((row) => ({ termId: row.id, score: Math.round(Number(row.score) * 1000) / 1000 }));
+    return rows.map((row) => ({
+      termId: row.id,
+      score: Math.round(Number(row.score) * 1000) / 1000,
+    }));
   }
 
   /** Mean cosine of up to 20 sampled findings of an output to a concept. */
-  private async contentCosine(row: VocabularyRow, concept: Concept): Promise<number | null> {
+  private async contentCosine(
+    row: VocabularyRow,
+    concept: Concept,
+  ): Promise<number | null> {
     if (!row.output || !concept.embedContentHash) return null;
     const space = await this.space();
     const dim = Prisma.raw(String(space.dim));
     const vecType = Prisma.raw(vectorCast(space.dim).type);
-    const [result] = await this.prisma.$queryRaw<Array<{ cos: number | null; n: bigint }>>(Prisma.sql`
+    const [result] = await this.prisma.$queryRaw<
+      Array<{ cos: number | null; n: bigint }>
+    >(Prisma.sql`
       WITH sample AS (
         SELECT f.embed_content_hash FROM findings f
          WHERE f.status = 'OPEN' AND f.embed_content_hash IS NOT NULL
@@ -587,7 +740,11 @@ export class SemanticSuggestionsService {
 
   // ── G-2 Link suggestions ───────────────────────────────────────────────
 
-  async generateLinks(minScore: number, cap: number, termIds?: string[]): Promise<number> {
+  async generateLinks(
+    minScore: number,
+    cap: number,
+    termIds?: string[],
+  ): Promise<number> {
     if (!(await this.embeddingsOn()) || !this.embeddings) return 0;
     const concepts = (await this.concepts()).filter(
       (c) =>
@@ -609,32 +766,48 @@ export class SemanticSuggestionsService {
       } catch {
         continue;
       }
-      const hits = await this.embeddings.semanticAssetIds(vector, MAX_LINK_CANDIDATES);
+      const hits = await this.embeddings.semanticAssetIds(
+        vector,
+        MAX_LINK_CANDIDATES,
+      );
       const candidates = hits.filter((hit) => Number(hit.score) >= minScore);
       if (!candidates.length) continue;
       const linked = await this.prisma.assetTerm.findMany({
-        where: { termId: concept.id, goneAt: null, assetId: { in: candidates.map((c) => c.id) } },
+        where: {
+          termId: concept.id,
+          goneAt: null,
+          assetId: { in: candidates.map((c) => c.id) },
+        },
         select: { assetId: true },
       });
       const already = new Set(linked.map((row) => row.assetId));
       const fresh = candidates.filter((c) => !already.has(c.id)).slice(0, cap);
       for (const hit of fresh) {
-        const chunk = await this.bestChunk(hit.id, vector, space).catch(() => null);
+        const chunk = await this.bestChunk(hit.id, vector, space).catch(
+          () => null,
+        );
         const similarity = Math.round(Number(hit.score) * 1000) / 1000;
         const row = await this.propose({
           kind: 'LINK',
           fingerprint: linkFingerprint(hit.id, concept.id),
           termId: concept.id,
           assetId: hit.id,
-          payload: { similarity, chunkHash: chunk?.hash ?? null } as Prisma.InputJsonValue,
+          payload: {
+            similarity,
+            chunkHash: chunk?.hash ?? null,
+          },
           score: similarity,
           generator: 'link',
           rationale: chunk
             ? `Mentions the idea: '${excerpt(chunk.text, 140)}' (similarity ${similarity.toFixed(2)}).`
             : `Semantically close to ${concept.term} (similarity ${similarity.toFixed(2)}).`,
           evidence: chunk
-            ? ({ chunk: excerpt(chunk.text, 400), page: chunk.page, similarity } as Prisma.InputJsonValue)
-            : ({ similarity } as Prisma.InputJsonValue),
+            ? {
+                chunk: excerpt(chunk.text, 400),
+                page: chunk.page,
+                similarity,
+              }
+            : { similarity },
           supportCount: 1,
         });
         if (row) written += 1;
@@ -663,20 +836,35 @@ export class SemanticSuggestionsService {
   ): Promise<{ text: string; page: number | null; hash: string } | null> {
     const dim = Prisma.raw(String(space.dim));
     const vecType = Prisma.raw(vectorCast(space.dim).type);
-    const [row] = await this.prisma.$queryRaw<Array<{ text: string; page: number | null; content_hash: string }>>(Prisma.sql`
+    const [row] = await this.prisma.$queryRaw<
+      Array<{ text: string; page: number | null; content_hash: string }>
+    >(Prisma.sql`
       SELECT ac.text, ac.page, ac.content_hash FROM asset_chunks ac
         JOIN content_embeddings ce ON ce.content_hash = ac.content_hash AND ce.space_id = ${space.id}
        WHERE ac.asset_id = ${assetId}
        ORDER BY ce.vec::public.${vecType}(${dim}) <=> ${JSON.stringify(vector)}::public.${vecType}(${dim})
        LIMIT 1`);
-    return row ? { text: row.text, page: row.page, hash: row.content_hash } : null;
+    return row
+      ? { text: row.text, page: row.page, hash: row.content_hash }
+      : null;
   }
 
   // ── G-3 Relation suggestions ───────────────────────────────────────────
 
-  async generateRelations(minSupport: number, minLift: number, minScore: number): Promise<number> {
+  async generateRelations(
+    minSupport: number,
+    minLift: number,
+    minScore: number,
+  ): Promise<number> {
     const rows = await this.prisma.$queryRaw<
-      Array<{ a: string; b: string; support: bigint; na: bigint; nb: bigint; total: bigint }>
+      Array<{
+        a: string;
+        b: string;
+        support: bigint;
+        na: bigint;
+        nb: bigint;
+        total: bigint;
+      }>
     >`
       WITH current AS (
         SELECT DISTINCT t.asset_id, t.term_id FROM asset_terms t
@@ -704,7 +892,9 @@ export class SemanticSuggestionsService {
           WHERE (r.from_term_id = p.a AND r.to_term_id = p.b) OR (r.from_term_id = p.b AND r.to_term_id = p.a)
        )`;
     if (!rows.length) return 0;
-    const ancestors = await this.ancestorPairs([...new Set(rows.flatMap((r) => [r.a, r.b]))]);
+    const ancestors = await this.ancestorPairs([
+      ...new Set(rows.flatMap((r) => [r.a, r.b])),
+    ]);
     const terms = await this.prisma.glossaryTerm.findMany({
       where: { id: { in: [...new Set(rows.flatMap((r) => [r.a, r.b]))] } },
       select: { id: true, term: true },
@@ -712,22 +902,43 @@ export class SemanticSuggestionsService {
     const name = new Map(terms.map((t) => [t.id, t.term]));
     let written = 0;
     for (const row of rows) {
-      if (ancestors.has(`${row.a}:${row.b}`) || ancestors.has(`${row.b}:${row.a}`)) continue;
+      if (
+        ancestors.has(`${row.a}:${row.b}`) ||
+        ancestors.has(`${row.b}:${row.a}`)
+      )
+        continue;
       const total = Number(row.total);
-      const lift = (Number(row.support) * total) / Math.max(Number(row.na) * Number(row.nb), 1);
+      const lift =
+        (Number(row.support) * total) /
+        Math.max(Number(row.na) * Number(row.nb), 1);
       if (lift < minLift) continue;
       // Score: support and lift both matter; saturates around lift 10, support 200.
-      const score = Math.round(Math.min(1, 0.5 + 0.25 * Math.min(lift / 10, 1) + 0.25 * Math.min(Number(row.support) / 200, 1)) * 1000) / 1000;
+      const score =
+        Math.round(
+          Math.min(
+            1,
+            0.5 +
+              0.25 * Math.min(lift / 10, 1) +
+              0.25 * Math.min(Number(row.support) / 200, 1),
+          ) * 1000,
+        ) / 1000;
       if (score < minScore) continue;
       const proposed = await this.propose({
         kind: 'RELATION',
         fingerprint: relationFingerprint(row.a, row.b, 'RELATED'),
         termId: row.a,
-        payload: { fromTermId: row.a, toTermId: row.b, type: 'RELATED' } as Prisma.InputJsonValue,
+        payload: {
+          fromTermId: row.a,
+          toTermId: row.b,
+          type: 'RELATED',
+        },
         score,
         generator: 'relation',
         rationale: `Co-occur on ${Number(row.support)} assets (lift ${lift.toFixed(1)}): ${name.get(row.a)} and ${name.get(row.b)}.`,
-        evidence: { support: Number(row.support), lift: Math.round(lift * 100) / 100 } as Prisma.InputJsonValue,
+        evidence: {
+          support: Number(row.support),
+          lift: Math.round(lift * 100) / 100,
+        },
         supportCount: Number(row.support),
       });
       if (proposed) written += 1;
@@ -738,7 +949,9 @@ export class SemanticSuggestionsService {
   /** Pairs where one concept is a BROADER ancestor of the other. */
   private async ancestorPairs(termIds: string[]): Promise<Set<string>> {
     if (!termIds.length) return new Set();
-    const rows = await this.prisma.$queryRaw<Array<{ start_id: string; term_id: string }>>`
+    const rows = await this.prisma.$queryRaw<
+      Array<{ start_id: string; term_id: string }>
+    >`
       WITH RECURSIVE up(start_id, term_id, depth) AS (
         SELECT t, t, 0 FROM unnest(${termIds}::text[]) t
         UNION
@@ -763,11 +976,13 @@ export class SemanticSuggestionsService {
       fingerprint: linkFingerprint(input.assetId, input.termId),
       termId: input.termId,
       assetId: input.assetId,
-      payload: { note: input.note ?? null } as Prisma.InputJsonValue,
+      payload: { note: input.note ?? null },
       score: 0.9,
       generator: 'agent',
       origin: 'AGENT',
-      rationale: input.note ? `Proposed by ${input.agent}: ${input.note}` : `Proposed by ${input.agent}.`,
+      rationale: input.note
+        ? `Proposed by ${input.agent}: ${input.note}`
+        : `Proposed by ${input.agent}.`,
       supportCount: 1,
       createdBy: input.agent,
     });
@@ -776,19 +991,22 @@ export class SemanticSuggestionsService {
   // ── Events and stats ───────────────────────────────────────────────────
 
   async pendingCounts(): Promise<Record<string, number>> {
-    const [suggestions, terms, aliases, relations, bindings, refs] = await Promise.all([
-      this.prisma.semanticSuggestion.groupBy({
-        by: ['kind'],
-        where: { status: 'PROPOSED' },
-        _count: { _all: true },
-      }),
-      this.prisma.glossaryTerm.count({ where: { status: 'DRAFT' } }),
-      this.prisma.glossaryTerm.count({ where: { proposedAliases: { isEmpty: false } } }),
-      this.prisma.glossaryRelation.count({ where: { status: 'DRAFT' } }),
-      this.prisma.glossaryBinding.count({ where: { status: 'DRAFT' } }),
-      this.prisma.$queryRaw<Array<{ n: bigint }>>`
+    const [suggestions, terms, aliases, relations, bindings, refs] =
+      await Promise.all([
+        this.prisma.semanticSuggestion.groupBy({
+          by: ['kind'],
+          where: { status: 'PROPOSED' },
+          _count: { _all: true },
+        }),
+        this.prisma.glossaryTerm.count({ where: { status: 'DRAFT' } }),
+        this.prisma.glossaryTerm.count({
+          where: { proposedAliases: { isEmpty: false } },
+        }),
+        this.prisma.glossaryRelation.count({ where: { status: 'DRAFT' } }),
+        this.prisma.glossaryBinding.count({ where: { status: 'DRAFT' } }),
+        this.prisma.$queryRaw<Array<{ n: bigint }>>`
         SELECT count(DISTINCT to_id) AS n FROM edges WHERE to_type = 'term_ref'`,
-    ]);
+      ]);
     const byKind = new Map(suggestions.map((s) => [s.kind, s._count._all]));
     return {
       TERM: terms,
@@ -804,17 +1022,34 @@ export class SemanticSuggestionsService {
   async notifyPending(): Promise<void> {
     const counts = await this.pendingCounts();
     const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
-    const settings = await this.prisma.instanceSettings.findUnique({ where: { id: 1 } });
+    const settings = await this.prisma.instanceSettings.findUnique({
+      where: { id: 1 },
+    });
     const today = new Date().toISOString().slice(0, 10);
-    const state = (settings?.glossaryProposalsNotified as { day?: string; thresholds?: number[] } | null) ?? {};
+    const state =
+      (settings?.glossaryProposalsNotified as {
+        day?: string;
+        thresholds?: number[];
+      } | null) ?? {};
     const fired = state.day === today ? (state.thresholds ?? []) : [];
-    const crossed = PROPOSAL_THRESHOLDS.filter((t) => total >= t && !fired.includes(t));
+    const crossed = PROPOSAL_THRESHOLDS.filter(
+      (t) => total >= t && !fired.includes(t),
+    );
     if (!crossed.length || !settings) return;
     const threshold = Math.max(...crossed);
-    glossaryEvents.emit({ type: 'glossary.proposals_pending', threshold, counts });
+    glossaryEvents.emit({
+      type: 'glossary.proposals_pending',
+      threshold,
+      counts,
+    });
     await this.prisma.instanceSettings.update({
       where: { id: 1 },
-      data: { glossaryProposalsNotified: { day: today, thresholds: [...fired, ...crossed] } },
+      data: {
+        glossaryProposalsNotified: {
+          day: today,
+          thresholds: [...fired, ...crossed],
+        },
+      },
     });
   }
 
@@ -822,7 +1057,12 @@ export class SemanticSuggestionsService {
   async stats(days = 90) {
     const since = new Date(Date.now() - days * 86_400_000);
     const rows = await this.prisma.$queryRaw<
-      Array<{ generator: string; band: number; accepted: bigint; dismissed: bigint }>
+      Array<{
+        generator: string;
+        band: number;
+        accepted: bigint;
+        dismissed: bigint;
+      }>
     >`
       SELECT generator, floor(score * 10) / 10 AS band,
              count(*) FILTER (WHERE status = 'ACCEPTED') AS accepted,
@@ -830,7 +1070,9 @@ export class SemanticSuggestionsService {
         FROM semantic_suggestions
        WHERE decided_at >= ${since} AND status IN ('ACCEPTED', 'DISMISSED')
        GROUP BY 1, 2 ORDER BY 1, 2`;
-    const reasons = await this.prisma.$queryRaw<Array<{ generator: string; reason: string | null; n: bigint }>>`
+    const reasons = await this.prisma.$queryRaw<
+      Array<{ generator: string; reason: string | null; n: bigint }>
+    >`
       SELECT generator, dismiss_reason AS reason, count(*) AS n FROM semantic_suggestions
        WHERE decided_at >= ${since} AND status = 'DISMISSED' GROUP BY 1, 2`;
     return {
@@ -846,7 +1088,11 @@ export class SemanticSuggestionsService {
           rate: accepted + dismissed ? accepted / (accepted + dismissed) : null,
         };
       }),
-      dismissReasons: reasons.map((r) => ({ generator: r.generator, reason: r.reason, count: Number(r.n) })),
+      dismissReasons: reasons.map((r) => ({
+        generator: r.generator,
+        reason: r.reason,
+        count: Number(r.n),
+      })),
       embeddings: await this.embeddingsOn(),
     };
   }

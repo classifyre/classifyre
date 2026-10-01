@@ -163,10 +163,7 @@ export function parseGlossaryCsv(text: string): ParsedGlossaryFile {
       return;
     }
     const statusRaw = cell(cells, 'status')?.toUpperCase();
-    if (
-      statusRaw &&
-      !['DRAFT', 'APPROVED', 'DEPRECATED'].includes(statusRaw)
-    ) {
+    if (statusRaw && !['DRAFT', 'APPROVED', 'DEPRECATED'].includes(statusRaw)) {
       refused.push({ row, reason: `Unknown status "${statusRaw}"` });
       return;
     }
@@ -250,7 +247,9 @@ export function toGlossaryCsv(terms: ExportTerm[]): string {
       steward: term.steward ?? '',
       notes: term.notes ?? '',
     };
-    lines.push(CSV_COLUMNS.map((column) => csvEscape(values[column])).join(','));
+    lines.push(
+      CSV_COLUMNS.map((column) => csvEscape(values[column])).join(','),
+    );
   }
   return `${lines.join('\r\n')}\r\n`;
 }
@@ -292,7 +291,8 @@ function literal(value: unknown): { text: string; lang?: string } | null {
   if (value && typeof value === 'object' && '@value' in value) {
     const v = value as { '@value'?: unknown; '@language'?: string };
     if (v['@value'] === undefined || v['@value'] === null) return null;
-    return { text: String(v['@value']), lang: v['@language'] };
+    if (typeof v['@value'] === 'object') return null;
+    return { text: jsonText(v['@value']), lang: v['@language'] };
   }
   return null;
 }
@@ -309,7 +309,9 @@ function idOf(value: unknown): string | null {
 function types(node: JsonLdNode): string[] {
   return [...asArray(node['@type']), ...asArray(node.type)]
     .filter((value): value is string => typeof value === 'string')
-    .map((value) => value.replace(SKOS, 'skos:').replace(/^Concept/, 'skos:Concept'));
+    .map((value) =>
+      value.replace(SKOS, 'skos:').replace(/^Concept/, 'skos:Concept'),
+    );
 }
 
 /** The slugified local part of an IRI (the segment after `#` or the last `/`). */
@@ -376,10 +378,12 @@ export function parseSkosJsonLd(
   };
 
   const schemes: ImportScheme[] = schemeNodes.map((node) => {
-    const iri = String(node['@id'] ?? '');
+    const iri = jsonText(node['@id']);
     const name =
-      pickLabel([...prop(node, 'prefLabel'), ...prop(node, 'title', 'http://purl.org/dc/terms/')]) ??
-      localPartKey(iri);
+      pickLabel([
+        ...prop(node, 'prefLabel'),
+        ...prop(node, 'title', 'http://purl.org/dc/terms/'),
+      ]) ?? localPartKey(iri);
     return {
       key: localPartKey(iri) || 'scheme',
       name,
@@ -393,7 +397,7 @@ export function parseSkosJsonLd(
 
   const iriToKey = new Map<string, string>();
   for (const node of conceptNodes) {
-    const iri = String(node['@id'] ?? '');
+    const iri = jsonText(node['@id']);
     const explicit = literal(prop(node, 'key', CLASSIFYRE)[0])?.text;
     iriToKey.set(iri, explicit ?? localPartKey(iri));
   }
@@ -402,7 +406,7 @@ export function parseSkosJsonLd(
   const terms: ImportTerm[] = [];
   const narrowerOf = new Map<string, string[]>();
   conceptNodes.forEach((node, index) => {
-    const iri = String(node['@id'] ?? '');
+    const iri = jsonText(node['@id']);
     const prefLabels = prop(node, 'prefLabel')
       .map(literal)
       .filter((label): label is { text: string; lang?: string } =>
@@ -410,7 +414,10 @@ export function parseSkosJsonLd(
       );
     const term = pickLabel(prop(node, 'prefLabel'));
     if (!term) {
-      refused.push({ row: index + 1, reason: `${iri || 'A concept'} has no prefLabel` });
+      refused.push({
+        row: index + 1,
+        reason: `${iri || 'A concept'} has no prefLabel`,
+      });
       return;
     }
     const otherPrefLabels = prefLabels
@@ -424,7 +431,10 @@ export function parseSkosJsonLd(
     for (const narrower of prop(node, 'narrower')) {
       const key = keyOf(narrower);
       if (key) {
-        narrowerOf.set(key, [...(narrowerOf.get(key) ?? []), iriToKey.get(iri)!]);
+        narrowerOf.set(key, [
+          ...(narrowerOf.get(key) ?? []),
+          iriToKey.get(iri)!,
+        ]);
       }
     }
     const custom = prop(node, 'relation', CLASSIFYRE)
@@ -435,14 +445,18 @@ export function parseSkosJsonLd(
         const label = literal(record['classifyre:label'] ?? record.label)?.text;
         return to && label ? { to, label } : null;
       })
-      .filter((value): value is { to: string; label: string } => Boolean(value));
+      .filter((value): value is { to: string; label: string } =>
+        Boolean(value),
+      );
     const inScheme = idOf(prop(node, 'inScheme')[0]);
     terms.push({
       row: index + 1,
       key: iriToKey.get(iri) || undefined,
       term,
       kind: kindText === 'ENTITY' ? 'ENTITY' : 'CONCEPT',
-      schemeKey: inScheme ? (schemeKeyByIri.get(inScheme) ?? localPartKey(inScheme)) : undefined,
+      schemeKey: inScheme
+        ? (schemeKeyByIri.get(inScheme) ?? localPartKey(inScheme))
+        : undefined,
       definition: pickLabel(prop(node, 'definition')),
       aliases: [
         ...otherPrefLabels,
@@ -532,12 +546,17 @@ export function toSkosJsonLd(input: {
     if (term.codes.length) node['skos:notation'] = term.codes;
     if (term.definition) node['skos:definition'] = label(term.definition);
     if (term.notes) node['skos:scopeNote'] = label(term.notes);
-    if (term.schemeKey) node['skos:inScheme'] = { '@id': schemeIri(term.schemeKey) };
+    if (term.schemeKey)
+      node['skos:inScheme'] = { '@id': schemeIri(term.schemeKey) };
     if (term.broader.length) {
-      node['skos:broader'] = term.broader.map((key) => ({ '@id': termIri(key) }));
+      node['skos:broader'] = term.broader.map((key) => ({
+        '@id': termIri(key),
+      }));
     }
     if (term.related.length) {
-      node['skos:related'] = term.related.map((key) => ({ '@id': termIri(key) }));
+      node['skos:related'] = term.related.map((key) => ({
+        '@id': termIri(key),
+      }));
     }
     if (term.instanceOf.length) {
       node['classifyre:instanceOf'] = term.instanceOf.map((key) => ({
@@ -563,3 +582,12 @@ export function toSkosJsonLd(input: {
 }
 
 export type { JsonLdValue };
+
+/** A JSON-LD scalar as text; objects and arrays are not text. */
+function jsonText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return '';
+}

@@ -18,7 +18,12 @@ export interface BoardSemanticTerm {
   kind: string;
   status: string;
   definition: string | null;
-  scheme: { id: string; key: string; name: string; color: string | null } | null;
+  scheme: {
+    id: string;
+    key: string;
+    name: string;
+    color: string | null;
+  } | null;
   replacedBy: { id: string; key: string; name: string } | null;
   linkedItems: Array<{
     itemId: string;
@@ -39,16 +44,50 @@ export interface BoardSemanticTerm {
 
 export interface BoardSemanticLayer {
   terms: BoardSemanticTerm[];
-  relations: Array<{ fromTermId: string; toTermId: string; type: string; label: string }>;
+  relations: Array<{
+    fromTermId: string;
+    toTermId: string;
+    type: string;
+    label: string;
+  }>;
   /** One level of broader concepts for "Show broader concepts". */
   broader: Array<{
     termId: string;
-    parent: { termId: string; key: string; name: string; kind: string; status: string };
+    parent: {
+      termId: string;
+      key: string;
+      name: string;
+      kind: string;
+      status: string;
+    };
   }>;
   /** Links of case evidence that went GONE: shown faded, never dropped. */
-  gone: Array<{ termId: string; key: string; name: string; itemId: string; goneAt: Date }>;
-  bindings: Record<string, { id: string; mode: string; label: string; approvedBy: string | null; approvedAt: Date | null; origin: string }>;
-  caseLinks: Array<{ referenceId: string; termId: string; key: string; name: string; note: string | null; by: string | null }>;
+  gone: Array<{
+    termId: string;
+    key: string;
+    name: string;
+    itemId: string;
+    goneAt: Date;
+  }>;
+  bindings: Record<
+    string,
+    {
+      id: string;
+      mode: string;
+      label: string;
+      approvedBy: string | null;
+      approvedAt: Date | null;
+      origin: string;
+    }
+  >;
+  caseLinks: Array<{
+    referenceId: string;
+    termId: string;
+    key: string;
+    name: string;
+    note: string | null;
+    by: string | null;
+  }>;
   truncated: number;
 }
 
@@ -82,19 +121,30 @@ export class SemanticBoardLayerService {
       return await this.build(caseId, items);
     } catch (error) {
       // The layer is an enhancement of the board; the board must always load.
-      this.logger.warn(`Board semantic layer failed for case ${caseId}: ${String(error)}`);
+      this.logger.warn(
+        `Board semantic layer failed for case ${caseId}: ${String(error)}`,
+      );
       return empty;
     }
   }
 
-  private async build(caseId: string, items: ItemRef[]): Promise<BoardSemanticLayer> {
+  private async build(
+    caseId: string,
+    items: ItemRef[],
+  ): Promise<BoardSemanticLayer> {
     const evidence = await this.prisma.caseEvidence.findMany({
       where: { caseId },
-      select: { id: true, entityType: true, entityId: true, findings: { select: { findingId: true } } },
+      select: {
+        id: true,
+        entityType: true,
+        entityId: true,
+        findings: { select: { findingId: true } },
+      },
     });
     const itemByEvidence = new Map<string, string>();
     for (const item of items) {
-      if (item.kind === 'EVIDENCE' && item.refId) itemByEvidence.set(item.refId, item.id);
+      if (item.kind === 'EVIDENCE' && item.refId)
+        itemByEvidence.set(item.refId, item.id);
     }
     const assetItem = new Map<string, string>();
     const findingItem = new Map<string, string>();
@@ -109,7 +159,9 @@ export class SemanticBoardLayerService {
       }
     }
     // A finding added as evidence names its asset through the finding.
-    const findingEvidence = evidence.filter((row) => row.entityType === 'finding');
+    const findingEvidence = evidence.filter(
+      (row) => row.entityType === 'finding',
+    );
     if (findingEvidence.length) {
       const rows = await this.prisma.finding.findMany({
         where: { id: { in: findingEvidence.map((row) => row.entityId) } },
@@ -117,8 +169,11 @@ export class SemanticBoardLayerService {
       });
       for (const row of rows) {
         const evidenceRow = findingEvidence.find((e) => e.entityId === row.id);
-        const itemId = evidenceRow ? itemByEvidence.get(evidenceRow.id) : undefined;
-        if (itemId && !assetItem.has(row.assetId)) assetItem.set(row.assetId, itemId);
+        const itemId = evidenceRow
+          ? itemByEvidence.get(evidenceRow.id)
+          : undefined;
+        if (itemId && !assetItem.has(row.assetId))
+          assetItem.set(row.assetId, itemId);
         if (itemId) {
           findingItem.set(row.id, itemId);
           findingIds.push(row.id);
@@ -137,7 +192,14 @@ export class SemanticBoardLayerService {
       }
       let linked = perItem.get(itemId);
       if (!linked) {
-        linked = { itemId, findingIds: [], methods: [], supportCount: 0, bindingIds: [], since: null };
+        linked = {
+          itemId,
+          findingIds: [],
+          methods: [],
+          supportCount: 0,
+          bindingIds: [],
+          since: null,
+        };
         perItem.set(itemId, linked);
       }
       return linked;
@@ -154,14 +216,24 @@ export class SemanticBoardLayerService {
         const itemId = assetItem.get(row.assetId);
         if (!itemId) continue;
         if (row.goneAt) {
-          gone.push({ termId: row.termId, key: row.term.key, name: row.term.term, itemId, goneAt: row.goneAt });
+          gone.push({
+            termId: row.termId,
+            key: row.term.key,
+            name: row.term.term,
+            itemId,
+            goneAt: row.goneAt,
+          });
           continue;
         }
         const linked = touch(row.termId, itemId);
-        if (!linked.methods.includes(row.method)) linked.methods.push(row.method);
+        if (!linked.methods.includes(row.method))
+          linked.methods.push(row.method);
         linked.supportCount += row.supportCount;
-        linked.bindingIds = [...new Set([...linked.bindingIds, ...row.bindingIds])];
-        if (!linked.since || row.firstLinkedAt < linked.since) linked.since = row.firstLinkedAt;
+        linked.bindingIds = [
+          ...new Set([...linked.bindingIds, ...row.bindingIds]),
+        ];
+        if (!linked.since || row.firstLinkedAt < linked.since)
+          linked.since = row.firstLinkedAt;
       }
     }
 
@@ -179,15 +251,19 @@ export class SemanticBoardLayerService {
           status: true,
         },
       });
-      const meanings = await this.meaning.meaningsOfFindings(findings, { broader: false });
+      const meanings = await this.meaning.meaningsOfFindings(findings, {
+        broader: false,
+      });
       for (const [findingId, list] of meanings) {
         const itemId = findingItem.get(findingId);
         if (!itemId) continue;
         for (const item of list) {
           if (item.method === 'BROADER') continue;
           const linked = touch(item.term.id, itemId);
-          if (!linked.findingIds.includes(findingId)) linked.findingIds.push(findingId);
-          if (!linked.methods.includes(item.method)) linked.methods.push(item.method);
+          if (!linked.findingIds.includes(findingId))
+            linked.findingIds.push(findingId);
+          if (!linked.methods.includes(item.method))
+            linked.methods.push(item.method);
           if (item.binding && !linked.bindingIds.includes(item.binding.id)) {
             linked.bindingIds.push(item.binding.id);
           }
@@ -203,13 +279,20 @@ export class SemanticBoardLayerService {
     const caseLinks = await this.meaning.caseLinks(caseId);
     const caseAbout = new Set(caseLinks.map((link) => link.term.id));
 
-    const termIds = new Set<string>([...byTerm.keys(), ...placed.keys(), ...caseAbout]);
+    const termIds = new Set<string>([
+      ...byTerm.keys(),
+      ...placed.keys(),
+      ...caseAbout,
+    ]);
     const ranked = [...termIds].sort(
       (a, b) =>
         (placed.has(b) ? 1 : 0) - (placed.has(a) ? 1 : 0) ||
         (byTerm.get(b)?.size ?? 0) - (byTerm.get(a)?.size ?? 0),
     );
-    const kept = ranked.slice(0, Math.max(BOARD_SEMANTIC_TERM_LIMIT, placed.size));
+    const kept = ranked.slice(
+      0,
+      Math.max(BOARD_SEMANTIC_TERM_LIMIT, placed.size),
+    );
     const truncated = ranked.length - kept.length;
     const terms = kept.length
       ? await this.prisma.glossaryTerm.findMany({
@@ -221,7 +304,9 @@ export class SemanticBoardLayerService {
             kind: true,
             status: true,
             definition: true,
-            scheme: { select: { id: true, key: true, name: true, color: true } },
+            scheme: {
+              select: { id: true, key: true, name: true, color: true },
+            },
             replacedBy: { select: { id: true, key: true, term: true } },
           },
         })
@@ -239,7 +324,11 @@ export class SemanticBoardLayerService {
         definition: term?.definition ? term.definition.slice(0, 300) : null,
         scheme: term?.scheme ?? null,
         replacedBy: term?.replacedBy
-          ? { id: term.replacedBy.id, key: term.replacedBy.key, name: term.replacedBy.term }
+          ? {
+              id: term.replacedBy.id,
+              key: term.replacedBy.key,
+              name: term.replacedBy.term,
+            }
           : null,
         linkedItems,
         totalLinked: linkedItems.length,
@@ -252,27 +341,53 @@ export class SemanticBoardLayerService {
 
     const relationRows = kept.length
       ? await this.prisma.glossaryRelation.findMany({
-          where: { status: 'APPROVED', fromTermId: { in: kept }, toTermId: { in: kept } },
+          where: {
+            status: 'APPROVED',
+            fromTermId: { in: kept },
+            toTermId: { in: kept },
+          },
           select: { fromTermId: true, toTermId: true, type: true, label: true },
         })
       : [];
     const parentRows = kept.length
       ? await this.prisma.glossaryRelation.findMany({
-          where: { status: 'APPROVED', type: 'BROADER', fromTermId: { in: kept } },
-          include: { to: { select: { id: true, key: true, term: true, kind: true, status: true } } },
+          where: {
+            status: 'APPROVED',
+            type: 'BROADER',
+            fromTermId: { in: kept },
+          },
+          include: {
+            to: {
+              select: {
+                id: true,
+                key: true,
+                term: true,
+                kind: true,
+                status: true,
+              },
+            },
+          },
         })
       : [];
 
-    const bindingIds = [...new Set(layerTerms.flatMap((t) => t.linkedItems.flatMap((l) => l.bindingIds)))];
+    const bindingIds = [
+      ...new Set(
+        layerTerms.flatMap((t) => t.linkedItems.flatMap((l) => l.bindingIds)),
+      ),
+    ];
     const bindingRows = bindingIds.length
-      ? await this.prisma.glossaryBinding.findMany({ where: { id: { in: bindingIds } } })
+      ? await this.prisma.glossaryBinding.findMany({
+          where: { id: { in: bindingIds } },
+        })
       : [];
     const bindings: BoardSemanticLayer['bindings'] = {};
     for (const row of bindingRows) {
       bindings[row.id] = {
         id: row.id,
         mode: row.mode,
-        label: row.findingType ? vocabularyLabel(row).label : (row.metadataPath ?? ''),
+        label: row.findingType
+          ? vocabularyLabel(row).label
+          : (row.metadataPath ?? ''),
         approvedBy: row.approvedBy,
         approvedAt: row.approvedAt,
         origin: row.origin,
@@ -281,10 +396,21 @@ export class SemanticBoardLayerService {
 
     return {
       terms: layerTerms,
-      relations: relationRows.map((r) => ({ fromTermId: r.fromTermId, toTermId: r.toTermId, type: r.type, label: r.label })),
+      relations: relationRows.map((r) => ({
+        fromTermId: r.fromTermId,
+        toTermId: r.toTermId,
+        type: r.type,
+        label: r.label,
+      })),
       broader: parentRows.map((r) => ({
         termId: r.fromTermId,
-        parent: { termId: r.to.id, key: r.to.key, name: r.to.term, kind: r.to.kind, status: r.to.status },
+        parent: {
+          termId: r.to.id,
+          key: r.to.key,
+          name: r.to.term,
+          kind: r.to.kind,
+          status: r.to.status,
+        },
       })),
       gone,
       bindings,
@@ -334,11 +460,20 @@ export class SemanticBoardLayerService {
     const termById = new Map(terms.map((t) => [t.id, t]));
     const assets = await this.prisma.asset.findMany({
       where: { id: { in: [...new Set(others.map((o) => o.asset_id))] } },
-      select: { id: true, name: true, assetType: true, sourceType: true, status: true, source: { select: { name: true } } },
+      select: {
+        id: true,
+        name: true,
+        assetType: true,
+        sourceType: true,
+        status: true,
+        source: { select: { name: true } },
+      },
     });
     const assetById = new Map(assets.map((a) => [a.id, a]));
     const seedOfTerm = new Map<string, string>();
-    for (const link of links) if (!seedOfTerm.has(link.termId)) seedOfTerm.set(link.termId, link.assetId);
+    for (const link of links)
+      if (!seedOfTerm.has(link.termId))
+        seedOfTerm.set(link.termId, link.assetId);
     const nodes: Array<Record<string, unknown>> = [];
     const edges: Array<Record<string, unknown>> = [];
     const seen = new Set<string>();

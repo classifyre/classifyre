@@ -303,7 +303,10 @@ export class BulkUpdateGlossaryTermsDto {
   @IsEnum(GlossaryEntityType)
   entityType?: GlossaryEntityType;
 
-  @ApiPropertyOptional({ nullable: true, description: 'null clears the scheme' })
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'null clears the scheme',
+  })
   @IsOptional()
   schemeId?: string | null;
 

@@ -76,8 +76,10 @@ export function buildLookupIndex(
   };
   for (const concept of concepts) {
     if (!concept.schemeId) continue;
-    for (const code of concept.codes) add(index.codes, concept.schemeId, code, concept.id);
-    for (const key of concept.matchKeys) add(index.keys, concept.schemeId, key, concept.id);
+    for (const code of concept.codes)
+      add(index.codes, concept.schemeId, code, concept.id);
+    for (const key of concept.matchKeys)
+      add(index.keys, concept.schemeId, key, concept.id);
   }
   return index;
 }
@@ -106,13 +108,26 @@ function inScope(binding: CompiledBinding, sourceId: string): boolean {
   return binding.sourceIds.length === 0 || binding.sourceIds.includes(sourceId);
 }
 
+/**
+ * How a finding-side half treats review status. Links count OPEN findings only
+ * (SL3 R2); filters and watch matchers leave status to their own dimension, so
+ * they ask for `anyStatus`.
+ */
+export interface FindingMatchOptions {
+  anyStatus?: boolean;
+}
+
 /** Whether a finding is of the binding's output (status and scope included). */
 export function selectsFinding(
   binding: CompiledBinding,
-  finding: BindingFinding,
+  finding: Pick<
+    BindingFinding,
+    'sourceId' | 'detectorType' | 'findingType' | 'customDetectorKey'
+  > & { status?: string },
+  options: FindingMatchOptions = {},
 ): boolean {
   if (!binding.detectorType || !binding.findingType) return false;
-  if (finding.status !== 'OPEN') return false;
+  if (!options.anyStatus && finding.status !== 'OPEN') return false;
   if (finding.detectorType !== binding.detectorType) return false;
   if (finding.findingType !== binding.findingType) return false;
   if (
@@ -131,19 +146,30 @@ export function selectsFinding(
  */
 export function matchFindingTerms(
   binding: CompiledBinding,
-  finding: BindingFinding,
+  finding: Omit<BindingFinding, 'status' | 'matchedContent'> & {
+    status?: string;
+    matchedContent?: string | null;
+  },
   index: LookupIndex,
+  options: FindingMatchOptions = {},
 ): string[] {
   if (binding.noMeaning) return [];
-  if (binding.mode === 'METADATA_VALUES' || binding.mode === 'METADATA_LOOKUP') {
+  if (
+    binding.mode === 'METADATA_VALUES' ||
+    binding.mode === 'METADATA_LOOKUP'
+  ) {
     return [];
   }
-  if (!selectsFinding(binding, finding)) return [];
-  const parts = splitValue(finding.matchedContent, binding.splitDelimiter);
+  if (!selectsFinding(binding, finding, options)) return [];
+  const parts = splitValue(
+    finding.matchedContent ?? '',
+    binding.splitDelimiter,
+  );
   if (binding.mode === 'OUTPUT') return binding.termId ? [binding.termId] : [];
   if (binding.mode === 'OUTPUT_VALUES') {
     const wanted = new Set(binding.values);
-    return parts.some((part) => wanted.has(glossaryNorm(part))) && binding.termId
+    return parts.some((part) => wanted.has(glossaryNorm(part))) &&
+      binding.termId
       ? [binding.termId]
       : [];
   }
@@ -164,7 +190,8 @@ export function metadataValues(metadata: unknown, path: string): string[] {
   }
   const scalar = (value: unknown): string | null => {
     if (typeof value === 'string') return value;
-    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (typeof value === 'number' || typeof value === 'boolean')
+      return String(value);
     return null;
   };
   if (Array.isArray(node)) {
@@ -181,7 +208,10 @@ export function matchAssetTerms(
   index: LookupIndex,
 ): string[] {
   if (binding.noMeaning) return [];
-  if (binding.mode !== 'METADATA_VALUES' && binding.mode !== 'METADATA_LOOKUP') {
+  if (
+    binding.mode !== 'METADATA_VALUES' &&
+    binding.mode !== 'METADATA_LOOKUP'
+  ) {
     return [];
   }
   if (!binding.metadataPath || !inScope(binding, asset.sourceId)) return [];
@@ -190,7 +220,8 @@ export function matchAssetTerms(
   );
   if (binding.mode === 'METADATA_VALUES') {
     const wanted = new Set(binding.values);
-    return parts.some((part) => wanted.has(glossaryNorm(part))) && binding.termId
+    return parts.some((part) => wanted.has(glossaryNorm(part))) &&
+      binding.termId
       ? [binding.termId]
       : [];
   }
@@ -205,19 +236,44 @@ export function matchAssetTerms(
 // ── SQL half ────────────────────────────────────────────────────────────────
 
 /** The output selector over `findings f`, OPEN and in scope (no value test). */
-export function findingSelectorSql(binding: CompiledBinding): Prisma.Sql {
+export function findingSelectorSql(
+  binding: CompiledBinding,
+  options: FindingMatchOptions = {},
+): Prisma.Sql {
   const parts: Prisma.Sql[] = [
-    Prisma.sql`f.status = 'OPEN'`,
     Prisma.sql`f.detector_type = ${binding.detectorType}::"DetectorType"`,
     Prisma.sql`f.finding_type = ${binding.findingType}`,
   ];
+  if (!options.anyStatus) parts.unshift(Prisma.sql`f.status = 'OPEN'`);
   if (binding.detectorType === 'CUSTOM') {
-    parts.push(Prisma.sql`f.custom_detector_key = ${binding.customDetectorKey}`);
+    parts.push(
+      Prisma.sql`f.custom_detector_key = ${binding.customDetectorKey}`,
+    );
   }
   if (binding.sourceIds.length) {
     parts.push(Prisma.sql`f.source_id = ANY(${binding.sourceIds}::text[])`);
   }
   return Prisma.join(parts, ' AND ');
+}
+
+/**
+ * The output selector as a Prisma `where`, status-free: the same predicate as
+ * {@link findingSelectorSql} with `anyStatus`. For value and lookup bindings it
+ * is only the coarse half; the value test needs SQL or the in-memory half.
+ */
+export function findingSelectorWhere(
+  binding: CompiledBinding,
+): Prisma.FindingWhereInput | null {
+  if (!binding.detectorType || !binding.findingType) return null;
+  const where: Prisma.FindingWhereInput = {
+    detectorType: binding.detectorType,
+    findingType: binding.findingType,
+  };
+  if (binding.detectorType === 'CUSTOM') {
+    where.customDetectorKey = binding.customDetectorKey;
+  }
+  if (binding.sourceIds.length) where.sourceId = { in: binding.sourceIds };
+  return where;
 }
 
 function findingPartsSql(binding: CompiledBinding): Prisma.Sql {
@@ -268,7 +324,10 @@ export function findingTermsSql(
   scope: Prisma.Sql = Prisma.sql`TRUE`,
 ): Prisma.Sql | null {
   if (binding.noMeaning) return null;
-  if (binding.mode === 'METADATA_VALUES' || binding.mode === 'METADATA_LOOKUP') {
+  if (
+    binding.mode === 'METADATA_VALUES' ||
+    binding.mode === 'METADATA_LOOKUP'
+  ) {
     return null;
   }
   const selector = findingSelectorSql(binding);
@@ -314,7 +373,10 @@ export function assetTermsSql(
   scope: Prisma.Sql = Prisma.sql`TRUE`,
 ): Prisma.Sql | null {
   if (binding.noMeaning || !binding.metadataPath) return null;
-  if (binding.mode !== 'METADATA_VALUES' && binding.mode !== 'METADATA_LOOKUP') {
+  if (
+    binding.mode !== 'METADATA_VALUES' &&
+    binding.mode !== 'METADATA_LOOKUP'
+  ) {
     return null;
   }
   const sourceScope = binding.sourceIds.length
@@ -352,12 +414,16 @@ export function assetTermsSql(
 export function findingPredicateSql(
   binding: CompiledBinding,
   termIds: string[],
+  options: FindingMatchOptions = {},
 ): Prisma.Sql | null {
   if (binding.noMeaning) return null;
-  if (binding.mode === 'METADATA_VALUES' || binding.mode === 'METADATA_LOOKUP') {
+  if (
+    binding.mode === 'METADATA_VALUES' ||
+    binding.mode === 'METADATA_LOOKUP'
+  ) {
     return null;
   }
-  const selector = findingSelectorSql(binding);
+  const selector = findingSelectorSql(binding, options);
   if (binding.mode === 'OUTPUT') {
     return binding.termId && termIds.includes(binding.termId)
       ? Prisma.sql`(${selector})`
@@ -390,7 +456,10 @@ export function bindingLinks(binding: CompiledBinding): boolean {
  * resolves to exactly one concept.
  */
 export function findingCoveredSql(binding: CompiledBinding): Prisma.Sql | null {
-  if (binding.mode === 'METADATA_VALUES' || binding.mode === 'METADATA_LOOKUP') {
+  if (
+    binding.mode === 'METADATA_VALUES' ||
+    binding.mode === 'METADATA_LOOKUP'
+  ) {
     return null;
   }
   const selector = findingSelectorSql(binding);

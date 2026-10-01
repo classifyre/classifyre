@@ -40,7 +40,10 @@ function bool(value: unknown): boolean {
 function list(value: unknown): string[] | undefined {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
   if (typeof value === 'string' && value.trim()) {
-    return value.split(',').map((v) => v.trim()).filter(Boolean);
+    return value
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
   }
   return undefined;
 }
@@ -60,7 +63,10 @@ const SPEC_KEYS = new Set([
 ]);
 
 /** Fail closed on unknown keys (integration rule 4): a typo is a 400, not a no-op. */
-export function parseBindingSpec(body: unknown, extra: string[] = []): BindingSpec {
+export function parseBindingSpec(
+  body: unknown,
+  extra: string[] = [],
+): BindingSpec {
   if (!body || typeof body !== 'object') {
     throw new BadRequestException('A binding spec is a JSON object');
   }
@@ -99,7 +105,10 @@ export class SemanticController {
   // ── Vocabulary (SL2 F8) ──────────────────────────────────────────────────
 
   @Get('vocabulary')
-  @ApiOperation({ summary: 'The observed vocabulary: detector outputs and metadata fields, with counts and bindings' })
+  @ApiOperation({
+    summary:
+      'The observed vocabulary: detector outputs and metadata fields, with counts and bindings',
+  })
   vocabularyList(
     @Query('kind') kind?: string,
     @Query('sourceId') sourceId?: string,
@@ -132,12 +141,17 @@ export class SemanticController {
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Queue a vocabulary refresh (one source, or all)' })
   async vocabularyRefresh(@Body() body: { sourceId?: string } = {}) {
-    await this.jobs.scheduleVocabularyRefresh(body?.sourceId ?? null, 'on demand');
+    await this.jobs.scheduleVocabularyRefresh(
+      body?.sourceId ?? null,
+      'on demand',
+    );
     return { queued: true };
   }
 
   @Get('vocabulary/values')
-  @ApiOperation({ summary: 'Top observed values with counts, for the binding dialog' })
+  @ApiOperation({
+    summary: 'Top observed values with counts, for the binding dialog',
+  })
   vocabularyValues(
     @Query('detectorType') detectorType?: string,
     @Query('customDetectorKey') customDetectorKey?: string,
@@ -160,7 +174,10 @@ export class SemanticController {
   }
 
   @Get('coverage')
-  @ApiOperation({ summary: 'Semantic coverage: the share of open findings that carry a meaning' })
+  @ApiOperation({
+    summary:
+      'Semantic coverage: the share of open findings that carry a meaning',
+  })
   async coverage(@Query('days') days?: string) {
     return {
       ...(await this.vocabulary.coverage()),
@@ -173,7 +190,9 @@ export class SemanticController {
   @Post('bindings/preview')
   @HttpCode(HttpStatus.OK)
   @AllowInDemoMode()
-  @ApiOperation({ summary: 'Preview a binding: counts, samples, the lookup table, warnings' })
+  @ApiOperation({
+    summary: 'Preview a binding: counts, samples, the lookup table, warnings',
+  })
   preview(@Body() body: unknown) {
     return this.bindings.preview(parseBindingSpec(body));
   }
@@ -211,15 +230,20 @@ export class SemanticController {
   }
 
   @Post('bindings')
-  @ApiOperation({ summary: 'Create a binding (APPROVED for operators unless status DRAFT)' })
-  createBinding(@Body() body: Record<string, unknown>, @ActorName() actor?: string) {
+  @ApiOperation({
+    summary: 'Create a binding (APPROVED for operators unless status DRAFT)',
+  })
+  createBinding(
+    @Body() body: Record<string, unknown>,
+    @ActorName() actor?: string,
+  ) {
     const { status, note, ...rest } = body ?? {};
     if (status !== undefined && status !== 'APPROVED' && status !== 'DRAFT') {
       throw new BadRequestException('status is APPROVED or DRAFT');
     }
     return this.bindings.create(parseBindingSpec(rest), {
       origin: 'OPERATOR',
-      status: (status as GlossaryBindingStatus | undefined) ?? 'APPROVED',
+      status: status ?? 'APPROVED',
       actor: actor ?? 'operator',
       note: typeof note === 'string' ? note : null,
     });
@@ -264,7 +288,9 @@ export class SemanticController {
 
   @Post('bindings/:id/retarget')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Aim a binding at its deprecated concept's successor" })
+  @ApiOperation({
+    summary: "Aim a binding at its deprecated concept's successor",
+  })
   retargetBinding(@Param('id') id: string, @ActorName() actor?: string) {
     return this.bindings.retarget(id, actor ?? 'operator');
   }
@@ -310,26 +336,40 @@ export class SemanticController {
   }
 
   @Delete('packs/:key')
-  @ApiOperation({ summary: 'Uninstall a pack: untouched items go, edited ones are detached' })
+  @ApiOperation({
+    summary: 'Uninstall a pack: untouched items go, edited ones are detached',
+  })
   uninstallPack(
     @Param('key') key: string,
     @Query('dryRun') dryRun?: string,
     @ActorName() actor?: string,
   ) {
-    return this.packs.uninstall(key, { dryRun: dryRun === undefined ? false : bool(dryRun), actor });
+    return this.packs.uninstall(key, {
+      dryRun: dryRun === undefined ? false : bool(dryRun),
+      actor,
+    });
   }
 
   // ── Meaning (SL3 R4) ─────────────────────────────────────────────────────
 
   @Get('findings/:findingId/meaning')
-  @ApiOperation({ summary: 'What a finding means: bindings evaluated, manual links, broader concepts (C11)' })
+  @ApiOperation({
+    summary:
+      'What a finding means: bindings evaluated, manual links, broader concepts (C11)',
+  })
   findingMeaning(@Param('findingId') findingId: string) {
     return this.meaning.findingMeaning(findingId);
   }
 
   @Get('assets/:assetId/meaning')
-  @ApiOperation({ summary: "An asset's current links, grouped by term; GONE links with history=true" })
-  assetMeaning(@Param('assetId') assetId: string, @Query('history') history?: string) {
+  @ApiOperation({
+    summary:
+      "An asset's current links, grouped by term; GONE links with history=true",
+  })
+  assetMeaning(
+    @Param('assetId') assetId: string,
+    @Query('history') history?: string,
+  ) {
     return this.meaning.assetMeaning(assetId, bool(history));
   }
 
@@ -340,11 +380,17 @@ export class SemanticController {
     @Param('termId') termId: string,
     @Query('page') page?: string,
   ) {
-    return this.meaning.assetTermEvidence(assetId, await this.termId(termId), Number(page ?? 0) || 0);
+    return this.meaning.assetTermEvidence(
+      assetId,
+      await this.termId(termId),
+      Number(page ?? 0) || 0,
+    );
   }
 
   @Get('terms/:termId/evidence')
-  @ApiOperation({ summary: 'Assets linked to a term, by severity then support' })
+  @ApiOperation({
+    summary: 'Assets linked to a term, by severity then support',
+  })
   async termEvidence(
     @Param('termId') termId: string,
     @Query('includeNarrower') includeNarrower?: string,
@@ -371,9 +417,17 @@ export class SemanticController {
   }
 
   @Get('terms/:termId/summary')
-  @ApiOperation({ summary: 'Counts by method, source and severity, and a weekly trend' })
-  async termSummary(@Param('termId') termId: string, @Query('includeNarrower') includeNarrower?: string) {
-    return this.meaning.termSummary(await this.termId(termId), bool(includeNarrower));
+  @ApiOperation({
+    summary: 'Counts by method, source and severity, and a weekly trend',
+  })
+  async termSummary(
+    @Param('termId') termId: string,
+    @Query('includeNarrower') includeNarrower?: string,
+  ) {
+    return this.meaning.termSummary(
+      await this.termId(termId),
+      bool(includeNarrower),
+    );
   }
 
   @Get('terms/:termId/usage')
@@ -416,7 +470,10 @@ export class SemanticController {
   }
 
   @Delete('links/:referenceId')
-  unlink(@Param('referenceId') referenceId: string, @ActorName() actor?: string) {
+  unlink(
+    @Param('referenceId') referenceId: string,
+    @ActorName() actor?: string,
+  ) {
     return this.meaning.unlink(referenceId, actor ?? 'operator');
   }
 
@@ -436,14 +493,21 @@ export class SemanticController {
 
   @Post('linker/rebuild')
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Rebuild every semantic link (backfill over all bindings)' })
+  @ApiOperation({
+    summary: 'Rebuild every semantic link (backfill over all bindings)',
+  })
   async rebuild() {
-    return { jobId: await this.jobs.scheduleBackfill({ all: true, reason: 'rebuild' }) };
+    return {
+      jobId: await this.jobs.scheduleBackfill({ all: true, reason: 'rebuild' }),
+    };
   }
 
   @Post('linker/reconcile')
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Compare a sample of the rollup with a recomputation and repair drift' })
+  @ApiOperation({
+    summary:
+      'Compare a sample of the rollup with a recomputation and repair drift',
+  })
   async reconcile() {
     return { jobId: await this.jobs.scheduleReconcile('on demand') };
   }
@@ -453,7 +517,9 @@ export class SemanticController {
   @Post('suggestions/refresh')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Run the suggestion generators (queued)' })
-  async refreshSuggestions(@Body() body: { generators?: string[]; termIds?: string[] } = {}) {
+  async refreshSuggestions(
+    @Body() body: { generators?: string[]; termIds?: string[] } = {},
+  ) {
     await this.jobs.scheduleSuggestions({
       generators: body?.generators,
       termIds: body?.termIds,
@@ -490,7 +556,9 @@ export class SemanticController {
   // ── Semantic map (SL5 Part B) ────────────────────────────────────────────
 
   @Get('map')
-  @ApiOperation({ summary: 'The semantic map: concepts, relations, co-occurrence, overlay' })
+  @ApiOperation({
+    summary: 'The semantic map: concepts, relations, co-occurrence, overlay',
+  })
   semanticMap(
     @Query('schemeIds') schemeIds?: string,
     @Query('sourceIds') sourceIds?: string,

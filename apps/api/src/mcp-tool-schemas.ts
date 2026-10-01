@@ -124,6 +124,21 @@ export const searchFindingsFilters = z
       .array(z.string())
       .optional()
       .describe('Leave out these finding ids.'),
+    term: z
+      .array(z.string())
+      .max(50)
+      .optional()
+      .describe(
+        'Glossary term keys: only findings that are evidence of one of these concepts (an APPROVED binding of their detector output, or a manual link). Prefer this over regex on values when a concept exists. Unknown keys are rejected.',
+      ),
+    includeNarrower: z
+      .boolean()
+      .optional()
+      .describe('With term: include the narrower concepts too.'),
+    meaningMethod: z
+      .array(z.enum(['BINDING', 'MANUAL']))
+      .optional()
+      .describe('With term: only evidence by these methods.'),
   })
   .describe(
     'Finding filters. Omit entirely to match all findings. Unknown keys are rejected.',
@@ -296,6 +311,21 @@ export const searchAssetsAssetFilters = z
           '{"legal_form_code": {"in": ["GES", "AG"]}}. Values compare as JSON: ' +
           'a number matches only a number. Keys may be nested with dots.',
       ),
+    term: z
+      .array(z.string())
+      .max(50)
+      .optional()
+      .describe(
+        'Glossary term keys: assets with a current semantic link to one of these concepts (any method). Unknown keys are rejected.',
+      ),
+    includeNarrower: z
+      .boolean()
+      .optional()
+      .describe('With term: include the narrower concepts too.'),
+    meaningMethod: z
+      .array(z.enum(['BINDING', 'DECLARED', 'MANUAL', 'SUGGESTED', 'MENTION']))
+      .optional()
+      .describe('With term: only links by these methods.'),
   })
   .describe('Asset-level filters. Omit entirely to match all assets.');
 
