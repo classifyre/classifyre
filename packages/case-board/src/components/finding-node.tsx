@@ -4,7 +4,7 @@ import * as React from "react";
 import { Check } from "lucide-react";
 import type { BoardColor } from "@workspace/schemas/case-board";
 import { cn } from "@workspace/ui/lib/utils";
-import { FINDING_NODE, type Lod, type SeverityKey } from "../lib/geometry";
+import { FINDING_NODE, FINDING_PORTS, type Lod, type SeverityKey } from "../lib/geometry";
 import { codeInk, ESCALATION_COLOR, ESCALATION_INK, FindingCircle, type FindingLook } from "./glyphs";
 import { Ports } from "./ports";
 
@@ -107,7 +107,7 @@ export function FindingNodeView({
           {label}
         </span>
       )}
-      <Ports connectable={!readOnly} round={{ cx, cy, r, bottom: FINDING_NODE.height + 3 }} core={{ cx, cy, d: 2 * r + 8 }} />
+      <Ports connectable={!readOnly} round={FINDING_PORTS} core={{ cx, cy, d: 2 * r + 8 }} />
     </div>
   );
 }

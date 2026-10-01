@@ -6,6 +6,7 @@ import { DecisionApplierService } from '../../decision-applier.service';
 import { AgentSearchService } from '../../search/agent-search.service';
 import { PrismaService } from '../../../prisma.service';
 import { AiProviderConfigService } from '../../../ai-provider-config.service';
+import { isCodeDetectorSchema } from '../../../custom-detector-code';
 import {
   coveredByBuiltIn,
   detectorSimilarity,
@@ -22,7 +23,19 @@ const PIPELINE_REQUIREMENTS = [
   'LLM → system_prompt + labels[] (and an aiProviderConfigId; never provider_runtime)',
   'TEXT_CLASSIFICATION / IMAGE_CLASSIFICATION / OBJECT_DETECTION → model (HuggingFace id; IMAGE_CLASSIFICATION has a default)',
   'TAG → not authorable here: a TAG detector runs nothing and only records a fact a CUSTOM connector notebook asserts, so it can never find anything you have not already been told',
+  `CODE_DETECTOR → not authorable here: ${'a code detector runs Python inside every scan it is attached to'}; propose the rule to a person with operator.notify (include the notebook code) instead`,
 ].join('; ');
+
+/**
+ * Why the agent may not write a code detector (PRD G1 R24): its notebook runs
+ * arbitrary Python inside every scan it is attached to, so creating or
+ * changing one is a code change that a person reviews and makes.
+ */
+const CODE_DETECTOR_REFUSAL =
+  'Refused: CODE_DETECTOR (code) detectors run Python inside every scan they are attached to, ' +
+  'so the autopilot may not create, change, activate or dry-run one. Propose the rule to a person ' +
+  'instead: call operator.notify with what it should catch, why, and the full detect(asset, ctx) ' +
+  'notebook code for them to review and paste.';
 
 /** Pipeline engines the agent may author, used for the examples filter enum.
  * TAG is deliberately absent: it detects nothing, and only a human writing a
@@ -74,6 +87,23 @@ export class DetectorToolset {
    * already enabled. Neither the operator nor the corpus benefits from being
    * scanned twice for the same thing.
    */
+  /** Refuse any write that would create or change a code detector (R24). */
+  private async assertNotCodeDetector(
+    detectorId: string,
+    pipelineSchema?: unknown,
+  ): Promise<void> {
+    if (isCodeDetectorSchema(pipelineSchema)) {
+      throw new Error(CODE_DETECTOR_REFUSAL);
+    }
+    const existing = await this.prisma.customDetector.findUnique({
+      where: { id: detectorId },
+      select: { pipelineSchema: true },
+    });
+    if (isCodeDetectorSchema(existing?.pipelineSchema)) {
+      throw new Error(CODE_DETECTOR_REFUSAL);
+    }
+  }
+
   private async assertDetectorIsNew(input: {
     key?: string;
     name: string;
@@ -358,6 +388,10 @@ export class DetectorToolset {
           } else {
             throw new Error('Provide either detectorId or pipelineSchema.');
           }
+          // Dry-running a code detector executes its notebook: same refusal.
+          if (isCodeDetectorSchema(detector.pipelineSchema)) {
+            throw new Error(CODE_DETECTOR_REFUSAL);
+          }
           if (Array.isArray(input.samples)) {
             const results = await this.tests.evaluateSamples(
               detector,
@@ -435,6 +469,9 @@ export class DetectorToolset {
             entityType: 'detector',
           }),
         handler: async (input) => {
+          if (isCodeDetectorSchema(input.pipelineSchema)) {
+            throw new Error(CODE_DETECTOR_REFUSAL);
+          }
           await this.assertDetectorIsNew({
             key: input.key as string | undefined,
             name: String(input.name),
@@ -474,6 +511,10 @@ export class DetectorToolset {
         decisionAction: AgentDecisionAction.UPDATE_DETECTOR,
         resolveGate: this.detectorGate,
         handler: async (input) => {
+          await this.assertNotCodeDetector(
+            String(input.detectorId),
+            input.pipelineSchema,
+          );
           const updated = await this.detectors.update(
             String(input.detectorId),
             {
@@ -509,6 +550,7 @@ export class DetectorToolset {
         decisionAction: AgentDecisionAction.UPDATE_DETECTOR,
         resolveGate: this.detectorGate,
         handler: async (input) => {
+          await this.assertNotCodeDetector(String(input.detectorId));
           const updated = await this.detectors.update(
             String(input.detectorId),
             {
@@ -537,6 +579,7 @@ export class DetectorToolset {
         decisionAction: AgentDecisionAction.DELETE_DETECTOR,
         resolveGate: this.detectorGate,
         handler: async (input) => {
+          await this.assertNotCodeDetector(String(input.detectorId));
           return this.detectors.delete(String(input.detectorId));
         },
       },

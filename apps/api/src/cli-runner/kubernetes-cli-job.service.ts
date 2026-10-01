@@ -128,6 +128,7 @@ export class KubernetesCliJobService {
     request: Record<string, unknown>,
     onJobCreated?: CliJobCreatedHandler,
     files: NotebookInputFile[] = [],
+    outputRestUrl?: string,
   ): Promise<CliJobResult> {
     // request is an untyped JSON payload; only take executionId when it really
     // is a string, or the Job tracking key becomes "[object Object]".
@@ -142,6 +143,10 @@ export class KubernetesCliJobService {
       ),
       jobTrackingKey: executionId,
       onJobCreated,
+      // preview_detect on an upload-backed source (SANDBOX) lists its assets
+      // over the API: without the callback base the CLI falls back to
+      // localhost:8000 and the preview fails to connect.
+      outputRestUrl,
       // The notebook itself cannot fetch these: it holds no callback key and no
       // API URL. An init container puts them on a volume before the cells run.
       notebookFilesB64: files.length

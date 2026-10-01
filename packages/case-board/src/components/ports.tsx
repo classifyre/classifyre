@@ -3,16 +3,13 @@
 import * as React from "react";
 import { Handle, Position } from "@xyflow/react";
 import { cn } from "@workspace/ui/lib/utils";
-import { PORTS } from "../lib/geometry";
-
-/** How far a port sits outside the node, so it never covers the node's own edge. */
-const GAP = 9;
+import { PORTS, roundPortCentre, type RoundPorts } from "../lib/geometry";
 
 const SIDES = [
-  { id: PORTS.top, position: Position.Top, dx: 0, dy: -1 },
-  { id: PORTS.right, position: Position.Right, dx: 1, dy: 0 },
-  { id: PORTS.bottom, position: Position.Bottom, dx: 0, dy: 1 },
-  { id: PORTS.left, position: Position.Left, dx: -1, dy: 0 },
+  { id: PORTS.top, position: Position.Top },
+  { id: PORTS.right, position: Position.Right },
+  { id: PORTS.bottom, position: Position.Bottom },
+  { id: PORTS.left, position: Position.Left },
 ] as const;
 
 /**
@@ -32,12 +29,8 @@ export function Ports({
   hidden = false,
 }: {
   connectable: boolean;
-  /**
-   * Circle the ports sit around, in node coordinates; boxes leave it out.
-   * `top`/`bottom` move those two past what sits above or below the circle
-   * (hypothesis dots, the name), so a port never covers them.
-   */
-  round?: { cx: number; cy: number; r: number; top?: number; bottom?: number };
+  /** Circle the ports sit around (see RoundPorts); boxes leave it out. */
+  round?: RoundPorts;
   /** What the link tool covers on a round node (defaults to the circle). */
   core?: { cx: number; cy: number; d: number };
   /** Edges still need the handles; nobody should see or use them. */
@@ -48,27 +41,21 @@ export function Ports({
     <>
       {SIDES.map((side) => {
         const main = side.id === PORTS.right;
-        const y =
-          side.id === PORTS.top && round?.top !== undefined
-            ? round.top
-            : side.id === PORTS.bottom && round?.bottom !== undefined
-              ? round.bottom
-              : round
-                ? round.cy + side.dy * (round.r + GAP)
-                : 0;
-        const style: React.CSSProperties | undefined = round
-          ? ({
-              "--px": `${round.cx + side.dx * (round.r + GAP)}px`,
-              "--py": `${y}px`,
-              ...(main
-                ? {
-                    "--core-x": `${core?.cx ?? round.cx}px`,
-                    "--core-y": `${core?.cy ?? round.cy}px`,
-                    "--core-d": `${core?.d ?? 2 * round.r}px`,
-                  }
-                : {}),
-            } as React.CSSProperties)
-          : undefined;
+        const at = round ? roundPortCentre(round, side.id) : null;
+        const style: React.CSSProperties | undefined =
+          round && at
+            ? ({
+                "--px": `${at.x}px`,
+                "--py": `${at.y}px`,
+                ...(main
+                  ? {
+                      "--core-x": `${core?.cx ?? round.cx}px`,
+                      "--core-y": `${core?.cy ?? round.cy}px`,
+                      "--core-d": `${core?.d ?? 2 * round.r}px`,
+                    }
+                  : {}),
+              } as React.CSSProperties)
+            : undefined;
         return (
           <Handle
             key={side.id}

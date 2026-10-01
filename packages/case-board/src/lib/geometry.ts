@@ -12,6 +12,7 @@
  * Pure: no React, so the board's store, layout estimates and tests share it.
  */
 
+import type { NodeHandle, Position } from "@xyflow/react";
 import { ASSET_NODE, FINDING_NODE, type XY } from "@workspace/schemas/case-board";
 
 export {
@@ -98,9 +99,73 @@ export function findingCode(detector: string | null, fallback: string): string {
  * link stores no port.
  */
 export const PORTS = { top: "t", right: "r", bottom: "b", left: "l" } as const;
+export type PortId = (typeof PORTS)[keyof typeof PORTS];
 /** The handles every projected edge is attached to (React Flow needs real ones). */
 export const SOURCE_PORT = PORTS.right;
 export const TARGET_PORT = PORTS.left;
+
+/** How far a round node's port sits outside its circle, so it never covers the circle's edge. */
+export const PORT_GAP = 9;
+/** A port's box, as board.css draws it (`.board-port`). */
+export const PORT_SIZE = 10;
+
+/**
+ * The circle a round node's ports sit around, in node coordinates. `top` and
+ * `bottom` move those two past what sits above or below it (hypothesis dots,
+ * the name), so a port never covers them.
+ */
+export interface RoundPorts extends RoundShape {
+  top?: number;
+  bottom?: number;
+}
+
+/** Centre of one of a round node's ports: the circle's compass points, just outside it. */
+export function roundPortCentre(round: RoundPorts, port: PortId): XY {
+  const reach = round.r + PORT_GAP;
+  switch (port) {
+    case PORTS.top:
+      return { x: round.cx, y: round.top ?? round.cy - reach };
+    case PORTS.bottom:
+      return { x: round.cx, y: round.bottom ?? round.cy + reach };
+    case PORTS.right:
+      return { x: round.cx + reach, y: round.cy };
+    case PORTS.left:
+      return { x: round.cx - reach, y: round.cy };
+  }
+}
+
+/** A finding node's ports: around its circle, the bottom one clear of its label. */
+export const FINDING_PORTS: RoundPorts = {
+  cx: FINDING_NODE.cx,
+  cy: FINDING_NODE.cy,
+  r: FINDING_NODE.r,
+  bottom: FINDING_NODE.height + 3,
+};
+
+// React Flow's `Position` values; a type-only import keeps this module free of React.
+const PORT_POSITION = { t: "top", r: "right", b: "bottom", l: "left" } as const;
+
+/**
+ * A round node's ports as React Flow handle bounds, relative to the node. A
+ * node that declares these and its size counts as measured, so React Flow
+ * mounts it only once it is in view, rather than mounting every new node once
+ * just to measure it (every finding on a big board, each time the zoom
+ * crosses into detail).
+ */
+export function roundPortHandles(round: RoundPorts): NodeHandle[] {
+  return Object.values(PORTS).map((id) => {
+    const c = roundPortCentre(round, id);
+    return {
+      id,
+      type: "source",
+      position: PORT_POSITION[id] as unknown as Position,
+      x: c.x - PORT_SIZE / 2,
+      y: c.y - PORT_SIZE / 2,
+      width: PORT_SIZE,
+      height: PORT_SIZE,
+    };
+  });
+}
 
 /** Level of detail from the zoom: names and labels, then shapes, then chips. */
 export type Lod = "full" | "compact" | "chip";

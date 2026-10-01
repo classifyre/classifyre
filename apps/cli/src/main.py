@@ -396,6 +396,9 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
     # The run's augmentation session, when the recipe enables it. Assigned
     # before phase 2; every later use is None-guarded.
     augmentation: Any = None
+    # Held at this scope so the finally below can stop code detectors' child
+    # processes however the run ends.
+    detector_pipeline: Any = None
 
     # Built before any logging or error formatting: every message below that
     # touches the recipe, a driver error, or a notebook verdict goes through
@@ -488,6 +491,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         runner_id,
                     )
                     has_detectors = bool(pipeline.detectors)
+                    detector_pipeline = pipeline
 
                     if has_detectors:
                         # Warm this run's optional dependency groups once, here in
@@ -518,7 +522,9 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             runner_id,
                             worker_pool=worker_pool,
                         )
+                        detector_pipeline = pipeline
 
+                    from .pipeline.asset_payload_server import AssetPayloadServer
                     from .pipeline.payload_window import PayloadWindowStore
                     from .pipeline.scan_cache import ScanCache
 
@@ -801,6 +807,9 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 source.evict_asset_cache(asset_hash)
                                 if augmentation is not None:
                                     augmentation.evict(asset)
+                                # Payload augmentation and code detectors
+                                # fetched for this asset, shared between them.
+                                AssetPayloadServer.evict_shared(source, asset)
                                 processed_count += 1
                             except Exception as exc:
                                 error_count += 1
@@ -863,6 +872,21 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 f"Text-chunk emission failed for {len(chunk_errors)}"
                                 f" asset(s) after retries: {preview}"
                             )
+
+                    # Code detectors hold child processes for the whole run.
+                    for code_summary in pipeline.custom_detector_summaries():
+                        logger.info(
+                            "Code detector %s: %d asset(s) judged, %d failed, %d finding(s)%s",
+                            code_summary["key"],
+                            code_summary["assets"],
+                            code_summary["failed"],
+                            code_summary["findings"],
+                            (
+                                f" (DISABLED: {_safe_text(code_summary['disabled'], redactor)})"
+                                if code_summary["disabled"]
+                                else ""
+                            ),
+                        )
 
                     # A detector the breaker disabled is not a crash and not a
                     # clean run; the API reports it from the per-asset
@@ -954,6 +978,8 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                 finally:
                     if augmentation is not None:
                         augmentation.close()
+                    if detector_pipeline is not None:
+                        detector_pipeline.close()
                     if worker_pool is not None:
                         worker_pool.shutdown(wait=True)
 

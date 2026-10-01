@@ -1,9 +1,29 @@
-/* Landing-page-only styles: the "case file" visual language.
+/* Landing-page styles: the "case dossier" visual language.
    Everything is driven by the theme tokens in @workspace/ui/globals.css
-   so both light and dark mode work without per-theme overrides. */
+   so both light and dark mode work without per-theme overrides.
+
+   Two motifs carry the brand and recur on purpose:
+     · the evidence thread — 2px accent lines with pin points that connect
+       facts across the page (`.cl-thread-*`, `cl-travel`);
+     · the case-file stamp — mono uppercase microtype, dot leaders, and a
+       slammed-on rubber stamp (`.cl-dots`, `.cl-stamp`). */
 
 .font-hero {
   font-family: var(--font-hero), var(--font-serif), sans-serif;
+}
+
+/* ── Focus ──────────────────────────────────────────────────────── */
+
+/* The marketing pages build their controls from plain anchors, so the
+   focus state is designed here once: a hard accent outline, offset off the
+   hairline borders so it stays visible on black bands and paper alike. */
+:where(a, button, [role="tab"], summary, [role="button"]):focus-visible {
+  outline: 3px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+
+.dark :where(a, button, [role="tab"], summary, [role="button"]):focus-visible {
+  outline-color: var(--color-accent);
 }
 
 /* ── Full-bleed sections ────────────────────────────────────────── */
@@ -94,27 +114,6 @@ body {
   }
 }
 
-/* ── Hero ───────────────────────────────────────────────────────── */
-
-@keyframes cl-ring-rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.cl-rotate-slow {
-  animation: cl-ring-rotate 46s linear infinite;
-  transform-origin: center;
-}
-
-.cl-rotate-slower {
-  animation: cl-ring-rotate 90s linear infinite reverse;
-  transform-origin: center;
-}
-
 @keyframes cl-stamp {
   0% {
     opacity: 0;
@@ -135,35 +134,79 @@ body {
   animation-delay: var(--cl-delay, 400ms);
 }
 
-/* ── Evidence board (the pipeline diagram) ──────────────────────── */
+/* ── The evidence thread ────────────────────────────────────────── */
 
-/* The board is static — no scroll state to track. It just assembles
-   itself once, top to bottom, when it first scrolls into view.
-   Parts hide only while their Reveal wrapper reports out-of-view, so a
-   board rendered without one (or without JS) still draws in full. */
+/* Dot leaders: the typewriter line between a label and its value, the way a
+   paper index or an inventory sheet fills the gap. */
+.cl-dots {
+  flex: 1 1 auto;
+  min-width: 1.5rem;
+  align-self: flex-end;
+  height: 0.55em;
+  border-bottom: 2px dotted color-mix(in srgb, currentColor 32%, transparent);
+}
 
-.cl-reveal[data-inview="false"] .cl-board .cl-board-edge,
-.cl-reveal[data-inview="false"] .cl-board .cl-board-node,
-.cl-reveal[data-inview="false"] .cl-board .cl-board-frame {
+/* An exhibit pin: the knot where two threads meet. */
+.cl-pin {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border: 2px solid var(--color-accent);
+  border-radius: 9999px;
+  background: var(--color-background);
+}
+
+.cl-pin-solid {
+  background: var(--color-accent);
+}
+
+/* Traveling evidence pulse: a short dash running along a normalized path
+   (`pathLength="1"`), so one animation fits every thread. */
+.cl-travel {
+  stroke-dasharray: 0.035 0.965;
+  stroke-dashoffset: 1;
+  animation: cl-travel var(--cl-dur, 6s) linear infinite;
+  animation-delay: var(--cl-delay, 0ms);
+}
+
+@keyframes cl-travel {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Threads draw themselves once, when the board scrolls into view. */
+.cl-reveal[data-inview="false"] .cl-thread-draw {
   opacity: 0;
 }
 
-.cl-reveal[data-inview="true"] .cl-board .cl-board-edge {
+.cl-reveal[data-inview="true"] .cl-thread-draw {
   opacity: 1;
-  stroke-dasharray: var(--cl-len, 90);
-  stroke-dashoffset: var(--cl-len, 90);
-  animation: cl-draw 0.5s ease forwards;
+  stroke-dasharray: var(--cl-len, 300);
+  stroke-dashoffset: var(--cl-len, 300);
+  animation: cl-draw 0.7s ease forwards;
   animation-delay: var(--cl-delay, 0ms);
 }
 
-.cl-reveal[data-inview="true"] .cl-board .cl-board-node {
-  animation: cl-fade 0.45s ease forwards;
-  animation-delay: var(--cl-delay, 0ms);
+/* ── The pinned case file ───────────────────────────────────────── */
+
+/* The investigator's case file rides a slow hover. */
+.cl-float {
+  animation: cl-float 7s ease-in-out infinite;
 }
 
-.cl-reveal[data-inview="true"] .cl-board .cl-board-frame {
-  animation: cl-fade 0.6s ease forwards;
-  animation-delay: 700ms;
+@keyframes cl-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 /* ── Case graph animation ───────────────────────────────────────── */
@@ -202,61 +245,6 @@ body {
 .cl-cg[data-inview="true"] .cl-cg-pulse {
   animation: cl-pulse-ring 1.8s ease-out infinite;
   animation-delay: 2.4s;
-}
-
-/* ── Harness mission ring ───────────────────────────────────────── */
-
-@keyframes cl-mission-glow {
-  0%,
-  16%,
-  100% {
-    opacity: 0.45;
-  }
-  4%,
-  12% {
-    opacity: 1;
-  }
-}
-
-.cl-mission {
-  opacity: 0.45;
-  animation: cl-mission-glow 12.5s linear infinite;
-  animation-delay: var(--cl-delay, 0s);
-}
-
-@keyframes cl-mission-dot-glow {
-  0%,
-  16%,
-  100% {
-    fill: transparent;
-  }
-  4%,
-  12% {
-    fill: var(--color-accent);
-  }
-}
-
-.cl-mission .cl-mission-dot {
-  transition: fill 0.3s ease;
-  animation: cl-mission-dot-glow 12.5s linear infinite;
-  animation-delay: var(--cl-delay, 0s);
-}
-
-@keyframes cl-mission-text-glow {
-  0%,
-  16%,
-  100% {
-    fill: currentColor;
-  }
-  4%,
-  12% {
-    fill: #0a0a0a;
-  }
-}
-
-.cl-mission .cl-mission-num {
-  animation: cl-mission-text-glow 12.5s linear infinite;
-  animation-delay: var(--cl-delay, 0s);
 }
 
 /* ── Closing board (string-board backdrop) ────────────────────── */
@@ -334,100 +322,28 @@ body {
   }
 }
 
-/* Lime spotlight tracking --mx/--my; hidden until the first pointer move
-   so touch readers just get the calm board. */
-.cl-net-spot {
-  opacity: 0;
-  transition: opacity 0.5s ease;
-  background: radial-gradient(
-    340px circle at var(--mx, 50%) var(--my, 40%),
-    color-mix(in srgb, var(--color-accent) 16%, transparent),
-    transparent 70%
-  );
-}
-
-.cl-net[data-lit="true"] .cl-net-spot {
-  opacity: 1;
-}
-
-/* The investigator's case file rides a slow hover. */
-.cl-float {
-  animation: cl-float 7s ease-in-out infinite;
-}
-
-@keyframes cl-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
-/* ── Workspace cabinet (isolated workspaces) ────────────────────── */
-
-/* Each file nudges out of the stack on hover, the way you'd thumb one
-   forward in a real drawer. Transform only, so it never reflows the stack. */
-.cl-file {
-  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.25, 1);
-}
-
-.cl-file:hover {
-  transform: translateX(6px);
-}
-
-/* Index tabs march across the stack like a real drawer. The offset is set
-   per file as --cl-tab-offset, but a narrow column has no room for it, so
-   the tabs stay flush-left until there is width to spend. */
-.cl-file-tab {
-  padding-left: 0;
-}
-
-@media (min-width: 640px) {
-  .cl-file-tab {
-    padding-left: var(--cl-tab-offset, 0%);
-  }
-}
-
 /* ── Reduced motion ─────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
-  .cl-file,
-  .cl-file:hover {
-    transform: none;
-    transition: none;
-  }
-
   .cl-reveal {
     opacity: 1;
     transform: none;
     transition: none;
   }
 
-  .cl-rotate-slow,
-  .cl-rotate-slower,
   .cl-float,
   .cl-net-svg,
   .cl-tag-swap,
   .cl-thread,
+  .cl-travel,
   .cl-pin-pulse,
   .cl-stamp,
-  .cl-mission,
-  .cl-mission .cl-mission-dot,
-  .cl-mission .cl-mission-num,
   .cl-cg[data-inview="true"] .cl-cg-pulse {
     animation: none;
   }
 
-  .cl-mission {
-    opacity: 1;
-  }
-
   .cl-cg [data-anim],
-  .cl-board .cl-board-edge,
-  .cl-board .cl-board-node,
-  .cl-board .cl-board-frame {
+  .cl-thread-draw {
     opacity: 1;
     animation: none;
   }
