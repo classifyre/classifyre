@@ -61,6 +61,9 @@ export const BOARD_ITEM_KINDS = [
   "COMMENT",
   "NOTE",
   "FRAME",
+  // A glossary term pinned to the board (semantic layer SL5 A3). `refId` is
+  // the term's id; deleting the card leaves the term untouched.
+  "TERM",
 ] as const;
 export type BoardItemKind = (typeof BOARD_ITEM_KINDS)[number];
 
@@ -303,6 +306,18 @@ export const BoardOpSchema = z.discriminatedUnion("type", [
    * from it, or a discussion started elsewhere (MCP, the thread list). An
    * item the thread already has is brought back rather than duplicated.
    */
+  /**
+   * Pin a glossary term to the board as a TERM card (SL5 A3). Replaying it
+   * for a removed card brings the same row back, as `thread.place` does.
+   */
+  z.strictObject({
+    type: z.literal("term.place"),
+    opId: OpId,
+    itemId: Id,
+    termId: Id,
+    x: Coord.optional(),
+    y: Coord.optional(),
+  }),
   z.strictObject({
     type: z.literal("thread.place"),
     opId: OpId,
@@ -399,6 +414,9 @@ export const MAX_FINDING_NODES = 12;
 
 /** Hypothesis cards are this wide; their height follows the statement. */
 export const HYPOTHESIS_WIDTH = 300;
+
+/** A term card (SL5 A3): glyph, name and scheme chip. */
+export const TERM_CARD_SIZE = { width: 200, height: 64 } as const;
 
 /** A frame's title bar; its contents start below it. */
 export const FRAME_TITLE_HEIGHT = 40;

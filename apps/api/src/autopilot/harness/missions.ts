@@ -58,6 +58,18 @@ const KNOWLEDGE_TOOLS = [
   'memory.write',
   'glossary.lookup',
   'glossary.propose',
+  'glossary.list_schemes',
+  'glossary.propose_relation',
+  'glossary.approve_relation',
+  'glossary.list_vocabulary',
+  'glossary.propose_binding',
+  'glossary.preview_binding',
+  'glossary.approve_binding',
+  'glossary.disable_binding',
+  'glossary.term_evidence',
+  'glossary.finding_meaning',
+  'glossary.propose_link',
+  'glossary.list_proposals',
   'agenda.defer',
 ];
 
@@ -219,8 +231,9 @@ const COLD_START_DOCTRINE = [
  * The correction for treating a source's detector list as a free knob.
  *
  * It is not a setting, it is the schema of the evidence base. Removing a
- * detector resolves every open finding it produced, and inquiries, cases,
- * fingerprints and glossary terms are all built on those findings. The config
+ * detector resolves every open finding it produced; inquiries, cases and
+ * fingerprints are built on those findings, and the semantic links that say
+ * what the data means are derived from them. The config
  * agent could not see any of that: its tool returned `{ok: true}` whether a
  * change touched nothing or resolved 44,174 findings, and the only quantity it
  * could measure was volume — a metric you improve by reducing it.
@@ -240,8 +253,9 @@ const COLD_START_DOCTRINE = [
 const DETECTION_STEWARDSHIP = [
   '\nDETECTION STEWARDSHIP: a source’s detector list is not a setting, it is the schema of',
   'its evidence base. Removing or disabling a detector RESOLVES every open finding it',
-  'produced, and inquiries, cases, fingerprints and glossary terms are all built on those',
-  'findings. config.preview_impact tells you exactly what a patch would cost before you make',
+  'produced. Inquiries, cases and fingerprints are built on those findings, and semantic links',
+  'are derived from them — removing a detector removes the meaning they carried.',
+  'config.preview_impact tells you exactly what a patch would cost before you make',
   'it — how many findings it orphans, how many of those are high-importance, and which',
   'inquiries and cases are relying on them. Call it before any patch that disables a detector',
   'or drops a custom_detector. Findings a case cites or an active inquiry watches are never',
@@ -275,14 +289,29 @@ const DETECTION_STEWARDSHIP = [
 ].join(' ');
 
 const GLOSSARY_DOCTRINE = [
-  '\nGLOSSARY: the glossary is the operator-facing shared vocabulary — canonical real-world names',
-  '(people, organizations, locations, project codenames, document references, recurring jargon)',
-  'written the way a human says them, with aliases for variant spellings. glossary.propose ONLY such',
-  'terms; observations, per-source summaries and investigation state go to memory.write instead.',
-  'When a specific case, inquiry, source or finding established the term, pass its refType/refId so',
-  'the investigation retains provenance and cases.detail can surface the vocabulary it relies on.',
-  'Bad: "aws_supabase_pii_consolidated". Good: term "Aurora Holdings Ltd" aliases ["Aurora Holdings",',
-  '"AHL"]. Use glossary.lookup before treating two spellings as different entities.',
+  '\nGLOSSARY: the glossary holds two kinds of term. CONCEPTS are business vocabulary — what',
+  'something means (Bank account, GmbH, Health data, Eigenmittelquote). ENTITIES are named',
+  'things — which one it is (ACME Holding GmbH, Jane Doe). Pass kind on every glossary.propose.',
+  'Write terms the way a human says them; observations, per-source summaries and investigation',
+  'state go to memory.write instead. Bad: "aws_supabase_pii_consolidated". Good: term "Aurora',
+  'Holdings Ltd" (ENTITY) aliases ["Aurora Holdings", "AHL"].',
+  'CODES are exact notations (GES, PKS 725000) and go in codes, not aliases; a single letter (E)',
+  'is a hidden alias, used by lookup and never matched in text. Choose a concept\'s scheme by',
+  'glossary.lookup / glossary.list_schemes and never invent a scheme for a single term.',
+  'Propose a BROADER relation only when the narrower concept is a kind of the broader one',
+  '(GmbH is a kind of Kapitalgesellschaft); otherwise RELATED. When a specific case, inquiry,',
+  'source or finding established the term, pass its refType/refId for provenance.',
+  'Use glossary.lookup before treating two spellings as different entities.',
+  '\nMEANING: bindings say once what a detector output means (IBAN_CODE → Bank account); the',
+  'semantic links derived from them say which assets are about which concept, with evidence.',
+  'Bind the NARROWEST concept — broader ones follow from the taxonomy. Prefer OUTPUT_LOOKUP for',
+  'code-like categorical outputs (tag:legal_form → scheme Rechtsformen). glossary.preview_binding',
+  'before glossary.approve_binding, and approve only within your budget. Never bind an',
+  'open-valued output (names, e-mail addresses) to an ENTITY: entities link through mentions.',
+  '"No meaning" is an operator decision. Prefer filtering findings by term over regex on values',
+  'when a concept exists. Work the proposal queue from the highest score; never decide',
+  'documents (LINK), terms or aliases — those are operator decisions.',
+  '\nYou never edit, disable or delete an item an operator approved: propose an alternative.',
 ].join(' ');
 
 /**

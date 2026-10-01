@@ -9,7 +9,10 @@ Name | Type
 `ids` | Array&lt;string&gt;
 `filters` | [BulkUpdateGlossaryFiltersDto](BulkUpdateGlossaryFiltersDto.md)
 `verified` | boolean
+`status` | string
 `entityType` | string
+`schemeId` | string
+`kind` | string
 `verifiedBy` | string
 
 ## Example
@@ -22,7 +25,10 @@ const example = {
   "ids": null,
   "filters": null,
   "verified": null,
+  "status": null,
   "entityType": null,
+  "schemeId": null,
+  "kind": null,
   "verifiedBy": null,
 } satisfies BulkUpdateGlossaryTermsDto
 

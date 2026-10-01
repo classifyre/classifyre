@@ -32,11 +32,65 @@ export interface UpsertGlossaryTermDto {
      */
     term: string;
     /**
+     * CONCEPT (business term) or ENTITY (named thing).
+     * @type {string}
+     * @memberof UpsertGlossaryTermDto
+     */
+    kind?: UpsertGlossaryTermDtoKindEnum;
+    /**
+     * Stable key (C8). Accepted on edit only; the old key keeps resolving.
+     * @type {string}
+     * @memberof UpsertGlossaryTermDto
+     */
+    key?: string;
+    /**
      * 
      * @type {Array<string>}
      * @memberof UpsertGlossaryTermDto
      */
     aliases?: Array<string>;
+    /**
+     * Exact notations (GES, PKS 725000). Case is significant.
+     * @type {Array<string>}
+     * @memberof UpsertGlossaryTermDto
+     */
+    codes?: Array<string>;
+    /**
+     * Lookup-only spellings, never matched in text.
+     * @type {Array<string>}
+     * @memberof UpsertGlossaryTermDto
+     */
+    hiddenAliases?: Array<string>;
+    /**
+     * Markdown, up to 10,000 characters.
+     * @type {string}
+     * @memberof UpsertGlossaryTermDto
+     */
+    definition?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermDto
+     */
+    schemeId?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermDto
+     */
+    schemeKey?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermDto
+     */
+    steward?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof UpsertGlossaryTermDto
+     */
+    status?: UpsertGlossaryTermDtoStatusEnum;
     /**
      * 
      * @type {string}
@@ -50,6 +104,12 @@ export interface UpsertGlossaryTermDto {
      */
     notes?: string;
     /**
+     * Create a new ENTITY even when one with the same name exists (two people called Jane Doe are two entities).
+     * @type {boolean}
+     * @memberof UpsertGlossaryTermDto
+     */
+    createNew?: boolean;
+    /**
      * 
      * @type {string}
      * @memberof UpsertGlossaryTermDto
@@ -62,13 +122,32 @@ export interface UpsertGlossaryTermDto {
      */
     refId?: string;
     /**
-     * Operator identity recorded as verifiedBy. Defaults to "operator".
+     * Operator identity recorded as approver. Defaults to the X-Actor-Name header or "operator".
      * @type {string}
      * @memberof UpsertGlossaryTermDto
      */
     author?: string;
 }
 
+
+/**
+ * @export
+ */
+export const UpsertGlossaryTermDtoKindEnum = {
+    Concept: 'CONCEPT',
+    Entity: 'ENTITY'
+} as const;
+export type UpsertGlossaryTermDtoKindEnum = typeof UpsertGlossaryTermDtoKindEnum[keyof typeof UpsertGlossaryTermDtoKindEnum];
+
+/**
+ * @export
+ */
+export const UpsertGlossaryTermDtoStatusEnum = {
+    Draft: 'DRAFT',
+    Approved: 'APPROVED',
+    Deprecated: 'DEPRECATED'
+} as const;
+export type UpsertGlossaryTermDtoStatusEnum = typeof UpsertGlossaryTermDtoStatusEnum[keyof typeof UpsertGlossaryTermDtoStatusEnum];
 
 /**
  * @export
@@ -104,9 +183,19 @@ export function UpsertGlossaryTermDtoFromJSONTyped(json: any, ignoreDiscriminato
         
         'id': json['id'] == null ? undefined : json['id'],
         'term': json['term'],
+        'kind': json['kind'] == null ? undefined : json['kind'],
+        'key': json['key'] == null ? undefined : json['key'],
         'aliases': json['aliases'] == null ? undefined : json['aliases'],
+        'codes': json['codes'] == null ? undefined : json['codes'],
+        'hiddenAliases': json['hiddenAliases'] == null ? undefined : json['hiddenAliases'],
+        'definition': json['definition'] == null ? undefined : json['definition'],
+        'schemeId': json['schemeId'] == null ? undefined : json['schemeId'],
+        'schemeKey': json['schemeKey'] == null ? undefined : json['schemeKey'],
+        'steward': json['steward'] == null ? undefined : json['steward'],
+        'status': json['status'] == null ? undefined : json['status'],
         'entityType': json['entityType'] == null ? undefined : json['entityType'],
         'notes': json['notes'] == null ? undefined : json['notes'],
+        'createNew': json['createNew'] == null ? undefined : json['createNew'],
         'refType': json['refType'] == null ? undefined : json['refType'],
         'refId': json['refId'] == null ? undefined : json['refId'],
         'author': json['author'] == null ? undefined : json['author'],
@@ -126,9 +215,19 @@ export function UpsertGlossaryTermDtoToJSONTyped(value?: UpsertGlossaryTermDto |
         
         'id': value['id'],
         'term': value['term'],
+        'kind': value['kind'],
+        'key': value['key'],
         'aliases': value['aliases'],
+        'codes': value['codes'],
+        'hiddenAliases': value['hiddenAliases'],
+        'definition': value['definition'],
+        'schemeId': value['schemeId'],
+        'schemeKey': value['schemeKey'],
+        'steward': value['steward'],
+        'status': value['status'],
         'entityType': value['entityType'],
         'notes': value['notes'],
+        'createNew': value['createNew'],
         'refType': value['refType'],
         'refId': value['refId'],
         'author': value['author'],

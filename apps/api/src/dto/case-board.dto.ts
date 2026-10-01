@@ -320,6 +320,15 @@ export class CaseBoardResponseDto {
 
   @ApiProperty({ type: [BoardThreadSummaryDto] })
   threads!: BoardThreadSummaryDto[];
+
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+    description:
+      "The Meaning layer (SL5 A2): terms the case's evidence is about, with the items they link to, relations between them, broader parents, links that went GONE and the case's own ABOUT links.",
+  })
+  semantic?: Record<string, unknown> | null;
 }
 
 /** Body of POST /cases/:id/board/ops. See `ApplyBoardOpsSchema`. */

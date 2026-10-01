@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { GlossarySchemeRefDto } from './GlossarySchemeRefDto';
+import {
+    GlossarySchemeRefDtoFromJSON,
+    GlossarySchemeRefDtoFromJSONTyped,
+    GlossarySchemeRefDtoToJSON,
+    GlossarySchemeRefDtoToJSONTyped,
+} from './GlossarySchemeRefDto';
+
 /**
  * 
  * @export
@@ -26,6 +34,18 @@ export interface GlossaryLookupHitDto {
      */
     id: string;
     /**
+     * Stable key (C8).
+     * @type {string}
+     * @memberof GlossaryLookupHitDto
+     */
+    key: string;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof GlossaryLookupHitDto
+     */
+    previousKeys: Array<string>;
+    /**
      * 
      * @type {string}
      * @memberof GlossaryLookupHitDto
@@ -33,16 +53,46 @@ export interface GlossaryLookupHitDto {
     term: string;
     /**
      * 
+     * @type {string}
+     * @memberof GlossaryLookupHitDto
+     */
+    kind: GlossaryLookupHitDtoKindEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryLookupHitDto
+     */
+    status: GlossaryLookupHitDtoStatusEnum;
+    /**
+     * 
      * @type {Array<string>}
      * @memberof GlossaryLookupHitDto
      */
     aliases: Array<string>;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof GlossaryLookupHitDto
+     */
+    codes: Array<string>;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof GlossaryLookupHitDto
+     */
+    hiddenAliases: Array<string>;
     /**
      * Unverified aliases suggested by agents for operator review
      * @type {Array<string>}
      * @memberof GlossaryLookupHitDto
      */
     proposedAliases: Array<string>;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryLookupHitDto
+     */
+    definition?: string | null;
     /**
      * 
      * @type {string}
@@ -56,13 +106,55 @@ export interface GlossaryLookupHitDto {
      */
     notes?: string | null;
     /**
-     * AGENT proposals are unverified hypotheses
+     * 
+     * @type {string}
+     * @memberof GlossaryLookupHitDto
+     */
+    steward?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryLookupHitDto
+     */
+    schemeId?: string | null;
+    /**
+     * 
+     * @type {GlossarySchemeRefDto}
+     * @memberof GlossaryLookupHitDto
+     */
+    scheme?: GlossarySchemeRefDto | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryLookupHitDto
+     */
+    replacedById?: string | null;
+    /**
+     * 
+     * @type {Date}
+     * @memberof GlossaryLookupHitDto
+     */
+    deprecatedAt?: Date | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryLookupHitDto
+     */
+    sourceIri?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryLookupHitDto
+     */
+    packKey?: string | null;
+    /**
+     * AGENT proposals are DRAFT hypotheses
      * @type {string}
      * @memberof GlossaryLookupHitDto
      */
     origin: string;
     /**
-     * 
+     * True when APPROVED (kept for compatibility).
      * @type {boolean}
      * @memberof GlossaryLookupHitDto
      */
@@ -78,6 +170,12 @@ export interface GlossaryLookupHitDto {
      * @type {Date}
      * @memberof GlossaryLookupHitDto
      */
+    approvedAt?: Date | null;
+    /**
+     * 
+     * @type {Date}
+     * @memberof GlossaryLookupHitDto
+     */
     createdAt: Date;
     /**
      * 
@@ -86,11 +184,29 @@ export interface GlossaryLookupHitDto {
      */
     updatedAt: Date;
     /**
-     * How this term was reached, and the order results come back in: an exact term, then an exact alias, then a prefix or substring, then a semantic neighbour. The alias tier ranks above substring on purpose — in a domain of two- and three-letter register codes, 'GES' has to resolve to the entry whose alias it is, not to the longest word it is a prefix of.
+     * Compatibility tier; `matchedOn` says precisely which label matched.
      * @type {string}
      * @memberof GlossaryLookupHitDto
      */
     matchType: GlossaryLookupHitDtoMatchTypeEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryLookupHitDto
+     */
+    matchedOn: GlossaryLookupHitDtoMatchedOnEnum;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof GlossaryLookupHitDto
+     */
+    deprecated: boolean;
+    /**
+     * 
+     * @type {object}
+     * @memberof GlossaryLookupHitDto
+     */
+    replacedBy?: object | null;
     /**
      * 
      * @type {number}
@@ -99,6 +215,25 @@ export interface GlossaryLookupHitDto {
     similarity?: number;
 }
 
+
+/**
+ * @export
+ */
+export const GlossaryLookupHitDtoKindEnum = {
+    Concept: 'CONCEPT',
+    Entity: 'ENTITY'
+} as const;
+export type GlossaryLookupHitDtoKindEnum = typeof GlossaryLookupHitDtoKindEnum[keyof typeof GlossaryLookupHitDtoKindEnum];
+
+/**
+ * @export
+ */
+export const GlossaryLookupHitDtoStatusEnum = {
+    Draft: 'DRAFT',
+    Approved: 'APPROVED',
+    Deprecated: 'DEPRECATED'
+} as const;
+export type GlossaryLookupHitDtoStatusEnum = typeof GlossaryLookupHitDtoStatusEnum[keyof typeof GlossaryLookupHitDtoStatusEnum];
 
 /**
  * @export
@@ -124,14 +259,32 @@ export const GlossaryLookupHitDtoMatchTypeEnum = {
 } as const;
 export type GlossaryLookupHitDtoMatchTypeEnum = typeof GlossaryLookupHitDtoMatchTypeEnum[keyof typeof GlossaryLookupHitDtoMatchTypeEnum];
 
+/**
+ * @export
+ */
+export const GlossaryLookupHitDtoMatchedOnEnum = {
+    Term: 'term',
+    Alias: 'alias',
+    Code: 'code',
+    HiddenAlias: 'hiddenAlias',
+    Semantic: 'semantic'
+} as const;
+export type GlossaryLookupHitDtoMatchedOnEnum = typeof GlossaryLookupHitDtoMatchedOnEnum[keyof typeof GlossaryLookupHitDtoMatchedOnEnum];
+
 
 /**
  * Check if a given object implements the GlossaryLookupHitDto interface.
  */
 export function instanceOfGlossaryLookupHitDto(value: object): value is GlossaryLookupHitDto {
     if (!('id' in value) || value['id'] === undefined) return false;
+    if (!('key' in value) || value['key'] === undefined) return false;
+    if (!('previousKeys' in value) || value['previousKeys'] === undefined) return false;
     if (!('term' in value) || value['term'] === undefined) return false;
+    if (!('kind' in value) || value['kind'] === undefined) return false;
+    if (!('status' in value) || value['status'] === undefined) return false;
     if (!('aliases' in value) || value['aliases'] === undefined) return false;
+    if (!('codes' in value) || value['codes'] === undefined) return false;
+    if (!('hiddenAliases' in value) || value['hiddenAliases'] === undefined) return false;
     if (!('proposedAliases' in value) || value['proposedAliases'] === undefined) return false;
     if (!('entityType' in value) || value['entityType'] === undefined) return false;
     if (!('origin' in value) || value['origin'] === undefined) return false;
@@ -139,6 +292,8 @@ export function instanceOfGlossaryLookupHitDto(value: object): value is Glossary
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     if (!('matchType' in value) || value['matchType'] === undefined) return false;
+    if (!('matchedOn' in value) || value['matchedOn'] === undefined) return false;
+    if (!('deprecated' in value) || value['deprecated'] === undefined) return false;
     return true;
 }
 
@@ -153,17 +308,35 @@ export function GlossaryLookupHitDtoFromJSONTyped(json: any, ignoreDiscriminator
     return {
         
         'id': json['id'],
+        'key': json['key'],
+        'previousKeys': json['previousKeys'],
         'term': json['term'],
+        'kind': json['kind'],
+        'status': json['status'],
         'aliases': json['aliases'],
+        'codes': json['codes'],
+        'hiddenAliases': json['hiddenAliases'],
         'proposedAliases': json['proposedAliases'],
+        'definition': json['definition'] == null ? undefined : json['definition'],
         'entityType': json['entityType'],
         'notes': json['notes'] == null ? undefined : json['notes'],
+        'steward': json['steward'] == null ? undefined : json['steward'],
+        'schemeId': json['schemeId'] == null ? undefined : json['schemeId'],
+        'scheme': json['scheme'] == null ? undefined : GlossarySchemeRefDtoFromJSON(json['scheme']),
+        'replacedById': json['replacedById'] == null ? undefined : json['replacedById'],
+        'deprecatedAt': json['deprecatedAt'] == null ? undefined : (new Date(json['deprecatedAt'])),
+        'sourceIri': json['sourceIri'] == null ? undefined : json['sourceIri'],
+        'packKey': json['packKey'] == null ? undefined : json['packKey'],
         'origin': json['origin'],
         'verified': json['verified'],
         'verifiedBy': json['verifiedBy'] == null ? undefined : json['verifiedBy'],
+        'approvedAt': json['approvedAt'] == null ? undefined : (new Date(json['approvedAt'])),
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
         'matchType': json['matchType'],
+        'matchedOn': json['matchedOn'],
+        'deprecated': json['deprecated'],
+        'replacedBy': json['replacedBy'] == null ? undefined : json['replacedBy'],
         'similarity': json['similarity'] == null ? undefined : json['similarity'],
     };
 }
@@ -180,17 +353,35 @@ export function GlossaryLookupHitDtoToJSONTyped(value?: GlossaryLookupHitDto | n
     return {
         
         'id': value['id'],
+        'key': value['key'],
+        'previousKeys': value['previousKeys'],
         'term': value['term'],
+        'kind': value['kind'],
+        'status': value['status'],
         'aliases': value['aliases'],
+        'codes': value['codes'],
+        'hiddenAliases': value['hiddenAliases'],
         'proposedAliases': value['proposedAliases'],
+        'definition': value['definition'],
         'entityType': value['entityType'],
         'notes': value['notes'],
+        'steward': value['steward'],
+        'schemeId': value['schemeId'],
+        'scheme': GlossarySchemeRefDtoToJSON(value['scheme']),
+        'replacedById': value['replacedById'],
+        'deprecatedAt': value['deprecatedAt'] == null ? value['deprecatedAt'] : value['deprecatedAt'].toISOString(),
+        'sourceIri': value['sourceIri'],
+        'packKey': value['packKey'],
         'origin': value['origin'],
         'verified': value['verified'],
         'verifiedBy': value['verifiedBy'],
+        'approvedAt': value['approvedAt'] == null ? value['approvedAt'] : value['approvedAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
         'matchType': value['matchType'],
+        'matchedOn': value['matchedOn'],
+        'deprecated': value['deprecated'],
+        'replacedBy': value['replacedBy'],
         'similarity': value['similarity'],
     };
 }

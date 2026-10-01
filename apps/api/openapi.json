@@ -7893,252 +7893,6 @@
         ]
       }
     },
-    "/glossary": {
-      "get": {
-        "operationId": "GlossaryController_list",
-        "parameters": [
-          {
-            "name": "query",
-            "required": false,
-            "in": "query",
-            "description": "Free-text filter over term, aliases and notes (ILIKE).",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "entityType",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "PERSON",
-                "ORGANIZATION",
-                "LOCATION",
-                "REFERENCE",
-                "TERM",
-                "OTHER"
-              ]
-            }
-          },
-          {
-            "name": "take",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 200,
-              "default": 25,
-              "type": "number"
-            }
-          },
-          {
-            "name": "skip",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 0,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlossaryListResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "List glossary terms",
-        "tags": [
-          "glossary"
-        ]
-      },
-      "post": {
-        "operationId": "GlossaryController_upsert",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpsertGlossaryTermDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UpsertGlossaryTermResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Create or update a glossary term (operator)",
-        "tags": [
-          "glossary"
-        ]
-      }
-    },
-    "/glossary/lookup": {
-      "get": {
-        "operationId": "GlossaryController_lookup",
-        "parameters": [
-          {
-            "name": "query",
-            "required": true,
-            "in": "query",
-            "description": "Name or alias to resolve.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 50,
-              "default": 10,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/GlossaryLookupHitDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "Resolve a name or alias to glossary terms (exact + semantic)",
-        "tags": [
-          "glossary"
-        ]
-      }
-    },
-    "/glossary/bulk": {
-      "post": {
-        "operationId": "GlossaryController_bulkUpdate",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BulkUpdateGlossaryTermsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BulkUpdateGlossaryTermsResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Bulk verify/unverify or retype glossary terms (operator)",
-        "tags": [
-          "glossary"
-        ]
-      }
-    },
-    "/glossary/{id}/verify": {
-      "patch": {
-        "operationId": "GlossaryController_verify",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyGlossaryTermDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlossaryTermDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Mark an agent-proposed term as verified",
-        "tags": [
-          "glossary"
-        ]
-      }
-    },
-    "/glossary/{id}": {
-      "delete": {
-        "operationId": "GlossaryController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeleteGlossaryTermResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Delete a glossary term",
-        "tags": [
-          "glossary"
-        ]
-      }
-    },
     "/cases/{caseId}/leads": {
       "get": {
         "operationId": "CaseLeadsController_list",
@@ -10466,7 +10220,9 @@
                 "SCHEDULE_WAKE",
                 "WRITE_JOURNAL",
                 "REVERT_ACTION",
-                "NO_ACTION"
+                "NO_ACTION",
+                "APPROVE_RELATION",
+                "APPROVE_BINDING"
               ]
             }
           },
@@ -12714,6 +12470,2263 @@
         "summary": "Cut the link between two assets. The verdict keeps later scans from rejoining them.",
         "tags": [
           "correlation-review"
+        ]
+      }
+    },
+    "/glossary": {
+      "get": {
+        "operationId": "GlossaryController_list",
+        "parameters": [
+          {
+            "name": "query",
+            "required": false,
+            "in": "query",
+            "description": "Free-text filter over term, key, aliases, codes, definition and notes.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PERSON",
+                "ORGANIZATION",
+                "LOCATION",
+                "REFERENCE",
+                "TERM",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CONCEPT",
+                "ENTITY"
+              ]
+            }
+          },
+          {
+            "name": "schemeId",
+            "required": false,
+            "in": "query",
+            "description": "Scheme id, or \"none\" for terms without a scheme.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schemeKey",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated statuses (DRAFT, APPROVED, DEPRECATED).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "steward",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 500,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossaryListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List glossary terms",
+        "tags": [
+          "glossary"
+        ]
+      },
+      "post": {
+        "operationId": "GlossaryController_upsert",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertGlossaryTermDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpsertGlossaryTermResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create or update a glossary term (operator)",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/lookup": {
+      "get": {
+        "operationId": "GlossaryController_lookup",
+        "parameters": [
+          {
+            "name": "query",
+            "required": true,
+            "in": "query",
+            "description": "Name, alias, code or hidden alias to resolve.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CONCEPT",
+                "ENTITY"
+              ]
+            }
+          },
+          {
+            "name": "schemeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schemeKey",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated statuses; default DRAFT,APPROVED.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeDeprecated",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GlossaryLookupHitDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve a name, alias, code or hidden alias to glossary terms (exact, prefix, substring, semantic)",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/banner": {
+      "get": {
+        "operationId": "GlossaryController_banner",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The one-time \"we classified your terms\" banner (SL1 R8)",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/banner/dismiss": {
+      "post": {
+        "operationId": "GlossaryController_dismissBanner",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Dismiss the classification banner",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/terms/{idOrKey}": {
+      "get": {
+        "operationId": "GlossaryController_getTerm",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "A term by id or key (old keys resolve): scheme, relations, broader chain, narrower list",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/terms/{idOrKey}/activity": {
+      "get": {
+        "operationId": "GlossaryController_activity",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "A term's history (paged)",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/bulk": {
+      "post": {
+        "operationId": "GlossaryController_bulkUpdate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpdateGlossaryTermsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUpdateGlossaryTermsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Bulk approve/unapprove/deprecate, retype, move scheme or change kind (operator)",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/{id}/verify": {
+      "patch": {
+        "operationId": "GlossaryController_verify",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyGlossaryTermDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossaryTermDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Approve a term (alias of /approve)",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/{id}/approve": {
+      "post": {
+        "operationId": "GlossaryController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossaryTermDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "DRAFT → APPROVED",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/{id}/unapprove": {
+      "post": {
+        "operationId": "GlossaryController_unapprove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossaryTermDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "APPROVED → DRAFT",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/{id}/deprecate": {
+      "post": {
+        "operationId": "GlossaryController_deprecate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeprecateGlossaryTermDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossaryTermDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "APPROVED → DEPRECATED, optionally with a successor",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/{id}/reinstate": {
+      "post": {
+        "operationId": "GlossaryController_reinstate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossaryTermDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "DEPRECATED → APPROVED",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/schemes": {
+      "get": {
+        "operationId": "GlossaryController_listSchemes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GlossarySchemeDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List schemes with term counts",
+        "tags": [
+          "glossary"
+        ]
+      },
+      "post": {
+        "operationId": "GlossaryController_createScheme",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertGlossarySchemeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossarySchemeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a scheme",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/schemes/{id}": {
+      "get": {
+        "operationId": "GlossaryController_getScheme",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossarySchemeDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "glossary"
+        ]
+      },
+      "patch": {
+        "operationId": "GlossaryController_updateScheme",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertGlossarySchemeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossarySchemeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Edit a scheme",
+        "tags": [
+          "glossary"
+        ]
+      },
+      "delete": {
+        "operationId": "GlossaryController_deleteScheme",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete an empty scheme",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/schemes/{id}/tree": {
+      "get": {
+        "operationId": "GlossaryController_tree",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "parentId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "One level of a scheme taxonomy: roots, or the narrower concepts of parentId",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/relations": {
+      "get": {
+        "operationId": "GlossaryController_listRelations",
+        "parameters": [
+          {
+            "name": "termId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List relations",
+        "tags": [
+          "glossary"
+        ]
+      },
+      "post": {
+        "operationId": "GlossaryController_createRelation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGlossaryRelationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a relation (APPROVED for operators)",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/relations/{id}/approve": {
+      "post": {
+        "operationId": "GlossaryController_approveRelation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/relations/{id}": {
+      "delete": {
+        "operationId": "GlossaryController_removeRelation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/import": {
+      "post": {
+        "operationId": "GlossaryController_import",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlossaryImportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Import CSV or SKOS JSON-LD. Defaults to a dry run that reports creates, updates, skips, conflicts and refusals.",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/import/{jobId}": {
+      "get": {
+        "operationId": "GlossaryController_importJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "An import report",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/export": {
+      "get": {
+        "operationId": "GlossaryController_export",
+        "parameters": [
+          {
+            "name": "schemeId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kinds",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "baseUrl",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Export as CSV or SKOS JSON-LD",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/{id}": {
+      "delete": {
+        "operationId": "GlossaryController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteGlossaryTermResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete a glossary term (deletion is remembered)",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/proposals": {
+      "get": {
+        "operationId": "GlossarySemanticController_list",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schemeId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "termId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "minScore",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The review queue: every proposal, one paged list",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/proposals/counts": {
+      "get": {
+        "operationId": "GlossarySemanticController_counts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Pending proposals by kind, for the badge",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/proposals/link-groups": {
+      "get": {
+        "operationId": "GlossarySemanticController_linkGroups",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Document suggestions grouped per concept, with a score histogram",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/proposals/decide": {
+      "post": {
+        "operationId": "GlossarySemanticController_decide",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Accept, edit and accept, dismiss, dismiss forever or skip one proposal",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/proposals/decide-bulk": {
+      "post": {
+        "operationId": "GlossarySemanticController_decideBulk",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Bulk accept or dismiss a group of document (LINK) suggestions",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/terms/{idOrKey}/find-in-text": {
+      "get": {
+        "operationId": "GlossarySemanticController_findInTextPreview",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "\"Find in text\": the labels, pattern and tests a detector would get",
+        "tags": [
+          "glossary"
+        ]
+      },
+      "post": {
+        "operationId": "GlossarySemanticController_findInTextCreate",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "\"Find in text\": create a tested REGEX detector bound to the term",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/terms/{idOrKey}/find-in-text/preview": {
+      "post": {
+        "operationId": "GlossarySemanticController_findInTextPreviewWith",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/terms/{idOrKey}/find-in-text/detectors": {
+      "get": {
+        "operationId": "GlossarySemanticController_findInTextStatus",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Detectors generated from a term, with out-of-date flags",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/semantic/vocabulary": {
+      "get": {
+        "operationId": "SemanticController_vocabularyList",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "detectorType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customDetectorKey",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bound",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The observed vocabulary: detector outputs and metadata fields, with counts and bindings",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/vocabulary/refresh": {
+      "post": {
+        "operationId": "SemanticController_vocabularyRefresh",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Queue a vocabulary refresh (one source, or all)",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/vocabulary/values": {
+      "get": {
+        "operationId": "SemanticController_vocabularyValues",
+        "parameters": [
+          {
+            "name": "detectorType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customDetectorKey",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "findingType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "field",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceIds",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Top observed values with counts, for the binding dialog",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/coverage": {
+      "get": {
+        "operationId": "SemanticController_coverage",
+        "parameters": [
+          {
+            "name": "days",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Semantic coverage: the share of open findings that carry a meaning",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/bindings/preview": {
+      "post": {
+        "operationId": "SemanticController_preview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Preview a binding: counts, samples, the lookup table, warnings",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/bindings": {
+      "get": {
+        "operationId": "SemanticController_listBindings",
+        "parameters": [
+          {
+            "name": "termId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "detectorType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customDetectorKey",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "findingType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schemeId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List bindings",
+        "tags": [
+          "semantic"
+        ]
+      },
+      "post": {
+        "operationId": "SemanticController_createBinding",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a binding (APPROVED for operators unless status DRAFT)",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/bindings/{id}": {
+      "get": {
+        "operationId": "SemanticController_getBinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "semantic"
+        ]
+      },
+      "patch": {
+        "operationId": "SemanticController_updateBinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Edit a DRAFT binding",
+        "tags": [
+          "semantic"
+        ]
+      },
+      "delete": {
+        "operationId": "SemanticController_deleteBinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a DRAFT or DISABLED binding",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/bindings/{id}/approve": {
+      "post": {
+        "operationId": "SemanticController_approveBinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/bindings/{id}/disable": {
+      "post": {
+        "operationId": "SemanticController_disableBinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/bindings/{id}/enable": {
+      "post": {
+        "operationId": "SemanticController_enableBinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/bindings/{id}/retarget": {
+      "post": {
+        "operationId": "SemanticController_retargetBinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Aim a binding at its deprecated concept's successor",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/packs": {
+      "get": {
+        "operationId": "SemanticController_listPacks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Installed packs and the bundled starter packs",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/packs/install": {
+      "post": {
+        "operationId": "SemanticController_installPack",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Install a pack (dry run by default)",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/packs/{key}/upgrade": {
+      "post": {
+        "operationId": "SemanticController_upgradePack",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/packs/{key}": {
+      "delete": {
+        "operationId": "SemanticController_uninstallPack",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dryRun",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Uninstall a pack: untouched items go, edited ones are detached",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/findings/{findingId}/meaning": {
+      "get": {
+        "operationId": "SemanticController_findingMeaning",
+        "parameters": [
+          {
+            "name": "findingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "What a finding means: bindings evaluated, manual links, broader concepts (C11)",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/assets/{assetId}/meaning": {
+      "get": {
+        "operationId": "SemanticController_assetMeaning",
+        "parameters": [
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "history",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "An asset's current links, grouped by term; GONE links with history=true",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/assets/{assetId}/terms/{termId}/evidence": {
+      "get": {
+        "operationId": "SemanticController_assetTermEvidence",
+        "parameters": [
+          {
+            "name": "assetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "termId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Why this asset is about this term",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/terms/{termId}/evidence": {
+      "get": {
+        "operationId": "SemanticController_termEvidence",
+        "parameters": [
+          {
+            "name": "termId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeNarrower",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "method",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Assets linked to a term, by severity then support",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/terms/{termId}/summary": {
+      "get": {
+        "operationId": "SemanticController_termSummary",
+        "parameters": [
+          {
+            "name": "termId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeNarrower",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Counts by method, source and severity, and a weekly trend",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/terms/{termId}/usage": {
+      "get": {
+        "operationId": "SemanticController_termUsage",
+        "parameters": [
+          {
+            "name": "termId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Cases and watches that use a term",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/cases/{caseId}/links": {
+      "get": {
+        "operationId": "SemanticController_caseLinks",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Terms a case is about (case ABOUT links)",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/links": {
+      "post": {
+        "operationId": "SemanticController_link",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Link a finding, asset or case to a term (MANUAL)",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/links/{referenceId}": {
+      "delete": {
+        "operationId": "SemanticController_unlink",
+        "parameters": [
+          {
+            "name": "referenceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/term-refs": {
+      "get": {
+        "operationId": "SemanticController_termRefs",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Unknown term references declared by connectors",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/linker/jobs": {
+      "get": {
+        "operationId": "SemanticController_linkerJobs",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Recent linker jobs with progress",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/linker/rebuild": {
+      "post": {
+        "operationId": "SemanticController_rebuild",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Rebuild every semantic link (backfill over all bindings)",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/linker/reconcile": {
+      "post": {
+        "operationId": "SemanticController_reconcile",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Compare a sample of the rollup with a recomputation and repair drift",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/suggestions/refresh": {
+      "post": {
+        "operationId": "SemanticController_refreshSuggestions",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Run the suggestion generators (queued)",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/suggestions/stats": {
+      "get": {
+        "operationId": "SemanticController_suggestionStats",
+        "parameters": [
+          {
+            "name": "days",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Acceptance rate per generator and score band",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/suggestions/settings": {
+      "get": {
+        "operationId": "SemanticController_suggestionSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "semantic"
+        ]
+      },
+      "patch": {
+        "operationId": "SemanticController_updateSuggestionSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/map": {
+      "get": {
+        "operationId": "SemanticController_semanticMap",
+        "parameters": [
+          {
+            "name": "schemeIds",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceIds",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "minAssets",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cooccurrence",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entities",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The semantic map: concepts, relations, co-occurrence, overlay",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/map/terms/{termId}": {
+      "get": {
+        "operationId": "SemanticController_mapTerm",
+        "parameters": [
+          {
+            "name": "termId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The map rail for one concept",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/map/rebuild": {
+      "post": {
+        "operationId": "SemanticController_rebuildMap",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "semantic"
         ]
       }
     },
@@ -20845,7 +22858,8 @@
           "HYPOTHESIS",
           "COMMENT",
           "NOTE",
-          "FRAME"
+          "FRAME",
+          "TERM"
         ]
       },
       "BoardItemDto": {
@@ -21252,6 +23266,12 @@
             "items": {
               "$ref": "#/components/schemas/BoardThreadSummaryDto"
             }
+          },
+          "semantic": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "The Meaning layer (SL5 A2): terms the case's evidence is about, with the items they link to, relations between them, broader parents, links that went GONE and the case's own ABOUT links."
           }
         },
         "required": [
@@ -23078,7 +25098,11 @@
               "INQUIRY_SETTINGS_UPDATED",
               "FINDINGS_ESCALATED",
               "ESCALATION_CLEARED",
-              "LEADS_GENERATED"
+              "LEADS_GENERATED",
+              "BOARD_TERM_PLACED",
+              "BOARD_TERM_REMOVED",
+              "MEANING_LINKED",
+              "MEANING_UNLINKED"
             ]
           },
           "actor": {
@@ -24699,400 +26723,6 @@
         },
         "required": [
           "reply"
-        ]
-      },
-      "GlossaryTermDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "term": {
-            "type": "string"
-          },
-          "aliases": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "proposedAliases": {
-            "description": "Unverified aliases suggested by agents for operator review",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "entityType": {
-            "type": "string",
-            "enum": [
-              "PERSON",
-              "ORGANIZATION",
-              "LOCATION",
-              "REFERENCE",
-              "TERM",
-              "OTHER"
-            ]
-          },
-          "notes": {
-            "type": "string",
-            "nullable": true
-          },
-          "origin": {
-            "type": "string",
-            "description": "AGENT proposals are unverified hypotheses"
-          },
-          "verified": {
-            "type": "boolean"
-          },
-          "verifiedBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "term",
-          "aliases",
-          "proposedAliases",
-          "entityType",
-          "origin",
-          "verified",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
-      "GlossaryListResponseDto": {
-        "type": "object",
-        "properties": {
-          "terms": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GlossaryTermDto"
-            }
-          },
-          "total": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "terms",
-          "total"
-        ]
-      },
-      "GlossaryLookupHitDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "term": {
-            "type": "string"
-          },
-          "aliases": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "proposedAliases": {
-            "description": "Unverified aliases suggested by agents for operator review",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "entityType": {
-            "type": "string",
-            "enum": [
-              "PERSON",
-              "ORGANIZATION",
-              "LOCATION",
-              "REFERENCE",
-              "TERM",
-              "OTHER"
-            ]
-          },
-          "notes": {
-            "type": "string",
-            "nullable": true
-          },
-          "origin": {
-            "type": "string",
-            "description": "AGENT proposals are unverified hypotheses"
-          },
-          "verified": {
-            "type": "boolean"
-          },
-          "verifiedBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "matchType": {
-            "type": "string",
-            "enum": [
-              "exact",
-              "alias",
-              "partial",
-              "semantic"
-            ],
-            "description": "How this term was reached, and the order results come back in: an exact term, then an exact alias, then a prefix or substring, then a semantic neighbour. The alias tier ranks above substring on purpose — in a domain of two- and three-letter register codes, 'GES' has to resolve to the entry whose alias it is, not to the longest word it is a prefix of."
-          },
-          "similarity": {
-            "type": "number",
-            "minimum": -1,
-            "maximum": 1
-          }
-        },
-        "required": [
-          "id",
-          "term",
-          "aliases",
-          "proposedAliases",
-          "entityType",
-          "origin",
-          "verified",
-          "createdAt",
-          "updatedAt",
-          "matchType"
-        ]
-      },
-      "UpsertGlossaryTermDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Existing row ID when editing or renaming"
-          },
-          "term": {
-            "type": "string"
-          },
-          "aliases": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "entityType": {
-            "type": "string",
-            "enum": [
-              "PERSON",
-              "ORGANIZATION",
-              "LOCATION",
-              "REFERENCE",
-              "TERM",
-              "OTHER"
-            ]
-          },
-          "notes": {
-            "type": "string"
-          },
-          "refType": {
-            "type": "string"
-          },
-          "refId": {
-            "type": "string"
-          },
-          "author": {
-            "type": "string",
-            "description": "Operator identity recorded as verifiedBy. Defaults to \"operator\"."
-          }
-        },
-        "required": [
-          "term"
-        ]
-      },
-      "UpsertGlossaryTermResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "term": {
-            "type": "string"
-          },
-          "aliases": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "proposedAliases": {
-            "description": "Unverified aliases suggested by agents for operator review",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "entityType": {
-            "type": "string",
-            "enum": [
-              "PERSON",
-              "ORGANIZATION",
-              "LOCATION",
-              "REFERENCE",
-              "TERM",
-              "OTHER"
-            ]
-          },
-          "notes": {
-            "type": "string",
-            "nullable": true
-          },
-          "origin": {
-            "type": "string",
-            "description": "AGENT proposals are unverified hypotheses"
-          },
-          "verified": {
-            "type": "boolean"
-          },
-          "verifiedBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "merged": {
-            "type": "boolean",
-            "description": "True when an agent alias proposal was stored for an operator-owned term"
-          }
-        },
-        "required": [
-          "id",
-          "term",
-          "aliases",
-          "proposedAliases",
-          "entityType",
-          "origin",
-          "verified",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
-      "BulkUpdateGlossaryFiltersDto": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "Free-text filter over term, aliases and notes (ILIKE)."
-          },
-          "entityType": {
-            "type": "string",
-            "enum": [
-              "PERSON",
-              "ORGANIZATION",
-              "LOCATION",
-              "REFERENCE",
-              "TERM",
-              "OTHER"
-            ]
-          }
-        }
-      },
-      "BulkUpdateGlossaryTermsDto": {
-        "type": "object",
-        "properties": {
-          "ids": {
-            "description": "Explicit term IDs to update. Use either ids or filters.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "filters": {
-            "description": "Update every term matching this filter snapshot.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/BulkUpdateGlossaryFiltersDto"
-              }
-            ]
-          },
-          "verified": {
-            "type": "boolean",
-            "description": "True marks the selected terms verified, false returns them to unverified. Omit to leave verification unchanged."
-          },
-          "entityType": {
-            "type": "string",
-            "enum": [
-              "PERSON",
-              "ORGANIZATION",
-              "LOCATION",
-              "REFERENCE",
-              "TERM",
-              "OTHER"
-            ],
-            "description": "New entity type. Omit to leave entity types unchanged."
-          },
-          "verifiedBy": {
-            "type": "string",
-            "description": "Operator identity recorded as verifiedBy. Defaults to \"operator\"."
-          }
-        }
-      },
-      "BulkUpdateGlossaryTermsResponseDto": {
-        "type": "object",
-        "properties": {
-          "updatedCount": {
-            "type": "number",
-            "description": "Number of terms updated"
-          },
-          "ids": {
-            "description": "IDs of the updated terms",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "updatedCount",
-          "ids"
-        ]
-      },
-      "VerifyGlossaryTermDto": {
-        "type": "object",
-        "properties": {
-          "verifiedBy": {
-            "type": "string",
-            "description": "Operator identity recorded as verifiedBy. Defaults to \"operator\"."
-          }
-        }
-      },
-      "DeleteGlossaryTermResponseDto": {
-        "type": "object",
-        "properties": {
-          "deleted": {
-            "type": "boolean"
-          },
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "deleted",
-          "id"
         ]
       },
       "CaseLeadDto": {
@@ -28426,7 +30056,9 @@
               "SCHEDULE_WAKE",
               "WRITE_JOURNAL",
               "REVERT_ACTION",
-              "NO_ACTION"
+              "NO_ACTION",
+              "APPROVE_RELATION",
+              "APPROVE_BINDING"
             ]
           },
           "outcome": {
@@ -29170,7 +30802,9 @@
               "SCHEDULE_WAKE",
               "WRITE_JOURNAL",
               "REVERT_ACTION",
-              "NO_ACTION"
+              "NO_ACTION",
+              "APPROVE_RELATION",
+              "APPROVE_BINDING"
             ]
           },
           "outcome": {
@@ -32168,6 +33802,966 @@
           "batchId",
           "clusterSplit",
           "workRemaining"
+        ]
+      },
+      "GlossarySchemeRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name"
+        ]
+      },
+      "GlossaryTermDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable key (C8)."
+          },
+          "previousKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "term": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CONCEPT",
+              "ENTITY"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "APPROVED",
+              "DEPRECATED"
+            ]
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hiddenAliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "proposedAliases": {
+            "description": "Unverified aliases suggested by agents for operator review",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "definition": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "steward": {
+            "type": "string",
+            "nullable": true
+          },
+          "schemeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheme": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GlossarySchemeRefDto"
+              }
+            ]
+          },
+          "replacedById": {
+            "type": "string",
+            "nullable": true
+          },
+          "deprecatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "sourceIri": {
+            "type": "string",
+            "nullable": true
+          },
+          "packKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "type": "string",
+            "description": "AGENT proposals are DRAFT hypotheses"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "True when APPROVED (kept for compatibility)."
+          },
+          "verifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "previousKeys",
+          "term",
+          "kind",
+          "status",
+          "aliases",
+          "codes",
+          "hiddenAliases",
+          "proposedAliases",
+          "entityType",
+          "origin",
+          "verified",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "GlossaryListResponseDto": {
+        "type": "object",
+        "properties": {
+          "terms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlossaryTermDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "terms",
+          "total"
+        ]
+      },
+      "GlossaryLookupHitDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable key (C8)."
+          },
+          "previousKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "term": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CONCEPT",
+              "ENTITY"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "APPROVED",
+              "DEPRECATED"
+            ]
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hiddenAliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "proposedAliases": {
+            "description": "Unverified aliases suggested by agents for operator review",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "definition": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "steward": {
+            "type": "string",
+            "nullable": true
+          },
+          "schemeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheme": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GlossarySchemeRefDto"
+              }
+            ]
+          },
+          "replacedById": {
+            "type": "string",
+            "nullable": true
+          },
+          "deprecatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "sourceIri": {
+            "type": "string",
+            "nullable": true
+          },
+          "packKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "type": "string",
+            "description": "AGENT proposals are DRAFT hypotheses"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "True when APPROVED (kept for compatibility)."
+          },
+          "verifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "matchType": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "alias",
+              "partial",
+              "semantic"
+            ],
+            "description": "Compatibility tier; `matchedOn` says precisely which label matched."
+          },
+          "matchedOn": {
+            "type": "string",
+            "enum": [
+              "term",
+              "alias",
+              "code",
+              "hiddenAlias",
+              "semantic"
+            ]
+          },
+          "deprecated": {
+            "type": "boolean"
+          },
+          "replacedBy": {
+            "type": "object",
+            "nullable": true
+          },
+          "similarity": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "previousKeys",
+          "term",
+          "kind",
+          "status",
+          "aliases",
+          "codes",
+          "hiddenAliases",
+          "proposedAliases",
+          "entityType",
+          "origin",
+          "verified",
+          "createdAt",
+          "updatedAt",
+          "matchType",
+          "matchedOn",
+          "deprecated"
+        ]
+      },
+      "UpsertGlossaryTermDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Existing row ID when editing or renaming"
+          },
+          "term": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CONCEPT",
+              "ENTITY"
+            ],
+            "description": "CONCEPT (business term) or ENTITY (named thing)."
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable key (C8). Accepted on edit only; the old key keeps resolving."
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "codes": {
+            "description": "Exact notations (GES, PKS 725000). Case is significant.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hiddenAliases": {
+            "description": "Lookup-only spellings, never matched in text.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "definition": {
+            "type": "string",
+            "description": "Markdown, up to 10,000 characters."
+          },
+          "schemeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "schemeKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "steward": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "APPROVED",
+              "DEPRECATED"
+            ]
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "createNew": {
+            "type": "boolean",
+            "description": "Create a new ENTITY even when one with the same name exists (two people called Jane Doe are two entities)."
+          },
+          "refType": {
+            "type": "string"
+          },
+          "refId": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string",
+            "description": "Operator identity recorded as approver. Defaults to the X-Actor-Name header or \"operator\"."
+          }
+        },
+        "required": [
+          "term"
+        ]
+      },
+      "UpsertGlossaryTermResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable key (C8)."
+          },
+          "previousKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "term": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CONCEPT",
+              "ENTITY"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "APPROVED",
+              "DEPRECATED"
+            ]
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hiddenAliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "proposedAliases": {
+            "description": "Unverified aliases suggested by agents for operator review",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "definition": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "steward": {
+            "type": "string",
+            "nullable": true
+          },
+          "schemeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheme": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GlossarySchemeRefDto"
+              }
+            ]
+          },
+          "replacedById": {
+            "type": "string",
+            "nullable": true
+          },
+          "deprecatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "sourceIri": {
+            "type": "string",
+            "nullable": true
+          },
+          "packKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "type": "string",
+            "description": "AGENT proposals are DRAFT hypotheses"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "True when APPROVED (kept for compatibility)."
+          },
+          "verifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "merged": {
+            "type": "boolean",
+            "description": "True when an agent alias proposal was stored for an operator-owned term"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "previousKeys",
+          "term",
+          "kind",
+          "status",
+          "aliases",
+          "codes",
+          "hiddenAliases",
+          "proposedAliases",
+          "entityType",
+          "origin",
+          "verified",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "BulkUpdateGlossaryFiltersDto": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CONCEPT",
+              "ENTITY"
+            ]
+          },
+          "schemeId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "APPROVED",
+                "DEPRECATED"
+              ]
+            }
+          },
+          "steward": {
+            "type": "string"
+          }
+        }
+      },
+      "BulkUpdateGlossaryTermsDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/BulkUpdateGlossaryFiltersDto"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "True approves the selected terms, false returns them to DRAFT (kept for compatibility; prefer status)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "APPROVED",
+              "DEPRECATED"
+            ]
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          },
+          "schemeId": {
+            "type": "string",
+            "nullable": true,
+            "description": "null clears the scheme"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CONCEPT",
+              "ENTITY"
+            ]
+          },
+          "verifiedBy": {
+            "type": "string"
+          }
+        }
+      },
+      "BulkUpdateGlossaryTermsResponseDto": {
+        "type": "object",
+        "properties": {
+          "updatedCount": {
+            "type": "number"
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "refused": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "updatedCount",
+          "ids"
+        ]
+      },
+      "VerifyGlossaryTermDto": {
+        "type": "object",
+        "properties": {
+          "verifiedBy": {
+            "type": "string"
+          }
+        }
+      },
+      "DeprecateGlossaryTermDto": {
+        "type": "object",
+        "properties": {
+          "replacedById": {
+            "type": "string",
+            "nullable": true,
+            "description": "Successor: an APPROVED term of the same kind (id or key)."
+          }
+        }
+      },
+      "GlossarySchemeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "OPERATOR",
+              "AGENT",
+              "PACK",
+              "IMPORT",
+              "SUGGESTION"
+            ]
+          },
+          "packKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "packVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "termCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "origin",
+          "termCount",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpsertGlossarySchemeDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "CreateGlossaryRelationDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Term id or key"
+          },
+          "to": {
+            "type": "string",
+            "description": "Term id or key"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "BROADER",
+              "RELATED",
+              "PART_OF",
+              "INSTANCE_OF",
+              "CUSTOM"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "description": "The verb, for CUSTOM"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "type"
+        ]
+      },
+      "GlossaryImportDto": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "skos"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "description": "The file content (UTF-8 text)."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": true
+          },
+          "conflict": {
+            "type": "string",
+            "enum": [
+              "skip",
+              "overwrite",
+              "merge-labels"
+            ],
+            "default": "skip"
+          },
+          "language": {
+            "type": "string",
+            "description": "SKOS: preferred label language."
+          },
+          "asDraft": {
+            "type": "boolean"
+          },
+          "schemeKey": {
+            "type": "string",
+            "description": "Import into this scheme."
+          }
+        },
+        "required": [
+          "format",
+          "content"
+        ]
+      },
+      "DeleteGlossaryTermResponseDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "deleted",
+          "id"
         ]
       },
       "EmbeddingSettingValueDto": {

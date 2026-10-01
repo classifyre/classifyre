@@ -251,12 +251,42 @@ All URIs are relative to *http://localhost*
 *FindingsApi* | [**findingsControllerListBulkOperations**](docs/FindingsApi.md#findingscontrollerlistbulkoperations) | **GET** /findings/bulk-operations | List background bulk finding operations
 *FindingsApi* | [**findingsControllerRefreshDiscoveryStats**](docs/FindingsApi.md#findingscontrollerrefreshdiscoverystats) | **POST** /findings/discovery/refresh | Queue a full rebuild of the pre-aggregated finding statistics
 *FindingsApi* | [**findingsControllerUpdate**](docs/FindingsApi.md#findingscontrollerupdate) | **PATCH** /findings/{id} | Update a finding
-*GlossaryApi* | [**glossaryControllerBulkUpdate**](docs/GlossaryApi.md#glossarycontrollerbulkupdate) | **POST** /glossary/bulk | Bulk verify/unverify or retype glossary terms (operator)
+*GlossaryApi* | [**glossaryControllerActivity**](docs/GlossaryApi.md#glossarycontrolleractivity) | **GET** /glossary/terms/{idOrKey}/activity | A term\&#39;s history (paged)
+*GlossaryApi* | [**glossaryControllerApprove**](docs/GlossaryApi.md#glossarycontrollerapprove) | **POST** /glossary/{id}/approve | DRAFT → APPROVED
+*GlossaryApi* | [**glossaryControllerApproveRelation**](docs/GlossaryApi.md#glossarycontrollerapproverelation) | **POST** /glossary/relations/{id}/approve | 
+*GlossaryApi* | [**glossaryControllerBanner**](docs/GlossaryApi.md#glossarycontrollerbanner) | **GET** /glossary/banner | The one-time \&quot;we classified your terms\&quot; banner (SL1 R8)
+*GlossaryApi* | [**glossaryControllerBulkUpdate**](docs/GlossaryApi.md#glossarycontrollerbulkupdate) | **POST** /glossary/bulk | Bulk approve/unapprove/deprecate, retype, move scheme or change kind (operator)
+*GlossaryApi* | [**glossaryControllerCreateRelation**](docs/GlossaryApi.md#glossarycontrollercreaterelation) | **POST** /glossary/relations | Create a relation (APPROVED for operators)
+*GlossaryApi* | [**glossaryControllerCreateScheme**](docs/GlossaryApi.md#glossarycontrollercreatescheme) | **POST** /glossary/schemes | Create a scheme
+*GlossaryApi* | [**glossaryControllerDeleteScheme**](docs/GlossaryApi.md#glossarycontrollerdeletescheme) | **DELETE** /glossary/schemes/{id} | Delete an empty scheme
+*GlossaryApi* | [**glossaryControllerDeprecate**](docs/GlossaryApi.md#glossarycontrollerdeprecate) | **POST** /glossary/{id}/deprecate | APPROVED → DEPRECATED, optionally with a successor
+*GlossaryApi* | [**glossaryControllerDismissBanner**](docs/GlossaryApi.md#glossarycontrollerdismissbanner) | **POST** /glossary/banner/dismiss | Dismiss the classification banner
+*GlossaryApi* | [**glossaryControllerExport**](docs/GlossaryApi.md#glossarycontrollerexport) | **GET** /glossary/export | Export as CSV or SKOS JSON-LD
+*GlossaryApi* | [**glossaryControllerGetScheme**](docs/GlossaryApi.md#glossarycontrollergetscheme) | **GET** /glossary/schemes/{id} | 
+*GlossaryApi* | [**glossaryControllerGetTerm**](docs/GlossaryApi.md#glossarycontrollergetterm) | **GET** /glossary/terms/{idOrKey} | A term by id or key (old keys resolve): scheme, relations, broader chain, narrower list
+*GlossaryApi* | [**glossaryControllerImport**](docs/GlossaryApi.md#glossarycontrollerimport) | **POST** /glossary/import | Import CSV or SKOS JSON-LD. Defaults to a dry run that reports creates, updates, skips, conflicts and refusals.
+*GlossaryApi* | [**glossaryControllerImportJob**](docs/GlossaryApi.md#glossarycontrollerimportjob) | **GET** /glossary/import/{jobId} | An import report
 *GlossaryApi* | [**glossaryControllerList**](docs/GlossaryApi.md#glossarycontrollerlist) | **GET** /glossary | List glossary terms
-*GlossaryApi* | [**glossaryControllerLookup**](docs/GlossaryApi.md#glossarycontrollerlookup) | **GET** /glossary/lookup | Resolve a name or alias to glossary terms (exact + semantic)
-*GlossaryApi* | [**glossaryControllerRemove**](docs/GlossaryApi.md#glossarycontrollerremove) | **DELETE** /glossary/{id} | Delete a glossary term
+*GlossaryApi* | [**glossaryControllerListRelations**](docs/GlossaryApi.md#glossarycontrollerlistrelations) | **GET** /glossary/relations | List relations
+*GlossaryApi* | [**glossaryControllerListSchemes**](docs/GlossaryApi.md#glossarycontrollerlistschemes) | **GET** /glossary/schemes | List schemes with term counts
+*GlossaryApi* | [**glossaryControllerLookup**](docs/GlossaryApi.md#glossarycontrollerlookup) | **GET** /glossary/lookup | Resolve a name, alias, code or hidden alias to glossary terms (exact, prefix, substring, semantic)
+*GlossaryApi* | [**glossaryControllerReinstate**](docs/GlossaryApi.md#glossarycontrollerreinstate) | **POST** /glossary/{id}/reinstate | DEPRECATED → APPROVED
+*GlossaryApi* | [**glossaryControllerRemove**](docs/GlossaryApi.md#glossarycontrollerremove) | **DELETE** /glossary/{id} | Delete a glossary term (deletion is remembered)
+*GlossaryApi* | [**glossaryControllerRemoveRelation**](docs/GlossaryApi.md#glossarycontrollerremoverelation) | **DELETE** /glossary/relations/{id} | 
+*GlossaryApi* | [**glossaryControllerTree**](docs/GlossaryApi.md#glossarycontrollertree) | **GET** /glossary/schemes/{id}/tree | One level of a scheme taxonomy: roots, or the narrower concepts of parentId
+*GlossaryApi* | [**glossaryControllerUnapprove**](docs/GlossaryApi.md#glossarycontrollerunapprove) | **POST** /glossary/{id}/unapprove | APPROVED → DRAFT
+*GlossaryApi* | [**glossaryControllerUpdateScheme**](docs/GlossaryApi.md#glossarycontrollerupdatescheme) | **PATCH** /glossary/schemes/{id} | Edit a scheme
 *GlossaryApi* | [**glossaryControllerUpsert**](docs/GlossaryApi.md#glossarycontrollerupsert) | **POST** /glossary | Create or update a glossary term (operator)
-*GlossaryApi* | [**glossaryControllerVerify**](docs/GlossaryApi.md#glossarycontrollerverify) | **PATCH** /glossary/{id}/verify | Mark an agent-proposed term as verified
+*GlossaryApi* | [**glossaryControllerVerify**](docs/GlossaryApi.md#glossarycontrollerverify) | **PATCH** /glossary/{id}/verify | Approve a term (alias of /approve)
+*GlossaryApi* | [**glossarySemanticControllerCounts**](docs/GlossaryApi.md#glossarysemanticcontrollercounts) | **GET** /glossary/proposals/counts | Pending proposals by kind, for the badge
+*GlossaryApi* | [**glossarySemanticControllerDecide**](docs/GlossaryApi.md#glossarysemanticcontrollerdecide) | **POST** /glossary/proposals/decide | Accept, edit and accept, dismiss, dismiss forever or skip one proposal
+*GlossaryApi* | [**glossarySemanticControllerDecideBulk**](docs/GlossaryApi.md#glossarysemanticcontrollerdecidebulk) | **POST** /glossary/proposals/decide-bulk | Bulk accept or dismiss a group of document (LINK) suggestions
+*GlossaryApi* | [**glossarySemanticControllerFindInTextCreate**](docs/GlossaryApi.md#glossarysemanticcontrollerfindintextcreate) | **POST** /glossary/terms/{idOrKey}/find-in-text | \&quot;Find in text\&quot;: create a tested REGEX detector bound to the term
+*GlossaryApi* | [**glossarySemanticControllerFindInTextPreview**](docs/GlossaryApi.md#glossarysemanticcontrollerfindintextpreview) | **GET** /glossary/terms/{idOrKey}/find-in-text | \&quot;Find in text\&quot;: the labels, pattern and tests a detector would get
+*GlossaryApi* | [**glossarySemanticControllerFindInTextPreviewWith**](docs/GlossaryApi.md#glossarysemanticcontrollerfindintextpreviewwith) | **POST** /glossary/terms/{idOrKey}/find-in-text/preview | 
+*GlossaryApi* | [**glossarySemanticControllerFindInTextStatus**](docs/GlossaryApi.md#glossarysemanticcontrollerfindintextstatus) | **GET** /glossary/terms/{idOrKey}/find-in-text/detectors | Detectors generated from a term, with out-of-date flags
+*GlossaryApi* | [**glossarySemanticControllerLinkGroups**](docs/GlossaryApi.md#glossarysemanticcontrollerlinkgroups) | **GET** /glossary/proposals/link-groups | Document suggestions grouped per concept, with a score histogram
+*GlossaryApi* | [**glossarySemanticControllerList**](docs/GlossaryApi.md#glossarysemanticcontrollerlist) | **GET** /glossary/proposals | The review queue: every proposal, one paged list
 *GraphApi* | [**graphControllerColumnLineage**](docs/GraphApi.md#graphcontrollercolumnlineage) | **POST** /graph/lineage/column | Trace one column back through the transformations that produced it
 *GraphApi* | [**graphControllerConstellationMap**](docs/GraphApi.md#graphcontrollerconstellationmap) | **GET** /graph/constellation | How this workspace\&#39;s sources connect
 *GraphApi* | [**graphControllerCreateManualEdge**](docs/GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type)
@@ -343,6 +373,44 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**searchRunnersControllerSearchRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerassets) | **POST** /search/runner-assets | Search runner assets
 *RunnersApi* | [**searchRunnersControllerSearchRunners**](docs/RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners
 *RunnersApi* | [**searchRunnersControllerSearchRunnersCharts**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview
+*SemanticApi* | [**semanticControllerApproveBinding**](docs/SemanticApi.md#semanticcontrollerapprovebinding) | **POST** /semantic/bindings/{id}/approve | 
+*SemanticApi* | [**semanticControllerAssetMeaning**](docs/SemanticApi.md#semanticcontrollerassetmeaning) | **GET** /semantic/assets/{assetId}/meaning | An asset\&#39;s current links, grouped by term; GONE links with history&#x3D;true
+*SemanticApi* | [**semanticControllerAssetTermEvidence**](docs/SemanticApi.md#semanticcontrollerassettermevidence) | **GET** /semantic/assets/{assetId}/terms/{termId}/evidence | Why this asset is about this term
+*SemanticApi* | [**semanticControllerCaseLinks**](docs/SemanticApi.md#semanticcontrollercaselinks) | **GET** /semantic/cases/{caseId}/links | Terms a case is about (case ABOUT links)
+*SemanticApi* | [**semanticControllerCoverage**](docs/SemanticApi.md#semanticcontrollercoverage) | **GET** /semantic/coverage | Semantic coverage: the share of open findings that carry a meaning
+*SemanticApi* | [**semanticControllerCreateBinding**](docs/SemanticApi.md#semanticcontrollercreatebinding) | **POST** /semantic/bindings | Create a binding (APPROVED for operators unless status DRAFT)
+*SemanticApi* | [**semanticControllerDeleteBinding**](docs/SemanticApi.md#semanticcontrollerdeletebinding) | **DELETE** /semantic/bindings/{id} | Delete a DRAFT or DISABLED binding
+*SemanticApi* | [**semanticControllerDisableBinding**](docs/SemanticApi.md#semanticcontrollerdisablebinding) | **POST** /semantic/bindings/{id}/disable | 
+*SemanticApi* | [**semanticControllerEnableBinding**](docs/SemanticApi.md#semanticcontrollerenablebinding) | **POST** /semantic/bindings/{id}/enable | 
+*SemanticApi* | [**semanticControllerFindingMeaning**](docs/SemanticApi.md#semanticcontrollerfindingmeaning) | **GET** /semantic/findings/{findingId}/meaning | What a finding means: bindings evaluated, manual links, broader concepts (C11)
+*SemanticApi* | [**semanticControllerGetBinding**](docs/SemanticApi.md#semanticcontrollergetbinding) | **GET** /semantic/bindings/{id} | 
+*SemanticApi* | [**semanticControllerInstallPack**](docs/SemanticApi.md#semanticcontrollerinstallpack) | **POST** /semantic/packs/install | Install a pack (dry run by default)
+*SemanticApi* | [**semanticControllerLink**](docs/SemanticApi.md#semanticcontrollerlink) | **POST** /semantic/links | Link a finding, asset or case to a term (MANUAL)
+*SemanticApi* | [**semanticControllerLinkerJobs**](docs/SemanticApi.md#semanticcontrollerlinkerjobs) | **GET** /semantic/linker/jobs | Recent linker jobs with progress
+*SemanticApi* | [**semanticControllerListBindings**](docs/SemanticApi.md#semanticcontrollerlistbindings) | **GET** /semantic/bindings | List bindings
+*SemanticApi* | [**semanticControllerListPacks**](docs/SemanticApi.md#semanticcontrollerlistpacks) | **GET** /semantic/packs | Installed packs and the bundled starter packs
+*SemanticApi* | [**semanticControllerMapTerm**](docs/SemanticApi.md#semanticcontrollermapterm) | **GET** /semantic/map/terms/{termId} | The map rail for one concept
+*SemanticApi* | [**semanticControllerPreview**](docs/SemanticApi.md#semanticcontrollerpreview) | **POST** /semantic/bindings/preview | Preview a binding: counts, samples, the lookup table, warnings
+*SemanticApi* | [**semanticControllerRebuild**](docs/SemanticApi.md#semanticcontrollerrebuild) | **POST** /semantic/linker/rebuild | Rebuild every semantic link (backfill over all bindings)
+*SemanticApi* | [**semanticControllerRebuildMap**](docs/SemanticApi.md#semanticcontrollerrebuildmap) | **POST** /semantic/map/rebuild | 
+*SemanticApi* | [**semanticControllerReconcile**](docs/SemanticApi.md#semanticcontrollerreconcile) | **POST** /semantic/linker/reconcile | Compare a sample of the rollup with a recomputation and repair drift
+*SemanticApi* | [**semanticControllerRefreshSuggestions**](docs/SemanticApi.md#semanticcontrollerrefreshsuggestions) | **POST** /semantic/suggestions/refresh | Run the suggestion generators (queued)
+*SemanticApi* | [**semanticControllerRetargetBinding**](docs/SemanticApi.md#semanticcontrollerretargetbinding) | **POST** /semantic/bindings/{id}/retarget | Aim a binding at its deprecated concept\&#39;s successor
+*SemanticApi* | [**semanticControllerSemanticMap**](docs/SemanticApi.md#semanticcontrollersemanticmap) | **GET** /semantic/map | The semantic map: concepts, relations, co-occurrence, overlay
+*SemanticApi* | [**semanticControllerSuggestionSettings**](docs/SemanticApi.md#semanticcontrollersuggestionsettings) | **GET** /semantic/suggestions/settings | 
+*SemanticApi* | [**semanticControllerSuggestionStats**](docs/SemanticApi.md#semanticcontrollersuggestionstats) | **GET** /semantic/suggestions/stats | Acceptance rate per generator and score band
+*SemanticApi* | [**semanticControllerTermEvidence**](docs/SemanticApi.md#semanticcontrollertermevidence) | **GET** /semantic/terms/{termId}/evidence | Assets linked to a term, by severity then support
+*SemanticApi* | [**semanticControllerTermRefs**](docs/SemanticApi.md#semanticcontrollertermrefs) | **GET** /semantic/term-refs | Unknown term references declared by connectors
+*SemanticApi* | [**semanticControllerTermSummary**](docs/SemanticApi.md#semanticcontrollertermsummary) | **GET** /semantic/terms/{termId}/summary | Counts by method, source and severity, and a weekly trend
+*SemanticApi* | [**semanticControllerTermUsage**](docs/SemanticApi.md#semanticcontrollertermusage) | **GET** /semantic/terms/{termId}/usage | Cases and watches that use a term
+*SemanticApi* | [**semanticControllerUninstallPack**](docs/SemanticApi.md#semanticcontrolleruninstallpack) | **DELETE** /semantic/packs/{key} | Uninstall a pack: untouched items go, edited ones are detached
+*SemanticApi* | [**semanticControllerUnlink**](docs/SemanticApi.md#semanticcontrollerunlink) | **DELETE** /semantic/links/{referenceId} | 
+*SemanticApi* | [**semanticControllerUpdateBinding**](docs/SemanticApi.md#semanticcontrollerupdatebinding) | **PATCH** /semantic/bindings/{id} | Edit a DRAFT binding
+*SemanticApi* | [**semanticControllerUpdateSuggestionSettings**](docs/SemanticApi.md#semanticcontrollerupdatesuggestionsettings) | **PATCH** /semantic/suggestions/settings | 
+*SemanticApi* | [**semanticControllerUpgradePack**](docs/SemanticApi.md#semanticcontrollerupgradepack) | **POST** /semantic/packs/{key}/upgrade | 
+*SemanticApi* | [**semanticControllerVocabularyList**](docs/SemanticApi.md#semanticcontrollervocabularylist) | **GET** /semantic/vocabulary | The observed vocabulary: detector outputs and metadata fields, with counts and bindings
+*SemanticApi* | [**semanticControllerVocabularyRefresh**](docs/SemanticApi.md#semanticcontrollervocabularyrefresh) | **POST** /semantic/vocabulary/refresh | Queue a vocabulary refresh (one source, or all)
+*SemanticApi* | [**semanticControllerVocabularyValues**](docs/SemanticApi.md#semanticcontrollervocabularyvalues) | **GET** /semantic/vocabulary/values | Top observed values with counts, for the binding dialog
 *SitemapApi* | [**sitemapControllerGetEntries**](docs/SitemapApi.md#sitemapcontrollergetentries) | **GET** /sitemap/entries | One chunk of detail-page ids + last-modified dates
 *SitemapApi* | [**sitemapControllerGetIndex**](docs/SitemapApi.md#sitemapcontrollergetindex) | **GET** /sitemap | Sitemap index: per-entity chunk counts and last-modified dates
 *SourcesApi* | [**cohortControllerPreview**](docs/SourcesApi.md#cohortcontrollerpreview) | **GET** /sources/{id}/cohort-weights | Preview the band split of a source\&#39;s cohorts for its next run
@@ -559,6 +627,7 @@ All URIs are relative to *http://localhost*
 - [CreateDetectorNotebookExecutionDto](docs/CreateDetectorNotebookExecutionDto.md)
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
+- [CreateGlossaryRelationDto](docs/CreateGlossaryRelationDto.md)
 - [CreateInquiryDto](docs/CreateInquiryDto.md)
 - [CreateManualEdgeDto](docs/CreateManualEdgeDto.md)
 - [CreateMcpServerDto](docs/CreateMcpServerDto.md)
@@ -581,6 +650,7 @@ All URIs are relative to *http://localhost*
 - [DeleteDataTransferJobResponseDto](docs/DeleteDataTransferJobResponseDto.md)
 - [DeleteGlossaryTermResponseDto](docs/DeleteGlossaryTermResponseDto.md)
 - [DeleteRunnerResponseDto](docs/DeleteRunnerResponseDto.md)
+- [DeprecateGlossaryTermDto](docs/DeprecateGlossaryTermDto.md)
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
 - [EdgeDetailDto](docs/EdgeDetailDto.md)
@@ -622,8 +692,11 @@ All URIs are relative to *http://localhost*
 - [FindingsDiscoveryTotalsDto](docs/FindingsDiscoveryTotalsDto.md)
 - [FindingsRankingDto](docs/FindingsRankingDto.md)
 - [GenerateCaseLeadsResponseDto](docs/GenerateCaseLeadsResponseDto.md)
+- [GlossaryImportDto](docs/GlossaryImportDto.md)
 - [GlossaryListResponseDto](docs/GlossaryListResponseDto.md)
 - [GlossaryLookupHitDto](docs/GlossaryLookupHitDto.md)
+- [GlossarySchemeDto](docs/GlossarySchemeDto.md)
+- [GlossarySchemeRefDto](docs/GlossarySchemeRefDto.md)
 - [GlossaryTermDto](docs/GlossaryTermDto.md)
 - [GraphEdgeDto](docs/GraphEdgeDto.md)
 - [GraphNodeDto](docs/GraphNodeDto.md)
@@ -878,6 +951,7 @@ All URIs are relative to *http://localhost*
 - [UpdateSystemBriefDto](docs/UpdateSystemBriefDto.md)
 - [UpdateThreadDto](docs/UpdateThreadDto.md)
 - [UploadedSourceFileDto](docs/UploadedSourceFileDto.md)
+- [UpsertGlossarySchemeDto](docs/UpsertGlossarySchemeDto.md)
 - [UpsertGlossaryTermDto](docs/UpsertGlossaryTermDto.md)
 - [UpsertGlossaryTermResponseDto](docs/UpsertGlossaryTermResponseDto.md)
 - [ValueOccurrenceAssetDto](docs/ValueOccurrenceAssetDto.md)

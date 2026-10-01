@@ -470,7 +470,7 @@ export class ConfigToolset {
       {
         name: 'config.preview_impact',
         description:
-          'What a config change WOULD cost, without making it. Returns the detectors the patch adds and removes, how many open findings removing them orphans (grouped by detector, with how many are high-importance), and which of those an active inquiry watches or a case cites. Removing a detector from a source resolves the findings it produced — inquiries, cases, fingerprints and glossary terms are all built on those findings — so call this before any patch that disables a detector or drops a custom_detector. Findings a case cites or an inquiry watches are never auto-resolved, but the change still stops them being re-detected.',
+          'What a config change WOULD cost, without making it. Returns the detectors the patch adds and removes, how many open findings removing them orphans (grouped by detector, with how many are high-importance), and which of those an active inquiry watches or a case cites. Removing a detector from a source resolves the findings it produced — inquiries, cases and fingerprints are built on those findings, and semantic links are derived from them (removing a detector removes the meaning they carried) — so call this before any patch that disables a detector or drops a custom_detector. Findings a case cites or an inquiry watches are never auto-resolved, but the change still stops them being re-detected.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -735,7 +735,8 @@ export function assertDetectionSurvives(config: Record<string, unknown>): void {
     'Refused: this would leave the source with no detection at all — every ' +
       'built-in detector disabled and no custom detector wired. A source that ' +
       'detects nothing produces no findings, and with no findings there is ' +
-      'nothing for any inquiry, case or glossary term to be built from; the ' +
+      'nothing for any inquiry or case to be built from and no meaning to ' +
+      'derive; the ' +
       'scans keep running and return empty. Reducing noise is right, but keep ' +
       'at least one detector live: narrow its patterns or raise its confidence ' +
       'threshold instead of switching the last one off, or author a targeted ' +

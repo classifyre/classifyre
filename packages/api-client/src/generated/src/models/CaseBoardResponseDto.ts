@@ -111,6 +111,12 @@ export interface CaseBoardResponseDto {
      * @memberof CaseBoardResponseDto
      */
     threads: Array<BoardThreadSummaryDto>;
+    /**
+     * The Meaning layer (SL5 A2): terms the case's evidence is about, with the items they link to, relations between them, broader parents, links that went GONE and the case's own ABOUT links.
+     * @type {{ [key: string]: any; }}
+     * @memberof CaseBoardResponseDto
+     */
+    semantic?: { [key: string]: any; } | null;
 }
 
 /**
@@ -144,6 +150,7 @@ export function CaseBoardResponseDtoFromJSONTyped(json: any, ignoreDiscriminator
         'graph': GraphResponseDtoFromJSON(json['graph']),
         'supports': ((json['supports'] as Array<any>).map(BoardSupportDtoFromJSON)),
         'threads': ((json['threads'] as Array<any>).map(BoardThreadSummaryDtoFromJSON)),
+        'semantic': json['semantic'] == null ? undefined : json['semantic'],
     };
 }
 
@@ -165,6 +172,7 @@ export function CaseBoardResponseDtoToJSONTyped(value?: CaseBoardResponseDto | n
         'graph': GraphResponseDtoToJSON(value['graph']),
         'supports': ((value['supports'] as Array<any>).map(BoardSupportDtoToJSON)),
         'threads': ((value['threads'] as Array<any>).map(BoardThreadSummaryDtoToJSON)),
+        'semantic': value['semantic'],
     };
 }
 
