@@ -436,7 +436,7 @@
         },
         "glossary": {
           "name": "Glossary",
-          "desc": "Agreed terms and references."
+          "desc": "Concepts, entities, schemes, relations, bindings and links made by hand, with their history."
         },
         "scans": {
           "name": "Scan history",
@@ -469,6 +469,22 @@
         "graph": {
           "name": "Source graph",
           "desc": "Precomputed source relationship graph. Rebuilt automatically by the graph worker."
+        },
+        "vocabulary": {
+          "name": "Vocabulary inventory",
+          "desc": "The detector outputs and metadata fields the data produces, with counts. Refreshed automatically from findings and assets."
+        },
+        "semanticLinks": {
+          "name": "Semantic links (derived)",
+          "desc": "Which assets are evidence of which concepts, with coverage history. Rebuilt automatically from bindings, declarations and manual links."
+        },
+        "suggestions": {
+          "name": "Pending suggestions",
+          "desc": "Glossary suggestions nobody has decided yet. Decided suggestions are kept, so dismissed ones are not proposed again."
+        },
+        "semanticMap": {
+          "name": "Semantic map",
+          "desc": "Precomputed concept rollups for the semantic map. Rebuilt automatically."
         },
         "transfers": {
           "name": "Finished transfers",
@@ -767,8 +783,8 @@
     "conflictMode": "If an entry already exists",
     "conflictSkip": "Keep the existing entry",
     "conflictOverwrite": "Replace it with the archive",
-    "conflictSkipHint": "Imported records always arrive as new records with new IDs, so nothing here is replaced. This only applies to entries matched by name — glossary terms, MCP servers — and to instance settings: those are left as they are.",
-    "conflictOverwriteHint": "Imported records always arrive as new records with new IDs. This only applies to entries matched by name — glossary terms, MCP servers — and to instance settings: those are overwritten by the archive. That cannot be undone.",
+    "conflictSkipHint": "Imported records always arrive as new records with new IDs, so nothing here is replaced. This only applies to entries matched by a unique name or key — glossary terms and schemes (by key), MCP servers — and to instance settings: those are left as they are.",
+    "conflictOverwriteHint": "Imported records always arrive as new records with new IDs. This only applies to entries matched by a unique name or key — glossary terms and schemes (by key), MCP servers — and to instance settings: those are overwritten by the archive. That cannot be undone.",
     "startImport": "Import data",
     "importStarted": "Import started",
     "importFailed": "Could not start the import",

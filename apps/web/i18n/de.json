@@ -436,7 +436,7 @@
         },
         "glossary": {
           "name": "Glossar",
-          "desc": "Vereinbarte Begriffe und Referenzen."
+          "desc": "Konzepte, Entitäten, Schemata, Beziehungen, Bindungen und manuelle Verknüpfungen mit ihrer Historie."
         },
         "scans": {
           "name": "Scan-Verlauf",
@@ -469,6 +469,22 @@
         "graph": {
           "name": "Quellen-Graph",
           "desc": "Vorberechneter Beziehungs-Graph der Quellen. Wird vom Graph-Worker automatisch neu aufgebaut."
+        },
+        "vocabulary": {
+          "name": "Vokabular-Inventar",
+          "desc": "Die Detektor-Ausgaben und Metadatenfelder, die in den Daten vorkommen, mit Anzahlen. Wird automatisch aus Funden und Assets aktualisiert."
+        },
+        "semanticLinks": {
+          "name": "Semantische Verknüpfungen (abgeleitet)",
+          "desc": "Welche Assets Belege für welche Konzepte sind, mit Abdeckungsverlauf. Wird automatisch aus Bindungen, Deklarationen und manuellen Verknüpfungen neu aufgebaut."
+        },
+        "suggestions": {
+          "name": "Offene Vorschläge",
+          "desc": "Glossarvorschläge, über die noch niemand entschieden hat. Entschiedene Vorschläge bleiben erhalten, damit abgelehnte nicht erneut vorgeschlagen werden."
+        },
+        "semanticMap": {
+          "name": "Semantische Karte",
+          "desc": "Vorberechnete Konzept-Zusammenfassungen für die semantische Karte. Wird automatisch neu aufgebaut."
         },
         "transfers": {
           "name": "Abgeschlossene Transfers",
@@ -767,8 +783,8 @@
     "conflictMode": "Wenn ein Eintrag bereits existiert",
     "conflictSkip": "Vorhandenen Eintrag behalten",
     "conflictOverwrite": "Durch das Archiv ersetzen",
-    "conflictSkipHint": "Importierte Datensätze werden immer als neue Datensätze mit neuen IDs angelegt, es wird also nichts ersetzt. Dies betrifft nur über den Namen zugeordnete Einträge — Glossarbegriffe, MCP-Server — sowie die Instanzeinstellungen: diese bleiben unverändert.",
-    "conflictOverwriteHint": "Importierte Datensätze werden immer als neue Datensätze mit neuen IDs angelegt. Dies betrifft nur über den Namen zugeordnete Einträge — Glossarbegriffe, MCP-Server — sowie die Instanzeinstellungen: diese werden durch das Archiv überschrieben. Das lässt sich nicht rückgängig machen.",
+    "conflictSkipHint": "Importierte Datensätze werden immer als neue Datensätze mit neuen IDs angelegt, es wird also nichts ersetzt. Dies betrifft nur über einen eindeutigen Namen oder Schlüssel zugeordnete Einträge — Glossarbegriffe und -schemata (über den Schlüssel), MCP-Server — sowie die Instanzeinstellungen: diese bleiben unverändert.",
+    "conflictOverwriteHint": "Importierte Datensätze werden immer als neue Datensätze mit neuen IDs angelegt. Dies betrifft nur über einen eindeutigen Namen oder Schlüssel zugeordnete Einträge — Glossarbegriffe und -schemata (über den Schlüssel), MCP-Server — sowie die Instanzeinstellungen: diese werden durch das Archiv überschrieben. Das lässt sich nicht rückgängig machen.",
     "startImport": "Daten importieren",
     "importStarted": "Import gestartet",
     "importFailed": "Import konnte nicht gestartet werden",

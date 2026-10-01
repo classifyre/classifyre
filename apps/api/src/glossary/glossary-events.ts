@@ -69,6 +69,11 @@ export type GlossaryEvent =
       counts: Record<string, number>;
     }
   | {
+      /** A derived semantic dataset was wiped in Cleanup (SL-9): rebuild it. */
+      type: 'semantic.derived_cleared';
+      dataset: 'vocabulary' | 'semanticLinks' | 'suggestions' | 'semanticMap';
+    }
+  | {
       /** A manual ABOUT reference was added or removed (SL3 R5). */
       type: 'semantic.reference_changed';
       change: 'linked' | 'unlinked';

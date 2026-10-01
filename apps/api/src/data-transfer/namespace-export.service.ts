@@ -204,6 +204,7 @@ export class NamespaceExportService {
 
     for (;;) {
       const rows = (await delegate.findMany({
+        ...(table.exportWhere ? { where: table.exportWhere } : {}),
         take: batchSize,
         orderBy: table.keys.map((key) => ({ [key]: 'asc' })),
         ...(cursor ? { cursor: cursorArg(table, cursor), skip: 1 } : {}),

@@ -2102,6 +2102,18 @@
               "name": "findingValueRegex",
               "type": "string[]",
               "required": false
+            },
+            {
+              "name": "termKeys",
+              "type": "string[]",
+              "required": false,
+              "description": "Glossary term keys: the finding must be evidence of one of these concepts (an APPROVED binding of its output, or a manual link). Prefer this over a value regex when a concept exists. Unknown keys are rejected."
+            },
+            {
+              "name": "termsIncludeNarrower",
+              "type": "boolean",
+              "required": false,
+              "description": "Include the narrower concepts of termKeys."
             }
           ]
         },
@@ -2192,6 +2204,18 @@
               "name": "findingValueRegex",
               "type": "string[]",
               "required": false
+            },
+            {
+              "name": "termKeys",
+              "type": "string[]",
+              "required": false,
+              "description": "Glossary term keys: the finding must be evidence of one of these concepts (an APPROVED binding of its output, or a manual link). Prefer this over a value regex when a concept exists. Unknown keys are rejected."
+            },
+            {
+              "name": "termsIncludeNarrower",
+              "type": "boolean",
+              "required": false,
+              "description": "Include the narrower concepts of termKeys."
             }
           ]
         },
@@ -2363,6 +2387,18 @@
               "name": "findingValueRegex",
               "type": "string[]",
               "required": false
+            },
+            {
+              "name": "termKeys",
+              "type": "string[]",
+              "required": false,
+              "description": "Glossary term keys: the finding must be evidence of one of these concepts (an APPROVED binding of its output, or a manual link). Prefer this over a value regex when a concept exists. Unknown keys are rejected."
+            },
+            {
+              "name": "termsIncludeNarrower",
+              "type": "boolean",
+              "required": false,
+              "description": "Include the narrower concepts of termKeys."
             }
           ]
         },
@@ -5017,14 +5053,17 @@
       "title": "Glossary",
       "description": "The shared vocabulary of concepts and entities: list, look up and curate terms, schemes and relations; bind detector outputs to meaning; read the semantic links (Meaning) derived from findings; review proposals and see the semantic map.",
       "operations": [
-        "List and look up glossary terms",
-        "Add or update a term definition"
+        "List and look up concepts and entities, schemes and relations",
+        "Curate terms, schemes and relations; import and export CSV or SKOS",
+        "Bind detector outputs and metadata fields to meaning; install packs",
+        "Read what a finding, asset or concept means, and link by hand",
+        "Work the review queue and see the semantic map"
       ],
       "tools": [
         {
           "name": "list_glossary_terms",
           "title": "List Glossary Terms",
-          "description": "List the shared investigation glossary: canonical terms, aliases, entity types and verification state. The vocabulary investigators and agents share.",
+          "description": "List the shared glossary: concepts (kinds of things) and entities (particular things), with keys, schemes, aliases, codes and status. Filter by kind, scheme, status or steward.",
           "readOnly": true,
           "destructive": false,
           "idempotent": true,
@@ -5046,6 +5085,35 @@
                 "TERM",
                 "OTHER"
               ]
+            },
+            {
+              "name": "kind",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "CONCEPT",
+                "ENTITY"
+              ]
+            },
+            {
+              "name": "schemeKey",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "status",
+              "type": "enum[]",
+              "required": false,
+              "enumValues": [
+                "DRAFT",
+                "APPROVED",
+                "DEPRECATED"
+              ]
+            },
+            {
+              "name": "steward",
+              "type": "string",
+              "required": false
             },
             {
               "name": "take",
@@ -5062,7 +5130,7 @@
         {
           "name": "lookup_glossary",
           "title": "Lookup Glossary",
-          "description": "Resolve a name, alias or concept against the glossary (exact, alias and semantic matching). Use before treating two spellings as separate entities.",
+          "description": "Resolve a name, alias, code or concept against the glossary (exact, code, alias, prefix and semantic matching); each hit says what it matched on. Use before treating two spellings as separate entities.",
           "readOnly": true,
           "destructive": false,
           "idempotent": true,
@@ -5076,25 +5144,109 @@
               "name": "limit",
               "type": "integer",
               "required": false
+            },
+            {
+              "name": "kind",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "CONCEPT",
+                "ENTITY"
+              ]
+            },
+            {
+              "name": "schemeKey",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "status",
+              "type": "enum[]",
+              "required": false,
+              "enumValues": [
+                "DRAFT",
+                "APPROVED",
+                "DEPRECATED"
+              ]
+            },
+            {
+              "name": "includeDeprecated",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_glossary_term",
+          "title": "Get Glossary Term",
+          "description": "One term by id or key: definition, scheme, labels, relations, broader chain and narrower concepts.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "term",
+              "type": "string",
+              "required": true,
+              "description": "Term id or key (previous keys redirect)."
             }
           ]
         },
         {
           "name": "upsert_glossary_term",
           "title": "Upsert Glossary Term",
-          "description": "Create or update a glossary term (canonical name, aliases, entity type, notes). Terms written through MCP are operator-curated and verified.",
+          "description": "Create or update a glossary term. kind CONCEPT for kinds of things (GmbH, IBAN), ENTITY for particular things (ACME Holding GmbH). codes are exact notations; single letters go to hiddenAliases. Terms written through MCP are operator-curated and APPROVED.",
           "readOnly": false,
           "destructive": false,
           "idempotent": false,
           "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": false
+            },
             {
               "name": "term",
               "type": "string",
               "required": true
             },
             {
+              "name": "kind",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "CONCEPT",
+                "ENTITY"
+              ]
+            },
+            {
+              "name": "key",
+              "type": "string",
+              "required": false
+            },
+            {
               "name": "aliases",
               "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "codes",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "hiddenAliases",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "definition",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "schemeKey",
+              "type": "string",
               "required": false
             },
             {
@@ -5111,8 +5263,952 @@
               ]
             },
             {
+              "name": "steward",
+              "type": "string",
+              "required": false
+            },
+            {
               "name": "notes",
               "type": "string",
+              "required": false
+            },
+            {
+              "name": "createNew",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "deprecate_glossary_term",
+          "title": "Deprecate Glossary Term",
+          "description": "Deprecate a term, optionally naming the term that replaces it. Its bindings stop producing links; history is kept.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "term",
+              "type": "string",
+              "required": true,
+              "description": "Term id or key (previous keys redirect)."
+            },
+            {
+              "name": "replacedBy",
+              "type": "string",
+              "required": false,
+              "description": "Term id or key (previous keys redirect)."
+            }
+          ]
+        },
+        {
+          "name": "list_glossary_schemes",
+          "title": "List Glossary Schemes",
+          "description": "Schemes are controlled vocabularies (Rechtsformen, GDPR categories), with term counts.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": []
+        },
+        {
+          "name": "upsert_glossary_scheme",
+          "title": "Upsert Glossary Scheme",
+          "description": "Create or rename a scheme. The key is generated from the name when omitted.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "key",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "color",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "list_glossary_relations",
+          "title": "List Glossary Relations",
+          "description": "Relations between terms (BROADER, RELATED, PART_OF, INSTANCE_OF, CUSTOM), optionally for one term.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "term",
+              "type": "string",
+              "required": false,
+              "description": "Term id or key (previous keys redirect)."
+            },
+            {
+              "name": "type",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "BROADER",
+                "RELATED",
+                "PART_OF",
+                "INSTANCE_OF",
+                "CUSTOM"
+              ]
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "DRAFT",
+                "APPROVED",
+                "DEPRECATED"
+              ]
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "relate_glossary_terms",
+          "title": "Relate Glossary Terms",
+          "description": "Relate two terms. BROADER only when the first concept is a kind of the second; INSTANCE_OF from an entity to its concept; CUSTOM needs a label. Cycles are refused with the path.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "from",
+              "type": "string",
+              "required": true,
+              "description": "Term id or key (previous keys redirect)."
+            },
+            {
+              "name": "to",
+              "type": "string",
+              "required": true,
+              "description": "Term id or key (previous keys redirect)."
+            },
+            {
+              "name": "type",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "BROADER",
+                "RELATED",
+                "PART_OF",
+                "INSTANCE_OF",
+                "CUSTOM"
+              ]
+            },
+            {
+              "name": "label",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "note",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "remove_glossary_relation",
+          "title": "Remove Glossary Relation",
+          "description": "Remove one relation.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "relationId",
+              "type": "string",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "export_glossary",
+          "title": "Export Glossary",
+          "description": "Export the glossary as CSV or SKOS (JSON-LD), optionally one scheme.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "format",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "csv",
+                "skos"
+              ]
+            },
+            {
+              "name": "schemeKey",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "kinds",
+              "type": "enum[]",
+              "required": false,
+              "enumValues": [
+                "CONCEPT",
+                "ENTITY"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "import_glossary",
+          "title": "Import Glossary",
+          "description": "Import CSV or SKOS. Defaults to a dry run that reports what would be created, updated and skipped; pass dryRun: false to write.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "format",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "csv",
+                "skos"
+              ]
+            },
+            {
+              "name": "content",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "dryRun",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "conflict",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "skip",
+                "overwrite",
+                "merge-labels"
+              ]
+            },
+            {
+              "name": "asDraft",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "schemeKey",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "language",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "list_vocabulary",
+          "title": "List Vocabulary",
+          "description": "The detector outputs and metadata fields the data produces, with counts, whether each has a meaning (binding), and suggestions. bound=false lists what has no meaning yet.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "kind",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "outputs",
+                "fields",
+                "all"
+              ]
+            },
+            {
+              "name": "bound",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "true",
+                "false",
+                "any"
+              ]
+            },
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "q",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "list_bindings",
+          "title": "List Bindings",
+          "description": "Bindings: what detector outputs and metadata fields mean, with status and the term or scheme they point to.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "term",
+              "type": "string",
+              "required": false,
+              "description": "Term id or key (previous keys redirect)."
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "DRAFT",
+                "APPROVED",
+                "DISABLED"
+              ]
+            },
+            {
+              "name": "detectorType",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "customDetectorKey",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "findingType",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "preview_binding",
+          "title": "Preview Binding",
+          "description": "What a binding would do before it exists: open findings, assets and sources it gives meaning, samples, the lookup table with unmatched values, and warnings.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "spec",
+              "type": "object",
+              "required": true,
+              "description": "Binding spec (C9): what a detector output (OUTPUT*) or asset metadata field (METADATA_*) means. Never regex."
+            },
+            {
+              "name": "spec.mode",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "OUTPUT",
+                "OUTPUT_VALUES",
+                "OUTPUT_LOOKUP",
+                "METADATA_VALUES",
+                "METADATA_LOOKUP"
+              ]
+            },
+            {
+              "name": "spec.output",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.field",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.values",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "spec.splitDelimiter",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.lookup",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.termKey",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.termId",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.noMeaning",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "spec.sourceIds",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "spec.confidence",
+              "type": "number",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "create_binding",
+          "title": "Create Binding",
+          "description": "Create a binding (APPROVED by default; DRAFT to leave it for review). Links follow without a re-scan.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "spec",
+              "type": "object",
+              "required": true,
+              "description": "Binding spec (C9): what a detector output (OUTPUT*) or asset metadata field (METADATA_*) means. Never regex."
+            },
+            {
+              "name": "spec.mode",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "OUTPUT",
+                "OUTPUT_VALUES",
+                "OUTPUT_LOOKUP",
+                "METADATA_VALUES",
+                "METADATA_LOOKUP"
+              ]
+            },
+            {
+              "name": "spec.output",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.field",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.values",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "spec.splitDelimiter",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.lookup",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.termKey",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.termId",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "spec.noMeaning",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "spec.sourceIds",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "spec.confidence",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "DRAFT",
+                "APPROVED"
+              ]
+            },
+            {
+              "name": "note",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "approve_binding",
+          "title": "Approve Binding",
+          "description": "Approve a DRAFT binding.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "bindingId",
+              "type": "string",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "disable_binding",
+          "title": "Disable Binding",
+          "description": "Disable an APPROVED binding; its links become GONE (history kept).",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "bindingId",
+              "type": "string",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "find_term_in_text",
+          "title": "Find Term In Text",
+          "description": "Turn a concept that appears only as words into a tested REGEX detector bound to it. Previews by default; create: true creates the detector.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "term",
+              "type": "string",
+              "required": true,
+              "description": "Term id or key (previous keys redirect)."
+            },
+            {
+              "name": "create",
+              "type": "boolean",
+              "required": false,
+              "description": "false (default) previews; true creates the detector."
+            },
+            {
+              "name": "wholeWords",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "continuations",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "severity",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "info",
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ]
+            },
+            {
+              "name": "sourceIds",
+              "type": "string[]",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "install_glossary_pack",
+          "title": "Install Glossary Pack",
+          "description": "Install a glossary pack (a starter pack by key, or a pack JSON): schemes, concepts, relations and bindings. Defaults to a dry run.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "key",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "pack",
+              "type": "object",
+              "required": false
+            },
+            {
+              "name": "dryRun",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "resolutions",
+              "type": "object",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_finding_meaning",
+          "title": "Get Finding Meaning",
+          "description": "What a finding means: the concepts it is evidence of, through which binding or manual link, and the broader concepts implied.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "findingId",
+              "type": "string",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "get_asset_meaning",
+          "title": "Get Asset Meaning",
+          "description": "An asset's concepts with method (binding, declared, manual, suggested), support and confidence.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "assetId",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "includeHistory",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_term_evidence",
+          "title": "Get Term Evidence",
+          "description": "Assets that are evidence of a concept, sorted by severity then support. includeNarrower rolls up the taxonomy.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "term",
+              "type": "string",
+              "required": true,
+              "description": "Term id or key (previous keys redirect)."
+            },
+            {
+              "name": "includeNarrower",
+              "type": "boolean",
+              "required": false
+            },
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "method",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "BINDING",
+                "DECLARED",
+                "MANUAL",
+                "SUGGESTED",
+                "MENTION"
+              ]
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "current",
+                "gone",
+                "all"
+              ]
+            },
+            {
+              "name": "page",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_term_summary",
+          "title": "Get Term Summary",
+          "description": "A concept's evidence counts by method, source and severity, with a weekly trend.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "term",
+              "type": "string",
+              "required": true,
+              "description": "Term id or key (previous keys redirect)."
+            },
+            {
+              "name": "includeNarrower",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "link_term",
+          "title": "Link Term",
+          "description": "Say by hand that an asset, finding or case is about a term (a MANUAL link).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "term",
+              "type": "string",
+              "required": true,
+              "description": "Term id or key (previous keys redirect)."
+            },
+            {
+              "name": "targetType",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "asset",
+                "finding",
+                "case"
+              ]
+            },
+            {
+              "name": "targetId",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "note",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "unlink_term",
+          "title": "Unlink Term",
+          "description": "Remove a manual link.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "referenceId",
+              "type": "string",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "list_glossary_proposals",
+          "title": "List Glossary Proposals",
+          "description": "The review queue: term, alias, relation, binding, document-link and term-reference proposals, one list, highest score first.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "kind",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "TERM",
+                "ALIAS",
+                "RELATION",
+                "BINDING",
+                "LINK",
+                "TERM_REF"
+              ]
+            },
+            {
+              "name": "minScore",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "decide_glossary_proposal",
+          "title": "Decide Glossary Proposal",
+          "description": "Accept, edit and accept, dismiss, dismiss forever, or skip one proposal. Operator level: every kind.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "kind",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "TERM",
+                "ALIAS",
+                "RELATION",
+                "BINDING",
+                "LINK",
+                "TERM_REF"
+              ]
+            },
+            {
+              "name": "id",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "decision",
+              "type": "enum",
+              "required": true,
+              "enumValues": [
+                "accept",
+                "edit",
+                "dismiss",
+                "dismiss_forever",
+                "skip"
+              ]
+            },
+            {
+              "name": "edit",
+              "type": "object",
+              "required": false
+            },
+            {
+              "name": "reason",
+              "type": "string",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "refresh_glossary_suggestions",
+          "title": "Refresh Glossary Suggestions",
+          "description": "Run the suggestion generators now (bindings for unbound vocabulary, document links, relations).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "generators",
+              "type": "enum[]",
+              "required": false,
+              "description": "Default: all enabled generators.",
+              "enumValues": [
+                "binding",
+                "link",
+                "relation"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "glossary_suggestion_stats",
+          "title": "Glossary Suggestion Stats",
+          "description": "Acceptance rates per generator and score band, so thresholds can be tuned.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "days",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_semantic_map",
+          "title": "Get Semantic Map",
+          "description": "A compact summary of the ontology: the top concepts by evidence, their relations, and how much vocabulary is still unbound.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "limit",
+              "type": "integer",
               "required": false
             }
           ]

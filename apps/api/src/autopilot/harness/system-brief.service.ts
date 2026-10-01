@@ -108,27 +108,73 @@ export class SystemBriefService {
     }
   }
 
+  /**
+   * The canonical vocabulary (SL1): APPROVED concepts first, grouped by
+   * scheme, with definitions cut to 160 characters, then APPROVED entities —
+   * verified first, then newest — all within `harnessMaxGlossaryEntries`.
+   * DRAFT terms are proposals, never canonical, so they are not listed.
+   */
   private async glossaryEntries(): Promise<BriefMemoryEntry[]> {
-    const terms = await this.prisma.glossaryTerm.findMany({
-      orderBy: [
-        { verifiedAt: { sort: 'desc', nulls: 'last' } },
-        { updatedAt: 'desc' },
-      ],
-      take: await this.cap('harnessMaxGlossaryEntries', MAX_GLOSSARY_ENTRIES),
-      select: { term: true, aliases: true, entityType: true, notes: true },
+    const cap = await this.cap(
+      'harnessMaxGlossaryEntries',
+      MAX_GLOSSARY_ENTRIES,
+    );
+    const select = {
+      term: true,
+      key: true,
+      aliases: true,
+      codes: true,
+      entityType: true,
+      notes: true,
+      definition: true,
+      scheme: { select: { name: true } },
+    } satisfies Prisma.GlossaryTermSelect;
+    const concepts = await this.prisma.glossaryTerm.findMany({
+      where: { kind: 'CONCEPT', status: 'APPROVED' },
+      orderBy: [{ scheme: { name: 'asc' } }, { term: 'asc' }],
+      take: cap,
+      select,
     });
-    return terms.map((term) => ({
+    const entities =
+      concepts.length < cap
+        ? await this.prisma.glossaryTerm.findMany({
+            where: { kind: 'ENTITY', status: 'APPROVED' },
+            orderBy: [
+              { verifiedAt: { sort: 'desc', nulls: 'last' } },
+              { updatedAt: 'desc' },
+            ],
+            take: cap - concepts.length,
+            select,
+          })
+        : [];
+    const entry = (
+      term: (typeof concepts)[number],
+      parts: Array<string | null | undefined>,
+    ): BriefMemoryEntry => ({
       key: term.term,
-      content: [
-        term.entityType !== 'TERM' ? term.entityType : null,
-        term.aliases.length ? `aka ${term.aliases.join(', ')}` : null,
-        term.notes,
-      ]
+      content: parts
         .filter(Boolean)
         .join(' — ')
         .slice(0, MAX_MEMORY_CONTENT_LENGTH),
       weight: 1,
-    }));
+    });
+    return [
+      ...concepts.map((term) =>
+        entry(term, [
+          `concept${term.scheme ? ` in ${term.scheme.name}` : ''} (key ${term.key})`,
+          term.codes.length ? `codes ${term.codes.join(', ')}` : null,
+          term.aliases.length ? `aka ${term.aliases.join(', ')}` : null,
+          term.definition ? term.definition.slice(0, 160) : null,
+        ]),
+      ),
+      ...entities.map((term) =>
+        entry(term, [
+          term.entityType !== 'TERM' ? term.entityType : 'entity',
+          term.aliases.length ? `aka ${term.aliases.join(', ')}` : null,
+          term.notes,
+        ]),
+      ),
+    ];
   }
 
   /** Read the singleton; returns an empty default when none exists yet. */
