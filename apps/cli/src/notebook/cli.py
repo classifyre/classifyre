@@ -219,7 +219,56 @@ def run_request(raw_request: dict[str, Any]) -> ExecutionResponse:
                 target_cell_id=request.target_cell_id,
             )
 
-    if is_augmentation:
+    if request.mode is ExecutionMode.PREVIEW_DETECT:
+        import asyncio
+
+        from ..detectors.custom_detector.preview import preview_detect
+
+        try:
+            return asyncio.run(preview_detect(request))
+        except Exception as exc:
+            return ExecutionResponse.failure(
+                request.mode,
+                ExecutionError(type=type(exc).__name__, message=str(exc)),
+                execution_id=request.execution_id,
+                revision=request.revision,
+            )
+
+    redactor: Redactor | None = None
+    context: Context
+    contract_required: Any
+    if scope is NotebookScope.DETECTOR:
+        # A code detector's cells while it is being written: `cell` / `all`
+        # replay them with the detector namespace (Finding, ctx) bound and no
+        # asset, `validate` checks for detect(). Everything the notebook needs
+        # travels in `detector`, not in a source recipe.
+        from ..detectors.custom_detector.contract import REQUIRED_FUNCTIONS as DETECT_REQUIRED
+        from ..detectors.custom_detector.preview import detector_cells, detector_schema
+        from ..detectors.custom_detector.runner import redactor_for
+        from ..detectors.custom_detector.sdk import DetectorContext, detector_namespace
+
+        schema = detector_schema(request.detector)
+        cells = detector_cells(request.detector)
+        notebook_section = schema.get("notebook")
+        revision = request.revision or (
+            notebook_section.get("revision") if isinstance(notebook_section, dict) else None
+        )
+        context = DetectorContext(
+            variables=_string_map(schema.get("variables")),
+            secrets=_string_map(schema.get("secrets")),
+            files_dir=os.environ.get(NOTEBOOK_FILES_DIR_ENV) or None,
+            source={"type": str(recipe.get("type") or ""), "source_id": recipe.get("source_id")},
+            detector={
+                "key": (request.detector or {}).get("key"),
+                "name": (request.detector or {}).get("name"),
+            },
+        )
+        namespace_builder: Any = detector_namespace
+        contract_required = tuple(DETECT_REQUIRED)
+        declared_packages = schema.get("packages")
+        limits: Any = {}
+        redactor = redactor_for({"secrets": schema.get("secrets") or {}})
+    elif is_augmentation:
         # `cell` / `all` while writing helpers: same cells the scan runs, the
         # augmentation namespace bound, no asset. Ordinary print() debugging.
         from ..augmentation.contract import REQUIRED_FUNCTIONS as AUGMENTATION_REQUIRED
@@ -227,9 +276,9 @@ def run_request(raw_request: dict[str, Any]) -> ExecutionResponse:
 
         cells, notebook_revision = _augmentation_notebook(recipe)
         revision = request.revision or notebook_revision
-        context: Context = build_augmentation_context(recipe)
+        context = build_augmentation_context(recipe)
         namespace_builder = augmentation_namespace
-        contract_required: Any = tuple(AUGMENTATION_REQUIRED)
+        contract_required = tuple(AUGMENTATION_REQUIRED)
         declared_packages = _section(recipe, "augmentation").get("packages")
         limits = _section(recipe, "augmentation", "limits")
     else:
@@ -242,7 +291,8 @@ def run_request(raw_request: dict[str, Any]) -> ExecutionResponse:
         declared_packages = _section(recipe, "optional").get("packages")
         limits = _section(recipe, "optional", "limits")
 
-    redactor = Redactor.from_recipe(recipe)
+    if redactor is None:
+        redactor = Redactor.from_recipe(recipe)
     # stderr carries CLI logging straight into runner-log storage, so it is
     # wrapped for the whole process rather than per cell.
     sys.stderr = RedactingStream(sys.stderr, redactor)

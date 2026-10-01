@@ -213,6 +213,52 @@ def test_custom_detectors_get_distinct_cache_keys() -> None:
     assert detector_cache_key("PII", {}) == "PII"
 
 
+def test_rotating_a_code_detector_secret_does_not_invalidate_the_cache() -> None:
+    """A code detector's secrets are dispatch-time credentials, not the rule."""
+    shape: dict[str, Any] = {}
+    base = {
+        "custom_detector_key": "totals",
+        "pipeline_schema": {
+            "type": "CODE_DETECTOR",
+            "secrets": {"api_token": "old"},
+            "variables": {"threshold": "0.9"},
+        },
+    }
+    rotated = {
+        "custom_detector_key": "totals",
+        "pipeline_schema": {
+            "type": "CODE_DETECTOR",
+            "secrets": {"api_token": "new"},
+            "variables": {"threshold": "0.9"},
+        },
+    }
+    assert detector_fingerprint("CUSTOM", base, shape) == detector_fingerprint(
+        "CUSTOM", rotated, shape
+    )
+
+
+def test_changing_a_code_detector_variable_invalidates_the_cache() -> None:
+    """Variables are author configuration: they can change what the rule reports."""
+    shape: dict[str, Any] = {}
+    base = {
+        "custom_detector_key": "totals",
+        "pipeline_schema": {
+            "type": "CODE_DETECTOR",
+            "variables": {"threshold": "0.9"},
+        },
+    }
+    retuned = {
+        "custom_detector_key": "totals",
+        "pipeline_schema": {
+            "type": "CODE_DETECTOR",
+            "variables": {"threshold": "0.5"},
+        },
+    }
+    assert detector_fingerprint("CUSTOM", base, shape) != detector_fingerprint(
+        "CUSTOM", retuned, shape
+    )
+
+
 def test_switching_strategy_invalidates_the_cache() -> None:
     """Results banked over the top 100 rows say nothing about the rest."""
     latest = _fingerprints(_recipe(sampling={"strategy": "LATEST", "rows_per_page": 100}))

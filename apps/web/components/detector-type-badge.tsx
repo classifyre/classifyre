@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   Bot,
   Brain,
+  Code2,
   Eye,
   Image,
   Layers,
@@ -29,6 +30,7 @@ import {
 const ICON_MAP: Record<string, LucideIcon> = {
   Bot,
   Brain,
+  Code2,
   Image,
   Layers,
   Link2,
