@@ -452,6 +452,14 @@ thinks in — a query for "equity ratio" reaches records that only ever say
 means *Einzelvertretung*, not "the letter E", which matters when a code that
 short would otherwise match half the corpus as a substring.
 
+A note on mechanism, so nobody expects more than happened: the cross-language
+reach came from semantic search and from glossary lookup, which resolves an
+alias to its term. The glossary does not rewrite queries — typing "equity
+ratio" into a findings filter is not silently expanded to *Eigenmittelquote*.
+Where a meaning should hold everywhere, it is now said explicitly: the register
+codes are bound to the concepts of the *Rechtsformen* scheme, and filters,
+watches and exports can ask for a concept by key.
+
 Notably, we put **no company names** in the glossary. Names are data, not
 terminology, and a glossary that learns entity names starts making the
 correlation engine confident about things it should be questioning.

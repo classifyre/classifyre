@@ -366,6 +366,31 @@ write by accident. `FlowType` is `TRANSFORM` _(default)_, `VIEW`, `COPY`,
 | `Ref.asset(id)` | An asset **this notebook yields**, by the id you gave it. |
 | `Ref.urn(urn)` | An object in **any** system, by what that platform calls it. |
 | `Ref.finding(id)` | An existing finding. |
+| `Ref.term(key)` | A glossary concept or entity, by its key (`term://glossary/<key>`). |
+
+### Declaring meaning: `means`
+
+A connector often knows what a record *is* — the register says the legal form,
+the CRM says the account type. Say it with `means()` instead of leaving it for a
+binding to rediscover:
+
+```python
+from classifyre import Ref, means
+
+
+def relationships():
+    yield means(
+        Ref.asset(company_id),
+        Ref.term("gmbh"),
+        evidence={"field": "Rechtsform", "value": "GES"},
+    )
+```
+
+The asset gets a **declared** semantic link to the concept (see
+[Glossary](/how-it-works/glossary/)). The key may not exist yet: the
+declaration is kept as a pending reference and links as soon as someone defines
+the term. Declarations to draft terms link once the term is approved. Keys are
+lower-case letters, digits, `.`, `_` and `-`; `Ref.term` refuses anything else.
 
 ### Lineage across systems
 
