@@ -6522,6 +6522,17 @@
       "existing": "{{name}} gab es bereits und wurde aktualisiert.",
       "found": "{{count}} Assets erwähnen sie.",
       "openEntity": "Entität öffnen"
+    },
+    "labels": {
+      "title": "Beteiligte Labels",
+      "summary": "{{names}} Namens-Labels · {{identifiers}} Kennungs-Labels",
+      "hint": "Namen werden nach Schreibweise abgeglichen und erzeugen Kandidaten zur Prüfung. Kennungen werden exakt abgeglichen. Tag-, Datums- und Freitext-Labels nehmen nie teil, damit ein häufiges Wort nicht jedes Dokument zur Erwähnung macht. Beim Speichern werden die Werte aller Entitäten neu erzeugt.",
+      "names": "Namens-Labels (eigene)",
+      "identifiers": "Kennungs-Labels",
+      "save": "Labels speichern",
+      "reset": "Zurücksetzen",
+      "saved": "Labels gespeichert. Die Entitätswerte werden neu erzeugt.",
+      "add": "Label hinzufügen"
     }
   }
 }

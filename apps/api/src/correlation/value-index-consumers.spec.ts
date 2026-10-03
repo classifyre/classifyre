@@ -1,6 +1,5 @@
 import { DetectorType } from '@prisma/client';
 import { CorrelationService } from './correlation.service';
-import type { PrismaService } from '../prisma.service';
 
 /**
  * The value index has two readers (G5 R9): duplicate detection, which scores
@@ -44,7 +43,7 @@ describe('the value index as a shared service', () => {
     };
     const reviewIndex = { refresh: jest.fn().mockResolvedValue(undefined) };
     const service = new CorrelationService(
-      prisma as unknown as PrismaService,
+      prisma as never,
       { runExclusive: (fn: () => Promise<unknown>) => fn() } as never,
       {} as never,
       reviewIndex as never,

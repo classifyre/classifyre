@@ -7,11 +7,14 @@ import {
   AlertTriangle,
   Anchor,
   Check,
+  ChevronDown,
+  ChevronRight,
   Download,
   GitMerge,
   Loader2,
   Plus,
   Trash2,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
@@ -40,6 +43,7 @@ import {
   TableRow,
 } from "@workspace/ui/components";
 import { FeatureOffNotice } from "@/components/feature-off-notice";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useNsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
@@ -49,6 +53,7 @@ import {
   downloadEntityMentions,
   getEntity,
   getEntityConfig,
+  saveEntityConfig,
   getEntityMentions,
   getEntityOverview,
   mergeEntity,
@@ -118,20 +123,29 @@ function ValueRows({
             {value.label}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-mono text-sm">{value.value}</span>
+            <span className="block truncate font-mono text-sm">
+              {value.value}
+            </span>
             {value.sharedWith.length > 0 && (
               <span className="flex flex-wrap items-center gap-1 text-[11px] text-amber-800 dark:text-amber-300">
                 <AlertTriangle className="h-3 w-3" aria-hidden />
                 {t("entities.values.sharedWith")}
                 {value.sharedWith.map((other) => (
-                  <TermLink key={other.id} termKey={other.key} className="font-normal">
+                  <TermLink
+                    key={other.id}
+                    termKey={other.key}
+                    className="font-normal"
+                  >
                     {other.term}
                   </TermLink>
                 ))}
               </span>
             )}
           </span>
-          <Badge variant="outline" className="shrink-0 rounded-[4px] text-[10px]">
+          <Badge
+            variant="outline"
+            className="shrink-0 rounded-[4px] text-[10px]"
+          >
             {t(`entities.methods.${value.method}` as TranslationKey)}
           </Badge>
           <span
@@ -183,7 +197,8 @@ function AddIdentifier({
       ...config.identifierLabels,
     ]);
     const observed = config.observedLabels.filter(
-      (entry) => !names.has(entry) && !entry.startsWith("tag_") && entry !== "date_time",
+      (entry) =>
+        !names.has(entry) && !entry.startsWith("tag_") && entry !== "date_time",
     );
     return [
       ...observed.filter((entry) => known.has(entry)),
@@ -254,7 +269,11 @@ function AddIdentifier({
         disabled={saving || !label.trim() || !value.trim()}
         className="h-8 rounded-[4px] text-xs"
       >
-        {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+        {saving ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Plus className="h-3.5 w-3.5" />
+        )}
         {t("entities.values.add")}
       </Button>
     </form>
@@ -286,13 +305,21 @@ function Timeline({ weeks }: { weeks: EntityOverview["timeline"] }) {
       </div>
       <div className="mt-1 flex justify-between font-mono text-[10px] text-muted-foreground">
         <span>{new Date(shown[0]!.week).toLocaleDateString()}</span>
-        <span>{new Date(shown[shown.length - 1]!.week).toLocaleDateString()}</span>
+        <span>
+          {new Date(shown[shown.length - 1]!.week).toLocaleDateString()}
+        </span>
       </div>
     </div>
   );
 }
 
-function MentionList({ entity, refreshKey }: { entity: EntityDetail; refreshKey: number }) {
+function MentionList({
+  entity,
+  refreshKey,
+}: {
+  entity: EntityDetail;
+  refreshKey: number;
+}) {
   const { t } = useTranslation();
   const nsPath = useNsPath();
   const [rows, setRows] = React.useState<EntityMention[] | null>(null);
@@ -321,7 +348,10 @@ function MentionList({ entity, refreshKey }: { entity: EntityDetail; refreshKey:
     if (!next) return;
     setLoading(true);
     try {
-      const page = await getEntityMentions(entity.id, { after: next, limit: 50 });
+      const page = await getEntityMentions(entity.id, {
+        after: next,
+        limit: 50,
+      });
       setRows((previous) => [...(previous ?? []), ...page.mentions]);
       setNext(page.next);
     } catch (error) {
@@ -388,13 +418,17 @@ function MentionList({ entity, refreshKey }: { entity: EntityDetail; refreshKey:
           <Table>
             <TableHeader>
               <TableRow>
-                {(["asset", "source", "value", "context", "seen"] as const).map((column) => (
-                  <TableHead key={column}>
-                    <span className={MICRO_LABEL}>
-                      {t(`entities.mentions.columns.${column}` as TranslationKey)}
-                    </span>
-                  </TableHead>
-                ))}
+                {(["asset", "source", "value", "context", "seen"] as const).map(
+                  (column) => (
+                    <TableHead key={column}>
+                      <span className={MICRO_LABEL}>
+                        {t(
+                          `entities.mentions.columns.${column}` as TranslationKey,
+                        )}
+                      </span>
+                    </TableHead>
+                  ),
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -411,7 +445,9 @@ function MentionList({ entity, refreshKey }: { entity: EntityDetail; refreshKey:
                   <TableCell className="text-xs">{row.sourceName}</TableCell>
                   <TableCell>
                     <span className="block font-mono text-xs">{row.value}</span>
-                    <span className="font-mono text-[10px] text-muted-foreground">{row.label}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {row.label}
+                    </span>
                   </TableCell>
                   <TableCell className="max-w-[420px]">
                     {row.findingId ? (
@@ -432,7 +468,12 @@ function MentionList({ entity, refreshKey }: { entity: EntityDetail; refreshKey:
           </Table>
           {next && (
             <div className="border-t p-3 text-center">
-              <Button size="sm" variant="outline" disabled={loading} onClick={more}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={loading}
+                onClick={more}
+              >
                 {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 {t("entities.mentions.more")}
               </Button>
@@ -512,13 +553,19 @@ export function EntityPanel({
   }
 
   if (failed) {
-    return <p className="text-sm text-muted-foreground">{t("entities.loadFailed")}</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("entities.loadFailed")}
+      </p>
+    );
   }
   if (!entity || !overview) {
     return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
   }
 
-  const identifiers = entity.values.filter((value) => value.family === "identifier");
+  const identifiers = entity.values.filter(
+    (value) => value.family === "identifier",
+  );
   const names = entity.values.filter((value) => value.family === "name");
   const tiles: Array<[string, string]> = [
     ["mentions", entity.mentionCount.toLocaleString()],
@@ -536,19 +583,28 @@ export function EntityPanel({
         <p className="flex items-center gap-2 rounded-[4px] border-2 border-border bg-muted/40 px-3 py-2 text-sm">
           <GitMerge className="h-4 w-4 shrink-0" aria-hidden />
           {t("entities.mergedInto")}{" "}
-          <TermLink termKey={entity.mergedInto.key}>{entity.mergedInto.term}</TermLink>
+          <TermLink termKey={entity.mergedInto.key}>
+            {entity.mergedInto.term}
+          </TermLink>
         </p>
       )}
-      {!entity.mergedInto && entity.featureEnabled && entity.status !== "APPROVED" && (
-        <p className="rounded-[4px] border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          {t("entities.notLinking")}
-        </p>
-      )}
+      {!entity.mergedInto &&
+        entity.featureEnabled &&
+        entity.status !== "APPROVED" && (
+          <p className="rounded-[4px] border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            {t("entities.notLinking")}
+          </p>
+        )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {tiles.map(([key, value]) => (
-          <div key={key} className="rounded-[4px] border-2 border-border px-3 py-2">
-            <div className={MICRO_LABEL}>{t(`entities.tiles.${key}` as TranslationKey)}</div>
+          <div
+            key={key}
+            className="rounded-[4px] border-2 border-border px-3 py-2"
+          >
+            <div className={MICRO_LABEL}>
+              {t(`entities.tiles.${key}` as TranslationKey)}
+            </div>
             <div className="font-mono text-xl font-bold">{value}</div>
           </div>
         ))}
@@ -558,7 +614,9 @@ export function EntityPanel({
         <section className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <div className={MICRO_LABEL}>
-              {t("entities.candidates.title", { count: String(entity.candidates.length) })}
+              {t("entities.candidates.title", {
+                count: String(entity.candidates.length),
+              })}
             </div>
             <Link
               href={nsPath("/glossary?tab=proposals")}
@@ -569,22 +627,36 @@ export function EntityPanel({
           </div>
           <ul className="divide-y rounded-[4px] border-2 border-border">
             {entity.candidates.map((candidate) => (
-              <li key={candidate.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
+              <li
+                key={candidate.id}
+                className="flex flex-wrap items-center gap-3 px-3 py-2"
+              >
                 <span className="w-36 shrink-0 truncate font-mono text-[11px] text-muted-foreground">
                   {candidate.label}
                 </span>
-                <span className="min-w-0 flex-1 truncate font-mono text-sm">{candidate.value}</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-sm">
+                  {candidate.value}
+                </span>
                 {candidate.conflictTermId ? (
-                  <Badge variant="outline" className="rounded-[4px] text-[10px]">
+                  <Badge
+                    variant="outline"
+                    className="rounded-[4px] text-[10px]"
+                  >
                     {t("entities.candidates.conflict")}
                   </Badge>
                 ) : (
                   <span className="font-mono text-[11px] text-muted-foreground">
-                    {t(`entities.methods.${candidate.method}` as TranslationKey)}
-                    {candidate.score !== null && ` · ${Math.round(candidate.score * 100)}%`}
+                    {t(
+                      `entities.methods.${candidate.method}` as TranslationKey,
+                    )}
+                    {candidate.score !== null &&
+                      ` · ${Math.round(candidate.score * 100)}%`}
                   </span>
                 )}
-                <span className="font-mono text-xs" title={t("entities.values.occurrencesHint")}>
+                <span
+                  className="font-mono text-xs"
+                  title={t("entities.values.occurrencesHint")}
+                >
                   {candidate.occurrences.toLocaleString()}
                 </span>
                 {candidate.conflictTermId ? (
@@ -601,7 +673,10 @@ export function EntityPanel({
                       disabled={busy}
                       onClick={() =>
                         act(
-                          () => reviewEntityCandidates([{ id: candidate.id, decision: "accept" }]),
+                          () =>
+                            reviewEntityCandidates([
+                              { id: candidate.id, decision: "accept" },
+                            ]),
                           t("entities.candidates.accepted"),
                         )
                       }
@@ -616,7 +691,10 @@ export function EntityPanel({
                       disabled={busy}
                       onClick={() =>
                         act(
-                          () => reviewEntityCandidates([{ id: candidate.id, decision: "reject" }]),
+                          () =>
+                            reviewEntityCandidates([
+                              { id: candidate.id, decision: "reject" },
+                            ]),
                           t("entities.candidates.rejected"),
                         )
                       }
@@ -636,22 +714,35 @@ export function EntityPanel({
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
           <section className="space-y-2">
-            <div className={MICRO_LABEL}>{t("entities.values.identifiers")}</div>
+            <div className={MICRO_LABEL}>
+              {t("entities.values.identifiers")}
+            </div>
             {identifiers.length > 0 ? (
               <ValueRows
                 values={identifiers}
                 busy={busy}
                 onRemove={(value) =>
-                  act(() => removeEntityValue(value.id), t("entities.values.removed"))
+                  act(
+                    () => removeEntityValue(value.id),
+                    t("entities.values.removed"),
+                  )
                 }
               />
             ) : (
-              <p className="text-xs text-muted-foreground">{t("entities.values.noIdentifiers")}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("entities.values.noIdentifiers")}
+              </p>
             )}
             {entity.status !== "DEPRECATED" && (
-              <AddIdentifier entityId={entity.id} config={config} onAdded={reload} />
+              <AddIdentifier
+                entityId={entity.id}
+                config={config}
+                onAdded={reload}
+              />
             )}
-            <p className="text-[11px] text-muted-foreground">{t("entities.values.labelHint")}</p>
+            <p className="text-[11px] text-muted-foreground">
+              {t("entities.values.labelHint")}
+            </p>
           </section>
           <section className="space-y-2">
             <div className={MICRO_LABEL}>{t("entities.values.names")}</div>
@@ -660,18 +751,26 @@ export function EntityPanel({
                 values={names}
                 busy={busy}
                 onRemove={(value) =>
-                  act(() => removeEntityValue(value.id), t("entities.values.removed"))
+                  act(
+                    () => removeEntityValue(value.id),
+                    t("entities.values.removed"),
+                  )
                 }
               />
             ) : (
-              <p className="text-xs text-muted-foreground">{t("entities.values.noNames")}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("entities.values.noNames")}
+              </p>
             )}
           </section>
           {entity.anchor && (
             <section className="space-y-1">
               <div className={MICRO_LABEL}>{t("entities.anchor")}</div>
               <p className="flex items-center gap-2 text-sm">
-                <Anchor className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                <Anchor
+                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                  aria-hidden
+                />
                 {entity.anchor.asset ? (
                   <Link
                     href={nsPath(`/assets/${entity.anchor.asset.id}`)}
@@ -694,7 +793,9 @@ export function EntityPanel({
             {overview.timeline.length > 0 ? (
               <Timeline weeks={overview.timeline} />
             ) : (
-              <p className="text-xs text-muted-foreground">{t("entities.mentions.none")}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("entities.mentions.none")}
+              </p>
             )}
           </section>
           {overview.sources.length > 0 && (
@@ -702,7 +803,10 @@ export function EntityPanel({
               <div className={MICRO_LABEL}>{t("entities.sources")}</div>
               <ul className="divide-y rounded-[4px] border-2 border-border">
                 {overview.sources.map((source) => (
-                  <li key={source.sourceId} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <li
+                    key={source.sourceId}
+                    className="flex items-center justify-between gap-3 px-3 py-2"
+                  >
                     <Link
                       href={nsPath(`/sources/${source.sourceId}`)}
                       className="min-w-0 truncate text-sm font-medium hover:underline"
@@ -738,7 +842,9 @@ export function EntityPanel({
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">{t("entities.coMentions.none")}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("entities.coMentions.none")}
+              </p>
             )}
           </section>
         </div>
@@ -775,7 +881,9 @@ export function MergeEntityDialog({
     setSaving(true);
     try {
       const result = await mergeEntity(term.id, target.id);
-      toast.success(t("entities.merge.done", { from: term.term, into: result.into.term }));
+      toast.success(
+        t("entities.merge.done", { from: term.term, into: result.into.term }),
+      );
       onOpenChange(false);
       onMerged(result.into.key);
     } catch (error) {
@@ -786,18 +894,28 @@ export function MergeEntityDialog({
   }
 
   const invalid =
-    target !== null && (target.id === term.id || target.kind !== "ENTITY" || target.status !== "APPROVED");
+    target !== null &&
+    (target.id === term.id ||
+      target.kind !== "ENTITY" ||
+      target.status !== "APPROVED");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-[6px]">
         <DialogHeader>
-          <DialogTitle>{t("entities.merge.title", { name: term.term })}</DialogTitle>
+          <DialogTitle>
+            {t("entities.merge.title", { name: term.term })}
+          </DialogTitle>
           <DialogDescription>{t("entities.merge.desc")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
           <Label>{t("entities.merge.into")}</Label>
-          <TermPicker value={target} onChange={setTarget} kind="ENTITY" autoFocus />
+          <TermPicker
+            value={target}
+            onChange={setTarget}
+            kind="ENTITY"
+            autoFocus
+          />
           {invalid && (
             <p className="text-xs text-amber-800 dark:text-amber-300">
               {target?.id === term.id
@@ -811,7 +929,11 @@ export function MergeEntityDialog({
             {t("common.cancel")}
           </Button>
           <Button disabled={!target || invalid || saving} onClick={merge}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitMerge className="h-4 w-4" />}
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <GitMerge className="h-4 w-4" />
+            )}
             {t("entities.merge.confirm")}
           </Button>
         </DialogFooter>
@@ -827,6 +949,333 @@ export function MergeEntityDialog({
  * entity: a name becomes the entity's name, anything else its first
  * identifier. The entity then lists every other place the value occurs.
  */
+const NAME_LABEL_TYPES = [
+  "PERSON",
+  "ORGANIZATION",
+  "LOCATION",
+  "OTHER",
+] as const;
+
+/**
+ * Which finding labels take part in resolution (G5 R5): the labels a detector
+ * produces that are *names* (matched by spelling, with candidates) and the ones
+ * that are *identifiers* (matched exactly). The shipped ones are fixed; this
+ * adds custom detectors' labels. Saving regenerates every entity's alias values.
+ */
+export function EntityLabelsCard({ onSaved }: { onSaved?: () => void }) {
+  const { t } = useTranslation();
+  const [config, setConfig] = React.useState<EntityConfig | null>(null);
+  const [names, setNames] = React.useState<Record<string, string>>({});
+  const [identifiers, setIdentifiers] = React.useState<string[]>([]);
+  const [draftName, setDraftName] = React.useState("");
+  const [draftType, setDraftType] = React.useState<string>("ORGANIZATION");
+  const [draftIdentifier, setDraftIdentifier] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+
+  const load = React.useCallback(() => {
+    getEntityConfig()
+      .then((result) => {
+        setConfig(result);
+        setNames(result.nameLabels);
+        setIdentifiers(result.identifierLabels);
+      })
+      .catch(() => setConfig(null));
+  }, []);
+  React.useEffect(load, [load]);
+
+  const dirty =
+    config !== null &&
+    (JSON.stringify(names) !== JSON.stringify(config.nameLabels) ||
+      JSON.stringify(identifiers) !== JSON.stringify(config.identifierLabels));
+  const normalize = (raw: string) =>
+    raw
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  const suggestions = (config?.observedLabels ?? []).filter(
+    (label) => !label.startsWith("tag_") && label !== "date_time",
+  );
+
+  async function save() {
+    setSaving(true);
+    try {
+      const result = await saveEntityConfig({
+        nameLabels: names,
+        identifierLabels: identifiers,
+      });
+      setConfig(result);
+      setNames(result.nameLabels);
+      setIdentifiers(result.identifierLabels);
+      toast.success(t("entities.labels.saved"));
+      onSaved?.();
+    } catch (error) {
+      toast.error(semanticErrorMessage(error, t("glossary.actionFailed")));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!config) return null;
+  return (
+    <section
+      className="rounded-[4px] border-2 border-border"
+      data-testid="entity-labels"
+    >
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        {open ? (
+          <ChevronDown className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5" />
+        )}
+        <span className={MICRO_LABEL}>{t("entities.labels.title")}</span>
+        <span className="ml-auto font-mono text-[11px] text-muted-foreground">
+          {t("entities.labels.summary", {
+            names: String(config.activeNameLabels.length),
+            identifiers: String(
+              config.shippedIdentifierLabels.length +
+                config.identifierLabels.length,
+            ),
+          })}
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-4 border-t-2 border-border p-3">
+          <p className="text-xs text-muted-foreground">
+            {t("entities.labels.hint")}
+          </p>
+          <datalist id="entity-label-suggestions">
+            {suggestions.map((label) => (
+              <option key={label} value={label} />
+            ))}
+          </datalist>
+
+          <div className="space-y-2">
+            <div className={MICRO_LABEL}>{t("entities.labels.names")}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {config.activeNameLabels
+                .filter((label) => !(label in names))
+                .map((label) => (
+                  <Badge
+                    key={label}
+                    variant="secondary"
+                    className="rounded-[4px] font-mono text-[10px]"
+                  >
+                    {label}
+                  </Badge>
+                ))}
+            </div>
+            <ul className="space-y-1">
+              {Object.entries(names).map(([label, type]) => (
+                <li key={label} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                    {label}
+                  </span>
+                  <Select
+                    value={type}
+                    onValueChange={(value) =>
+                      setNames({ ...names, [label]: value })
+                    }
+                  >
+                    <SelectTrigger className="h-7 w-40 rounded-[4px] border-2 border-border text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {NAME_LABEL_TYPES.map((entry) => (
+                        <SelectItem key={entry} value={entry}>
+                          {t(`glossary.entityTypes.${entry}` as TranslationKey)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0"
+                    aria-label={t("entities.values.remove")}
+                    onClick={() => {
+                      const next = { ...names };
+                      delete next[label];
+                      setNames(next);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center gap-2">
+              <Input
+                list="entity-label-suggestions"
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+                placeholder="company_name"
+                aria-label={t("entities.values.label")}
+                className="h-8 flex-1 rounded-[4px] border-2 border-border font-mono text-xs"
+              />
+              <Select value={draftType} onValueChange={setDraftType}>
+                <SelectTrigger className="h-8 w-40 rounded-[4px] border-2 border-border text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {NAME_LABEL_TYPES.map((entry) => (
+                    <SelectItem key={entry} value={entry}>
+                      {t(`glossary.entityTypes.${entry}` as TranslationKey)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!normalize(draftName)}
+                onClick={() => {
+                  setNames({ ...names, [normalize(draftName)]: draftType });
+                  setDraftName("");
+                }}
+                className="h-8 rounded-[4px] border-2 border-border text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {t("entities.labels.add")}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className={MICRO_LABEL}>
+              {t("entities.labels.identifiers")}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {config.shippedIdentifierLabels.map((label) => (
+                <Badge
+                  key={label}
+                  variant="secondary"
+                  className="rounded-[4px] font-mono text-[10px]"
+                >
+                  {label}
+                </Badge>
+              ))}
+              {identifiers.map((label) => (
+                <Badge
+                  key={label}
+                  variant="outline"
+                  className="gap-1 rounded-[4px] font-mono text-[10px]"
+                >
+                  {label}
+                  <button
+                    type="button"
+                    aria-label={t("entities.values.remove")}
+                    onClick={() =>
+                      setIdentifiers(
+                        identifiers.filter((entry) => entry !== label),
+                      )
+                    }
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                list="entity-label-suggestions"
+                value={draftIdentifier}
+                onChange={(event) => setDraftIdentifier(event.target.value)}
+                placeholder="customer_number"
+                aria-label={t("entities.values.label")}
+                className="h-8 flex-1 rounded-[4px] border-2 border-border font-mono text-xs"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!normalize(draftIdentifier)}
+                onClick={() => {
+                  const label = normalize(draftIdentifier);
+                  if (!identifiers.includes(label))
+                    setIdentifiers([...identifiers, label]);
+                  setDraftIdentifier("");
+                }}
+                className="h-8 rounded-[4px] border-2 border-border text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {t("entities.labels.add")}
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!dirty || saving}
+              onClick={load}
+              className="h-8 rounded-[4px] border-2 border-border text-xs"
+            >
+              {t("entities.labels.reset")}
+            </Button>
+            <Button
+              size="sm"
+              disabled={!dirty || saving}
+              onClick={save}
+              className="h-8 rounded-[4px] text-xs"
+            >
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {t("entities.labels.save")}
+            </Button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * "Make entity" for a value shown anywhere: the button and its dialog in one,
+ * hidden while the Entities feature is off (G5 R16).
+ */
+export function MakeEntityButton({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  const { isOff } = useWorkspaceFeatures();
+  const [open, setOpen] = React.useState(false);
+  if (!label || !value || isOff("entities")) return null;
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setOpen(true)}
+        className={
+          className ?? "h-7 rounded-[4px] border-2 border-border text-xs"
+        }
+        data-testid="make-entity"
+      >
+        <UserPlus className="h-3.5 w-3.5" />
+        {t("entities.make.open")}
+      </Button>
+      <MakeEntityDialog
+        open={open}
+        onOpenChange={setOpen}
+        label={label}
+        value={value}
+      />
+    </>
+  );
+}
+
 export function MakeEntityDialog({
   open,
   onOpenChange,
@@ -860,7 +1309,9 @@ export function MakeEntityDialog({
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
-  const isName = config ? config.activeNameLabels.includes(normalizedLabel) : false;
+  const isName = config
+    ? config.activeNameLabels.includes(normalizedLabel)
+    : false;
 
   React.useEffect(() => {
     if (!open) return;
@@ -913,7 +1364,9 @@ export function MakeEntityDialog({
         <DialogHeader>
           <DialogTitle>{t("entities.make.title")}</DialogTitle>
           <DialogDescription>
-            {isName ? t("entities.make.descName") : t("entities.make.descIdentifier")}
+            {isName
+              ? t("entities.make.descName")
+              : t("entities.make.descIdentifier")}
           </DialogDescription>
         </DialogHeader>
         {created ? (
@@ -922,11 +1375,16 @@ export function MakeEntityDialog({
               {created.merged
                 ? t("entities.make.existing", { name: created.term })
                 : t("entities.make.created", { name: created.term })}{" "}
-              {t("entities.make.found", { count: created.assets.toLocaleString() })}
+              {t("entities.make.found", {
+                count: created.assets.toLocaleString(),
+              })}
             </p>
             {created.conflict && (
               <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                <AlertTriangle
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                  aria-hidden
+                />
                 {t("entities.values.conflict", { entity: created.conflict })}
               </p>
             )}
@@ -935,18 +1393,24 @@ export function MakeEntityDialog({
                 {t("common.close")}
               </Button>
               <Button asChild>
-                <Link href={`${termHref(created.key)}?tab=entity`}>{t("entities.make.openEntity")}</Link>
+                <Link href={`${termHref(created.key)}?tab=entity`}>
+                  {t("entities.make.openEntity")}
+                </Link>
               </Button>
             </DialogFooter>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
             <div className="rounded-[4px] border-2 border-border px-3 py-2">
-              <div className="font-mono text-[11px] text-muted-foreground">{label}</div>
+              <div className="font-mono text-[11px] text-muted-foreground">
+                {label}
+              </div>
               <div className="break-all font-mono text-sm">{value}</div>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="make-entity-name">{t("entities.make.name")}</Label>
+              <Label htmlFor="make-entity-name">
+                {t("entities.make.name")}
+              </Label>
               <Input
                 id="make-entity-name"
                 value={name}
@@ -958,7 +1422,10 @@ export function MakeEntityDialog({
             </div>
             <div className="space-y-1">
               <Label>{t("entities.make.type")}</Label>
-              <Select value={entityType} onValueChange={(next) => setEntityType(next as EntityType)}>
+              <Select
+                value={entityType}
+                onValueChange={(next) => setEntityType(next as EntityType)}
+              >
                 <SelectTrigger className="rounded-[4px] border-2 border-border">
                   <SelectValue />
                 </SelectTrigger>
@@ -972,7 +1439,11 @@ export function MakeEntityDialog({
               </Select>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
                 {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={saving || !name.trim()}>

@@ -73,6 +73,81 @@ Terms you add are approved at once. Terms proposed by AI agents, imports marked
 as drafts and suggestions from the system start as **drafts** and wait in the
 review queue.
 
+## Entities: from mentions to things
+
+An entity is more than a glossary entry: it is a thing with a **name, aliases
+and identifiers**, and every finding that carries one of them is a **mention**.
+*ACME Holding GmbH* in an e-mail, the register record for ACME and the VAT number
+`ATU12345678` on an invoice become one thing with one page.
+
+```mermaid
+graph LR
+    Mail["E-mail: ACME Holding GmbH"] --> E["Entity: ACME"]
+    Invoice["Invoice: ATU12345678"] --> E
+    Register["Register record<br/>(declares the entity)"] --> E
+    Variant["Acme Holding G.m.b.H."] -.->|candidate, you decide| E
+```
+
+**Mentions are never stored per finding.** An entity keeps a list of confirmed
+*values* — its name and aliases under every name label of its type, plus the
+identifiers you or a source gave it — and a mention is any finding whose
+normalised value is on that list. A value confirmed today therefore shows the
+documents scanned last year, and a new scan adds its matches without a
+resolution step.
+
+- **Exact links need no review.** Names, aliases and identifiers link on
+  their own, once the entity is approved. A draft entity lists its mentions so
+  you can judge it, but links nothing.
+- **Spelling variants are candidates.** After each scan, name-like values that
+  sound or fold to the same spelling as an entity's name (*Acme Holding
+  G.m.b.H.*) are proposed with a score. Accept one and it becomes a mention;
+  reject it and it is never proposed again. Candidates never confirm themselves
+  and entities never merge on their own.
+- **An identifier has one owner.** An IBAN, VAT or national ID confirmed for one
+  entity cannot be confirmed for a second without a *conflict review*: take it
+  from the first holder or reject it. A *name* may belong to several entities;
+  the page flags it as ambiguous.
+- **Only identifier-like and name-like labels take part.** Tag, date and
+  free-text labels never do, so a common word cannot turn every document into a
+  mention. Labels from your own detectors are declared as names or identifiers
+  under **Entities → Labels that take part**.
+- **Merging** moves values, references, relations, graph edges and watches from
+  one entity to another. The first redirects to the second and a source that
+  re-declares it on the next scan lands on the survivor. Splitting is not
+  supported.
+
+### Where entities appear
+
+- **Make entity** on a finding, in *Where else found*, in the shared-value
+  panel of the Fingerprints graph, and on a case board's details.
+- The **entity page**: mentions over time, sources and assets, the most
+  co-mentioned entities (computed on demand), the anchor record, cases,
+  watches and pending candidates. **Export mentions** (CSV or JSON) answers
+  "what do we hold about this person".
+- **Review queue** (Entities & glossary → Proposals): candidates and
+  conflicts, best first, each with up to three occurrences.
+- **Watches** on an entity ("anything new about ACME") and **case leads**: a
+  case about an entity suggests findings that newly mention it.
+- Agents and MCP can search, create and update entities and propose verdicts.
+  Only a person confirms an identifier conflict, accepts a candidate or
+  merges.
+
+### Sources that declare entities
+
+A register or a customer master does not merely mention a company: its record
+*is* the company. A custom connector says so with `Asset(entity=Entity(...))`,
+see [custom connectors](/sources/custom-connectors/reference/#declaring-an-entity-entity).
+Declared entities are approved from the start, anchored to the record and
+idempotent by its URN; what an operator later edits is kept.
+
+### The Entities switch
+
+Entities are one of the three feature switches in
+[Settings → Cleanup](/settings/cleanup/). They share the *value index* with
+duplicate detection, so values stay indexed while either is on. A new workspace
+has entities on; an existing one gets the switch off and turns it on to build
+values and counters from what is already there.
+
 ## Giving data a meaning
 
 ### Bindings

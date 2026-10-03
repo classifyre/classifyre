@@ -208,7 +208,7 @@ export class CorrelationWorker {
       return;
     }
     for (const job of jobs) {
-      await this.indexOnly(job.data as CorrelationJobPayload);
+      await this.indexOnly(job.data);
     }
   }
 

@@ -372,9 +372,7 @@ export class EntityMentionsService {
    * exports. A finding is a mention when it is the value index's
    * representative finding for a confirmed value in its asset.
    */
-  async entitiesOfFindings(
-    findingIds: string[],
-  ): Promise<
+  async entitiesOfFindings(findingIds: string[]): Promise<
     Map<
       string,
       Array<{
@@ -539,8 +537,16 @@ export function mentionsCsv(rows: EntityMention[]): string {
     'first_seen',
   ];
   const cell = (value: unknown) => {
-    const text = value == null ? '' : String(value);
-    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    const text =
+      typeof value === 'string'
+        ? value
+        : value == null
+          ? ''
+          : JSON.stringify(value);
+    // Matched text comes from the documents. A cell that starts like a formula
+    // is defused so a spreadsheet shows it instead of running it.
+    const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+    return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
   };
   const lines = rows.map((row) =>
     [

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Shipped on this branch (2026-10-03). Deviations from this text are in [§13](#13-as-built) |
 | **Size** | L |
 | **Milestone** | M4 · Entities ([integration](00-integration-architecture.md#4-build-order-and-milestones)) |
 | **Depends on** | F2 conditions ([G4](G4-extracted-values-and-watch-conditions.md)) for entity watches; F1 events ([G3](G3-outbound-webhooks-notifications-export.md)); [S1](S1-enterprise-extension-seams.md) actor for verdicts. Strongly benefits from [G2](G2-eu-detection-coverage.md) A7 (identifier labels) |
@@ -214,3 +214,69 @@ model EntityValue {
 
 - **Semantic candidates.** Embed distinct name values (bounded) and propose nearest entity aliases. This uses the embedding stack and needs a filtered HNSW query that bounds the scan before joining. Proposed for v2.
 - **Typed relations.** Promote a co-mention to a typed relation ("director of") by hand, stored in `edges` with `fromType='entity'` (the edge table is polymorphic by design). Proposed for v2.
+
+## 13. As built
+
+Where the design above and the code differ, the code is right and this section says why. Five points the PRD left open were settled while building.
+
+### 13.1 Decisions
+
+| Point | Decision |
+|---|---|
+| **Status clash.** §6.1 added `status ACTIVE \| MERGED` next to the glossary's own `status` | No second status. A merged entity is `DEPRECATED` with `replacedById`, the redirect the glossary already had, plus a `mergedAt` stamp that tells a merge from an ordinary deprecation. Merging repoints entities already redirecting to A at B, so a redirect is always one hop |
+| **Identifiers vs `codes`.** SL1 already has `codes` | `codes` stay what SL1 defined: unlabelled, lookup-only. Identifiers live only in `entity_values`, each with the label a detector finds it under. The `identifiers` JSON column of §6.1 was not added |
+| **Origin.** R13 needs `origin=CONNECTOR` | `GlossaryOrigin` gets a `CONNECTOR` value; a declared entity is `CONNECTOR` and `APPROVED` |
+| **Mentions as links.** §6.3 derives mentions by a join only | The join stays the source of truth (counters, mention list, export, co-mentions). The semantic linker also writes `MENTION` links from it, so Meaning cards, term filters and the term dimension of watches see entities like any other term. The review queue has `ENTITY_MENTION` and `ENTITY_MERGE` kinds |
+| **Value-index split (R9).** | With duplicates on, the flow is unchanged. With duplicates off and entities on, scans go to a new `values.index` queue. With both off nothing is indexed, and turning entities on rebuilds the index first |
+
+Also settled:
+
+- **Linking waits for approval.** Only an `APPROVED` entity links mentions to documents, watches and cases. A draft lists its mentions so it can be judged. Agents create drafts (R22).
+- **Short names never link by themselves.** A name below `ENTITY_MIN_ALIAS_CHARS` is refused as an alias value; it can be a hidden alias.
+- **A rejection is a row.** `REJECTED` stays in `entity_values`, so `ON CONFLICT DO NOTHING` is what makes "never proposed again" true. Typing the same value as an alias later supersedes it.
+- **Folded spelling is a candidate method.** Besides PHONETIC (Jaro-Winkler ≥ 0.92 in the phonetic bucket), a value that equals an alias once case, punctuation and diacritics fold away ("Acme Holding G.m.b.H.") is proposed as `FUZZY` with a floor score.
+- **Declarations ride on the asset.** `Asset(entity=…)` travels in asset metadata under `_entity` and is applied at ingest by `declareMany`, idempotent by URN (or by the key the source chose). A scan that changes nothing costs two reads for the whole batch. Declarations made while the switch is off are replayed when it is turned on.
+- **A scan never undoes a merge.** A record whose entity was merged is declared onto the survivor.
+
+### 13.2 Requirement status
+
+| # | Status | As built |
+|---|---|---|
+| R1 | Done, with the changes in 13.1 | Counters, `anchorUrn`, `attributes`, `mergedAt` on `glossary_terms` |
+| R2 | Done | `entity_values`, plus `rawValue`, `phoneticHash`, `foldKey`, `conflictTermId`, `agentVerdict`, `agentNote` for review and blocking |
+| R3 | Done | `EntityValuesService.syncTerm` normalises name and aliases under every name label of the entity's type. A name label first seen in a later run regenerates every entity's values (`syncedLabels`) |
+| R4 | Done | Per run, bounded by the run's assets (`assetsOfRun`), capped per run. A new or changed entity also scans the whole index (`resolveTerms`) |
+| R5 | Done | `entity-labels.ts`. Operators declare custom labels as names or identifiers: API and **Entities → Labels that take part** |
+| R6 | Done | An identifier held by another entity is stored `PROPOSED` with the holder, and appears as a conflict. `review` refuses to *accept* a conflict (it would leave two holders); the choices are `move` and `reject`. A name may belong to several entities and is flagged ambiguous |
+| R7 | Done | One transaction moves values, references, relations, graph edges, board terms and watches. `entity.merged` and activity are recorded. Only a person merges |
+| R8 | Done | Incremental per run, recounted after value changes, and nightly (`entities.recount`, 03:07 UTC) |
+| R9 | Done | See 13.1. Tested for duplicates on, off, and both off |
+| R10 | Done | Third switch next to embeddings and duplicates, with keep and delete semantics. Delete removes candidates, mention links and counters, never the entities or decided values |
+| R11 | Done | Resolution runs inline after the run's values are indexed, before the autopilot hand-off |
+| R12 | Done | `Entity` in the SDK; see 13.1 |
+| R13 | Done | `CONNECTOR`, `APPROVED`; a later declaration only adds |
+| R14 | Done | Entity page on the glossary term page: values, counters, mentions, timeline, sources, co-mentions, anchor, cases, watches, candidates. Findings go through the snippet presenter |
+| R15 | Done | Review queue under Entities & glossary → Proposals: score, up to 3 occurrences, batch accept/reject/move, `decidedBy`, an agent's note shown with the item; its verdict is stored apart from the person's decision |
+| R16 | Done | Finding page, *Where else found*, the Fingerprints graph (shared value and bundle values), case board details. The value list in `get_value_occurrences` is the same view as *Where else found* |
+| R17 | Done, differently | An entity is a glossary term, so a case links it through the existing `glossary_references` (role `ABOUT`) and the board shows it as a `TERM` card, not through `CaseEvidence.entityType = 'entity'`. Lead origin `ENTITY` proposes open findings that mention a case's approved entities, one lead per asset value |
+| R18 | Done, differently | G4's `entity` condition is not needed: a watch's *About* terms already accept entities and match through mentions. "Watch this" is on the term page. Re-uses the term filter, so entity filters on findings work too |
+| R19 | Done | `IDENTIFIES` edge, class `IDENTITY`, from the entity to its anchor asset, one per entity. Co-mentions are computed on demand from the latest 5,000 mention assets and never stored |
+| R20 | Done | CSV and JSON. Cells that start like a spreadsheet formula are defused, because matched text comes from documents |
+| R21 | Done | The nine tools in an `entities` capability group; `lookup_glossary` returns the counters |
+| R22 | Done | Agents create drafts and propose verdicts (`agentVerdict`); `review`, `removeValue` and `merge` refuse an agent |
+
+### 13.3 Acceptance (§9) as verified
+
+Verified on the dev stack with a register source that declares entities and a mail source that mentions them:
+
+- **Exact:** ACME was mentioned across both sources by name and by VAT number with no resolution run.
+- **Candidates:** "Acme Holding G.m.b.H." and "Beta Logistic AG" were proposed, not confirmed. A rejected one was not proposed again.
+- **Conflict:** a second record claiming ACME's VAT number became a conflict. Settled by merge, the values moved and a redirect remained. A rescan did not recreate the merged entity.
+- **Switches:** duplicates off with entities on still indexed; both off indexed nothing; turning entities back on rebuilt the index.
+- **Watch:** a watch on ACME matched its 7 mentions; a new scan added an eighth.
+- **Not measured:** the §9 scale target (first mention page under 1 s and co-mentions under 2 s on a 1M-value corpus) and the §10 success measures. The mention list is keyset-paged on the value index's key and co-mentions bound the scan before joining; the counters, timeline and per-source figures are unbounded joins over an entity's mentions and are the first thing to measure on a hub entity.
+
+### 13.4 Left out of v1
+
+- **Splitting** a merged entity (non-goal).
+- **Entity grouping in triage** ([G6](G6-triage-queue.md)) and `entity.*` webhooks ([G3](G3-outbound-webhooks-notifications-export.md)): the events (`entity.created`, `entity.merged`, `entity.candidates_pending`) are emitted; those PRDs consume them.

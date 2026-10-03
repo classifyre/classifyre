@@ -14,7 +14,8 @@ export function hashIdentityKey(identityKey: string): string {
   return createHash('sha256').update(identityKey, 'utf8').digest('hex');
 }
 
-export interface DetectionIdentityInput {  assetId: string;
+export interface DetectionIdentityInput {
+  assetId: string;
   detectorType: string;
   findingType: string;
   matchedContent: string;
