@@ -14,7 +14,7 @@ import { applyAll, type BoardOp, type LocalContext } from "./ops";
 import { placeItems, type Command, type XY } from "./commands";
 import { advanceClaims, recordOwnWrite, type OwnWrites } from "./claims";
 import { createPersistence, type Persistence } from "./persistence";
-import type { BoardDomain, ItemPreview } from "./types";
+import type { BoardDomain, ItemPreview, BoardSemantic } from "./types";
 
 const UNDO_LIMIT = 100;
 /** Coalesce refetch requests (socket pushes, focus, stale batches). */
@@ -45,6 +45,8 @@ export interface BoardState extends BoardDomain {
   clientId: string;
   /** The stored thumbnail sketch's signature as of the last read (null: none yet). */
   thumbnailSignature: string | null;
+  /** The Meaning layer (SL5): concepts the board's evidence is about. */
+  semantic: BoardSemantic | null;
 
   load(): Promise<void>;
   hydrate(res: CaseBoardResponseDto): void;
@@ -228,6 +230,7 @@ export function createBoardStore(
       notice: null,
       clientId: persistence.clientId,
       thumbnailSignature: null,
+      semantic: null,
       ...emptyDomain(),
 
       async load() {
@@ -287,6 +290,7 @@ export function createBoardStore(
         set({
           ...domain,
           previews,
+          semantic: (res.semantic as BoardSemantic | null | undefined) ?? null,
           version: Math.max(state.version, res.board.version),
           readOnly,
           caseStatus: res.board.caseStatus,

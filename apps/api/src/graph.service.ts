@@ -5,6 +5,13 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import {
+  MEANING_NODE_TYPES,
+  TERM_NODE,
+  TERM_REF_NODE,
+  isTermUrn,
+  resolveTermUrns,
+} from './semantic/term-refs';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { SourceGraphScheduler } from './stats/source-graph-scheduler.service';
@@ -502,9 +509,15 @@ export class GraphService {
       }
     }
 
-    const [hashToId, urnToId] = await Promise.all([
+    const termUrns = [...urns].filter((urn) => isTermUrn(urn));
+    const [hashToId, urnToId, termUrnToId] = await Promise.all([
       this.resolveHashes([...hashes], dto.sourceId),
-      this.resolveUrns([...urns], dto.sourceId),
+      this.resolveUrns(
+        [...urns].filter((urn) => !isTermUrn(urn)),
+        dto.sourceId,
+      ),
+      // `term://glossary/<key>` names a glossary term, not an asset (SL3 R6).
+      resolveTermUrns(this.prisma, termUrns),
     ]);
 
     interface Endpoint {
@@ -530,6 +543,15 @@ export class GraphService {
       }
       const normalized = tryNormalizeUrn(urn);
       if (!normalized) return null;
+      if (isTermUrn(normalized)) {
+        const termId = termUrnToId.get(normalized);
+        // An unknown key is kept as `term_ref`, never `external`: it is not an
+        // object another scan will produce, and the connection map must not
+        // count it. It stitches when the key appears in the glossary.
+        return termId
+          ? { type: TERM_NODE, id: termId, external: false }
+          : { type: TERM_REF_NODE, id: normalized, external: false };
+      }
       const resolved = urnToId.get(normalized);
       return resolved
         ? { type: kind, id: resolved, external: false }
@@ -1764,6 +1786,8 @@ export class GraphService {
     fanOutCap?: number,
     /** Only walk into nodes of these types (the seeds are exempt). */
     nodeTypes?: string[],
+    /** Walk `term` / `term_ref` endpoints too (the `meaning` kind only). */
+    includeMeaning = false,
   ): Promise<GraphResponseDto> {
     if (seeds.length === 0) {
       return { nodes: [], edges: [], truncated: false };
@@ -1791,14 +1815,24 @@ export class GraphService {
       nodeTypes && nodeTypes.length > 0
         ? Prisma.sql`AND e.from_type IN (${Prisma.join(nodeTypes)})`
         : Prisma.empty;
+    // Meaning is not lineage (rule SL-4): a concept is a hub that would join
+    // everything about it, so `term` and `term_ref` endpoints are never a hop
+    // unless the meaning kind is asked for.
+    const meaningTypes = [...MEANING_NODE_TYPES];
+    const notMeaningTo = includeMeaning
+      ? Prisma.empty
+      : Prisma.sql`AND e.to_type NOT IN (${Prisma.join(meaningTypes)})`;
+    const notMeaningFrom = includeMeaning
+      ? Prisma.empty
+      : Prisma.sql`AND e.from_type NOT IN (${Prisma.join(meaningTypes)})`;
     const outward = Prisma.sql`
       SELECT e.to_type AS node_type, e.to_id AS node_id
       FROM edges e
-      WHERE e.from_type = t.node_type AND e.from_id = t.node_id ${relFilter} ${toTypes}`;
+      WHERE e.from_type = t.node_type AND e.from_id = t.node_id ${relFilter} ${toTypes} ${notMeaningTo}`;
     const inward = Prisma.sql`
       SELECT e.from_type AS node_type, e.from_id AS node_id
       FROM edges e
-      WHERE e.to_type = t.node_type AND e.to_id = t.node_id ${relFilter} ${fromTypes}`;
+      WHERE e.to_type = t.node_type AND e.to_id = t.node_id ${relFilter} ${fromTypes} ${notMeaningFrom}`;
     const neighbor =
       direction === 'out'
         ? outward
@@ -1881,6 +1915,16 @@ export class GraphService {
       .filter((r) => r.node_type === 'finding')
       .map((r) => r.node_id);
 
+    const termIds = rows
+      .filter((r) => r.node_type === TERM_NODE)
+      .map((r) => r.node_id);
+    const terms = termIds.length
+      ? await this.prisma.glossaryTerm.findMany({
+          where: { id: { in: termIds } },
+          select: { id: true, term: true, kind: true, status: true, key: true },
+        })
+      : [];
+    const termMap = new Map(terms.map((t) => [t.id, t]));
     const [assets, findings] = await Promise.all([
       this.prisma.asset.findMany({
         where: { id: { in: assetIds } },
@@ -1943,6 +1987,24 @@ export class GraphService {
           status: 'external',
           urn: r.node_id,
           missing: false,
+        };
+      }
+      if (r.node_type === TERM_NODE || r.node_type === TERM_REF_NODE) {
+        const t = r.node_type === TERM_NODE ? termMap.get(r.node_id) : null;
+        const glyph = t?.kind === 'ENTITY' ? '◇' : '⬡';
+        return {
+          id: r.node_id,
+          type: r.node_type,
+          depth,
+          label:
+            r.node_type === TERM_REF_NODE
+              ? `${r.node_id} (unknown term)`
+              : t
+                ? `${glyph} ${t.term}`
+                : '(deleted term)',
+          status: t ? String(t.status) : 'unresolved',
+          urn: t ? `term://glossary/${t.key}` : r.node_id,
+          missing: r.node_type === TERM_NODE && !t,
         };
       }
       if (r.node_type === 'asset') {

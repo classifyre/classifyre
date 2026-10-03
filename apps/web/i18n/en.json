@@ -183,7 +183,7 @@
     "detectors": "Custom Detectors",
     "investigations": "Investigations",
     "fingerprints": "Duplicate review",
-    "glossary": "Glossary",
+    "glossary": "Entities & glossary",
     "scans": "Scans",
     "operations": "Operations",
     "settings": "Settings",
@@ -196,12 +196,11 @@
     }
   },
   "glossary": {
-    "title": "Glossary",
-    "description": "Canonical vocabulary shared by operators, cases, and every AI Harness run.",
+    "title": "Entities & glossary",
+    "description": "The named things your data refers to, and the vocabulary shared by operators, cases, and every AI Harness run.",
     "addTerm": "Add term",
     "editTerm": "Edit term",
     "searchPlaceholder": "Search terms, aliases, or notes…",
-    "entityTypeFilter": "Entity type",
     "allTypes": "All types",
     "entityTypes": {
       "PERSON": "Person",
@@ -213,23 +212,18 @@
     },
     "columns": {
       "term": "Term",
-      "aliases": "Aliases",
       "type": "Type",
-      "verification": "Origin",
-      "notes": "Notes",
-      "actions": "Actions"
+      "actions": "Actions",
+      "scheme": "Scheme",
+      "labels": "Labels",
+      "status": "Status",
+      "usage": "Used by"
     },
-    "unverifiedAgent": "Unverified · agent",
-    "verified": "Verified",
     "suggested": "suggested",
-    "verify": "Verify",
     "edit": "Edit",
     "delete": "Delete",
     "noValue": "—",
-    "noTerms": "No glossary terms found",
-    "noTermsHint": "Adjust the filters or add a new term.",
     "loading": "Loading glossary…",
-    "updating": "Updating glossary…",
     "form": {
       "termLabel": "Term",
       "termPlaceholder": "e.g. Acme Corp",
@@ -245,26 +239,388 @@
     "termRequired": "Term is required",
     "saved": "Glossary term saved",
     "saveFailed": "Failed to save glossary term",
-    "verifySuccess": "Term verified",
-    "verifyFailed": "Failed to verify term",
     "deleted": "Glossary term deleted",
-    "deleteFailed": "Failed to delete glossary term",
     "deleteConfirmTitle": "Delete glossary term?",
     "deleteConfirmDescription": "This action cannot be undone.",
-    "unverified": "Unverified",
     "bulk": {
       "selected": "{{count}} term selected",
       "selectedPlural": "{{count}} terms selected",
-      "allSelected": "All {{count}} matching terms selected",
       "selectAllAria": "Select all terms matching the current filters",
       "selectTermAria": "Select term {{term}}",
       "selectAll": "Select all {{count}} terms matching the current filters",
-      "deselectAll": "Deselect all terms",
-      "verify": "Verify",
-      "unverify": "Unverify",
-      "changeType": "Change type",
-      "applied": "{{count}} term(s) updated",
-      "failed": "Failed to update the selected terms"
+      "approve": "Approve",
+      "done": "Updated",
+      "moveScheme": "Move to scheme",
+      "makeEntities": "Make entities",
+      "makeConcepts": "Make concepts"
+    },
+    "loadFailed": "Failed to load the glossary",
+    "actionFailed": "That did not work",
+    "allStatuses": "All statuses",
+    "allSchemes": "All schemes",
+    "approve": "Approve",
+    "approved": "Approved",
+    "proposedByAgent": "Proposed by an agent",
+    "transfer": "Import / export",
+    "kinds": {
+      "CONCEPT": "Concept",
+      "ENTITY": "Entity"
+    },
+    "statuses": {
+      "APPROVED": "Approved",
+      "DRAFT": "Draft",
+      "DEPRECATED": "Deprecated"
+    },
+    "methods": {
+      "BINDING": "Binding",
+      "DECLARED": "Declared",
+      "MANUAL": "By hand",
+      "SUGGESTED": "Suggested",
+      "MENTION": "Mention",
+      "BROADER": "Broader"
+    },
+    "tabs": {
+      "concepts": "Concepts",
+      "entities": "Entities",
+      "schemes": "Schemes",
+      "vocabulary": "Unbound vocabulary",
+      "proposals": "Proposals"
+    },
+    "empty": {
+      "concepts": "No concepts yet",
+      "conceptsHint": "Concepts are kinds of things — GmbH, IBAN, Force majeure. Add one, or install a starter pack.",
+      "entities": "No entities yet",
+      "entitiesHint": "Entities are particular things — ACME Holding GmbH, Jane Doe."
+    },
+    "editor": {
+      "conceptHint": "A concept is a kind of thing. Give it a definition and put it in a scheme.",
+      "entityHint": "An entity is one particular thing: a company, a person, a place.",
+      "kindHelp": {
+        "CONCEPT": "A kind of thing (GmbH, IBAN)",
+        "ENTITY": "One particular thing (ACME Holding GmbH)"
+      },
+      "conceptPlaceholder": "e.g. Gesellschaft mit beschränkter Haftung",
+      "keyLabel": "Key",
+      "keyHelp": "The stable identifier connectors and bindings use. Renaming keeps the old key working.",
+      "definitionLabel": "Definition",
+      "definitionPlaceholder": "One or two sentences: what makes something this concept.",
+      "schemeLabel": "Scheme",
+      "noScheme": "No scheme",
+      "codesLabel": "Codes",
+      "codesHelp": "Exact notations, matched case-sensitively (GES, AT_SVNR).",
+      "hiddenAliasesLabel": "Hidden aliases",
+      "hiddenAliasesHelp": "Matched only exactly, never as a word in text — for single letters and abbreviations.",
+      "singleLetterWarning": "“{{letters}}” would match almost every document as an alias. Move it to hidden aliases.",
+      "stewardLabel": "Steward"
+    },
+    "picker": {
+      "placeholder": "Search the glossary…",
+      "change": "Change",
+      "noMatch": "No matching term"
+    },
+    "schemes": {
+      "add": "Add scheme",
+      "edit": "Edit scheme",
+      "delete": "Delete scheme",
+      "deleted": "Scheme deleted",
+      "deleteFailed": "Could not delete the scheme",
+      "notEmpty": "Only an empty scheme can be deleted",
+      "none": "No schemes yet.",
+      "name": "Name",
+      "namePlaceholder": "e.g. Rechtsformen",
+      "nameRequired": "A scheme needs a name",
+      "description": "Description",
+      "color": "Colour",
+      "fromPack": "from pack {{pack}}",
+      "emptyTree": "No concepts in this scheme yet.",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "pick": "Pick a scheme",
+      "pickHint": "A scheme is a controlled vocabulary, like the legal forms of a register."
+    },
+    "vocabulary": {
+      "coverage": "Semantic coverage: {{share}}% of open findings carry a meaning · {{outputs}} outputs unbound ({{findings}} findings)",
+      "search": "Search outputs and fields…",
+      "unbound": "Unbound",
+      "bound": "Bound",
+      "everything": "Everything",
+      "outputs": "Detector outputs",
+      "fields": "Metadata fields",
+      "both": "Outputs and fields",
+      "refresh": "Refresh",
+      "refreshQueued": "Refreshing the vocabulary…",
+      "refreshedAt": "Counted {{when}}",
+      "allBound": "Everything has a meaning",
+      "empty": "No vocabulary yet",
+      "emptyHint": "The vocabulary is counted from findings and assets after each scan.",
+      "unboundShort": "Unbound",
+      "bind": "Bind…",
+      "more": "Showing {{shown}} of {{total}}",
+      "columns": {
+        "vocabulary": "Vocabulary",
+        "sources": "Sources",
+        "open": "Open",
+        "values": "Values",
+        "means": "Means"
+      }
+    },
+    "bind": {
+      "title": "What does this mean?",
+      "description": "Say once what this output or field means; every matching finding gets that meaning, without a re-scan.",
+      "searchVocabulary": "Search detector outputs and fields…",
+      "noVocabulary": "Nothing matches.",
+      "step1": "What the data says",
+      "step2": "Which findings",
+      "step3": "What it means",
+      "allSources": "All sources",
+      "onlySource": "Only {{name}}",
+      "observed": "{{findings}} open findings · {{assets}} assets · {{values}} distinct values",
+      "openValued": "open-valued",
+      "alreadyMeans": "Already means {{terms}} — this adds another meaning.",
+      "choice": {
+        "every": "Every finding of this kind",
+        "values": "Only these values",
+        "lookup": "Each value names a term"
+      },
+      "noValues": "No values observed yet.",
+      "pickScheme": "Scheme…",
+      "matchCodes": "Match codes",
+      "matchAny": "Codes and labels",
+      "searchConcepts": "Search concepts…",
+      "termNotApproved": "This concept is still a draft: the binding links nothing until it is approved.",
+      "preview": "Preview",
+      "completeToPreview": "Choose the findings and the meaning to see what it would link.",
+      "previewFailed": "Preview failed",
+      "willLink": "Will give meaning to {{findings}} open findings on {{assets}} assets in {{sources}} sources.",
+      "timedOut": "(counting timed out; numbers are partial)",
+      "unmatched": "Unmatched:",
+      "ambiguous": "Ambiguous:",
+      "samples": "Samples:",
+      "noMeaning": "No meaning",
+      "noMeaningShort": "— no meaning —",
+      "noMeaningHelp": "Mark as deliberately unbound (e.g. DATE_TIME). Counts as covered; undo like any binding.",
+      "markedNoMeaning": "Marked as having no meaning",
+      "saveDraft": "Save as draft",
+      "save": "Save binding",
+      "saved": "Binding saved — linking {{assets}} assets…",
+      "savedDraft": "Draft binding saved",
+      "saveFailed": "Could not save the binding"
+    },
+    "proposals": {
+      "all": "All",
+      "kinds": {
+        "BINDING": "Bindings",
+        "TERM": "Terms",
+        "ALIAS": "Aliases",
+        "RELATION": "Relations",
+        "LINK": "Documents",
+        "TERM_REF": "Unknown references",
+        "ENTITY_MENTION": "Entity values",
+        "ENTITY_MERGE": "Entity conflicts"
+      },
+      "refresh": "Look for suggestions",
+      "refreshQueued": "Looking for suggestions…",
+      "needsEmbeddings": "Document and meaning-based suggestions need embeddings (Settings → Cleanup › Features).",
+      "empty": "Nothing to review",
+      "emptyHint": "Agent proposals, suggested bindings and unknown term references land here.",
+      "score": "score {{score}}",
+      "term": "Term",
+      "agentNote": "Agent note: {{note}}",
+      "accept": "Accept",
+      "dismiss": "Dismiss",
+      "dismissForever": "Dismiss forever",
+      "accepted": "Accepted",
+      "dismissed": "Dismissed",
+      "reasons": {
+        "wrong_concept": "Wrong concept",
+        "too_broad": "Too broad",
+        "noise": "Noise",
+        "other": "Other"
+      }
+    },
+    "packs": {
+      "open": "Starter packs",
+      "title": "Starter packs",
+      "description": "Schemes, concepts and bindings for common needs. Preview first; nothing an operator curated is overwritten.",
+      "counts": "{{schemes}} schemes · {{terms}} terms · {{bindings}} bindings",
+      "installedVersion": "installed v{{version}}",
+      "preview": "Preview",
+      "install": "Install",
+      "reinstall": "Upgrade",
+      "dryRun": "Would create {{create}}, update {{update}}, skip {{skip}} terms and add {{bindings}} bindings.",
+      "installed": "Pack installed",
+      "failed": "Pack could not be installed"
+    },
+    "export": {
+      "csv": "Export CSV",
+      "skos": "Export SKOS (JSON-LD)"
+    },
+    "import": {
+      "title": "Import",
+      "description": "CSV or SKOS. Run a dry run first to see what would change.",
+      "conflictSkip": "Skip existing keys",
+      "conflictMerge": "Merge labels",
+      "conflictOverwrite": "Overwrite",
+      "asDraft": "Import as drafts",
+      "placeholder": "Paste the file's contents, or choose a file above.",
+      "report": "Report",
+      "counts": "Create {{create}} · update {{update}} · skip {{skip}} · conflicts {{conflict}} · refused {{refused}}",
+      "dryRun": "Dry run",
+      "run": "Import",
+      "done": "Import finished",
+      "failed": "Import failed"
+    },
+    "term": {
+      "notFound": "Term not found",
+      "broaderPath": "Broader concepts",
+      "replacedBy": "Replaced by",
+      "unapprove": "Back to draft",
+      "unapproved": "Back to draft",
+      "deprecate": "Deprecate",
+      "deprecated": "Deprecated",
+      "reinstate": "Reinstate",
+      "reinstated": "Reinstated",
+      "tabs": {
+        "overview": "Overview",
+        "evidence": "Evidence",
+        "bindings": "Bindings",
+        "activity": "Activity",
+        "usage": "Cases & watches",
+        "entity": "Mentions"
+      },
+      "noDefinition": "No definition yet.",
+      "steward": "Steward: {{steward}}",
+      "aliases": "Aliases",
+      "codes": "Codes",
+      "hiddenAliases": "Hidden aliases",
+      "proposedAliases": "Proposed aliases",
+      "narrower": "Narrower concepts",
+      "relations": "Relations",
+      "generatedDetectors": "Detectors made from this term",
+      "noActivity": "No activity yet."
+    },
+    "relations": {
+      "out": {
+        "BROADER": "is a kind of",
+        "RELATED": "is related to",
+        "PART_OF": "is part of",
+        "INSTANCE_OF": "is an instance of",
+        "CUSTOM": "custom"
+      },
+      "in": {
+        "BROADER": "has narrower",
+        "RELATED": "is related to",
+        "PART_OF": "has part",
+        "INSTANCE_OF": "has instance",
+        "CUSTOM": "custom (from)"
+      },
+      "none": "No relations yet.",
+      "add": "Add a relation",
+      "addButton": "Add relation",
+      "labelPlaceholder": "verb, e.g. regulates",
+      "remove": "Remove relation",
+      "failed": "Could not add the relation"
+    },
+    "evidence": {
+      "assets": "Assets",
+      "findings": "Findings",
+      "sources": "Sources",
+      "includeNarrower": "Include narrower concepts",
+      "none": "No evidence yet",
+      "noneHint": "Bind a detector output to this concept, or link a document by hand.",
+      "notApproved": "Only approved terms carry evidence. Approve this one first.",
+      "asset": "Asset",
+      "source": "Source",
+      "method": "Method",
+      "via": "Via",
+      "support": "Support",
+      "severity": "Severity",
+      "page": "{{from}}–{{to}} of {{total}}"
+    },
+    "bindings": {
+      "hint": "Detector outputs and fields bound to this concept.",
+      "add": "Add binding",
+      "none": "No bindings",
+      "noneHint": "Bind an output (a PII type, a tag, an LLM label) so its findings mean this concept.",
+      "entitiesHint": "Entities link through mentions, not bindings.",
+      "vocabulary": "Vocabulary",
+      "mode": "Mode",
+      "by": "By",
+      "disable": "Disable",
+      "enable": "Enable",
+      "modes": {
+        "OUTPUT": "Every finding",
+        "OUTPUT_VALUES": "Only these values",
+        "OUTPUT_LOOKUP": "Value names a term",
+        "METADATA_VALUES": "Field values",
+        "METADATA_LOOKUP": "Field value names a term"
+      },
+      "viaScheme": "looks values up in {{scheme}}"
+    },
+    "findInText": {
+      "open": "Find in text",
+      "title": "Find in text",
+      "description": "Make a tested REGEX detector from this concept's labels and bind its output here — for concepts that appear only as words.",
+      "labels": "Labels",
+      "pattern": "Pattern",
+      "tests": "{{count}} generated tests",
+      "existing": "Already generated: {{names}}",
+      "severity": "Severity",
+      "create": "Create detector",
+      "created": "Detector created and bound",
+      "failed": "Could not create the detector",
+      "openDetector": "Open the detector"
+    },
+    "meaning": {
+      "title": "Meaning",
+      "none": "This finding carries no meaning yet.",
+      "noneAsset": "No concepts yet.",
+      "assetHint": "Concepts this asset is evidence of.",
+      "impliedBy": "implied by {{term}}",
+      "throughBinding": "through {{label}}",
+      "linkedBy": "linked by {{by}}",
+      "unlink": "Remove link",
+      "whatDoesThisMean": "What does this mean?",
+      "linkByHand": "Link to a term",
+      "notePlaceholder": "Why (optional)",
+      "link": "Link",
+      "linked": "Linked",
+      "support": "{{count}} findings",
+      "gone": "No longer supported",
+      "history": "Earlier",
+      "showHistory": "Show earlier concepts",
+      "hideHistory": "Hide earlier concepts"
+    },
+    "inquiry": {
+      "aboutLabel": "About",
+      "aboutHint": "Only findings that are evidence of one of these terms: a concept (a binding of their output, or a manual link) or an entity (a mention of one of its names or identifiers).",
+      "includeNarrower": "Include narrower concepts",
+      "remove": "Remove {{term}}"
+    },
+    "usage": {
+      "unused": "Not used yet",
+      "asset": "asset",
+      "assets": "assets",
+      "binding": "binding",
+      "bindings": "bindings",
+      "tiles": {
+        "assets": "Assets",
+        "findings": "Findings",
+        "bindings": "Bindings",
+        "cases": "Cases",
+        "watches": "Watches"
+      },
+      "unusedHint": "Nothing links to this term yet. Bind a detector output or a metadata field to it under Bindings, or use Find in text — the links appear without a re-scan.",
+      "cases": "Cases",
+      "noCases": "No case uses this term",
+      "noCasesHint": "A case appears here when its evidence links to the term, or when the case itself is linked to it from the board.",
+      "about": "about this term",
+      "caseAssets": "{{count}} evidence asset(s)",
+      "watches": "Watches",
+      "watchThis": "Watch this term",
+      "noWatches": "No watch follows this term",
+      "noWatchesHint": "A watch on this term reports new findings that are evidence of it after every scan.",
+      "watchMatches": "{{count}} matches"
     }
   },
   "common": {
@@ -436,7 +792,7 @@
         },
         "glossary": {
           "name": "Glossary",
-          "desc": "Agreed terms and references."
+          "desc": "Concepts, entities, schemes, relations, bindings and links made by hand, with their history."
         },
         "scans": {
           "name": "Scan history",
@@ -470,9 +826,29 @@
           "name": "Source graph",
           "desc": "Precomputed source relationship graph. Rebuilt automatically by the graph worker."
         },
+        "vocabulary": {
+          "name": "Vocabulary inventory",
+          "desc": "The detector outputs and metadata fields the data produces, with counts. Refreshed automatically from findings and assets."
+        },
+        "semanticLinks": {
+          "name": "Semantic links (derived)",
+          "desc": "Which assets are evidence of which concepts, with coverage history. Rebuilt automatically from bindings, declarations and manual links."
+        },
+        "suggestions": {
+          "name": "Pending suggestions",
+          "desc": "Glossary suggestions nobody has decided yet. Decided suggestions are kept, so dismissed ones are not proposed again."
+        },
+        "semanticMap": {
+          "name": "Semantic map",
+          "desc": "Precomputed concept rollups for the semantic map. Rebuilt automatically."
+        },
         "transfers": {
           "name": "Finished transfers",
           "desc": "Completed, failed and cancelled export/import jobs with their chunks. Staged and running transfers are kept."
+        },
+        "entities": {
+          "name": "Entity candidates and mentions",
+          "desc": "Pending entity candidates, mention links and counters. Rebuilt automatically while Entities are on. Entities and decided values are kept."
         }
       }
     },
@@ -619,7 +995,7 @@
   },
   "features": {
     "title": "Features",
-    "subtitle": "The two background engines that build most of this workspace's derived data. Turning one off stops its work and pauses its workers; the investigation itself — sources, findings, assets, cases, inquiry watches, glossary — is never touched.",
+    "subtitle": "The background engines that build most of this workspace's derived data. Turning one off stops its work and pauses its workers; the investigation itself — sources, findings, assets, cases, inquiry watches, glossary — is never touched.",
     "loading": "Reading feature switches…",
     "loadFailed": "Could not load the feature switches",
     "retry": "Retry",
@@ -646,6 +1022,11 @@
         "name": "Duplicate detection",
         "desc": "Matches assets that share identifying values after every scan. Feeds Duplicate review, “where else found”, similar-asset links in the graph and the harness duplicates tools.",
         "configure": "Tuning"
+      },
+      "entities": {
+        "name": "Entities",
+        "desc": "Links findings to the named things they refer to: every finding that carries an entity’s name or identifier is a mention of it. Feeds entity pages, the candidate review, entity watches and case leads.",
+        "configure": "Entities"
       }
     },
     "off": {
@@ -673,6 +1054,14 @@
         "stop4": "The correlation.scan worker is paused (Settings → Workers) and cannot be resumed there.",
         "keep": "Kept: every match and pattern as it stands now, and all review decisions.",
         "delete": "Deletes match candidates, signatures, correlation values, clusters, patterns and the scored duplicate links in the asset graph. Lineage links and your review decisions are kept. Duplicate review stays empty until it is turned back on and the recompute finishes."
+      },
+      "entities": {
+        "stop1": "No entity resolution after scans: mention counters, candidates and mention links stop updating.",
+        "stop2": "Entity watches and case leads stop seeing new mentions.",
+        "stop3": "With duplicate detection off as well, finding values are no longer indexed at all.",
+        "stop4": "The entities.resolve and entities.recount workers are paused (Settings → Workers) and cannot be resumed there.",
+        "keep": "Kept: every entity, every confirmed and rejected value, pending candidates, mention links and counters as they stand now.",
+        "delete": "Deletes pending candidates, mention links and counters — and the value index too, unless duplicate detection is on. The entities themselves and every confirmed or rejected value are kept, so nothing has to be decided twice."
       }
     },
     "enable": {
@@ -681,7 +1070,8 @@
       "cancel": "Cancel",
       "embeddingsKept": "Embedding resumes where it stopped: content scanned while it was off is embedded in the background, and rankings update as it catches up.",
       "embeddingsDeleted": "Embedding starts from scratch: every finding is re-embedded in the background — hours of worker CPU on a large corpus. Document text deleted earlier only comes back by rescanning sources with a full rescan.",
-      "duplicates": "Runs one full recompute over every asset to catch up with everything scanned while it was off — on a large corpus about an hour of worker time. Duplicate review fills in as it finishes."
+      "duplicates": "Runs one full recompute over every asset to catch up with everything scanned while it was off — on a large corpus about an hour of worker time. Duplicate review fills in as it finishes.",
+      "entities": "Matches the names and identifiers of your entities against everything already scanned. If duplicate detection is off, the value index is rebuilt first — on a large corpus that takes a while. Counters and candidates appear as it finishes."
     },
     "deleteKept": {
       "title": "Delete the data {{name}} kept?",
@@ -712,6 +1102,10 @@
         "review": "New scans are not checked for duplicates, so this queue shows the results from before it was turned off.",
         "reviewDeleted": "Its results were deleted, so there is nothing to review until it is turned back on.",
         "occurrences": "Shared-value lookups come from duplicate detection, which is turned off for this workspace."
+      },
+      "entities": {
+        "title": "Entities are turned off",
+        "entity": "Mentions, counters and candidates are not updated, so this page shows the state from before they were turned off."
       }
     },
     "workers": {
@@ -767,8 +1161,8 @@
     "conflictMode": "If an entry already exists",
     "conflictSkip": "Keep the existing entry",
     "conflictOverwrite": "Replace it with the archive",
-    "conflictSkipHint": "Imported records always arrive as new records with new IDs, so nothing here is replaced. This only applies to entries matched by name — glossary terms, MCP servers — and to instance settings: those are left as they are.",
-    "conflictOverwriteHint": "Imported records always arrive as new records with new IDs. This only applies to entries matched by name — glossary terms, MCP servers — and to instance settings: those are overwritten by the archive. That cannot be undone.",
+    "conflictSkipHint": "Imported records always arrive as new records with new IDs, so nothing here is replaced. This only applies to entries matched by a unique name or key — glossary terms and schemes (by key), MCP servers — and to instance settings: those are left as they are.",
+    "conflictOverwriteHint": "Imported records always arrive as new records with new IDs. This only applies to entries matched by a unique name or key — glossary terms and schemes (by key), MCP servers — and to instance settings: those are overwritten by the archive. That cannot be undone.",
     "startImport": "Import data",
     "importStarted": "Import started",
     "importFailed": "Could not start the import",
@@ -4129,6 +4523,17 @@
           "body": "Someone made this link a relationship of the whole workspace: every case that holds both sees it."
         }
       }
+    },
+    "term": {
+      "unknown": "Concept",
+      "concept": "Concept",
+      "linked": "{{count}} on the board"
+    },
+    "meaning": {
+      "title": "Meaning",
+      "place": "Place",
+      "show": "Move here",
+      "truncated": "{{count}} more concepts not shown"
     }
   },
   "caseCleanup": {
@@ -4305,7 +4710,8 @@
       "INQUIRY": "Watch answers",
       "SEMANTIC_NEIGHBOR": "Similar",
       "AUTOPILOT": "Autopilot",
-      "MANUAL": "Bookmarked"
+      "MANUAL": "Bookmarked",
+      "ENTITY": "Entity mentions"
     },
     "origin": {
       "DUPLICATE": "Look-alike",
@@ -4313,7 +4719,8 @@
       "SEMANTIC_NEIGHBOR": "Similar",
       "SAME_VALUE": "Same value",
       "AUTOPILOT": "Autopilot",
-      "MANUAL": "Bookmarked"
+      "MANUAL": "Bookmarked",
+      "ENTITY": "Mentions an entity"
     },
     "why": {
       "sameValue": "Same value as {{via}}",
@@ -5981,5 +6388,151 @@
     "linkFailed": "Created, but could not link it to: {{titles}}",
     "open": "Open “{{title}}” at this watch",
     "more": "+{{count}} more"
+  },
+  "semanticMap": {
+    "title": "Meaning",
+    "subtitle": "{{concepts}} concepts · {{unbound}} outputs unbound",
+    "loading": "Loading…",
+    "loadFailed": "The semantic map could not be loaded",
+    "assets": "{{count}} assets",
+    "minAssets": "Min assets",
+    "cooccurrence": "Co-occurrence",
+    "layouts": {
+      "taxonomy": "Taxonomy",
+      "network": "Network"
+    },
+    "modes": {
+      "sources": "Sources",
+      "meaning": "Meaning"
+    },
+    "rebuild": "Rebuild",
+    "rebuildQueued": "Rebuilding the map…",
+    "empty": {
+      "noConcepts": "Your glossary has no concepts yet.",
+      "noConceptsHint": "Install a starter pack, or import SKOS or CSV.",
+      "openGlossary": "Open the glossary",
+      "noLinks": "Nothing is bound yet.",
+      "noLinksHint": "Bind detector outputs to concepts and the map fills in.",
+      "bindOutputs": "Bind detector outputs"
+    },
+    "unbound": "Unbound vocabulary: {{outputs}} outputs · {{findings}} open findings without meaning.",
+    "review": "Review",
+    "pending": "{{count}} pending proposals",
+    "openTerm": "Open term"
+  },
+  "entities": {
+    "loadFailed": "The entity could not be loaded",
+    "mergedInto": "Merged into",
+    "notLinking": "This entity is not approved yet. Its mentions are listed here so you can judge it, but they link to documents, watches and cases only once it is approved.",
+    "anchor": "Anchor record",
+    "sources": "Sources",
+    "sourceCounts": "{{mentions}} mentions · {{assets}} assets",
+    "tiles": {
+      "mentions": "Mentions",
+      "assets": "Assets",
+      "sources": "Sources",
+      "firstSeen": "First seen",
+      "lastSeen": "Last seen"
+    },
+    "usage": {
+      "mention": "mention",
+      "mentions": "mentions"
+    },
+    "methods": {
+      "EXACT_ALIAS": "Name",
+      "IDENTIFIER": "Identifier",
+      "CONNECTOR": "Declared by source",
+      "PHONETIC": "Sounds alike",
+      "FUZZY": "Same spelling",
+      "MANUAL": "Promoted"
+    },
+    "values": {
+      "identifiers": "Identifiers",
+      "names": "Names",
+      "noIdentifiers": "No identifiers yet. An IBAN, a VAT number or an e-mail address links more reliably than any name.",
+      "noNames": "No finding label in this workspace carries names of this kind yet.",
+      "label": "Label",
+      "value": "Value",
+      "add": "Add identifier",
+      "added": "Identifier added",
+      "removed": "Value removed",
+      "remove": "Remove {{value}}",
+      "labelHint": "The label is the one a detector finds the value under. It is what links a finding to this entity.",
+      "occurrencesHint": "Assets that carry this value",
+      "sharedWith": "also a name of",
+      "conflict": "{{entity}} already holds this identifier. It was not linked twice: decide in the review queue."
+    },
+    "mentions": {
+      "title": "Mentions",
+      "overTime": "Mentions over time",
+      "none": "No mentions yet",
+      "noneHint": "No scanned finding carries one of this entity’s names or identifiers.",
+      "notApproved": "No scanned finding carries one of this entity’s names or identifiers.",
+      "more": "Load more",
+      "export": "Export mentions",
+      "columns": {
+        "asset": "Asset",
+        "source": "Source",
+        "value": "Value",
+        "context": "Context",
+        "seen": "First seen"
+      }
+    },
+    "coMentions": {
+      "title": "Mentioned with",
+      "none": "No other entity appears in the same assets."
+    },
+    "candidates": {
+      "title": "To review ({{count}})",
+      "openQueue": "Open the review queue",
+      "conflict": "Conflict",
+      "review": "Review",
+      "reject": "Reject",
+      "rejectForever": "Not this entity",
+      "accepted": "Value confirmed",
+      "rejected": "Value rejected. It will not be proposed again."
+    },
+    "conflict": {
+      "both": "Both hold it",
+      "settle": "Settle…",
+      "move": "Move it to {{name}}",
+      "merge": "Merge {{from}} into {{into}}",
+      "keep": "Keep it with {{name}}"
+    },
+    "merge": {
+      "open": "Merge",
+      "title": "Merge {{name}} into another entity",
+      "desc": "Its names, identifiers, values, relations and watches move to the entity you choose, and it redirects there. This is not undone with one click.",
+      "into": "Merge into",
+      "same": "Choose a different entity.",
+      "needsApproved": "Choose an approved entity.",
+      "confirm": "Merge",
+      "done": "{{from}} was merged into {{into}}"
+    },
+    "make": {
+      "open": "Make entity",
+      "title": "Make entity",
+      "descName": "This value becomes the entity’s name. Every finding with the same name is then a mention of it.",
+      "descIdentifier": "This value becomes the entity’s first identifier. Every finding with the same value is then a mention of it.",
+      "name": "Name",
+      "namePlaceholder": "ACME Holding GmbH",
+      "type": "Type",
+      "confirm": "Create entity",
+      "created": "{{name}} was created.",
+      "existing": "{{name}} already existed and was updated.",
+      "found": "{{count}} assets mention it.",
+      "openEntity": "Open entity"
+    },
+    "labels": {
+      "title": "Labels that take part",
+      "summary": "{{names}} name labels · {{identifiers}} identifier labels",
+      "hint": "Names are matched by spelling and produce candidates to review. Identifiers are matched exactly. Tag, date and free-text labels never take part, so a common word cannot make every document a mention. Saving regenerates every entity’s values.",
+      "names": "Name labels (custom)",
+      "identifiers": "Identifier labels",
+      "save": "Save labels",
+      "reset": "Reset",
+      "saved": "Labels saved. Entity values are being regenerated.",
+      "add": "Add label"
+    }
   }
 }

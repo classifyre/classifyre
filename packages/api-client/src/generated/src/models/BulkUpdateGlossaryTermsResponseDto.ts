@@ -20,17 +20,23 @@ import { mapValues } from '../runtime';
  */
 export interface BulkUpdateGlossaryTermsResponseDto {
     /**
-     * Number of terms updated
+     * 
      * @type {number}
      * @memberof BulkUpdateGlossaryTermsResponseDto
      */
     updatedCount: number;
     /**
-     * IDs of the updated terms
+     * 
      * @type {Array<string>}
      * @memberof BulkUpdateGlossaryTermsResponseDto
      */
     ids: Array<string>;
+    /**
+     * 
+     * @type {Array<object>}
+     * @memberof BulkUpdateGlossaryTermsResponseDto
+     */
+    refused?: Array<object>;
 }
 
 /**
@@ -54,6 +60,7 @@ export function BulkUpdateGlossaryTermsResponseDtoFromJSONTyped(json: any, ignor
         
         'updatedCount': json['updatedCount'],
         'ids': json['ids'],
+        'refused': json['refused'] == null ? undefined : json['refused'],
     };
 }
 
@@ -70,6 +77,7 @@ export function BulkUpdateGlossaryTermsResponseDtoToJSONTyped(value?: BulkUpdate
         
         'updatedCount': value['updatedCount'],
         'ids': value['ids'],
+        'refused': value['refused'],
     };
 }
 

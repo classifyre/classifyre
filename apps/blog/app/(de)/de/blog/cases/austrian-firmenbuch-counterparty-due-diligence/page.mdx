@@ -464,6 +464,15 @@ je *Eigenmittelquote* sagen. Und einbuchstabige Registercodes lösen korrekt auf
 `E` heißt *Einzelvertretung*, nicht „der Buchstabe E“ — was zählt, wenn ein so
 kurzer Code sonst den halben Korpus als Substring matchte.
 
+Eine Anmerkung zum Mechanismus, damit niemand mehr erwartet, als passiert ist:
+Die sprachübergreifende Reichweite kam aus der semantischen Suche und aus dem
+Glossar-Lookup, der ein Synonym zu seinem Begriff auflöst. Das Glossar schreibt
+keine Queries um — „equity ratio“ in einem Fund-Filter wird nicht stillschweigend
+zu *Eigenmittelquote* erweitert. Wo eine Bedeutung überall gelten soll, wird sie
+jetzt ausdrücklich festgelegt: Die Registercodes sind an die Konzepte des Schemas
+*Rechtsformen* gebunden, und Filter, Watches und Exporte können ein Konzept über
+seinen Schlüssel abfragen.
+
 Bemerkenswert: Wir legten **keine Firmennamen** ins Glossar. Namen sind Daten,
 keine Terminologie, und ein Glossar, das Entitätsnamen lernt, macht die
 Korrelations-Engine über Dinge confident, die sie hinterfragen sollte.

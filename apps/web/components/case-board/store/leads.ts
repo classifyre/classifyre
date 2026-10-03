@@ -8,7 +8,7 @@ import type { CaseLeadDto } from "@workspace/api-client";
  */
 
 /** The reasons a lead can have, in the order the filters show them. */
-export const LEAD_ORIGINS = ["DUPLICATE", "INQUIRY", "SEMANTIC_NEIGHBOR", "AUTOPILOT", "MANUAL"] as const;
+export const LEAD_ORIGINS = ["DUPLICATE", "INQUIRY", "SEMANTIC_NEIGHBOR", "ENTITY", "AUTOPILOT", "MANUAL"] as const;
 export type LeadOrigin = (typeof LEAD_ORIGINS)[number];
 /** A similar finding with the very value of what it resembles is named apart. */
 export type LeadReason = LeadOrigin | "SAME_VALUE";

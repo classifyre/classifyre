@@ -30,6 +30,7 @@ import {
   evidenceTombstone,
 } from '../case-board/tombstones';
 import { CompiledMatcher } from '../matching/inquiry-matcher';
+import { ensureTermSnapshotFor } from '../semantic/term-snapshot';
 import { CASE_CLEANUP_ACTOR, type CaseCleanupPort } from './case-cleanup.port';
 import {
   anyRule,
@@ -174,6 +175,8 @@ const MATCHER_SELECT = {
   findingTypes: true,
   findingTypeRegex: true,
   findingValueRegex: true,
+  termKeys: true,
+  termsIncludeNarrower: true,
 } as const;
 
 export function rulesOf(row: CleanupRules): CleanupRules {
@@ -772,6 +775,10 @@ export class CaseCleanupService implements CaseCleanupPort {
       where: { id: { in: linkIds } },
       select: { id: true, inquiry: { select: MATCHER_SELECT } },
     });
+    await ensureTermSnapshotFor(
+      this.prisma,
+      links.map((l) => l.inquiry),
+    );
     return new Map(links.map((l) => [l.id, new CompiledMatcher(l.inquiry)]));
   }
 

@@ -38,6 +38,8 @@ import {
   UpdateSupervisorGoalDto,
   WakeSupervisorDto,
 } from '../dto/supervisor.dto';
+import { BindingsService } from '../../semantic/bindings/bindings.service';
+import { GlossaryRelationsService } from '../../glossary/glossary-relations.service';
 
 const INSTANCE_SETTINGS_ID = 1;
 
@@ -51,6 +53,8 @@ export class SupervisorController {
     private readonly undo: UndoService,
     private readonly registry: ToolRegistry,
     private readonly runner: CliRunnerService,
+    private readonly bindings: BindingsService,
+    private readonly relations: GlossaryRelationsService,
   ) {}
 
   @Get()
@@ -304,6 +308,32 @@ export class SupervisorController {
         outcome:
           'Re-scan started. Findings and assets will be rebuilt from current ' +
           'detection; triage decisions made before the purge do not return.',
+      };
+    }
+
+    // Glossary approvals by agents (D7) go back to DRAFT; SL3 then marks
+    // their links GONE.
+    const payload = claim.payload as {
+      kind?: string;
+      bindingId?: string;
+      relationId?: string;
+    } | null;
+    if (payload?.kind === 'glossary.binding' && payload.bindingId) {
+      await this.bindings.revertToDraft(payload.bindingId, OPERATOR_ACTOR);
+      return {
+        id,
+        revertKind: claim.revertKind,
+        outcome:
+          'Binding returned to DRAFT. Its semantic links are marked GONE on ' +
+          'the next linker pass.',
+      };
+    }
+    if (payload?.kind === 'glossary.relation' && payload.relationId) {
+      await this.relations.unapprove(payload.relationId, OPERATOR_ACTOR);
+      return {
+        id,
+        revertKind: claim.revertKind,
+        outcome: 'Relation returned to DRAFT.',
       };
     }
 

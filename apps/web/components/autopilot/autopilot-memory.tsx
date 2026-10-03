@@ -37,7 +37,7 @@ import {
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
 import { cn } from "@workspace/ui/lib/utils";
-import { GlossaryWorkspace } from "@/app/[locale]/[namespaceSlug]/(dashboard)/glossary/page";
+import { GlossaryWorkspace } from "@/components/glossary/glossary-workspace";
 import { useNamespace } from "@/components/namespace-provider";
 
 type Kind =

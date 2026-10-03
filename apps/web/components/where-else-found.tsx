@@ -3,9 +3,10 @@
 import { useNsPath } from "@/lib/ns-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Radar } from "lucide-react";
+import { Radar, UserPlus } from "lucide-react";
 import { api, type ValueOccurrencesResponseDto } from "@workspace/api-client";
 import {
+  Button,
   Card,
   CardContent,
   CardDescription,
@@ -19,6 +20,8 @@ import { useTranslation } from "@/hooks/use-translation";
 import { FeatureOffNotice } from "@/components/feature-off-notice";
 import { assetCandidate, useAddToCase } from "@/components/case-target/case-target";
 import { AddToCaseButton } from "@/components/case-target/case-target-menu";
+import { MakeEntityDialog } from "@/components/glossary/entity-sections";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 
 /**
  * "Where else found" — lists every other asset that carries the same normalized
@@ -29,11 +32,14 @@ export function WhereElseFound({
   label,
   value,
   currentAssetId,
+  findingId,
   embedded = false,
 }: {
   label: string;
   value: string;
   currentAssetId?: string;
+  /** The finding this value came from, so "Make entity" records where. */
+  findingId?: string;
   /** Inside another panel (the case board's details): no card around it. */
   embedded?: boolean;
 }) {
@@ -43,6 +49,22 @@ export function WhereElseFound({
   const { target: caseTarget, dialog: caseDialog } = useAddToCase();
   const [data, setData] = useState<ValueOccurrencesResponseDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The value occurs in several places: it may be a thing worth naming (G5 R16).
+  const [makingEntity, setMakingEntity] = useState(false);
+  const { isOff } = useWorkspaceFeatures();
+  const makeEntity =
+    label && value && !isOff("entities") ? (
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setMakingEntity(true)}
+        className="h-7 shrink-0 rounded-[4px] border-2 border-border text-xs"
+        data-testid="make-entity"
+      >
+        <UserPlus className="h-3.5 w-3.5" />
+        {t("entities.make.open")}
+      </Button>
+    ) : null;
 
   useEffect(() => {
     let active = true;
@@ -134,13 +156,23 @@ export function WhereElseFound({
         </div>
       )}
       {caseDialog}
+      <MakeEntityDialog
+        open={makingEntity}
+        onOpenChange={setMakingEntity}
+        findingId={findingId}
+        label={label}
+        value={value}
+      />
     </>
   );
 
   if (embedded) {
     return (
       <div className="space-y-3" data-testid="where-else-found">
-        <p className="text-xs text-muted-foreground">{t("correlation.occurrences.desc")}</p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-xs text-muted-foreground">{t("correlation.occurrences.desc")}</p>
+          {makeEntity}
+        </div>
         {content}
       </div>
     );
@@ -149,9 +181,12 @@ export function WhereElseFound({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Radar className="h-4 w-4" />
-          {t("correlation.occurrences.title")}
+        <CardTitle className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2">
+            <Radar className="h-4 w-4" />
+            {t("correlation.occurrences.title")}
+          </span>
+          {makeEntity}
         </CardTitle>
         <CardDescription>{t("correlation.occurrences.desc")}</CardDescription>
       </CardHeader>

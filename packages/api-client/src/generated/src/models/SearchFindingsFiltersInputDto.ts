@@ -109,6 +109,24 @@ export interface SearchFindingsFiltersInputDto {
      * @memberof SearchFindingsFiltersInputDto
      */
     excludeIds?: Array<string>;
+    /**
+     * Glossary term keys: findings that are evidence of one of them (an APPROVED binding of their output, or a manual link). Unknown keys are rejected.
+     * @type {Array<string>}
+     * @memberof SearchFindingsFiltersInputDto
+     */
+    term?: Array<string>;
+    /**
+     * With term: include the narrower concepts too.
+     * @type {boolean}
+     * @memberof SearchFindingsFiltersInputDto
+     */
+    includeNarrower?: boolean;
+    /**
+     * With term: only evidence by these methods.
+     * @type {Array<string>}
+     * @memberof SearchFindingsFiltersInputDto
+     */
+    meaningMethod?: Array<SearchFindingsFiltersInputDtoMeaningMethodEnum>;
 }
 
 
@@ -148,6 +166,15 @@ export const SearchFindingsFiltersInputDtoStatusEnum = {
 } as const;
 export type SearchFindingsFiltersInputDtoStatusEnum = typeof SearchFindingsFiltersInputDtoStatusEnum[keyof typeof SearchFindingsFiltersInputDtoStatusEnum];
 
+/**
+ * @export
+ */
+export const SearchFindingsFiltersInputDtoMeaningMethodEnum = {
+    Binding: 'BINDING',
+    Manual: 'MANUAL'
+} as const;
+export type SearchFindingsFiltersInputDtoMeaningMethodEnum = typeof SearchFindingsFiltersInputDtoMeaningMethodEnum[keyof typeof SearchFindingsFiltersInputDtoMeaningMethodEnum];
+
 
 /**
  * Check if a given object implements the SearchFindingsFiltersInputDto interface.
@@ -181,6 +208,9 @@ export function SearchFindingsFiltersInputDtoFromJSONTyped(json: any, ignoreDisc
         'firstDetectedAfter': json['firstDetectedAfter'] == null ? undefined : (new Date(json['firstDetectedAfter'])),
         'lastDetectedBefore': json['lastDetectedBefore'] == null ? undefined : (new Date(json['lastDetectedBefore'])),
         'excludeIds': json['excludeIds'] == null ? undefined : json['excludeIds'],
+        'term': json['term'] == null ? undefined : json['term'],
+        'includeNarrower': json['includeNarrower'] == null ? undefined : json['includeNarrower'],
+        'meaningMethod': json['meaningMethod'] == null ? undefined : json['meaningMethod'],
     };
 }
 
@@ -210,6 +240,9 @@ export function SearchFindingsFiltersInputDtoToJSONTyped(value?: SearchFindingsF
         'firstDetectedAfter': value['firstDetectedAfter'] == null ? value['firstDetectedAfter'] : value['firstDetectedAfter'].toISOString(),
         'lastDetectedBefore': value['lastDetectedBefore'] == null ? value['lastDetectedBefore'] : value['lastDetectedBefore'].toISOString(),
         'excludeIds': value['excludeIds'],
+        'term': value['term'],
+        'includeNarrower': value['includeNarrower'],
+        'meaningMethod': value['meaningMethod'],
     };
 }
 

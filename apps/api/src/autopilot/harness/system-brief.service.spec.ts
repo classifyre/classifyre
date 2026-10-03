@@ -43,9 +43,37 @@ describe('SystemBriefService', () => {
     mockPrisma.runner.groupBy.mockResolvedValue([]);
     mockPrisma.finding.count.mockResolvedValue(0);
 
-    mockPrisma.glossaryTerm.findMany.mockResolvedValue([
-      { term: 'pii', aliases: [], entityType: 'TERM', notes: 'personal data' },
-    ]);
+    mockPrisma.glossaryTerm.findMany.mockImplementation(
+      (args: { where: { kind: string } }) =>
+        Promise.resolve(
+          args.where.kind === 'CONCEPT'
+            ? [
+                {
+                  term: 'Personal data',
+                  key: 'personal-data',
+                  aliases: ['PII'],
+                  codes: [],
+                  entityType: 'TERM',
+                  notes: null,
+                  definition:
+                    'Any information relating to an identified person.',
+                  scheme: { name: 'GDPR' },
+                },
+              ]
+            : [
+                {
+                  term: 'ACME Holding GmbH',
+                  key: 'acme-holding-gmbh',
+                  aliases: [],
+                  codes: [],
+                  entityType: 'ORGANIZATION',
+                  notes: 'parent company',
+                  definition: null,
+                  scheme: null,
+                },
+              ],
+        ),
+    );
     mockMemory.topByWeight.mockImplementation((kind: AgentMemoryKind) => {
       const byKind: Partial<Record<AgentMemoryKind, unknown[]>> = {
         [AgentMemoryKind.ENTITY_MAP]: [
@@ -158,7 +186,7 @@ describe('SystemBriefService', () => {
     it('folds glossary, topics and gaps in from memory', async () => {
       const c = await service.compose();
       expect(c.overview).toBe('Overview text');
-      expect(c.glossary.map((g) => g.key)).toContain('pii');
+      expect(c.glossary.map((g) => g.key)).toContain('Personal data');
       expect(c.topics.map((t) => t.key)).toContain('leaks');
       expect(c.gaps.map((g) => g.key)).toContain('detector-author:iban');
     });
@@ -334,5 +362,26 @@ describe('SystemBriefService', () => {
       // Detector autopilot is off → it is surfaced as a next step.
       expect(labels).toContain('Detector-authoring autopilot is off');
     });
+  });
+
+  it('lists APPROVED concepts by scheme before APPROVED entities, never drafts', async () => {
+    mockPrisma.agentSystemBrief.findUnique.mockResolvedValue(null);
+    mockMemory.topByWeight.mockResolvedValue([]);
+    const entries = await (
+      service as unknown as {
+        glossaryEntries: () => Promise<Array<{ key: string; content: string }>>;
+      }
+    ).glossaryEntries();
+    expect(entries.map((e) => e.key)).toEqual([
+      'Personal data',
+      'ACME Holding GmbH',
+    ]);
+    expect(entries[0].content).toContain('concept in GDPR (key personal-data)');
+    const calls = mockPrisma.glossaryTerm.findMany.mock.calls as Array<
+      [{ where: { status: string } }]
+    >;
+    expect(calls.every(([args]) => args.where.status === 'APPROVED')).toBe(
+      true,
+    );
   });
 });

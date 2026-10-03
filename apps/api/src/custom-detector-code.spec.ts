@@ -109,9 +109,9 @@ describe('code detector schema rules', () => {
     expect(() =>
       validateCodeDetectorSchema(schema({ files: ['file-id-1'] })),
     ).not.toThrow();
-    expect(() =>
-      validateCodeDetectorSchema(schema({ files: [42] })),
-    ).toThrow(/files/);
+    expect(() => validateCodeDetectorSchema(schema({ files: [42] }))).toThrow(
+      /files/,
+    );
     expect(() =>
       validateCodeDetectorSchema(
         schema({ severity: 'High', category: 'quality' }),

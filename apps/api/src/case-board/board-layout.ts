@@ -1,6 +1,7 @@
 import {
   ASSET_NODE,
   COMMENT_PIN_SIZE,
+  TERM_CARD_SIZE,
   DEFAULT_FRAME_SIZE,
   DEFAULT_NOTE_SIZE,
   FINDING_NODE,
@@ -216,6 +217,13 @@ export function boxOf(
         dy: 0,
         width: item.width ?? DEFAULT_NOTE_SIZE.width,
         height: item.height ?? DEFAULT_NOTE_SIZE.height,
+      };
+    case 'TERM':
+      return {
+        dx: 0,
+        dy: 0,
+        width: TERM_CARD_SIZE.width,
+        height: TERM_CARD_SIZE.height,
       };
     case 'FRAME':
       return {

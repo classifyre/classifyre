@@ -22,6 +22,7 @@ import { TransferProgress } from './transfer-progress';
 import { modelDelegate, scalarFields } from './prisma-delegate';
 import { createIdRemapper, type IdRemapper } from './id-remap';
 import { cursorArg, keyOf } from './namespace-export.service';
+import { glossaryEvents } from '../glossary/glossary-events';
 
 /**
  * Loads an archive into the current namespace.
@@ -246,6 +247,19 @@ export class NamespaceImportService {
 
       this.warnAboutStrippedSecrets(reader.footer?.stripped, progress);
       await this.finish(job.id, DataTransferStatus.COMPLETED, progress);
+
+      // Semantic links, the vocabulary inventory and the map are derived and
+      // do not travel (transfer-scopes.ts); the semantic layer rebuilds them
+      // from what was imported.
+      if (['glossary', 'assets', 'findings'].some((id) => selected.has(id))) {
+        glossaryEvents.emit({
+          type: 'glossary.imported',
+          format: 'archive',
+          created: progress.processedRows,
+          updated: 0,
+          skipped: progress.skippedRows,
+        });
+      }
 
       this.logger.log(
         `Import ${job.id} wrote ${progress.processedRows} rows ` +

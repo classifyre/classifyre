@@ -13,13 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
-import type { GlossaryTermDto } from './GlossaryTermDto';
+import type { GlossaryListedTermDto } from './GlossaryListedTermDto';
 import {
-    GlossaryTermDtoFromJSON,
-    GlossaryTermDtoFromJSONTyped,
-    GlossaryTermDtoToJSON,
-    GlossaryTermDtoToJSONTyped,
-} from './GlossaryTermDto';
+    GlossaryListedTermDtoFromJSON,
+    GlossaryListedTermDtoFromJSONTyped,
+    GlossaryListedTermDtoToJSON,
+    GlossaryListedTermDtoToJSONTyped,
+} from './GlossaryListedTermDto';
 
 /**
  * 
@@ -29,10 +29,10 @@ import {
 export interface GlossaryListResponseDto {
     /**
      * 
-     * @type {Array<GlossaryTermDto>}
+     * @type {Array<GlossaryListedTermDto>}
      * @memberof GlossaryListResponseDto
      */
-    terms: Array<GlossaryTermDto>;
+    terms: Array<GlossaryListedTermDto>;
     /**
      * 
      * @type {number}
@@ -60,7 +60,7 @@ export function GlossaryListResponseDtoFromJSONTyped(json: any, ignoreDiscrimina
     }
     return {
         
-        'terms': ((json['terms'] as Array<any>).map(GlossaryTermDtoFromJSON)),
+        'terms': ((json['terms'] as Array<any>).map(GlossaryListedTermDtoFromJSON)),
         'total': json['total'],
     };
 }
@@ -76,7 +76,7 @@ export function GlossaryListResponseDtoToJSONTyped(value?: GlossaryListResponseD
 
     return {
         
-        'terms': ((value['terms'] as Array<any>).map(GlossaryTermDtoToJSON)),
+        'terms': ((value['terms'] as Array<any>).map(GlossaryListedTermDtoToJSON)),
         'total': value['total'],
     };
 }

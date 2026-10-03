@@ -8,9 +8,10 @@ Name | Type
 ------------ | -------------
 `ids` | Array&lt;string&gt;
 `filters` | [BulkUpdateGlossaryFiltersDto](BulkUpdateGlossaryFiltersDto.md)
-`verified` | boolean
+`status` | string
 `entityType` | string
-`verifiedBy` | string
+`schemeId` | string
+`kind` | string
 
 ## Example
 
@@ -21,9 +22,10 @@ import type { BulkUpdateGlossaryTermsDto } from '@workspace/api-client'
 const example = {
   "ids": null,
   "filters": null,
-  "verified": null,
+  "status": null,
   "entityType": null,
-  "verifiedBy": null,
+  "schemeId": null,
+  "kind": null,
 } satisfies BulkUpdateGlossaryTermsDto
 
 console.log(example)

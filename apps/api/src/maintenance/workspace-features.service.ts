@@ -12,6 +12,12 @@ import { CorrelationSwitchService } from '../correlation/correlation-switch.serv
 import { CorrelationJobScheduler } from '../correlation/correlation-job-scheduler.service';
 import { CorrelationWorker } from '../correlation/correlation.worker';
 import { CORRELATION_QUEUE } from '../correlation/correlation.constants';
+import { EntitySwitchService } from '../entities/entity-switch.service';
+import { EntityResolutionService } from '../entities/entity-resolution.service';
+import {
+  ENTITIES_RECOUNT_QUEUE,
+  ENTITIES_RESOLVE_QUEUE,
+} from '../entities/entities.constants';
 import { EmbeddingSettingsService } from '../embedding/embedding-settings.service';
 import { EmbeddingQueueService } from '../embedding/embedding-queue.service';
 import { MaintenanceService } from './maintenance.service';
@@ -56,7 +62,10 @@ export interface SetWorkspaceFeatureResult {
   feature: WorkspaceFeatureState;
   /** The run deleting the feature's data; poll GET /maintenance/cleanup/runs/:id. */
   cleanupRunId: string | null;
-  /** Duplicates turned back on: the catch-up recompute was queued. */
+  /**
+   * The catch-up was queued: a full recompute for duplicates, a resolution
+   * pass (after a value-index rebuild, if needed) for entities.
+   */
   recomputeScheduled: boolean;
   /** One sentence describing what happened, for API and MCP callers. */
   note: string;
@@ -65,10 +74,11 @@ export interface SetWorkspaceFeatureResult {
 const FEATURE_DATASET: Record<WorkspaceFeatureKey, CleanupKey> = {
   embeddings: 'embeddings',
   duplicates: 'duplicates',
+  entities: 'entities',
 };
 
 /**
- * Workspace feature switches: embeddings and duplicate detection.
+ * Workspace feature switches: embeddings, duplicate detection and entities.
  *
  * Turning a feature off is three things, in this order:
  *  1. the switch itself, which every producer and worker of the feature reads
@@ -82,6 +92,11 @@ const FEATURE_DATASET: Record<WorkspaceFeatureKey, CleanupKey> = {
  * (duplicates by one full recompute, embeddings by a catch-up backfill). Off
  * with the data deleted frees the storage; turning back on rebuilds from
  * scratch.
+ *
+ * Duplicates and entities share the value index (G5 R9). Each keeps it fresh
+ * while it is on; when one is switched off the other takes over the indexing
+ * (scans move between `correlation.scan` and `values.index`), and the index is
+ * deleted only by a switch-off with data when the other feature is off too.
  */
 @Injectable()
 export class WorkspaceFeaturesService {
@@ -96,16 +111,20 @@ export class WorkspaceFeaturesService {
     private readonly correlationWorker: CorrelationWorker,
     private readonly embeddingSettings: EmbeddingSettingsService,
     private readonly embeddingQueue: EmbeddingQueueService,
+    private readonly entitySwitch: EntitySwitchService,
+    private readonly entityResolution: EntityResolutionService,
   ) {}
 
   async list(): Promise<WorkspaceFeaturesOverview> {
     const namespaceId = this.namespaceId();
-    const [overview, holds, duplicates, embeddings] = await Promise.all([
-      this.maintenance.overview(),
-      this.queues.listPauseHolds(namespaceId),
-      this.correlationSwitch.state(0),
-      this.embeddingSettings.switchState(),
-    ]);
+    const [overview, holds, duplicates, embeddings, entities] =
+      await Promise.all([
+        this.maintenance.overview(),
+        this.queues.listPauseHolds(namespaceId),
+        this.correlationSwitch.state(0),
+        this.embeddingSettings.switchState(),
+        this.entitySwitch.state(0),
+      ]);
     const heldBy = (feature: WorkspaceFeatureKey) =>
       [...holds.entries()]
         .filter(([, holder]) => holder === feature)
@@ -137,14 +156,23 @@ export class WorkspaceFeaturesService {
               deploymentDefault: embeddings.deploymentDefault,
               ...measured(key),
             }
-          : {
-              key,
-              enabled: duplicates.enabled,
-              disabledMode: duplicates.disabledMode,
-              changedAt: duplicates.changedAt?.toISOString() ?? null,
-              deploymentDefault: null,
-              ...measured(key),
-            },
+          : key === 'entities'
+            ? {
+                key,
+                enabled: entities.enabled,
+                disabledMode: entities.disabledMode,
+                changedAt: entities.changedAt?.toISOString() ?? null,
+                deploymentDefault: null,
+                ...measured(key),
+              }
+            : {
+                key,
+                enabled: duplicates.enabled,
+                disabledMode: duplicates.disabledMode,
+                changedAt: duplicates.changedAt?.toISOString() ?? null,
+                deploymentDefault: null,
+                ...measured(key),
+              },
     );
     return { features };
   }
@@ -219,6 +247,37 @@ export class WorkspaceFeaturesService {
       };
     }
 
+    if (key === 'entities') {
+      const before = await this.entitySwitch.state(0);
+      await this.entitySwitch.set(true, null);
+      const released = await this.queues.releaseFeature(namespaceId, key);
+      // Mentions are a join against the value index. With duplicate detection
+      // on it is already fresh; with it off nothing has indexed since it was
+      // switched off (or ever), so the index is rebuilt first and the
+      // resolution pass follows it.
+      let scheduled = false;
+      if (!before.enabled) {
+        if (await this.correlationSwitch.isEnabled()) {
+          await this.entityResolution.scheduleResolveAll('Entities turned on');
+          scheduled = true;
+        } else {
+          scheduled =
+            await this.correlationJobs.scheduleReindex('Entities turned on');
+        }
+      }
+      this.logger.log(
+        `Entities turned on (released ${released.length} queue(s), ` +
+          `catch-up ${scheduled ? 'queued' : 'not needed'})`,
+      );
+      return {
+        cleanupRunId: null,
+        recomputeScheduled: scheduled,
+        note: scheduled
+          ? 'Entities are on. Values of the existing entities are being matched against everything already scanned; counters and candidates appear as that finishes.'
+          : 'Entities are on.',
+      };
+    }
+
     await this.embeddingSettings.setEnabled(true, null);
     const released = await this.queues.releaseFeature(namespaceId, key);
     // In a process that runs workers (desktop, all-in-one) this binds and
@@ -278,6 +337,36 @@ export class WorkspaceFeaturesService {
         note: deleteData
           ? 'Duplicate detection is off and its results are being deleted.'
           : 'Duplicate detection is off. Its results are kept and stay as they are until it is turned back on.',
+      };
+    }
+
+    if (key === 'entities') {
+      const before = await this.entitySwitch.state(0);
+      if (!before.enabled && !deleteData) {
+        return {
+          cleanupRunId: null,
+          recomputeScheduled: false,
+          note: 'Entities are already off.',
+        };
+      }
+      await this.entitySwitch.set(false, mode);
+      // `values.index` is deliberately not held: its scan jobs carry the
+      // autopilot hand-off, and its worker skips the indexing by itself once
+      // entities are off (a held hand-off would stop every autopilot cycle).
+      await this.queues.holdForFeature(namespaceId, key, [
+        ENTITIES_RESOLVE_QUEUE,
+        ENTITIES_RECOUNT_QUEUE,
+      ]);
+      const cleanupRunId = deleteData
+        ? this.maintenance.startCleanup('entities').runId
+        : null;
+      this.logger.log(`Entities turned off (${mode})`);
+      return {
+        cleanupRunId,
+        recomputeScheduled: false,
+        note: deleteData
+          ? 'Entities are off. Pending candidates, mention links and counters are being deleted; the entities themselves and every confirmed or rejected value are kept.'
+          : 'Entities are off. Mentions, counters and candidates are kept and stay as they are until they are turned back on.',
       };
     }
 

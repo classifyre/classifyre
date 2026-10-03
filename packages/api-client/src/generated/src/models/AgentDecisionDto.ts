@@ -113,7 +113,9 @@ export const AgentDecisionDtoActionEnum = {
     ScheduleWake: 'SCHEDULE_WAKE',
     WriteJournal: 'WRITE_JOURNAL',
     RevertAction: 'REVERT_ACTION',
-    NoAction: 'NO_ACTION'
+    NoAction: 'NO_ACTION',
+    ApproveRelation: 'APPROVE_RELATION',
+    ApproveBinding: 'APPROVE_BINDING'
 } as const;
 export type AgentDecisionDtoActionEnum = typeof AgentDecisionDtoActionEnum[keyof typeof AgentDecisionDtoActionEnum];
 

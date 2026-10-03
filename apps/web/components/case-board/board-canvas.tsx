@@ -58,6 +58,7 @@ import { TraceNode } from "./nodes/trace-node";
 import { ContainsEdge, SystemEdge } from "./edges/system-edge";
 import { LinkEdge } from "./edges/link-edge";
 import { StanceEdge } from "./edges/stance-edge";
+import { TermNode } from "./nodes/term-node";
 import { TraceEdge } from "./edges/trace-edge";
 import { EdgeMarkers } from "@workspace/case-board/components/markers";
 import { BoardContextMenuContent, targetFromNodeEvent, type MenuTarget } from "./ui/board-context-menu";
@@ -80,6 +81,7 @@ const nodeTypes = {
   comment: CommentPin,
   suggested: SuggestedNode,
   trace: TraceNode,
+  term: TermNode,
 } satisfies NodeTypes;
 
 const edgeTypes = {

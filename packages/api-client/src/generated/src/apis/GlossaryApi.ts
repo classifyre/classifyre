@@ -17,62 +17,188 @@ import * as runtime from '../runtime';
 import type {
   BulkUpdateGlossaryTermsDto,
   BulkUpdateGlossaryTermsResponseDto,
+  CreateGlossaryRelationDto,
   DeleteGlossaryTermResponseDto,
+  DeprecateGlossaryTermDto,
+  GlossaryImportDto,
   GlossaryListResponseDto,
   GlossaryLookupHitDto,
+  GlossarySchemeDto,
   GlossaryTermDto,
+  UpsertGlossarySchemeDto,
   UpsertGlossaryTermDto,
   UpsertGlossaryTermResponseDto,
-  VerifyGlossaryTermDto,
 } from '../models/index';
 import {
     BulkUpdateGlossaryTermsDtoFromJSON,
     BulkUpdateGlossaryTermsDtoToJSON,
     BulkUpdateGlossaryTermsResponseDtoFromJSON,
     BulkUpdateGlossaryTermsResponseDtoToJSON,
+    CreateGlossaryRelationDtoFromJSON,
+    CreateGlossaryRelationDtoToJSON,
     DeleteGlossaryTermResponseDtoFromJSON,
     DeleteGlossaryTermResponseDtoToJSON,
+    DeprecateGlossaryTermDtoFromJSON,
+    DeprecateGlossaryTermDtoToJSON,
+    GlossaryImportDtoFromJSON,
+    GlossaryImportDtoToJSON,
     GlossaryListResponseDtoFromJSON,
     GlossaryListResponseDtoToJSON,
     GlossaryLookupHitDtoFromJSON,
     GlossaryLookupHitDtoToJSON,
+    GlossarySchemeDtoFromJSON,
+    GlossarySchemeDtoToJSON,
     GlossaryTermDtoFromJSON,
     GlossaryTermDtoToJSON,
+    UpsertGlossarySchemeDtoFromJSON,
+    UpsertGlossarySchemeDtoToJSON,
     UpsertGlossaryTermDtoFromJSON,
     UpsertGlossaryTermDtoToJSON,
     UpsertGlossaryTermResponseDtoFromJSON,
     UpsertGlossaryTermResponseDtoToJSON,
-    VerifyGlossaryTermDtoFromJSON,
-    VerifyGlossaryTermDtoToJSON,
 } from '../models/index';
+
+export interface GlossaryControllerActivityRequest {
+    idOrKey: string;
+    take: string;
+    skip: string;
+}
+
+export interface GlossaryControllerApproveRequest {
+    id: string;
+}
+
+export interface GlossaryControllerApproveRelationRequest {
+    id: string;
+}
 
 export interface GlossaryControllerBulkUpdateRequest {
     bulkUpdateGlossaryTermsDto: BulkUpdateGlossaryTermsDto;
 }
 
+export interface GlossaryControllerCreateRelationRequest {
+    createGlossaryRelationDto: CreateGlossaryRelationDto;
+}
+
+export interface GlossaryControllerCreateSchemeRequest {
+    upsertGlossarySchemeDto: UpsertGlossarySchemeDto;
+}
+
+export interface GlossaryControllerDeleteSchemeRequest {
+    id: string;
+}
+
+export interface GlossaryControllerDeprecateRequest {
+    id: string;
+    deprecateGlossaryTermDto: DeprecateGlossaryTermDto;
+}
+
+export interface GlossaryControllerExportRequest {
+    schemeId: string;
+    kinds: string;
+    baseUrl: string;
+}
+
+export interface GlossaryControllerGetSchemeRequest {
+    id: string;
+}
+
+export interface GlossaryControllerGetTermRequest {
+    idOrKey: string;
+}
+
+export interface GlossaryControllerImportRequest {
+    glossaryImportDto: GlossaryImportDto;
+}
+
+export interface GlossaryControllerImportJobRequest {
+    jobId: string;
+}
+
 export interface GlossaryControllerListRequest {
     query?: string;
     entityType?: GlossaryControllerListEntityTypeEnum;
+    kind?: GlossaryControllerListKindEnum;
+    schemeId?: string;
+    schemeKey?: string;
+    status?: string;
+    steward?: string;
     take?: number;
     skip?: number;
+}
+
+export interface GlossaryControllerListRelationsRequest {
+    termId: string;
+    type: string;
+    status: string;
+    take: string;
+    skip: string;
 }
 
 export interface GlossaryControllerLookupRequest {
     query: string;
     limit?: number;
+    kind?: GlossaryControllerLookupKindEnum;
+    schemeId?: string;
+    schemeKey?: string;
+    status?: string;
+    includeDeprecated?: string;
+}
+
+export interface GlossaryControllerReinstateRequest {
+    id: string;
 }
 
 export interface GlossaryControllerRemoveRequest {
     id: string;
 }
 
+export interface GlossaryControllerRemoveRelationRequest {
+    id: string;
+}
+
+export interface GlossaryControllerTreeRequest {
+    id: string;
+    parentId: string;
+}
+
+export interface GlossaryControllerUnapproveRequest {
+    id: string;
+}
+
+export interface GlossaryControllerUpdateSchemeRequest {
+    id: string;
+    upsertGlossarySchemeDto: UpsertGlossarySchemeDto;
+}
+
 export interface GlossaryControllerUpsertRequest {
     upsertGlossaryTermDto: UpsertGlossaryTermDto;
 }
 
-export interface GlossaryControllerVerifyRequest {
-    id: string;
-    verifyGlossaryTermDto: VerifyGlossaryTermDto;
+export interface GlossarySemanticControllerFindInTextCreateRequest {
+    idOrKey: string;
+}
+
+export interface GlossarySemanticControllerFindInTextPreviewRequest {
+    idOrKey: string;
+}
+
+export interface GlossarySemanticControllerFindInTextPreviewWithRequest {
+    idOrKey: string;
+}
+
+export interface GlossarySemanticControllerFindInTextStatusRequest {
+    idOrKey: string;
+}
+
+export interface GlossarySemanticControllerListRequest {
+    kind: string;
+    origin: string;
+    schemeId: string;
+    termId: string;
+    minScore: string;
+    take: string;
+    skip: string;
 }
 
 /**
@@ -81,7 +207,136 @@ export interface GlossaryControllerVerifyRequest {
 export class GlossaryApi extends runtime.BaseAPI {
 
     /**
-     * Bulk verify/unverify or retype glossary terms (operator)
+     * A term\'s history (paged)
+     */
+    async glossaryControllerActivityRaw(requestParameters: GlossaryControllerActivityRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['idOrKey'] == null) {
+            throw new runtime.RequiredError(
+                'idOrKey',
+                'Required parameter "idOrKey" was null or undefined when calling glossaryControllerActivity().'
+            );
+        }
+
+        if (requestParameters['take'] == null) {
+            throw new runtime.RequiredError(
+                'take',
+                'Required parameter "take" was null or undefined when calling glossaryControllerActivity().'
+            );
+        }
+
+        if (requestParameters['skip'] == null) {
+            throw new runtime.RequiredError(
+                'skip',
+                'Required parameter "skip" was null or undefined when calling glossaryControllerActivity().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['take'] != null) {
+            queryParameters['take'] = requestParameters['take'];
+        }
+
+        if (requestParameters['skip'] != null) {
+            queryParameters['skip'] = requestParameters['skip'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/terms/{idOrKey}/activity`;
+        urlPath = urlPath.replace(`{${"idOrKey"}}`, encodeURIComponent(String(requestParameters['idOrKey'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * A term\'s history (paged)
+     */
+    async glossaryControllerActivity(requestParameters: GlossaryControllerActivityRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossaryControllerActivityRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * DRAFT → APPROVED
+     */
+    async glossaryControllerApproveRaw(requestParameters: GlossaryControllerApproveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GlossaryTermDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling glossaryControllerApprove().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/{id}/approve`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GlossaryTermDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * DRAFT → APPROVED
+     */
+    async glossaryControllerApprove(requestParameters: GlossaryControllerApproveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GlossaryTermDto> {
+        const response = await this.glossaryControllerApproveRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async glossaryControllerApproveRelationRaw(requestParameters: GlossaryControllerApproveRelationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling glossaryControllerApproveRelation().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/relations/{id}/approve`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     */
+    async glossaryControllerApproveRelation(requestParameters: GlossaryControllerApproveRelationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossaryControllerApproveRelationRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Bulk approve/unapprove/deprecate, retype, move scheme or change kind (operator)
      */
     async glossaryControllerBulkUpdateRaw(requestParameters: GlossaryControllerBulkUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkUpdateGlossaryTermsResponseDto>> {
         if (requestParameters['bulkUpdateGlossaryTermsDto'] == null) {
@@ -112,11 +367,377 @@ export class GlossaryApi extends runtime.BaseAPI {
     }
 
     /**
-     * Bulk verify/unverify or retype glossary terms (operator)
+     * Bulk approve/unapprove/deprecate, retype, move scheme or change kind (operator)
      */
     async glossaryControllerBulkUpdate(requestParameters: GlossaryControllerBulkUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkUpdateGlossaryTermsResponseDto> {
         const response = await this.glossaryControllerBulkUpdateRaw(requestParameters, initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Create a relation (APPROVED for operators)
+     */
+    async glossaryControllerCreateRelationRaw(requestParameters: GlossaryControllerCreateRelationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['createGlossaryRelationDto'] == null) {
+            throw new runtime.RequiredError(
+                'createGlossaryRelationDto',
+                'Required parameter "createGlossaryRelationDto" was null or undefined when calling glossaryControllerCreateRelation().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/glossary/relations`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateGlossaryRelationDtoToJSON(requestParameters['createGlossaryRelationDto']),
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Create a relation (APPROVED for operators)
+     */
+    async glossaryControllerCreateRelation(requestParameters: GlossaryControllerCreateRelationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossaryControllerCreateRelationRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Create a scheme
+     */
+    async glossaryControllerCreateSchemeRaw(requestParameters: GlossaryControllerCreateSchemeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GlossarySchemeDto>> {
+        if (requestParameters['upsertGlossarySchemeDto'] == null) {
+            throw new runtime.RequiredError(
+                'upsertGlossarySchemeDto',
+                'Required parameter "upsertGlossarySchemeDto" was null or undefined when calling glossaryControllerCreateScheme().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/glossary/schemes`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpsertGlossarySchemeDtoToJSON(requestParameters['upsertGlossarySchemeDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GlossarySchemeDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Create a scheme
+     */
+    async glossaryControllerCreateScheme(requestParameters: GlossaryControllerCreateSchemeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GlossarySchemeDto> {
+        const response = await this.glossaryControllerCreateSchemeRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Delete an empty scheme
+     */
+    async glossaryControllerDeleteSchemeRaw(requestParameters: GlossaryControllerDeleteSchemeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling glossaryControllerDeleteScheme().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/schemes/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Delete an empty scheme
+     */
+    async glossaryControllerDeleteScheme(requestParameters: GlossaryControllerDeleteSchemeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossaryControllerDeleteSchemeRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * APPROVED → DEPRECATED, optionally with a successor
+     */
+    async glossaryControllerDeprecateRaw(requestParameters: GlossaryControllerDeprecateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GlossaryTermDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling glossaryControllerDeprecate().'
+            );
+        }
+
+        if (requestParameters['deprecateGlossaryTermDto'] == null) {
+            throw new runtime.RequiredError(
+                'deprecateGlossaryTermDto',
+                'Required parameter "deprecateGlossaryTermDto" was null or undefined when calling glossaryControllerDeprecate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/glossary/{id}/deprecate`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: DeprecateGlossaryTermDtoToJSON(requestParameters['deprecateGlossaryTermDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GlossaryTermDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * APPROVED → DEPRECATED, optionally with a successor
+     */
+    async glossaryControllerDeprecate(requestParameters: GlossaryControllerDeprecateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GlossaryTermDto> {
+        const response = await this.glossaryControllerDeprecateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Export as CSV or SKOS JSON-LD
+     */
+    async glossaryControllerExportRaw(requestParameters: GlossaryControllerExportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['schemeId'] == null) {
+            throw new runtime.RequiredError(
+                'schemeId',
+                'Required parameter "schemeId" was null or undefined when calling glossaryControllerExport().'
+            );
+        }
+
+        if (requestParameters['kinds'] == null) {
+            throw new runtime.RequiredError(
+                'kinds',
+                'Required parameter "kinds" was null or undefined when calling glossaryControllerExport().'
+            );
+        }
+
+        if (requestParameters['baseUrl'] == null) {
+            throw new runtime.RequiredError(
+                'baseUrl',
+                'Required parameter "baseUrl" was null or undefined when calling glossaryControllerExport().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['schemeId'] != null) {
+            queryParameters['schemeId'] = requestParameters['schemeId'];
+        }
+
+        if (requestParameters['kinds'] != null) {
+            queryParameters['kinds'] = requestParameters['kinds'];
+        }
+
+        if (requestParameters['baseUrl'] != null) {
+            queryParameters['baseUrl'] = requestParameters['baseUrl'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/export`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Export as CSV or SKOS JSON-LD
+     */
+    async glossaryControllerExport(requestParameters: GlossaryControllerExportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossaryControllerExportRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     */
+    async glossaryControllerGetSchemeRaw(requestParameters: GlossaryControllerGetSchemeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GlossarySchemeDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling glossaryControllerGetScheme().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/schemes/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GlossarySchemeDtoFromJSON(jsonValue));
+    }
+
+    /**
+     */
+    async glossaryControllerGetScheme(requestParameters: GlossaryControllerGetSchemeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GlossarySchemeDto> {
+        const response = await this.glossaryControllerGetSchemeRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * A term by id or key (old keys resolve): scheme, relations, broader chain, narrower list
+     */
+    async glossaryControllerGetTermRaw(requestParameters: GlossaryControllerGetTermRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['idOrKey'] == null) {
+            throw new runtime.RequiredError(
+                'idOrKey',
+                'Required parameter "idOrKey" was null or undefined when calling glossaryControllerGetTerm().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/terms/{idOrKey}`;
+        urlPath = urlPath.replace(`{${"idOrKey"}}`, encodeURIComponent(String(requestParameters['idOrKey'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * A term by id or key (old keys resolve): scheme, relations, broader chain, narrower list
+     */
+    async glossaryControllerGetTerm(requestParameters: GlossaryControllerGetTermRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossaryControllerGetTermRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Import CSV or SKOS JSON-LD. Defaults to a dry run that reports creates, updates, skips, conflicts and refusals.
+     */
+    async glossaryControllerImportRaw(requestParameters: GlossaryControllerImportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['glossaryImportDto'] == null) {
+            throw new runtime.RequiredError(
+                'glossaryImportDto',
+                'Required parameter "glossaryImportDto" was null or undefined when calling glossaryControllerImport().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/glossary/import`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: GlossaryImportDtoToJSON(requestParameters['glossaryImportDto']),
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Import CSV or SKOS JSON-LD. Defaults to a dry run that reports creates, updates, skips, conflicts and refusals.
+     */
+    async glossaryControllerImport(requestParameters: GlossaryControllerImportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossaryControllerImportRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * An import report
+     */
+    async glossaryControllerImportJobRaw(requestParameters: GlossaryControllerImportJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['jobId'] == null) {
+            throw new runtime.RequiredError(
+                'jobId',
+                'Required parameter "jobId" was null or undefined when calling glossaryControllerImportJob().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/import/{jobId}`;
+        urlPath = urlPath.replace(`{${"jobId"}}`, encodeURIComponent(String(requestParameters['jobId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * An import report
+     */
+    async glossaryControllerImportJob(requestParameters: GlossaryControllerImportJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossaryControllerImportJobRaw(requestParameters, initOverrides);
     }
 
     /**
@@ -131,6 +752,26 @@ export class GlossaryApi extends runtime.BaseAPI {
 
         if (requestParameters['entityType'] != null) {
             queryParameters['entityType'] = requestParameters['entityType'];
+        }
+
+        if (requestParameters['kind'] != null) {
+            queryParameters['kind'] = requestParameters['kind'];
+        }
+
+        if (requestParameters['schemeId'] != null) {
+            queryParameters['schemeId'] = requestParameters['schemeId'];
+        }
+
+        if (requestParameters['schemeKey'] != null) {
+            queryParameters['schemeKey'] = requestParameters['schemeKey'];
+        }
+
+        if (requestParameters['status'] != null) {
+            queryParameters['status'] = requestParameters['status'];
+        }
+
+        if (requestParameters['steward'] != null) {
+            queryParameters['steward'] = requestParameters['steward'];
         }
 
         if (requestParameters['take'] != null) {
@@ -165,7 +806,119 @@ export class GlossaryApi extends runtime.BaseAPI {
     }
 
     /**
-     * Resolve a name or alias to glossary terms (exact + semantic)
+     * List relations
+     */
+    async glossaryControllerListRelationsRaw(requestParameters: GlossaryControllerListRelationsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['termId'] == null) {
+            throw new runtime.RequiredError(
+                'termId',
+                'Required parameter "termId" was null or undefined when calling glossaryControllerListRelations().'
+            );
+        }
+
+        if (requestParameters['type'] == null) {
+            throw new runtime.RequiredError(
+                'type',
+                'Required parameter "type" was null or undefined when calling glossaryControllerListRelations().'
+            );
+        }
+
+        if (requestParameters['status'] == null) {
+            throw new runtime.RequiredError(
+                'status',
+                'Required parameter "status" was null or undefined when calling glossaryControllerListRelations().'
+            );
+        }
+
+        if (requestParameters['take'] == null) {
+            throw new runtime.RequiredError(
+                'take',
+                'Required parameter "take" was null or undefined when calling glossaryControllerListRelations().'
+            );
+        }
+
+        if (requestParameters['skip'] == null) {
+            throw new runtime.RequiredError(
+                'skip',
+                'Required parameter "skip" was null or undefined when calling glossaryControllerListRelations().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['termId'] != null) {
+            queryParameters['termId'] = requestParameters['termId'];
+        }
+
+        if (requestParameters['type'] != null) {
+            queryParameters['type'] = requestParameters['type'];
+        }
+
+        if (requestParameters['status'] != null) {
+            queryParameters['status'] = requestParameters['status'];
+        }
+
+        if (requestParameters['take'] != null) {
+            queryParameters['take'] = requestParameters['take'];
+        }
+
+        if (requestParameters['skip'] != null) {
+            queryParameters['skip'] = requestParameters['skip'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/relations`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * List relations
+     */
+    async glossaryControllerListRelations(requestParameters: GlossaryControllerListRelationsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossaryControllerListRelationsRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * List schemes with term counts
+     */
+    async glossaryControllerListSchemesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<GlossarySchemeDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/schemes`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(GlossarySchemeDtoFromJSON));
+    }
+
+    /**
+     * List schemes with term counts
+     */
+    async glossaryControllerListSchemes(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<GlossarySchemeDto>> {
+        const response = await this.glossaryControllerListSchemesRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Resolve a name, alias, code or hidden alias to glossary terms (exact, prefix, substring, semantic)
      */
     async glossaryControllerLookupRaw(requestParameters: GlossaryControllerLookupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<GlossaryLookupHitDto>>> {
         if (requestParameters['query'] == null) {
@@ -185,6 +938,26 @@ export class GlossaryApi extends runtime.BaseAPI {
             queryParameters['limit'] = requestParameters['limit'];
         }
 
+        if (requestParameters['kind'] != null) {
+            queryParameters['kind'] = requestParameters['kind'];
+        }
+
+        if (requestParameters['schemeId'] != null) {
+            queryParameters['schemeId'] = requestParameters['schemeId'];
+        }
+
+        if (requestParameters['schemeKey'] != null) {
+            queryParameters['schemeKey'] = requestParameters['schemeKey'];
+        }
+
+        if (requestParameters['status'] != null) {
+            queryParameters['status'] = requestParameters['status'];
+        }
+
+        if (requestParameters['includeDeprecated'] != null) {
+            queryParameters['includeDeprecated'] = requestParameters['includeDeprecated'];
+        }
+
         const headerParameters: runtime.HTTPHeaders = {};
 
 
@@ -201,7 +974,7 @@ export class GlossaryApi extends runtime.BaseAPI {
     }
 
     /**
-     * Resolve a name or alias to glossary terms (exact + semantic)
+     * Resolve a name, alias, code or hidden alias to glossary terms (exact, prefix, substring, semantic)
      */
     async glossaryControllerLookup(requestParameters: GlossaryControllerLookupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<GlossaryLookupHitDto>> {
         const response = await this.glossaryControllerLookupRaw(requestParameters, initOverrides);
@@ -209,7 +982,44 @@ export class GlossaryApi extends runtime.BaseAPI {
     }
 
     /**
-     * Delete a glossary term
+     * DEPRECATED → APPROVED
+     */
+    async glossaryControllerReinstateRaw(requestParameters: GlossaryControllerReinstateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GlossaryTermDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling glossaryControllerReinstate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/{id}/reinstate`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GlossaryTermDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * DEPRECATED → APPROVED
+     */
+    async glossaryControllerReinstate(requestParameters: GlossaryControllerReinstateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GlossaryTermDto> {
+        const response = await this.glossaryControllerReinstateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Delete a glossary term (deletion is remembered)
      */
     async glossaryControllerRemoveRaw(requestParameters: GlossaryControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<DeleteGlossaryTermResponseDto>> {
         if (requestParameters['id'] == null) {
@@ -238,10 +1048,175 @@ export class GlossaryApi extends runtime.BaseAPI {
     }
 
     /**
-     * Delete a glossary term
+     * Delete a glossary term (deletion is remembered)
      */
     async glossaryControllerRemove(requestParameters: GlossaryControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<DeleteGlossaryTermResponseDto> {
         const response = await this.glossaryControllerRemoveRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     */
+    async glossaryControllerRemoveRelationRaw(requestParameters: GlossaryControllerRemoveRelationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling glossaryControllerRemoveRelation().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/relations/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     */
+    async glossaryControllerRemoveRelation(requestParameters: GlossaryControllerRemoveRelationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossaryControllerRemoveRelationRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * One level of a scheme taxonomy: roots, or the narrower concepts of parentId
+     */
+    async glossaryControllerTreeRaw(requestParameters: GlossaryControllerTreeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling glossaryControllerTree().'
+            );
+        }
+
+        if (requestParameters['parentId'] == null) {
+            throw new runtime.RequiredError(
+                'parentId',
+                'Required parameter "parentId" was null or undefined when calling glossaryControllerTree().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['parentId'] != null) {
+            queryParameters['parentId'] = requestParameters['parentId'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/schemes/{id}/tree`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * One level of a scheme taxonomy: roots, or the narrower concepts of parentId
+     */
+    async glossaryControllerTree(requestParameters: GlossaryControllerTreeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossaryControllerTreeRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * APPROVED → DRAFT
+     */
+    async glossaryControllerUnapproveRaw(requestParameters: GlossaryControllerUnapproveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GlossaryTermDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling glossaryControllerUnapprove().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/{id}/unapprove`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GlossaryTermDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * APPROVED → DRAFT
+     */
+    async glossaryControllerUnapprove(requestParameters: GlossaryControllerUnapproveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GlossaryTermDto> {
+        const response = await this.glossaryControllerUnapproveRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Edit a scheme
+     */
+    async glossaryControllerUpdateSchemeRaw(requestParameters: GlossaryControllerUpdateSchemeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GlossarySchemeDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling glossaryControllerUpdateScheme().'
+            );
+        }
+
+        if (requestParameters['upsertGlossarySchemeDto'] == null) {
+            throw new runtime.RequiredError(
+                'upsertGlossarySchemeDto',
+                'Required parameter "upsertGlossarySchemeDto" was null or undefined when calling glossaryControllerUpdateScheme().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/glossary/schemes/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpsertGlossarySchemeDtoToJSON(requestParameters['upsertGlossarySchemeDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GlossarySchemeDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Edit a scheme
+     */
+    async glossaryControllerUpdateScheme(requestParameters: GlossaryControllerUpdateSchemeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GlossarySchemeDto> {
+        const response = await this.glossaryControllerUpdateSchemeRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -285,20 +1260,97 @@ export class GlossaryApi extends runtime.BaseAPI {
     }
 
     /**
-     * Mark an agent-proposed term as verified
+     * Pending proposals by kind, for the badge
      */
-    async glossaryControllerVerifyRaw(requestParameters: GlossaryControllerVerifyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GlossaryTermDto>> {
-        if (requestParameters['id'] == null) {
-            throw new runtime.RequiredError(
-                'id',
-                'Required parameter "id" was null or undefined when calling glossaryControllerVerify().'
-            );
-        }
+    async glossarySemanticControllerCountsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const queryParameters: any = {};
 
-        if (requestParameters['verifyGlossaryTermDto'] == null) {
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/proposals/counts`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Pending proposals by kind, for the badge
+     */
+    async glossarySemanticControllerCounts(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossarySemanticControllerCountsRaw(initOverrides);
+    }
+
+    /**
+     * Accept, edit and accept, dismiss, dismiss forever or skip one proposal
+     */
+    async glossarySemanticControllerDecideRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/proposals/decide`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Accept, edit and accept, dismiss, dismiss forever or skip one proposal
+     */
+    async glossarySemanticControllerDecide(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossarySemanticControllerDecideRaw(initOverrides);
+    }
+
+    /**
+     * Bulk accept or dismiss a group of document (LINK) suggestions
+     */
+    async glossarySemanticControllerDecideBulkRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/proposals/decide-bulk`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Bulk accept or dismiss a group of document (LINK) suggestions
+     */
+    async glossarySemanticControllerDecideBulk(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossarySemanticControllerDecideBulkRaw(initOverrides);
+    }
+
+    /**
+     * \"Find in text\": create a tested REGEX detector bound to the term
+     */
+    async glossarySemanticControllerFindInTextCreateRaw(requestParameters: GlossarySemanticControllerFindInTextCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['idOrKey'] == null) {
             throw new runtime.RequiredError(
-                'verifyGlossaryTermDto',
-                'Required parameter "verifyGlossaryTermDto" was null or undefined when calling glossaryControllerVerify().'
+                'idOrKey',
+                'Required parameter "idOrKey" was null or undefined when calling glossarySemanticControllerFindInTextCreate().'
             );
         }
 
@@ -306,29 +1358,264 @@ export class GlossaryApi extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        headerParameters['Content-Type'] = 'application/json';
 
-
-        let urlPath = `/glossary/{id}/verify`;
-        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        let urlPath = `/glossary/terms/{idOrKey}/find-in-text`;
+        urlPath = urlPath.replace(`{${"idOrKey"}}`, encodeURIComponent(String(requestParameters['idOrKey'])));
 
         const response = await this.request({
             path: urlPath,
-            method: 'PATCH',
+            method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-            body: VerifyGlossaryTermDtoToJSON(requestParameters['verifyGlossaryTermDto']),
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => GlossaryTermDtoFromJSON(jsonValue));
+        return new runtime.VoidApiResponse(response);
     }
 
     /**
-     * Mark an agent-proposed term as verified
+     * \"Find in text\": create a tested REGEX detector bound to the term
      */
-    async glossaryControllerVerify(requestParameters: GlossaryControllerVerifyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GlossaryTermDto> {
-        const response = await this.glossaryControllerVerifyRaw(requestParameters, initOverrides);
-        return await response.value();
+    async glossarySemanticControllerFindInTextCreate(requestParameters: GlossarySemanticControllerFindInTextCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossarySemanticControllerFindInTextCreateRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * \"Find in text\": the labels, pattern and tests a detector would get
+     */
+    async glossarySemanticControllerFindInTextPreviewRaw(requestParameters: GlossarySemanticControllerFindInTextPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['idOrKey'] == null) {
+            throw new runtime.RequiredError(
+                'idOrKey',
+                'Required parameter "idOrKey" was null or undefined when calling glossarySemanticControllerFindInTextPreview().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/terms/{idOrKey}/find-in-text`;
+        urlPath = urlPath.replace(`{${"idOrKey"}}`, encodeURIComponent(String(requestParameters['idOrKey'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * \"Find in text\": the labels, pattern and tests a detector would get
+     */
+    async glossarySemanticControllerFindInTextPreview(requestParameters: GlossarySemanticControllerFindInTextPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossarySemanticControllerFindInTextPreviewRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     */
+    async glossarySemanticControllerFindInTextPreviewWithRaw(requestParameters: GlossarySemanticControllerFindInTextPreviewWithRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['idOrKey'] == null) {
+            throw new runtime.RequiredError(
+                'idOrKey',
+                'Required parameter "idOrKey" was null or undefined when calling glossarySemanticControllerFindInTextPreviewWith().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/terms/{idOrKey}/find-in-text/preview`;
+        urlPath = urlPath.replace(`{${"idOrKey"}}`, encodeURIComponent(String(requestParameters['idOrKey'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     */
+    async glossarySemanticControllerFindInTextPreviewWith(requestParameters: GlossarySemanticControllerFindInTextPreviewWithRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossarySemanticControllerFindInTextPreviewWithRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Detectors generated from a term, with out-of-date flags
+     */
+    async glossarySemanticControllerFindInTextStatusRaw(requestParameters: GlossarySemanticControllerFindInTextStatusRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['idOrKey'] == null) {
+            throw new runtime.RequiredError(
+                'idOrKey',
+                'Required parameter "idOrKey" was null or undefined when calling glossarySemanticControllerFindInTextStatus().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/terms/{idOrKey}/find-in-text/detectors`;
+        urlPath = urlPath.replace(`{${"idOrKey"}}`, encodeURIComponent(String(requestParameters['idOrKey'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Detectors generated from a term, with out-of-date flags
+     */
+    async glossarySemanticControllerFindInTextStatus(requestParameters: GlossarySemanticControllerFindInTextStatusRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossarySemanticControllerFindInTextStatusRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Document suggestions grouped per concept, with a score histogram
+     */
+    async glossarySemanticControllerLinkGroupsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/proposals/link-groups`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Document suggestions grouped per concept, with a score histogram
+     */
+    async glossarySemanticControllerLinkGroups(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossarySemanticControllerLinkGroupsRaw(initOverrides);
+    }
+
+    /**
+     * The review queue: every proposal, one paged list
+     */
+    async glossarySemanticControllerListRaw(requestParameters: GlossarySemanticControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['kind'] == null) {
+            throw new runtime.RequiredError(
+                'kind',
+                'Required parameter "kind" was null or undefined when calling glossarySemanticControllerList().'
+            );
+        }
+
+        if (requestParameters['origin'] == null) {
+            throw new runtime.RequiredError(
+                'origin',
+                'Required parameter "origin" was null or undefined when calling glossarySemanticControllerList().'
+            );
+        }
+
+        if (requestParameters['schemeId'] == null) {
+            throw new runtime.RequiredError(
+                'schemeId',
+                'Required parameter "schemeId" was null or undefined when calling glossarySemanticControllerList().'
+            );
+        }
+
+        if (requestParameters['termId'] == null) {
+            throw new runtime.RequiredError(
+                'termId',
+                'Required parameter "termId" was null or undefined when calling glossarySemanticControllerList().'
+            );
+        }
+
+        if (requestParameters['minScore'] == null) {
+            throw new runtime.RequiredError(
+                'minScore',
+                'Required parameter "minScore" was null or undefined when calling glossarySemanticControllerList().'
+            );
+        }
+
+        if (requestParameters['take'] == null) {
+            throw new runtime.RequiredError(
+                'take',
+                'Required parameter "take" was null or undefined when calling glossarySemanticControllerList().'
+            );
+        }
+
+        if (requestParameters['skip'] == null) {
+            throw new runtime.RequiredError(
+                'skip',
+                'Required parameter "skip" was null or undefined when calling glossarySemanticControllerList().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['kind'] != null) {
+            queryParameters['kind'] = requestParameters['kind'];
+        }
+
+        if (requestParameters['origin'] != null) {
+            queryParameters['origin'] = requestParameters['origin'];
+        }
+
+        if (requestParameters['schemeId'] != null) {
+            queryParameters['schemeId'] = requestParameters['schemeId'];
+        }
+
+        if (requestParameters['termId'] != null) {
+            queryParameters['termId'] = requestParameters['termId'];
+        }
+
+        if (requestParameters['minScore'] != null) {
+            queryParameters['minScore'] = requestParameters['minScore'];
+        }
+
+        if (requestParameters['take'] != null) {
+            queryParameters['take'] = requestParameters['take'];
+        }
+
+        if (requestParameters['skip'] != null) {
+            queryParameters['skip'] = requestParameters['skip'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/glossary/proposals`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * The review queue: every proposal, one paged list
+     */
+    async glossarySemanticControllerList(requestParameters: GlossarySemanticControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.glossarySemanticControllerListRaw(requestParameters, initOverrides);
     }
 
 }
@@ -345,3 +1632,19 @@ export const GlossaryControllerListEntityTypeEnum = {
     Other: 'OTHER'
 } as const;
 export type GlossaryControllerListEntityTypeEnum = typeof GlossaryControllerListEntityTypeEnum[keyof typeof GlossaryControllerListEntityTypeEnum];
+/**
+ * @export
+ */
+export const GlossaryControllerListKindEnum = {
+    Concept: 'CONCEPT',
+    Entity: 'ENTITY'
+} as const;
+export type GlossaryControllerListKindEnum = typeof GlossaryControllerListKindEnum[keyof typeof GlossaryControllerListKindEnum];
+/**
+ * @export
+ */
+export const GlossaryControllerLookupKindEnum = {
+    Concept: 'CONCEPT',
+    Entity: 'ENTITY'
+} as const;
+export type GlossaryControllerLookupKindEnum = typeof GlossaryControllerLookupKindEnum[keyof typeof GlossaryControllerLookupKindEnum];

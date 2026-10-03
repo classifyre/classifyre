@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://classifyre.io/schemas/glossary_pack.json",
+  "title": "GlossaryPack",
+  "description": "Contract C10 (docs/prd/SL2 \u00a78): classifyre.glossary-pack/v1 \u2014 schemes, terms, relations and bindings, referenced by key. May be embedded in a detector bundle as `glossary`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "key",
+    "version",
+    "name"
+  ],
+  "properties": {
+    "format": {
+      "const": "classifyre.glossary-pack/v1"
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+    },
+    "version": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schemes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "name"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "terms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "term"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CONCEPT",
+              "ENTITY"
+            ]
+          },
+          "term": {
+            "type": "string"
+          },
+          "scheme": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+          },
+          "definition": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hiddenAliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "steward": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "type",
+          "to"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "BROADER",
+              "RELATED",
+              "PART_OF",
+              "INSTANCE_OF",
+              "CUSTOM"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 64
+          }
+        }
+      }
+    },
+    "bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "glossary_binding.json"
+      }
+    }
+  }
+}
