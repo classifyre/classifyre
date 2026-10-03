@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://classifyre.io/schemas/glossary_term_ref.json",
+  "title": "GlossaryTermRef",
+  "description": "Contract C8 (docs/prd/SL0 \u00a75): a reference to a glossary term by key. URN form term://glossary/<key>; a renamed key keeps resolving through previousKeys.",
+  "oneOf": [
+    {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+    },
+    {
+      "type": "string",
+      "pattern": "^term://glossary/[a-z0-9][a-z0-9._-]{0,99}$"
+    }
+  ]
+}

@@ -208,7 +208,10 @@ export class NotebookExecutionService {
     // detector's own secret values before they reach Postgres.
     const outputs =
       executionId != null
-        ? await this.redactedDetectorOutputs(executionId, this.buildOutputs(payload))
+        ? await this.redactedDetectorOutputs(
+            executionId,
+            this.buildOutputs(payload),
+          )
         : this.buildOutputs(payload);
     await this.prisma.notebookExecution.update({
       where: { id: executionId },
@@ -234,7 +237,8 @@ export class NotebookExecutionService {
    * Kept as one JSON column rather than a table: outputs are read as a whole,
    * by one editor, and are disposable — the notebook can always be run again.
    */
-  private buildOutputs(payload: Record<string, any>): Prisma.InputJsonValue {    return {
+  private buildOutputs(payload: Record<string, any>): Prisma.InputJsonValue {
+    return {
       cells: payload.cells ?? [],
       ...(payload.result !== undefined ? { result: payload.result } : {}),
       ...(payload.assets !== undefined ? { assets: payload.assets } : {}),
@@ -246,9 +250,7 @@ export class NotebookExecutionService {
    * The detector's decrypted secret values, for redacting stored outputs.
    * Best-effort: a redaction miss must not fail the execution write.
    */
-  private async detectorSecretValues(
-    executionId: string,
-  ): Promise<string[]> {
+  private async detectorSecretValues(executionId: string): Promise<string[]> {
     try {
       const execution = await this.prisma.notebookExecution.findUnique({
         where: { id: executionId },
@@ -256,10 +258,8 @@ export class NotebookExecutionService {
           customDetector: { select: { pipelineSchema: true } },
         },
       });
-      const schema = (execution?.customDetector?.pipelineSchema ?? {}) as Record<
-        string,
-        unknown
-      >;
+      const schema = (execution?.customDetector?.pipelineSchema ??
+        {}) as Record<string, unknown>;
       const secrets =
         schema && typeof schema === 'object'
           ? (schema.secrets as Record<string, unknown> | undefined)

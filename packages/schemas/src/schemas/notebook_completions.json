@@ -24,6 +24,13 @@
       "insertText": "Tag"
     },
     {
+      "label": "Entity",
+      "kind": "class",
+      "detail": "Entity(name, type=\"ORGANIZATION\", identifiers={...})",
+      "documentation": "The named thing a record *is*: a company, a person, an account.\n\nA register or a customer master does not merely mention ACME Holding GmbH --\nits record is ACME. Saying so::\n\n    Asset(\n        id=fn,\n        urn=urn_for(\"firmenbuch\", fn),\n        entity=Entity(\n            type=\"ORGANIZATION\",\n            name=\"ACME Holding GmbH\",\n            identifiers={\"vat\": \"ATU12345678\", \"fn\": \"123456a\"},\n            aliases=[\"ACME Holding\"],\n        ),\n    )\n\ncreates the entity in the glossary (or updates it), anchored to this\nrecord, and from then on every document in every other source that carries\nthat name or one of those identifiers is a mention of it -- the e-mail that\nquotes the VAT number, the contract that names the company.\n\n``identifiers`` are keyed by the *label a detector finds them under*\n(``iban``, ``email``, a custom detector's label): that label is what links\na finding to the entity, so an identifier under a label nothing detects\nlinks nothing. ``key`` pins the glossary key, for a source that already\nrefers to the entity with ``Ref.term(key)``.\n\nThe asset needs a ``urn`` (or the entity a ``key``): it is what makes the\ndeclaration the same entity on the next scan instead of a new one. A\ndeclared entity is the register's word and is approved from the start; what\nan operator changes afterwards is kept -- a later scan only adds.",
+      "insertText": "Entity"
+    },
+    {
       "label": "Ref",
       "kind": "class",
       "detail": "Ref.asset(id) | Ref.urn(urn)",
@@ -320,6 +327,13 @@
             "insertText": "link(${1:other_hash})"
           },
           {
+            "label": "means",
+            "kind": "method",
+            "detail": "(key: 'str', *, evidence: 'Mapping[str, Any] | None' = None, confidence: 'float | None' = None) -> 'None'",
+            "documentation": "Declare that this asset is about a glossary concept or entity, by key.\n\nAdditive, like ``tag()`` and ``link()``: a DECLARED semantic link. The\nterm need not exist yet; the declaration links once it is defined. An\ninvalid key is skipped with a warning.",
+            "insertText": "means(${1:key})"
+          },
+          {
             "label": "metadata",
             "kind": "property",
             "detail": "Mapping[str, Any]",
@@ -571,6 +585,13 @@
           "detail": "CohortItem | None",
           "required": false,
           "insertText": "cohort="
+        },
+        {
+          "label": "entity",
+          "kind": "field",
+          "detail": "Entity | None",
+          "required": false,
+          "insertText": "entity="
         }
       ]
     },
@@ -590,6 +611,53 @@
           "detail": "str | None",
           "required": false,
           "insertText": "severity="
+        }
+      ]
+    },
+    "Entity": {
+      "documentation": "The named thing a record *is*: a company, a person, an account.\n\nA register or a customer master does not merely mention ACME Holding GmbH --\nits record is ACME. Saying so::\n\n    Asset(\n        id=fn,\n        urn=urn_for(\"firmenbuch\", fn),\n        entity=Entity(\n            type=\"ORGANIZATION\",\n            name=\"ACME Holding GmbH\",\n            identifiers={\"vat\": \"ATU12345678\", \"fn\": \"123456a\"},\n            aliases=[\"ACME Holding\"],\n        ),\n    )\n\ncreates the entity in the glossary (or updates it), anchored to this\nrecord, and from then on every document in every other source that carries\nthat name or one of those identifiers is a mention of it -- the e-mail that\nquotes the VAT number, the contract that names the company.\n\n``identifiers`` are keyed by the *label a detector finds them under*\n(``iban``, ``email``, a custom detector's label): that label is what links\na finding to the entity, so an identifier under a label nothing detects\nlinks nothing. ``key`` pins the glossary key, for a source that already\nrefers to the entity with ``Ref.term(key)``.\n\nThe asset needs a ``urn`` (or the entity a ``key``): it is what makes the\ndeclaration the same entity on the next scan instead of a new one. A\ndeclared entity is the register's word and is approved from the start; what\nan operator changes afterwards is kept -- a later scan only adds.",
+      "fields": [
+        {
+          "label": "name",
+          "kind": "field",
+          "detail": "str",
+          "required": true,
+          "insertText": "name="
+        },
+        {
+          "label": "type",
+          "kind": "field",
+          "detail": "str",
+          "required": false,
+          "insertText": "type="
+        },
+        {
+          "label": "key",
+          "kind": "field",
+          "detail": "str | None",
+          "required": false,
+          "insertText": "key="
+        },
+        {
+          "label": "identifiers",
+          "kind": "field",
+          "detail": "Mapping[str, str]",
+          "required": false,
+          "insertText": "identifiers="
+        },
+        {
+          "label": "aliases",
+          "kind": "field",
+          "detail": "tuple[str, ...] | list[str]",
+          "required": false,
+          "insertText": "aliases="
+        },
+        {
+          "label": "attributes",
+          "kind": "field",
+          "detail": "Mapping[str, Any]",
+          "required": false,
+          "insertText": "attributes="
         }
       ]
     },
@@ -623,6 +691,13 @@
           "detail": "(other_hash: 'str') -> 'None'",
           "documentation": "Record an untyped \"related\" link to another asset by its hash.",
           "insertText": "link(${1:other_hash})"
+        },
+        {
+          "label": "means",
+          "kind": "method",
+          "detail": "(key: 'str', *, evidence: 'Mapping[str, Any] | None' = None, confidence: 'float | None' = None) -> 'None'",
+          "documentation": "Declare that this asset is about a glossary concept or entity, by key.\n\nAdditive, like ``tag()`` and ``link()``: a DECLARED semantic link. The\nterm need not exist yet; the declaration links once it is defined. An\ninvalid key is skipped with a warning.",
+          "insertText": "means(${1:key})"
         },
         {
           "label": "metadata",

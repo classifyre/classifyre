@@ -1,3 +1,4 @@
+import { glossaryEvents } from '../glossary/glossary-events';
 import {
   BadRequestException,
   ConflictException,
@@ -40,6 +41,10 @@ import {
 import { TRACE_KINDS, TRACE_MAX_DEPTH } from '../graph-trace';
 import { GraphResponseDto } from '../dto/graph.dto';
 import { BoardOpRejected } from './board-op-rejected';
+import { SemanticBoardLayerService } from '../semantic/board/semantic-board-layer.service';
+import { GlossaryRelationsService } from '../glossary/glossary-relations.service';
+import { SemanticSuggestionsService } from '../semantic/suggestions/semantic-suggestions.service';
+import { SemanticJobsScheduler } from '../semantic/semantic-jobs.scheduler';
 import {
   caseFindingTombstone,
   evidenceTombstone,
@@ -67,7 +72,7 @@ const TraceRequestSchema = z.strictObject({
   assetIds: z.array(z.string().trim().min(1).max(200)).min(1).max(500),
   direction: z.enum(['up', 'down', 'both']).optional(),
   depth: z.number().int().min(1).max(TRACE_MAX_DEPTH).optional(),
-  kinds: z.array(z.enum(TRACE_KINDS)).min(1).max(4).optional(),
+  kinds: z.array(z.enum(TRACE_KINDS)).min(1).max(TRACE_KINDS.length).optional(),
   limit: z.number().int().min(1).max(300).optional(),
 });
 
@@ -105,7 +110,14 @@ const LINKABLE_KINDS: ReadonlySet<CaseBoardItemKind> = new Set([
   CaseBoardItemKind.EVIDENCE,
   CaseBoardItemKind.NOTE,
   CaseBoardItemKind.HYPOTHESIS,
+  // Links to a term can be promoted into meaning (SL5 A8).
+  CaseBoardItemKind.TERM,
 ]);
+
+/** Board writes made by an agent rather than a person (D7: agents propose). */
+function isAgentActor(actor: string | undefined): boolean {
+  return Boolean(actor && /^(agent|autopilot)[:\s-]/i.test(actor));
+}
 
 /**
  * The case board's single write path (docs/architecture/CASE_BOARD_PRD.md
@@ -136,6 +148,10 @@ export class CaseBoardService {
     @Optional()
     @Inject(CASE_BOARD_EVENTS)
     private readonly events?: CaseBoardEvents,
+    @Optional() private readonly semanticLayer?: SemanticBoardLayerService,
+    @Optional() private readonly glossaryRelations?: GlossaryRelationsService,
+    @Optional() private readonly suggestions?: SemanticSuggestionsService,
+    @Optional() private readonly semanticJobs?: SemanticJobsScheduler,
   ) {}
 
   async applyOps(
@@ -265,13 +281,37 @@ export class CaseBoardService {
     if (!exists)
       throw new NotFoundException(`Case with ID ${caseId} not found`);
     const input = parsed.data;
-    const result = await this.graph.trace({
-      seeds: [...new Set(input.assetIds)].map((id) => ({ type: 'asset', id })),
-      depth: input.depth ?? 2,
-      direction: input.direction ?? 'both',
-      kinds: input.kinds ?? [...TRACE_KINDS],
-      limit: input.limit ?? 150,
-    });
+    const kinds = input.kinds ?? [...TRACE_KINDS];
+    const edgeKinds = kinds.filter((kind) => kind !== 'meaning');
+    const limit = input.limit ?? 150;
+    const result = edgeKinds.length
+      ? await this.graph.trace({
+          seeds: [...new Set(input.assetIds)].map((id) => ({
+            type: 'asset',
+            id,
+          })),
+          depth: input.depth ?? 2,
+          direction: input.direction ?? 'both',
+          kinds: edgeKinds,
+          limit,
+        })
+      : { nodes: [], edges: [], truncated: false };
+    // `meaning` is not an edge walk: other assets about the same concepts,
+    // one hop, from the semantic links (SL5 A9, rule SL-4).
+    if (kinds.includes('meaning') && this.semanticLayer) {
+      const meaning = await this.semanticLayer.meaningTrace(
+        input.assetIds,
+        Math.max(limit - result.nodes.length, 0),
+      );
+      const known = new Set(result.nodes.map((n) => `${n.type}:${n.id}`));
+      for (const node of meaning.nodes) {
+        if (!known.has(`asset:${String(node.id)}`)) {
+          result.nodes.push(node as never);
+        }
+      }
+      result.edges.push(...(meaning.edges as never[]));
+      result.truncated = result.truncated || meaning.truncated;
+    }
     return result as BoardTraceResponseDto;
   }
 
@@ -347,6 +387,8 @@ export class CaseBoardService {
         return this.commentResolve(ctx, op);
       case 'thread.place':
         return this.threadPlace(ctx, op);
+      case 'term.place':
+        return this.termPlace(ctx, op);
     }
   }
 
@@ -520,6 +562,15 @@ export class CaseBoardService {
     }
     if (item.deletedAt) return { id: item.id };
     await this.softDeleteItem(ctx, item);
+    if (item.kind === CaseBoardItemKind.TERM) {
+      // The card leaves the board; the term is untouched.
+      await this.record(ctx, CaseActivityType.BOARD_TERM_REMOVED, {
+        itemId: item.id,
+        termId: item.refId,
+        termKey: await this.termKeyOf(ctx, item.refId),
+      });
+      return { id: item.id };
+    }
     if (item.kind === 'NOTE' || item.kind === 'FRAME') {
       await this.recordNative(ctx, item.kind, 'REMOVED', item);
       return { id: item.id };
@@ -728,6 +779,16 @@ export class CaseBoardService {
     op: BoardOpOf<'link.promote'>,
   ): Promise<OpOutcome> {
     const link = await this.liveLink(ctx, op.id);
+    const [sourceItem, targetItem] = await Promise.all([
+      this.liveItem(ctx, link.sourceItemId),
+      this.liveItem(ctx, link.targetItemId),
+    ]);
+    if (
+      sourceItem.kind === CaseBoardItemKind.TERM ||
+      targetItem.kind === CaseBoardItemKind.TERM
+    ) {
+      return this.promoteToMeaning(ctx, link, sourceItem, targetItem);
+    }
     if (link.promotedEdgeId) {
       const edge = await ctx.tx.edge.findUnique({
         where: { id: link.promotedEdgeId },
@@ -1491,6 +1552,270 @@ export class CaseBoardService {
     return { id: item.id, updatedAt: item.updatedAt, arranged: true };
   }
 
+  // ─── Terms (semantic layer, SL5 A3/A8) ────────────────────────────────────
+
+  private async termKeyOf(ctx: OpContext, termId: string | null) {
+    if (!termId) return null;
+    const term = await ctx.tx.glossaryTerm.findUnique({
+      where: { id: termId },
+      select: { key: true },
+    });
+    return term?.key ?? null;
+  }
+
+  /**
+   * Pin a glossary term as a TERM card. Idempotent like `thread.place`: a card
+   * the term already had on this board comes back instead of a second one.
+   */
+  private async termPlace(
+    ctx: OpContext,
+    op: BoardOpOf<'term.place'>,
+  ): Promise<OpOutcome> {
+    const term = await ctx.tx.glossaryTerm.findUnique({
+      where: { id: op.termId },
+      select: { id: true, key: true },
+    });
+    if (!term) throw new BoardOpRejected('Term not found', 'NOT_FOUND');
+    const existing = await ctx.tx.caseBoardItem.findFirst({
+      where: {
+        boardId: ctx.boardId,
+        kind: CaseBoardItemKind.TERM,
+        refId: term.id,
+      },
+    });
+    if (existing) {
+      const placed = existing.deletedAt
+        ? await this.reviveItem(ctx, existing)
+        : existing;
+      const updated = await ctx.tx.caseBoardItem.update({
+        where: { id: placed.id },
+        data: {
+          ...(op.x !== undefined ? { x: op.x } : {}),
+          ...(op.y !== undefined ? { y: op.y } : {}),
+          updatedBy: ctx.actor ?? null,
+        },
+      });
+      if (existing.deletedAt) {
+        await this.record(ctx, CaseActivityType.BOARD_TERM_PLACED, {
+          itemId: updated.id,
+          termId: term.id,
+          termKey: term.key,
+          restored: true,
+        });
+      }
+      return {
+        id: updated.id,
+        updatedAt: updated.updatedAt,
+        arranged: !existing.deletedAt,
+      };
+    }
+    const item = await ctx.tx.caseBoardItem.create({
+      data: {
+        id: op.itemId,
+        boardId: ctx.boardId,
+        kind: CaseBoardItemKind.TERM,
+        refId: term.id,
+        x: op.x ?? null,
+        y: op.y ?? null,
+        createdBy: ctx.actor ?? null,
+        updatedBy: ctx.actor ?? null,
+      },
+    });
+    await this.record(ctx, CaseActivityType.BOARD_TERM_PLACED, {
+      itemId: item.id,
+      termId: term.id,
+      termKey: term.key,
+    });
+    return { id: item.id, updatedAt: item.updatedAt };
+  }
+
+  /**
+   * Promote a board link that touches a TERM card (SL5 A8):
+   * evidence or a finding ↔ term becomes a MANUAL ABOUT link (an agent's
+   * becomes an SL4 proposal instead); concept ↔ concept becomes a glossary
+   * relation (APPROVED for operators, DRAFT for agents); entity ↔ entity waits
+   * for G5′. The means edge replaces the board link.
+   */
+  private async promoteToMeaning(
+    ctx: OpContext,
+    link: CaseBoardLink,
+    sourceItem: CaseBoardItem,
+    targetItem: CaseBoardItem,
+  ): Promise<OpOutcome> {
+    const agent = isAgentActor(ctx.actor);
+    const termItems = [sourceItem, targetItem].filter(
+      (item) => item.kind === CaseBoardItemKind.TERM,
+    );
+    if (termItems.length === 2) {
+      const [from, to] = await Promise.all(
+        termItems.map((item) =>
+          ctx.tx.glossaryTerm.findUnique({
+            where: { id: item.refId ?? '' },
+            select: { id: true, key: true, kind: true },
+          }),
+        ),
+      );
+      if (!from || !to)
+        throw new BoardOpRejected('Term not found', 'NOT_FOUND');
+      if (from.kind === 'ENTITY' && to.kind === 'ENTITY') {
+        throw new BoardOpRejected(
+          'Links between entities become facts with the Entities release (G5).',
+        );
+      }
+      if (from.kind !== 'CONCEPT' || to.kind !== 'CONCEPT') {
+        throw new BoardOpRejected(
+          'An entity relates to a concept through INSTANCE_OF; promote links between two concepts.',
+        );
+      }
+      if (!this.glossaryRelations) {
+        throw new BoardOpRejected('The glossary is not available here');
+      }
+      const custom = link.kind !== 'related_to';
+      const relation = await this.glossaryRelations
+        .create({
+          fromTermId: from.id,
+          toTermId: to.id,
+          type: custom ? 'CUSTOM' : 'RELATED',
+          label: custom ? (link.label ?? link.kind).slice(0, 64) : undefined,
+          origin: agent ? 'AGENT' : 'OPERATOR',
+          actor: ctx.actor ?? 'operator',
+          note: link.note ?? `Promoted from a case board link`,
+        })
+        .catch((error: unknown) => {
+          throw new BoardOpRejected(
+            error instanceof Error ? error.message : String(error),
+          );
+        });
+      await this.record(ctx, CaseActivityType.BOARD_LINK_PROMOTED, {
+        linkId: link.id,
+        itemId: link.sourceItemId,
+        relationId: relation.id,
+        relationType: relation.type,
+        status: relation.status,
+      });
+      return {
+        id: link.id,
+        updatedAt: link.updatedAt,
+        note:
+          relation.status === 'APPROVED'
+            ? 'Relation created'
+            : 'Relation proposed',
+      };
+    }
+    const termItem = termItems[0];
+    const evidenceItem =
+      termItem.id === sourceItem.id ? targetItem : sourceItem;
+    const findingId =
+      termItem.id === sourceItem.id
+        ? link.targetFindingId
+        : link.sourceFindingId;
+    if (evidenceItem.kind !== CaseBoardItemKind.EVIDENCE) {
+      throw new BoardOpRejected(
+        'Only evidence or a finding can be linked to a term',
+      );
+    }
+    const term = await ctx.tx.glossaryTerm.findUnique({
+      where: { id: termItem.refId ?? '' },
+      select: { id: true, key: true },
+    });
+    if (!term) throw new BoardOpRejected('Term not found', 'NOT_FOUND');
+    const evidence = await this.evidenceOf(ctx, evidenceItem);
+    let target: { type: 'finding' | 'asset'; id: string };
+    let assetId: string | null = null;
+    if (findingId) {
+      target = { type: 'finding', id: findingId };
+      assetId =
+        (
+          await ctx.tx.finding.findUnique({
+            where: { id: findingId },
+            select: { assetId: true },
+          })
+        )?.assetId ?? null;
+    } else if (evidence.entityType === 'finding') {
+      target = { type: 'finding', id: evidence.entityId };
+      assetId =
+        (
+          await ctx.tx.finding.findUnique({
+            where: { id: evidence.entityId },
+            select: { assetId: true },
+          })
+        )?.assetId ?? null;
+    } else {
+      target = { type: 'asset', id: evidence.entityId };
+      assetId = evidence.entityId;
+    }
+    if (agent) {
+      // D7: agents never create links directly; it becomes a LINK proposal.
+      if (!assetId || !this.suggestions) {
+        throw new BoardOpRejected(
+          'Agents propose links; the review queue is not available here',
+        );
+      }
+      await this.suggestions.proposeAgentLink({
+        termId: term.id,
+        assetId,
+        note: link.note ?? link.label ?? undefined,
+        agent: ctx.actor ?? 'agent',
+      });
+      return {
+        id: link.id,
+        updatedAt: link.updatedAt,
+        note: 'Link proposed for review',
+      };
+    }
+    const reference = await ctx.tx.glossaryReference.upsert({
+      where: {
+        glossaryTermId_entityType_entityId_role: {
+          glossaryTermId: term.id,
+          entityType: target.type,
+          entityId: target.id,
+          role: 'ABOUT',
+        },
+      },
+      create: {
+        glossaryTermId: term.id,
+        entityType: target.type,
+        entityId: target.id,
+        role: 'ABOUT',
+        note: link.note ?? null,
+        createdBy: ctx.actor ?? 'operator',
+      },
+      update: {},
+    });
+    // The means edge replaces the board link.
+    await ctx.tx.caseBoardLink.update({
+      where: { id: link.id },
+      data: { deletedAt: ctx.now, updatedBy: ctx.actor ?? null },
+    });
+    await this.record(ctx, CaseActivityType.MEANING_LINKED, {
+      linkId: link.id,
+      itemId: evidenceItem.id,
+      termItemId: termItem.id,
+      termId: term.id,
+      termKey: term.key,
+      referenceId: reference.id,
+      target,
+    });
+    glossaryEvents.emit({
+      type: 'semantic.reference_changed',
+      change: 'linked',
+      termId: term.id,
+      entityType: target.type,
+      entityId: target.id,
+    });
+    if (assetId && this.semanticJobs) {
+      await this.semanticJobs.scheduleIncrementalForAssets(
+        [assetId],
+        `board link promoted to ${term.key}`,
+      );
+    }
+    return {
+      id: link.id,
+      updatedAt: link.updatedAt,
+      note: 'Manual link created',
+    };
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   /** `updatedAt` of the rows this batch's text edits make claims about, before any op ran. */
@@ -1566,7 +1891,7 @@ export class CaseBoardService {
     }
     const evidence = await ctx.tx.caseEvidence.findUnique({
       where: { id: item.refId },
-      select: { id: true, entityId: true, caseId: true },
+      select: { id: true, entityType: true, entityId: true, caseId: true },
     });
     if (!evidence || evidence.caseId !== ctx.caseId) {
       throw new BoardOpRejected(

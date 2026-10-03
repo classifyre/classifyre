@@ -4,6 +4,7 @@ import { DetectorType, FindingStatus, Severity } from '@prisma/client';
 export enum QuickSearchKind {
   ASSETS = 'assets',
   FINDINGS = 'findings',
+  TERMS = 'terms',
 }
 
 export class QuickSearchRequestDto {
@@ -80,12 +81,37 @@ export class QuickSearchFindingDto {
   @ApiProperty({ enum: FindingStatus }) status!: FindingStatus;
 }
 
+export class QuickSearchTermDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({
+    description: 'Stable key; the term page is /glossary/terms/<key>',
+  })
+  key!: string;
+  @ApiProperty() term!: string;
+  @ApiProperty({ enum: ['CONCEPT', 'ENTITY'] }) kind!: string;
+  @ApiProperty({ enum: ['DRAFT', 'APPROVED', 'DEPRECATED'] }) status!: string;
+  @ApiPropertyOptional({ type: String, nullable: true }) schemeName!:
+    | string
+    | null;
+  @ApiProperty({
+    enum: ['term', 'code', 'alias', 'hiddenAlias'],
+    description: 'Which label matched',
+  })
+  matchedOn!: string;
+}
+
 export class QuickSearchResponseDto {
   @ApiProperty({ type: [QuickSearchAssetDto] })
   assets!: QuickSearchAssetDto[];
 
   @ApiProperty({ type: [QuickSearchFindingDto] })
   findings!: QuickSearchFindingDto[];
+
+  @ApiProperty({
+    type: [QuickSearchTermDto],
+    description: 'Glossary terms whose labels match (SL3 R7.5)',
+  })
+  terms!: QuickSearchTermDto[];
 
   @ApiProperty({
     description:

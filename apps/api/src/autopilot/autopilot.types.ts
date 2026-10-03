@@ -338,7 +338,8 @@ export interface FocusedCaseDetail {
     aliases: string[];
     entityType: string;
     notes: string | null;
-    verified: boolean;
+    /** DRAFT terms are proposals; only APPROVED ones are canonical. */
+    status: string;
   }>;
   linkedInquiryIds: string[];
 }

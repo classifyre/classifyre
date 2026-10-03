@@ -6,7 +6,7 @@
 
 Name | Type
 ------------ | -------------
-`terms` | [Array&lt;GlossaryTermDto&gt;](GlossaryTermDto.md)
+`terms` | [Array&lt;GlossaryListedTermDto&gt;](GlossaryListedTermDto.md)
 `total` | number
 
 ## Example

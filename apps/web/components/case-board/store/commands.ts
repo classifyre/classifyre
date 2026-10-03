@@ -635,6 +635,25 @@ export function placeThread(threadId: string, existingItemId: string | null, at:
   };
 }
 
+/** Pin a glossary term to the board as a TERM card (SL5 A3). */
+export function placeTerm(termId: string, existingItemId: string | null, at: XY): Command {
+  const itemId = existingItemId ?? crypto.randomUUID();
+  return {
+    label: "Place concept",
+    forward: [
+      {
+        type: "term.place",
+        opId: opId(),
+        itemId,
+        termId,
+        x: Math.round(at.x),
+        y: Math.round(at.y),
+      },
+    ],
+    inverse: [{ type: "item.delete", opId: opId(), id: itemId }],
+  };
+}
+
 /** Absolute position of an item's top-left corner (children are parent-relative). */
 export function itemAbsolute(d: BoardDomain, itemId: string): XY {
   return absolutePosition(d.items, itemId);

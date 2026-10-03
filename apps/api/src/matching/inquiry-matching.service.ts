@@ -16,7 +16,10 @@ import {
   CompiledMatcher,
   FindingCandidate,
   InquiryMatchers,
+  exactInWhere,
+  needsMatchedContent,
 } from './inquiry-matcher';
+import { ensureTermSnapshotFor } from '../semantic/term-snapshot';
 import {
   classifyMatch,
   InquiryMatchState,
@@ -432,6 +435,7 @@ export class InquiryMatchingService {
       // Only questions a person asked: the autopilot's own inquiries are its
       // working set and would turn every run into a notification.
       if (created.length > 0 && q.createdBy !== AI_ACTOR) {
+        await ensureTermSnapshotFor(this.prisma, [q]);
         const matcher = new CompiledMatcher(q);
         const added = created.filter((f) => matcher.matches(f)).length;
         if (added > 0) {
@@ -751,6 +755,7 @@ export class InquiryMatchingService {
     const anchors = await this.runAnchors([args.sourceId]);
 
     for (const inquiry of inquiries) {
+      await ensureTermSnapshotFor(this.prisma, [inquiry]);
       const matcher = new CompiledMatcher(inquiry);
       if (
         findings.some(
@@ -1060,6 +1065,7 @@ export class InquiryMatchingService {
     };
 
     for (const inquiry of inquiries) {
+      await ensureTermSnapshotFor(this.prisma, [inquiry]);
       const matcher = new CompiledMatcher(inquiry);
       for (const f of findings) {
         if (!matcher.matches(f)) continue;
@@ -1162,6 +1168,7 @@ export class InquiryMatchingService {
       }),
     ]);
 
+    await ensureTermSnapshotFor(this.prisma, inquiries);
     const matchers = inquiries.map((q) => new CompiledMatcher(q));
     const unmatched = candidates.filter(
       (f) => !matchers.some((m) => m.matches(f)),
@@ -1254,6 +1261,7 @@ export class InquiryMatchingService {
     });
     if (inquiries.length === 0) return watched;
 
+    await ensureTermSnapshotFor(this.prisma, inquiries);
     const matchers = inquiries.map(
       (q) => [q.id, new CompiledMatcher(q)] as const,
     );
@@ -1354,11 +1362,9 @@ export class InquiryMatchingService {
 
     const countWith = async (override: Partial<InquiryMatchers>) => {
       const relaxed: InquiryMatchers = { ...m, ...override };
+      await ensureTermSnapshotFor(this.prisma, [relaxed]);
       const where = candidateWhere(relaxed);
-      if (
-        relaxed.findingTypeRegex.length === 0 &&
-        relaxed.findingValueRegex.length === 0
-      ) {
+      if (exactInWhere(relaxed)) {
         return this.prisma.finding.count({ where });
       }
       const matcher = new CompiledMatcher(relaxed);
@@ -1474,6 +1480,20 @@ export class InquiryMatchingService {
       }
     }
 
+    if ((m.termKeys ?? []).length > 0) {
+      const without = await countWith({ termKeys: [] });
+      if (without > 0) {
+        diagnostics.push({
+          dimension: 'termKeys',
+          survivingWithout: without,
+          message:
+            `${without} finding(s) match everything else but are not evidence ` +
+            `of ${m.termKeys!.join(', ')}. Check that the term is APPROVED and ` +
+            'has an APPROVED binding for these detector outputs.',
+        });
+      }
+    }
+
     if (diagnostics.length === 0) {
       diagnostics.push({
         dimension: 'corpus',
@@ -1545,6 +1565,7 @@ export class InquiryMatchingService {
   private async previewRows(
     m: InquiryMatchers,
   ): Promise<{ total: number; sample: FindingRow[] }> {
+    await ensureTermSnapshotFor(this.prisma, [m]);
     const where = candidateWhere(m);
     const previewSelect = {
       ...FINDING_SELECT,
@@ -1560,7 +1581,7 @@ export class InquiryMatchingService {
       },
     } as const;
 
-    if (m.findingTypeRegex.length === 0 && m.findingValueRegex.length === 0) {
+    if (exactInWhere(m)) {
       const [total, sample] = await Promise.all([
         this.prisma.finding.count({ where }),
         this.prisma.finding.findMany({
@@ -1572,6 +1593,7 @@ export class InquiryMatchingService {
       return { total, sample };
     }
 
+    await ensureTermSnapshotFor(this.prisma, [m]);
     const matcher = new CompiledMatcher(m);
     // Only the dimensions the matcher actually reads. `matchedContent` is the
     // large column here, so it is pulled only when a value regex needs it.
@@ -1581,7 +1603,7 @@ export class InquiryMatchingService {
       detectorType: true,
       customDetectorKey: true,
       findingType: true,
-      ...(m.findingValueRegex.length > 0 ? { matchedContent: true } : {}),
+      ...(needsMatchedContent(m) ? { matchedContent: true } : {}),
     } as const;
 
     let total = 0;
@@ -1630,6 +1652,8 @@ export class InquiryMatchingService {
     findingTypes: true,
     findingTypeRegex: true,
     findingValueRegex: true,
+    termKeys: true,
+    termsIncludeNarrower: true,
   } satisfies Prisma.InquirySelect;
 
   /**
@@ -1662,6 +1686,7 @@ export class InquiryMatchingService {
     withAsset: boolean,
     scanLimit?: number,
   ): AsyncGenerator<{ rows: FindingRow[]; scanned: number }> {
+    await ensureTermSnapshotFor(this.prisma, [m]);
     yield* this.findingPages(
       candidateWhere(m),
       m,
@@ -1684,6 +1709,7 @@ export class InquiryMatchingService {
     anchors: RunAnchors,
     withAsset: boolean,
   ): AsyncGenerator<{ rows: FindingRow[]; scanned: number }> {
+    await ensureTermSnapshotFor(this.prisma, [m]);
     const where = retiredCandidateWhere(m, anchors);
     if (!where) return;
     for await (const page of this.findingPages(
@@ -1726,6 +1752,7 @@ export class InquiryMatchingService {
     select: object,
     scanLimit?: number,
   ): AsyncGenerator<{ rows: FindingRow[]; scanned: number }> {
+    await ensureTermSnapshotFor(this.prisma, [m]);
     const matcher = new CompiledMatcher(m);
 
     let cursor: string | null = null;

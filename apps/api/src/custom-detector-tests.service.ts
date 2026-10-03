@@ -760,16 +760,13 @@ export class CustomDetectorTestsService {
    * The decrypted secret values in a runtime pipeline schema (dispatch-time
    * shape from prepareRuntimePipelineSchema). For redacting stored outputs.
    */
-  private secretValues(
-    pipelineSchema: Record<string, unknown>,
-  ): string[] {
+  private secretValues(pipelineSchema: Record<string, unknown>): string[] {
     const secrets = pipelineSchema?.secrets;
     if (!secrets || typeof secrets !== 'object' || Array.isArray(secrets)) {
       return [];
     }
     return Object.values(secrets as Record<string, unknown>).filter(
-      (value): value is string =>
-        typeof value === 'string' && value.length > 0,
+      (value): value is string => typeof value === 'string' && value.length > 0,
     );
   }
 

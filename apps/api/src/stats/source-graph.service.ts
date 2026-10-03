@@ -172,6 +172,9 @@ export class SourceGraphService {
         JOIN assets a ON e.from_type = 'asset' AND a.id::text = e.from_id
         LEFT JOIN assets b ON e.to_type = 'asset' AND b.id::text = e.to_id
         WHERE b.source_id IS DISTINCT FROM a.source_id
+          -- Meaning is not lineage (rule SL-4): a semantic link to a glossary
+          -- term is not a boundary crossing.
+          AND e.to_type NOT IN ('term', 'term_ref')
       ),
       incoming AS (
         SELECT a.id AS asset_id, a.source_id,
@@ -181,6 +184,7 @@ export class SourceGraphService {
         JOIN assets a ON e.to_type = 'asset' AND a.id::text = e.to_id
         LEFT JOIN assets b ON e.from_type = 'asset' AND b.id::text = e.from_id
         WHERE b.source_id IS DISTINCT FROM a.source_id
+          AND e.from_type NOT IN ('term', 'term_ref')
       ),
       crossing AS (
         SELECT * FROM outgoing
@@ -208,9 +212,11 @@ export class SourceGraphService {
     await this.prisma.$executeRaw`
       INSERT INTO source_graph_nodes (source_id, asset_count, connected_asset_count, internal_edge_count, finding_count, severity_counts)
       WITH endpoints AS (
-        SELECT from_id AS asset_id FROM edges WHERE from_type = 'asset'
+        SELECT from_id AS asset_id FROM edges
+         WHERE from_type = 'asset' AND to_type NOT IN ('term', 'term_ref')
         UNION
-        SELECT to_id   AS asset_id FROM edges WHERE to_type   = 'asset'
+        SELECT to_id   AS asset_id FROM edges
+         WHERE to_type   = 'asset' AND from_type NOT IN ('term', 'term_ref')
         UNION
         SELECT a.id::text FROM assets a
         CROSS JOIN LATERAL jsonb_array_elements_text(

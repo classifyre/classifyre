@@ -46,6 +46,7 @@ import { STATUS_TONE, statusBadgeClass } from "@/lib/status-tone";
 const CONFIGURE_PATH: Record<WorkspaceFeatureKey, string> = {
   embeddings: "/harness?tab=embedding",
   duplicates: "/duplicates/tune",
+  entities: "/glossary?tab=entities",
 };
 
 /** "While it is off" bullets per feature, in order. */
@@ -88,7 +89,7 @@ type Pending =
   | { kind: "delete"; feature: WorkspaceFeatureState };
 
 /**
- * Settings → Cleanup › Features: whether the two storage-heavy engines run.
+ * Settings → Cleanup › Features: whether the background engines run.
  *
  * Every change goes through a dialog that says what the change costs, because
  * none of them is free: off stops work the rest of the product reads, delete
@@ -528,7 +529,9 @@ export function FeatureSwitchesCard() {
             <AlertDialogDescription className="text-xs">
               {dialogFeature?.key === "duplicates"
                 ? t("features.enable.duplicates")
-                : dialogFeature?.disabledMode === "deleted"
+                : dialogFeature?.key === "entities"
+                  ? t("features.enable.entities")
+                  : dialogFeature?.disabledMode === "deleted"
                   ? t("features.enable.embeddingsDeleted")
                   : t("features.enable.embeddingsKept")}
             </AlertDialogDescription>

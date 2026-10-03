@@ -31,6 +31,34 @@ export class SearchAssetsFiltersDto extends OmitType(QueryAssetsDto, [
   })
   @IsOptional()
   metadata?: Record<string, { eq?: unknown; in?: unknown[] }>;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Glossary term keys: assets with a current semantic link to one of them ' +
+      '(any method). Unknown keys are rejected.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  term?: string[];
+
+  @ApiPropertyOptional({ description: 'With term: include narrower concepts.' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  includeNarrower?: boolean;
+
+  @ApiPropertyOptional({
+    enum: ['BINDING', 'DECLARED', 'MANUAL', 'SUGGESTED', 'MENTION'],
+    isArray: true,
+    description: 'With term: only links by these methods.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  meaningMethod?: string[];
 }
 
 const normalizeToStringArray = (value: unknown, uppercase = false) => {

@@ -52,7 +52,8 @@ export class NamespacesController {
 
   @Get('stats')
   @ApiOperation({
-    summary: 'Per-namespace source rollups (total + failing + running + pending)',
+    summary:
+      'Per-namespace source rollups (total + failing + running + pending)',
   })
   stats(): Promise<NamespaceStats[]> {
     return this.registry.stats();

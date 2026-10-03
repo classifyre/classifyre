@@ -13,6 +13,8 @@ Name | Type
 `findingTypes` | Array&lt;string&gt;
 `findingTypeRegex` | Array&lt;string&gt;
 `findingValueRegex` | Array&lt;string&gt;
+`termKeys` | Array&lt;string&gt;
+`termsIncludeNarrower` | boolean
 
 ## Example
 
@@ -28,6 +30,8 @@ const example = {
   "findingTypes": null,
   "findingTypeRegex": null,
   "findingValueRegex": null,
+  "termKeys": null,
+  "termsIncludeNarrower": null,
 } satisfies PreviewInquiryDto
 
 console.log(example)

@@ -807,6 +807,9 @@ describe('finding filter key conformance', () => {
     firstDetectedAfter: new Date('2026-01-01'),
     lastDetectedBefore: new Date('2026-01-02'),
     excludeIds: ['f'],
+    term: ['bank-account'],
+    includeNarrower: true,
+    meaningMethod: ['BINDING'],
   };
 
   const build = (filters: Record<string, unknown>) =>

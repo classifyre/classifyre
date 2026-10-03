@@ -21,6 +21,9 @@ Name | Type
 `firstDetectedAfter` | Date
 `lastDetectedBefore` | Date
 `excludeIds` | Array&lt;string&gt;
+`term` | Array&lt;string&gt;
+`includeNarrower` | boolean
+`meaningMethod` | Array&lt;string&gt;
 
 ## Example
 
@@ -44,6 +47,9 @@ const example = {
   "firstDetectedAfter": null,
   "lastDetectedBefore": null,
   "excludeIds": null,
+  "term": null,
+  "includeNarrower": null,
+  "meaningMethod": null,
 } satisfies SearchFindingsFiltersInputDto
 
 console.log(example)

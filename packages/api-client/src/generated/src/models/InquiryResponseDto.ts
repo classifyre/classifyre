@@ -112,6 +112,18 @@ export interface InquiryResponseDto {
      */
     findingValueRegex: Array<string>;
     /**
+     * 
+     * @type {Array<string>}
+     * @memberof InquiryResponseDto
+     */
+    termKeys: Array<string>;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof InquiryResponseDto
+     */
+    termsIncludeNarrower: boolean;
+    /**
      * Open findings currently matching this query
      * @type {number}
      * @memberof InquiryResponseDto
@@ -199,6 +211,8 @@ export function instanceOfInquiryResponseDto(value: object): value is InquiryRes
     if (!('findingTypes' in value) || value['findingTypes'] === undefined) return false;
     if (!('findingTypeRegex' in value) || value['findingTypeRegex'] === undefined) return false;
     if (!('findingValueRegex' in value) || value['findingValueRegex'] === undefined) return false;
+    if (!('termKeys' in value) || value['termKeys'] === undefined) return false;
+    if (!('termsIncludeNarrower' in value) || value['termsIncludeNarrower'] === undefined) return false;
     if (!('matchCount' in value) || value['matchCount'] === undefined) return false;
     if (!('newMatchCount' in value) || value['newMatchCount'] === undefined) return false;
     if (!('goneMatchCount' in value) || value['goneMatchCount'] === undefined) return false;
@@ -231,6 +245,8 @@ export function InquiryResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'findingTypes': json['findingTypes'],
         'findingTypeRegex': json['findingTypeRegex'],
         'findingValueRegex': json['findingValueRegex'],
+        'termKeys': json['termKeys'],
+        'termsIncludeNarrower': json['termsIncludeNarrower'],
         'matchCount': json['matchCount'],
         'newMatchCount': json['newMatchCount'],
         'goneMatchCount': json['goneMatchCount'],
@@ -265,6 +281,8 @@ export function InquiryResponseDtoToJSONTyped(value?: InquiryResponseDto | null,
         'findingTypes': value['findingTypes'],
         'findingTypeRegex': value['findingTypeRegex'],
         'findingValueRegex': value['findingValueRegex'],
+        'termKeys': value['termKeys'],
+        'termsIncludeNarrower': value['termsIncludeNarrower'],
         'matchCount': value['matchCount'],
         'newMatchCount': value['newMatchCount'],
         'goneMatchCount': value['goneMatchCount'],

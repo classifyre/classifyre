@@ -41,6 +41,7 @@ import {
 import { useTranslation } from "@/hooks/use-translation";
 import { useGoBack } from "@/hooks/use-go-back";
 import { InquiryCasesPanel, type CaseRef } from "@/components/inquiry-cases";
+import { InquiryAboutTerms } from "@/components/glossary/inquiry-about-terms";
 import {
   ALL_SOURCES_VALUE,
   customDetectorValue,
@@ -91,6 +92,8 @@ export interface InquiryFormHandle {
       findingTypes: string[];
       findingTypeRegex: string[];
       findingValueRegex: string[];
+      termKeys: string[];
+      termsIncludeNarrower: boolean;
     };
   };
   applyPatches: (patches: Array<{ path: string; value: unknown }>) => void;
@@ -156,6 +159,16 @@ export const InquiryForm = React.forwardRef<
   );
   const [valueRegexText, setValueRegexText] = React.useState(
     joinList(initial?.findingValueRegex ?? []),
+  );
+  // About (SL3 R7.6): the findings must be evidence of one of these concepts.
+  // A watch started from a term page (?term=<key>) opens about that term.
+  const [termKeys, setTermKeys] = React.useState<string[]>(() => {
+    if (initial?.termKeys) return initial.termKeys;
+    const preset = !isEdit ? searchParams?.get("term") : null;
+    return preset ? [preset] : [];
+  });
+  const [termsIncludeNarrower, setTermsIncludeNarrower] = React.useState(
+    initial?.termsIncludeNarrower ?? false,
   );
 
   const [options, setOptions] = React.useState<MatchOptionsResponseDto | null>(
@@ -265,8 +278,12 @@ export const InquiryForm = React.forwardRef<
       findingTypes: [...selectedTypes],
       findingTypeRegex: parseList(regexText),
       findingValueRegex: parseList(valueRegexText),
+      termKeys,
+      termsIncludeNarrower,
     }),
     [
+      termKeys,
+      termsIncludeNarrower,
       matchAllSources,
       selectedSources,
       selectedDetectors,
@@ -901,6 +918,13 @@ export const InquiryForm = React.forwardRef<
                     </MultiSelectContent>
                   </MultiSelect>
                 </div>
+
+                <InquiryAboutTerms
+                  termKeys={termKeys}
+                  onTermKeysChange={setTermKeys}
+                  includeNarrower={termsIncludeNarrower}
+                  onIncludeNarrowerChange={setTermsIncludeNarrower}
+                />
 
                 <Accordion type="single" collapsible>
                   <AccordionItem value="advanced">

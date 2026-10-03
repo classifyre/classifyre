@@ -20,6 +20,8 @@ Name | Type
 `findingTypes` | Array&lt;string&gt;
 `findingTypeRegex` | Array&lt;string&gt;
 `findingValueRegex` | Array&lt;string&gt;
+`termKeys` | Array&lt;string&gt;
+`termsIncludeNarrower` | boolean
 `matchCount` | number
 `newMatchCount` | number
 `goneMatchCount` | number
@@ -48,6 +50,8 @@ const example = {
   "findingTypes": null,
   "findingTypeRegex": null,
   "findingValueRegex": null,
+  "termKeys": null,
+  "termsIncludeNarrower": null,
   "matchCount": null,
   "newMatchCount": null,
   "goneMatchCount": null,

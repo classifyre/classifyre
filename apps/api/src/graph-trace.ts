@@ -15,6 +15,9 @@ export const TRACE_KINDS = [
   'links',
   'duplicates',
   'similar',
+  // Other assets about the same concepts (SL5 A9). Not an edge-table walk:
+  // served from the semantic links, one hop, never written to `edges`.
+  'meaning',
 ] as const;
 export type TraceKind = (typeof TRACE_KINDS)[number];
 export type TraceSide = 'seed' | 'up' | 'down' | 'side';

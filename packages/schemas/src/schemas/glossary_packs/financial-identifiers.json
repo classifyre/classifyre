@@ -1,0 +1,171 @@
+{
+  "format": "classifyre.glossary-pack/v1",
+  "key": "financial-identifiers",
+  "version": "1.0.0",
+  "name": "Financial identifiers",
+  "language": "en",
+  "description": "Identifiers of accounts, cards, wallets and businesses, bound to the built-in PII detector's outputs.",
+  "schemes": [
+    {
+      "key": "financial-identifiers",
+      "name": "Financial identifiers"
+    }
+  ],
+  "terms": [
+    {
+      "key": "financial-identifier",
+      "kind": "CONCEPT",
+      "term": "Financial identifier",
+      "scheme": "financial-identifiers",
+      "definition": "An identifier of a financial account, instrument or tax subject."
+    },
+    {
+      "key": "bank-account",
+      "kind": "CONCEPT",
+      "term": "Bank account",
+      "scheme": "financial-identifiers",
+      "definition": "A bank account number, domestic or IBAN.",
+      "aliases": [
+        "account number",
+        "Kontonummer"
+      ]
+    },
+    {
+      "key": "payment-card",
+      "kind": "CONCEPT",
+      "term": "Payment card",
+      "scheme": "financial-identifiers",
+      "definition": "A credit, debit or prepaid card number.",
+      "aliases": [
+        "card number"
+      ]
+    },
+    {
+      "key": "crypto-address",
+      "kind": "CONCEPT",
+      "term": "Crypto address",
+      "scheme": "financial-identifiers",
+      "definition": "A cryptocurrency wallet address.",
+      "aliases": [
+        "wallet address",
+        "Bitcoin address"
+      ]
+    },
+    {
+      "key": "tax-or-vat-number",
+      "kind": "CONCEPT",
+      "term": "Tax or VAT number",
+      "scheme": "financial-identifiers",
+      "definition": "A tax identification or VAT registration number.",
+      "aliases": [
+        "VAT number",
+        "UID-Nummer",
+        "Steuernummer"
+      ]
+    },
+    {
+      "key": "business-registration-number",
+      "kind": "CONCEPT",
+      "term": "Business registration number",
+      "scheme": "financial-identifiers",
+      "definition": "A number a register assigns to a business.",
+      "aliases": [
+        "company number",
+        "Firmenbuchnummer"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "bank-account",
+      "type": "BROADER",
+      "to": "financial-identifier"
+    },
+    {
+      "from": "payment-card",
+      "type": "BROADER",
+      "to": "financial-identifier"
+    },
+    {
+      "from": "crypto-address",
+      "type": "BROADER",
+      "to": "financial-identifier"
+    },
+    {
+      "from": "tax-or-vat-number",
+      "type": "BROADER",
+      "to": "financial-identifier"
+    },
+    {
+      "from": "business-registration-number",
+      "type": "BROADER",
+      "to": "financial-identifier"
+    }
+  ],
+  "bindings": [
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "IBAN_CODE"
+      },
+      "termKey": "bank-account"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "US_BANK_NUMBER"
+      },
+      "termKey": "bank-account"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "CREDIT_CARD"
+      },
+      "termKey": "payment-card"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "CRYPTO"
+      },
+      "termKey": "crypto-address"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "IT_VAT_CODE"
+      },
+      "termKey": "tax-or-vat-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "AU_ABN"
+      },
+      "termKey": "business-registration-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "AU_ACN"
+      },
+      "termKey": "business-registration-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "SG_UEN"
+      },
+      "termKey": "business-registration-number"
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://classifyre.io/schemas/glossary_binding.json",
+  "title": "GlossaryBindingSpec",
+  "description": "Contract C9 (docs/prd/SL2 \u00a74): what a detector output or metadata field means. Never a pattern (rule SL-7).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode"
+  ],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "OUTPUT",
+        "OUTPUT_VALUES",
+        "OUTPUT_LOOKUP",
+        "METADATA_VALUES",
+        "METADATA_LOOKUP"
+      ]
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "detectorType",
+        "findingType"
+      ],
+      "properties": {
+        "detectorType": {
+          "type": "string",
+          "enum": [
+            "SECRETS",
+            "PII",
+            "YARA",
+            "BROKEN_LINKS",
+            "CODE_SECURITY",
+            "CUSTOM"
+          ]
+        },
+        "customDetectorKey": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Required exactly when detectorType is CUSTOM."
+        },
+        "findingType": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "field": {
+      "type": "string",
+      "description": "Metadata path, a or a.b"
+    },
+    "values": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 1000
+    },
+    "splitDelimiter": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 8
+    },
+    "lookup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "match"
+      ],
+      "properties": {
+        "schemeId": {
+          "type": "string"
+        },
+        "schemeKey": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+        },
+        "match": {
+          "type": "string",
+          "enum": [
+            "CODES",
+            "ANY"
+          ]
+        }
+      }
+    },
+    "termKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+    },
+    "termId": {
+      "type": "string"
+    },
+    "noMeaning": {
+      "type": "boolean"
+    },
+    "sourceIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    }
+  }
+}
