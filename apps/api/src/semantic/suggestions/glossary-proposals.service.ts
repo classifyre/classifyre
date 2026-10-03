@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma, SemanticSuggestion } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
@@ -23,6 +24,8 @@ import { vocabularyLabel } from '../bindings/binding-spec';
 import { SemanticJobsScheduler } from '../semantic-jobs.scheduler';
 import { SemanticSuggestionsService } from './semantic-suggestions.service';
 import { stitchTermRefs, unknownTermRefs } from '../term-refs';
+import { EntityCandidatesService } from '../../entities/entity-candidates.service';
+import { EntityValuesService } from '../../entities/entity-values.service';
 
 export const PROPOSAL_KINDS = [
   'TERM',
@@ -31,6 +34,10 @@ export const PROPOSAL_KINDS = [
   'BINDING',
   'LINK',
   'TERM_REF',
+  // G5: a value that may refer to an entity, and an identifier two entities
+  // claim (which is settled by keeping, moving or merging).
+  'ENTITY_MENTION',
+  'ENTITY_MERGE',
 ] as const;
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
 export type ProposalDecision =
@@ -43,9 +50,9 @@ export const DISMISS_REASONS = ['wrong concept', 'too broad', 'noise', 'other'];
 
 export interface ProposalItem {
   kind: ProposalKind;
-  /** draft:<id> | suggestion:<id> | ref:<urn> | alias:<termId> */
+  /** draft:<id> | suggestion:<id> | ref:<urn> | alias:<termId> | entity:<valueId> */
   id: string;
-  source: 'draft' | 'suggestion' | 'ref';
+  source: 'draft' | 'suggestion' | 'ref' | 'entity';
   title: string;
   rationale: string | null;
   score: number | null;
@@ -73,8 +80,10 @@ type Actor = { name: string; isAgent?: boolean };
  * One review queue for every proposal (SL4, F10). It is a view, not a copy:
  * DRAFT terms, aliases, relations and bindings stay in their own tables,
  * machine suggestions and agent link proposals live in `semantic_suggestions`,
- * and unknown term references are read from `edges`. One decision API covers
- * them all. Agents never decide LINK, TERM, ALIAS or TERM_REF items (D7).
+ * and unknown term references are read from `edges`. Entity candidates and
+ * identifier conflicts (G5) are PROPOSED rows of `entity_values`. One decision
+ * API covers them all. Agents never decide LINK, TERM, ALIAS, TERM_REF or
+ * entity items (D7, G5 R22).
  */
 @Injectable()
 export class GlossaryProposalsService {
@@ -85,10 +94,21 @@ export class GlossaryProposalsService {
     private readonly bindings: BindingsService,
     private readonly suggestions: SemanticSuggestionsService,
     private readonly jobs: SemanticJobsScheduler,
+    @Optional() private readonly entityCandidates?: EntityCandidatesService,
+    @Optional() private readonly entityValues?: EntityValuesService,
   ) {}
 
-  counts() {
-    return this.suggestions.pendingCounts();
+  async counts(): Promise<Record<string, number>> {
+    const [counts, entities] = await Promise.all([
+      this.suggestions.pendingCounts(),
+      this.entityCandidates?.counts() ??
+        Promise.resolve({ mention: 0, conflict: 0 }),
+    ]);
+    return {
+      ...counts,
+      ENTITY_MENTION: entities.mention,
+      ENTITY_MERGE: entities.conflict,
+    };
   }
 
   private termRef(
@@ -161,7 +181,7 @@ export class GlossaryProposalsService {
           score: null,
           generator: null,
           origin: String(term.origin),
-          createdBy: term.verifiedBy,
+          createdBy: term.approvedBy,
           createdAt: term.createdAt,
           term: this.termRef(term),
           payload: {
@@ -333,6 +353,62 @@ export class GlossaryProposalsService {
         });
       }
     }
+    if (
+      this.entityCandidates &&
+      (want('ENTITY_MENTION') || want('ENTITY_MERGE')) &&
+      (!params.origin || params.origin === 'SUGGESTION')
+    ) {
+      const kind =
+        want('ENTITY_MENTION') && want('ENTITY_MERGE')
+          ? undefined
+          : want('ENTITY_MERGE')
+            ? ('conflict' as const)
+            : ('mention' as const);
+      const candidates = await this.entityCandidates.list({
+        kind,
+        termId: params.termId,
+        minScore: params.minScore,
+        take: Math.min(budget, 200),
+      });
+      for (const candidate of candidates.items) {
+        const conflict = candidate.kind === 'conflict';
+        items.push({
+          kind: conflict ? 'ENTITY_MERGE' : 'ENTITY_MENTION',
+          id: `entity:${candidate.id}`,
+          source: 'entity',
+          title: conflict
+            ? `${candidate.label} ${candidate.value}: ◇ ${candidate.conflictWith?.term ?? '?'} or ◇ ${candidate.term.term}`
+            : `"${candidate.value}" → ◇ ${candidate.term.term}`,
+          rationale: conflict
+            ? `◇ ${candidate.conflictWith?.term ?? 'Another entity'} already holds this identifier. Keep it there, move it, let both hold it, or merge the two entities.`
+            : `${candidate.method === 'FUZZY' ? 'Same letters and digits as' : 'Sounds like'} "${candidate.resembles ?? candidate.term.term}". ${candidate.occurrences} asset(s) carry it.`,
+          score: candidate.score,
+          generator: 'entity',
+          origin: 'SUGGESTION',
+          createdBy: null,
+          createdAt: candidate.createdAt,
+          term: {
+            id: candidate.term.id,
+            key: candidate.term.key,
+            term: candidate.term.term,
+            kind: 'ENTITY',
+            status: candidate.term.status,
+          },
+          payload: {
+            label: candidate.label,
+            value: candidate.value,
+            method: candidate.method,
+            resembles: candidate.resembles,
+            occurrences: candidate.occurrences,
+            conflictWith: candidate.conflictWith,
+          },
+          evidence: { samples: candidate.samples },
+          agentNote: candidate.agentNote
+            ? `${candidate.agentVerdict ?? ''}: ${candidate.agentNote}`.trim()
+            : candidate.agentVerdict,
+        });
+      }
+    }
     items.sort(
       (a, b) =>
         (b.score ?? 0.5) - (a.score ?? 0.5) ||
@@ -451,6 +527,8 @@ export class GlossaryProposalsService {
       result = await this.decideAlias(ref, decision, input.edit, actor);
     else if (kind === 'TERM_REF')
       result = await this.decideRef(ref, decision, input.edit, actor);
+    else if (kind === 'ENTITY_MENTION' || kind === 'ENTITY_MERGE')
+      result = await this.decideEntity(ref, decision, input.edit, actor);
     else if (prefix === 'draft') {
       result =
         kind === 'RELATION'
@@ -626,6 +704,47 @@ export class GlossaryProposalsService {
       origin: 'OPERATOR',
       author: actor.name,
     });
+  }
+
+  /**
+   * An entity candidate or an identifier conflict (G5 R15, R6). `accept`
+   * confirms the value for the entity (for a conflict: both hold it), a
+   * dismissal rejects and remembers it. A conflict can also be settled with
+   * `edit.resolution`: `move` (take it from the holder) or `merge` (merge the
+   * claiming entity into the holder).
+   */
+  private async decideEntity(
+    valueId: string,
+    decision: ProposalDecision,
+    edit: Record<string, unknown> | undefined,
+    actor: Actor,
+  ) {
+    if (!this.entityValues) {
+      throw new BadRequestException('Entities are not available here.');
+    }
+    if (decision === 'dismiss' || decision === 'dismiss_forever') {
+      return this.entityValues.review(
+        [{ id: valueId, decision: 'reject' }],
+        actor,
+      );
+    }
+    const resolution = edit?.resolution;
+    if (resolution === 'merge') {
+      const row = await this.prisma.entityValue.findUnique({
+        where: { id: valueId },
+        select: { termId: true, conflictTermId: true },
+      });
+      if (!row?.conflictTermId) {
+        throw new BadRequestException(
+          'Only a conflict can be settled by merging.',
+        );
+      }
+      return this.entityValues.merge(row.termId, row.conflictTermId, actor);
+    }
+    return this.entityValues.review(
+      [{ id: valueId, decision: resolution === 'move' ? 'move' : 'accept' }],
+      actor,
+    );
   }
 
   private async decideDraftRelation(

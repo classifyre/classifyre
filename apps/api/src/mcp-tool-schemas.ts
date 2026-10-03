@@ -129,14 +129,14 @@ export const searchFindingsFilters = z
       .max(50)
       .optional()
       .describe(
-        'Glossary term keys: only findings that are evidence of one of these concepts (an APPROVED binding of their detector output, or a manual link). Prefer this over regex on values when a concept exists. Unknown keys are rejected.',
+        'Glossary term keys: only findings that are evidence of one of these terms (an APPROVED binding of their detector output, a manual link, or — for an entity — a mention of one of its confirmed values). Prefer this over regex on values when a term exists. Unknown keys are rejected.',
       ),
     includeNarrower: z
       .boolean()
       .optional()
       .describe('With term: include the narrower concepts too.'),
     meaningMethod: z
-      .array(z.enum(['BINDING', 'MANUAL']))
+      .array(z.enum(['BINDING', 'MANUAL', 'MENTION']))
       .optional()
       .describe('With term: only evidence by these methods.'),
   })

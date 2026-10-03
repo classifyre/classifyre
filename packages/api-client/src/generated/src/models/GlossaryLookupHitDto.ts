@@ -82,7 +82,7 @@ export interface GlossaryLookupHitDto {
      */
     hiddenAliases: Array<string>;
     /**
-     * Unverified aliases suggested by agents for operator review
+     * Aliases suggested by agents, waiting for an operator
      * @type {Array<string>}
      * @memberof GlossaryLookupHitDto
      */
@@ -154,17 +154,11 @@ export interface GlossaryLookupHitDto {
      */
     origin: string;
     /**
-     * True when APPROVED (kept for compatibility).
-     * @type {boolean}
-     * @memberof GlossaryLookupHitDto
-     */
-    verified: boolean;
-    /**
      * 
      * @type {string}
      * @memberof GlossaryLookupHitDto
      */
-    verifiedBy?: string | null;
+    approvedBy?: string | null;
     /**
      * 
      * @type {Date}
@@ -184,11 +178,53 @@ export interface GlossaryLookupHitDto {
      */
     updatedAt: Date;
     /**
-     * Compatibility tier; `matchedOn` says precisely which label matched.
+     * Entities: URN of the record that is this entity (a register entry).
      * @type {string}
      * @memberof GlossaryLookupHitDto
      */
-    matchType: GlossaryLookupHitDtoMatchTypeEnum;
+    anchorUrn?: string | null;
+    /**
+     * Entities: free-form attributes from connectors or people.
+     * @type {object}
+     * @memberof GlossaryLookupHitDto
+     */
+    attributes?: object | null;
+    /**
+     * Entities: occurrences of a confirmed value in the value index (asset × value).
+     * @type {number}
+     * @memberof GlossaryLookupHitDto
+     */
+    mentionCount: number;
+    /**
+     * Entities: distinct assets that mention it.
+     * @type {number}
+     * @memberof GlossaryLookupHitDto
+     */
+    assetCount: number;
+    /**
+     * Entities: distinct sources that mention it.
+     * @type {number}
+     * @memberof GlossaryLookupHitDto
+     */
+    sourceCount: number;
+    /**
+     * 
+     * @type {Date}
+     * @memberof GlossaryLookupHitDto
+     */
+    firstSeenAt?: Date | null;
+    /**
+     * 
+     * @type {Date}
+     * @memberof GlossaryLookupHitDto
+     */
+    lastSeenAt?: Date | null;
+    /**
+     * Entities: set when this entity was merged into `replacedById`.
+     * @type {Date}
+     * @memberof GlossaryLookupHitDto
+     */
+    mergedAt?: Date | null;
     /**
      * 
      * @type {string}
@@ -251,17 +287,6 @@ export type GlossaryLookupHitDtoEntityTypeEnum = typeof GlossaryLookupHitDtoEnti
 /**
  * @export
  */
-export const GlossaryLookupHitDtoMatchTypeEnum = {
-    Exact: 'exact',
-    Alias: 'alias',
-    Partial: 'partial',
-    Semantic: 'semantic'
-} as const;
-export type GlossaryLookupHitDtoMatchTypeEnum = typeof GlossaryLookupHitDtoMatchTypeEnum[keyof typeof GlossaryLookupHitDtoMatchTypeEnum];
-
-/**
- * @export
- */
 export const GlossaryLookupHitDtoMatchedOnEnum = {
     Term: 'term',
     Alias: 'alias',
@@ -288,10 +313,11 @@ export function instanceOfGlossaryLookupHitDto(value: object): value is Glossary
     if (!('proposedAliases' in value) || value['proposedAliases'] === undefined) return false;
     if (!('entityType' in value) || value['entityType'] === undefined) return false;
     if (!('origin' in value) || value['origin'] === undefined) return false;
-    if (!('verified' in value) || value['verified'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
-    if (!('matchType' in value) || value['matchType'] === undefined) return false;
+    if (!('mentionCount' in value) || value['mentionCount'] === undefined) return false;
+    if (!('assetCount' in value) || value['assetCount'] === undefined) return false;
+    if (!('sourceCount' in value) || value['sourceCount'] === undefined) return false;
     if (!('matchedOn' in value) || value['matchedOn'] === undefined) return false;
     if (!('deprecated' in value) || value['deprecated'] === undefined) return false;
     return true;
@@ -328,12 +354,18 @@ export function GlossaryLookupHitDtoFromJSONTyped(json: any, ignoreDiscriminator
         'sourceIri': json['sourceIri'] == null ? undefined : json['sourceIri'],
         'packKey': json['packKey'] == null ? undefined : json['packKey'],
         'origin': json['origin'],
-        'verified': json['verified'],
-        'verifiedBy': json['verifiedBy'] == null ? undefined : json['verifiedBy'],
+        'approvedBy': json['approvedBy'] == null ? undefined : json['approvedBy'],
         'approvedAt': json['approvedAt'] == null ? undefined : (new Date(json['approvedAt'])),
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
-        'matchType': json['matchType'],
+        'anchorUrn': json['anchorUrn'] == null ? undefined : json['anchorUrn'],
+        'attributes': json['attributes'] == null ? undefined : json['attributes'],
+        'mentionCount': json['mentionCount'],
+        'assetCount': json['assetCount'],
+        'sourceCount': json['sourceCount'],
+        'firstSeenAt': json['firstSeenAt'] == null ? undefined : (new Date(json['firstSeenAt'])),
+        'lastSeenAt': json['lastSeenAt'] == null ? undefined : (new Date(json['lastSeenAt'])),
+        'mergedAt': json['mergedAt'] == null ? undefined : (new Date(json['mergedAt'])),
         'matchedOn': json['matchedOn'],
         'deprecated': json['deprecated'],
         'replacedBy': json['replacedBy'] == null ? undefined : json['replacedBy'],
@@ -373,12 +405,18 @@ export function GlossaryLookupHitDtoToJSONTyped(value?: GlossaryLookupHitDto | n
         'sourceIri': value['sourceIri'],
         'packKey': value['packKey'],
         'origin': value['origin'],
-        'verified': value['verified'],
-        'verifiedBy': value['verifiedBy'],
+        'approvedBy': value['approvedBy'],
         'approvedAt': value['approvedAt'] == null ? value['approvedAt'] : value['approvedAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
-        'matchType': value['matchType'],
+        'anchorUrn': value['anchorUrn'],
+        'attributes': value['attributes'],
+        'mentionCount': value['mentionCount'],
+        'assetCount': value['assetCount'],
+        'sourceCount': value['sourceCount'],
+        'firstSeenAt': value['firstSeenAt'] == null ? value['firstSeenAt'] : value['firstSeenAt'].toISOString(),
+        'lastSeenAt': value['lastSeenAt'] == null ? value['lastSeenAt'] : value['lastSeenAt'].toISOString(),
+        'mergedAt': value['mergedAt'] == null ? value['mergedAt'] : value['mergedAt'].toISOString(),
         'matchedOn': value['matchedOn'],
         'deprecated': value['deprecated'],
         'replacedBy': value['replacedBy'],

@@ -148,8 +148,9 @@ export type {
 export type {
   EmbeddingReindexResponseDto,
   UpsertGlossaryTermDto,
-  VerifyGlossaryTermDto,
   GlossaryTermDto,
+  GlossaryListedTermDto,
+  GlossaryTermUsageDto,
   GlossaryListResponseDto,
   GlossaryLookupHitDto,
   UpsertGlossaryTermResponseDto,
@@ -1805,7 +1806,7 @@ export interface MaintenanceCleanupProgress {
 }
 
 /** A workspace feature switch (Settings → Cleanup › Features). */
-export type WorkspaceFeatureKey = "embeddings" | "duplicates";
+export type WorkspaceFeatureKey = "embeddings" | "duplicates" | "entities";
 
 /** One feature switch: its state, the data it owns and the queues it holds. */
 export interface WorkspaceFeatureState {

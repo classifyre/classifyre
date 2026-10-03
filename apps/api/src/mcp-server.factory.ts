@@ -65,6 +65,15 @@ import {
   registerSemanticMcpTools,
   type SemanticMcpServer,
 } from './semantic/semantic-mcp-tools';
+import { EntitiesService } from './entities/entities.service';
+import { EntityValuesService } from './entities/entity-values.service';
+import { EntityMentionsService } from './entities/entity-mentions.service';
+import { EntityCandidatesService } from './entities/entity-candidates.service';
+import { EntitySwitchService } from './entities/entity-switch.service';
+import {
+  registerEntityMcpTools,
+  type EntityMcpServer,
+} from './entities/entities-mcp-tools';
 import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
 import { AutopilotService } from './autopilot/autopilot.service';
@@ -360,6 +369,11 @@ export class McpServerFactoryService {
     private readonly glossaryProposals: GlossaryProposalsService,
     private readonly semanticSuggestions: SemanticSuggestionsService,
     private readonly semanticMap: SemanticMapService,
+    private readonly entitiesService: EntitiesService,
+    private readonly entityValues: EntityValuesService,
+    private readonly entityMentions: EntityMentionsService,
+    private readonly entityCandidates: EntityCandidatesService,
+    private readonly entitySwitch: EntitySwitchService,
   ) {}
 
   /**
@@ -395,6 +409,7 @@ export class McpServerFactoryService {
     this.registerCaseBoardTools(srv);
     this.registerCorrelationTools(srv);
     this.registerGlossaryTools(srv);
+    this.registerEntityTools(srv);
     this.registerCaseLeadTools(srv);
     this.registerAutopilotTools(srv);
 
@@ -925,6 +940,23 @@ export class McpServerFactoryService {
         proposals: this.glossaryProposals,
         suggestions: this.semanticSuggestions,
         map: this.semanticMap,
+      },
+      {
+        json: jsonResult,
+        assertNotDemoMode: () => this.mcpToolExecutor.assertNotDemoMode(),
+      },
+    );
+  }
+
+  private registerEntityTools(server: McpServerCompat) {
+    registerEntityMcpTools(
+      server as unknown as EntityMcpServer,
+      {
+        entities: this.entitiesService,
+        values: this.entityValues,
+        mentions: this.entityMentions,
+        candidates: this.entityCandidates,
+        switchService: this.entitySwitch,
       },
       {
         json: jsonResult,

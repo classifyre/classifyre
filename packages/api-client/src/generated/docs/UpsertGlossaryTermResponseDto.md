@@ -27,11 +27,18 @@ Name | Type
 `sourceIri` | string
 `packKey` | string
 `origin` | string
-`verified` | boolean
-`verifiedBy` | string
+`approvedBy` | string
 `approvedAt` | Date
 `createdAt` | Date
 `updatedAt` | Date
+`anchorUrn` | string
+`attributes` | object
+`mentionCount` | number
+`assetCount` | number
+`sourceCount` | number
+`firstSeenAt` | Date
+`lastSeenAt` | Date
+`mergedAt` | Date
 `merged` | boolean
 
 ## Example
@@ -62,11 +69,18 @@ const example = {
   "sourceIri": null,
   "packKey": null,
   "origin": null,
-  "verified": null,
-  "verifiedBy": null,
+  "approvedBy": null,
   "approvedAt": null,
   "createdAt": null,
   "updatedAt": null,
+  "anchorUrn": null,
+  "attributes": null,
+  "mentionCount": null,
+  "assetCount": null,
+  "sourceCount": null,
+  "firstSeenAt": null,
+  "lastSeenAt": null,
+  "mergedAt": null,
   "merged": null,
 } satisfies UpsertGlossaryTermResponseDto
 

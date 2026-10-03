@@ -102,6 +102,112 @@ class Tag:
         object.__setattr__(self, "severity", normalized)
 
 
+#: What kind of named thing an entity is. Decides which finding labels its name
+#: is matched under: a PERSON is found among person names, never among
+#: organisations.
+ENTITY_TYPES = ("PERSON", "ORGANIZATION", "LOCATION", "REFERENCE", "OTHER")
+
+#: The asset-metadata key a declared entity travels under.
+ENTITY_METADATA_KEY = "_entity"
+
+
+@dataclass(frozen=True)
+class Entity:
+    """The named thing a record *is*: a company, a person, an account.
+
+    A register or a customer master does not merely mention ACME Holding GmbH --
+    its record is ACME. Saying so::
+
+        Asset(
+            id=fn,
+            urn=urn_for("firmenbuch", fn),
+            entity=Entity(
+                type="ORGANIZATION",
+                name="ACME Holding GmbH",
+                identifiers={"vat": "ATU12345678", "fn": "123456a"},
+                aliases=["ACME Holding"],
+            ),
+        )
+
+    creates the entity in the glossary (or updates it), anchored to this
+    record, and from then on every document in every other source that carries
+    that name or one of those identifiers is a mention of it -- the e-mail that
+    quotes the VAT number, the contract that names the company.
+
+    ``identifiers`` are keyed by the *label a detector finds them under*
+    (``iban``, ``email``, a custom detector's label): that label is what links
+    a finding to the entity, so an identifier under a label nothing detects
+    links nothing. ``key`` pins the glossary key, for a source that already
+    refers to the entity with ``Ref.term(key)``.
+
+    The asset needs a ``urn`` (or the entity a ``key``): it is what makes the
+    declaration the same entity on the next scan instead of a new one. A
+    declared entity is the register's word and is approved from the start; what
+    an operator changes afterwards is kept -- a later scan only adds.
+    """
+
+    name: str
+    type: str = "OTHER"
+    key: str | None = None
+    identifiers: Mapping[str, str] = field(default_factory=dict)
+    aliases: tuple[str, ...] | list[str] = field(default_factory=tuple)
+    attributes: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        name = str(self.name or "").strip()
+        if not name:
+            raise ValueError("Entity.name is required and must be a non-empty string")
+        object.__setattr__(self, "name", name)
+        kind = str(self.type or "OTHER").strip().upper()
+        if kind not in ENTITY_TYPES:
+            raise ValueError(
+                f"Entity.type must be one of {', '.join(ENTITY_TYPES)}, got {self.type!r}"
+            )
+        object.__setattr__(self, "type", kind)
+        key = str(self.key).strip().lower() if self.key is not None else ""
+        object.__setattr__(self, "key", key or None)
+        if not isinstance(self.identifiers, Mapping):
+            raise TypeError(
+                'Entity.identifiers must map a label to a value, e.g. {"vat": "ATU12345678"}'
+            )
+        object.__setattr__(
+            self,
+            "identifiers",
+            {
+                str(label).strip(): str(value).strip()
+                for label, value in self.identifiers.items()
+                if str(label).strip() and value is not None and str(value).strip()
+            },
+        )
+        if isinstance(self.aliases, str | bytes):
+            raise TypeError("Entity.aliases must be a list of names, not a single string")
+        object.__setattr__(
+            self,
+            "aliases",
+            tuple(
+                dict.fromkeys(str(alias).strip() for alias in self.aliases if str(alias).strip())
+            ),
+        )
+        if not isinstance(self.attributes, Mapping):
+            raise TypeError("Entity.attributes must be a mapping")
+        object.__setattr__(self, "attributes", dict(self.attributes))
+
+    def to_metadata(self) -> dict[str, Any]:
+        """The declaration as it travels on the asset. Empty parts are left out,
+        so adding a field here never changes the checksum of an asset that does
+        not use it."""
+        payload: dict[str, Any] = {"name": self.name, "type": self.type}
+        if self.key:
+            payload["key"] = self.key
+        if self.identifiers:
+            payload["identifiers"] = dict(sorted(self.identifiers.items()))
+        if self.aliases:
+            payload["aliases"] = list(self.aliases)
+        if self.attributes:
+            payload["attributes"] = dict(self.attributes)
+        return payload
+
+
 @dataclass
 class Asset:
     """One thing worth scanning.
@@ -169,6 +275,10 @@ class Asset:
     #: chose it (``metadata["_cohort"]``), which is how the platform measures
     #: each band's yield. Never part of the asset's checksum.
     cohort: CohortItem | None = None
+    #: The named thing this record *is* -- see :class:`Entity`. Recorded as
+    #: ``metadata["_entity"]``, so it is part of the checksum only for assets
+    #: that declare one. Needs ``urn`` (or ``Entity.key``).
+    entity: Entity | None = None
 
     def __post_init__(self) -> None:
         self.id = str(self.id).strip()
@@ -207,6 +317,17 @@ class Asset:
                     "key": self.cohort.key,
                 },
             }
+        if self.entity is not None:
+            if not isinstance(self.entity, Entity):
+                raise TypeError("Asset.entity must be an Entity(...)")
+            if not (self.urn and str(self.urn).strip()) and not self.entity.key:
+                # Without either, the next scan could not tell this is the same
+                # entity and would create it again.
+                raise ValueError(
+                    "Asset.entity needs Asset.urn (build one with urn_for(...)) or "
+                    "Entity.key, so the next scan updates the same entity"
+                )
+            self.metadata = {**self.metadata, ENTITY_METADATA_KEY: self.entity.to_metadata()}
         if not isinstance(self.extract, bool):
             raise TypeError(f"Asset.extract must be True or False (got {self.extract!r})")
         reason = str(self.reference_reason).strip() if self.reference_reason is not None else ""
@@ -845,6 +966,7 @@ def build_module(context: Context) -> types.ModuleType:
     module.contains = contains  # type: ignore[attr-defined]
     module.references = references  # type: ignore[attr-defined]
     module.means = means  # type: ignore[attr-defined]
+    module.Entity = Entity  # type: ignore[attr-defined]
     module.same_as = same_as  # type: ignore[attr-defined]
     module.uses = uses  # type: ignore[attr-defined]
     module.urn_for = urn_for  # type: ignore[attr-defined]
@@ -862,6 +984,7 @@ def build_module(context: Context) -> types.ModuleType:
         "Asset",
         "Context",
         "ContainmentType",
+        "Entity",
         "FieldMapping",
         "FieldTransform",
         "FlowType",
@@ -906,6 +1029,7 @@ def namespace(context: Context) -> dict[str, Any]:
         "__builtins__": __builtins__,
         "Asset": Asset,
         "Tag": Tag,
+        "Entity": Entity,
         "Ref": Ref,
         "FieldMapping": FieldMapping,
         "FlowType": FlowType,

@@ -70,6 +70,9 @@ const KNOWLEDGE_TOOLS = [
   'glossary.finding_meaning',
   'glossary.propose_link',
   'glossary.list_proposals',
+  'glossary.entity',
+  'glossary.entity_candidates',
+  'glossary.propose_entity_verdict',
   'agenda.defer',
 ];
 
@@ -311,6 +314,14 @@ const GLOSSARY_DOCTRINE = [
   '"No meaning" is an operator decision. Prefer filtering findings by term over regex on values',
   'when a concept exists. Work the proposal queue from the highest score; never decide',
   'documents (LINK), terms or aliases — those are operator decisions.',
+  '\nENTITIES: an approved ENTITY links by itself — every finding that carries its name, an',
+  'alias or one of its identifiers is a mention, across all sources. Pivot on the thing, not the',
+  'string: glossary.entity gives its mentions, sources and the entities it appears with. Propose',
+  'an entity (glossary.propose, kind ENTITY) for a person or organisation the evidence keeps',
+  'returning to; it stays a draft until an operator approves it. Spelling variants arrive as',
+  'candidates (glossary.entity_candidates): read their occurrences and leave a verdict with',
+  'glossary.propose_entity_verdict when it is clear. You never confirm a candidate, settle an',
+  'identifier two entities claim, or merge entities — a person does.',
   '\nYou never edit, disable or delete an item an operator approved: propose an alternative.',
 ].join(' ');
 

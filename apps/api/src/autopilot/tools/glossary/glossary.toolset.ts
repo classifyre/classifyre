@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import {
   AgentDecisionAction,
   AiManagementMode,
@@ -23,6 +23,10 @@ import {
 import type { ProposalKind } from '../../../semantic/suggestions/glossary-proposals.service';
 import { SemanticSuggestionsService } from '../../../semantic/suggestions/semantic-suggestions.service';
 import { UndoService } from '../../supervisor/undo.service';
+import { EntitiesService } from '../../../entities/entities.service';
+import { EntityCandidatesService } from '../../../entities/entity-candidates.service';
+import { EntityMentionsService } from '../../../entities/entity-mentions.service';
+import { EntityValuesService } from '../../../entities/entity-values.service';
 import type { Tool, ToolContext, ToolGate } from '../tool.types';
 
 const ENTITY_TYPES = [
@@ -104,6 +108,11 @@ function agentActor(tc: ToolContext): string {
  * vocabulary and meaning; they propose terms, relations, bindings and links;
  * they approve relations and bindings only within the operator's guardrails;
  * and they never decide documents, terms or aliases.
+ *
+ * Entities (G5 R22): an agent creates an entity like any other term (DRAFT,
+ * through glossary.propose), reads where it is mentioned, and may propose a
+ * verdict on a candidate value — a person confirms it, and only a person
+ * settles an identifier conflict or merges two entities.
  */
 @Injectable()
 export class GlossaryToolset {
@@ -117,6 +126,11 @@ export class GlossaryToolset {
     private readonly suggestions: SemanticSuggestionsService,
     private readonly undo: UndoService,
     private readonly prisma: PrismaService,
+    // Optional and last, so the specs' positional construction keeps working.
+    @Optional() private readonly entities?: EntitiesService,
+    @Optional() private readonly entityCandidates?: EntityCandidatesService,
+    @Optional() private readonly entityMentions?: EntityMentionsService,
+    @Optional() private readonly entityValues?: EntityValuesService,
   ) {}
 
   /** Proposals change nothing an operator relies on: allowed in every mode. */
@@ -513,6 +527,145 @@ export class GlossaryToolset {
             note: str(input.note),
             agent: agentActor(tc),
           });
+        },
+      },
+      {
+        name: 'glossary.entity',
+        description:
+          'One ENTITY (a named thing: a person, an organisation, an account) by key or id: its confirmed names and identifiers, how many assets and sources mention it, the entities it appears with, and a few mentions. Mentions are every finding that carries one of its confirmed values — use this to pivot from a string to the thing, instead of searching each spelling.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            term: { type: 'string', description: 'Entity key or id.' },
+            mentions: {
+              type: 'number',
+              description: 'How many mentions to include (default 10, max 50).',
+            },
+          },
+          required: ['term'],
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async (input) => {
+          if (!this.entities || !this.entityMentions) {
+            throw new Error('Entities are not available here.');
+          }
+          const entity = await this.entities.get(String(input.term ?? ''));
+          const limit = Math.min(
+            Math.max(
+              typeof input.mentions === 'number' ? input.mentions : 10,
+              1,
+            ),
+            50,
+          );
+          const [mentions, coMentions] = await Promise.all([
+            this.entityMentions.mentions(entity.id, { limit }),
+            this.entityMentions.coMentions(entity.id, 10),
+          ]);
+          return {
+            id: entity.id,
+            key: entity.key,
+            name: entity.term,
+            entityType: entity.entityType,
+            status: entity.status,
+            linking: entity.linking,
+            mentionCount: entity.mentionCount,
+            assetCount: entity.assetCount,
+            sourceCount: entity.sourceCount,
+            firstSeenAt: entity.firstSeenAt,
+            lastSeenAt: entity.lastSeenAt,
+            anchor: entity.anchor,
+            values: entity.values.map((value) => ({
+              label: value.label,
+              value: value.value,
+              method: value.method,
+              occurrences: value.occurrences,
+              sharedWith: value.sharedWith.map((other) => other.key),
+            })),
+            pendingCandidates: entity.candidates.length,
+            coMentioned: coMentions,
+            mentions: mentions.mentions.map((mention) => ({
+              assetId: mention.assetId,
+              assetName: mention.assetName,
+              sourceName: mention.sourceName,
+              findingId: mention.findingId,
+              label: mention.label,
+              value: mention.value,
+            })),
+            moreMentions: Boolean(mentions.next),
+          };
+        },
+      },
+      {
+        name: 'glossary.entity_candidates',
+        description:
+          'Values that MAY refer to an entity and wait for a person: a spelling variant found by sound or by folded spelling ("Acme Holding G.m.b.H." for ACME Holding GmbH), with a score and up to three occurrences, and identifier conflicts (two entities claiming one IBAN). You cannot decide these; when the occurrences make it clear, say so with glossary.propose_entity_verdict.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            term: {
+              type: 'string',
+              description: 'Only this entity (key or id).',
+            },
+            minScore: { type: 'number' },
+            take: { type: 'number' },
+          },
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async (input) => {
+          if (!this.entities || !this.entityCandidates) {
+            throw new Error('Entities are not available here.');
+          }
+          const term = str(input.term);
+          return this.entityCandidates.list({
+            termId: term
+              ? (await this.entities.resolveEntity(term)).id
+              : undefined,
+            minScore:
+              typeof input.minScore === 'number' ? input.minScore : undefined,
+            take: typeof input.take === 'number' ? input.take : 25,
+          });
+        },
+      },
+      {
+        name: 'glossary.propose_entity_verdict',
+        description:
+          'Say what you think of an entity candidate (accept: the value refers to the entity; reject: it does not) and why, in one or two sentences grounded in its occurrences. This decides nothing: the operator sees your verdict next to the candidate and confirms or overrules it.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            candidateId: {
+              type: 'string',
+              description: 'A candidate id from glossary.entity_candidates.',
+            },
+            verdict: { type: 'string', enum: ['accept', 'reject'] },
+            note: { type: 'string', description: 'Why, in 1-2 sentences.' },
+          },
+          required: ['candidateId', 'verdict'],
+          additionalProperties: false,
+        },
+        sideEffect: 'mutate',
+        domain: 'glossary',
+        resolveGate: this.proposalGate,
+        handler: async (input) => {
+          if (!this.entityValues) {
+            throw new Error('Entities are not available here.');
+          }
+          if (input.verdict !== 'accept' && input.verdict !== 'reject') {
+            throw new Error('verdict is accept or reject');
+          }
+          const row = await this.entityValues.proposeVerdict(
+            String(input.candidateId ?? ''),
+            input.verdict,
+            str(input.note),
+          );
+          return {
+            candidateId: row.id,
+            verdict: row.agentVerdict,
+            decided: false,
+            note: 'Recorded for the operator; the candidate is still pending.',
+          };
         },
       },
       {

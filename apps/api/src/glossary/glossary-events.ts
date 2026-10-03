@@ -30,6 +30,12 @@ export type GlossaryEvent =
       kind: string;
       /** Whether labels (term, aliases, codes, hidden aliases) changed. */
       labelsChanged?: boolean;
+      /**
+       * Whether the change can alter what links to the term: its status,
+       * labels, scheme or kind. Lookup bindings read all four, so each one
+       * needs a linker backfill.
+       */
+      linkingChanged?: boolean;
       /** Key renames, so `term_ref` endpoints can stitch. */
       keys?: string[];
     }
@@ -71,7 +77,12 @@ export type GlossaryEvent =
   | {
       /** A derived semantic dataset was wiped in Cleanup (SL-9): rebuild it. */
       type: 'semantic.derived_cleared';
-      dataset: 'vocabulary' | 'semanticLinks' | 'suggestions' | 'semanticMap';
+      dataset:
+        | 'vocabulary'
+        | 'semanticLinks'
+        | 'suggestions'
+        | 'semanticMap'
+        | 'entities';
     }
   | {
       /** A manual ABOUT reference was added or removed (SL3 R5). */
@@ -88,6 +99,38 @@ export type GlossaryEvent =
       trigger: string;
       terms: Array<{ key: string; added: number; gone: number }>;
       durationMs: number;
+    }
+  | {
+      /** An entity was created (G5): by a person, an agent or a source. */
+      type: 'entity.created';
+      termId: string;
+      key: string;
+      origin: string;
+    }
+  | {
+      /** Entity A was merged into B (G5 R7). */
+      type: 'entity.merged';
+      fromTermId: string;
+      fromKey: string;
+      intoTermId: string;
+      intoKey: string;
+      valuesMoved: number;
+      referencesMoved: number;
+    }
+  | {
+      /** A resolution pass proposed values for review (G5 §6.2). */
+      type: 'entity.candidates_pending';
+      count: number;
+      runId?: string | null;
+      top: Array<{ key: string; term: string; count: number }>;
+    }
+  | {
+      /**
+       * The confirmed values of these entities changed, so their mentions
+       * did: links, counters and watch snapshots follow. In-process only.
+       */
+      type: 'entity.values_changed';
+      termIds: string[];
     }
   | {
       type: 'glossary.proposals_pending';

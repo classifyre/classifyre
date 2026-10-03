@@ -9,8 +9,9 @@ import { TermPicker } from "./glossary-ui";
 
 /**
  * A watch's *About* section (SL3 R7.6): the findings must be evidence of one
- * of these glossary concepts — through an APPROVED binding of their output,
- * or a manual link — optionally including narrower concepts.
+ * of these glossary terms — a concept, through an APPROVED binding of their
+ * output or a manual link, optionally including narrower concepts; or an
+ * entity, through a mention of one of its confirmed values (G5 R18).
  */
 export function InquiryAboutTerms({
   termKeys,
@@ -57,7 +58,7 @@ export function InquiryAboutTerms({
           ))}
         </div>
       )}
-      <TermPicker value={picking} onChange={setPicking} kind="CONCEPT" />
+      <TermPicker value={picking} onChange={setPicking} />
       {termKeys.length > 0 && (
         <label className="flex items-center gap-2 text-xs">
           <Switch checked={includeNarrower} onCheckedChange={onIncludeNarrowerChange} />

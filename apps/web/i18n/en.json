@@ -183,7 +183,7 @@
     "detectors": "Custom Detectors",
     "investigations": "Investigations",
     "fingerprints": "Duplicate review",
-    "glossary": "Glossary",
+    "glossary": "Entities & glossary",
     "scans": "Scans",
     "operations": "Operations",
     "settings": "Settings",
@@ -196,12 +196,11 @@
     }
   },
   "glossary": {
-    "title": "Glossary",
-    "description": "Canonical vocabulary shared by operators, cases, and every AI Harness run.",
+    "title": "Entities & glossary",
+    "description": "The named things your data refers to, and the vocabulary shared by operators, cases, and every AI Harness run.",
     "addTerm": "Add term",
     "editTerm": "Edit term",
     "searchPlaceholder": "Search terms, aliases, or notes…",
-    "entityTypeFilter": "Entity type",
     "allTypes": "All types",
     "entityTypes": {
       "PERSON": "Person",
@@ -213,26 +212,18 @@
     },
     "columns": {
       "term": "Term",
-      "aliases": "Aliases",
       "type": "Type",
-      "verification": "Origin",
-      "notes": "Notes",
       "actions": "Actions",
       "scheme": "Scheme",
       "labels": "Labels",
-      "status": "Status"
+      "status": "Status",
+      "usage": "Used by"
     },
-    "unverifiedAgent": "Unverified · agent",
-    "verified": "Verified",
     "suggested": "suggested",
-    "verify": "Verify",
     "edit": "Edit",
     "delete": "Delete",
     "noValue": "—",
-    "noTerms": "No glossary terms found",
-    "noTermsHint": "Adjust the filters or add a new term.",
     "loading": "Loading glossary…",
-    "updating": "Updating glossary…",
     "form": {
       "termLabel": "Term",
       "termPlaceholder": "e.g. Acme Corp",
@@ -248,26 +239,15 @@
     "termRequired": "Term is required",
     "saved": "Glossary term saved",
     "saveFailed": "Failed to save glossary term",
-    "verifySuccess": "Term verified",
-    "verifyFailed": "Failed to verify term",
     "deleted": "Glossary term deleted",
-    "deleteFailed": "Failed to delete glossary term",
     "deleteConfirmTitle": "Delete glossary term?",
     "deleteConfirmDescription": "This action cannot be undone.",
-    "unverified": "Unverified",
     "bulk": {
       "selected": "{{count}} term selected",
       "selectedPlural": "{{count}} terms selected",
-      "allSelected": "All {{count}} matching terms selected",
       "selectAllAria": "Select all terms matching the current filters",
       "selectTermAria": "Select term {{term}}",
       "selectAll": "Select all {{count}} terms matching the current filters",
-      "deselectAll": "Deselect all terms",
-      "verify": "Verify",
-      "unverify": "Unverify",
-      "changeType": "Change type",
-      "applied": "{{count}} term(s) updated",
-      "failed": "Failed to update the selected terms",
       "approve": "Approve",
       "done": "Updated",
       "moveScheme": "Move to scheme",
@@ -305,10 +285,6 @@
       "schemes": "Schemes",
       "vocabulary": "Unbound vocabulary",
       "proposals": "Proposals"
-    },
-    "banner": {
-      "text": "We sorted your existing terms: {{concepts}} became concepts and {{entities}} entities. Review the split under Concepts and Entities — Change kind fixes any mistake.",
-      "dismiss": "Dismiss"
     },
     "empty": {
       "concepts": "No concepts yet",
@@ -438,7 +414,9 @@
         "ALIAS": "Aliases",
         "RELATION": "Relations",
         "LINK": "Documents",
-        "TERM_REF": "Unknown references"
+        "TERM_REF": "Unknown references",
+        "ENTITY_MENTION": "Entity values",
+        "ENTITY_MERGE": "Entity conflicts"
       },
       "refresh": "Look for suggestions",
       "refreshQueued": "Looking for suggestions…",
@@ -506,7 +484,9 @@
         "overview": "Overview",
         "evidence": "Evidence",
         "bindings": "Bindings",
-        "activity": "Activity"
+        "activity": "Activity",
+        "usage": "Cases & watches",
+        "entity": "Mentions"
       },
       "noDefinition": "No definition yet.",
       "steward": "Steward: {{steward}}",
@@ -574,7 +554,8 @@
         "OUTPUT_LOOKUP": "Value names a term",
         "METADATA_VALUES": "Field values",
         "METADATA_LOOKUP": "Field value names a term"
-      }
+      },
+      "viaScheme": "looks values up in {{scheme}}"
     },
     "findInText": {
       "open": "Find in text",
@@ -612,9 +593,34 @@
     },
     "inquiry": {
       "aboutLabel": "About",
-      "aboutHint": "Only findings that are evidence of one of these concepts (a binding of their output, or a manual link).",
+      "aboutHint": "Only findings that are evidence of one of these terms: a concept (a binding of their output, or a manual link) or an entity (a mention of one of its names or identifiers).",
       "includeNarrower": "Include narrower concepts",
       "remove": "Remove {{term}}"
+    },
+    "usage": {
+      "unused": "Not used yet",
+      "asset": "asset",
+      "assets": "assets",
+      "binding": "binding",
+      "bindings": "bindings",
+      "tiles": {
+        "assets": "Assets",
+        "findings": "Findings",
+        "bindings": "Bindings",
+        "cases": "Cases",
+        "watches": "Watches"
+      },
+      "unusedHint": "Nothing links to this term yet. Bind a detector output or a metadata field to it under Bindings, or use Find in text — the links appear without a re-scan.",
+      "cases": "Cases",
+      "noCases": "No case uses this term",
+      "noCasesHint": "A case appears here when its evidence links to the term, or when the case itself is linked to it from the board.",
+      "about": "about this term",
+      "caseAssets": "{{count}} evidence asset(s)",
+      "watches": "Watches",
+      "watchThis": "Watch this term",
+      "noWatches": "No watch follows this term",
+      "noWatchesHint": "A watch on this term reports new findings that are evidence of it after every scan.",
+      "watchMatches": "{{count}} matches"
     }
   },
   "common": {
@@ -839,6 +845,10 @@
         "transfers": {
           "name": "Finished transfers",
           "desc": "Completed, failed and cancelled export/import jobs with their chunks. Staged and running transfers are kept."
+        },
+        "entities": {
+          "name": "Entity candidates and mentions",
+          "desc": "Pending entity candidates, mention links and counters. Rebuilt automatically while Entities are on. Entities and decided values are kept."
         }
       }
     },
@@ -985,7 +995,7 @@
   },
   "features": {
     "title": "Features",
-    "subtitle": "The two background engines that build most of this workspace's derived data. Turning one off stops its work and pauses its workers; the investigation itself — sources, findings, assets, cases, inquiry watches, glossary — is never touched.",
+    "subtitle": "The background engines that build most of this workspace's derived data. Turning one off stops its work and pauses its workers; the investigation itself — sources, findings, assets, cases, inquiry watches, glossary — is never touched.",
     "loading": "Reading feature switches…",
     "loadFailed": "Could not load the feature switches",
     "retry": "Retry",
@@ -1012,6 +1022,11 @@
         "name": "Duplicate detection",
         "desc": "Matches assets that share identifying values after every scan. Feeds Duplicate review, “where else found”, similar-asset links in the graph and the harness duplicates tools.",
         "configure": "Tuning"
+      },
+      "entities": {
+        "name": "Entities",
+        "desc": "Links findings to the named things they refer to: every finding that carries an entity’s name or identifier is a mention of it. Feeds entity pages, the candidate review, entity watches and case leads.",
+        "configure": "Entities"
       }
     },
     "off": {
@@ -1039,6 +1054,14 @@
         "stop4": "The correlation.scan worker is paused (Settings → Workers) and cannot be resumed there.",
         "keep": "Kept: every match and pattern as it stands now, and all review decisions.",
         "delete": "Deletes match candidates, signatures, correlation values, clusters, patterns and the scored duplicate links in the asset graph. Lineage links and your review decisions are kept. Duplicate review stays empty until it is turned back on and the recompute finishes."
+      },
+      "entities": {
+        "stop1": "No entity resolution after scans: mention counters, candidates and mention links stop updating.",
+        "stop2": "Entity watches and case leads stop seeing new mentions.",
+        "stop3": "With duplicate detection off as well, finding values are no longer indexed at all.",
+        "stop4": "The entities.resolve and entities.recount workers are paused (Settings → Workers) and cannot be resumed there.",
+        "keep": "Kept: every entity, every confirmed and rejected value, pending candidates, mention links and counters as they stand now.",
+        "delete": "Deletes pending candidates, mention links and counters — and the value index too, unless duplicate detection is on. The entities themselves and every confirmed or rejected value are kept, so nothing has to be decided twice."
       }
     },
     "enable": {
@@ -1047,7 +1070,8 @@
       "cancel": "Cancel",
       "embeddingsKept": "Embedding resumes where it stopped: content scanned while it was off is embedded in the background, and rankings update as it catches up.",
       "embeddingsDeleted": "Embedding starts from scratch: every finding is re-embedded in the background — hours of worker CPU on a large corpus. Document text deleted earlier only comes back by rescanning sources with a full rescan.",
-      "duplicates": "Runs one full recompute over every asset to catch up with everything scanned while it was off — on a large corpus about an hour of worker time. Duplicate review fills in as it finishes."
+      "duplicates": "Runs one full recompute over every asset to catch up with everything scanned while it was off — on a large corpus about an hour of worker time. Duplicate review fills in as it finishes.",
+      "entities": "Matches the names and identifiers of your entities against everything already scanned. If duplicate detection is off, the value index is rebuilt first — on a large corpus that takes a while. Counters and candidates appear as it finishes."
     },
     "deleteKept": {
       "title": "Delete the data {{name}} kept?",
@@ -1078,6 +1102,10 @@
         "review": "New scans are not checked for duplicates, so this queue shows the results from before it was turned off.",
         "reviewDeleted": "Its results were deleted, so there is nothing to review until it is turned back on.",
         "occurrences": "Shared-value lookups come from duplicate detection, which is turned off for this workspace."
+      },
+      "entities": {
+        "title": "Entities are turned off",
+        "entity": "Mentions, counters and candidates are not updated, so this page shows the state from before they were turned off."
       }
     },
     "workers": {
@@ -4682,7 +4710,8 @@
       "INQUIRY": "Watch answers",
       "SEMANTIC_NEIGHBOR": "Similar",
       "AUTOPILOT": "Autopilot",
-      "MANUAL": "Bookmarked"
+      "MANUAL": "Bookmarked",
+      "ENTITY": "Entity mentions"
     },
     "origin": {
       "DUPLICATE": "Look-alike",
@@ -4690,7 +4719,8 @@
       "SEMANTIC_NEIGHBOR": "Similar",
       "SAME_VALUE": "Same value",
       "AUTOPILOT": "Autopilot",
-      "MANUAL": "Bookmarked"
+      "MANUAL": "Bookmarked",
+      "ENTITY": "Mentions an entity"
     },
     "why": {
       "sameValue": "Same value as {{via}}",
@@ -6389,5 +6419,109 @@
     "review": "Review",
     "pending": "{{count}} pending proposals",
     "openTerm": "Open term"
+  },
+  "entities": {
+    "loadFailed": "The entity could not be loaded",
+    "mergedInto": "Merged into",
+    "notLinking": "This entity is not approved yet. Its mentions are listed here so you can judge it, but they link to documents, watches and cases only once it is approved.",
+    "anchor": "Anchor record",
+    "sources": "Sources",
+    "sourceCounts": "{{mentions}} mentions · {{assets}} assets",
+    "tiles": {
+      "mentions": "Mentions",
+      "assets": "Assets",
+      "sources": "Sources",
+      "firstSeen": "First seen",
+      "lastSeen": "Last seen"
+    },
+    "usage": {
+      "mention": "mention",
+      "mentions": "mentions"
+    },
+    "methods": {
+      "EXACT_ALIAS": "Name",
+      "IDENTIFIER": "Identifier",
+      "CONNECTOR": "Declared by source",
+      "PHONETIC": "Sounds alike",
+      "FUZZY": "Same spelling",
+      "MANUAL": "Promoted"
+    },
+    "values": {
+      "identifiers": "Identifiers",
+      "names": "Names",
+      "noIdentifiers": "No identifiers yet. An IBAN, a VAT number or an e-mail address links more reliably than any name.",
+      "noNames": "No finding label in this workspace carries names of this kind yet.",
+      "label": "Label",
+      "value": "Value",
+      "add": "Add identifier",
+      "added": "Identifier added",
+      "removed": "Value removed",
+      "remove": "Remove {{value}}",
+      "labelHint": "The label is the one a detector finds the value under. It is what links a finding to this entity.",
+      "occurrencesHint": "Assets that carry this value",
+      "sharedWith": "also a name of",
+      "conflict": "{{entity}} already holds this identifier. It was not linked twice: decide in the review queue."
+    },
+    "mentions": {
+      "title": "Mentions",
+      "overTime": "Mentions over time",
+      "none": "No mentions yet",
+      "noneHint": "No scanned finding carries one of this entity’s names or identifiers.",
+      "notApproved": "No scanned finding carries one of this entity’s names or identifiers.",
+      "more": "Load more",
+      "export": "Export mentions",
+      "columns": {
+        "asset": "Asset",
+        "source": "Source",
+        "value": "Value",
+        "context": "Context",
+        "seen": "First seen"
+      }
+    },
+    "coMentions": {
+      "title": "Mentioned with",
+      "none": "No other entity appears in the same assets."
+    },
+    "candidates": {
+      "title": "To review ({{count}})",
+      "openQueue": "Open the review queue",
+      "conflict": "Conflict",
+      "review": "Review",
+      "reject": "Reject",
+      "rejectForever": "Not this entity",
+      "accepted": "Value confirmed",
+      "rejected": "Value rejected. It will not be proposed again."
+    },
+    "conflict": {
+      "both": "Both hold it",
+      "settle": "Settle…",
+      "move": "Move it to {{name}}",
+      "merge": "Merge {{from}} into {{into}}",
+      "keep": "Keep it with {{name}}"
+    },
+    "merge": {
+      "open": "Merge",
+      "title": "Merge {{name}} into another entity",
+      "desc": "Its names, identifiers, values, relations and watches move to the entity you choose, and it redirects there. This is not undone with one click.",
+      "into": "Merge into",
+      "same": "Choose a different entity.",
+      "needsApproved": "Choose an approved entity.",
+      "confirm": "Merge",
+      "done": "{{from}} was merged into {{into}}"
+    },
+    "make": {
+      "open": "Make entity",
+      "title": "Make entity",
+      "descName": "This value becomes the entity’s name. Every finding with the same name is then a mention of it.",
+      "descIdentifier": "This value becomes the entity’s first identifier. Every finding with the same value is then a mention of it.",
+      "name": "Name",
+      "namePlaceholder": "ACME Holding GmbH",
+      "type": "Type",
+      "confirm": "Create entity",
+      "created": "{{name}} was created.",
+      "existing": "{{name}} already existed and was updated.",
+      "found": "{{count}} assets mention it.",
+      "openEntity": "Open entity"
+    }
   }
 }

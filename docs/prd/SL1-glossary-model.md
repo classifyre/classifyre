@@ -139,7 +139,7 @@ DRAFT ──reject──▶ deleted (deletion remembered, as today)
 - Only APPROVED terms drive linking (SL2, SL3) and appear in the system brief's canonical section.
 - DRAFT terms are visible, with a badge, and searchable.
 - DEPRECATED terms are hidden from lookup unless asked for. An exact match on one still returns it, with `deprecated: true` and its `replacedBy`.
-- Compatibility: `verifiedAt` and `verifiedBy` become the approval stamp, so APPROVED ⇔ `verifiedAt` is set. `PATCH /glossary/:id/verify` stays as an alias of approve. Bulk *verify* and *unverify* become *approve* and *unapprove*.
+- The approval stamp is `approvedAt` and `approvedBy` (renamed from `verified*` in migration `20261003120000_glossary_approval_stamp`), so APPROVED ⇔ `approvedAt` is set. There is no compatibility surface: the `verify` endpoint, the `verified` flags and the lookup's `matchType` are removed, because nothing ran in production against them.
 - Operators can approve directly. Agents' terms always start as DRAFT, as today.
 
 ### R7 Lookup
@@ -163,7 +163,7 @@ One additive migration:
 3. Backfill `key` (R2) and `status` (`verifiedAt` set → APPROVED, else DRAFT), and compute `matchKeys` in SQL.
 4. Drop the global unique index on `term`. Add a partial unique index `(COALESCE(scheme_id, ''), lower(term)) WHERE kind = 'CONCEPT'` in raw SQL; Prisma cannot model a partial index, so document it in `schema.prisma`, as `case_leads` already does.
 
-After the migration, a one-time banner on the glossary page reads "We classified N terms as concepts and M as entities — review". It opens a filtered list with bulk *Change kind*. Dismissal is stored per workspace in `InstanceSettings`.
+Existing terms are migrated in place and nothing is shown about it. A misclassified term is fixed with bulk *Change kind* on the Concepts or Entities tab.
 
 Aliases that look like codes are **suggested** in the editor, never moved automatically:
 - a single character (`E`, `K`) is suggested as a **hidden alias**;
@@ -363,7 +363,7 @@ enum GlossaryRelationType {
 
 model GlossaryTerm {
   // existing: id, term (no longer @unique, see R4/R8), aliases, proposedAliases,
-  // entityType, notes, origin, verifiedAt, verifiedBy, embedContentHash,
+  // entityType, notes, origin, approvedAt, approvedBy, embedContentHash,
   // createdAt, updatedAt, references
   kind          GlossaryTermKind @default(CONCEPT)
   key           String           @unique
@@ -468,7 +468,7 @@ Notes:
 | `GET /glossary/terms/:idOrKey` (new) | Term with scheme, relations in and out, broader chain, narrower list |
 | `GET /glossary/terms/:idOrKey/activity` (new) | Paged |
 | `POST /glossary` | Upsert with the new fields; `key` accepted on edit only |
-| `POST /glossary/:id/approve`, `/unapprove`, `/deprecate` (`{ replacedById? }`), `/reinstate` (new) | R6. `PATCH /:id/verify` stays as an alias of approve |
+| `POST /glossary/:id/approve`, `/unapprove`, `/deprecate` (`{ replacedById? }`), `/reinstate` (new) | R6 |
 | `POST /glossary/bulk` | Adds `status`, `schemeId` and `kind` changes |
 | `DELETE /glossary/:id` | As today (deletion memory) |
 | `GET / POST / PATCH / DELETE /glossary/schemes[/:id]` (new) | R4 |
@@ -495,11 +495,11 @@ No change.
 
 1. **PR 1:** the claims fixes (R13). Ships immediately.
 2. **PR 2:** migration, model, service, lookup and the DTO and API changes, keeping the old fields working.
-3. **PR 3:** the web tabs, editor, term page and banner.
+3. **PR 3:** the web tabs, editor and term page.
 4. **PR 4:** relations, the tree and agent tools.
 5. **PR 5:** import and export.
 
-Each PR is independently releasable. The banner (R8) ships with PR 3.
+Each PR is independently releasable.
 
 ## 11. Testing
 
@@ -522,7 +522,7 @@ Each PR is independently releasable. The banner (R8) ships with PR 3.
 | Risk | Mitigation |
 |---|---|
 | Removing the global unique on `term` breaks callers that assumed it | Agent upsert matches by kind and, for concepts, scheme. Data transfer matches by key. A spec covers both |
-| The migration misclassifies terms (an ORGANIZATION that is really a concept) | The review banner and bulk *Change kind* (R8) |
+| The migration misclassifies terms (an ORGANIZATION that is really a concept) | Bulk *Change kind* (R8) |
 | Key churn breaks references | `previousKeys` redirect (R2), and keys are never reused |
 | Huge imports | Limits, dry run, background job (R12) |
 | Agents grow a messy taxonomy | DRAFT by default, approval guardrails (D7), relation cap per term, cycle checks |
@@ -532,7 +532,7 @@ Each PR is independently releasable. The banner (R8) ships with PR 3.
 - [ ] A concept with codes and hidden aliases can be created, approved, related, deprecated with a successor, and found by code.
 - [ ] `E` resolves by lookup and is excluded from SL2's text matching.
 - [ ] A 7,000-concept SKOS file imports with a dry-run report, and exports again to an equivalent graph.
-- [ ] Existing workspaces migrate without data loss; the banner lists the inferred kinds.
+- [ ] Existing workspaces migrate without data loss.
 - [ ] The four claims are fixed.
 - [ ] An agent can propose a concept and a relation, and can approve the relation only in MANAGED mode, within its budget; the approval can be undone.
 - [ ] Every new string exists in EN and DE.

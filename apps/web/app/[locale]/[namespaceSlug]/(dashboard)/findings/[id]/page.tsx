@@ -547,6 +547,7 @@ export default function FindingDetailPage() {
           label={finding.findingType}
           value={finding.matchedContent}
           currentAssetId={finding.asset?.id || finding.assetId}
+          findingId={finding.id}
         />
       )}
 

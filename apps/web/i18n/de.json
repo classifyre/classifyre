@@ -183,7 +183,7 @@
     "detectors": "Custom-Detektoren",
     "investigations": "Ermittlungen",
     "fingerprints": "Dublettenprüfung",
-    "glossary": "Glossar",
+    "glossary": "Entitäten & Glossar",
     "scans": "Scans",
     "operations": "Operationen",
     "settings": "Einstellungen",
@@ -196,12 +196,11 @@
     }
   },
   "glossary": {
-    "title": "Glossar",
-    "description": "Kanonisches Vokabular für Bediener, Fälle und jeden KI-Harness-Lauf.",
+    "title": "Entitäten & Glossar",
+    "description": "Die benannten Dinge, auf die sich Ihre Daten beziehen, und das gemeinsame Vokabular für Bediener, Fälle und jeden KI-Harness-Lauf.",
     "addTerm": "Begriff hinzufügen",
     "editTerm": "Begriff bearbeiten",
     "searchPlaceholder": "Begriffe, Aliasse oder Notizen durchsuchen…",
-    "entityTypeFilter": "Entitätstyp",
     "allTypes": "Alle Typen",
     "entityTypes": {
       "PERSON": "Person",
@@ -213,26 +212,18 @@
     },
     "columns": {
       "term": "Begriff",
-      "aliases": "Aliasse",
       "type": "Typ",
-      "verification": "Herkunft",
-      "notes": "Notizen",
       "actions": "Aktionen",
       "scheme": "Schema",
       "labels": "Bezeichnungen",
-      "status": "Status"
+      "status": "Status",
+      "usage": "Verwendet von"
     },
-    "unverifiedAgent": "Ungeprüft · Agent",
-    "verified": "Geprüft",
     "suggested": "vorgeschlagen",
-    "verify": "Prüfen",
     "edit": "Bearbeiten",
     "delete": "Löschen",
     "noValue": "—",
-    "noTerms": "Keine Glossarbegriffe gefunden",
-    "noTermsHint": "Filter anpassen oder einen neuen Begriff hinzufügen.",
     "loading": "Glossar wird geladen…",
-    "updating": "Glossar wird aktualisiert…",
     "form": {
       "termLabel": "Begriff",
       "termPlaceholder": "z. B. Acme Corp",
@@ -248,26 +239,15 @@
     "termRequired": "Begriff ist erforderlich",
     "saved": "Glossarbegriff gespeichert",
     "saveFailed": "Glossarbegriff konnte nicht gespeichert werden",
-    "verifySuccess": "Begriff geprüft",
-    "verifyFailed": "Begriff konnte nicht geprüft werden",
     "deleted": "Glossarbegriff gelöscht",
-    "deleteFailed": "Glossarbegriff konnte nicht gelöscht werden",
     "deleteConfirmTitle": "Glossarbegriff löschen?",
     "deleteConfirmDescription": "Diese Aktion kann nicht rückgängig gemacht werden.",
-    "unverified": "Ungeprüft",
     "bulk": {
       "selected": "{{count}} Begriff ausgewählt",
       "selectedPlural": "{{count}} Begriffe ausgewählt",
-      "allSelected": "Alle {{count}} passenden Begriffe ausgewählt",
       "selectAllAria": "Alle Begriffe auswählen, die den aktuellen Filtern entsprechen",
       "selectTermAria": "Begriff {{term}} auswählen",
       "selectAll": "Alle {{count}} Begriffe auswählen, die den aktuellen Filtern entsprechen",
-      "deselectAll": "Alle Begriffe abwählen",
-      "verify": "Prüfen",
-      "unverify": "Prüfung aufheben",
-      "changeType": "Typ ändern",
-      "applied": "{{count}} Begriff(e) aktualisiert",
-      "failed": "Ausgewählte Begriffe konnten nicht aktualisiert werden",
       "approve": "Freigeben",
       "done": "Aktualisiert",
       "moveScheme": "In Schema verschieben",
@@ -305,10 +285,6 @@
       "schemes": "Schemata",
       "vocabulary": "Ungebundenes Vokabular",
       "proposals": "Vorschläge"
-    },
-    "banner": {
-      "text": "Wir haben Ihre bestehenden Begriffe eingeordnet: {{concepts}} wurden zu Konzepten und {{entities}} zu Entitäten. Prüfen Sie die Aufteilung unter Konzepte und Entitäten — „Art ändern“ korrigiert Fehler.",
-      "dismiss": "Ausblenden"
     },
     "empty": {
       "concepts": "Noch keine Konzepte",
@@ -438,7 +414,9 @@
         "ALIAS": "Synonyme",
         "RELATION": "Beziehungen",
         "LINK": "Dokumente",
-        "TERM_REF": "Unbekannte Verweise"
+        "TERM_REF": "Unbekannte Verweise",
+        "ENTITY_MENTION": "Entitätswerte",
+        "ENTITY_MERGE": "Entitätskonflikte"
       },
       "refresh": "Nach Vorschlägen suchen",
       "refreshQueued": "Suche nach Vorschlägen…",
@@ -506,7 +484,9 @@
         "overview": "Übersicht",
         "evidence": "Belege",
         "bindings": "Bindungen",
-        "activity": "Verlauf"
+        "activity": "Verlauf",
+        "usage": "Fälle & Watches",
+        "entity": "Erwähnungen"
       },
       "noDefinition": "Noch keine Definition.",
       "steward": "Verantwortlich: {{steward}}",
@@ -574,7 +554,8 @@
         "OUTPUT_LOOKUP": "Wert benennt Begriff",
         "METADATA_VALUES": "Feldwerte",
         "METADATA_LOOKUP": "Feldwert benennt Begriff"
-      }
+      },
+      "viaScheme": "schlägt Werte in {{scheme}} nach"
     },
     "findInText": {
       "open": "Im Text finden",
@@ -612,9 +593,34 @@
     },
     "inquiry": {
       "aboutLabel": "Über",
-      "aboutHint": "Nur Funde, die Belege für eines dieser Konzepte sind (Bindung ihrer Ausgabe oder manuelle Verknüpfung).",
+      "aboutHint": "Nur Funde, die Belege für einen dieser Begriffe sind: ein Konzept (Bindung ihrer Ausgabe oder manuelle Verknüpfung) oder eine Entität (Erwähnung eines ihrer Namen oder Identifikatoren).",
       "includeNarrower": "Untergeordnete Konzepte einbeziehen",
       "remove": "{{term}} entfernen"
+    },
+    "usage": {
+      "unused": "Noch nicht verwendet",
+      "asset": "Asset",
+      "assets": "Assets",
+      "binding": "Bindung",
+      "bindings": "Bindungen",
+      "tiles": {
+        "assets": "Assets",
+        "findings": "Funde",
+        "bindings": "Bindungen",
+        "cases": "Fälle",
+        "watches": "Watches"
+      },
+      "unusedHint": "Noch ist nichts mit diesem Begriff verknüpft. Binden Sie unter „Bindungen“ eine Detektor-Ausgabe oder ein Metadatenfeld daran, oder nutzen Sie „Im Text finden“ — die Verknüpfungen entstehen ohne erneuten Scan.",
+      "cases": "Fälle",
+      "noCases": "Kein Fall verwendet diesen Begriff",
+      "noCasesHint": "Ein Fall erscheint hier, wenn seine Belege mit dem Begriff verknüpft sind oder der Fall selbst auf dem Board damit verknüpft wurde.",
+      "about": "handelt von diesem Begriff",
+      "caseAssets": "{{count}} Beleg-Asset(s)",
+      "watches": "Watches",
+      "watchThis": "Diesen Begriff beobachten",
+      "noWatches": "Kein Watch folgt diesem Begriff",
+      "noWatchesHint": "Ein Watch auf diesen Begriff meldet nach jedem Scan neue Funde, die ihn belegen.",
+      "watchMatches": "{{count}} Treffer"
     }
   },
   "common": {
@@ -839,6 +845,10 @@
         "transfers": {
           "name": "Abgeschlossene Transfers",
           "desc": "Erledigte, fehlgeschlagene und abgebrochene Export/Import-Jobs mit ihren Chunks. Bereitgestellte und laufende Transfers bleiben."
+        },
+        "entities": {
+          "name": "Entitätskandidaten und Erwähnungen",
+          "desc": "Offene Entitätskandidaten, Erwähnungsverknüpfungen und Zähler. Werden automatisch neu aufgebaut, solange Entitäten eingeschaltet sind. Entitäten und entschiedene Werte bleiben erhalten."
         }
       }
     },
@@ -985,7 +995,7 @@
   },
   "features": {
     "title": "Funktionen",
-    "subtitle": "Die beiden Hintergrund-Engines, die den Großteil der abgeleiteten Daten dieses Arbeitsbereichs erzeugen. Wird eine ausgeschaltet, stoppt ihre Arbeit und ihre Worker pausieren; die Untersuchung selbst — Quellen, Befunde, Assets, Fälle, Anfrage-Beobachtung-Beobachtungen, Glossar — bleibt immer unberührt.",
+    "subtitle": "Die Hintergrund-Engines, die den Großteil der abgeleiteten Daten dieses Arbeitsbereichs erzeugen. Wird eine ausgeschaltet, stoppt ihre Arbeit und ihre Worker pausieren; die Untersuchung selbst — Quellen, Befunde, Assets, Fälle, Beobachtungen, Glossar — bleibt immer unberührt.",
     "loading": "Funktionsschalter werden gelesen…",
     "loadFailed": "Die Funktionsschalter konnten nicht geladen werden",
     "retry": "Erneut versuchen",
@@ -1012,6 +1022,11 @@
         "name": "Duplikaterkennung",
         "desc": "Ordnet nach jedem Scan Assets einander zu, die identifizierende Werte teilen. Speist die Duplikatprüfung, „Wo sonst gefunden“, Ähnlichkeitsverbindungen im Graphen und die Duplikat-Werkzeuge des Harness.",
         "configure": "Feinabstimmung"
+      },
+      "entities": {
+        "name": "Entitäten",
+        "desc": "Verknüpft Befunde mit den benannten Dingen, auf die sie sich beziehen: Jeder Befund, der den Namen oder einen Identifikator einer Entität trägt, ist eine Erwähnung. Speist Entitätsseiten, die Kandidatenprüfung, Beobachtungen zu Entitäten und Fall-Hinweise.",
+        "configure": "Entitäten"
       }
     },
     "off": {
@@ -1039,6 +1054,14 @@
         "stop4": "Der Worker correlation.scan wird pausiert (Einstellungen → Worker) und lässt sich dort nicht fortsetzen.",
         "keep": "Behalten werden alle Treffer und Muster im aktuellen Stand sowie alle Prüfentscheidungen.",
         "delete": "Löscht Trefferkandidaten, Signaturen, Korrelationswerte, Cluster, Muster und die bewerteten Duplikat-Verbindungen im Asset-Graphen. Herkunftsverbindungen (Lineage) und Ihre Prüfentscheidungen bleiben erhalten. Die Duplikatprüfung bleibt leer, bis die Funktion wieder eingeschaltet ist und die Neuberechnung abgeschlossen ist."
+      },
+      "entities": {
+        "stop1": "Keine Entitätsauflösung nach Scans: Erwähnungszähler, Kandidaten und Erwähnungsverknüpfungen werden nicht mehr aktualisiert.",
+        "stop2": "Beobachtungen zu Entitäten und Fall-Hinweise sehen keine neuen Erwähnungen mehr.",
+        "stop3": "Ist auch die Duplikaterkennung aus, werden Befundwerte überhaupt nicht mehr indexiert.",
+        "stop4": "Die Worker entities.resolve und entities.recount werden pausiert (Einstellungen → Worker) und lassen sich dort nicht fortsetzen.",
+        "keep": "Behalten werden alle Entitäten, alle bestätigten und abgelehnten Werte, offene Kandidaten, Erwähnungsverknüpfungen und Zähler im aktuellen Stand.",
+        "delete": "Löscht offene Kandidaten, Erwähnungsverknüpfungen und Zähler — und auch den Werteindex, sofern die Duplikaterkennung nicht eingeschaltet ist. Die Entitäten selbst und alle bestätigten oder abgelehnten Werte bleiben erhalten, sodass nichts zweimal entschieden werden muss."
       }
     },
     "enable": {
@@ -1047,7 +1070,8 @@
       "cancel": "Abbrechen",
       "embeddingsKept": "Das Einbetten wird dort fortgesetzt, wo es aufgehört hat: Inhalte, die während der Pause gescannt wurden, werden im Hintergrund eingebettet, und die Rankings werden beim Aufholen aktualisiert.",
       "embeddingsDeleted": "Das Einbetten beginnt von vorn: Jeder Befund wird im Hintergrund neu eingebettet — bei großen Korpora Stunden Worker-CPU. Zuvor gelöschter Dokumenttext kommt nur durch einen vollständigen erneuten Scan der Quellen zurück.",
-      "duplicates": "Führt eine vollständige Neuberechnung über alle Assets aus, um alles aufzuholen, was während der Pause gescannt wurde — bei großen Korpora etwa eine Stunde Worker-Zeit. Die Duplikatprüfung füllt sich, sobald sie abgeschlossen ist."
+      "duplicates": "Führt eine vollständige Neuberechnung über alle Assets aus, um alles aufzuholen, was während der Pause gescannt wurde — bei großen Korpora etwa eine Stunde Worker-Zeit. Die Duplikatprüfung füllt sich, sobald sie abgeschlossen ist.",
+      "entities": "Gleicht die Namen und Identifikatoren Ihrer Entitäten mit allem ab, was bereits gescannt wurde. Ist die Duplikaterkennung aus, wird zuerst der Werteindex neu aufgebaut — bei großen Korpora dauert das eine Weile. Zähler und Kandidaten erscheinen, sobald es abgeschlossen ist."
     },
     "deleteKept": {
       "title": "Von {{name}} behaltene Daten löschen?",
@@ -1078,6 +1102,10 @@
         "review": "Neue Scans werden nicht auf Duplikate geprüft; diese Liste zeigt den Stand vor dem Ausschalten.",
         "reviewDeleted": "Ihre Ergebnisse wurden gelöscht; bis zum Wiedereinschalten gibt es nichts zu prüfen.",
         "occurrences": "Abfragen gemeinsamer Werte stammen aus der Duplikaterkennung, die für diesen Arbeitsbereich ausgeschaltet ist."
+      },
+      "entities": {
+        "title": "Entitäten sind ausgeschaltet",
+        "entity": "Erwähnungen, Zähler und Kandidaten werden nicht aktualisiert; diese Seite zeigt den Stand vor dem Ausschalten."
       }
     },
     "workers": {
@@ -4682,7 +4710,8 @@
       "INQUIRY": "Antworten",
       "SEMANTIC_NEIGHBOR": "Ähnlich",
       "AUTOPILOT": "Autopilot",
-      "MANUAL": "Gemerkt"
+      "MANUAL": "Gemerkt",
+      "ENTITY": "Erwähnungen von Entitäten"
     },
     "origin": {
       "DUPLICATE": "Ähnliches Dokument",
@@ -4690,7 +4719,8 @@
       "SEMANTIC_NEIGHBOR": "Ähnlich",
       "SAME_VALUE": "Gleicher Wert",
       "AUTOPILOT": "Autopilot",
-      "MANUAL": "Gemerkt"
+      "MANUAL": "Gemerkt",
+      "ENTITY": "Erwähnt eine Entität"
     },
     "why": {
       "sameValue": "Gleicher Wert wie {{via}}",
@@ -6389,5 +6419,109 @@
     "review": "Prüfen",
     "pending": "{{count}} offene Vorschläge",
     "openTerm": "Begriff öffnen"
+  },
+  "entities": {
+    "loadFailed": "Die Entität konnte nicht geladen werden",
+    "mergedInto": "Zusammengeführt mit",
+    "notLinking": "Diese Entität ist noch nicht freigegeben. Ihre Erwähnungen werden hier zur Beurteilung aufgelistet, verknüpfen aber erst nach der Freigabe mit Dokumenten, Beobachtungen und Fällen.",
+    "anchor": "Ankerdatensatz",
+    "sources": "Quellen",
+    "sourceCounts": "{{mentions}} Erwähnungen · {{assets}} Assets",
+    "tiles": {
+      "mentions": "Erwähnungen",
+      "assets": "Assets",
+      "sources": "Quellen",
+      "firstSeen": "Zuerst gesehen",
+      "lastSeen": "Zuletzt gesehen"
+    },
+    "usage": {
+      "mention": "Erwähnung",
+      "mentions": "Erwähnungen"
+    },
+    "methods": {
+      "EXACT_ALIAS": "Name",
+      "IDENTIFIER": "Identifikator",
+      "CONNECTOR": "Von der Quelle deklariert",
+      "PHONETIC": "Klingt gleich",
+      "FUZZY": "Gleiche Schreibung",
+      "MANUAL": "Übernommen"
+    },
+    "values": {
+      "identifiers": "Identifikatoren",
+      "names": "Namen",
+      "noIdentifiers": "Noch keine Identifikatoren. Eine IBAN, eine UID-Nummer oder eine E-Mail-Adresse verknüpft zuverlässiger als jeder Name.",
+      "noNames": "Noch trägt kein Befund-Label in diesem Arbeitsbereich Namen dieser Art.",
+      "label": "Label",
+      "value": "Wert",
+      "add": "Identifikator hinzufügen",
+      "added": "Identifikator hinzugefügt",
+      "removed": "Wert entfernt",
+      "remove": "{{value}} entfernen",
+      "labelHint": "Das Label ist jenes, unter dem ein Detektor den Wert findet. Es verknüpft einen Befund mit dieser Entität.",
+      "occurrencesHint": "Assets, die diesen Wert tragen",
+      "sharedWith": "auch ein Name von",
+      "conflict": "{{entity}} führt diesen Identifikator bereits. Er wurde nicht doppelt verknüpft: Entscheiden Sie in der Prüfliste."
+    },
+    "mentions": {
+      "title": "Erwähnungen",
+      "overTime": "Erwähnungen im Zeitverlauf",
+      "none": "Noch keine Erwähnungen",
+      "noneHint": "Kein gescannter Befund trägt einen Namen oder Identifikator dieser Entität.",
+      "notApproved": "Kein gescannter Befund trägt einen Namen oder Identifikator dieser Entität.",
+      "more": "Mehr laden",
+      "export": "Erwähnungen exportieren",
+      "columns": {
+        "asset": "Asset",
+        "source": "Quelle",
+        "value": "Wert",
+        "context": "Kontext",
+        "seen": "Zuerst gesehen"
+      }
+    },
+    "coMentions": {
+      "title": "Gemeinsam erwähnt mit",
+      "none": "Keine andere Entität erscheint in denselben Assets."
+    },
+    "candidates": {
+      "title": "Zu prüfen ({{count}})",
+      "openQueue": "Prüfliste öffnen",
+      "conflict": "Konflikt",
+      "review": "Prüfen",
+      "reject": "Ablehnen",
+      "rejectForever": "Nicht diese Entität",
+      "accepted": "Wert bestätigt",
+      "rejected": "Wert abgelehnt. Er wird nicht erneut vorgeschlagen."
+    },
+    "conflict": {
+      "both": "Beide führen ihn",
+      "settle": "Klären…",
+      "move": "Zu {{name}} verschieben",
+      "merge": "{{from}} mit {{into}} zusammenführen",
+      "keep": "Bei {{name}} belassen"
+    },
+    "merge": {
+      "open": "Zusammenführen",
+      "title": "{{name}} mit einer anderen Entität zusammenführen",
+      "desc": "Namen, Identifikatoren, Werte, Beziehungen und Beobachtungen gehen auf die gewählte Entität über, und diese hier leitet dorthin weiter. Das lässt sich nicht mit einem Klick rückgängig machen.",
+      "into": "Zusammenführen mit",
+      "same": "Wählen Sie eine andere Entität.",
+      "needsApproved": "Wählen Sie eine freigegebene Entität.",
+      "confirm": "Zusammenführen",
+      "done": "{{from}} wurde mit {{into}} zusammengeführt"
+    },
+    "make": {
+      "open": "Entität anlegen",
+      "title": "Entität anlegen",
+      "descName": "Dieser Wert wird der Name der Entität. Jeder Befund mit demselben Namen ist dann eine Erwähnung.",
+      "descIdentifier": "Dieser Wert wird der erste Identifikator der Entität. Jeder Befund mit demselben Wert ist dann eine Erwähnung.",
+      "name": "Name",
+      "namePlaceholder": "ACME Holding GmbH",
+      "type": "Typ",
+      "confirm": "Entität anlegen",
+      "created": "{{name}} wurde angelegt.",
+      "existing": "{{name}} gab es bereits und wurde aktualisiert.",
+      "found": "{{count}} Assets erwähnen sie.",
+      "openEntity": "Entität öffnen"
+    }
   }
 }

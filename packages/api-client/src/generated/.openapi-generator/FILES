@@ -227,6 +227,7 @@ docs/EmbeddingSpaceStatsDto.md
 docs/EmbeddingStatsDto.md
 docs/EmbeddingStatusResponseDto.md
 docs/EmbeddingsApi.md
+docs/EntitiesApi.md
 docs/EvidenceEntityDto.md
 docs/EvidenceStance.md
 docs/ExclusionRuleDto.md
@@ -259,10 +260,12 @@ docs/GenerateCaseLeadsResponseDto.md
 docs/GlossaryApi.md
 docs/GlossaryImportDto.md
 docs/GlossaryListResponseDto.md
+docs/GlossaryListedTermDto.md
 docs/GlossaryLookupHitDto.md
 docs/GlossarySchemeDto.md
 docs/GlossarySchemeRefDto.md
 docs/GlossaryTermDto.md
+docs/GlossaryTermUsageDto.md
 docs/GraphApi.md
 docs/GraphEdgeDto.md
 docs/GraphNodeDto.md
@@ -535,7 +538,6 @@ docs/UpsertGlossaryTermDto.md
 docs/UpsertGlossaryTermResponseDto.md
 docs/ValueOccurrenceAssetDto.md
 docs/ValueOccurrencesResponseDto.md
-docs/VerifyGlossaryTermDto.md
 docs/WakeSupervisorDto.md
 docs/WorkerOverviewDto.md
 docs/WorkerQueueDto.md
@@ -557,6 +559,7 @@ src/apis/CustomDetectorTestsApi.ts
 src/apis/CustomDetectorsApi.ts
 src/apis/DataTransferApi.ts
 src/apis/EmbeddingsApi.ts
+src/apis/EntitiesApi.ts
 src/apis/FindingsApi.ts
 src/apis/GlossaryApi.ts
 src/apis/GraphApi.ts
@@ -816,10 +819,12 @@ src/models/FindingsRankingDto.ts
 src/models/GenerateCaseLeadsResponseDto.ts
 src/models/GlossaryImportDto.ts
 src/models/GlossaryListResponseDto.ts
+src/models/GlossaryListedTermDto.ts
 src/models/GlossaryLookupHitDto.ts
 src/models/GlossarySchemeDto.ts
 src/models/GlossarySchemeRefDto.ts
 src/models/GlossaryTermDto.ts
+src/models/GlossaryTermUsageDto.ts
 src/models/GraphEdgeDto.ts
 src/models/GraphNodeDto.ts
 src/models/GraphResponseDto.ts
@@ -1079,7 +1084,6 @@ src/models/UpsertGlossaryTermDto.ts
 src/models/UpsertGlossaryTermResponseDto.ts
 src/models/ValueOccurrenceAssetDto.ts
 src/models/ValueOccurrencesResponseDto.ts
-src/models/VerifyGlossaryTermDto.ts
 src/models/WakeSupervisorDto.ts
 src/models/WorkerOverviewDto.ts
 src/models/WorkerQueueDto.ts

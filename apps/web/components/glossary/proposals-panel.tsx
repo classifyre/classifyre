@@ -24,6 +24,7 @@ import {
   type ProposalItem,
   type ProposalKind,
 } from "@/lib/semantic-api";
+import { Snippet } from "./entity-sections";
 import { MICRO_LABEL, TermLink } from "./glossary-ui";
 
 const KINDS: ProposalKind[] = [
@@ -33,13 +34,32 @@ const KINDS: ProposalKind[] = [
   "RELATION",
   "LINK",
   "TERM_REF",
+  "ENTITY_MENTION",
+  "ENTITY_MERGE",
 ];
+
+/** What an entity proposal carries (G5 R15): the value and where it occurs. */
+interface EntityProposalPayload {
+  label?: string;
+  value?: string;
+  occurrences?: number;
+  conflictWith?: { id: string; key: string; term: string } | null;
+}
+interface EntityProposalEvidence {
+  samples?: Array<{
+    assetId: string;
+    assetName: string;
+    sourceName: string;
+    snippet: { before: string; matched: string; after: string } | null;
+  }>;
+}
 
 const DISMISS_REASONS = ["wrong concept", "too broad", "noise", "other"];
 
 /**
  * The review queue (SL4): every proposal — agent drafts, machine
- * suggestions, unknown term references — in one list, highest score first.
+ * suggestions, unknown term references, entity candidates and identifier
+ * conflicts (G5) — in one list, highest score first.
  * Accepting is the operator's call; nothing here changes meaning until then.
  */
 export function ProposalsPanel({
@@ -74,10 +94,11 @@ export function ProposalsPanel({
     item: ProposalItem,
     decision: ProposalDecision,
     reason?: string,
+    edit?: Record<string, unknown>,
   ) {
     setBusy(item.id);
     try {
-      await decideProposal({ kind: item.kind, id: item.id, decision, reason });
+      await decideProposal({ kind: item.kind, id: item.id, decision, reason, edit });
       toast.success(
         decision === "accept"
           ? t("glossary.proposals.accepted")
@@ -218,6 +239,22 @@ export function ProposalsPanel({
                 {item.rationale && (
                   <p className="text-xs text-muted-foreground">{item.rationale}</p>
                 )}
+                {item.source === "entity" &&
+                  ((item.evidence as EntityProposalEvidence | null)?.samples ?? []).length > 0 && (
+                    <ul className="space-y-1 border-l-2 border-border pl-3">
+                      {(item.evidence as EntityProposalEvidence).samples!.map((sample) => (
+                        <li key={sample.assetId} className="text-xs">
+                          <span className="font-medium">{sample.assetName}</span>
+                          <span className="text-muted-foreground"> · {sample.sourceName}</span>
+                          {sample.snippet && (
+                            <span className="block">
+                              <Snippet snippet={sample.snippet} />
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 {item.agentNote && (
                   <p className="text-xs italic text-muted-foreground">
                     {t("glossary.proposals.agentNote", { note: item.agentNote })}
@@ -236,8 +273,40 @@ export function ProposalsPanel({
                   ) : (
                     <Check className="h-3.5 w-3.5" />
                   )}
-                  {t("glossary.proposals.accept")}
+                  {item.kind === "ENTITY_MERGE"
+                    ? t("entities.conflict.both")
+                    : t("glossary.proposals.accept")}
                 </Button>
+                {item.kind === "ENTITY_MERGE" && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy !== null}
+                        className="h-8 rounded-[4px] border-2 border-border text-xs"
+                      >
+                        {t("entities.conflict.settle")}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => decide(item, "accept", undefined, { resolution: "move" })}
+                      >
+                        {t("entities.conflict.move", { name: item.term?.term ?? "" })}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => decide(item, "accept", undefined, { resolution: "merge" })}
+                      >
+                        {t("entities.conflict.merge", {
+                          from: item.term?.term ?? "",
+                          into:
+                            (item.payload as EntityProposalPayload | null)?.conflictWith?.term ?? "",
+                        })}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -251,19 +320,35 @@ export function ProposalsPanel({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {DISMISS_REASONS.map((reason) => (
-                      <DropdownMenuItem
-                        key={reason}
-                        onClick={() => decide(item, "dismiss", reason)}
-                      >
-                        {t(
-                          `glossary.proposals.reasons.${reason.replace(" ", "_")}` as TranslationKey,
-                        )}
+                    {item.source === "entity" ? (
+                      // A rejected value is remembered: it is never proposed
+                      // for this entity again.
+                      <DropdownMenuItem onClick={() => decide(item, "dismiss")}>
+                        {item.kind === "ENTITY_MERGE"
+                          ? t("entities.conflict.keep", {
+                              name:
+                                (item.payload as EntityProposalPayload | null)?.conflictWith
+                                  ?.term ?? "",
+                            })
+                          : t("entities.candidates.rejectForever")}
                       </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuItem onClick={() => decide(item, "dismiss_forever")}>
-                      {t("glossary.proposals.dismissForever")}
-                    </DropdownMenuItem>
+                    ) : (
+                      <>
+                        {DISMISS_REASONS.map((reason) => (
+                          <DropdownMenuItem
+                            key={reason}
+                            onClick={() => decide(item, "dismiss", reason)}
+                          >
+                            {t(
+                              `glossary.proposals.reasons.${reason.replace(" ", "_")}` as TranslationKey,
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuItem onClick={() => decide(item, "dismiss_forever")}>
+                          {t("glossary.proposals.dismissForever")}
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

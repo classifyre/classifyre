@@ -61,6 +61,7 @@ import {
   SchemeChip,
   TermLink,
   TermStatusBadge,
+  TermUsageCell,
 } from "./glossary-ui";
 
 const ALL = "ALL";
@@ -395,6 +396,11 @@ export function TermsPanel({
                   </TableHead>
                   <TableHead>
                     <span className={MICRO_LABEL}>
+                      {t("glossary.columns.usage")}
+                    </span>
+                  </TableHead>
+                  <TableHead>
+                    <span className={MICRO_LABEL}>
                       {t("glossary.columns.status")}
                     </span>
                   </TableHead>
@@ -491,6 +497,9 @@ export function TermsPanel({
                           </span>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap py-3 text-xs">
+                      <TermUsageCell term={term} />
                     </TableCell>
                     <TableCell className="py-3">
                       <div className="flex items-center gap-1.5">

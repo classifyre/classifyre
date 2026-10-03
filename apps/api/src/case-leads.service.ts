@@ -60,6 +60,7 @@ const QUOTA: Record<GeneratedOrigin, number> = {
   INQUIRY: 10,
   DUPLICATE: 10,
   SEMANTIC_NEIGHBOR: 10,
+  ENTITY: 10,
 };
 /** A case never holds more than this many leads waiting for review. */
 const MAX_OPEN_LEADS = 60;
@@ -68,7 +69,10 @@ const GENERATED_ORIGINS = [
   'SEMANTIC_NEIGHBOR',
   'INQUIRY',
   'DUPLICATE',
+  'ENTITY',
 ] as const;
+/** Mentions of the case's entities read per refresh, newest first. */
+const ENTITY_MENTIONS_READ = 200;
 type GeneratedOrigin = (typeof GENERATED_ORIGINS)[number];
 const VALUE_MAX = 160;
 
@@ -146,10 +150,10 @@ const pairKey = (x: string, y: string) => (x <= y ? `${x}|${y}` : `${y}|${x}`);
 
 /**
  * Lead triage for cases: ranked candidates that a human accepts into evidence
- * or dismisses. Three kinds come from the case itself — findings similar to
- * its evidence, important answers of its watches, and documents the duplicates
- * engine pairs with its evidence — and two from outside: Autopilot's proposals
- * and a person's bookmarks.
+ * or dismisses. Four kinds come from the case itself — findings similar to
+ * its evidence, important answers of its watches, documents the duplicates
+ * engine pairs with its evidence, and new mentions of its entities — and two
+ * from outside: Autopilot's proposals and a person's bookmarks.
  *
  * The case refreshes them by itself (CaseLeadsScheduler → CaseLeadsWorker →
  * {@link generate}). A dismissed lead's row persists, so the same finding or
@@ -328,6 +332,7 @@ export class CaseLeadsService {
       ),
       DUPLICATE: await this.lookAlikes(knowledge),
       SEMANTIC_NEIGHBOR: await this.similarContent(knowledge),
+      ENTITY: await this.entityMentions(knowledge),
     };
     const considered = Object.values(byKind).reduce((n, c) => n + c.length, 0);
     const chosen = interleave(
@@ -839,6 +844,84 @@ export class CaseLeadsService {
           rank: importance,
         });
       }
+    }
+    return [...out.values()].sort((a, b) => b.rank - a.rank);
+  }
+
+  /**
+   * Findings that mention an entity linked to the case and are not in it yet
+   * (G5 R17), newest first: "ACME is in this case, and three documents scanned
+   * since then name it". A mention is the value index's representative
+   * finding for one of the entity's confirmed values in an asset, so a
+   * document that repeats a name is one lead, not twenty.
+   */
+  private async entityMentions(k: CaseKnowledge): Promise<Candidate[]> {
+    let rows: Array<{
+      finding_id: string;
+      asset_id: string;
+      term: string;
+      finding_type: string;
+      matched_content: string;
+      importance_score: number | null;
+      seen: Date | null;
+    }>;
+    try {
+      const config = await this.prisma.entityConfig.findUnique({
+        where: { id: 1 },
+        select: { enabled: true },
+      });
+      if (config && !config.enabled) return [];
+      rows = await this.prisma.$queryRaw`
+        SELECT acv.finding_id, acv.asset_id, t.term, f.finding_type,
+               f.matched_content, f.importance_score,
+               COALESCE(f.first_detected_at, f.detected_at) AS seen
+          FROM glossary_references r
+          JOIN glossary_terms t ON t.id = r.glossary_term_id
+                               AND t.kind = 'ENTITY' AND t.status = 'APPROVED'
+          JOIN entity_values ev ON ev.term_id = t.id AND ev.verdict = 'CONFIRMED'
+          JOIN asset_correlation_values acv ON acv.value_hash = ev.value_hash
+          JOIN findings f ON f.id = acv.finding_id AND f.status = 'OPEN'
+         WHERE r.entity_type = 'case' AND r.entity_id = ${k.caseId} AND r.role = 'ABOUT'
+         ORDER BY seen DESC NULLS LAST
+         LIMIT ${ENTITY_MENTIONS_READ}`;
+    } catch (error) {
+      // Entities are optional to a case's leads: never fail the refresh.
+      this.logger.debug(`Entity leads skipped: ${String(error)}`);
+      return [];
+    }
+    const inCase = await this.findingsInCase(
+      k.caseId,
+      rows.map((row) => row.finding_id),
+    );
+    const out = new Map<string, Candidate>();
+    for (const row of rows) {
+      if (
+        out.has(row.finding_id) ||
+        k.knownFindings.has(row.finding_id) ||
+        inCase.has(row.finding_id) ||
+        k.knownAssets.has(row.asset_id)
+      ) {
+        continue;
+      }
+      if (
+        k.caseWideGate({
+          findingType: row.finding_type,
+          matchedContent: row.matched_content,
+        })
+      ) {
+        continue;
+      }
+      out.set(row.finding_id, {
+        origin: 'ENTITY',
+        findingId: row.finding_id,
+        assetId: row.asset_id,
+        title: leadTitle(row.finding_type, row.matched_content),
+        rationale: `Mentions ${short(row.term)}, an entity of this case`,
+        importance: row.importance_score,
+        similarity: null,
+        details: { entity: row.term },
+        rank: row.seen ? row.seen.getTime() : 0,
+      });
     }
     return [...out.values()].sort((a, b) => b.rank - a.rank);
   }

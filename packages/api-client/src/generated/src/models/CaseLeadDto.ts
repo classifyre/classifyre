@@ -229,7 +229,8 @@ export const CaseLeadDtoOriginEnum = {
     Inquiry: 'INQUIRY',
     Autopilot: 'AUTOPILOT',
     Manual: 'MANUAL',
-    Duplicate: 'DUPLICATE'
+    Duplicate: 'DUPLICATE',
+    Entity: 'ENTITY'
 } as const;
 export type CaseLeadDtoOriginEnum = typeof CaseLeadDtoOriginEnum[keyof typeof CaseLeadDtoOriginEnum];
 

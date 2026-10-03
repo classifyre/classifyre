@@ -82,7 +82,7 @@ export interface GlossaryTermDto {
      */
     hiddenAliases: Array<string>;
     /**
-     * Unverified aliases suggested by agents for operator review
+     * Aliases suggested by agents, waiting for an operator
      * @type {Array<string>}
      * @memberof GlossaryTermDto
      */
@@ -154,17 +154,11 @@ export interface GlossaryTermDto {
      */
     origin: string;
     /**
-     * True when APPROVED (kept for compatibility).
-     * @type {boolean}
-     * @memberof GlossaryTermDto
-     */
-    verified: boolean;
-    /**
      * 
      * @type {string}
      * @memberof GlossaryTermDto
      */
-    verifiedBy?: string | null;
+    approvedBy?: string | null;
     /**
      * 
      * @type {Date}
@@ -183,6 +177,54 @@ export interface GlossaryTermDto {
      * @memberof GlossaryTermDto
      */
     updatedAt: Date;
+    /**
+     * Entities: URN of the record that is this entity (a register entry).
+     * @type {string}
+     * @memberof GlossaryTermDto
+     */
+    anchorUrn?: string | null;
+    /**
+     * Entities: free-form attributes from connectors or people.
+     * @type {object}
+     * @memberof GlossaryTermDto
+     */
+    attributes?: object | null;
+    /**
+     * Entities: occurrences of a confirmed value in the value index (asset × value).
+     * @type {number}
+     * @memberof GlossaryTermDto
+     */
+    mentionCount: number;
+    /**
+     * Entities: distinct assets that mention it.
+     * @type {number}
+     * @memberof GlossaryTermDto
+     */
+    assetCount: number;
+    /**
+     * Entities: distinct sources that mention it.
+     * @type {number}
+     * @memberof GlossaryTermDto
+     */
+    sourceCount: number;
+    /**
+     * 
+     * @type {Date}
+     * @memberof GlossaryTermDto
+     */
+    firstSeenAt?: Date | null;
+    /**
+     * 
+     * @type {Date}
+     * @memberof GlossaryTermDto
+     */
+    lastSeenAt?: Date | null;
+    /**
+     * Entities: set when this entity was merged into `replacedById`.
+     * @type {Date}
+     * @memberof GlossaryTermDto
+     */
+    mergedAt?: Date | null;
 }
 
 
@@ -235,9 +277,11 @@ export function instanceOfGlossaryTermDto(value: object): value is GlossaryTermD
     if (!('proposedAliases' in value) || value['proposedAliases'] === undefined) return false;
     if (!('entityType' in value) || value['entityType'] === undefined) return false;
     if (!('origin' in value) || value['origin'] === undefined) return false;
-    if (!('verified' in value) || value['verified'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
+    if (!('mentionCount' in value) || value['mentionCount'] === undefined) return false;
+    if (!('assetCount' in value) || value['assetCount'] === undefined) return false;
+    if (!('sourceCount' in value) || value['sourceCount'] === undefined) return false;
     return true;
 }
 
@@ -272,11 +316,18 @@ export function GlossaryTermDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'sourceIri': json['sourceIri'] == null ? undefined : json['sourceIri'],
         'packKey': json['packKey'] == null ? undefined : json['packKey'],
         'origin': json['origin'],
-        'verified': json['verified'],
-        'verifiedBy': json['verifiedBy'] == null ? undefined : json['verifiedBy'],
+        'approvedBy': json['approvedBy'] == null ? undefined : json['approvedBy'],
         'approvedAt': json['approvedAt'] == null ? undefined : (new Date(json['approvedAt'])),
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
+        'anchorUrn': json['anchorUrn'] == null ? undefined : json['anchorUrn'],
+        'attributes': json['attributes'] == null ? undefined : json['attributes'],
+        'mentionCount': json['mentionCount'],
+        'assetCount': json['assetCount'],
+        'sourceCount': json['sourceCount'],
+        'firstSeenAt': json['firstSeenAt'] == null ? undefined : (new Date(json['firstSeenAt'])),
+        'lastSeenAt': json['lastSeenAt'] == null ? undefined : (new Date(json['lastSeenAt'])),
+        'mergedAt': json['mergedAt'] == null ? undefined : (new Date(json['mergedAt'])),
     };
 }
 
@@ -312,11 +363,18 @@ export function GlossaryTermDtoToJSONTyped(value?: GlossaryTermDto | null, ignor
         'sourceIri': value['sourceIri'],
         'packKey': value['packKey'],
         'origin': value['origin'],
-        'verified': value['verified'],
-        'verifiedBy': value['verifiedBy'],
+        'approvedBy': value['approvedBy'],
         'approvedAt': value['approvedAt'] == null ? value['approvedAt'] : value['approvedAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
+        'anchorUrn': value['anchorUrn'],
+        'attributes': value['attributes'],
+        'mentionCount': value['mentionCount'],
+        'assetCount': value['assetCount'],
+        'sourceCount': value['sourceCount'],
+        'firstSeenAt': value['firstSeenAt'] == null ? value['firstSeenAt'] : value['firstSeenAt'].toISOString(),
+        'lastSeenAt': value['lastSeenAt'] == null ? value['lastSeenAt'] : value['lastSeenAt'].toISOString(),
+        'mergedAt': value['mergedAt'] == null ? value['mergedAt'] : value['mergedAt'].toISOString(),
     };
 }
 
