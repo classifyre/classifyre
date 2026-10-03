@@ -32,7 +32,13 @@ export type GlossaryActivityType =
   | 'PROPOSAL_DECIDED'
   | 'IMPORTED'
   | 'PACK_INSTALLED'
-  | 'PACK_UNINSTALLED';
+  | 'PACK_UNINSTALLED'
+  | 'ENTITY_VALUE_ADDED'
+  | 'ENTITY_VALUE_REMOVED'
+  | 'ENTITY_VALUE_CONFLICT'
+  | 'ENTITY_CANDIDATES_REVIEWED'
+  | 'ENTITY_MERGED'
+  | 'ENTITY_DECLARED';
 
 export interface GlossaryActivityEntry {
   type: GlossaryActivityType;

@@ -96,7 +96,8 @@ export const GlossarySchemeDtoOriginEnum = {
     Agent: 'AGENT',
     Pack: 'PACK',
     Import: 'IMPORT',
-    Suggestion: 'SUGGESTION'
+    Suggestion: 'SUGGESTION',
+    Connector: 'CONNECTOR'
 } as const;
 export type GlossarySchemeDtoOriginEnum = typeof GlossarySchemeDtoOriginEnum[keyof typeof GlossarySchemeDtoOriginEnum];
 

@@ -13,6 +13,7 @@ import {
   findingSelectorWhere,
   matchFindingTerms,
 } from './bindings/binding-compiler';
+import { normalizeValue, valueHash } from '../correlation/value-normalizer';
 
 /** Depth of the narrower closure (SL1, same as `narrowerClosure`). */
 const CLOSURE_DEPTH = 10;
@@ -39,6 +40,12 @@ export interface TermSnapshot {
   narrower: Map<string, string[]>;
   /** Term id → finding ids with a MANUAL (ABOUT) reference. */
   manualFindings: Map<string, Set<string>>;
+  /**
+   * Entity id → value hashes of its CONFIRMED values (G5): what makes a
+   * finding a mention. APPROVED entities only, and empty while the Entities
+   * feature is off.
+   */
+  mentionHashes?: Map<string, Set<string>>;
 }
 
 const snapshots = new Map<string, TermSnapshot>();
@@ -55,6 +62,8 @@ function installListener(): void {
   glossaryEvents.on('glossary.imported', drop);
   glossaryEvents.on('glossary.pack_installed', drop);
   glossaryEvents.on('semantic.reference_changed', drop);
+  glossaryEvents.on('entity.values_changed', drop);
+  glossaryEvents.on('entity.merged', drop);
 }
 
 function schemaKey(): string {
@@ -96,7 +105,7 @@ export async function ensureTermSnapshot(
   const cached = currentTermSnapshot();
   if (cached) return cached;
   const key = schemaKey();
-  const [active, terms, relations, references] = await Promise.all([
+  const [active, terms, relations, references, mentions] = await Promise.all([
     loadActiveBindings(prisma),
     prisma.glossaryTerm.findMany({
       select: { id: true, key: true, previousKeys: true },
@@ -109,6 +118,7 @@ export async function ensureTermSnapshot(
       where: { role: 'ABOUT', entityType: 'finding' },
       select: { glossaryTermId: true, entityId: true },
     }),
+    loadMentionHashes(prisma),
   ]);
   const keys = new Map<string, string>();
   for (const term of terms) keys.set(term.key, term.id);
@@ -136,9 +146,42 @@ export async function ensureTermSnapshot(
     keys,
     narrower,
     manualFindings,
+    mentionHashes: mentions,
   };
   snapshots.set(key, snapshot);
   return snapshot;
+}
+
+/**
+ * The confirmed value hashes of every APPROVED entity, when entities are on.
+ * A curated set: entities times their names and identifiers, not mentions.
+ */
+async function loadMentionHashes(
+  prisma: PrismaService,
+): Promise<Map<string, Set<string>>> {
+  const out = new Map<string, Set<string>>();
+  try {
+    const config = await prisma.entityConfig.findUnique({
+      where: { id: 1 },
+      select: { enabled: true },
+    });
+    if (config && !config.enabled) return out;
+    const rows = await prisma.$queryRaw<
+      Array<{ term_id: string; value_hash: string }>
+    >`
+      SELECT ev.term_id, ev.value_hash
+        FROM entity_values ev
+        JOIN glossary_terms t ON t.id = ev.term_id
+       WHERE ev.verdict = 'CONFIRMED' AND t.kind = 'ENTITY' AND t.status = 'APPROVED'`;
+    for (const row of rows) {
+      const set = out.get(row.term_id) ?? new Set<string>();
+      set.add(row.value_hash);
+      out.set(row.term_id, set);
+    }
+  } catch {
+    // A namespace that has not migrated yet has no entities to mention.
+  }
+  return out;
 }
 
 /**
@@ -213,11 +256,22 @@ export interface TermFindingCandidate {
 /**
  * "Is this finding evidence of one of these terms?", both halves (SL3 R7.6).
  * Status is left to the caller's own status dimension.
+ *
+ * For an entity (G5 R18) the evidence is a mention: the finding is the value
+ * index's representative finding for one of the entity's confirmed values in
+ * its asset. That makes "watch this entity" count documents and values, not
+ * every repetition of a name inside one document, and it is the definition
+ * the SQL halves state exactly. The in-memory half cannot read the index, so
+ * it recomputes the finding's own value hash instead — always applied after
+ * the `where`, where it can only agree. (A code detector's declared
+ * `normalized_value` is not visible in memory; such a finding is a mention
+ * through the SQL halves only.)
  */
 export class TermMatcher {
   readonly termIds: Set<string>;
   private readonly bindings: CompiledBinding[];
   private readonly manual: Set<string>;
+  private readonly mentions: Set<string>;
 
   constructor(
     private readonly snapshot: TermSnapshot,
@@ -228,9 +282,13 @@ export class TermMatcher {
       this.relevant(binding),
     );
     this.manual = new Set<string>();
+    this.mentions = new Set<string>();
     for (const termId of termIds) {
       for (const id of snapshot.manualFindings.get(termId) ?? []) {
         this.manual.add(id);
+      }
+      for (const hash of snapshot.mentionHashes?.get(termId) ?? []) {
+        this.mentions.add(hash);
       }
     }
   }
@@ -261,6 +319,18 @@ export class TermMatcher {
       );
       if (terms.some((termId) => this.termIds.has(termId))) return true;
     }
+    if (this.mentions.size && finding.matchedContent) {
+      const normalized = normalizeValue(
+        finding.findingType,
+        finding.matchedContent,
+      );
+      if (
+        normalized &&
+        this.mentions.has(valueHash(finding.findingType, normalized))
+      ) {
+        return true;
+      }
+    }
     return false;
   }
 
@@ -274,7 +344,7 @@ export class TermMatcher {
 
   /** True when the in-memory half needs `matchedContent`. */
   get needsContent(): boolean {
-    return !this.exactInWhere;
+    return !this.exactInWhere || this.mentions.size > 0;
   }
 
   /**
@@ -289,8 +359,18 @@ export class TermMatcher {
       if (selector) or.push(selector);
     }
     if (this.manual.size) or.push({ id: { in: [...this.manual] } });
+    const mention = this.mentionWhere();
+    if (mention) or.push(mention);
     if (or.length === 0) return { id: { in: [] } };
     return { OR: or };
+  }
+
+  /** Mentions as a Prisma `where` (exact), or null when no entity is named. */
+  mentionWhere(): Prisma.FindingWhereInput | null {
+    if (!this.mentions.size) return null;
+    return {
+      correlationValues: { some: { valueHash: { in: [...this.mentions] } } },
+    };
   }
 
   /** SQL half over `findings f` (exact), for filters that can run SQL. */
@@ -305,6 +385,12 @@ export class TermMatcher {
     }
     if (this.manual.size) {
       parts.push(Prisma.sql`f.id = ANY(${[...this.manual]}::text[])`);
+    }
+    if (this.mentions.size) {
+      parts.push(Prisma.sql`EXISTS (
+        SELECT 1 FROM asset_correlation_values acv
+         WHERE acv.finding_id = f.id
+           AND acv.value_hash = ANY(${[...this.mentions]}::text[]))`);
     }
     if (parts.length === 0) return Prisma.sql`FALSE`;
     return Prisma.sql`(${Prisma.join(parts, ' OR ')})`;

@@ -98,7 +98,7 @@ const BULK_STATUS_PAGE_SIZE = 5000;
 const ASSET_SEVERITY_COUNT_CAP = 500;
 
 /** Methods by which a finding is evidence of a term (SL3 R7.5). */
-const FINDING_MEANING_METHODS = ['BINDING', 'MANUAL'] as const;
+const FINDING_MEANING_METHODS = ['BINDING', 'MANUAL', 'MENTION'] as const;
 type FindingMeaningMethod = (typeof FINDING_MEANING_METHODS)[number];
 /** Findings a term filter may resolve through value-level bindings. */
 const TERM_VALUE_MATCH_CAP = 20_000;
@@ -402,6 +402,9 @@ export class FindingsService {
     if (methods.has('MANUAL') && matcher.manualFindingIds.length) {
       or.push({ id: { in: matcher.manualFindingIds } });
     }
+    // An entity's mentions (G5): the value index's representative findings.
+    const mention = methods.has('MENTION') ? matcher.mentionWhere() : null;
+    if (mention) or.push(mention);
     const clause: Prisma.FindingWhereInput =
       or.length > 0 ? { OR: or } : { id: { in: [] } };
     const existing = where.AND

@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components";
-import { FileSearch, Link2 } from "lucide-react";
+import { Eye, FileSearch, FolderSearch, Link2 } from "lucide-react";
 import { useNsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
@@ -54,6 +54,7 @@ import {
   type TermDetail,
   type TermEvidencePage,
   type TermSummaryStats,
+  type TermUsage,
 } from "@/lib/semantic-api";
 import { BindDialog } from "./bind-dialog";
 import {
@@ -277,6 +278,192 @@ export function TermEvidence({ term }: { term: TermDetail }) {
   );
 }
 
+// ── Where the term is used ───────────────────────────────────────────────────
+
+export type TermTab =
+  | "overview"
+  | "entity"
+  | "evidence"
+  | "bindings"
+  | "usage"
+  | "activity";
+
+/**
+ * The term's usage at a glance, above the tabs: how much data links to it,
+ * what links it, and which cases and watches rely on it. Each figure opens
+ * the tab behind it, so the way from a definition to its evidence is one click.
+ */
+export function TermUsageStrip({
+  term,
+  usage,
+  onOpen,
+}: {
+  term: TermDetail;
+  usage: TermUsage | null;
+  onOpen: (tab: TermTab) => void;
+}) {
+  const { t } = useTranslation();
+  const [stats, setStats] = React.useState<TermSummaryStats | null>(null);
+  const [bindings, setBindings] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    getTermSummary(term.id, term.narrower.length > 0)
+      .then((result) => {
+        if (active) setStats(result);
+      })
+      .catch(() => undefined);
+    Promise.all([
+      listBindings({ termId: term.id, status: "APPROVED", take: 1 }),
+      term.kind === "CONCEPT" && term.schemeId
+        ? listBindings({ schemeId: term.schemeId, status: "APPROVED", take: 1 })
+        : Promise.resolve({ bindings: [], total: 0 }),
+    ])
+      .then(([direct, lookups]) => {
+        if (active) setBindings(direct.total + lookups.total);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [term.id, term.kind, term.schemeId, term.narrower.length]);
+
+  const tiles: Array<{ key: string; value: number | null; tab: TermTab }> = [
+    { key: "assets", value: stats?.counts.assets ?? null, tab: "evidence" },
+    { key: "findings", value: stats?.counts.findings ?? null, tab: "evidence" },
+    { key: "bindings", value: bindings, tab: "bindings" },
+    { key: "cases", value: usage?.cases.length ?? null, tab: "usage" },
+    { key: "watches", value: usage?.watches.length ?? null, tab: "usage" },
+  ];
+  const unused =
+    stats !== null &&
+    bindings !== null &&
+    usage !== null &&
+    tiles.every((tile) => !tile.value);
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {tiles.map((tile) => (
+          <button
+            key={tile.key}
+            type="button"
+            onClick={() => onOpen(tile.tab)}
+            className="rounded-[4px] border-2 border-border px-3 py-2 text-left transition-colors hover:bg-muted/50"
+          >
+            <div className={MICRO_LABEL}>
+              {t(`glossary.usage.tiles.${tile.key}` as TranslationKey)}
+            </div>
+            <div className="font-mono text-xl font-bold">
+              {tile.value === null ? "–" : tile.value.toLocaleString()}
+            </div>
+          </button>
+        ))}
+      </div>
+      {unused && (
+        <p className="text-xs text-muted-foreground">
+          {term.status === "APPROVED"
+            ? t("glossary.usage.unusedHint")
+            : t("glossary.evidence.notApproved")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Cases and watches that rely on the term (SL3 R7.3). */
+export function TermCasesAndWatches({
+  term,
+  usage,
+}: {
+  term: TermDetail;
+  usage: TermUsage | null;
+}) {
+  const { t } = useTranslation();
+  const nsPath = useNsPath();
+  if (usage === null) {
+    return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+  }
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <section className="space-y-2">
+        <div className={MICRO_LABEL}>{t("glossary.usage.cases")}</div>
+        {usage.cases.length === 0 ? (
+          <EmptyState
+            icon={FolderSearch}
+            title={t("glossary.usage.noCases")}
+            description={t("glossary.usage.noCasesHint")}
+          />
+        ) : (
+          <ul className="divide-y rounded-[4px] border-2 border-border">
+            {usage.cases.map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                <Link
+                  href={nsPath(`/investigations/${entry.id}`)}
+                  className="min-w-0 truncate text-sm font-medium hover:underline"
+                >
+                  {entry.title}
+                </Link>
+                <span className="flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground">
+                  {entry.about && (
+                    <Badge variant="outline" className="rounded-[4px] text-[10px]">
+                      {t("glossary.usage.about")}
+                    </Badge>
+                  )}
+                  {entry.assets > 0 &&
+                    t("glossary.usage.caseAssets", { count: String(entry.assets) })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <section className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className={MICRO_LABEL}>{t("glossary.usage.watches")}</div>
+          {term.status === "APPROVED" && (
+            <Button asChild size="sm" variant="outline" className="h-7 rounded-[4px] text-xs">
+              <Link
+                href={nsPath(
+                  `/investigations/inquiries/new?term=${encodeURIComponent(term.key)}`,
+                )}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {t("glossary.usage.watchThis")}
+              </Link>
+            </Button>
+          )}
+        </div>
+        {usage.watches.length === 0 ? (
+          <EmptyState
+            icon={Eye}
+            title={t("glossary.usage.noWatches")}
+            description={t("glossary.usage.noWatchesHint")}
+          />
+        ) : (
+          <ul className="divide-y rounded-[4px] border-2 border-border">
+            {usage.watches.map((watch) => (
+              <li key={watch.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                <Link
+                  href={nsPath(`/investigations/inquiries/${watch.id}`)}
+                  className="min-w-0 truncate text-sm font-medium hover:underline"
+                >
+                  {watch.title}
+                </Link>
+                <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+                  {t("glossary.usage.watchMatches", {
+                    count: watch.matchCount.toLocaleString(),
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
 // ── Bindings (SL2) ───────────────────────────────────────────────────────────
 
 export function TermBindings({ term }: { term: TermDetail }) {
@@ -288,9 +475,16 @@ export function TermBindings({ term }: { term: TermDetail }) {
 
   React.useEffect(() => {
     let active = true;
-    listBindings({ termId: term.id, take: 200 })
-      .then((result) => {
-        if (active) setBindings(result.bindings);
+    // A concept gets meaning two ways: a binding straight to it, or a lookup
+    // binding on its scheme that resolves values to it by code or label.
+    Promise.all([
+      listBindings({ termId: term.id, take: 200 }),
+      term.kind === "CONCEPT" && term.schemeId
+        ? listBindings({ schemeId: term.schemeId, take: 200 })
+        : Promise.resolve({ bindings: [], total: 0 }),
+    ])
+      .then(([direct, lookups]) => {
+        if (active) setBindings([...direct.bindings, ...lookups.bindings]);
       })
       .catch(() => {
         if (active) setBindings([]);
@@ -298,7 +492,7 @@ export function TermBindings({ term }: { term: TermDetail }) {
     return () => {
       active = false;
     };
-  }, [term.id, refresh]);
+  }, [term.id, term.kind, term.schemeId, refresh]);
 
   async function act(id: string, action: () => Promise<unknown>) {
     setBusy(id);
@@ -374,6 +568,13 @@ export function TermBindings({ term }: { term: TermDetail }) {
                   </TableCell>
                   <TableCell className="text-xs">
                     {t(`glossary.bindings.modes.${binding.mode}` as TranslationKey)}
+                    {binding.lookup?.scheme && (
+                      <div className="text-[11px] text-muted-foreground">
+                        {t("glossary.bindings.viaScheme", {
+                          scheme: binding.lookup.scheme.name,
+                        })}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="rounded-[4px] font-mono text-[10px]">

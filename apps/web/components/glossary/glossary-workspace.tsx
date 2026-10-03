@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   BookOpen,
@@ -9,7 +10,6 @@ import {
   Package,
   Plus,
   Upload,
-  X,
 } from "lucide-react";
 import {
   Badge,
@@ -38,16 +38,13 @@ import {
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
 import {
-  dismissMigrationBanner,
   exportGlossaryUrl,
-  getMigrationBanner,
   importGlossary,
   installPack,
   listPacks,
   proposalCounts,
   semanticErrorMessage,
   type ImportReport,
-  type MigrationBanner,
   type Term,
   type TermKind,
 } from "@/lib/semantic-api";
@@ -59,6 +56,7 @@ import { TermsPanel } from "./terms-panel";
 import { VocabularyPanel } from "./vocabulary-panel";
 
 type Tab = "concepts" | "entities" | "schemes" | "vocabulary" | "proposals";
+const TABS: Tab[] = ["concepts", "entities", "schemes", "vocabulary", "proposals"];
 
 function PacksDialog({
   open,
@@ -356,22 +354,21 @@ function ImportDialog({
  */
 export function GlossaryWorkspace({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation();
-  const [tab, setTab] = React.useState<Tab>("concepts");
+  // Other pages link straight to a tab: an entity's candidates to the review
+  // queue (?tab=proposals), the Entities switch to its list (?tab=entities).
+  const searchParams = useSearchParams();
+  const [tab, setTab] = React.useState<Tab>(() => {
+    const wanted = searchParams?.get("tab");
+    return TABS.includes(wanted as Tab) ? (wanted as Tab) : "concepts";
+  });
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [editing, setEditing] = React.useState<Term | null>(null);
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [packsOpen, setPacksOpen] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
-  const [banner, setBanner] = React.useState<MigrationBanner | null>(null);
   const [pending, setPending] = React.useState(0);
 
   const bump = React.useCallback(() => setRefreshKey((value) => value + 1), []);
-
-  React.useEffect(() => {
-    getMigrationBanner()
-      .then(setBanner)
-      .catch(() => setBanner(null));
-  }, []);
 
   React.useEffect(() => {
     proposalCounts()
@@ -440,28 +437,6 @@ export function GlossaryWorkspace({ embedded = false }: { embedded?: boolean }) 
           </Button>
         </div>
       </div>
-
-      {banner?.show && (
-        <div className="flex items-start justify-between gap-3 rounded-[4px] border-2 border-accent/30 bg-accent/5 px-4 py-3 text-sm">
-          <p>
-            {t("glossary.banner.text", {
-              concepts: banner.concepts.toLocaleString(),
-              entities: banner.entities.toLocaleString(),
-            })}
-          </p>
-          <button
-            type="button"
-            aria-label={t("glossary.banner.dismiss")}
-            onClick={() => {
-              setBanner(null);
-              void dismissMigrationBanner().catch(() => undefined);
-            }}
-            className="rounded-[2px] p-0.5 hover:bg-muted"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
         <TabsList>

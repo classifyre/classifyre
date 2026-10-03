@@ -63,6 +63,7 @@ import { EmbeddingQueueService } from './embedding/embedding-queue.service';
 import { SemanticSearchMode } from './dto/search-findings-request.dto';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
+import { EntitiesService, declaredEntityOf } from './entities/entities.service';
 import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
 import { FindingStatsService } from './stats/finding-stats.service';
 import { citedFindingIds as citedFindingIdsForSource } from './utils/cited-findings';
@@ -251,6 +252,8 @@ export class AssetService {
     // config can never name them. Without this the removed-detector cleanup
     // below resolves every TAG finding at the end of the run that created it.
     @Optional() private readonly customDetectors?: CustomDetectorsService,
+    // Sources that declare entities with the records they ingest (G5 R12).
+    @Optional() private readonly entities?: EntitiesService,
   ) {}
 
   private async assertSourceAndRunner(sourceId: string, runnerId: string) {
@@ -3721,6 +3724,54 @@ export class AssetService {
         );
       }
     }
+    await this.declareEntities(sourceId, batch);
     return ingestResult;
+  }
+
+  /**
+   * Upsert the entities this batch's assets declared (G5 R12): a register-like
+   * source says "this record *is* ACME Holding GmbH", and the entity is
+   * anchored to the record's URN. After the commit and never fatal, like the
+   * lineage stitch above — the assets are ingested whatever happens here, and
+   * the declaration is re-read from asset metadata on the next scan.
+   */
+  private async declareEntities(
+    sourceId: string,
+    assets: Record<string, any>[],
+  ): Promise<void> {
+    if (!this.entities) return;
+    const declaring = assets.filter((asset) =>
+      declaredEntityOf(this.metadataRecord(asset.metadata)),
+    );
+    if (declaring.length === 0) return;
+    try {
+      const rows = await this.prisma.asset.findMany({
+        where: {
+          sourceId,
+          hash: { in: declaring.map((asset) => String(asset.hash)) },
+        },
+        select: { id: true, hash: true, urn: true },
+      });
+      const byHash = new Map(rows.map((row) => [row.hash, row]));
+      const declarations = declaring.flatMap((asset) => {
+        const row = byHash.get(String(asset.hash));
+        const entity = declaredEntityOf(this.metadataRecord(asset.metadata));
+        return row && entity
+          ? [{ assetId: row.id, urn: row.urn, sourceId, entity }]
+          : [];
+      });
+      const result = await this.entities.declareMany(declarations);
+      if (result.declared > 0) {
+        this.logger.log(
+          `Declared ${result.declared} entit(ies) from source ${sourceId} (${result.created} new)`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Could not upsert declared entities: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 }

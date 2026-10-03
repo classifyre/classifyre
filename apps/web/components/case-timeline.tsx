@@ -138,6 +138,7 @@ const LEAD_ORIGINS: Record<string, [string, string]> = {
   DUPLICATE: ["look-alike document", "look-alike documents"],
   INQUIRY: ["watch answer", "watch answers"],
   SEMANTIC_NEIGHBOR: ["similar finding", "similar findings"],
+  ENTITY: ["entity mention", "entity mentions"],
   AUTOPILOT: ["Autopilot proposal", "Autopilot proposals"],
   MANUAL: ["bookmark", "bookmarks"],
 };

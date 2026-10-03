@@ -8,6 +8,7 @@ import { SemanticJobsScheduler } from './semantic-jobs.scheduler';
 import { SemanticSuggestionsService } from './suggestions/semantic-suggestions.service';
 import { SemanticMapService } from './map/semantic-map.service';
 import { GlossaryPacksService } from './packs/glossary-packs.service';
+import { EntitiesWorker } from '../entities/entities.worker';
 import {
   SEMANTIC_LINKS_QUEUE,
   SEMANTIC_LINKS_RECONCILE_QUEUE,
@@ -40,6 +41,7 @@ export class SemanticWorker {
     @Optional() private readonly suggestions?: SemanticSuggestionsService,
     @Optional() private readonly map?: SemanticMapService,
     @Optional() private readonly packs?: GlossaryPacksService,
+    @Optional() private readonly entities?: EntitiesWorker,
   ) {}
 
   async registerForNamespace(): Promise<void> {
@@ -125,6 +127,9 @@ export class SemanticWorker {
     } catch (error) {
       this.logger.warn(`Semantic first-build checks failed: ${String(error)}`);
     }
+    // Entities are ENTITY-kind terms: their queues register with the
+    // glossary's own.
+    await this.entities?.registerForNamespace();
     this.logger.log('Registered semantic-layer workers');
   }
 

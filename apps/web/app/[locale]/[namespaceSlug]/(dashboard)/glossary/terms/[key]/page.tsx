@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   Archive,
@@ -9,6 +9,7 @@ import {
   Check,
   ChevronRight,
   FileSearch,
+  GitMerge,
   Loader2,
   Pencil,
   RotateCcw,
@@ -33,12 +34,16 @@ import {
   TermStatusBadge,
   useTermHref,
 } from "@/components/glossary/glossary-ui";
+import { EntityPanel, MergeEntityDialog } from "@/components/glossary/entity-sections";
 import { TermEditorDialog } from "@/components/glossary/term-editor-dialog";
 import {
   FindInTextDialog,
   TermBindings,
+  TermCasesAndWatches,
   TermEvidence,
   TermRelations,
+  TermUsageStrip,
+  type TermTab,
 } from "@/components/glossary/term-sections";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
@@ -47,13 +52,17 @@ import {
   deprecateTerm,
   getTerm,
   getTermActivity,
+  getTermUsage,
   reinstateTerm,
   semanticErrorMessage,
   unapproveTerm,
   type TermActivity,
   type TermDetail,
+  type TermUsage,
 } from "@/lib/semantic-api";
 import { useStaticRouteParam } from "@/lib/use-route-id";
+
+const TERM_TABS: TermTab[] = ["overview", "entity", "evidence", "bindings", "usage", "activity"];
 
 function Labels({ term }: { term: TermDetail }) {
   const { t } = useTranslation();
@@ -130,9 +139,34 @@ export default function GlossaryTermPage() {
   const [refresh, setRefresh] = React.useState(0);
   const [editing, setEditing] = React.useState(false);
   const [findInText, setFindInText] = React.useState(false);
+  const [merging, setMerging] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [usage, setUsage] = React.useState<TermUsage | null>(null);
+  // The glossary list links straight to a term's evidence (?tab=evidence).
+  const searchParams = useSearchParams();
+  const [tab, setTab] = React.useState<TermTab>(() => {
+    const wanted = searchParams?.get("tab");
+    return TERM_TABS.includes(wanted as TermTab) ? (wanted as TermTab) : "overview";
+  });
+  const tabChosen = React.useRef(Boolean(searchParams?.get("tab")));
 
   useEntityDocumentTitle(term?.term ?? null);
+
+  const termId = term?.id;
+  React.useEffect(() => {
+    if (!termId) return;
+    let active = true;
+    getTermUsage(termId)
+      .then((result) => {
+        if (active) setUsage(result);
+      })
+      .catch(() => {
+        if (active) setUsage({ cases: [], watches: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, [termId, refresh]);
 
   React.useEffect(() => {
     if (!key) return;
@@ -142,6 +176,11 @@ export default function GlossaryTermPage() {
         if (!active) return;
         setTerm(result);
         setError(null);
+        // An entity is read by its mentions first; a concept by its definition.
+        if (!tabChosen.current) {
+          tabChosen.current = true;
+          if (result.kind === "ENTITY") setTab("entity");
+        }
         // An old key redirects to the current one.
         if (result.key !== key.toLowerCase()) {
           router.replace(termHref(result.key));
@@ -221,7 +260,7 @@ export default function GlossaryTermPage() {
           </div>
           {term.replacedBy && (
             <p className="text-sm">
-              {t("glossary.term.replacedBy")}{" "}
+              {term.mergedAt ? t("entities.mergedInto") : t("glossary.term.replacedBy")}{" "}
               <TermLink termKey={term.replacedBy.key}>{term.replacedBy.term}</TermLink>
             </p>
           )}
@@ -279,6 +318,16 @@ export default function GlossaryTermPage() {
               {t("glossary.findInText.open")}
             </Button>
           )}
+          {term.kind === "ENTITY" && term.status !== "DEPRECATED" && (
+            <Button
+              variant="outline"
+              onClick={() => setMerging(true)}
+              className="rounded-[4px] border-2 border-border"
+            >
+              <GitMerge className="h-4 w-4" />
+              {t("entities.merge.open")}
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => setEditing(true)}
@@ -290,11 +339,20 @@ export default function GlossaryTermPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview">
+      <TermUsageStrip term={term} usage={usage} onOpen={setTab} />
+
+      <Tabs
+        value={tab === "entity" && term.kind !== "ENTITY" ? "overview" : tab}
+        onValueChange={(value) => setTab(value as TermTab)}
+      >
         <TabsList>
           <TabsTrigger value="overview">{t("glossary.term.tabs.overview")}</TabsTrigger>
+          {term.kind === "ENTITY" && (
+            <TabsTrigger value="entity">{t("glossary.term.tabs.entity")}</TabsTrigger>
+          )}
           <TabsTrigger value="evidence">{t("glossary.term.tabs.evidence")}</TabsTrigger>
           <TabsTrigger value="bindings">{t("glossary.term.tabs.bindings")}</TabsTrigger>
+          <TabsTrigger value="usage">{t("glossary.term.tabs.usage")}</TabsTrigger>
           <TabsTrigger value="activity">{t("glossary.term.tabs.activity")}</TabsTrigger>
         </TabsList>
 
@@ -344,11 +402,23 @@ export default function GlossaryTermPage() {
           )}
         </TabsContent>
 
+        {term.kind === "ENTITY" && (
+          <TabsContent value="entity" className="pt-4">
+            <EntityPanel
+              term={term}
+              refreshKey={refresh}
+              onChanged={() => setRefresh((value) => value + 1)}
+            />
+          </TabsContent>
+        )}
         <TabsContent value="evidence" className="pt-4">
           <TermEvidence term={term} />
         </TabsContent>
         <TabsContent value="bindings" className="pt-4">
           <TermBindings term={term} />
+        </TabsContent>
+        <TabsContent value="usage" className="pt-4">
+          <TermCasesAndWatches term={term} usage={usage} />
         </TabsContent>
         <TabsContent value="activity" className="pt-4">
           <Activity termKey={term.key} />
@@ -366,6 +436,14 @@ export default function GlossaryTermPage() {
         }}
       />
       <FindInTextDialog term={term} open={findInText} onOpenChange={setFindInText} />
+      {term.kind === "ENTITY" && (
+        <MergeEntityDialog
+          term={term}
+          open={merging}
+          onOpenChange={setMerging}
+          onMerged={(intoKey) => router.push(`${termHref(intoKey)}?tab=entity`)}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma, SemanticLinkMethod } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { BindingsService } from '../bindings/bindings.service';
@@ -13,6 +13,7 @@ import type { CompiledBinding } from '../bindings/binding-spec';
 import { isOutputMode } from '../bindings/binding-spec';
 import { glossaryEvents } from '../../glossary/glossary-events';
 import { withStatementTimeout } from '../semantic-sql';
+import { EntitySwitchService } from '../../entities/entity-switch.service';
 import {
   GONE_RETENTION_DAYS,
   LINKER_BATCH,
@@ -20,13 +21,19 @@ import {
   SemanticLinkTrigger,
 } from '../semantic.constants';
 
-/** The methods the linker owns. MENTION belongs to G5′ and is never touched. */
-const LINKER_METHODS: SemanticLinkMethod[] = [
+/** The methods that are derived whatever is switched on. */
+const BASE_METHODS: SemanticLinkMethod[] = [
   'BINDING',
   'DECLARED',
   'MANUAL',
   'SUGGESTED',
 ];
+/**
+ * With MENTION (G5): an entity's confirmed value occurs in the asset. Derived
+ * only while the Entities feature is on; while it is off the rows it left are
+ * neither refreshed nor marked gone, which is what "off, data kept" means.
+ */
+const ALL_METHODS: SemanticLinkMethod[] = [...BASE_METHODS, 'MENTION'];
 
 const SEVERITY_RANK: Record<string, number> = {
   CRITICAL: 0,
@@ -48,6 +55,11 @@ interface DesiredLink {
   confidence: number;
 }
 
+/** `coverage: false` when the caller records coverage itself (the drain). */
+interface JobOptions {
+  coverage?: boolean;
+}
+
 export interface RelinkResult {
   assets: number;
   added: number;
@@ -65,9 +77,9 @@ function linkKey(assetId: string, termId: string, method: string): string {
  *
  * For a batch of assets it recomputes every link the evidence supports — from
  * APPROVED bindings (through the compiler's SQL half), connector declarations
- * (`MEANS` edges to terms), manual ABOUT references and accepted LINK
- * suggestions — then upserts what is supported and marks GONE what no longer
- * is. Incremental jobs, backfills and the reconcile all funnel through
+ * (`MEANS` edges to terms), manual ABOUT references, accepted LINK
+ * suggestions and entity mentions (confirmed entity values in the value
+ * index) — then upserts what is supported and marks GONE what no longer is. Incremental jobs, backfills and the reconcile all funnel through
  * {@link relinkAssets}, which is why they agree: they differ only in which
  * assets they visit. Never a row per finding (rule SL-2).
  */
@@ -78,7 +90,12 @@ export class SemanticLinkerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bindings: BindingsService,
+    @Optional() private readonly entitySwitch?: EntitySwitchService,
   ) {}
+
+  private async mentionsOn(): Promise<boolean> {
+    return this.entitySwitch ? this.entitySwitch.isEnabled() : false;
+  }
 
   // ── The batch recompute ─────────────────────────────────────────────────
 
@@ -90,9 +107,13 @@ export class SemanticLinkerService {
       perTerm: new Map(),
     };
     if (!assetIds.length) return result;
-    const desired = await this.desiredLinks(assetIds);
+    const mentions = await this.mentionsOn();
+    const desired = await this.desiredLinks(assetIds, { mentions });
     const existing = await this.prisma.assetTerm.findMany({
-      where: { assetId: { in: assetIds }, method: { in: LINKER_METHODS } },
+      where: {
+        assetId: { in: assetIds },
+        method: { in: mentions ? ALL_METHODS : BASE_METHODS },
+      },
       select: { assetId: true, termId: true, method: true, goneAt: true },
     });
     const existingByKey = new Map(
@@ -176,7 +197,10 @@ export class SemanticLinkerService {
   }
 
   /** Every link the evidence supports for these assets, keyed asset×term×method. */
-  async desiredLinks(assetIds: string[]): Promise<Map<string, DesiredLink>> {
+  async desiredLinks(
+    assetIds: string[],
+    options: { mentions?: boolean } = {},
+  ): Promise<Map<string, DesiredLink>> {
     const desired = new Map<string, DesiredLink>();
     const assets = await this.prisma.asset.findMany({
       where: { id: { in: assetIds } },
@@ -298,16 +322,24 @@ export class SemanticLinkerService {
         confidence: Prisma.Decimal;
       }>
     >`
-      SELECT COALESCE(fa.asset_id, e.from_id) AS asset_id, e.to_id AS term_id,
-             count(*) AS support, max(e.confidence) AS confidence
-        FROM edges e
-        LEFT JOIN findings fa ON e.from_type = 'finding' AND fa.id = e.from_id
-        JOIN glossary_terms t ON t.id = e.to_id AND t.status = 'APPROVED'
-       WHERE e.to_type = 'term' AND e.relation_type = 'MEANS'
-         AND (
-           (e.from_type = 'asset' AND e.from_id = ANY(${presentIds}::text[]))
-           OR (e.from_type = 'finding' AND fa.asset_id = ANY(${presentIds}::text[]))
-         )
+      -- Two branches, each driven from the batch (edges by from_id, findings
+      -- by asset_id). One query with an OR across both would walk every MEANS
+      -- edge of the workspace for every batch.
+      SELECT d.asset_id, d.term_id, count(*) AS support,
+             max(d.confidence) AS confidence
+        FROM (
+          SELECT e.from_id AS asset_id, e.to_id AS term_id, e.confidence
+            FROM edges e
+           WHERE e.from_type = 'asset' AND e.from_id = ANY(${presentIds}::text[])
+             AND e.to_type = 'term' AND e.relation_type = 'MEANS'
+          UNION ALL
+          SELECT fa.asset_id, e.to_id AS term_id, e.confidence
+            FROM findings fa
+            JOIN edges e ON e.from_type = 'finding' AND e.from_id = fa.id
+           WHERE fa.asset_id = ANY(${presentIds}::text[])
+             AND e.to_type = 'term' AND e.relation_type = 'MEANS'
+        ) d
+        JOIN glossary_terms t ON t.id = d.term_id AND t.status = 'APPROVED'
        GROUP BY 1, 2
     `;
     for (const row of declared) {
@@ -387,6 +419,47 @@ export class SemanticLinkerService {
         maxSeverity: null,
         confidence: Math.min(Number(row.score), 1),
       });
+    }
+    // MENTION (G5): a confirmed value of an APPROVED entity occurs in the
+    // asset. Never a row per finding: the value index is one row per asset
+    // and value, and this groups it per asset and entity.
+    if (options.mentions ?? (await this.mentionsOn())) {
+      const mentioned = await this.prisma.$queryRaw<
+        Array<{
+          asset_id: string;
+          term_id: string;
+          support: bigint;
+          max_severity: string | null;
+          sample: string | null;
+          score: number | null;
+        }>
+      >`
+        SELECT acv.asset_id, ev.term_id, count(*) AS support,
+               min(f.severity)::text AS max_severity,
+               (array_agg(acv.finding_id ORDER BY f.severity ASC NULLS LAST)
+                  FILTER (WHERE acv.finding_id IS NOT NULL))[1] AS sample,
+               max(COALESCE(ev.score, 1)) AS score
+          FROM asset_correlation_values acv
+          JOIN entity_values ev ON ev.value_hash = acv.value_hash AND ev.verdict = 'CONFIRMED'
+          JOIN glossary_terms t ON t.id = ev.term_id
+                               AND t.kind = 'ENTITY' AND t.status = 'APPROVED'
+          LEFT JOIN findings f ON f.id = acv.finding_id
+         WHERE acv.asset_id = ANY(${presentIds}::text[])
+         GROUP BY 1, 2
+      `;
+      for (const row of mentioned) {
+        add({
+          assetId: row.asset_id,
+          termId: row.term_id,
+          method: 'MENTION',
+          sourceId: sourceOf.get(row.asset_id) ?? '',
+          supportCount: Number(row.support),
+          bindingIds: [],
+          sampleFindingId: row.sample,
+          maxSeverity: row.max_severity,
+          confidence: Math.min(Number(row.score ?? 1), 1),
+        });
+      }
     }
     for (const link of desired.values()) {
       link.confidence =
@@ -487,6 +560,16 @@ export class SemanticLinkerService {
            WHERE s.kind = 'LINK' AND s.status = 'ACCEPTED'
              AND s.term_id = ANY(${termIds}::text[]) AND s.asset_id > ${afterId}
            ORDER BY 1 LIMIT ${limit})`);
+        // Assets that carry a confirmed value of a changed entity (G5).
+        if (await this.mentionsOn()) {
+          branches.push(Prisma.sql`(
+            SELECT DISTINCT acv.asset_id AS id
+              FROM entity_values ev
+              JOIN asset_correlation_values acv ON acv.value_hash = ev.value_hash
+             WHERE ev.term_id = ANY(${termIds}::text[]) AND ev.verdict = 'CONFIRMED'
+               AND acv.asset_id > ${afterId}
+             ORDER BY 1 LIMIT ${limit})`);
+        }
       }
       if (bindingIds.length) {
         branches.push(Prisma.sql`(
@@ -496,10 +579,20 @@ export class SemanticLinkerService {
       }
     }
     if (trigger.all) {
+      const mentions = await this.mentionsOn();
       branches.push(Prisma.sql`(
         SELECT asset_id AS id FROM asset_terms
-         WHERE method <> 'MENTION' AND asset_id > ${afterId}
+         WHERE ${mentions ? Prisma.sql`TRUE` : Prisma.sql`method <> 'MENTION'`}
+           AND asset_id > ${afterId}
          ORDER BY asset_id LIMIT ${limit})`);
+      if (mentions) {
+        branches.push(Prisma.sql`(
+          SELECT DISTINCT acv.asset_id AS id
+            FROM entity_values ev
+            JOIN asset_correlation_values acv ON acv.value_hash = ev.value_hash
+           WHERE ev.verdict = 'CONFIRMED' AND acv.asset_id > ${afterId}
+           ORDER BY 1 LIMIT ${limit})`);
+      }
     }
     const outputs = bindingRows.filter((binding) => isOutputMode(binding.mode));
     if (outputs.length) {
@@ -559,14 +652,38 @@ export class SemanticLinkerService {
       RETURNING id, kind
     `;
     if (!jobs.length) return;
+    // The worker is a different process from the API that approved a binding
+    // or a term: its cache never hears that event, and a job that links with
+    // a stale set marks itself DONE having linked nothing.
+    this.bindings.invalidate();
     const incremental = jobs.filter((job) => job.kind === 'INCREMENTAL');
     const backfills = jobs.filter((job) => job.kind === 'BACKFILL');
     const reconciles = jobs.filter((job) => job.kind === 'RECONCILE');
-    for (const job of incremental) await this.runIncremental(job.id);
-    if (backfills.length)
-      await this.runBackfills(backfills.map((job) => job.id));
+    // A failed job is already marked FAILED; the others it was claimed with
+    // must still run, or they sit RUNNING until the stale-claim timeout.
+    const attempt = async (label: string, run: () => Promise<unknown>) => {
+      try {
+        await run();
+      } catch (error) {
+        this.logger.error(`Semantic ${label} job failed: ${String(error)}`);
+      }
+    };
+    const deferred = { coverage: false };
+    for (const job of incremental) {
+      await attempt('incremental', () => this.runIncremental(job.id, deferred));
+    }
+    if (backfills.length) {
+      await attempt('backfill', () =>
+        this.runBackfills(
+          backfills.map((job) => job.id),
+          deferred,
+        ),
+      );
+    }
     if (reconciles.length) {
-      await this.runReconcile(reconciles[0].id);
+      await attempt('reconcile', () =>
+        this.runReconcile(reconciles[0].id, deferred),
+      );
       if (reconciles.length > 1) {
         await this.prisma.semanticLinkJob.updateMany({
           where: { id: { in: reconciles.slice(1).map((job) => job.id) } },
@@ -578,11 +695,16 @@ export class SemanticLinkerService {
         });
       }
     }
+    // Coverage counts every open finding: once per drain, not once per job.
+    await this.recordCoverage().catch((error) =>
+      this.logger.warn(`Coverage stats failed: ${String(error)}`),
+    );
   }
 
   private async start(ids: string[]) {
     // Jobs run directly (tests, "Rebuild") are claimed here; drained ones
     // already are.
+    this.bindings.invalidate();
     await this.prisma.semanticLinkJob.updateMany({
       where: { id: { in: ids }, status: 'QUEUED' },
       data: { status: 'RUNNING', startedAt: new Date() },
@@ -595,6 +717,7 @@ export class SemanticLinkerService {
     started: number,
     trigger: string,
     runId?: string | null,
+    options: JobOptions = {},
   ) {
     await this.prisma.semanticLinkJob.updateMany({
       where: { id: { in: ids } },
@@ -613,9 +736,11 @@ export class SemanticLinkerService {
       trigger,
       runId,
     );
-    await this.recordCoverage().catch((error) =>
-      this.logger.warn(`Coverage stats failed: ${String(error)}`),
-    );
+    if (options.coverage !== false) {
+      await this.recordCoverage().catch((error) =>
+        this.logger.warn(`Coverage stats failed: ${String(error)}`),
+      );
+    }
   }
 
   private async fail(ids: string[], error: unknown) {
@@ -661,7 +786,10 @@ export class SemanticLinkerService {
     }
   }
 
-  async runIncremental(jobId: string): Promise<RelinkResult> {
+  async runIncremental(
+    jobId: string,
+    options: JobOptions = {},
+  ): Promise<RelinkResult> {
     const job = await this.prisma.semanticLinkJob.findUnique({
       where: { id: jobId },
     });
@@ -706,6 +834,7 @@ export class SemanticLinkerService {
         started,
         trigger.reason ?? 'incremental',
         trigger.runId,
+        options,
       );
     } catch (error) {
       await this.fail([jobId], error);
@@ -714,7 +843,10 @@ export class SemanticLinkerService {
     return totals;
   }
 
-  async runBackfills(jobIds: string[]): Promise<RelinkResult> {
+  async runBackfills(
+    jobIds: string[],
+    options: JobOptions = {},
+  ): Promise<RelinkResult> {
     const jobs = await this.prisma.semanticLinkJob.findMany({
       where: { id: { in: jobIds } },
     });
@@ -757,7 +889,14 @@ export class SemanticLinkerService {
         });
         if (page.length < LINKER_BATCH) break;
       }
-      await this.finish(jobIds, totals, started, merged.reason || 'backfill');
+      await this.finish(
+        jobIds,
+        totals,
+        started,
+        merged.reason || 'backfill',
+        null,
+        options,
+      );
     } catch (error) {
       await this.fail(jobIds, error);
       throw error;
@@ -787,6 +926,7 @@ export class SemanticLinkerService {
    */
   async runReconcile(
     jobId: string,
+    options: JobOptions = {},
   ): Promise<RelinkResult & { purged: number }> {
     const started = Date.now();
     await this.start([jobId]);
@@ -825,7 +965,7 @@ export class SemanticLinkerService {
           },
         },
       });
-      await this.finish([jobId], totals, started, 'reconcile');
+      await this.finish([jobId], totals, started, 'reconcile', null, options);
       if (totals.added + totals.gone > 0) {
         this.logger.warn(
           `Semantic reconcile repaired ${totals.added} missing and ${totals.gone} stale link(s) in a sample of ${ids.length} asset(s).`,

@@ -38,8 +38,8 @@ function queryString(query?: Query): string {
   return text ? `?${text}` : "";
 }
 
-async function request<T>(
-  method: "GET" | "POST" | "PATCH" | "DELETE",
+export async function request<T>(
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
   path: string,
   options: { query?: Query; body?: unknown } = {},
 ): Promise<T> {
@@ -117,6 +117,12 @@ export interface TermSummary {
   scheme: SchemeRef | null;
 }
 
+/** Assets currently linked to a term, and the bindings that link them. */
+export interface TermUsageCounts {
+  assets: number;
+  bindings: number;
+}
+
 export interface Term {
   id: string;
   key: string;
@@ -138,11 +144,22 @@ export interface Term {
   deprecatedAt: string | null;
   packKey: string | null;
   origin: string;
-  verified: boolean;
-  verifiedBy: string | null;
+  approvedBy: string | null;
   approvedAt: string | null;
+  /** Present on list rows: where the term is used. */
+  usage?: TermUsageCounts;
   createdAt: string;
   updatedAt: string;
+  // Entities (G5). Zero and null for concepts.
+  anchorUrn: string | null;
+  attributes: Record<string, unknown> | null;
+  mentionCount: number;
+  assetCount: number;
+  sourceCount: number;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+  /** Set when the entity was merged into `replacedById`. */
+  mergedAt: string | null;
 }
 
 export interface TermRelation {
@@ -288,19 +305,6 @@ export function bulkUpdateTerms(input: {
     body: input,
   });
 }
-
-export interface MigrationBanner {
-  show: boolean;
-  concepts: number;
-  entities: number;
-  migratedAt: string | null;
-  dismissedAt: string | null;
-}
-
-export const getMigrationBanner = () =>
-  request<MigrationBanner>("GET", "/glossary/banner");
-export const dismissMigrationBanner = () =>
-  request<unknown>("POST", "/glossary/banner/dismiss");
 
 export const listSchemes = () => request<Scheme[]>("GET", "/glossary/schemes");
 export const saveScheme = (input: {
@@ -524,6 +528,8 @@ export interface BindingPreview {
 
 export function listBindings(params: {
   termId?: string;
+  /** Lookup bindings that read values against this scheme. */
+  schemeId?: string;
   status?: string;
   detectorType?: string;
   customDetectorKey?: string;
@@ -658,6 +664,8 @@ export interface MeaningItem {
     note: string | null;
   } | null;
   via?: { id: string; key: string; name: string } | null;
+  /** For MENTION: the entity value the finding carries, and how it was confirmed. */
+  mention?: { label: string; value: string; how: string } | null;
   since: string | null;
 }
 
@@ -777,7 +785,9 @@ export type ProposalKind =
   | "RELATION"
   | "BINDING"
   | "LINK"
-  | "TERM_REF";
+  | "TERM_REF"
+  | "ENTITY_MENTION"
+  | "ENTITY_MERGE";
 
 export type ProposalDecision =
   | "accept"
@@ -789,7 +799,7 @@ export type ProposalDecision =
 export interface ProposalItem {
   kind: ProposalKind;
   id: string;
-  source: "draft" | "suggestion" | "ref";
+  source: "draft" | "suggestion" | "ref" | "entity";
   title: string;
   rationale: string | null;
   score: number | null;
@@ -806,6 +816,7 @@ export interface ProposalItem {
   } | null;
   asset?: { id: string; name: string } | null;
   payload?: unknown;
+  evidence?: unknown;
   agentNote?: string | null;
 }
 
@@ -907,3 +918,31 @@ export const getCoverage = () =>
     unboundOutputs: number;
     unboundFindings: number;
   }>("GET", "/semantic/coverage");
+
+// ── Where a term is used (SL3 R7.3) ──────────────────────────────────────────
+
+export interface TermUsage {
+  cases: Array<{
+    id: string;
+    title: string;
+    status: string;
+    /** Evidence assets of the case that link to the term. */
+    assets: number;
+    /** The case itself was linked to the term ("this case is about …"). */
+    about: boolean;
+  }>;
+  watches: Array<{
+    id: string;
+    title: string;
+    status: string;
+    matchCount: number;
+    newMatchCount: number;
+    termsIncludeNarrower: boolean;
+  }>;
+}
+
+export const getTermUsage = (termId: string) =>
+  request<TermUsage>(
+    "GET",
+    `/semantic/terms/${encodeURIComponent(termId)}/usage`,
+  );

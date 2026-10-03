@@ -58,6 +58,8 @@ export interface MeaningItem {
     by: string | null;
     note: string | null;
   } | null;
+  /** For MENTION items (G5): the entity value the finding carries. */
+  mention?: { label: string; value: string; how: string } | null;
   /** For BROADER items: the narrower term it is implied by. */
   via?: { id: string; key: string; name: string } | null;
   since: Date | null;
@@ -263,6 +265,43 @@ export class MeaningService {
             note: reference.note,
           },
           since: reference.createdAt,
+        },
+      });
+    }
+    // MENTION (G5): the finding is the value index's representative finding
+    // for a confirmed value of an APPROVED entity.
+    const mentions = await this.prisma.$queryRaw<
+      Array<{
+        finding_id: string;
+        term_id: string;
+        label: string;
+        normalized_value: string;
+        method: string;
+        score: number | null;
+        decided_at: Date | null;
+      }>
+    >`
+      SELECT acv.finding_id, ev.term_id, ev.label, acv.normalized_value,
+             ev.method::text AS method, ev.score, ev.decided_at
+        FROM asset_correlation_values acv
+        JOIN entity_values ev ON ev.value_hash = acv.value_hash AND ev.verdict = 'CONFIRMED'
+        JOIN glossary_terms t ON t.id = ev.term_id
+                             AND t.kind = 'ENTITY' AND t.status = 'APPROVED'
+       WHERE acv.finding_id = ANY(${findings.map((f) => f.id)}::text[])`;
+    for (const row of mentions) {
+      pairs.push({
+        findingId: row.finding_id,
+        termId: row.term_id,
+        item: {
+          method: 'MENTION',
+          confidence: Math.min(Number(row.score ?? 1), 1),
+          support: 1,
+          mention: {
+            label: row.label,
+            value: row.normalized_value,
+            how: row.method,
+          },
+          since: row.decided_at,
         },
       });
     }
@@ -539,6 +578,48 @@ export class MeaningService {
             at: r.created_at,
           })),
         });
+      } else if (row.method === 'MENTION') {
+        const values = await this.prisma.$queryRaw<
+          Array<{
+            finding_id: string | null;
+            label: string;
+            normalized_value: string;
+            how: string;
+            finding_type: string | null;
+            severity: string | null;
+            status: string | null;
+            matched_content: string | null;
+            last_detected_at: Date | null;
+          }>
+        >`
+          SELECT acv.finding_id, acv.label, acv.normalized_value,
+                 ev.method::text AS how, f.finding_type, f.severity::text AS severity,
+                 f.status::text AS status, f.matched_content, f.last_detected_at
+            FROM asset_correlation_values acv
+            JOIN entity_values ev ON ev.value_hash = acv.value_hash
+                                 AND ev.verdict = 'CONFIRMED' AND ev.term_id = ${termId}
+            LEFT JOIN findings f ON f.id = acv.finding_id
+           WHERE acv.asset_id = ${assetId}
+           ORDER BY acv.value_hash
+           LIMIT ${pageSize} OFFSET ${page * pageSize}`;
+        evidence.push({
+          method: 'MENTION',
+          values: values.map((v) => ({
+            label: v.label,
+            value: v.normalized_value,
+            how: v.how,
+          })),
+          findings: values
+            .filter((v) => v.finding_id)
+            .map((v) => ({
+              id: v.finding_id,
+              findingType: v.finding_type,
+              severity: v.severity,
+              status: v.status,
+              matchedContent: v.matched_content,
+              lastDetectedAt: v.last_detected_at,
+            })),
+        });
       } else if (row.method === 'SUGGESTED') {
         const suggestions = await this.prisma.semanticSuggestion.findMany({
           where: { assetId, termId, kind: 'LINK', status: 'ACCEPTED' },
@@ -694,7 +775,7 @@ export class MeaningService {
       Array<{ assets: bigint; sources: bigint; findings: bigint }>
     >`
       SELECT count(DISTINCT asset_id) AS assets, count(DISTINCT source_id) AS sources,
-             coalesce(sum(support_count) FILTER (WHERE method IN ('BINDING', 'MANUAL')), 0) AS findings
+             coalesce(sum(support_count) FILTER (WHERE method IN ('BINDING', 'MANUAL', 'MENTION')), 0) AS findings
         FROM asset_terms WHERE term_id = ANY(${ids}::text[]) AND gone_at IS NULL`;
     const [directCount] = await this.prisma.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(DISTINCT asset_id) AS n FROM asset_terms

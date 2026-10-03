@@ -24,9 +24,19 @@ import { SemanticEventsListener } from '../semantic/semantic-events.listener';
 import { SemanticWorker } from '../semantic/semantic.worker';
 import { SemanticController } from '../semantic/semantic.controller';
 import { GlossarySemanticController } from '../semantic/glossary-semantic.controller';
+import { CaseLeadsScheduler } from '../cases/case-leads.scheduler';
+import { EntitiesController } from '../entities/entities.controller';
+import { EntitiesService } from '../entities/entities.service';
+import { EntitiesWorker } from '../entities/entities.worker';
+import { EntityCandidatesService } from '../entities/entity-candidates.service';
+import { EntityMentionsService } from '../entities/entity-mentions.service';
+import { EntityResolutionService } from '../entities/entity-resolution.service';
+import { EntitySwitchService } from '../entities/entity-switch.service';
+import { EntityValuesService } from '../entities/entity-values.service';
 
 /**
- * The glossary and the semantic layer (docs/prd/SL0–SL5).
+ * The glossary and the semantic layer (docs/prd/SL0–SL5), and the entities
+ * built on its ENTITY kind (docs/prd/G5-entities.md).
  *
  * One module instance so the stateful parts (the binding cache, the event
  * listeners, the linker, suggestion and map workers) exist once. AppModule,
@@ -39,6 +49,7 @@ import { GlossarySemanticController } from '../semantic/glossary-semantic.contro
     GlossaryController,
     GlossarySemanticController,
     SemanticController,
+    EntitiesController,
   ],
   providers: [
     PrismaService,
@@ -64,6 +75,15 @@ import { GlossarySemanticController } from '../semantic/glossary-semantic.contro
     FindInTextService,
     SemanticEventsListener,
     SemanticWorker,
+    // Entities (G5). The resolution worker asks cases to refresh their leads.
+    CaseLeadsScheduler,
+    EntitySwitchService,
+    EntityValuesService,
+    EntityMentionsService,
+    EntityCandidatesService,
+    EntityResolutionService,
+    EntitiesService,
+    EntitiesWorker,
   ],
   exports: [
     GlossaryService,
@@ -81,6 +101,13 @@ import { GlossarySemanticController } from '../semantic/glossary-semantic.contro
     GlossaryPacksService,
     FindInTextService,
     SemanticWorker,
+    EntitySwitchService,
+    EntityValuesService,
+    EntityMentionsService,
+    EntityCandidatesService,
+    EntityResolutionService,
+    EntitiesService,
+    EntitiesWorker,
   ],
 })
 export class GlossaryModule {}

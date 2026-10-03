@@ -6,15 +6,21 @@
  * its investigation: findings, assets, sources, cases, inquiries and the
  * glossary are never touched by a switch.
  *
+ * Duplicates and entities share one piece of derived data, the value index
+ * (`asset_correlation_values`): it is kept up to date while either is on, and
+ * deleted only when a feature is switched off with its data and the other is
+ * off too (G5 R9).
+ *
  * The key doubles as the `feature` marker on `public.worker_queue_pauses`: a
  * switched-off feature holds its queues paused there, which is what makes every
  * worker replica stop and what the Workers tab shows.
  */
-export type WorkspaceFeatureKey = 'embeddings' | 'duplicates';
+export type WorkspaceFeatureKey = 'embeddings' | 'duplicates' | 'entities';
 
 export const WORKSPACE_FEATURE_KEYS: readonly WorkspaceFeatureKey[] = [
   'embeddings',
   'duplicates',
+  'entities',
 ];
 
 export function isWorkspaceFeatureKey(
@@ -30,6 +36,7 @@ export type FeatureDisabledMode = 'kept' | 'deleted';
 export const WORKSPACE_FEATURE_LABELS: Record<WorkspaceFeatureKey, string> = {
   embeddings: 'Embeddings',
   duplicates: 'Duplicate detection',
+  entities: 'Entities',
 };
 
 /** Where the switch lives, for messages that tell an API caller what to do. */

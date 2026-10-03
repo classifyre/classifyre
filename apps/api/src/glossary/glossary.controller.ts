@@ -40,7 +40,6 @@ import {
   UpsertGlossarySchemeDto,
   UpsertGlossaryTermDto,
   UpsertGlossaryTermResponseDto,
-  VerifyGlossaryTermDto,
 } from './dto/glossary.dto';
 
 const STATUSES = new Set<string>(Object.values(GlossaryStatus));
@@ -99,21 +98,6 @@ export class GlossaryController {
       status: parseStatuses(query.status),
       includeDeprecated: query.includeDeprecated === 'true',
     });
-  }
-
-  @Get('banner')
-  @ApiOperation({
-    summary: 'The one-time "we classified your terms" banner (SL1 R8)',
-  })
-  banner() {
-    return this.glossary.migrationBanner();
-  }
-
-  @Post('banner/dismiss')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Dismiss the classification banner' })
-  dismissBanner() {
-    return this.glossary.dismissMigrationBanner();
   }
 
   @Get('terms/:idOrKey')
@@ -180,24 +164,12 @@ export class GlossaryController {
     return this.glossary.bulkUpdate({
       ids: dto.ids,
       filters: dto.filters,
-      verified: dto.verified,
       status: dto.status,
       entityType: dto.entityType,
       schemeId: dto.schemeId,
       kind: dto.kind,
-      verifiedBy: dto.verifiedBy ?? actor,
+      actor,
     });
-  }
-
-  @Patch(':id/verify')
-  @ApiOperation({ summary: 'Approve a term (alias of /approve)' })
-  @ApiOkResponse({ type: GlossaryTermDto })
-  verify(
-    @Param('id') id: string,
-    @Body() dto: VerifyGlossaryTermDto,
-    @ActorName() actor?: string,
-  ) {
-    return this.glossary.verify(id, dto?.verifiedBy ?? actor);
   }
 
   @Post(':id/approve')

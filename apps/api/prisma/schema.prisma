@@ -1074,8 +1074,6 @@ model InstanceSettings {
   autopilotGlossaryApproveEnabled  Boolean   @default(true) @map("autopilot_glossary_approve_enabled")
   autopilotGlossaryApprovalsPerDay Int       @default(20) @map("autopilot_glossary_approvals_per_day")
   autopilotBindingImpactLimit      Int       @default(5000) @map("autopilot_binding_impact_limit")
-  // One-time "we classified your terms" banner (SL1 R8), dismissed per workspace.
-  glossaryKindBannerDismissedAt    DateTime? @map("glossary_kind_banner_dismissed_at")
   // Suggestion generators (SL4 §9): on/off map and minimum score per kind.
   suggestionGenerators             Json?     @map("suggestion_generators") @db.JsonB
   suggestionMinScore               Json?     @map("suggestion_min_score") @db.JsonB
@@ -2021,6 +2019,8 @@ enum CaseLeadOrigin {
   // A document the duplicates engine pairs with evidence: a byte-identical copy
   // or one sharing most of its weighted values. Always an asset lead.
   DUPLICATE
+  // A finding that mentions an entity linked to the case (G5 R17).
+  ENTITY
 }
 
 enum CaseLeadStatus {
@@ -3166,6 +3166,8 @@ enum GlossaryOrigin {
   PACK
   IMPORT
   SUGGESTION
+  // Declared by a source as it ingested a record (G5 R13).
+  CONNECTOR
 }
 
 enum GlossaryRelationType {
@@ -3189,10 +3191,10 @@ model GlossaryTerm {
   proposedAliases  String[]            @default([]) @map("proposed_aliases")
   entityType       GlossaryEntityType  @default(TERM) @map("entity_type")
   notes            String?             @db.Text
-  origin           AgentMemoryOrigin   @default(OPERATOR)
-  // The approval stamp: APPROVED <=> verifiedAt is set (SL1 R6).
-  verifiedAt       DateTime?           @map("verified_at")
-  verifiedBy       String?             @map("verified_by")
+  origin           GlossaryOrigin      @default(OPERATOR)
+  // The approval stamp: APPROVED <=> approvedAt is set (SL1 R6).
+  approvedAt       DateTime?           @map("approved_at")
+  approvedBy       String?             @map("approved_by")
   // Content hash of "term + aliases + codes + definition + notes" in the
   // shared embedding store (hidden aliases excluded, SL1 R7).
   embedContentHash String?             @map("embed_content_hash")
@@ -3220,6 +3222,24 @@ model GlossaryTerm {
   sourceIri     String?          @map("source_iri")
   packKey       String?          @map("pack_key")
 
+  // ── Entities (G5). Only ENTITY-kind terms use these. ──
+  // URN of the record that *is* this entity (a register entry, a customer
+  // master row). A source that declares an entity upserts it by this URN.
+  anchorUrn     String?   @map("anchor_urn")
+  // Free-form, from connectors or people. Never a typed schema (G5 §4).
+  attributes    Json?     @db.JsonB
+  // Mention counters, derived from entity_values ⋈ asset_correlation_values.
+  // Updated per run and fully recomputed nightly; never written by an edit.
+  mentionCount  Int       @default(0) @map("mention_count")
+  assetCount    Int       @default(0) @map("asset_count")
+  sourceCount   Int       @default(0) @map("source_count")
+  firstSeenAt   DateTime? @map("first_seen_at")
+  lastSeenAt    DateTime? @map("last_seen_at")
+  // A merged entity is DEPRECATED with `replacedById` (which already
+  // redirects); this stamp is what tells a merge from a plain deprecation.
+  mergedAt      DateTime? @map("merged_at")
+
+  values           EntityValue[]
   references       GlossaryReference[]
   scheme           GlossaryScheme?      @relation(fields: [schemeId], references: [id], onDelete: SetNull)
   replacedBy       GlossaryTerm?        @relation("GlossaryTermReplacedBy", fields: [replacedById], references: [id], onDelete: SetNull)
@@ -3237,7 +3257,101 @@ model GlossaryTerm {
   @@index([codes], type: Gin)
   @@index([previousKeys], type: Gin)
   @@index([sourceIri])
+  @@index([anchorUrn])
   @@map("glossary_terms")
+}
+
+// ── Entities (docs/prd/G5-entities.md) ───────────────────────────────────────
+
+enum EntityValueMethod {
+  // The entity's name or an alias, normalised under a name label.
+  EXACT_ALIAS
+  // A labelled identifier (IBAN, VAT number, e-mail) a person entered.
+  IDENTIFIER
+  // Declared by a source with the record it ingested.
+  CONNECTOR
+  // Candidates from the resolution worker.
+  PHONETIC
+  FUZZY
+  // A finding value a person promoted or confirmed by hand.
+  MANUAL
+}
+
+enum EntityValueVerdict {
+  CONFIRMED
+  PROPOSED
+  REJECTED
+}
+
+// One normalised value that refers (or may refer) to an entity. Mentions are
+// never stored per finding: they are the join
+//   entity_values (CONFIRMED) ⋈ asset_correlation_values ON value_hash
+// so a value confirmed once links every past and future finding that carries
+// it. A REJECTED row is the memory that stops a candidate being proposed again.
+//
+// This is also the one store of an entity's identifiers (method IDENTIFIER or
+// CONNECTOR, with `rawValue` as entered): a term's `codes` stay what SL1 made
+// them, unlabelled notations for lookup that never link anything.
+model EntityValue {
+  id              String             @id @default(uuid())
+  termId          String             @map("term_id")
+  // = asset_correlation_values.value_hash: sha256(label + ':' + normalizedValue).
+  valueHash       String             @map("value_hash") @db.VarChar(64)
+  label           String
+  normalizedValue String             @map("normalized_value") @db.Text
+  // As entered or as found, for display.
+  rawValue        String?            @map("raw_value") @db.Text
+  // Blocking keys for candidate generation, set on CONFIRMED name values:
+  // the value index's phonetic fingerprint, and the value with everything but
+  // letters and digits removed ("acme holding g.m.b.h." → "acmeholdinggmbh").
+  phoneticHash    String?            @map("phonetic_hash") @db.VarChar(64)
+  foldKey         String?            @map("fold_key")
+  method          EntityValueMethod
+  verdict         EntityValueVerdict
+  score           Float?
+  // The entity that already holds this identifier (R6). Set on a PROPOSED row:
+  // confirming it is a conflict review, never a silent double link.
+  conflictTermId  String?            @map("conflict_term_id")
+  // An agent's proposed verdict and its reason. Only a person decides (R22).
+  agentVerdict    String?            @map("agent_verdict")
+  agentNote       String?            @map("agent_note") @db.Text
+  decidedBy       String?            @map("decided_by")
+  decidedAt       DateTime?          @map("decided_at")
+  createdBy       String?            @map("created_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  term GlossaryTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@unique([termId, valueHash])
+  @@index([valueHash, verdict])
+  @@index([label, phoneticHash])
+  @@index([foldKey])
+  @@index([verdict, score(sort: Desc)])
+  @@map("entity_values")
+}
+
+// Singleton: the Entities feature switch (Settings → Cleanup › Features) and
+// which labels take part in resolution. A missing row means on with the
+// shipped labels, which is what a new workspace gets; the migration writes an
+// "off" row into workspaces that already had data.
+model EntityConfig {
+  id               Int       @id @default(1)
+  enabled          Boolean   @default(true)
+  // "kept" or "deleted" while off, null while on.
+  disabledMode     String?   @map("disabled_mode")
+  enabledChangedAt DateTime? @map("enabled_changed_at")
+  // Custom labels declared as names: { "<label>": "PERSON" | "ORGANIZATION" | "LOCATION" | "OTHER" }.
+  nameLabels       Json      @default("{}") @map("name_labels") @db.JsonB
+  // Labels treated as identifiers on top of the shipped set.
+  identifierLabels String[]  @default([]) @map("identifier_labels")
+  // The name labels alias values were last generated under. A run that brings
+  // a name label not listed here regenerates them, so a detector added later
+  // links exactly like the ones that were there first.
+  syncedLabels     String[]  @default([]) @map("synced_labels")
+  recountedAt      DateTime? @map("recounted_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("entity_config")
 }
 
 model GlossaryScheme {
@@ -3442,7 +3556,8 @@ enum SemanticLinkMethod {
   DECLARED
   MANUAL
   SUGGESTED
-  MENTION // G5′
+  // An entity's confirmed value occurs in the asset (G5).
+  MENTION
 }
 
 // The semantic lineage (F9): asset × term × method, never a row per finding

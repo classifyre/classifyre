@@ -1,22 +1,24 @@
 
-# VerifyGlossaryTermDto
+# GlossaryTermUsageDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`verifiedBy` | string
+`assets` | number
+`bindings` | number
 
 ## Example
 
 ```typescript
-import type { VerifyGlossaryTermDto } from '@workspace/api-client'
+import type { GlossaryTermUsageDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "verifiedBy": null,
-} satisfies VerifyGlossaryTermDto
+  "assets": null,
+  "bindings": null,
+} satisfies GlossaryTermUsageDto
 
 console.log(example)
 
@@ -25,7 +27,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as VerifyGlossaryTermDto
+const exampleParsed = JSON.parse(exampleJSON) as GlossaryTermUsageDto
 console.log(exampleParsed)
 ```
 

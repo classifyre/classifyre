@@ -140,7 +140,7 @@ export class SystemBriefService {
         ? await this.prisma.glossaryTerm.findMany({
             where: { kind: 'ENTITY', status: 'APPROVED' },
             orderBy: [
-              { verifiedAt: { sort: 'desc', nulls: 'last' } },
+              { approvedAt: { sort: 'desc', nulls: 'last' } },
               { updatedAt: 'desc' },
             ],
             take: cap - concepts.length,

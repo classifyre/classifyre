@@ -238,6 +238,22 @@ All URIs are relative to *http://localhost*
 *EmbeddingsApi* | [**embeddingControllerSimilar**](docs/EmbeddingsApi.md#embeddingcontrollersimilar) | **GET** /findings/{findingId}/similar | Find semantically similar findings with ranking evidence
 *EmbeddingsApi* | [**embeddingControllerStatus**](docs/EmbeddingsApi.md#embeddingcontrollerstatus) | **GET** /embeddings/status | Get semantic storage and search capability
 *EmbeddingsApi* | [**embeddingControllerUpdateSettings**](docs/EmbeddingsApi.md#embeddingcontrollerupdatesettings) | **PUT** /embeddings/settings | Change embedding configuration; redefining the vector space purges the corpus and re-embeds it
+*EntitiesApi* | [**entitiesControllerAddValue**](docs/EntitiesApi.md#entitiescontrolleraddvalue) | **POST** /entities/{idOrKey}/values | Add an identifier (or promote an indexed value). A value another entity holds becomes a conflict to review
+*EntitiesApi* | [**entitiesControllerCoMentions**](docs/EntitiesApi.md#entitiescontrollercomentions) | **GET** /entities/{idOrKey}/co-mentions | Entities that appear in the same assets
+*EntitiesApi* | [**entitiesControllerConfig**](docs/EntitiesApi.md#entitiescontrollerconfig) | **GET** /entities/config | The Entities switch and which labels take part in resolution (names, identifiers)
+*EntitiesApi* | [**entitiesControllerCreate**](docs/EntitiesApi.md#entitiescontrollercreate) | **POST** /entities | Create an entity, optionally from a finding or an indexed value (\&quot;Make entity\&quot;)
+*EntitiesApi* | [**entitiesControllerExport**](docs/EntitiesApi.md#entitiescontrollerexport) | **GET** /entities/{idOrKey}/export | Export mentions as CSV or JSON: \&quot;what do we hold about this person\&quot; (access request)
+*EntitiesApi* | [**entitiesControllerGet**](docs/EntitiesApi.md#entitiescontrollerget) | **GET** /entities/{idOrKey} | An entity: values and identifiers, live counters, anchor record, pending candidates
+*EntitiesApi* | [**entitiesControllerListCandidates**](docs/EntitiesApi.md#entitiescontrollerlistcandidates) | **GET** /entities/candidates | The entity review queue: proposed values with scores and up to 3 occurrences each
+*EntitiesApi* | [**entitiesControllerListMentions**](docs/EntitiesApi.md#entitiescontrollerlistmentions) | **GET** /entities/{idOrKey}/mentions | Mentions of an entity across all sources (keyset-paged)
+*EntitiesApi* | [**entitiesControllerMerge**](docs/EntitiesApi.md#entitiescontrollermerge) | **POST** /entities/{idOrKey}/merge | Merge this entity into another: values, references and watches move, and it redirects
+*EntitiesApi* | [**entitiesControllerOverview**](docs/EntitiesApi.md#entitiescontrolleroverview) | **GET** /entities/{idOrKey}/overview | Mentions over time, sources, and the entities most often mentioned with this one
+*EntitiesApi* | [**entitiesControllerRemoveValue**](docs/EntitiesApi.md#entitiescontrollerremovevalue) | **DELETE** /entities/values/{valueId} | Remove an identifier or a confirmed value
+*EntitiesApi* | [**entitiesControllerResolve**](docs/EntitiesApi.md#entitiescontrollerresolve) | **POST** /entities/resolve | Queue a full resolution pass: alias values, candidates over the whole index, counters
+*EntitiesApi* | [**entitiesControllerReview**](docs/EntitiesApi.md#entitiescontrollerreview) | **POST** /entities/candidates/review | Accept or reject candidates (batch). A rejection is remembered; a conflict can also be moved
+*EntitiesApi* | [**entitiesControllerSaveConfig**](docs/EntitiesApi.md#entitiescontrollersaveconfig) | **PUT** /entities/config | Declare custom labels as names or identifiers; alias values are regenerated
+*EntitiesApi* | [**entitiesControllerSearch**](docs/EntitiesApi.md#entitiescontrollersearch) | **GET** /entities | Search entities by name, alias or identifier value, with mention counters
+*EntitiesApi* | [**entitiesControllerUpdate**](docs/EntitiesApi.md#entitiescontrollerupdate) | **PATCH** /entities/{idOrKey} | Set an entity\&#39;s anchor URN or attributes
 *FindingsApi* | [**findingsControllerAssetSeverityCounts**](docs/FindingsApi.md#findingscontrollerassetseveritycounts) | **POST** /findings/assets/severity-counts | Unresolved finding counts per asset, for a set of assets
 *FindingsApi* | [**findingsControllerBulkUpdate**](docs/FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings
 *FindingsApi* | [**findingsControllerCancelBulkOperation**](docs/FindingsApi.md#findingscontrollercancelbulkoperation) | **POST** /findings/bulk-operations/{operationId}/cancel | Cancel a background bulk finding operation
@@ -254,13 +270,11 @@ All URIs are relative to *http://localhost*
 *GlossaryApi* | [**glossaryControllerActivity**](docs/GlossaryApi.md#glossarycontrolleractivity) | **GET** /glossary/terms/{idOrKey}/activity | A term\&#39;s history (paged)
 *GlossaryApi* | [**glossaryControllerApprove**](docs/GlossaryApi.md#glossarycontrollerapprove) | **POST** /glossary/{id}/approve | DRAFT → APPROVED
 *GlossaryApi* | [**glossaryControllerApproveRelation**](docs/GlossaryApi.md#glossarycontrollerapproverelation) | **POST** /glossary/relations/{id}/approve | 
-*GlossaryApi* | [**glossaryControllerBanner**](docs/GlossaryApi.md#glossarycontrollerbanner) | **GET** /glossary/banner | The one-time \&quot;we classified your terms\&quot; banner (SL1 R8)
 *GlossaryApi* | [**glossaryControllerBulkUpdate**](docs/GlossaryApi.md#glossarycontrollerbulkupdate) | **POST** /glossary/bulk | Bulk approve/unapprove/deprecate, retype, move scheme or change kind (operator)
 *GlossaryApi* | [**glossaryControllerCreateRelation**](docs/GlossaryApi.md#glossarycontrollercreaterelation) | **POST** /glossary/relations | Create a relation (APPROVED for operators)
 *GlossaryApi* | [**glossaryControllerCreateScheme**](docs/GlossaryApi.md#glossarycontrollercreatescheme) | **POST** /glossary/schemes | Create a scheme
 *GlossaryApi* | [**glossaryControllerDeleteScheme**](docs/GlossaryApi.md#glossarycontrollerdeletescheme) | **DELETE** /glossary/schemes/{id} | Delete an empty scheme
 *GlossaryApi* | [**glossaryControllerDeprecate**](docs/GlossaryApi.md#glossarycontrollerdeprecate) | **POST** /glossary/{id}/deprecate | APPROVED → DEPRECATED, optionally with a successor
-*GlossaryApi* | [**glossaryControllerDismissBanner**](docs/GlossaryApi.md#glossarycontrollerdismissbanner) | **POST** /glossary/banner/dismiss | Dismiss the classification banner
 *GlossaryApi* | [**glossaryControllerExport**](docs/GlossaryApi.md#glossarycontrollerexport) | **GET** /glossary/export | Export as CSV or SKOS JSON-LD
 *GlossaryApi* | [**glossaryControllerGetScheme**](docs/GlossaryApi.md#glossarycontrollergetscheme) | **GET** /glossary/schemes/{id} | 
 *GlossaryApi* | [**glossaryControllerGetTerm**](docs/GlossaryApi.md#glossarycontrollergetterm) | **GET** /glossary/terms/{idOrKey} | A term by id or key (old keys resolve): scheme, relations, broader chain, narrower list
@@ -277,7 +291,6 @@ All URIs are relative to *http://localhost*
 *GlossaryApi* | [**glossaryControllerUnapprove**](docs/GlossaryApi.md#glossarycontrollerunapprove) | **POST** /glossary/{id}/unapprove | APPROVED → DRAFT
 *GlossaryApi* | [**glossaryControllerUpdateScheme**](docs/GlossaryApi.md#glossarycontrollerupdatescheme) | **PATCH** /glossary/schemes/{id} | Edit a scheme
 *GlossaryApi* | [**glossaryControllerUpsert**](docs/GlossaryApi.md#glossarycontrollerupsert) | **POST** /glossary | Create or update a glossary term (operator)
-*GlossaryApi* | [**glossaryControllerVerify**](docs/GlossaryApi.md#glossarycontrollerverify) | **PATCH** /glossary/{id}/verify | Approve a term (alias of /approve)
 *GlossaryApi* | [**glossarySemanticControllerCounts**](docs/GlossaryApi.md#glossarysemanticcontrollercounts) | **GET** /glossary/proposals/counts | Pending proposals by kind, for the badge
 *GlossaryApi* | [**glossarySemanticControllerDecide**](docs/GlossaryApi.md#glossarysemanticcontrollerdecide) | **POST** /glossary/proposals/decide | Accept, edit and accept, dismiss, dismiss forever or skip one proposal
 *GlossaryApi* | [**glossarySemanticControllerDecideBulk**](docs/GlossaryApi.md#glossarysemanticcontrollerdecidebulk) | **POST** /glossary/proposals/decide-bulk | Bulk accept or dismiss a group of document (LINK) suggestions
@@ -694,10 +707,12 @@ All URIs are relative to *http://localhost*
 - [GenerateCaseLeadsResponseDto](docs/GenerateCaseLeadsResponseDto.md)
 - [GlossaryImportDto](docs/GlossaryImportDto.md)
 - [GlossaryListResponseDto](docs/GlossaryListResponseDto.md)
+- [GlossaryListedTermDto](docs/GlossaryListedTermDto.md)
 - [GlossaryLookupHitDto](docs/GlossaryLookupHitDto.md)
 - [GlossarySchemeDto](docs/GlossarySchemeDto.md)
 - [GlossarySchemeRefDto](docs/GlossarySchemeRefDto.md)
 - [GlossaryTermDto](docs/GlossaryTermDto.md)
+- [GlossaryTermUsageDto](docs/GlossaryTermUsageDto.md)
 - [GraphEdgeDto](docs/GraphEdgeDto.md)
 - [GraphNodeDto](docs/GraphNodeDto.md)
 - [GraphResponseDto](docs/GraphResponseDto.md)
@@ -957,7 +972,6 @@ All URIs are relative to *http://localhost*
 - [UpsertGlossaryTermResponseDto](docs/UpsertGlossaryTermResponseDto.md)
 - [ValueOccurrenceAssetDto](docs/ValueOccurrenceAssetDto.md)
 - [ValueOccurrencesResponseDto](docs/ValueOccurrencesResponseDto.md)
-- [VerifyGlossaryTermDto](docs/VerifyGlossaryTermDto.md)
 - [WakeSupervisorDto](docs/WakeSupervisorDto.md)
 - [WorkerOverviewDto](docs/WorkerOverviewDto.md)
 - [WorkerQueueDto](docs/WorkerQueueDto.md)

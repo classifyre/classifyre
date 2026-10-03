@@ -38,6 +38,7 @@ import {
   CorrelationReviewIndexService,
   type ReviewIndexStats,
 } from './review/correlation-review-index.service';
+import { EntitySwitchService } from '../entities/entity-switch.service';
 import {
   hashSet,
   jaroWinkler,
@@ -121,6 +122,17 @@ export interface PairScore {
   sharedByLabel: Record<string, number>;
   exact: boolean;
 }
+
+/** What an index-only pass did (G5 R9): no pairs, no clusters. */
+export interface ValueIndexSummary {
+  assetsProcessed: number;
+  valuesIndexed: number;
+}
+
+const EMPTY_INDEX_SUMMARY: ValueIndexSummary = {
+  assetsProcessed: 0,
+  valuesIndexed: 0,
+};
 
 export interface CorrelationRunSummary {
   assetsProcessed: number;
@@ -339,6 +351,7 @@ export class CorrelationService {
     // Optional and last: the specs construct this service positionally, and
     // an absent switch reads as "on", which is every workspace's default.
     @Optional() private readonly featureSwitch?: CorrelationSwitchService,
+    @Optional() private readonly entitySwitch?: EntitySwitchService,
   ) {
     this.batches = computeCorrelationBatchSizes();
     this.logger.log(
@@ -493,6 +506,112 @@ export class CorrelationService {
       clustersTouched,
       topMatch,
     };
+  }
+
+  // ── Value index only (G5 R9) ────────────────────────────────────────────────
+  //
+  // The value index has two readers: duplicate detection scores pairs over it,
+  // and entities join their confirmed values against it. The entry points
+  // above index AND score, and stay gated by the duplicates switch exactly as
+  // before. These index only, for a workspace where duplicate detection is off
+  // and entities are on: same fingerprints, same exclusions, same lock — and
+  // no pairs, clusters or review index.
+
+  /** Whether anything reads the value index right now. */
+  async valueIndexWanted(): Promise<boolean> {
+    if (!this.featureSwitch || (await this.featureSwitch.isEnabled())) {
+      return true;
+    }
+    return this.entitySwitch ? this.entitySwitch.isEnabled() : false;
+  }
+
+  /** Index the values of every asset a completed runner touched. */
+  async indexValuesForRunner(
+    runnerId: string,
+    onProgress?: ProgressFn,
+  ): Promise<ValueIndexSummary> {
+    if (!(await this.valueIndexWanted())) return EMPTY_INDEX_SUMMARY;
+    const touched = await this.prisma.asset.findMany({
+      where: { runnerId },
+      select: { id: true },
+    });
+    return this.runRecompute(() =>
+      this.indexAssets(
+        touched.map((a) => a.id),
+        onProgress,
+      ),
+    );
+  }
+
+  async indexValuesForAssets(assetIds: string[]): Promise<ValueIndexSummary> {
+    await this.pause?.assertNotPaused();
+    if (!(await this.valueIndexWanted())) return EMPTY_INDEX_SUMMARY;
+    const unique = [...new Set(assetIds)].filter(Boolean);
+    return this.runRecompute(() => this.indexAssets(unique));
+  }
+
+  /**
+   * Rebuild the whole value index, paged like {@link recomputeAll}. Stops
+   * between pages once nothing reads the index any more.
+   */
+  async indexAllValues(onProgress?: ProgressFn): Promise<ValueIndexSummary> {
+    await this.pause?.assertNotPaused();
+    if (!(await this.valueIndexWanted())) return EMPTY_INDEX_SUMMARY;
+    return this.runRecompute(async () => {
+      const cfg = await this.loadConfig();
+      const total = await this.prisma.asset.count();
+      let valuesIndexed = 0;
+      let processed = 0;
+      const PAGE = 200;
+      let cursor: string | undefined;
+      for (;;) {
+        const rows = await this.prisma.asset.findMany({
+          select: { id: true },
+          orderBy: { id: 'asc' },
+          take: PAGE,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
+        if (rows.length === 0) break;
+        for (const r of rows) {
+          valuesIndexed += await this.rebuildAssetValues(r.id, cfg);
+          await yieldToGC();
+        }
+        processed += rows.length;
+        if (onProgress)
+          await onProgress(
+            `Indexed ${processed}/${total} assets (${valuesIndexed} values).`,
+            { processed, total, valuesIndexed },
+          );
+        cursor = rows.at(-1)!.id;
+        if (rows.length < PAGE) break;
+        if (!(await this.valueIndexWanted())) break;
+      }
+      return { assetsProcessed: processed, valuesIndexed };
+    });
+  }
+
+  /** The indexing half of a recompute: fingerprints for each asset. */
+  private async indexAssets(
+    assetIds: string[],
+    onProgress?: ProgressFn,
+    cfg?: ResolvedConfig,
+  ): Promise<ValueIndexSummary> {
+    if (assetIds.length === 0) return EMPTY_INDEX_SUMMARY;
+    // Load the (DB-backed, dynamic) tuning once per pass.
+    const resolved = cfg ?? (await this.loadConfig());
+    // Skip any values matched by exclusion rules. Yield to GC after every
+    // asset so long scans don't accumulate unreachable objects in the heap.
+    let valuesIndexed = 0;
+    for (let i = 0; i < assetIds.length; i++) {
+      valuesIndexed += await this.rebuildAssetValues(assetIds[i], resolved);
+      await yieldToGC(); // after every asset so GC can reclaim large finding arrays
+      if (i > 0 && i % 50 === 0 && onProgress)
+        await onProgress(
+          `Fingerprinted ${i + 1}/${assetIds.length} assets (${valuesIndexed} values so far)…`,
+          { processed: i + 1, total: assetIds.length, valuesIndexed },
+        );
+    }
+    return { assetsProcessed: assetIds.length, valuesIndexed };
   }
 
   // ── Tuning config (DB-backed, dynamic labels) ───────────────────────────────
@@ -829,19 +948,13 @@ export class CorrelationService {
     // Load the (DB-backed, dynamic) tuning once per recompute.
     const cfg = await this.loadConfig();
 
-    // 1. Rebuild fingerprints (reverse-index rows + signature) for each asset,
-    //    skipping any values matched by exclusion rules. Yield to GC every 50
-    //    assets so long scans don't accumulate unreachable objects in the heap.
-    let valuesIndexed = 0;
-    for (let i = 0; i < touchedIds.length; i++) {
-      valuesIndexed += await this.rebuildAssetValues(touchedIds[i], cfg);
-      await yieldToGC(); // after every asset so GC can reclaim large finding arrays
-      if (i > 0 && i % 50 === 0 && onProgress)
-        await onProgress(
-          `Fingerprinted ${i + 1}/${touchedIds.length} assets (${valuesIndexed} values so far)…`,
-          { processed: i + 1, total: touchedIds.length, valuesIndexed },
-        );
-    }
+    // 1. Rebuild fingerprints (reverse-index rows + signature) for each asset.
+    //    This half is the shared value index (G5 R9); see indexAssets.
+    const { valuesIndexed } = await this.indexAssets(
+      touchedIds,
+      onProgress,
+      cfg,
+    );
 
     if (onProgress)
       await onProgress('Scoring pairs…', {
@@ -927,11 +1040,21 @@ export class CorrelationService {
 
   // ── Fingerprints ──────────────────────────────────────────────────────────
 
-  /** Keys of the code detectors (pipeline type CODE_DETECTOR). A small table. */
-  private codeDetectorKeysCache: { at: number; keys: Set<string> } | null =
-    null;
+  /**
+   * Keys and ids of the code detectors (pipeline type CODE_DETECTOR). A small
+   * table. Both, because a finding names its detector by id and by key, and a
+   * renamed detector keeps its id while its old key leaves the live set.
+   */
+  private codeDetectorKeysCache: {
+    at: number;
+    keys: Set<string>;
+    ids: Set<string>;
+  } | null = null;
 
-  private async codeDetectorKeys(): Promise<Set<string>> {
+  private async codeDetectors(): Promise<{
+    keys: Set<string>;
+    ids: Set<string>;
+  }> {
     // One query per recompute run, not per asset: the set changes only when a
     // detector is created/renamed/deleted, so a 60s TTL is plenty and turns
     // N asset rebuilds from N queries into one.
@@ -940,15 +1063,19 @@ export class CorrelationService {
       this.codeDetectorKeysCache &&
       now - this.codeDetectorKeysCache.at < 60_000
     ) {
-      return this.codeDetectorKeysCache.keys;
+      return this.codeDetectorKeysCache;
     }
-    const rows = await this.prisma.$queryRaw<Array<{ key: string }>>`
-      SELECT key FROM custom_detectors
+    const rows = await this.prisma.$queryRaw<
+      Array<{ id: string; key: string }>
+    >`
+      SELECT id, key FROM custom_detectors
       WHERE pipeline_schema->>'type' = 'CODE_DETECTOR'
     `;
-    const keys = new Set(Array.isArray(rows) ? rows.map((row) => row.key) : []);
-    this.codeDetectorKeysCache = { at: now, keys };
-    return keys;
+    const list = Array.isArray(rows) ? rows : [];
+    const keys = new Set(list.map((row) => row.key));
+    const ids = new Set(list.map((row) => row.id));
+    this.codeDetectorKeysCache = { at: now, keys, ids };
+    return { keys, ids };
   }
 
   /** Rebuild an asset's correlation values + signature from its findings. */
@@ -981,7 +1108,7 @@ export class CorrelationService {
     // normalized value they declare (contract C2). Their matched text is a
     // verdict like "total 523 != 520", and indexing it is how templated values
     // correlated thousands of unrelated assets (GENESIS field report P6).
-    const codeDetectorKeys = await this.codeDetectorKeys();
+    const codeDetectors = await this.codeDetectors();
     const codeFindingIds: string[] = [];
     let idCursor: string | null = null;
     for (;;) {
@@ -1016,14 +1143,20 @@ export class CorrelationService {
       });
       if (!batch.length) break;
       for (const f of batch) {
-        // A finding that carries a code-detector id (or a code-detector key
-        // the live set still knows) enters the index only through its
-        // declared normalized_value (contract C2). Matching on the id as
-        // well as the key keeps a renamed detector out of the P6 fallback:
-        // its key misses the live set, but its id still proves it is code.
+        // A finding of a code detector — known by its id or by its key —
+        // enters the index only through its declared normalized_value
+        // (contract C2). Matching on the id as well as the key keeps a renamed
+        // detector out of the P6 fallback: its key misses the live set, but
+        // its id still proves it is code.
+        //
+        // Every other custom detector (REGEX, GLiNER, a classifier) is indexed
+        // by its matched text like a built-in. Testing only "has a custom
+        // detector id" here — which every custom finding does — kept all of
+        // them out of the index, so a regex-found VAT number or a GLiNER
+        // organisation could neither pair two documents nor mention an entity.
         if (
-          f.customDetectorId ||
-          (f.customDetectorKey && codeDetectorKeys.has(f.customDetectorKey))
+          (f.customDetectorId && codeDetectors.ids.has(f.customDetectorId)) ||
+          (f.customDetectorKey && codeDetectors.keys.has(f.customDetectorKey))
         ) {
           codeFindingIds.push(f.id);
           continue;

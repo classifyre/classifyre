@@ -31,10 +31,14 @@ export class SemanticEventsListener {
 
   private install(): void {
     glossaryEvents.on('glossary.binding_changed', async (event) => {
-      await this.scheduler.scheduleBackfill({
-        bindingIds: [event.bindingId],
-        reason: `binding ${event.change}`,
-      });
+      // A binding created APPROVED emits `approved` right after; one created
+      // as a DRAFT links nothing. Either way `created` needs no walk.
+      if (event.change !== 'created') {
+        await this.scheduler.scheduleBackfill({
+          bindingIds: [event.bindingId],
+          reason: `binding ${event.change}`,
+        });
+      }
       await this.scheduler.scheduleMapRebuild('binding changed');
       await this.scheduler.scheduleSuggestions({
         generators: ['binding'],
@@ -49,7 +53,7 @@ export class SemanticEventsListener {
         'deprecated',
         'reinstated',
       ].includes(event.change);
-      if (statusChange || (event.change === 'updated' && event.labelsChanged)) {
+      if (statusChange || event.linkingChanged) {
         await this.scheduler.scheduleBackfill({
           termIds: [event.termId],
           reason: `term ${event.key} ${event.change}`,

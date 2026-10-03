@@ -17,7 +17,9 @@ import {
 import {
   CORRELATION_QUEUE,
   SCAN_HANDOFF_QUEUE,
+  VALUES_INDEX_QUEUE,
   scanHandoffJobOptions,
+  valuesIndexJobOptions,
 } from './correlation.constants';
 import { CORRELATION_RELATION_TYPES } from './correlation.service';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
@@ -27,16 +29,21 @@ import {
   type CorrelationJobPayload,
 } from './correlation-job-scheduler.service';
 import { CorrelationService } from './correlation.service';
+import { EntitySwitchService } from '../entities/entity-switch.service';
+import { EntityResolutionService } from '../entities/entity-resolution.service';
 
 /**
  * Consumes CORRELATION_QUEUE jobs (enqueued by the cli-runner when a scan
  * finishes). For each job it runs the deterministic DUPLICATES FINDER AGENT,
- * then hands off to the autopilot cycle — guaranteeing the duplicate/cluster
- * results exist before the inquiry/case agents run.
+ * resolves entities against the freshly indexed values, then hands off to the
+ * autopilot cycle — guaranteeing the duplicate/cluster results and the
+ * mentions exist before the inquiry/case agents run (G5 R11).
  *
- * Also consumes SCAN_HANDOFF_QUEUE: the same hand-off without the duplicate
- * check, used while duplicate detection is turned off (CORRELATION_QUEUE is
- * then held paused, and the agents must not stop with it).
+ * Also consumes VALUES_INDEX_QUEUE: the value index alone, then entities and
+ * the hand-off, used while duplicate detection is off and entities are on
+ * (G5 R9). And SCAN_HANDOFF_QUEUE: the hand-off with neither, used while both
+ * are off (CORRELATION_QUEUE is then held paused, and the agents must not
+ * stop with it).
  */
 @Injectable()
 export class CorrelationWorker {
@@ -51,10 +58,16 @@ export class CorrelationWorker {
     private readonly jobs: CorrelationJobScheduler,
     @Optional() private readonly pause?: NamespacePauseService,
     @Optional() private readonly featureSwitch?: CorrelationSwitchService,
+    @Optional() private readonly entitySwitch?: EntitySwitchService,
+    @Optional() private readonly entities?: EntityResolutionService,
   ) {}
 
   private async duplicatesEnabled(): Promise<boolean> {
     return this.featureSwitch ? this.featureSwitch.isEnabled() : true;
+  }
+
+  private async entitiesEnabled(): Promise<boolean> {
+    return this.entitySwitch ? this.entitySwitch.isEnabled() : false;
   }
 
   /**
@@ -69,6 +82,12 @@ export class CorrelationWorker {
     await this.pgBoss.work(CORRELATION_QUEUE, { localConcurrency: 1 }, (jobs) =>
       this.handle(jobs as Job[]),
     );
+    await boss.createQueue(VALUES_INDEX_QUEUE);
+    await this.pgBoss.work(
+      VALUES_INDEX_QUEUE,
+      { localConcurrency: 1 },
+      (jobs) => this.handleIndex(jobs as Job[]),
+    );
     await boss.createQueue(SCAN_HANDOFF_QUEUE);
     await this.pgBoss.work(
       SCAN_HANDOFF_QUEUE,
@@ -76,7 +95,7 @@ export class CorrelationWorker {
       (jobs) => this.handleHandoff(jobs as Job[]),
     );
     this.logger.log(
-      `Registered workers for queues ${CORRELATION_QUEUE}, ${SCAN_HANDOFF_QUEUE}`,
+      `Registered workers for queues ${CORRELATION_QUEUE}, ${VALUES_INDEX_QUEUE}, ${SCAN_HANDOFF_QUEUE}`,
     );
     // A namespace scanned before the review queue existed has all the
     // correlation data and none of the rollups, so its queue would read empty
@@ -151,27 +170,24 @@ export class CorrelationWorker {
     }
     // Normally unreachable while the switch is off — the queue is held
     // paused — but a batch fetched in the instant before the hold landed
-    // still arrives. It gets the hand-off and nothing else; the recompute that
-    // runs when the switch comes back on covers the duplicate check.
+    // still arrives. It is treated as the index-only job it would have been
+    // (which is the hand-off alone when entities are off too); the recompute
+    // that runs when the switch comes back on covers the duplicate check.
     const enabled = await this.duplicatesEnabled();
     for (const job of jobs) {
       const data = job.data as CorrelationJobPayload;
       if (!enabled) {
-        if (data?.sourceId && data?.runnerId) {
-          await this.handOffToAutopilot(
-            data.sourceId,
-            data.runnerId,
-            `scan:${data.sourceId}:${data.runnerId}`,
-          );
-        }
+        await this.indexOnly(data);
         continue;
       }
       if (data?.recomputeAll) {
         await this.duplicatesFinder.runForConfigChange();
+        await this.entities?.scheduleResolveAll('value index rebuilt');
         continue;
       }
       if (data?.assetIds?.length) {
         await this.correlationService.recomputeForAssets(data.assetIds);
+        await this.entities?.afterAssetsIndexed(data.assetIds);
         continue;
       }
       if (!data?.sourceId || !data?.runnerId) continue;
@@ -179,6 +195,83 @@ export class CorrelationWorker {
       // be dequeued by its own namespace's worker, so no cross-namespace guard
       // is needed here anymore.
       await this.process(data.sourceId, data.runnerId);
+    }
+  }
+
+  /**
+   * VALUES_INDEX_QUEUE: keep the value index fresh for entities while
+   * duplicate detection is off (G5 R9).
+   */
+  private async handleIndex(jobs: Job[]): Promise<void> {
+    if (await this.pause?.isPaused()) {
+      this.logger.debug('Workspace paused — skipping value-index job(s)');
+      return;
+    }
+    for (const job of jobs) {
+      await this.indexOnly(job.data as CorrelationJobPayload);
+    }
+  }
+
+  /**
+   * One payload's worth of indexing without scoring, then entities, then the
+   * hand-off. With entities off as well nothing is indexed and a scan gets its
+   * hand-off alone, so a job that outlived both switches still ends cleanly.
+   */
+  private async indexOnly(data: CorrelationJobPayload): Promise<void> {
+    const wanted = await this.entitiesEnabled();
+    if (data?.recomputeAll) {
+      if (!wanted) return;
+      const summary = await this.correlationService.indexAllValues();
+      this.logger.log(
+        `Value index rebuilt: ${summary.assetsProcessed} asset(s), ${summary.valuesIndexed} value(s).`,
+      );
+      await this.entities?.scheduleResolveAll('value index rebuilt');
+      return;
+    }
+    if (data?.assetIds?.length) {
+      if (!wanted) return;
+      await this.correlationService.indexValuesForAssets(data.assetIds);
+      await this.entities?.afterAssetsIndexed(data.assetIds);
+      return;
+    }
+    if (!data?.sourceId || !data?.runnerId) return;
+    try {
+      if (wanted) {
+        await this.correlationService.indexValuesForRunner(data.runnerId);
+        await this.resolveEntities(data.sourceId, data.runnerId);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Value indexing failed for run ${data.runnerId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    } finally {
+      await this.handOffToAutopilot(
+        data.sourceId,
+        data.runnerId,
+        `scan:${data.sourceId}:${data.runnerId}`,
+      );
+    }
+  }
+
+  /**
+   * Entity resolution for a run whose values are indexed. Never fails the job:
+   * mentions are derived, and the nightly recount repairs a missed pass.
+   */
+  private async resolveEntities(
+    sourceId: string,
+    runnerId: string,
+  ): Promise<void> {
+    if (!this.entities) return;
+    try {
+      await this.entities.afterRunIndexed({ sourceId, runnerId });
+    } catch (error) {
+      this.logger.warn(
+        `Entity resolution failed for run ${runnerId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
 
@@ -204,13 +297,19 @@ export class CorrelationWorker {
    * switched-off duplicate detection.
    *
    * Per-scan jobs carry the scan's autopilot hand-off, so each becomes a
-   * SCAN_HANDOFF_QUEUE job — the agents still hear about every scan. Recompute
-   * jobs are dropped: turning the switch back on schedules one full recompute
-   * that covers all of them. Fetched and completed through pg-boss rather than
-   * deleted by SQL, so a job a worker is running right now is never touched.
+   * SCAN_HANDOFF_QUEUE job — the agents still hear about every scan. While
+   * entities are on they become VALUES_INDEX_QUEUE jobs instead, which index
+   * the scan's values before the same hand-off (G5 R9). Recompute jobs are
+   * dropped: turning the switch back on schedules one full recompute that
+   * covers all of them, and the value index of an asset edited in between is
+   * repaired by its next scan. Fetched and completed through pg-boss rather
+   * than deleted by SQL, so a job a worker is running right now is never
+   * touched.
    */
   async drainToHandoff(): Promise<{ handedOff: number; dropped: number }> {
     const boss = await this.pgBoss.getBossAsync();
+    const indexing = await this.entitiesEnabled();
+    if (indexing) await boss.createQueue(VALUES_INDEX_QUEUE);
     let handedOff = 0;
     let dropped = 0;
     for (;;) {
@@ -222,9 +321,11 @@ export class CorrelationWorker {
         const data = job.data;
         if (data?.sourceId && data?.runnerId) {
           await boss.send(
-            SCAN_HANDOFF_QUEUE,
+            indexing ? VALUES_INDEX_QUEUE : SCAN_HANDOFF_QUEUE,
             { sourceId: data.sourceId, runnerId: data.runnerId },
-            scanHandoffJobOptions(data.sourceId),
+            indexing
+              ? valuesIndexJobOptions(data.sourceId)
+              : scanHandoffJobOptions(data.sourceId),
           );
           handedOff += 1;
         } else {
@@ -257,6 +358,9 @@ export class CorrelationWorker {
         cycleKey,
         sourceName,
       });
+      // The finder has just indexed the run's values; mentions and candidates
+      // follow from them, before the agents are told about the scan (R11).
+      await this.resolveEntities(sourceId, runnerId);
     } finally {
       // Always hand off to the autopilot, even if correlation failed — the AI
       // agents are independently valuable.

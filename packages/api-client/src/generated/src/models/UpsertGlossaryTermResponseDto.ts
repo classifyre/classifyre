@@ -82,7 +82,7 @@ export interface UpsertGlossaryTermResponseDto {
      */
     hiddenAliases: Array<string>;
     /**
-     * Unverified aliases suggested by agents for operator review
+     * Aliases suggested by agents, waiting for an operator
      * @type {Array<string>}
      * @memberof UpsertGlossaryTermResponseDto
      */
@@ -154,17 +154,11 @@ export interface UpsertGlossaryTermResponseDto {
      */
     origin: string;
     /**
-     * True when APPROVED (kept for compatibility).
-     * @type {boolean}
-     * @memberof UpsertGlossaryTermResponseDto
-     */
-    verified: boolean;
-    /**
      * 
      * @type {string}
      * @memberof UpsertGlossaryTermResponseDto
      */
-    verifiedBy?: string | null;
+    approvedBy?: string | null;
     /**
      * 
      * @type {Date}
@@ -183,6 +177,54 @@ export interface UpsertGlossaryTermResponseDto {
      * @memberof UpsertGlossaryTermResponseDto
      */
     updatedAt: Date;
+    /**
+     * Entities: URN of the record that is this entity (a register entry).
+     * @type {string}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    anchorUrn?: string | null;
+    /**
+     * Entities: free-form attributes from connectors or people.
+     * @type {object}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    attributes?: object | null;
+    /**
+     * Entities: occurrences of a confirmed value in the value index (asset × value).
+     * @type {number}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    mentionCount: number;
+    /**
+     * Entities: distinct assets that mention it.
+     * @type {number}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    assetCount: number;
+    /**
+     * Entities: distinct sources that mention it.
+     * @type {number}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    sourceCount: number;
+    /**
+     * 
+     * @type {Date}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    firstSeenAt?: Date | null;
+    /**
+     * 
+     * @type {Date}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    lastSeenAt?: Date | null;
+    /**
+     * Entities: set when this entity was merged into `replacedById`.
+     * @type {Date}
+     * @memberof UpsertGlossaryTermResponseDto
+     */
+    mergedAt?: Date | null;
     /**
      * True when an agent alias proposal was stored for an operator-owned term
      * @type {boolean}
@@ -241,9 +283,11 @@ export function instanceOfUpsertGlossaryTermResponseDto(value: object): value is
     if (!('proposedAliases' in value) || value['proposedAliases'] === undefined) return false;
     if (!('entityType' in value) || value['entityType'] === undefined) return false;
     if (!('origin' in value) || value['origin'] === undefined) return false;
-    if (!('verified' in value) || value['verified'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
+    if (!('mentionCount' in value) || value['mentionCount'] === undefined) return false;
+    if (!('assetCount' in value) || value['assetCount'] === undefined) return false;
+    if (!('sourceCount' in value) || value['sourceCount'] === undefined) return false;
     return true;
 }
 
@@ -278,11 +322,18 @@ export function UpsertGlossaryTermResponseDtoFromJSONTyped(json: any, ignoreDisc
         'sourceIri': json['sourceIri'] == null ? undefined : json['sourceIri'],
         'packKey': json['packKey'] == null ? undefined : json['packKey'],
         'origin': json['origin'],
-        'verified': json['verified'],
-        'verifiedBy': json['verifiedBy'] == null ? undefined : json['verifiedBy'],
+        'approvedBy': json['approvedBy'] == null ? undefined : json['approvedBy'],
         'approvedAt': json['approvedAt'] == null ? undefined : (new Date(json['approvedAt'])),
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
+        'anchorUrn': json['anchorUrn'] == null ? undefined : json['anchorUrn'],
+        'attributes': json['attributes'] == null ? undefined : json['attributes'],
+        'mentionCount': json['mentionCount'],
+        'assetCount': json['assetCount'],
+        'sourceCount': json['sourceCount'],
+        'firstSeenAt': json['firstSeenAt'] == null ? undefined : (new Date(json['firstSeenAt'])),
+        'lastSeenAt': json['lastSeenAt'] == null ? undefined : (new Date(json['lastSeenAt'])),
+        'mergedAt': json['mergedAt'] == null ? undefined : (new Date(json['mergedAt'])),
         'merged': json['merged'] == null ? undefined : json['merged'],
     };
 }
@@ -319,11 +370,18 @@ export function UpsertGlossaryTermResponseDtoToJSONTyped(value?: UpsertGlossaryT
         'sourceIri': value['sourceIri'],
         'packKey': value['packKey'],
         'origin': value['origin'],
-        'verified': value['verified'],
-        'verifiedBy': value['verifiedBy'],
+        'approvedBy': value['approvedBy'],
         'approvedAt': value['approvedAt'] == null ? value['approvedAt'] : value['approvedAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
+        'anchorUrn': value['anchorUrn'],
+        'attributes': value['attributes'],
+        'mentionCount': value['mentionCount'],
+        'assetCount': value['assetCount'],
+        'sourceCount': value['sourceCount'],
+        'firstSeenAt': value['firstSeenAt'] == null ? value['firstSeenAt'] : value['firstSeenAt'].toISOString(),
+        'lastSeenAt': value['lastSeenAt'] == null ? value['lastSeenAt'] : value['lastSeenAt'].toISOString(),
+        'mergedAt': value['mergedAt'] == null ? value['mergedAt'] : value['mergedAt'].toISOString(),
         'merged': value['merged'],
     };
 }

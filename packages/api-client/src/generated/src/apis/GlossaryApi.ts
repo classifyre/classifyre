@@ -28,7 +28,6 @@ import type {
   UpsertGlossarySchemeDto,
   UpsertGlossaryTermDto,
   UpsertGlossaryTermResponseDto,
-  VerifyGlossaryTermDto,
 } from '../models/index';
 import {
     BulkUpdateGlossaryTermsDtoFromJSON,
@@ -57,8 +56,6 @@ import {
     UpsertGlossaryTermDtoToJSON,
     UpsertGlossaryTermResponseDtoFromJSON,
     UpsertGlossaryTermResponseDtoToJSON,
-    VerifyGlossaryTermDtoFromJSON,
-    VerifyGlossaryTermDtoToJSON,
 } from '../models/index';
 
 export interface GlossaryControllerActivityRequest {
@@ -176,11 +173,6 @@ export interface GlossaryControllerUpdateSchemeRequest {
 
 export interface GlossaryControllerUpsertRequest {
     upsertGlossaryTermDto: UpsertGlossaryTermDto;
-}
-
-export interface GlossaryControllerVerifyRequest {
-    id: string;
-    verifyGlossaryTermDto: VerifyGlossaryTermDto;
 }
 
 export interface GlossarySemanticControllerFindInTextCreateRequest {
@@ -341,34 +333,6 @@ export class GlossaryApi extends runtime.BaseAPI {
      */
     async glossaryControllerApproveRelation(requestParameters: GlossaryControllerApproveRelationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.glossaryControllerApproveRelationRaw(requestParameters, initOverrides);
-    }
-
-    /**
-     * The one-time \"we classified your terms\" banner (SL1 R8)
-     */
-    async glossaryControllerBannerRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/glossary/banner`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.VoidApiResponse(response);
-    }
-
-    /**
-     * The one-time \"we classified your terms\" banner (SL1 R8)
-     */
-    async glossaryControllerBanner(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.glossaryControllerBannerRaw(initOverrides);
     }
 
     /**
@@ -568,34 +532,6 @@ export class GlossaryApi extends runtime.BaseAPI {
     async glossaryControllerDeprecate(requestParameters: GlossaryControllerDeprecateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GlossaryTermDto> {
         const response = await this.glossaryControllerDeprecateRaw(requestParameters, initOverrides);
         return await response.value();
-    }
-
-    /**
-     * Dismiss the classification banner
-     */
-    async glossaryControllerDismissBannerRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/glossary/banner/dismiss`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'POST',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.VoidApiResponse(response);
-    }
-
-    /**
-     * Dismiss the classification banner
-     */
-    async glossaryControllerDismissBanner(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.glossaryControllerDismissBannerRaw(initOverrides);
     }
 
     /**
@@ -1320,53 +1256,6 @@ export class GlossaryApi extends runtime.BaseAPI {
      */
     async glossaryControllerUpsert(requestParameters: GlossaryControllerUpsertRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UpsertGlossaryTermResponseDto> {
         const response = await this.glossaryControllerUpsertRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Approve a term (alias of /approve)
-     */
-    async glossaryControllerVerifyRaw(requestParameters: GlossaryControllerVerifyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GlossaryTermDto>> {
-        if (requestParameters['id'] == null) {
-            throw new runtime.RequiredError(
-                'id',
-                'Required parameter "id" was null or undefined when calling glossaryControllerVerify().'
-            );
-        }
-
-        if (requestParameters['verifyGlossaryTermDto'] == null) {
-            throw new runtime.RequiredError(
-                'verifyGlossaryTermDto',
-                'Required parameter "verifyGlossaryTermDto" was null or undefined when calling glossaryControllerVerify().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        headerParameters['Content-Type'] = 'application/json';
-
-
-        let urlPath = `/glossary/{id}/verify`;
-        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'PATCH',
-            headers: headerParameters,
-            query: queryParameters,
-            body: VerifyGlossaryTermDtoToJSON(requestParameters['verifyGlossaryTermDto']),
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => GlossaryTermDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * Approve a term (alias of /approve)
-     */
-    async glossaryControllerVerify(requestParameters: GlossaryControllerVerifyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GlossaryTermDto> {
-        const response = await this.glossaryControllerVerifyRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

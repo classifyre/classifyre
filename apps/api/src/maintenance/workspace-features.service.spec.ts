@@ -19,6 +19,7 @@ describe('WorkspaceFeaturesService', () => {
       duplicatesOn?: boolean;
       embeddingsOn?: boolean;
       embeddingsMode?: 'kept' | 'deleted' | null;
+      entitiesOn?: boolean;
       running?: string | null;
       holds?: Map<string, string | null>;
     } = {},
@@ -26,6 +27,7 @@ describe('WorkspaceFeaturesService', () => {
     const calls: string[] = [];
     let duplicatesOn = over.duplicatesOn ?? true;
     let embeddingsOn = over.embeddingsOn ?? true;
+    let entitiesOn = over.entitiesOn ?? true;
     const maintenance = {
       overview: jest.fn().mockResolvedValue({
         datasets: [
@@ -76,6 +78,7 @@ describe('WorkspaceFeaturesService', () => {
           changedAt: null,
         }),
       ),
+      isEnabled: jest.fn(() => Promise.resolve(duplicatesOn)),
       set: jest.fn((enabled: boolean, mode: string | null) => {
         calls.push(`switch:duplicates:${enabled}:${mode}`);
         duplicatesOn = enabled;
@@ -86,6 +89,30 @@ describe('WorkspaceFeaturesService', () => {
       scheduleFull: jest.fn(() => {
         calls.push('recompute');
         return Promise.resolve(true);
+      }),
+      scheduleReindex: jest.fn(() => {
+        calls.push('reindex');
+        return Promise.resolve(true);
+      }),
+    };
+    const entitySwitch = {
+      state: jest.fn(() =>
+        Promise.resolve({
+          enabled: entitiesOn,
+          disabledMode: entitiesOn ? null : 'kept',
+          changedAt: null,
+        }),
+      ),
+      set: jest.fn((enabled: boolean, mode: string | null) => {
+        calls.push(`switch:entities:${enabled}:${mode}`);
+        entitiesOn = enabled;
+        return Promise.resolve();
+      }),
+    };
+    const entityResolution = {
+      scheduleResolveAll: jest.fn(() => {
+        calls.push('resolve-all');
+        return Promise.resolve();
       }),
     };
     const correlationWorker = {
@@ -131,6 +158,8 @@ describe('WorkspaceFeaturesService', () => {
       correlationWorker as never,
       embeddingSettings as never,
       embeddingQueue as never,
+      entitySwitch as never,
+      entityResolution as never,
     );
     return { service, calls, maintenance, correlationJobs };
   };
@@ -239,6 +268,72 @@ describe('WorkspaceFeaturesService', () => {
         'release:embeddings',
         'reconcile:{"catchUp":true}',
       ]);
+    });
+  });
+
+  // Entities read the value index duplicate detection writes (G5 R9). Turning
+  // them on has to make sure that index exists: it does while duplicates are
+  // on, and has to be rebuilt first while they are off.
+  describe('entities', () => {
+    it('turns on with duplicates on: release, then resolve against the live index', async () => {
+      const { service, calls } = build({ entitiesOn: false });
+
+      const out = await service.set('entities', { enabled: true });
+
+      expect(calls).toEqual([
+        'switch:entities:true:null',
+        'release:entities',
+        'resolve-all',
+      ]);
+      expect(out.recomputeScheduled).toBe(true);
+    });
+
+    it('turns on with duplicates off: the value index is rebuilt first', async () => {
+      const { service, calls } = build({
+        entitiesOn: false,
+        duplicatesOn: false,
+      });
+
+      await service.set('entities', { enabled: true });
+
+      expect(calls).toEqual([
+        'switch:entities:true:null',
+        'release:entities',
+        'reindex',
+      ]);
+    });
+
+    it('turns off as a pause: its own queues are held, the scan hand-off is not', async () => {
+      const { service, calls } = build();
+
+      const out = await service.set('entities', { enabled: false });
+
+      expect(calls).toEqual([
+        'switch:entities:false:kept',
+        'hold:entities:entities.resolve,entities.recount',
+      ]);
+      expect(out.cleanupRunId).toBeNull();
+    });
+
+    it('turns off and deletes what resolution derived', async () => {
+      const { service, calls } = build();
+
+      const out = await service.set('entities', {
+        enabled: false,
+        deleteData: true,
+      });
+
+      expect(calls.at(-1)).toBe('cleanup:entities');
+      expect(out.cleanupRunId).toBe('run-entities');
+    });
+
+    it('does not resolve again when it was already on', async () => {
+      const { service, calls } = build({ entitiesOn: true });
+
+      await service.set('entities', { enabled: true });
+
+      expect(calls).not.toContain('resolve-all');
+      expect(calls).not.toContain('reindex');
     });
   });
 

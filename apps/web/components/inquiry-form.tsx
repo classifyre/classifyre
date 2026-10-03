@@ -161,9 +161,12 @@ export const InquiryForm = React.forwardRef<
     joinList(initial?.findingValueRegex ?? []),
   );
   // About (SL3 R7.6): the findings must be evidence of one of these concepts.
-  const [termKeys, setTermKeys] = React.useState<string[]>(
-    () => initial?.termKeys ?? [],
-  );
+  // A watch started from a term page (?term=<key>) opens about that term.
+  const [termKeys, setTermKeys] = React.useState<string[]>(() => {
+    if (initial?.termKeys) return initial.termKeys;
+    const preset = !isEdit ? searchParams?.get("term") : null;
+    return preset ? [preset] : [];
+  });
   const [termsIncludeNarrower, setTermsIncludeNarrower] = React.useState(
     initial?.termsIncludeNarrower ?? false,
   );

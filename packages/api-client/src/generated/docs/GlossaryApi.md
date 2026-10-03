@@ -7,13 +7,11 @@ All URIs are relative to *http://localhost*
 | [**glossaryControllerActivity**](GlossaryApi.md#glossarycontrolleractivity) | **GET** /glossary/terms/{idOrKey}/activity | A term\&#39;s history (paged) |
 | [**glossaryControllerApprove**](GlossaryApi.md#glossarycontrollerapprove) | **POST** /glossary/{id}/approve | DRAFT → APPROVED |
 | [**glossaryControllerApproveRelation**](GlossaryApi.md#glossarycontrollerapproverelation) | **POST** /glossary/relations/{id}/approve |  |
-| [**glossaryControllerBanner**](GlossaryApi.md#glossarycontrollerbanner) | **GET** /glossary/banner | The one-time \&quot;we classified your terms\&quot; banner (SL1 R8) |
 | [**glossaryControllerBulkUpdate**](GlossaryApi.md#glossarycontrollerbulkupdate) | **POST** /glossary/bulk | Bulk approve/unapprove/deprecate, retype, move scheme or change kind (operator) |
 | [**glossaryControllerCreateRelation**](GlossaryApi.md#glossarycontrollercreaterelation) | **POST** /glossary/relations | Create a relation (APPROVED for operators) |
 | [**glossaryControllerCreateScheme**](GlossaryApi.md#glossarycontrollercreatescheme) | **POST** /glossary/schemes | Create a scheme |
 | [**glossaryControllerDeleteScheme**](GlossaryApi.md#glossarycontrollerdeletescheme) | **DELETE** /glossary/schemes/{id} | Delete an empty scheme |
 | [**glossaryControllerDeprecate**](GlossaryApi.md#glossarycontrollerdeprecate) | **POST** /glossary/{id}/deprecate | APPROVED → DEPRECATED, optionally with a successor |
-| [**glossaryControllerDismissBanner**](GlossaryApi.md#glossarycontrollerdismissbanner) | **POST** /glossary/banner/dismiss | Dismiss the classification banner |
 | [**glossaryControllerExport**](GlossaryApi.md#glossarycontrollerexport) | **GET** /glossary/export | Export as CSV or SKOS JSON-LD |
 | [**glossaryControllerGetScheme**](GlossaryApi.md#glossarycontrollergetscheme) | **GET** /glossary/schemes/{id} |  |
 | [**glossaryControllerGetTerm**](GlossaryApi.md#glossarycontrollergetterm) | **GET** /glossary/terms/{idOrKey} | A term by id or key (old keys resolve): scheme, relations, broader chain, narrower list |
@@ -30,7 +28,6 @@ All URIs are relative to *http://localhost*
 | [**glossaryControllerUnapprove**](GlossaryApi.md#glossarycontrollerunapprove) | **POST** /glossary/{id}/unapprove | APPROVED → DRAFT |
 | [**glossaryControllerUpdateScheme**](GlossaryApi.md#glossarycontrollerupdatescheme) | **PATCH** /glossary/schemes/{id} | Edit a scheme |
 | [**glossaryControllerUpsert**](GlossaryApi.md#glossarycontrollerupsert) | **POST** /glossary | Create or update a glossary term (operator) |
-| [**glossaryControllerVerify**](GlossaryApi.md#glossarycontrollerverify) | **PATCH** /glossary/{id}/verify | Approve a term (alias of /approve) |
 | [**glossarySemanticControllerCounts**](GlossaryApi.md#glossarysemanticcontrollercounts) | **GET** /glossary/proposals/counts | Pending proposals by kind, for the badge |
 | [**glossarySemanticControllerDecide**](GlossaryApi.md#glossarysemanticcontrollerdecide) | **POST** /glossary/proposals/decide | Accept, edit and accept, dismiss, dismiss forever or skip one proposal |
 | [**glossarySemanticControllerDecideBulk**](GlossaryApi.md#glossarysemanticcontrollerdecidebulk) | **POST** /glossary/proposals/decide-bulk | Bulk accept or dismiss a group of document (LINK) suggestions |
@@ -221,63 +218,6 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **id** | `string` |  | [Defaults to `undefined`] |
-
-### Return type
-
-`void` (Empty response body)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: Not defined
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** |  |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
-## glossaryControllerBanner
-
-> glossaryControllerBanner()
-
-The one-time \&quot;we classified your terms\&quot; banner (SL1 R8)
-
-### Example
-
-```ts
-import {
-  Configuration,
-  GlossaryApi,
-} from '@workspace/api-client';
-import type { GlossaryControllerBannerRequest } from '@workspace/api-client';
-
-async function example() {
-  console.log("🚀 Testing @workspace/api-client SDK...");
-  const api = new GlossaryApi();
-
-  try {
-    const data = await api.glossaryControllerBanner();
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-This endpoint does not need any parameter.
 
 ### Return type
 
@@ -619,63 +559,6 @@ No authorization required
 
 - **Content-Type**: `application/json`
 - **Accept**: `application/json`
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** |  |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
-## glossaryControllerDismissBanner
-
-> glossaryControllerDismissBanner()
-
-Dismiss the classification banner
-
-### Example
-
-```ts
-import {
-  Configuration,
-  GlossaryApi,
-} from '@workspace/api-client';
-import type { GlossaryControllerDismissBannerRequest } from '@workspace/api-client';
-
-async function example() {
-  console.log("🚀 Testing @workspace/api-client SDK...");
-  const api = new GlossaryApi();
-
-  try {
-    const data = await api.glossaryControllerDismissBanner();
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-This endpoint does not need any parameter.
-
-### Return type
-
-`void` (Empty response body)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: Not defined
 
 
 ### HTTP response details
@@ -1765,74 +1648,6 @@ example().catch(console.error);
 ### Return type
 
 [**UpsertGlossaryTermResponseDto**](UpsertGlossaryTermResponseDto.md)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: `application/json`
-- **Accept**: `application/json`
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** |  |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
-## glossaryControllerVerify
-
-> GlossaryTermDto glossaryControllerVerify(id, verifyGlossaryTermDto)
-
-Approve a term (alias of /approve)
-
-### Example
-
-```ts
-import {
-  Configuration,
-  GlossaryApi,
-} from '@workspace/api-client';
-import type { GlossaryControllerVerifyRequest } from '@workspace/api-client';
-
-async function example() {
-  console.log("🚀 Testing @workspace/api-client SDK...");
-  const api = new GlossaryApi();
-
-  const body = {
-    // string
-    id: id_example,
-    // VerifyGlossaryTermDto
-    verifyGlossaryTermDto: ...,
-  } satisfies GlossaryControllerVerifyRequest;
-
-  try {
-    const data = await api.glossaryControllerVerify(body);
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-
-| Name | Type | Description  | Notes |
-|------------- | ------------- | ------------- | -------------|
-| **id** | `string` |  | [Defaults to `undefined`] |
-| **verifyGlossaryTermDto** | [VerifyGlossaryTermDto](VerifyGlossaryTermDto.md) |  | |
-
-### Return type
-
-[**GlossaryTermDto**](GlossaryTermDto.md)
 
 ### Authorization
 

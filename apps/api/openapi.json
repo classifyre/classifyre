@@ -12706,36 +12706,6 @@
         ]
       }
     },
-    "/glossary/banner": {
-      "get": {
-        "operationId": "GlossaryController_banner",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "The one-time \"we classified your terms\" banner (SL1 R8)",
-        "tags": [
-          "glossary"
-        ]
-      }
-    },
-    "/glossary/banner/dismiss": {
-      "post": {
-        "operationId": "GlossaryController_dismissBanner",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Dismiss the classification banner",
-        "tags": [
-          "glossary"
-        ]
-      }
-    },
     "/glossary/terms/{idOrKey}": {
       "get": {
         "operationId": "GlossaryController_getTerm",
@@ -12827,47 +12797,6 @@
           }
         },
         "summary": "Bulk approve/unapprove/deprecate, retype, move scheme or change kind (operator)",
-        "tags": [
-          "glossary"
-        ]
-      }
-    },
-    "/glossary/{id}/verify": {
-      "patch": {
-        "operationId": "GlossaryController_verify",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyGlossaryTermDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlossaryTermDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Approve a term (alias of /approve)",
         "tags": [
           "glossary"
         ]
@@ -14727,6 +14656,451 @@
         },
         "tags": [
           "semantic"
+        ]
+      }
+    },
+    "/entities": {
+      "get": {
+        "operationId": "EntitiesController_search",
+        "parameters": [
+          {
+            "name": "query",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Search entities by name, alias or identifier value, with mention counters",
+        "tags": [
+          "entities"
+        ]
+      },
+      "post": {
+        "operationId": "EntitiesController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create an entity, optionally from a finding or an indexed value (\"Make entity\")",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/config": {
+      "get": {
+        "operationId": "EntitiesController_config",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The Entities switch and which labels take part in resolution (names, identifiers)",
+        "tags": [
+          "entities"
+        ]
+      },
+      "put": {
+        "operationId": "EntitiesController_saveConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Declare custom labels as names or identifiers; alias values are regenerated",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/candidates": {
+      "get": {
+        "operationId": "EntitiesController_listCandidates",
+        "parameters": [
+          {
+            "name": "termId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "minScore",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The entity review queue: proposed values with scores and up to 3 occurrences each",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/candidates/review": {
+      "post": {
+        "operationId": "EntitiesController_review",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Accept or reject candidates (batch). A rejection is remembered; a conflict can also be moved",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/resolve": {
+      "post": {
+        "operationId": "EntitiesController_resolve",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Queue a full resolution pass: alias values, candidates over the whole index, counters",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/values/{valueId}": {
+      "delete": {
+        "operationId": "EntitiesController_removeValue",
+        "parameters": [
+          {
+            "name": "valueId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Remove an identifier or a confirmed value",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/{idOrKey}": {
+      "get": {
+        "operationId": "EntitiesController_get",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "An entity: values and identifiers, live counters, anchor record, pending candidates",
+        "tags": [
+          "entities"
+        ]
+      },
+      "patch": {
+        "operationId": "EntitiesController_update",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Set an entity's anchor URN or attributes",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/{idOrKey}/mentions": {
+      "get": {
+        "operationId": "EntitiesController_listMentions",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Mentions of an entity across all sources (keyset-paged)",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/{idOrKey}/overview": {
+      "get": {
+        "operationId": "EntitiesController_overview",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Mentions over time, sources, and the entities most often mentioned with this one",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/{idOrKey}/co-mentions": {
+      "get": {
+        "operationId": "EntitiesController_coMentions",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Entities that appear in the same assets",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/{idOrKey}/export": {
+      "get": {
+        "operationId": "EntitiesController_export",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Export mentions as CSV or JSON: \"what do we hold about this person\" (access request)",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/{idOrKey}/values": {
+      "post": {
+        "operationId": "EntitiesController_addValue",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Add an identifier (or promote an indexed value). A value another entity holds becomes a conflict to review",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/entities/{idOrKey}/merge": {
+      "post": {
+        "operationId": "EntitiesController_merge",
+        "parameters": [
+          {
+            "name": "idOrKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Merge this entity into another: values, references and watches move, and it redirects",
+        "tags": [
+          "entities"
         ]
       }
     },
@@ -26920,7 +27294,8 @@
               "INQUIRY",
               "AUTOPILOT",
               "MANUAL",
-              "DUPLICATE"
+              "DUPLICATE",
+              "ENTITY"
             ]
           },
           "status": {
@@ -33980,7 +34355,24 @@
           "name"
         ]
       },
-      "GlossaryTermDto": {
+      "GlossaryTermUsageDto": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": "number",
+            "description": "Distinct assets currently linked to the term"
+          },
+          "bindings": {
+            "type": "number",
+            "description": "APPROVED bindings that give the term meaning: straight to it, or a lookup on its scheme"
+          }
+        },
+        "required": [
+          "assets",
+          "bindings"
+        ]
+      },
+      "GlossaryListedTermDto": {
         "type": "object",
         "properties": {
           "id": {
@@ -34033,7 +34425,7 @@
             }
           },
           "proposedAliases": {
-            "description": "Unverified aliases suggested by agents for operator review",
+            "description": "Aliases suggested by agents, waiting for an operator",
             "type": "array",
             "items": {
               "type": "string"
@@ -34096,11 +34488,7 @@
             "type": "string",
             "description": "AGENT proposals are DRAFT hypotheses"
           },
-          "verified": {
-            "type": "boolean",
-            "description": "True when APPROVED (kept for compatibility)."
-          },
-          "verifiedBy": {
+          "approvedBy": {
             "type": "string",
             "nullable": true
           },
@@ -34116,6 +34504,47 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "anchorUrn": {
+            "type": "string",
+            "nullable": true,
+            "description": "Entities: URN of the record that is this entity (a register entry)."
+          },
+          "attributes": {
+            "type": "object",
+            "nullable": true,
+            "description": "Entities: free-form attributes from connectors or people."
+          },
+          "mentionCount": {
+            "type": "number",
+            "description": "Entities: occurrences of a confirmed value in the value index (asset × value)."
+          },
+          "assetCount": {
+            "type": "number",
+            "description": "Entities: distinct assets that mention it."
+          },
+          "sourceCount": {
+            "type": "number",
+            "description": "Entities: distinct sources that mention it."
+          },
+          "firstSeenAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "lastSeenAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "mergedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "Entities: set when this entity was merged into `replacedById`."
+          },
+          "usage": {
+            "$ref": "#/components/schemas/GlossaryTermUsageDto"
           }
         },
         "required": [
@@ -34131,9 +34560,12 @@
           "proposedAliases",
           "entityType",
           "origin",
-          "verified",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "mentionCount",
+          "assetCount",
+          "sourceCount",
+          "usage"
         ]
       },
       "GlossaryListResponseDto": {
@@ -34142,7 +34574,7 @@
           "terms": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/GlossaryTermDto"
+              "$ref": "#/components/schemas/GlossaryListedTermDto"
             }
           },
           "total": {
@@ -34207,7 +34639,7 @@
             }
           },
           "proposedAliases": {
-            "description": "Unverified aliases suggested by agents for operator review",
+            "description": "Aliases suggested by agents, waiting for an operator",
             "type": "array",
             "items": {
               "type": "string"
@@ -34270,11 +34702,7 @@
             "type": "string",
             "description": "AGENT proposals are DRAFT hypotheses"
           },
-          "verified": {
-            "type": "boolean",
-            "description": "True when APPROVED (kept for compatibility)."
-          },
-          "verifiedBy": {
+          "approvedBy": {
             "type": "string",
             "nullable": true
           },
@@ -34291,15 +34719,43 @@
             "format": "date-time",
             "type": "string"
           },
-          "matchType": {
+          "anchorUrn": {
             "type": "string",
-            "enum": [
-              "exact",
-              "alias",
-              "partial",
-              "semantic"
-            ],
-            "description": "Compatibility tier; `matchedOn` says precisely which label matched."
+            "nullable": true,
+            "description": "Entities: URN of the record that is this entity (a register entry)."
+          },
+          "attributes": {
+            "type": "object",
+            "nullable": true,
+            "description": "Entities: free-form attributes from connectors or people."
+          },
+          "mentionCount": {
+            "type": "number",
+            "description": "Entities: occurrences of a confirmed value in the value index (asset × value)."
+          },
+          "assetCount": {
+            "type": "number",
+            "description": "Entities: distinct assets that mention it."
+          },
+          "sourceCount": {
+            "type": "number",
+            "description": "Entities: distinct sources that mention it."
+          },
+          "firstSeenAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "lastSeenAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "mergedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "Entities: set when this entity was merged into `replacedById`."
           },
           "matchedOn": {
             "type": "string",
@@ -34337,10 +34793,11 @@
           "proposedAliases",
           "entityType",
           "origin",
-          "verified",
           "createdAt",
           "updatedAt",
-          "matchType",
+          "mentionCount",
+          "assetCount",
+          "sourceCount",
           "matchedOn",
           "deprecated"
         ]
@@ -34497,7 +34954,7 @@
             }
           },
           "proposedAliases": {
-            "description": "Unverified aliases suggested by agents for operator review",
+            "description": "Aliases suggested by agents, waiting for an operator",
             "type": "array",
             "items": {
               "type": "string"
@@ -34560,11 +35017,7 @@
             "type": "string",
             "description": "AGENT proposals are DRAFT hypotheses"
           },
-          "verified": {
-            "type": "boolean",
-            "description": "True when APPROVED (kept for compatibility)."
-          },
-          "verifiedBy": {
+          "approvedBy": {
             "type": "string",
             "nullable": true
           },
@@ -34580,6 +35033,44 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "anchorUrn": {
+            "type": "string",
+            "nullable": true,
+            "description": "Entities: URN of the record that is this entity (a register entry)."
+          },
+          "attributes": {
+            "type": "object",
+            "nullable": true,
+            "description": "Entities: free-form attributes from connectors or people."
+          },
+          "mentionCount": {
+            "type": "number",
+            "description": "Entities: occurrences of a confirmed value in the value index (asset × value)."
+          },
+          "assetCount": {
+            "type": "number",
+            "description": "Entities: distinct assets that mention it."
+          },
+          "sourceCount": {
+            "type": "number",
+            "description": "Entities: distinct sources that mention it."
+          },
+          "firstSeenAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "lastSeenAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "mergedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "Entities: set when this entity was merged into `replacedById`."
           },
           "merged": {
             "type": "boolean",
@@ -34599,9 +35090,11 @@
           "proposedAliases",
           "entityType",
           "origin",
-          "verified",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "mentionCount",
+          "assetCount",
+          "sourceCount"
         ]
       },
       "BulkUpdateGlossaryFiltersDto": {
@@ -34659,10 +35152,6 @@
           "filters": {
             "$ref": "#/components/schemas/BulkUpdateGlossaryFiltersDto"
           },
-          "verified": {
-            "type": "boolean",
-            "description": "True approves the selected terms, false returns them to DRAFT (kept for compatibility; prefer status)."
-          },
           "status": {
             "type": "string",
             "enum": [
@@ -34693,9 +35182,6 @@
               "CONCEPT",
               "ENTITY"
             ]
-          },
-          "verifiedBy": {
-            "type": "string"
           }
         }
       },
@@ -34723,13 +35209,197 @@
           "ids"
         ]
       },
-      "VerifyGlossaryTermDto": {
+      "GlossaryTermDto": {
         "type": "object",
         "properties": {
-          "verifiedBy": {
+          "id": {
             "type": "string"
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable key (C8)."
+          },
+          "previousKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "term": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CONCEPT",
+              "ENTITY"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "APPROVED",
+              "DEPRECATED"
+            ]
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hiddenAliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "proposedAliases": {
+            "description": "Aliases suggested by agents, waiting for an operator",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "definition": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "steward": {
+            "type": "string",
+            "nullable": true
+          },
+          "schemeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheme": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GlossarySchemeRefDto"
+              }
+            ]
+          },
+          "replacedById": {
+            "type": "string",
+            "nullable": true
+          },
+          "deprecatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "sourceIri": {
+            "type": "string",
+            "nullable": true
+          },
+          "packKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "type": "string",
+            "description": "AGENT proposals are DRAFT hypotheses"
+          },
+          "approvedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "anchorUrn": {
+            "type": "string",
+            "nullable": true,
+            "description": "Entities: URN of the record that is this entity (a register entry)."
+          },
+          "attributes": {
+            "type": "object",
+            "nullable": true,
+            "description": "Entities: free-form attributes from connectors or people."
+          },
+          "mentionCount": {
+            "type": "number",
+            "description": "Entities: occurrences of a confirmed value in the value index (asset × value)."
+          },
+          "assetCount": {
+            "type": "number",
+            "description": "Entities: distinct assets that mention it."
+          },
+          "sourceCount": {
+            "type": "number",
+            "description": "Entities: distinct sources that mention it."
+          },
+          "firstSeenAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "lastSeenAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "mergedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "Entities: set when this entity was merged into `replacedById`."
           }
-        }
+        },
+        "required": [
+          "id",
+          "key",
+          "previousKeys",
+          "term",
+          "kind",
+          "status",
+          "aliases",
+          "codes",
+          "hiddenAliases",
+          "proposedAliases",
+          "entityType",
+          "origin",
+          "createdAt",
+          "updatedAt",
+          "mentionCount",
+          "assetCount",
+          "sourceCount"
+        ]
       },
       "DeprecateGlossaryTermDto": {
         "type": "object",
@@ -34768,7 +35438,8 @@
               "AGENT",
               "PACK",
               "IMPORT",
-              "SUGGESTION"
+              "SUGGESTION",
+              "CONNECTOR"
             ]
           },
           "packKey": {

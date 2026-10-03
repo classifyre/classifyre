@@ -285,14 +285,6 @@ export class BulkUpdateGlossaryTermsDto {
   @Type(() => BulkUpdateGlossaryFiltersDto)
   filters?: BulkUpdateGlossaryFiltersDto;
 
-  @ApiPropertyOptional({
-    description:
-      'True approves the selected terms, false returns them to DRAFT (kept for compatibility; prefer status).',
-  })
-  @IsOptional()
-  @IsBoolean()
-  verified?: boolean;
-
   @ApiPropertyOptional({ enum: GlossaryStatus })
   @IsOptional()
   @IsEnum(GlossaryStatus)
@@ -314,11 +306,6 @@ export class BulkUpdateGlossaryTermsDto {
   @IsOptional()
   @IsEnum(GlossaryTermKind)
   kind?: GlossaryTermKind;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  verifiedBy?: string;
 }
 
 export class BulkUpdateGlossaryTermsResponseDto {
@@ -376,7 +363,7 @@ export class GlossaryTermDto {
 
   @ApiProperty({
     type: [String],
-    description: 'Unverified aliases suggested by agents for operator review',
+    description: 'Aliases suggested by agents, waiting for an operator',
   })
   proposedAliases!: string[];
 
@@ -413,11 +400,8 @@ export class GlossaryTermDto {
   @ApiProperty({ description: 'AGENT proposals are DRAFT hypotheses' })
   origin!: string;
 
-  @ApiProperty({ description: 'True when APPROVED (kept for compatibility).' })
-  verified!: boolean;
-
   @ApiPropertyOptional({ nullable: true })
-  verifiedBy?: string | null;
+  approvedBy?: string | null;
 
   @ApiPropertyOptional({ nullable: true })
   approvedAt?: Date | null;
@@ -427,6 +411,63 @@ export class GlossaryTermDto {
 
   @ApiProperty()
   updatedAt!: Date;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    description:
+      'Entities: URN of the record that is this entity (a register entry).',
+  })
+  anchorUrn!: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    type: Object,
+    description: 'Entities: free-form attributes from connectors or people.',
+  })
+  attributes!: Record<string, unknown> | null;
+
+  @ApiProperty({
+    description:
+      'Entities: occurrences of a confirmed value in the value index (asset × value).',
+  })
+  mentionCount!: number;
+
+  @ApiProperty({ description: 'Entities: distinct assets that mention it.' })
+  assetCount!: number;
+
+  @ApiProperty({ description: 'Entities: distinct sources that mention it.' })
+  sourceCount!: number;
+
+  @ApiPropertyOptional({ nullable: true, type: Date })
+  firstSeenAt!: Date | null;
+
+  @ApiPropertyOptional({ nullable: true, type: Date })
+  lastSeenAt!: Date | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    type: Date,
+    description:
+      'Entities: set when this entity was merged into `replacedById`.',
+  })
+  mergedAt!: Date | null;
+}
+
+export class GlossaryTermUsageDto {
+  @ApiProperty({ description: 'Distinct assets currently linked to the term' })
+  assets!: number;
+
+  @ApiProperty({
+    description:
+      'APPROVED bindings that give the term meaning: straight to it, or a lookup on its scheme',
+  })
+  bindings!: number;
+}
+
+export class GlossaryListedTermDto extends GlossaryTermDto {
+  @ApiProperty({ type: GlossaryTermUsageDto })
+  usage!: GlossaryTermUsageDto;
 }
 
 export class UpsertGlossaryTermResponseDto extends GlossaryTermDto {
@@ -438,21 +479,14 @@ export class UpsertGlossaryTermResponseDto extends GlossaryTermDto {
 }
 
 export class GlossaryListResponseDto {
-  @ApiProperty({ type: [GlossaryTermDto] })
-  terms!: GlossaryTermDto[];
+  @ApiProperty({ type: [GlossaryListedTermDto] })
+  terms!: GlossaryListedTermDto[];
 
   @ApiProperty()
   total!: number;
 }
 
 export class GlossaryLookupHitDto extends GlossaryTermDto {
-  @ApiProperty({
-    enum: ['exact', 'alias', 'partial', 'semantic'],
-    description:
-      'Compatibility tier; `matchedOn` says precisely which label matched.',
-  })
-  matchType!: 'exact' | 'alias' | 'partial' | 'semantic';
-
   @ApiProperty({ enum: ['term', 'alias', 'code', 'hiddenAlias', 'semantic'] })
   matchedOn!: 'term' | 'alias' | 'code' | 'hiddenAlias' | 'semantic';
 
@@ -472,13 +506,6 @@ export class DeleteGlossaryTermResponseDto {
 
   @ApiProperty()
   id!: string;
-}
-
-export class VerifyGlossaryTermDto {
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  verifiedBy?: string;
 }
 
 export class DeprecateGlossaryTermDto {

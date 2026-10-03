@@ -1,3 +1,4 @@
+import { glossaryEvents } from './glossary-events';
 import { GlossaryService, lexicalRank } from './glossary.service';
 import {
   generateKey,
@@ -72,8 +73,8 @@ describe('GlossaryService', () => {
     sourceIri: null,
     packKey: null,
     origin: 'OPERATOR',
-    verifiedAt: new Date(),
-    verifiedBy: 'operator',
+    approvedAt: new Date(),
+    approvedBy: 'operator',
     embedContentHash: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -123,7 +124,6 @@ describe('GlossaryService', () => {
         author: 'analyst-1',
       });
 
-      expect(result.verified).toBe(true);
       expect(result.status).toBe('APPROVED');
       expect(result.merged).toBe(false);
       expect(prisma.glossaryTerm.create).toHaveBeenCalledWith(
@@ -133,7 +133,7 @@ describe('GlossaryService', () => {
             kind: 'ENTITY',
             status: 'APPROVED',
             origin: 'OPERATOR',
-            verifiedBy: 'analyst-1',
+            approvedBy: 'analyst-1',
             matchKeys: ['little st. james', 'lsj'],
           }),
         }),
@@ -151,17 +151,86 @@ describe('GlossaryService', () => {
         author: 'CASE',
       });
 
-      expect(result.verified).toBe(false);
       expect(result.status).toBe('DRAFT');
       expect(prisma.glossaryTerm.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             origin: 'AGENT',
             status: 'DRAFT',
-            verifiedAt: null,
+            approvedAt: null,
           }),
         }),
       );
+    });
+
+    // Rule SL-8: an APPROVED term's labels drive lookup bindings, so an agent
+    // alias must wait for an operator even on a term the agent proposed itself.
+    it('keeps an agent alias pending on its own term once that term is APPROVED', async () => {
+      prisma.glossaryTerm.findFirst.mockResolvedValue(
+        term('t-1', 'Force majeure', { origin: 'AGENT', status: 'APPROVED' }),
+      );
+
+      const result = await service.upsert({
+        term: 'Force majeure',
+        kind: 'CONCEPT',
+        aliases: ['höhere Gewalt'],
+        origin: 'AGENT',
+        author: 'CASE',
+      });
+
+      expect(result.merged).toBe(true);
+      expect(prisma.glossaryTerm.update).toHaveBeenCalledWith({
+        where: { id: 't-1' },
+        data: { proposedAliases: ['höhere Gewalt'] },
+      });
+    });
+
+    it('lets an agent refine its own term while it is still a DRAFT', async () => {
+      prisma.glossaryTerm.findFirst.mockResolvedValue(
+        term('t-1', 'Force majeure', {
+          origin: 'AGENT',
+          status: 'DRAFT',
+          approvedAt: null,
+          approvedBy: null,
+        }),
+      );
+
+      const result = await service.upsert({
+        term: 'Force majeure',
+        kind: 'CONCEPT',
+        aliases: ['höhere Gewalt'],
+        origin: 'AGENT',
+        author: 'CASE',
+      });
+
+      expect(result.merged).toBe(false);
+      expect(result.aliases).toEqual(['höhere Gewalt']);
+      expect(result.status).toBe('DRAFT');
+    });
+
+    // An edit that takes a term out of APPROVED must unlink it exactly as the
+    // lifecycle endpoint does (rule SL-5), so it has to say so.
+    it('reports a status change made through an edit as that change', async () => {
+      const events: Array<{ change: string; linkingChanged?: boolean }> = [];
+      const off = glossaryEvents.on('glossary.term_changed', (event) => {
+        events.push(event);
+      });
+      prisma.glossaryTerm.findUnique.mockResolvedValue(
+        term('t-1', 'Bank account', { status: 'APPROVED' }),
+      );
+
+      await service.upsert({
+        id: 't-1',
+        term: 'Bank account',
+        kind: 'CONCEPT',
+        status: 'DRAFT',
+        origin: 'OPERATOR',
+      });
+      off();
+
+      expect(events).toEqual([
+        expect.objectContaining({ change: 'unapproved', linkingChanged: true }),
+      ]);
     });
 
     it('agents never set keys', async () => {
@@ -339,21 +408,6 @@ describe('GlossaryService', () => {
         /cannot become DEPRECATED/,
       );
     });
-
-    it('verify stays an alias of approve', async () => {
-      prisma.glossaryTerm.findUnique.mockResolvedValue(
-        term('d', 'Draft', { status: 'DRAFT', verifiedAt: null }),
-      );
-      await service.verify('d', 'analyst');
-      expect(prisma.glossaryTerm.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            status: 'APPROVED',
-            verifiedBy: 'analyst',
-          }),
-        }),
-      );
-    });
   });
 
   describe('bulk update', () => {
@@ -365,7 +419,7 @@ describe('GlossaryService', () => {
 
       const result = await service.bulkUpdate({
         ids: [baseTerm.id],
-        verified: false,
+        status: 'DRAFT',
         entityType: 'PERSON',
       });
 
@@ -374,8 +428,8 @@ describe('GlossaryService', () => {
         data: {
           entityType: 'PERSON',
           status: 'DRAFT',
-          verifiedAt: null,
-          verifiedBy: null,
+          approvedAt: null,
+          approvedBy: null,
         },
       });
       expect(result).toEqual({ updatedCount: 1, ids: [baseTerm.id] });
@@ -386,7 +440,11 @@ describe('GlossaryService', () => {
         /status change/,
       );
       await expect(
-        service.bulkUpdate({ ids: [baseTerm.id], filters: {}, verified: true }),
+        service.bulkUpdate({
+          ids: [baseTerm.id],
+          filters: {},
+          status: 'APPROVED',
+        }),
       ).rejects.toThrow(/ids or filters/);
       expect(prisma.glossaryTerm.updateMany).not.toHaveBeenCalled();
     });
@@ -414,10 +472,7 @@ describe('GlossaryService', () => {
 
       expect(hits[0].term).toBe('GmbH');
       expect(hits[0].matchedOn).toBe('code');
-      expect(hits.slice(1).map((h) => h.matchType)).toEqual([
-        'partial',
-        'partial',
-      ]);
+      expect(hits.slice(1).map((h) => h.matchedOn)).toEqual(['term', 'term']);
     });
 
     it('resolves a hidden alias exactly, never by substring', () => {
@@ -470,7 +525,34 @@ describe('GlossaryService', () => {
       const hits = await service.lookup('AR', 5);
 
       expect(hits[0].term).toBe('AR');
-      expect(hits[0].matchType).toBe('exact');
+      expect(hits[0].matchedOn).toBe('term');
+    });
+
+    // `E` is a hidden alias of one term and a letter in hundreds of names.
+    // The exact hit is read on its own, so a full page of substring matches
+    // cannot push it out.
+    it('keeps an exact hit when the substring page is full', async () => {
+      prisma.$queryRaw
+        .mockResolvedValueOnce([{ id: 'einzel' }])
+        .mockResolvedValueOnce([]);
+      prisma.glossaryTerm.findMany
+        .mockResolvedValueOnce([
+          term('einzel', 'Zeichnungsbefugnis allein', { hiddenAliases: ['E'] }),
+        ])
+        .mockResolvedValueOnce(
+          Array.from({ length: 25 }, (_, i) => term(`t${i}`, `Entry ${i}`)),
+        );
+
+      const hits = await service.lookup('E', 5);
+
+      expect(hits[0].id).toBe('einzel');
+      expect(hits[0].matchedOn).toBe('hiddenAlias');
+      expect(prisma.glossaryTerm.findMany).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          where: { AND: [{ id: { in: ['einzel'] } }] },
+        }),
+      );
     });
 
     it('returns an exact hit on a DEPRECATED term, marked, with its successor', async () => {

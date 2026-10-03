@@ -41,9 +41,9 @@ export type GlossaryUpsertInput = {
   notes?: string | null;
   refType?: string;
   refId?: string;
-  origin: 'AGENT' | 'OPERATOR';
+  /** CONNECTOR: declared by a source with a record it ingested (G5 R13). */
+  origin: 'AGENT' | 'OPERATOR' | 'CONNECTOR';
   author?: string;
-  verified?: boolean;
   // SL1
   kind?: GlossaryTermKind;
   /** Operators only, on edit (R2). Agents never set keys. */
@@ -60,6 +60,9 @@ export type GlossaryUpsertInput = {
   packKey?: string | null;
   /** Create a new ENTITY even when one with the same name exists (R4). */
   createNew?: boolean;
+  // G5: entities only.
+  anchorUrn?: string | null;
+  attributes?: Record<string, unknown> | null;
 };
 
 export type GlossaryMatchedOn =
@@ -72,8 +75,6 @@ export type GlossaryMatchedOn =
 export type GlossaryTermView = ReturnType<GlossaryService['toDto']>;
 
 export type GlossaryLookupHit = GlossaryTermView & {
-  /** Kept for existing callers; `matchedOn` is the precise answer. */
-  matchType: 'exact' | 'alias' | 'partial' | 'semantic';
   matchedOn: GlossaryMatchedOn;
   deprecated: boolean;
   replacedBy?: { id: string; key: string; term: string } | null;
@@ -153,12 +154,6 @@ export function lexicalRank(
     return { order: 4, matchedOn: 'code' };
   }
   return null;
-}
-
-function legacyMatchType(order: number): GlossaryLookupHit['matchType'] {
-  if (order === 0) return 'exact';
-  if (order <= 2) return 'alias';
-  return 'partial';
 }
 
 /**
@@ -267,7 +262,72 @@ export class GlossaryService {
       }),
       this.prisma.glossaryTerm.count({ where }),
     ]);
-    return { terms: terms.map((term) => this.toDto(term)), total };
+    const usage = await this.usageOf(terms);
+    return {
+      terms: terms.map((term) => ({
+        ...this.toDto(term),
+        usage: usage.get(term.id) ?? { assets: 0, bindings: 0 },
+      })),
+      total,
+    };
+  }
+
+  /**
+   * Where a page of terms is used: distinct assets currently linked to each
+   * term, and the APPROVED bindings that give it meaning — a binding straight
+   * to the term, or a lookup binding on its scheme. Two grouped reads for the
+   * page; without them the list cannot tell a concept the data uses from one
+   * that is only written down.
+   */
+  private async usageOf(
+    terms: Array<Pick<GlossaryTerm, 'id' | 'schemeId' | 'kind'>>,
+  ): Promise<Map<string, { assets: number; bindings: number }>> {
+    const out = new Map<string, { assets: number; bindings: number }>();
+    if (terms.length === 0) return out;
+    const ids = terms.map((term) => term.id);
+    const schemeIds = [
+      ...new Set(
+        terms
+          .map((term) => term.schemeId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const [links, direct, lookups] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ term_id: string; assets: bigint }>>`
+        SELECT term_id, count(DISTINCT asset_id) AS assets
+          FROM asset_terms
+         WHERE term_id = ANY(${ids}::text[]) AND gone_at IS NULL
+         GROUP BY term_id`,
+      this.prisma.glossaryBinding.groupBy({
+        by: ['termId'],
+        where: { termId: { in: ids }, status: 'APPROVED', noMeaning: false },
+        _count: { _all: true },
+      }),
+      this.prisma.glossaryBinding.groupBy({
+        by: ['lookupSchemeId'],
+        where: { lookupSchemeId: { in: schemeIds }, status: 'APPROVED' },
+        _count: { _all: true },
+      }),
+    ]);
+    const assets = new Map(links.map((row) => [row.term_id, row.assets]));
+    const directCount = new Map<string | null, number>(
+      direct.map((row) => [row.termId, row._count._all]),
+    );
+    const lookupCount = new Map<string | null, number>();
+    for (const row of lookups) {
+      lookupCount.set(row.lookupSchemeId, row._count._all);
+    }
+    for (const term of terms) {
+      out.set(term.id, {
+        assets: Number(assets.get(term.id) ?? 0),
+        bindings:
+          (directCount.get(term.id) ?? 0) +
+          (term.kind === 'CONCEPT' && term.schemeId
+            ? (lookupCount.get(term.schemeId) ?? 0)
+            : 0),
+      });
+    }
+    return out;
   }
 
   // ── Resolution (C8) ────────────────────────────────────────────────────────
@@ -446,7 +506,9 @@ export class GlossaryService {
       // Entity names are not unique (R4): an operator can deliberately create a
       // second "Jane Doe". Agents (and MCP upserts without `createNew`) land on
       // the existing entity so a repeated proposal does not multiply people.
-      if (input.createNew && input.origin === 'OPERATOR') return null;
+      // A source declares records, and two records with one name are two
+      // entities (two companies called "Müller GmbH" in one register).
+      if (input.createNew && input.origin !== 'AGENT') return null;
       return this.prisma.glossaryTerm.findFirst({
         where: { kind, term: { equals: term, mode: 'insensitive' } },
         orderBy: { createdAt: 'asc' },
@@ -508,12 +570,7 @@ export class GlossaryService {
     const codes = cleanLabels(input.codes, { caseSensitive: true });
     const hiddenAliases = cleanLabels(input.hiddenAliases);
     const schemeId = await this.resolveSchemeId(input);
-    const kind: GlossaryTermKind =
-      input.kind ??
-      (input.entityType &&
-      ['PERSON', 'ORGANIZATION', 'LOCATION'].includes(input.entityType)
-        ? 'ENTITY'
-        : 'CONCEPT');
+    const kind: GlossaryTermKind = input.kind ?? 'CONCEPT';
 
     const existing = await this.findExisting(
       input,
@@ -526,10 +583,13 @@ export class GlossaryService {
     // They are deliberately excluded from lexical and semantic lookup until
     // an operator accepts them by saving the term. Agents never edit operator
     // items (rule SL-8).
+    // The same holds for an agent's own term once an operator decided it:
+    // an APPROVED term's labels drive lookup bindings, so an alias added
+    // straight to it would change what the data means without a decision.
     if (
       existing &&
-      existing.origin === 'OPERATOR' &&
-      input.origin === 'AGENT'
+      input.origin === 'AGENT' &&
+      (existing.origin === 'OPERATOR' || existing.status !== 'DRAFT')
     ) {
       const proposedAliases = [
         ...new Set([
@@ -577,15 +637,16 @@ export class GlossaryService {
     let status: GlossaryStatus;
     if (input.origin === 'AGENT') {
       status = existing?.status ?? 'DRAFT';
+    } else if (input.origin === 'CONNECTOR' && existing) {
+      // A source re-declares its records on every scan; that must never undo
+      // an operator's unapprove or deprecation.
+      status = existing.status;
     } else if (input.status) {
       status = input.status;
     } else if (existing?.status === 'DEPRECATED') {
       status = 'DEPRECATED';
     } else {
       status = 'APPROVED';
-    }
-    if (input.origin === 'OPERATOR' && input.verified === false) {
-      status = 'DRAFT';
     }
     const approved = status === 'APPROVED';
     const approver = input.author ?? input.origin.toLowerCase();
@@ -688,25 +749,40 @@ export class GlossaryService {
       origin: existing?.origin ?? input.origin,
       status,
       // The approval stamp survives edits; it is set when a term becomes
-      // APPROVED and cleared when it returns to DRAFT (APPROVED <=> verifiedAt).
-      verifiedAt: approved
-        ? existing?.status === 'APPROVED' && existing.verifiedAt
-          ? existing.verifiedAt
+      // APPROVED and cleared when it returns to DRAFT (APPROVED <=> approvedAt).
+      approvedAt: approved
+        ? existing?.status === 'APPROVED' && existing.approvedAt
+          ? existing.approvedAt
           : new Date()
         : status === 'DEPRECATED'
-          ? (existing?.verifiedAt ?? null)
+          ? (existing?.approvedAt ?? null)
           : null,
-      verifiedBy: approved
-        ? existing?.status === 'APPROVED' && existing.verifiedBy
-          ? existing.verifiedBy
+      approvedBy: approved
+        ? existing?.status === 'APPROVED' && existing.approvedBy
+          ? existing.approvedBy
           : approver
         : status === 'DEPRECATED'
-          ? (existing?.verifiedBy ?? null)
+          ? (existing?.approvedBy ?? null)
           : null,
       ...(input.origin === 'OPERATOR' ? { proposedAliases: [] } : {}),
       ...(status !== 'DEPRECATED'
-        ? { deprecatedAt: null, replacedById: null }
+        ? { deprecatedAt: null, replacedById: null, mergedAt: null }
         : {}),
+      ...(nextKind === 'ENTITY'
+        ? {
+            ...(input.anchorUrn !== undefined
+              ? { anchorUrn: input.anchorUrn?.trim() || null }
+              : {}),
+            ...(input.attributes !== undefined
+              ? {
+                  attributes:
+                    (input.attributes as Prisma.InputJsonValue | null) ??
+                    Prisma.DbNull,
+                }
+              : {}),
+          }
+        : // A concept has no anchor and no mentions (G5 R1).
+          { anchorUrn: null }),
     } satisfies Prisma.GlossaryTermUncheckedUpdateInput;
 
     let saved: GlossaryTerm;
@@ -766,19 +842,43 @@ export class GlossaryService {
         payload: { from: existing.kind, to: saved.kind },
       });
     }
+    // A status change made through an edit is the same event as the lifecycle
+    // endpoint's: listeners unlink a term that left APPROVED either way.
+    const statusChanged = existing ? existing.status !== saved.status : false;
+    const change = !existing
+      ? ('created' as const)
+      : !statusChanged
+        ? ('updated' as const)
+        : saved.status === 'APPROVED'
+          ? existing.status === 'DEPRECATED'
+            ? ('reinstated' as const)
+            : ('approved' as const)
+          : saved.status === 'DRAFT'
+            ? ('unapproved' as const)
+            : ('deprecated' as const);
     glossaryEvents.emit({
       type: 'glossary.term_changed',
-      change: existing
-        ? existing.status !== saved.status && saved.status === 'APPROVED'
-          ? 'approved'
-          : 'updated'
-        : 'created',
+      change,
       termId: saved.id,
       key: saved.key,
       kind: saved.kind,
       labelsChanged,
+      linkingChanged: existing
+        ? labelsChanged ||
+          statusChanged ||
+          existing.schemeId !== saved.schemeId ||
+          existing.kind !== saved.kind
+        : saved.status === 'APPROVED',
       keys: [saved.key],
     });
+    if (!existing && saved.kind === 'ENTITY') {
+      glossaryEvents.emit({
+        type: 'entity.created',
+        termId: saved.id,
+        key: saved.key,
+        origin: String(saved.origin),
+      });
+    }
     const withScheme = saved.schemeId
       ? await this.prisma.glossaryTerm.findUnique({
           where: { id: saved.id },
@@ -946,19 +1046,19 @@ export class GlossaryService {
           ? {
               // A reinstated term keeps its original approval stamp; an
               // approval out of DRAFT is stamped by whoever approved it.
-              verifiedAt:
+              approvedAt:
                 existing.status === 'DEPRECATED'
-                  ? (existing.verifiedAt ?? new Date())
+                  ? (existing.approvedAt ?? new Date())
                   : new Date(),
-              verifiedBy:
+              approvedBy:
                 existing.status === 'DEPRECATED'
-                  ? (existing.verifiedBy ?? actor)
+                  ? (existing.approvedBy ?? actor)
                   : actor,
               deprecatedAt: null,
               replacedById: null,
             }
           : {}),
-        ...(next === 'DRAFT' ? { verifiedAt: null, verifiedBy: null } : {}),
+        ...(next === 'DRAFT' ? { approvedAt: null, approvedBy: null } : {}),
         ...(next === 'DEPRECATED'
           ? { deprecatedAt: new Date(), replacedById }
           : {}),
@@ -1012,28 +1112,18 @@ export class GlossaryService {
     return this.transition(idOrKey, 'APPROVED', actor);
   }
 
-  /** `PATCH /glossary/:id/verify` stays as an alias of approve (R6). */
-  async verify(id: string, verifiedBy?: string) {
-    const existing = await this.resolveOrThrow(id);
-    if (existing.status === 'DEPRECATED') {
-      return this.reinstate(id, verifiedBy ?? 'operator');
-    }
-    return this.approve(id, verifiedBy ?? 'operator');
-  }
-
   /**
-   * Operator-only batch edit over a selection of terms: approve or unapprove
-   * (formerly verify), retype, move between schemes or change kind.
+   * Operator-only batch edit over a selection of terms: approve, unapprove or
+   * deprecate, retype, move between schemes or change kind.
    */
   async bulkUpdate(input: {
     ids?: string[];
     filters?: GlossaryListParams;
-    verified?: boolean;
     status?: GlossaryStatus;
     entityType?: GlossaryEntityType;
     schemeId?: string | null;
     kind?: GlossaryTermKind;
-    verifiedBy?: string;
+    actor?: string;
   }): Promise<{
     updatedCount: number;
     ids: string[];
@@ -1047,7 +1137,6 @@ export class GlossaryService {
       );
     }
     if (
-      input.verified === undefined &&
       !input.status &&
       !input.entityType &&
       input.schemeId === undefined &&
@@ -1068,7 +1157,7 @@ export class GlossaryService {
     if (selected.length === 0) return { updatedCount: 0, ids: [] };
     let ids = selected.map((term) => term.id);
     const refused: Array<{ id: string; reason: string }> = [];
-    const actor = input.verifiedBy ?? 'operator';
+    const actor = input.actor ?? 'operator';
 
     if (input.kind) {
       const ok: string[] = [];
@@ -1090,13 +1179,7 @@ export class GlossaryService {
         ? undefined
         : await this.resolveSchemeId({ schemeId: input.schemeId });
 
-    const status =
-      input.status ??
-      (input.verified === true
-        ? 'APPROVED'
-        : input.verified === false
-          ? 'DRAFT'
-          : undefined);
+    const status = input.status;
     const data: Prisma.GlossaryTermUncheckedUpdateManyInput = {
       ...(input.entityType ? { entityType: input.entityType } : {}),
       ...(input.kind ? { kind: input.kind } : {}),
@@ -1104,14 +1187,14 @@ export class GlossaryService {
       ...(status === 'APPROVED'
         ? {
             status,
-            verifiedAt: new Date(),
-            verifiedBy: actor,
+            approvedAt: new Date(),
+            approvedBy: actor,
             deprecatedAt: null,
             replacedById: null,
           }
         : {}),
       ...(status === 'DRAFT'
-        ? { status, verifiedAt: null, verifiedBy: null }
+        ? { status, approvedAt: null, approvedBy: null }
         : {}),
       ...(status === 'DEPRECATED' ? { status, deprecatedAt: new Date() } : {}),
     };
@@ -1174,6 +1257,9 @@ export class GlossaryService {
           termId: row.id,
           key: row.key,
           kind: row.kind,
+          linkingChanged: Boolean(
+            status || input.kind || schemeId !== undefined,
+          ),
         });
       }
     }
@@ -1283,28 +1369,46 @@ export class GlossaryService {
        WHERE strpos(lower(label), lower(${trimmed})) > 0
        LIMIT ${LEXICAL_FETCH_CAP}
     `;
-    const exactIds = new Set(exactRows.map((row) => row.id));
-    const candidateIds = [...exactIds, ...labelRows.map((row) => row.id)];
-    const lexical = await this.prisma.glossaryTerm.findMany({
-      where: {
-        AND: [
-          {
-            OR: [
-              { term: { contains: trimmed, mode: 'insensitive' } },
-              { id: { in: candidateIds } },
-            ],
-          },
-          ...(options.kind ? [{ kind: options.kind }] : []),
-          ...(schemeId !== undefined ? [{ schemeId }] : []),
-        ],
-      },
-      include: { scheme: true, replacedBy: true },
-      take: Math.min(
-        limit * LEXICAL_OVERFETCH + exactIds.size,
-        LEXICAL_FETCH_CAP,
-      ),
-      orderBy: { term: 'asc' },
-    });
+    const exactIds = [...new Set(exactRows.map((row) => row.id))];
+    const scope: Prisma.GlossaryTermWhereInput[] = [
+      ...(options.kind ? [{ kind: options.kind }] : []),
+      ...(schemeId !== undefined ? [{ schemeId }] : []),
+    ];
+    // Exact hits are read on their own, never through the over-fetch below:
+    // that one is cut alphabetically, and with a short query (`E`) hundreds
+    // of substring matches would push the one exact match out of the page.
+    const [exact, partial] = await Promise.all([
+      exactIds.length
+        ? this.prisma.glossaryTerm.findMany({
+            where: { AND: [{ id: { in: exactIds } }, ...scope] },
+            include: { scheme: true, replacedBy: true },
+          })
+        : Promise.resolve([]),
+      this.prisma.glossaryTerm.findMany({
+        where: {
+          AND: [
+            {
+              OR: [
+                { term: { contains: trimmed, mode: 'insensitive' } },
+                { id: { in: labelRows.map((row) => row.id) } },
+              ],
+            },
+            { id: { notIn: exactIds } },
+            // Only an exact hit may surface a status outside the filter.
+            { status: { in: [...statuses] } },
+            ...scope,
+          ],
+        },
+        include: { scheme: true, replacedBy: true },
+        take: Math.min(limit * LEXICAL_OVERFETCH, LEXICAL_FETCH_CAP),
+        orderBy: { term: 'asc' },
+      }),
+    ]);
+    const exactSeen = new Set(exact.map((row) => row.id));
+    const lexical = [
+      ...exact,
+      ...partial.filter((row) => !exactSeen.has(row.id)),
+    ];
 
     const ranked = lexical
       .map((term) => ({ term, rank: lexicalRank(trimmed, term) }))
@@ -1332,7 +1436,7 @@ export class GlossaryService {
       .slice(0, limit);
 
     const hits: GlossaryLookupHit[] = ranked.map(({ term, rank }) =>
-      this.toHit(term, rank.order, rank.matchedOn),
+      this.toHit(term, rank.matchedOn),
     );
     const seen = new Set(hits.map((hit) => hit.id));
 
@@ -1356,12 +1460,10 @@ export class GlossaryService {
 
   private toHit(
     term: TermWithScheme & { replacedBy?: GlossaryTerm | null },
-    order: number,
     matchedOn: GlossaryMatchedOn,
   ): GlossaryLookupHit {
     return {
       ...this.toDto(term),
-      matchType: legacyMatchType(order),
       matchedOn,
       deprecated: term.status === 'DEPRECATED',
       replacedBy: term.replacedBy
@@ -1417,8 +1519,7 @@ export class GlossaryService {
         return term
           ? [
               {
-                ...this.toHit(term, 5, 'semantic'),
-                matchType: 'semantic' as const,
+                ...this.toHit(term, 'semantic'),
                 similarity: Math.round(Number(row.score) * 100) / 100,
               },
             ]
@@ -1570,43 +1671,6 @@ export class GlossaryService {
       this.prisma.glossaryActivity.count({ where: { termId } }),
     ]);
     return { activities: rows, total };
-  }
-
-  /** "We classified N terms as concepts and M as entities — review" (R8). */
-  async migrationBanner() {
-    const settings = await this.prisma.instanceSettings.findUnique({
-      where: { id: 1 },
-      select: { glossaryKindBannerDismissedAt: true },
-    });
-    const cutoff = await this.prisma.$queryRaw<Array<{ applied: Date | null }>>`
-      SELECT finished_at AS applied FROM _prisma_migrations
-       WHERE migration_name = '20261001120000_glossary_model'
-       LIMIT 1
-    `.catch(() => [] as Array<{ applied: Date | null }>);
-    const appliedAt = cutoff[0]?.applied ?? null;
-    const where: Prisma.GlossaryTermWhereInput = appliedAt
-      ? { createdAt: { lt: appliedAt } }
-      : { id: '__none__' };
-    const [concepts, entities] = await Promise.all([
-      this.prisma.glossaryTerm.count({ where: { ...where, kind: 'CONCEPT' } }),
-      this.prisma.glossaryTerm.count({ where: { ...where, kind: 'ENTITY' } }),
-    ]);
-    return {
-      show: !settings?.glossaryKindBannerDismissedAt && concepts + entities > 0,
-      concepts,
-      entities,
-      migratedAt: appliedAt,
-      dismissedAt: settings?.glossaryKindBannerDismissedAt ?? null,
-    };
-  }
-
-  async dismissMigrationBanner() {
-    await this.prisma.instanceSettings.upsert({
-      where: { id: 1 },
-      create: { id: 1, glossaryKindBannerDismissedAt: new Date() },
-      update: { glossaryKindBannerDismissedAt: new Date() },
-    });
-    return this.migrationBanner();
   }
 
   // ── Schemes (R4) ─────────────────────────────────────────────────────────
@@ -1891,11 +1955,19 @@ export class GlossaryService {
       sourceIri: term.sourceIri ?? null,
       packKey: term.packKey ?? null,
       origin: String(term.origin),
-      verified: term.status === 'APPROVED',
-      verifiedBy: term.verifiedBy,
-      approvedAt: term.verifiedAt,
+      approvedBy: term.approvedBy,
+      approvedAt: term.approvedAt,
       createdAt: term.createdAt,
       updatedAt: term.updatedAt,
+      // Entities (G5). Zero and null for concepts.
+      anchorUrn: term.anchorUrn ?? null,
+      attributes: (term.attributes as Record<string, unknown> | null) ?? null,
+      mentionCount: term.mentionCount ?? 0,
+      assetCount: term.assetCount ?? 0,
+      sourceCount: term.sourceCount ?? 0,
+      firstSeenAt: term.firstSeenAt ?? null,
+      lastSeenAt: term.lastSeenAt ?? null,
+      mergedAt: term.mergedAt ?? null,
     };
   }
 }

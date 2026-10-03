@@ -1053,7 +1053,7 @@
               "name": "filters.term",
               "type": "string[]",
               "required": false,
-              "description": "Glossary term keys: only findings that are evidence of one of these concepts (an APPROVED binding of their detector output, or a manual link). Prefer this over regex on values when a concept exists. Unknown keys are rejected."
+              "description": "Glossary term keys: only findings that are evidence of one of these terms (an APPROVED binding of their detector output, a manual link, or — for an entity — a mention of one of its confirmed values). Prefer this over regex on values when a term exists. Unknown keys are rejected."
             },
             {
               "name": "filters.includeNarrower",
@@ -1068,7 +1068,8 @@
               "description": "With term: only evidence by these methods.",
               "enumValues": [
                 "BINDING",
-                "MANUAL"
+                "MANUAL",
+                "MENTION"
               ]
             },
             {
@@ -1318,7 +1319,7 @@
               "name": "filters.term",
               "type": "string[]",
               "required": false,
-              "description": "Glossary term keys: only findings that are evidence of one of these concepts (an APPROVED binding of their detector output, or a manual link). Prefer this over regex on values when a concept exists. Unknown keys are rejected."
+              "description": "Glossary term keys: only findings that are evidence of one of these terms (an APPROVED binding of their detector output, a manual link, or — for an entity — a mention of one of its confirmed values). Prefer this over regex on values when a term exists. Unknown keys are rejected."
             },
             {
               "name": "filters.includeNarrower",
@@ -1333,7 +1334,8 @@
               "description": "With term: only evidence by these methods.",
               "enumValues": [
                 "BINDING",
-                "MANUAL"
+                "MANUAL",
+                "MENTION"
               ]
             },
             {
@@ -6210,6 +6212,338 @@
               "name": "limit",
               "type": "integer",
               "required": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "entities",
+      "title": "Entities",
+      "description": "The named things findings refer to — people, organisations, accounts: search them, read where each is mentioned and with whom, create one from a finding, review candidate values and merge duplicates.",
+      "operations": [
+        "Search entities and read their names, identifiers and counters",
+        "List where an entity is mentioned, and which entities appear with it",
+        "Create an entity from a finding or a value; add identifiers",
+        "Review candidate values and identifier conflicts; merge two entities"
+      ],
+      "tools": [
+        {
+          "name": "search_entities",
+          "title": "Search Entities",
+          "description": "Find entities — the named things findings refer to (a person, an organisation, an account) — by name, alias, key or identifier value, with their mention counters. An entity is an ENTITY-kind glossary term, so its key works wherever a term key does (the `term` finding filter, watches, Ref.term).",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "query",
+              "type": "string",
+              "required": false,
+              "description": "Matches names, aliases, keys and identifier values."
+            },
+            {
+              "name": "entityType",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "PERSON",
+                "ORGANIZATION",
+                "LOCATION",
+                "REFERENCE",
+                "OTHER"
+              ]
+            },
+            {
+              "name": "status",
+              "type": "enum[]",
+              "required": false,
+              "enumValues": [
+                "DRAFT",
+                "APPROVED",
+                "DEPRECATED"
+              ]
+            },
+            {
+              "name": "sort",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "mentions",
+                "name",
+                "lastSeen"
+              ]
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "get_entity",
+          "title": "Get Entity",
+          "description": "One entity: its names and identifiers (confirmed values), live mention counters, the record it is anchored to, pending candidates, and which names it shares with other entities (ambiguous, not wrong). Mentions link — and count as meaning — only while the entity is APPROVED.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "entity",
+              "type": "string",
+              "required": true,
+              "description": "Entity id or glossary key (previous keys redirect)."
+            }
+          ]
+        },
+        {
+          "name": "get_entity_mentions",
+          "title": "Get Entity Mentions",
+          "description": "Where an entity is mentioned, across every source: asset, source, finding, the value that matched and a snippet. Derived by joining the entity's confirmed values with the value index, so a value confirmed today lists documents scanned long ago. Keyset-paged: pass `next` back as `after`.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "entity",
+              "type": "string",
+              "required": true,
+              "description": "Entity id or glossary key (previous keys redirect)."
+            },
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "after",
+              "type": "string",
+              "required": false,
+              "description": "The `next` cursor of the previous page."
+            }
+          ]
+        },
+        {
+          "name": "get_co_mentioned_entities",
+          "title": "Get Co-mentioned Entities",
+          "description": "The entities that appear in the same assets as this one, most shared first: who appears with whom. Computed on demand over the latest mention assets; nothing is stored as graph edges.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "entity",
+              "type": "string",
+              "required": true,
+              "description": "Entity id or glossary key (previous keys redirect)."
+            },
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "create_entity",
+          "title": "Create Entity",
+          "description": "Create an entity, optionally from a finding (`findingId`) or an indexed value (`value`), which becomes its first alias or identifier. Every existing and future finding carrying one of its names or identifiers is then a mention, with no further step. Returns the entity with its mentions counted, and any identifier another entity already holds as `conflicts` (those wait in the review queue).",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string",
+              "required": false,
+              "description": "Required unless the promoted value is itself a name (a person or organisation finding)."
+            },
+            {
+              "name": "entityType",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "PERSON",
+                "ORGANIZATION",
+                "LOCATION",
+                "REFERENCE",
+                "OTHER"
+              ]
+            },
+            {
+              "name": "aliases",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "identifiers",
+              "type": "object[]",
+              "required": false
+            },
+            {
+              "name": "definition",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "notes",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "findingId",
+              "type": "string",
+              "required": false,
+              "description": "Promote this finding's value: it becomes the entity's first alias (a name) or identifier."
+            },
+            {
+              "name": "value",
+              "type": "object",
+              "required": false,
+              "description": "Or promote a value from get_value_occurrences."
+            },
+            {
+              "name": "value.label",
+              "type": "string",
+              "required": true,
+              "description": "The finding label the value is detected under (e.g. iban_code, email_address, a custom detector label). It is what links findings to the entity."
+            },
+            {
+              "name": "value.value",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "createNew",
+              "type": "boolean",
+              "required": false,
+              "description": "Create a second entity even if one has this name."
+            }
+          ]
+        },
+        {
+          "name": "update_entity",
+          "title": "Update Entity",
+          "description": "Add identifiers to an entity, remove values, or set its anchor URN and attributes. Rename it or edit aliases with upsert_glossary_term (it is a glossary term). An identifier another entity holds is not double-linked: it comes back under `conflicts` and waits for review.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "entity",
+              "type": "string",
+              "required": true,
+              "description": "Entity id or glossary key (previous keys redirect)."
+            },
+            {
+              "name": "addIdentifiers",
+              "type": "object[]",
+              "required": false
+            },
+            {
+              "name": "removeValueIds",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "anchorUrn",
+              "type": "unknown",
+              "required": false,
+              "description": "URN of the record that is this entity; null clears it."
+            },
+            {
+              "name": "attributes",
+              "type": "unknown",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "list_entity_candidates",
+          "title": "List Entity Candidates",
+          "description": "The entity review queue: values that may refer to an entity (a spelling variant found by sound or by folded spelling), each with a score, how many assets carry it and up to three occurrences to judge it by — plus identifier conflicts. Nothing here links until it is accepted.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "entity",
+              "type": "string",
+              "required": false,
+              "description": "Entity id or glossary key (previous keys redirect)."
+            },
+            {
+              "name": "kind",
+              "type": "enum",
+              "required": false,
+              "description": "mention: a spelling variant to confirm. conflict: an identifier two entities claim.",
+              "enumValues": [
+                "mention",
+                "conflict"
+              ]
+            },
+            {
+              "name": "minScore",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "take",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "skip",
+              "type": "integer",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "review_entity_candidates",
+          "title": "Review Entity Candidates",
+          "description": "Accept or reject candidates in one call. Accepting confirms the value for its entity, so every asset that carries it becomes a mention; rejecting is remembered and the value is not proposed for that entity again.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "decisions",
+              "type": "object[]",
+              "required": true
+            }
+          ]
+        },
+        {
+          "name": "merge_entities",
+          "title": "Merge Entities",
+          "description": "Merge one entity into another: its names, identifiers, values, references, relations and watches move to the target, and it becomes deprecated and redirects there. Two entities are never merged automatically. This cannot be undone by a single call.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "from",
+              "type": "string",
+              "required": true,
+              "description": "The entity that goes away (it will redirect)."
+            },
+            {
+              "name": "into",
+              "type": "string",
+              "required": true,
+              "description": "The entity that stays; it must be APPROVED."
             }
           ]
         }

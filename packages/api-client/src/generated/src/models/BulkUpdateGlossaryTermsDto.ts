@@ -40,12 +40,6 @@ export interface BulkUpdateGlossaryTermsDto {
      */
     filters?: BulkUpdateGlossaryFiltersDto;
     /**
-     * True approves the selected terms, false returns them to DRAFT (kept for compatibility; prefer status).
-     * @type {boolean}
-     * @memberof BulkUpdateGlossaryTermsDto
-     */
-    verified?: boolean;
-    /**
      * 
      * @type {string}
      * @memberof BulkUpdateGlossaryTermsDto
@@ -69,12 +63,6 @@ export interface BulkUpdateGlossaryTermsDto {
      * @memberof BulkUpdateGlossaryTermsDto
      */
     kind?: BulkUpdateGlossaryTermsDtoKindEnum;
-    /**
-     * 
-     * @type {string}
-     * @memberof BulkUpdateGlossaryTermsDto
-     */
-    verifiedBy?: string;
 }
 
 
@@ -130,12 +118,10 @@ export function BulkUpdateGlossaryTermsDtoFromJSONTyped(json: any, ignoreDiscrim
         
         'ids': json['ids'] == null ? undefined : json['ids'],
         'filters': json['filters'] == null ? undefined : BulkUpdateGlossaryFiltersDtoFromJSON(json['filters']),
-        'verified': json['verified'] == null ? undefined : json['verified'],
         'status': json['status'] == null ? undefined : json['status'],
         'entityType': json['entityType'] == null ? undefined : json['entityType'],
         'schemeId': json['schemeId'] == null ? undefined : json['schemeId'],
         'kind': json['kind'] == null ? undefined : json['kind'],
-        'verifiedBy': json['verifiedBy'] == null ? undefined : json['verifiedBy'],
     };
 }
 
@@ -152,12 +138,10 @@ export function BulkUpdateGlossaryTermsDtoToJSONTyped(value?: BulkUpdateGlossary
         
         'ids': value['ids'],
         'filters': BulkUpdateGlossaryFiltersDtoToJSON(value['filters']),
-        'verified': value['verified'],
         'status': value['status'],
         'entityType': value['entityType'],
         'schemeId': value['schemeId'],
         'kind': value['kind'],
-        'verifiedBy': value['verifiedBy'],
     };
 }
 

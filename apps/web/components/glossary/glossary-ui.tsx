@@ -13,6 +13,7 @@ import {
   lookupTerms,
   type LinkMethod,
   type LookupHit,
+  type Term,
   type SchemeRef,
   type TermKind,
   type TermStatus,
@@ -120,6 +121,61 @@ export function TermLink({
       )}
     >
       {children}
+    </Link>
+  );
+}
+
+/**
+ * Where a listed term is used: the assets linked to it and the bindings that
+ * link them, opening its evidence. A term nothing links to says so, because
+ * that is the difference between vocabulary and vocabulary the data uses.
+ */
+export function TermUsageCell({ term }: { term: Term }) {
+  const { t } = useTranslation();
+  const href = useTermHref();
+  const usage = term.usage;
+  // An entity is used through its mentions (G5), counted on the term itself.
+  if (term.kind === "ENTITY" && term.mentionCount > 0) {
+    return (
+      <Link
+        href={`${href(term.key)}?tab=entity`}
+        className="underline-offset-2 hover:underline"
+      >
+        <span className="font-mono font-semibold">
+          {term.mentionCount.toLocaleString()}
+        </span>{" "}
+        {t(term.mentionCount === 1 ? "entities.usage.mention" : "entities.usage.mentions")}
+        <span className="text-muted-foreground">
+          {" · "}
+          {term.assetCount.toLocaleString()}{" "}
+          {t(term.assetCount === 1 ? "glossary.usage.asset" : "glossary.usage.assets")}
+        </span>
+      </Link>
+    );
+  }
+  if (!usage || (usage.assets === 0 && usage.bindings === 0)) {
+    return (
+      <span className="text-muted-foreground">{t("glossary.usage.unused")}</span>
+    );
+  }
+  return (
+    <Link
+      href={`${href(term.key)}?tab=${usage.assets > 0 ? "evidence" : "bindings"}`}
+      className="underline-offset-2 hover:underline"
+    >
+      <span className="font-mono font-semibold">
+        {usage.assets.toLocaleString()}
+      </span>{" "}
+      {t(usage.assets === 1 ? "glossary.usage.asset" : "glossary.usage.assets")}
+      <span className="text-muted-foreground">
+        {" · "}
+        {usage.bindings.toLocaleString()}{" "}
+        {t(
+          usage.bindings === 1
+            ? "glossary.usage.binding"
+            : "glossary.usage.bindings",
+        )}
+      </span>
     </Link>
   );
 }
