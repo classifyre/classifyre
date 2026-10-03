@@ -1,5 +1,10 @@
 import { getActorName, getNamespacedApiBaseUrl } from "@workspace/api-client";
-import { request, type EntityType, type Term, type TermStatus } from "./semantic-api";
+import {
+  request,
+  type EntityType,
+  type Term,
+  type TermStatus,
+} from "./semantic-api";
 
 /**
  * Entities (docs/prd/G5-entities.md): the named things findings refer to. An
@@ -58,7 +63,12 @@ export interface EntityDetail extends Term {
   featureEnabled: boolean;
   anchor: {
     urn: string;
-    asset: { id: string; name: string; sourceId: string; externalUrl: string } | null;
+    asset: {
+      id: string;
+      name: string;
+      sourceId: string;
+      externalUrl: string;
+    } | null;
   } | null;
   mergedInto: EntityRef | null;
   values: EntityValue[];
@@ -167,7 +177,14 @@ export type CreatedEntity = EntityDetail & {
   conflicts: Array<{ label: string; value: string; heldBy: EntityRef }>;
 };
 
-export const getEntityConfig = () => request<EntityConfig>("GET", "/entities/config");
+export const getEntityConfig = () =>
+  request<EntityConfig>("GET", "/entities/config");
+
+/** Replace the custom labels that take part; alias values are regenerated. */
+export const saveEntityConfig = (input: {
+  nameLabels: Record<string, string>;
+  identifierLabels: string[];
+}) => request<EntityConfig>("PUT", "/entities/config", { body: input });
 
 export function searchEntities(params: {
   query?: string;
@@ -176,9 +193,13 @@ export function searchEntities(params: {
   take?: number;
   skip?: number;
 }) {
-  return request<{ entities: EntityListRow[]; total: number }>("GET", "/entities", {
-    query: params,
-  });
+  return request<{ entities: EntityListRow[]; total: number }>(
+    "GET",
+    "/entities",
+    {
+      query: params,
+    },
+  );
 }
 
 export const getEntity = (idOrKey: string) =>
@@ -188,7 +209,10 @@ export const createEntity = (input: CreateEntityInput) =>
   request<CreatedEntity>("POST", "/entities", { body: input });
 
 export const getEntityOverview = (idOrKey: string) =>
-  request<EntityOverview>("GET", `/entities/${encodeURIComponent(idOrKey)}/overview`);
+  request<EntityOverview>(
+    "GET",
+    `/entities/${encodeURIComponent(idOrKey)}/overview`,
+  );
 
 export const getEntityMentions = (
   idOrKey: string,
@@ -200,7 +224,10 @@ export const getEntityMentions = (
     { query: params },
   );
 
-export const addEntityValue = (idOrKey: string, input: { label: string; value: string }) =>
+export const addEntityValue = (
+  idOrKey: string,
+  input: { label: string; value: string },
+) =>
   request<{ value: EntityValue; conflict: EntityRef | null }>(
     "POST",
     `/entities/${encodeURIComponent(idOrKey)}/values`,
@@ -208,7 +235,10 @@ export const addEntityValue = (idOrKey: string, input: { label: string; value: s
   );
 
 export const removeEntityValue = (valueId: string) =>
-  request<{ removed: boolean }>("DELETE", `/entities/values/${encodeURIComponent(valueId)}`);
+  request<{ removed: boolean }>(
+    "DELETE",
+    `/entities/values/${encodeURIComponent(valueId)}`,
+  );
 
 export const mergeEntity = (fromIdOrKey: string, into: string) =>
   request<{ merged: boolean; into: EntityRef }>(

@@ -6522,6 +6522,17 @@
       "existing": "{{name}} already existed and was updated.",
       "found": "{{count}} assets mention it.",
       "openEntity": "Open entity"
+    },
+    "labels": {
+      "title": "Labels that take part",
+      "summary": "{{names}} name labels · {{identifiers}} identifier labels",
+      "hint": "Names are matched by spelling and produce candidates to review. Identifiers are matched exactly. Tag, date and free-text labels never take part, so a common word cannot make every document a mention. Saving regenerates every entity’s values.",
+      "names": "Name labels (custom)",
+      "identifiers": "Identifier labels",
+      "save": "Save labels",
+      "reset": "Reset",
+      "saved": "Labels saved. Entity values are being regenerated.",
+      "add": "Add label"
     }
   }
 }

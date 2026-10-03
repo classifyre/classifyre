@@ -550,7 +550,7 @@ export class GlossaryToolset {
           if (!this.entities || !this.entityMentions) {
             throw new Error('Entities are not available here.');
           }
-          const entity = await this.entities.get(String(input.term ?? ''));
+          const entity = await this.entities.get(str(input.term) ?? '');
           const limit = Math.min(
             Math.max(
               typeof input.mentions === 'number' ? input.mentions : 10,
@@ -656,7 +656,7 @@ export class GlossaryToolset {
             throw new Error('verdict is accept or reject');
           }
           const row = await this.entityValues.proposeVerdict(
-            String(input.candidateId ?? ''),
+            str(input.candidateId) ?? '',
             input.verdict,
             str(input.note),
           );

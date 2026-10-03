@@ -33,6 +33,7 @@ These PRDs turn the findings of [palantir-use-case-gap-analysis.md](../../palant
 
 | PRD | Status |
 |---|---|
-| All | Proposed, 2026-09-30 |
+| [G5 · Entities](G5-entities.md) | Shipped on this branch, 2026-10-03 ([as built](G5-entities.md#13-as-built)) |
+| All others | Proposed, 2026-09-30 |
 
 Update this table as PRDs move to *Accepted*, *In progress* and *Shipped*.

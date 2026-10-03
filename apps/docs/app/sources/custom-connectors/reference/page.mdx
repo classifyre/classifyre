@@ -161,6 +161,7 @@ What `extract()` yields. One thing worth scanning.
 | `mime_type` | `str` | Content type of `content_bytes`. Detected when omitted. |
 | `created_at` / `updated_at` | `datetime \| str` | Defaults to now. A string must be ISO 8601. |
 | `location` | `str` | Where inside the system this came from. |
+| `entity` | `Entity` | The named thing this record *is*. See [Declaring an entity](#declaring-an-entity-entity). |
 
 ### Choosing `kind`
 
@@ -391,6 +392,50 @@ The asset gets a **declared** semantic link to the concept (see
 declaration is kept as a pending reference and links as soon as someone defines
 the term. Declarations to draft terms link once the term is approved. Keys are
 lower-case letters, digits, `.`, `_` and `-`; `Ref.term` refuses anything else.
+
+### Declaring an entity: `Entity`
+
+A register or a customer master does not merely mention *ACME Holding GmbH*; its
+record **is** ACME. Say so on the asset:
+
+```python
+from classifyre import Asset, Entity
+
+
+yield Asset(
+    id=fn,
+    urn=urn_for("firmenbuch", fn),
+    content=record_text,
+    entity=Entity(
+        type="ORGANIZATION",
+        name="ACME Holding GmbH",
+        identifiers={"vat": "ATU12345678", "fn": "123456a"},
+        aliases=["ACME Holding"],
+        attributes={"seat": "Wien"},
+    ),
+)
+```
+
+The entity is created in the [glossary](/how-it-works/glossary/) (or updated),
+anchored to this record, and from then on every document in every source that
+carries the name or one of the identifiers is a mention of it.
+
+| Field | Notes |
+| --- | --- |
+| `name` | **Required.** The entity's canonical name. |
+| `type` | `PERSON`, `ORGANIZATION`, `LOCATION`, `REFERENCE` or `OTHER` _(default)_. Decides which name labels the name is matched under. |
+| `identifiers` | `{label: value}`. The **label is the one a detector finds the value under** (`iban_code`, `email_address`, a custom detector's label). An identifier under a label nothing detects links nothing. |
+| `aliases` | Other names. |
+| `attributes` | Free-form facts shown on the entity page. |
+| `key` | Pins the glossary key, for a source that already uses `Ref.term(key)`. |
+
+The asset needs a `urn` (or the entity a `key`): it is what makes the
+declaration the same entity on the next scan instead of a new one. A declared
+entity is the register's word, so it is approved from the start. A later scan
+only **adds** — names, identifiers and attributes an operator edited stay as
+they are, and an entity merged into another is declared onto the survivor.
+Entities must be on in the workspace; declarations made while they are off are
+applied when they are turned on.
 
 ### Lineage across systems
 

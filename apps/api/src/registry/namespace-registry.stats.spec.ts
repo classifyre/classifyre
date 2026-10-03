@@ -64,12 +64,11 @@ describe('classifyStatsSource', () => {
     [{ runnerStatus: 'COMPLETED', latestRunnerStatus: 'COMPLETED' }, null],
     [{ runnerStatus: 'WARNING', latestRunnerStatus: 'WARNING' }, null],
     [{ runnerStatus: 'STOPPED', latestRunnerStatus: 'STOPPED' }, null],
-  ] as Array<[NamespaceStatsSourceRow, 'failing' | 'running' | 'pending' | null]>)(
-    'classifies %j as %s',
-    (row, expected) => {
-      expect(classifyStatsSource(row)).toBe(expected);
-    },
-  );
+  ] as Array<
+    [NamespaceStatsSourceRow, 'failing' | 'running' | 'pending' | null]
+  >)('classifies %j as %s', (row, expected) => {
+    expect(classifyStatsSource(row)).toBe(expected);
+  });
 });
 
 describe('NamespaceRegistryService stats', () => {

@@ -673,6 +673,14 @@ export class EntityValuesService {
         result.moved += 1;
         continue;
       }
+      if (row.conflictTermId) {
+        // Accepting would leave two entities holding one identifier (R6).
+        result.skipped.push({
+          id,
+          reason: 'a conflict: move the identifier here, or reject it',
+        });
+        continue;
+      }
       await this.prisma.entityValue.update({
         where: { id },
         data: {
@@ -906,6 +914,12 @@ export class EntityValuesService {
             mergeAttributes(into.attributes, from.attributes) ?? Prisma.DbNull,
         },
       });
+      // Entities already redirecting to A follow A to B, so a redirect is
+      // always one hop.
+      await tx.glossaryTerm.updateMany({
+        where: { replacedById: from.id },
+        data: { replacedById: into.id },
+      });
       await tx.glossaryTerm.update({
         where: { id: from.id },
         data: {
@@ -1025,8 +1039,7 @@ function mergeAttributes(
 ): Prisma.InputJsonValue | null {
   const isObject = (value: unknown): value is Record<string, unknown> =>
     Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-  if (!isObject(from))
-    return isObject(into) ? (into as Prisma.InputJsonValue) : null;
-  if (!isObject(into)) return from as Prisma.InputJsonValue;
-  return { ...from, ...into } as Prisma.InputJsonValue;
+  if (!isObject(from)) return isObject(into) ? into : null;
+  if (!isObject(into)) return from;
+  return { ...from, ...into };
 }

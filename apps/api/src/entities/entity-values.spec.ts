@@ -1,6 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { normalizeValue, valueHash } from '../correlation/value-normalizer';
 import { EntityValuesService } from './entity-values.service';
+import { mentionsCsv, type EntityMention } from './entity-mentions.service';
 
 const NO_CONFIG = { nameLabels: {}, identifierLabels: [] };
 
@@ -215,5 +216,58 @@ describe('EntityValuesService', () => {
     await expect(service.merge('a', 'b', agent)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
+  });
+
+  it('does not accept a conflict: the identifier would have two holders (R6)', async () => {
+    const update = jest.fn();
+    const prisma = {
+      entityValue: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'c1', verdict: 'PROPOSED', termId: 'b', conflictTermId: 'a' },
+          { id: 'm1', verdict: 'PROPOSED', termId: 'b', conflictTermId: null },
+        ]),
+        update,
+      },
+      glossaryActivity: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const { service } = build(prisma);
+
+    const out = await service.review(
+      [
+        { id: 'c1', decision: 'accept' },
+        { id: 'm1', decision: 'accept' },
+      ],
+      { name: 'ada' },
+    );
+
+    expect(out.accepted).toBe(1);
+    expect(out.skipped).toEqual([{ id: 'c1', reason: expect.any(String) }]);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0][0].where).toEqual({ id: 'm1' });
+  });
+
+  it('defuses spreadsheet formulas in the access-request export', () => {
+    const row = {
+      assetName: '=HYPERLINK("http://evil")',
+      externalUrl: 'https://x',
+      sourceName: 'mail',
+      snippet: {
+        location: 'p1',
+        matched: '+1 555',
+        before: '',
+        after: '',
+      },
+      findingType: 'PERSON',
+      detectorType: 'PII',
+      label: 'person',
+      value: 'x',
+      seenAt: null,
+    } as unknown as EntityMention;
+
+    const csv = mentionsCsv([row]);
+
+    expect(csv).toContain(`"'=HYPERLINK(""http://evil"")"`);
+    expect(csv).toContain(",'+1 555,");
+    expect(csv).not.toMatch(/(^|,)=/m);
   });
 });

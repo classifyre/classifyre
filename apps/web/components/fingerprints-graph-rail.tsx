@@ -29,6 +29,7 @@ import {
   FingerprintValueOccurrences,
   type FingerprintOccurrencesCache,
 } from "./fingerprint-value-occurrences";
+import { MakeEntityButton } from "@/components/glossary/entity-sections";
 import { useDetailLink } from "@/hooks/use-detail-link";
 import { useSourceTypeLabel } from "@/hooks/use-source-type-label";
 import { useTranslation } from "@/hooks/use-translation";
@@ -142,7 +143,10 @@ export function FingerprintsGraphSelectionRail({
           {/* Which source this document came from, by its real name. */}
           {selectedNode.sourceName && (
             <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-              {[selectedNode.sourceName, sourceTypeLabel(selectedNode.sourceType)]
+              {[
+                selectedNode.sourceName,
+                sourceTypeLabel(selectedNode.sourceType),
+              ]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
@@ -180,10 +184,17 @@ export function FingerprintsGraphSelectionRail({
           {/* A graph value is a hash shared by multiple finding rows. Resolve
               the concrete row only once the operator opens this detail. */}
           {selectedNode.detectorType !== "BUNDLE" && (
-            <FingerprintValueOccurrences
-              valueHash={selectedNode.id}
-              cache={occurrencesCache}
-            />
+            <>
+              <MakeEntityButton
+                label={selectedNode.detectorType ?? ""}
+                value={selectedNode.label}
+                className="h-7 w-full rounded-[4px] border-2 border-border text-xs"
+              />
+              <FingerprintValueOccurrences
+                valueHash={selectedNode.id}
+                cache={occurrencesCache}
+              />
+            </>
           )}
         </div>
       ) : null}
@@ -232,7 +243,13 @@ function BundleValueOccurrences({
               </span>
             </button>
             {active && (
-              <FingerprintValueOccurrences valueHash={value.id} cache={cache} />
+              <>
+                <MakeEntityButton label={value.label} value={value.value} />
+                <FingerprintValueOccurrences
+                  valueHash={value.id}
+                  cache={cache}
+                />
+              </>
             )}
           </li>
         );
@@ -296,7 +313,9 @@ export function FingerprintsGraphOverviewFooter({
           </li>
           <li className="flex items-center gap-2">
             <span className="inline-block h-2.5 w-2.5 rounded-full bg-foreground/70" />
-            {t("correlation.fingerprints.legendValue", { count: String(valueCount) })}
+            {t("correlation.fingerprints.legendValue", {
+              count: String(valueCount),
+            })}
           </li>
         </ul>
         <div className="space-y-1 pt-1">

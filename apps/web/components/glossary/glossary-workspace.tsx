@@ -48,6 +48,7 @@ import {
   type Term,
   type TermKind,
 } from "@/lib/semantic-api";
+import { EntityLabelsCard } from "./entity-sections";
 import { MICRO_LABEL } from "./glossary-ui";
 import { ProposalsPanel } from "./proposals-panel";
 import { SchemesPanel } from "./schemes-panel";
@@ -56,7 +57,13 @@ import { TermsPanel } from "./terms-panel";
 import { VocabularyPanel } from "./vocabulary-panel";
 
 type Tab = "concepts" | "entities" | "schemes" | "vocabulary" | "proposals";
-const TABS: Tab[] = ["concepts", "entities", "schemes", "vocabulary", "proposals"];
+const TABS: Tab[] = [
+  "concepts",
+  "entities",
+  "schemes",
+  "vocabulary",
+  "proposals",
+];
 
 function PacksDialog({
   open,
@@ -121,7 +128,9 @@ function PacksDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("glossary.packs.title")}</DialogTitle>
-          <DialogDescription>{t("glossary.packs.description")}</DialogDescription>
+          <DialogDescription>
+            {t("glossary.packs.description")}
+          </DialogDescription>
         </DialogHeader>
         {packs === null ? (
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -140,7 +149,10 @@ function PacksDialog({
                         v{pack.version}
                       </span>
                       {pack.installedVersion && (
-                        <Badge variant="outline" className="rounded-[4px] text-[10px]">
+                        <Badge
+                          variant="outline"
+                          className="rounded-[4px] text-[10px]"
+                        >
                           {t("glossary.packs.installedVersion", {
                             version: pack.installedVersion,
                           })}
@@ -148,7 +160,9 @@ function PacksDialog({
                       )}
                     </div>
                     {pack.description && (
-                      <p className="text-xs text-muted-foreground">{pack.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {pack.description}
+                      </p>
                     )}
                     <p className="font-mono text-[11px] text-muted-foreground">
                       {t("glossary.packs.counts", {
@@ -174,7 +188,9 @@ function PacksDialog({
                       onClick={() => install(pack.key)}
                       className="h-8 rounded-[4px] text-xs"
                     >
-                      {busy === pack.key && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {busy === pack.key && (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      )}
                       {pack.installedVersion
                         ? t("glossary.packs.reinstall")
                         : t("glossary.packs.install")}
@@ -188,7 +204,10 @@ function PacksDialog({
                       update: String(dryRun.counts.update ?? 0),
                       skip: String(dryRun.counts.skip ?? 0),
                       bindings: String(
-                        Object.values(dryRun.bindings).reduce((a, b) => a + b, 0),
+                        Object.values(dryRun.bindings).reduce(
+                          (a, b) => a + b,
+                          0,
+                        ),
                       ),
                     })}
                   </p>
@@ -215,9 +234,9 @@ function ImportDialog({
   const [format, setFormat] = React.useState<"csv" | "skos">("csv");
   const [content, setContent] = React.useState("");
   const [asDraft, setAsDraft] = React.useState(false);
-  const [conflict, setConflict] = React.useState<"skip" | "overwrite" | "merge-labels">(
-    "skip",
-  );
+  const [conflict, setConflict] = React.useState<
+    "skip" | "overwrite" | "merge-labels"
+  >("skip");
   const [report, setReport] = React.useState<ImportReport | null>(null);
   const [busy, setBusy] = React.useState(false);
 
@@ -230,7 +249,13 @@ function ImportDialog({
   async function run(dryRun: boolean) {
     setBusy(true);
     try {
-      const result = await importGlossary({ format, content, dryRun, conflict, asDraft });
+      const result = await importGlossary({
+        format,
+        content,
+        dryRun,
+        conflict,
+        asDraft,
+      });
       setReport(result);
       if (!dryRun) {
         toast.success(t("glossary.import.done"));
@@ -246,7 +271,8 @@ function ImportDialog({
 
   async function readFile(file: File) {
     setContent(await file.text());
-    if (file.name.endsWith(".json") || file.name.endsWith(".jsonld")) setFormat("skos");
+    if (file.name.endsWith(".json") || file.name.endsWith(".jsonld"))
+      setFormat("skos");
     if (file.name.endsWith(".csv")) setFormat("csv");
   }
 
@@ -255,11 +281,16 @@ function ImportDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("glossary.import.title")}</DialogTitle>
-          <DialogDescription>{t("glossary.import.description")}</DialogDescription>
+          <DialogDescription>
+            {t("glossary.import.description")}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
-            <Select value={format} onValueChange={(value) => setFormat(value as "csv" | "skos")}>
+            <Select
+              value={format}
+              onValueChange={(value) => setFormat(value as "csv" | "skos")}
+            >
               <SelectTrigger className="h-9 w-[160px] rounded-[4px] border-2 border-border">
                 <SelectValue />
               </SelectTrigger>
@@ -278,9 +309,15 @@ function ImportDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="skip">{t("glossary.import.conflictSkip")}</SelectItem>
-                <SelectItem value="merge-labels">{t("glossary.import.conflictMerge")}</SelectItem>
-                <SelectItem value="overwrite">{t("glossary.import.conflictOverwrite")}</SelectItem>
+                <SelectItem value="skip">
+                  {t("glossary.import.conflictSkip")}
+                </SelectItem>
+                <SelectItem value="merge-labels">
+                  {t("glossary.import.conflictMerge")}
+                </SelectItem>
+                <SelectItem value="overwrite">
+                  {t("glossary.import.conflictOverwrite")}
+                </SelectItem>
               </SelectContent>
             </Select>
             <label className="flex items-center gap-2 text-xs">
@@ -320,7 +357,10 @@ function ImportDialog({
                 .filter((item) => item.reason)
                 .slice(0, 8)
                 .map((item) => (
-                  <p key={`${item.row}-${item.key}`} className="text-muted-foreground">
+                  <p
+                    key={`${item.row}-${item.key}`}
+                    className="text-muted-foreground"
+                  >
                     {item.term}: {item.reason}
                   </p>
                 ))}
@@ -328,7 +368,11 @@ function ImportDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => onOpenChange(false)}
+          >
             {t("common.cancel")}
           </Button>
           <Button
@@ -352,7 +396,11 @@ function ImportDialog({
  * The glossary (SL1–SL4): concepts and entities, schemes, the vocabulary the
  * data actually produces, and the review queue — one workspace.
  */
-export function GlossaryWorkspace({ embedded = false }: { embedded?: boolean }) {
+export function GlossaryWorkspace({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const { t } = useTranslation();
   // Other pages link straight to a tab: an entity's candidates to the review
   // queue (?tab=proposals), the Entities switch to its list (?tab=entities).
@@ -373,7 +421,9 @@ export function GlossaryWorkspace({ embedded = false }: { embedded?: boolean }) 
   React.useEffect(() => {
     proposalCounts()
       .then((counts) =>
-        setPending(Object.values(counts).reduce((sum, n) => sum + (Number(n) || 0), 0)),
+        setPending(
+          Object.values(counts).reduce((sum, n) => sum + (Number(n) || 0), 0),
+        ),
       )
       .catch(() => setPending(0));
   }, [refreshKey]);
@@ -391,7 +441,9 @@ export function GlossaryWorkspace({ embedded = false }: { embedded?: boolean }) 
             </h1>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">{t("glossary.description")}</p>
+          <p className="text-sm text-muted-foreground">
+            {t("glossary.description")}
+          </p>
         )}
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -404,7 +456,10 @@ export function GlossaryWorkspace({ embedded = false }: { embedded?: boolean }) 
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="rounded-[4px] border-2 border-border">
+              <Button
+                variant="outline"
+                className="rounded-[4px] border-2 border-border"
+              >
                 <Download className="h-4 w-4" />
                 {t("glossary.transfer")}
               </Button>
@@ -440,10 +495,18 @@ export function GlossaryWorkspace({ embedded = false }: { embedded?: boolean }) 
 
       <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
         <TabsList>
-          <TabsTrigger value="concepts">{t("glossary.tabs.concepts")}</TabsTrigger>
-          <TabsTrigger value="entities">{t("glossary.tabs.entities")}</TabsTrigger>
-          <TabsTrigger value="schemes">{t("glossary.tabs.schemes")}</TabsTrigger>
-          <TabsTrigger value="vocabulary">{t("glossary.tabs.vocabulary")}</TabsTrigger>
+          <TabsTrigger value="concepts">
+            {t("glossary.tabs.concepts")}
+          </TabsTrigger>
+          <TabsTrigger value="entities">
+            {t("glossary.tabs.entities")}
+          </TabsTrigger>
+          <TabsTrigger value="schemes">
+            {t("glossary.tabs.schemes")}
+          </TabsTrigger>
+          <TabsTrigger value="vocabulary">
+            {t("glossary.tabs.vocabulary")}
+          </TabsTrigger>
           <TabsTrigger value="proposals">
             {t("glossary.tabs.proposals")}
             {pending > 0 && (
@@ -464,7 +527,8 @@ export function GlossaryWorkspace({ embedded = false }: { embedded?: boolean }) 
             onChanged={bump}
           />
         </TabsContent>
-        <TabsContent value="entities" className="pt-4">
+        <TabsContent value="entities" className="space-y-4 pt-4">
+          <EntityLabelsCard onSaved={bump} />
           <TermsPanel
             kind="ENTITY"
             refreshKey={refreshKey}
@@ -496,8 +560,16 @@ export function GlossaryWorkspace({ embedded = false }: { embedded?: boolean }) 
           bump();
         }}
       />
-      <PacksDialog open={packsOpen} onOpenChange={setPacksOpen} onInstalled={bump} />
-      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={bump} />
+      <PacksDialog
+        open={packsOpen}
+        onOpenChange={setPacksOpen}
+        onInstalled={bump}
+      />
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={bump}
+      />
     </div>
   );
 }
