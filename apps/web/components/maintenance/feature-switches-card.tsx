@@ -228,23 +228,18 @@ export function FeatureSwitchesCard() {
   };
 
   const stateBadge = (feature: WorkspaceFeatureState) => {
-    const neverChosen =
-      !feature.enabled &&
-      feature.changedAt === null &&
-      feature.deploymentDefault === false;
+    // Every feature ships enabled: an off switch is always an operator's
+    // choice, never a deployment default, so there is no "off by default" state.
     const [label, tone] = feature.enabled
       ? [t("features.stateOn"), STATUS_TONE.active]
-      : neverChosen
-        ? [t("features.stateDefaultOff"), STATUS_TONE.idle]
-        : feature.disabledMode === "deleted"
-          ? [t("features.stateOffDeleted"), STATUS_TONE.idle]
-          : [t("features.stateOffKept"), STATUS_TONE.progress];
+      : feature.disabledMode === "deleted"
+        ? [t("features.stateOffDeleted"), STATUS_TONE.idle]
+        : [t("features.stateOffKept"), STATUS_TONE.progress];
     return (
       <Badge
         variant="outline"
         data-testid={`feature-state-${feature.key}`}
         className={`${statusBadgeClass} ${tone}`}
-        title={neverChosen ? t("features.defaultOffHint") : undefined}
       >
         {label}
       </Badge>

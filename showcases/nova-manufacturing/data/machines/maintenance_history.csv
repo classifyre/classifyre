@@ -1,0 +1,4 @@
+machine_id,performed_date,failure_mode,downtime_hours
+M001,2026-02-10,BEARING,12
+M001,2026-05-03,BEARING,18
+M002,2026-09-05,PLANNED_SERVICE,2

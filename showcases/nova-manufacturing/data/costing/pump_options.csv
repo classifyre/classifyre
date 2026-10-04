@@ -1,0 +1,3 @@
+product_id,demand_units,min_contract_units,price_eur,material_cost_eur,labor_cost_eur,energy_cost_eur,bottleneck_hours
+P100,100,0,2500,1600,164,36,2
+P200,100,20,4000,2400,328,72,4

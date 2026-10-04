@@ -1,0 +1,3 @@
+origin,destination,arrival_date,capacity,unit_cost_eur,cold_chain
+HAM,MUC,2026-10-04,250,3,0
+BRQ,MUC,2026-10-04,180,4,0

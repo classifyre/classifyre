@@ -1,0 +1,4 @@
+finished_lot,customer_id,material_batch,units,state
+FG41,CU01,B994,50,SHIPPED
+FG42,CU03,,30,SHIPPED
+FG43,CU04,B990,120,SHIPPED

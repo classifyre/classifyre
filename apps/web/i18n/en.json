@@ -1002,8 +1002,6 @@
     "stateOn": "On",
     "stateOffKept": "Off · data kept",
     "stateOffDeleted": "Off · data deleted",
-    "stateDefaultOff": "Off by default",
-    "defaultOffHint": "This deployment ships with it off. Turning it on applies to this workspace only.",
     "since": "since {{when}}",
     "dataSize": "{{size}} of data · ~{{rows}} rows",
     "noData": "No data stored",

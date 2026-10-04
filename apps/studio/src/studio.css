@@ -1,0 +1,9 @@
+/*
+ * The product's own stylesheet: tokens, theme, utilities. Importing it rather
+ * than restating it is the point of this app — a video cannot drift from the
+ * UI it shows.
+ */
+@import "@workspace/ui/globals.css";
+
+@source "./**/*.{ts,tsx}";
+@source "../videos/**/*.{ts,tsx}";

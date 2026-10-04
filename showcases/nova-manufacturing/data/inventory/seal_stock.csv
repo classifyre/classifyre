@@ -1,0 +1,4 @@
+plant_id,component_id,quantity,reserved_qty,safety_qty,quarantine_qty
+MUC,C100,20,0,0,0
+HAM,C100,1300,300,200,150
+BRQ,C100,300,50,50,0

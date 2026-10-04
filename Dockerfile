@@ -97,11 +97,16 @@ RUN curl -fsSL https://bun.sh/install | bash -s -- bun-v${BUN_VERSION}
 ENV PATH="/root/.bun/bin:${PATH}" \
     HUSKY=0
 COPY . .
-RUN bun install --frozen-lockfile
+# apps/studio is the video production studio: it lives in the workspace so it
+# can import the product's components, but it is never shipped. Filtering it out
+# of the install keeps Remotion, its bundler and its fonts out of node_modules —
+# and so out of api-final, which copies node_modules whole. Its package.json
+# still has to be in the context, or the lockfile no longer matches.
+RUN bun install --frozen-lockfile --filter '!@classifyre/studio'
 # Remove frontend workspace source after installing — web/blog/docs are injected
 # as pre-built artifacts (--build-context web-dist=…) and their source isn't
 # needed here. Installed packages in node_modules are kept.
-RUN rm -rf apps/web apps/blog apps/docs
+RUN rm -rf apps/web apps/blog apps/docs apps/studio
 RUN cd apps/api && bun run prisma:generate
 COPY --from=api-source / /repo/apps/api/dist/
 

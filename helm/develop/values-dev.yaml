@@ -23,7 +23,7 @@ api:
     value: "classifyre-dev-fixed-key-0000001"
 
   embedding:
-    enabled: false
+    enabled: true
 
   command: ["/bin/sh", "-lc"]
   args:
@@ -123,10 +123,9 @@ api:
     # an OOM mitigation on the theory that each namespace forks its own
     # onnxruntime and four of them were stacking up. That theory was wrong on
     # both counts: EmbeddingProviderService is a singleton owning exactly ONE
-    # forked child for the whole process, and only one namespace here has
-    # embeddings enabled at all (firmenbuch-test-2, via a DB override — this
-    # values file sets api.embedding.enabled=false, which a workspace row
-    # overrides). The pod was dying on a single 2,000-row inference call; see
+    # forked child for the whole process. Embeddings are on for every workspace
+    # by default (api.embedding.enabled=true above); a workspace row can still
+    # override it per namespace. The pod was dying on a single 2,000-row inference call; see
     # worker.resources below. Thread count is a CPU knob — keep it modest so
     # background embedding does not starve the API, and do not expect it to
     # bound memory.
