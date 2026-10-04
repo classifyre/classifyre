@@ -1,0 +1,4 @@
+trial_id,supplier_id,component_id,process_revision,input_kg,usable_kg,chemistry_result,completed_at
+PT201,S003,CSTEEL,R2,1000,965,PASS,2026-10-05T08:00:00Z
+PT202,S003,CSTEEL,R2,1000,970,PASS,2026-10-05T09:00:00Z
+PT203,S003,CSTEEL,R2,1000,975,PASS,2026-10-05T10:00:00Z

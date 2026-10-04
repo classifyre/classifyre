@@ -1,0 +1,2 @@
+offer_id,supplier_id,component_id,quantity,revision,unit_price_landed_eur,accept_before,recorded_at
+RO101,S004,C431,200,D,195,2026-10-02T15:00:00Z,2026-10-02T10:30:00Z

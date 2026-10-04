@@ -61,6 +61,7 @@ describe('InstanceSettingsService', () => {
           autopilotDetectorEnabled: true,
           autopilotEscalationEnabled: true,
           autopilotMcpEnabled: true,
+          supervisorEnabled: true,
         }),
       }),
     );

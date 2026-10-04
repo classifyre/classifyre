@@ -1,0 +1,321 @@
+---
+title: "Ein schlechter Freitag in der Pumpenfabrik: Sechs Fragen, bei denen die naheliegende Antwort falsch war"
+description: Eine Lieferung verschiebt sich, ein Rabatt ist keiner, eine Maschine verschleißt unbemerkt, und die Zahlen widersprechen sich in allem. Ein Blick in Nova Manufacturing, das Showcase aus Problemen, die echte Hersteller kennen.
+date: 2026-10-05T00:00:00.000Z
+tags:
+  - investigations
+  - manufacturing
+  - supply-chain
+  - glossary
+categories:
+  - Field Notes
+author: Banandre
+image: /blog/assets/images/nova-manufacturing-one-bad-friday.jpg
+keywords:
+  - Fertigungsdaten Untersuchung
+  - Lieferkettenstörung
+  - Lieferantenabhängigkeit
+  - vorausschauende Wartung
+  - Qualität Rückverfolgbarkeit
+  - Datenqualität
+  - Unternehmensglossar
+  - Classifyre
+alternates:
+  canonical: /de/blog/cases/nova-manufacturing-one-bad-friday
+  languages:
+    en: /blog/cases/nova-manufacturing-one-bad-friday/
+    de: /de/blog/cases/nova-manufacturing-one-bad-friday/
+    x-default: /blog/cases/nova-manufacturing-one-bad-friday/
+openGraph:
+  type: article
+  title: "Ein schlechter Freitag in der Pumpenfabrik: Sechs Fragen, bei denen die naheliegende Antwort falsch war"
+  description: Eine Lieferung verschiebt sich, ein Rabatt ist keiner, eine Maschine verschleißt unbemerkt, und die Zahlen widersprechen sich in allem. Ein Blick in Nova Manufacturing.
+  url: /de/blog/cases/nova-manufacturing-one-bad-friday
+  siteName: Classifyre
+  publishedTime: 2026-10-05T00:00:00.000Z
+  modifiedTime: 2026-10-05T00:00:00.000Z
+  authors:
+    - Banandre
+  section: Field Notes
+  tags:
+    - manufacturing
+    - supply chain
+    - maintenance
+    - traceability
+  images:
+    - /blog/assets/images/nova-manufacturing-one-bad-friday.jpg
+twitter:
+  card: summary
+  title: "Ein schlechter Freitag in der Pumpenfabrik: Sechs Fragen, bei denen die naheliegende Antwort falsch war"
+  description: Eine Lieferung verschiebt sich, ein Rabatt ist keiner, eine Maschine verschleißt unbemerkt, und die Zahlen widersprechen sich in allem.
+  images:
+    - /blog/assets/images/nova-manufacturing-one-bad-friday.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/nova-manufacturing-one-bad-friday.jpg"
+  eyebrow="Feldnotizen"
+  title="Ein schlechter Freitag in der Pumpenfabrik"
+  description="Eine Lieferung verschiebt sich, ein Rabatt ist keiner, eine Maschine verschleißt unbemerkt, und die Zahlen widersprechen sich in allem. Sechs Fragen bei Nova Manufacturing und was die Belege sagten statt des Naheliegenden."
+/>
+
+<ArticleJsonLd
+  headline="Ein schlechter Freitag in der Pumpenfabrik: Sechs Fragen, bei denen die naheliegende Antwort falsch war"
+  description="Eine Lieferung verschiebt sich, ein Rabatt ist keiner, eine Maschine verschleißt unbemerkt, und die Zahlen widersprechen sich in allem. Ein Blick in Nova Manufacturing, das Showcase aus Problemen, die echte Hersteller kennen."
+  path="/de/blog/cases/nova-manufacturing-one-bad-friday"
+  datePublished="2026-10-05T00:00:00.000Z"
+  dateModified="2026-10-05T00:00:00.000Z"
+  authorName="Banandre"
+  articleSection="Field Notes"
+  about={[
+    "Lieferkettenstörung",
+    "Lieferantenabhängigkeit",
+    "Vorausschauende Wartung",
+    "Qualitätsrückverfolgbarkeit",
+    "Datenqualität in der Fertigung",
+  ]}
+  mentions={[
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://showcase.classifyre.com/de/nova-manufacturing",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://showcase.classifyre.com/de/nova-manufacturing"
+  liveCaseName="Nova Manufacturing"
+/>
+
+<LiveCaseLink
+  href="https://showcase.classifyre.com/de/nova-manufacturing"
+  caseName="Nova-Manufacturing-Namespace"
+  locale="de"
+/>
+
+<ArticleSideRail
+  title="Ein schlechter Freitag in der Pumpenfabrik"
+  path="/de/blog/cases/nova-manufacturing-one-bad-friday/"
+  tags={["investigations", "manufacturing", "supply-chain", "glossary"]}
+  backHref="/de/blog/cases"
+  backLabel="Alle Fallakten"
+  locale="de"
+/>
+
+Es ist Freitag, zehn Uhr, in München. Die Planungsrunde läuft seit neun Minuten, als jemand den Satz sagt, den
+alle fürchten: *Die Gehäuse sind auf den 18. verschoben.*
+
+Fünfhundert Pumpengehäuse von Elbe Precision Castings, fällig am 4. Oktober, kommen nun zwei Wochen später. Drei
+Kundenaufträge brauchen sie zwischen dem 5. und dem 7. Zusammen sind sie **870.000 €** wert. Der Kundenservice hätte
+gern eine Liste von Leuten, die er vor dem Mittagessen anrufen kann.
+
+Jeder im Raum hat eine Idee.
+
+*Hamburg hat Bestand.* Jemand hat ein günstiges Los über tausend Stück gefunden. *Für genau diesen Fall haben wir
+einen zweiten Lieferanten gebucht.* Und um halb zwölf kommt ein Rettungsangebot mit einer Frist um 15:00 Uhr.
+
+Welche dieser Ideen überlebt den Kontakt mit den Daten?
+
+> **Die kurze Antwort:** Eine von vieren, und auch sie nur unter Vorbehalt. Die anderen drei scheitern jeweils an
+> einem Grund, der in einem anderen System steht: an einem Lkw-Slot, an einer Konstruktionsrevision, an einer
+> Gießerei, die sich zwei „verschiedene“ Lieferanten teilen. Dies ist die Geschichte des Namespace, mit dem wir das in
+> Minuten herausfinden, und von fünf weiteren Fragen dieser Art in derselben Fabrik.
+
+Nova Manufacturing ist erfunden. Jede Zahl ist ausgedacht, nichts davon gehört einem echten Unternehmen. Aber jede
+Falle in diesem Artikel kennen echte Hersteller, denn der Namespace wurde aus den Problemen gebaut, die sie zu uns bringen.
+
+## Das Unternehmen
+
+Nova baut Industriepumpen in drei Werken: **München**, **Hamburg** und **Brünn**. Es verkauft drei Modelle (eine
+Universalpumpe, eine Duplex-Industriepumpe und eine Sanitär-Prozesspumpe) an vier Kunden, betreibt zwanzig
+Maschinen, sechzehn davon mit Sensoren, und kauft bei vier Tier-1-Lieferanten, von denen manche wiederum von zwei Gießereien abhängen,
+mit denen Nova nie direkt zu tun hat.
+
+Das Unternehmen ist absichtlich klein. Es geht nicht um Größe. Es geht darum, dass dieselben wenigen Namen an sehr
+verschiedenen Stellen auftauchen: ein Lieferant im Einkaufsblatt, im Qualitätsbericht, in einer Wartungsnotiz und in
+einem Datenticket. Niemand hat sie zusammengeführt. Das ist das eigentliche Problem am Freitagmorgen.
+
+## Was im Namespace steckt
+
+Sieben Quellen, jede ein Fachbereich statt einer Technologie:
+
+| Quelle | Was sie enthält | Wofür sie da ist |
+|---|---|---|
+| **Stammdaten** | Lieferanten, Gießereien, Kunden, Werke, Maschinen, Teile, Pumpen | Das Verzeichnis, auf das alles andere zeigt |
+| **Versorgung & Aufträge** | Aufträge, Bestellungen, Lagerbestand, Lkw-Slots, Lieferantenangebote, die Notiz der Lieferantenbetreuung | Was die Planer sehen, wenn eine Lieferung rutscht |
+| **Einkauf & Kalkulation** | Stahlangebote, Harzangebote, das Kalkulationsblatt der Endbearbeitung, Beschaffungsnotizen | Wo „günstiger“ geprüft wird |
+| **Maschinen & Wartung** | 34.560 stündliche Messwerte von 16 Maschinen, Wartungshistorie, M003-Temperaturfeed, Übergabenotizen | Welche Maschine wirklich krank ist |
+| **Qualität & Rückverfolgbarkeit** | 400 Gehäuseprüfungen, 2.000 Endprüfungen, Lieferungen, Fertigungslose, das Qualitätsprotokoll | Folgt der Fehler der Charge oder der Maschine |
+| **Bestandsführung** | Bestände, Lose, Reservierungen und Umlagerungen in drei Werken | Warum Bestand auf dem Papier nicht nutzbarer Bestand ist |
+| **Datenschnittstellen** | Auszüge aus SAP, MES, Lager, Auftragsereignissen und Qualitätsgeräten sowie Stewardship-Tickets | Wo die Daten selbst lügen können |
+
+Zusammen sind das 196 Geschäftsobjekte, zwölf davon Notizen. Darüber liegen:
+
+- **Acht Detektoren**, die diese Objekte lesen und in einfachen Sätzen sagen, was nicht stimmt, mit offengelegter Rechnung.
+- **Ein Glossar mit 65 Begriffen** (was eine „verspätete Lieferung“, eine „versteckte gemeinsame Abhängigkeit“ oder ein
+  „Einheitenfehler“ *ist*) und **44 benannte Entitäten** wie Elbe Precision Castings oder Maschine M001.
+- **Zwölf stehende Fragen**, die weiter beobachten, etwa „Wo verlassen sich zwei Lieferanten auf dieselbe Quelle?“
+- **Sechs Fälle**, einer je Frage unten, die jeweils konkurrierende Erklärungen als Hypothesen prüfen.
+
+## Sechs Fragen, sechs naheliegende Antworten, die falsch waren
+
+### 1. Die verspätete Lieferung: Wen trifft es, und was können wir tun?
+
+Vier Rettungsideen, als Hypothesen nebeneinandergelegt.
+
+**„Hamburgs Bestand deckt alles.“** Hamburg zeigt 260 freigegebene Gehäuse, also scheint es einfach. Aber 160 sichern
+lokale Reservierungen und Sicherheitsbestand, 100 sind frei, und der einzige rechtzeitige Lkw-Slot fasst **80**. Das rettet
+einen Auftrag (300.000 €) und lässt 570.000 € ungedeckt. *Widerlegt.*
+
+**„Das günstige Tausender-Los genügt.“** Für die Sanitärpumpe bietet Adria Value Metals 1.000 Gehäuse zu 145 €. Sie sind
+Revision C mit Industriezulassung; die Pumpe braucht Revision D mit Sanitärzulassung, und die Konstruktion kann das nicht
+erlassen. Das einzige konforme und rechtzeitige Angebot deckt 60 der 80 Stück. *Widerlegt.*
+
+**„Wir haben doppelt beschafft.“** Elbe und Morava sind zwei Namen auf der Buchungsliste. Eine Ebene höher gegossen wird
+bei beiden bei **Central Alloy Works**, das vom 2. bis 16. Oktober bestätigt ausfällt. Alle 100 gebuchten Gehäuse liegen
+in diesem Fenster. *Widerlegt, und die gefährlichste der vier.*
+
+**„Das Rettungslos deckt alles.“** Nord Independent Foundry hat 200 fertige Gehäuse aus einer anderen Gießerei, von der
+Konstruktion für genau diese Pumpen freigegeben, Lieferung am 5. Damit decken 380 Gehäuse 380 Bedarf. Diese
+Hypothese gilt als *gestützt*, mit 75 % Konfidenz, denn es ist nur ein Angebot, und es läuft heute um 15:00 Uhr ab.
+
+<Alert>
+  <AlertTitle>Warum sich das Urteil bewegt hat</AlertTitle>
+  <AlertDescription>
+    Um 10:00 Uhr standen drei widerlegte Hypothesen und eine offene Frage auf dem Board. Um 11:30 Uhr traf eine Notiz
+    ein, und die vierte Hypothese wechselte von *vorgeschlagen* auf *gestützt*. Das Log zeigt wann und warum. Niemand hat
+    die Geschichte umgeschrieben.
+  </AlertDescription>
+</Alert>
+
+### 2. Ist die günstigere Option wirklich günstiger?
+
+Drei Einkaufsentscheidungen, bei denen die niedrigste Zahl nicht die Antwort ist.
+
+- **Stahl.** Adria bietet 9 % weniger pro Kilogramm als Elbe. Aber Preise gelten pro *gekauftem* Kilogramm, der Bedarf
+  zählt in *nutzbaren* Kilogramm. Bei Adrias Ausbeute von 86 % kosten 10.000 nutzbare Kilogramm **53.372 €** statt
+  **49.184 €**: 4.188 € *mehr*.
+- **Harz.** Ein Quartalsende-Angebot zu 4,00 € je Kilogramm, Mindestmenge 5.000 kg. Das Lager fasst 4.000 und enthält
+  schon 600. 1.600 kg haben keinen Platz, und 3.000 kg lägen noch da, wenn alles am 30. Oktober verfällt. Ein kleineres
+  Angebot zu 5,20 € passt, verschwendet nichts und bindet 10.400 € statt 20.000 €.
+- **Pumpen.** Die Duplexpumpe bringt mehr *pro Pumpe*. Die Universalpumpe bringt mehr *pro Stunde an der Endbearbeitung*,
+  und diese Stunden sind der Engpass. Mit einem verbindlichen Vertragsminimum ist der beste machbare Plan 80 + 20 für 80.000 €.
+
+Dann eine Wendung. Am 5. Oktober pilotiert die Konstruktion ein überarbeitetes Zerspanungsverfahren, und Adrias Ausbeute
+steigt auf 97 %. Der Rabatt *überlebt*: 1.864 € günstiger, aber nur als Modellrechnung aus drei Pilotläufen und nur für den
+nächsten Auftrag. Der Fall behält beide Schlüsse, mit Datum, denn beide waren zum Zeitpunkt ihrer Niederschrift richtig.
+
+### 3. Welche Maschine soll die Wartung zuerst besuchen?
+
+Sechzehn Maschinen senden jede Stunde Messwerte. Eine werksweite Alarmgrenze lässt **M002** krank aussehen. Sie läuft seit
+neunzig Tagen mit 6,0 mm/s in ihrem freigegebenen Schnelllaufmodus. Sie ist einfach laut.
+
+**M001** sieht gegen diese Grenze unauffällig aus, ist aber in ihrem *eigenen* Modus innerhalb einer Woche von 2,0 auf
+8,0 mm/s und von 60 auf 80 °C gestiegen. Sie hatte zwei Lagerreparaturen und Aufträge über 150.000 €. Inspiziert am
+3. Oktober: Ausbrüche am Außenring. Nach dem Tausch liest sie 2,2 mm/s und 61 °C, während die unberührte Kontrollmaschine
+M002 sich nicht bewegt hat.
+
+Und **M003**, die „mit 190 Grad lief“? Ihr Sensor wurde am 30. September auf Fahrenheit umgestellt, während der Adapter
+weiter Celsius ausweist. 190 °F sind 87,8 °C, der Wert ist einen Tag alt, und der unabhängige Referenzsensor zeigt
+87,8 °C bei einem Alarm von 95 °C. Keine Überhitzung.
+
+### 4. Warum lecken die Pumpen: die Charge, die Maschine oder der Produktmix?
+
+Gehäusecharge B994 von Elbe fällt bei 19 % der Prüfungen durch. B990 von Morava bei 2,5 %. Die Lücke zeigt sich auf
+*beiden* Maschinen. Die Fehler folgen dem Material.
+
+Hier zahlt sich der Namespace aus. M001 ist ein berechtigter Verdächtiger: Sie driftet wirklich. Aber der Beleg liegt einen
+Klick entfernt in einer anderen Quelle. Charge B990 auf derselben M001 fällt nur zu 2 % durch, und die völlig stabile M002
+fällt mit B994 zu 18 % durch. Das defekte Lager ist real, und es ist nicht das, was die Pumpen lecken lässt.
+
+Unterdessen sprang die Ausschussquote von 1,9 % auf 9,1 %, und der Betrieb will die Linie stoppen. Innerhalb jedes Produkts
+hat sich nichts bewegt: eines blieb bei 1 %, das andere bei 10 %. Geändert hat sich der Mix, von 10 % auf 90 % der
+schwierigeren Pumpe. Beim gleichen Mix erreichen beide Monate 5,5 %.
+
+Und Los FG42, 30 Stück für Danube Bioprocess, hatte keinen Materialscan. Unbekannt ist nicht sauber. Die Eingrenzung
+lag bei 50 bis 80 Stück, bis ein wiedergefundener Fertigungslaufzettel 12 Stück aus B994 und 18 aus B990 zeigte:
+**genau 62 betroffen**.
+
+### 5. Reichlich Bestand auf dem Papier: Warum fehlt trotzdem etwas?
+
+Hamburg zeigt 1.300 Dichtungskartuschen, München braucht 400. Nur 650 sind frei (der Rest ist reserviert, Sicherheitsbestand
+oder gesperrt), und die Lkw fassen 250 aus Hamburg und 180 aus Brünn. Der günstigste machbare Plan ist 250 + 130 für
+**1.270 €**. Der Notkauf würde 17.480 € kosten und am 23. Oktober eintreffen.
+
+Beim Harz ist es schlimmer: 700 kg auf dem Papier, 20 kg nutzbar. Ein Los verfällt, bevor es gebraucht wird, 180 kg des
+anderen sind reserviert, und die günstige Route hat keine Kühlkette. 100 kg bleiben ungelöst, und der Fall sagt das, statt
+eine Lösung zu erfinden.
+
+Dann ein Wiederholungsversuch. Eine Freigabe für Hamburgs Lagersätze wurde wiederholt, und jemand fürchtete, sie habe den
+Bestand doppelt reserviert. Hat sie nicht: Das System gab die ursprüngliche Entscheidung zurück. Alle Antworten zu addieren
+würde 280 Sätze behaupten; die tatsächlichen Reservierungen sind 160.
+
+### 6. Welchen unserer Zahlen können wir trauen?
+
+Vier Alarme treffen am Freitagmorgen ein. Drei haben die Daten selbst erzeugt.
+
+- *„380 Dichtungssätze fehlen.“* Das Lager zählt 35 Kartons zu je 12, also 420 Stück. SAPs 20 sind 27 Stunden alt.
+  Ein ähnlich benanntes Teil mit 900 Stück ist nicht dasselbe Teil. Kein Einkauf nötig.
+- *„340 Laufräder benötigt.“* Fünf Nachrichten, eine doppelt zugestellt, eine alte Version nach einer neueren wiederholt.
+  Der echte aktuelle Bedarf ist 60.
+- *„Los QT61 hat 95 Grad überschritten.“* Es meldete 185 unter einem Schema, das Fahrenheit bedeutet. Das sind 85 °C.
+- *„Los QT63 meldet 2.040.“* Dieses war tatsächlich ungeklärt, bis der Hersteller den fehlenden Vertrag wiederfand: Das Feld
+  ist Leitfähigkeit, keine Temperatur. Alle Prüfungen bestehen. Die Qualität darf das Los *prüfen*. Freigegeben ist nichts.
+
+## Die Fäden, die die Fälle verbinden
+
+Die besten Momente lagen nicht innerhalb eines einzelnen Falls.
+
+**Elbe Precision Castings taucht in vier Quellen auf.** Es ist bei einer Bestellung verspätet, teilt eine Gießerei mit einem
+Lieferanten, mit dem es konkurriert, liefert die Gehäuse der Charge B994, und sein Stahl ist der Platzhirsch in einem
+Kalkulationsblatt. Kein einzelnes System zeigt das. Die Entitätsseite schon.
+
+**Maschine M001 taucht in zwei Fällen auf.** Sie ist in einem die verschleißende Maschine und im anderen das Alibi. Ohne den
+Querverweis wäre das defekte Lager für Lecks verantwortlich gemacht worden, die es nicht verursacht hat.
+
+**Eine Gießerei, zwei scheinbare Lieferanten.** Central Alloy Works ist der stille Bösewicht im Versorgungsfall, und sein
+Ausfallfenster steht im Register, in den Notizen und in einer stehenden Frage, die den nächsten Fall abfängt.
+
+## Was das mehr macht als ein Dashboard
+
+Ein Dashboard zeigt Zahlen. Dieser Namespace zeigt die **Begründung**.
+
+- **Prüfungen, die ihre Rechnung zeigen.** Jeder Befund ist ein Satz, den ein Planer lesen kann („SO102 kann bis 6. Okt. nicht
+  fertiggestellt werden: 40 von 100 Gehäusen fehlen auch nach der besten verfügbaren Umlagerung“). Die Zahlen werden aus den
+  Datensätzen berechnet, nicht eingetippt; ändert man eine Menge, ändert sich der Befund mit.
+- **Ein gemeinsames Vokabular.** „Verspätete Lieferung“, „versteckte gemeinsame Abhängigkeit“ und „Einheitenfehler“ sind
+  einmal in einfacher Sprache definiert. Jeder Befund ist an den Begriff gebunden, den er bedeutet; eine
+  stehende Frage nach *Versorgungsrisiko* erreicht deshalb Befunde aus drei verschiedenen Prüfungen.
+- **Benannte Dinge statt Zeichenketten.** Lieferanten, Kunden, Werke, Maschinen und Teile sind Entitäten. Eine Notiz, die
+  „S001“ sagt, ein Blatt, das „Elbe Precision Castings“ sagt, und ein Chargendatensatz, der seinen Lieferanten nennt, landen
+  auf derselben Seite.
+- **Konkurrierende Erklärungen.** Jeder Fall führt Hypothesen mit Belegen *dafür* und *dagegen* und ein Log, das jede Änderung
+  des Urteils erklärt. Neue Belege ändern das Urteil, nicht die Geschichte.
+- **Zitierte Notizen.** Die Sätze in den Notizen, die verändern, was erlaubt ist („der Einkauf kann diese Anforderung nicht
+  erlassen“), werden wörtlich gefunden und zitiert, sodass man eine Zahl immer neben den Satz dahinter legen kann.
+
+## Was er bewusst nicht behauptet
+
+Ehrlichkeit ist eingebaut. Umsatz im Risiko ist Gefährdung, kein Verlust. Eine Wahrscheinlichkeit ist ein Planungseingang,
+keine Prognose. Betroffene Stück sind nicht fehlerhafte Stück. Ein kurzes Nach-Reparatur-Fenster beweist keine
+Zuverlässigkeit. Ein wiedergefundener Papierweg ist keine Freigabe. Ein Angebot ist kein Bestand. Diese Vorbehalte stehen in
+den Befunden selbst, denn das Erste, was ein guter Analyst fragt, ist: *Was können wir nicht sagen?*
+
+## Sehen Sie selbst
+
+Der Namespace ist live, mit jeder Quelle, Prüfung, jedem Begriff, jeder stehenden Frage und jedem Fall von oben:
+
+**[showcase.classifyre.com/nova-manufacturing](https://showcase.classifyre.com/de/nova-manufacturing)**
+
+Eine Drei-Minuten-Tour:
+
+1. Öffnen Sie den **Versorgungsfall** und klicken Sie auf jede Hypothese. Beachten Sie, dass die Belege aufleuchten und die
+   anderen verblassen.
+2. Öffnen Sie die Entität **Elbe Precision Castings** und sehen Sie, wo sie erwähnt wird.
+3. Öffnen Sie den **Qualitätsfall** und suchen Sie M001 auf dem Board. Es ist dieselbe Maschine, die Sie in der Wartung gesehen haben.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/de/blog/cases/nova-manufacturing-one-bad-friday"
+  heading="Weitere Fallakten"
+  locale="de"
+/>

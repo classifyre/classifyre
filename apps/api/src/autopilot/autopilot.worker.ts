@@ -49,8 +49,9 @@ const INSTANCE_SETTINGS_ID = 1;
 /**
  * Agents that record a SKIPPED run when their switch is off.
  *
- * Only the two investigation agents do. The other three are opt-in and off by
- * default, so a SKIPPED row per scan for each would bury the audit trail.
+ * Only the two investigation agents do. The other three run in chains whose
+ * per-scan outcome is already recorded on the cycle, so a SKIPPED row per
+ * scan for each would bury the audit trail.
  */
 const DISABLED_SKIP_REASONS: Partial<Record<AgentKind, string>> = {
   [AgentKind.INQUIRY]:
@@ -623,9 +624,9 @@ export class AutopilotWorker {
         continue;
       }
 
-      // Only the two investigation agents record a SKIPPED run; the opt-in
-      // agents are off by default, and a SKIPPED row per scan for each of them
-      // is pure noise.
+      // Only the two investigation agents record a SKIPPED run; the other
+      // agents' per-scan outcome is already on the cycle, so a SKIPPED row
+      // per scan for each of them is pure noise.
       const skipReason = DISABLED_SKIP_REASONS[kind];
       if (!cycle.only && skipReason) {
         await this.audit.recordSkippedRun(

@@ -1,0 +1,21 @@
+machine_id,plant_id,machine_type,installed_year
+M001,MUC,CNC machining centre,2015
+M002,HAM,CNC machining centre,2016
+M003,BRQ,CNC machining centre,2017
+M004,MUC,CNC machining centre,2018
+M005,HAM,CNC machining centre,2019
+M006,BRQ,CNC machining centre,2020
+M007,MUC,CNC machining centre,2021
+M008,HAM,CNC machining centre,2014
+M009,BRQ,CNC machining centre,2015
+M010,MUC,CNC machining centre,2016
+M011,HAM,CNC machining centre,2017
+M012,BRQ,CNC machining centre,2018
+M013,MUC,CNC machining centre,2019
+M014,HAM,CNC machining centre,2020
+M015,BRQ,CNC machining centre,2021
+M016,MUC,CNC machining centre,2014
+M017,HAM,CNC machining centre,2015
+M018,BRQ,CNC machining centre,2016
+M019,MUC,CNC machining centre,2017
+M020,HAM,CNC machining centre,2018

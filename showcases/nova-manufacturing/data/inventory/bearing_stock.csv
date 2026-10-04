@@ -1,0 +1,2 @@
+plant_id,component_id,quantity,reserved_qty,safety_qty,quarantine_qty
+HAM,CBRG,200,0,40,0

@@ -1,0 +1,4 @@
+supplier_id,component_id,quantity,arrival_date,revision,scope,valid_until,unit_price_eur
+S002,C431,60,2026-10-04,D,SANITARY,2026-12-31,190
+S003,C431,1000,2026-10-03,C,INDUSTRIAL,2026-12-31,145
+S004,C431,100,2026-10-07,D,SANITARY,2026-12-31,200

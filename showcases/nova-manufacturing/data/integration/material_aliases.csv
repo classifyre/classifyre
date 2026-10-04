@@ -1,0 +1,5 @@
+source_system,source_material_id,component_id,unit,units_per_pack,valid_from
+SAP,00000124,CGSK,EA,1,2026-01-01
+MES,GS-124,CGSK,PIECE,1,2026-01-01
+WMS,124-GS,CGSK,BOX,12,2026-01-01
+WMS,GS124-A,C999,EA,1,2026-01-01

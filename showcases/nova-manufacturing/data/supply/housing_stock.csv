@@ -1,0 +1,4 @@
+plant_id,component_id,quantity,status,reserved_qty,safety_qty
+MUC,C431,100,RELEASED,0,0
+MUC,C431,50,QUARANTINE,0,0
+HAM,C431,260,RELEASED,120,40

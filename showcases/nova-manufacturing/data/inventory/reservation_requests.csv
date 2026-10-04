@@ -1,0 +1,5 @@
+attempt_id,proposal_id,idempotency_key,requested_qty,expected_stock_version,requested_at
+A51,TR51,TR51-REV1,120,7,2026-10-02T08:01:00Z
+A52,TR52,TR52-REV1,100,7,2026-10-02T08:01:01Z
+A53,TR52,TR52-REV2,40,8,2026-10-02T08:02:00Z
+A54,TR51,TR51-REV1,120,7,2026-10-02T08:03:00Z

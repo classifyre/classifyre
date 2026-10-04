@@ -155,6 +155,29 @@ test("lists both switches with their state and what they cost", async ({
   ).toBeVisible();
 });
 
+test("an untouched off switch reads as off, never off by default", async ({
+  mount,
+  page,
+}) => {
+  await mockFeaturesApi(page, {
+    embeddings: {
+      enabled: false,
+      disabledMode: "kept",
+      changedAt: null,
+      deploymentDefault: false,
+    },
+  });
+  const component = await mount(<FeatureSwitchesHarness />);
+
+  const embeddings = component.getByTestId("feature-row-embeddings");
+  await expect(
+    embeddings.getByTestId("feature-state-embeddings"),
+  ).toHaveText("Off · data kept");
+  await expect(
+    embeddings.getByText("Off by default", { exact: false }),
+  ).toHaveCount(0);
+});
+
 test("turning off asks keep or delete, and keep is the default", async ({
   mount,
   page,
