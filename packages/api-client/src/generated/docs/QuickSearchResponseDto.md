@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `assets` | [Array&lt;QuickSearchAssetDto&gt;](QuickSearchAssetDto.md)
 `findings` | [Array&lt;QuickSearchFindingDto&gt;](QuickSearchFindingDto.md)
+`terms` | [Array&lt;QuickSearchTermDto&gt;](QuickSearchTermDto.md)
 `truncated` | boolean
 
 ## Example
@@ -19,6 +20,7 @@ import type { QuickSearchResponseDto } from '@workspace/api-client'
 const example = {
   "assets": null,
   "findings": null,
+  "terms": null,
   "truncated": null,
 } satisfies QuickSearchResponseDto
 

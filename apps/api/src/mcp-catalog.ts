@@ -2,6 +2,8 @@ import type {
   McpCapabilityGroupDto,
   McpPromptSummaryDto,
 } from './dto/mcp-settings.dto';
+import { SEMANTIC_MCP_TOOL_NAMES } from './semantic/semantic-mcp-tools';
+import { ENTITY_MCP_TOOL_NAMES } from './entities/entities-mcp-tools';
 
 export const MCP_TOKEN_PREFIX = 'inmcp';
 
@@ -322,15 +324,27 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     id: 'glossary',
     title: 'Glossary',
     description:
-      'The shared term glossary findings and detectors resolve abbreviations and jargon against.',
-    toolNames: [
-      'list_glossary_terms',
-      'lookup_glossary',
-      'upsert_glossary_term',
-    ],
+      'The shared vocabulary of concepts and entities: list, look up and curate terms, schemes and relations; bind detector outputs to meaning; read the semantic links (Meaning) derived from findings; review proposals and see the semantic map.',
+    toolNames: [...SEMANTIC_MCP_TOOL_NAMES],
     operations: [
-      'List and look up glossary terms',
-      'Add or update a term definition',
+      'List and look up concepts and entities, schemes and relations',
+      'Curate terms, schemes and relations; import and export CSV or SKOS',
+      'Bind detector outputs and metadata fields to meaning; install packs',
+      'Read what a finding, asset or concept means, and link by hand',
+      'Work the review queue and see the semantic map',
+    ],
+  },
+  {
+    id: 'entities',
+    title: 'Entities',
+    description:
+      'The named things findings refer to — people, organisations, accounts: search them, read where each is mentioned and with whom, create one from a finding, review candidate values and merge duplicates.',
+    toolNames: [...ENTITY_MCP_TOOL_NAMES],
+    operations: [
+      'Search entities and read their names, identifiers and counters',
+      'List where an entity is mentioned, and which entities appear with it',
+      'Create an entity from a finding or a value; add identifiers',
+      'Review candidate values and identifier conflicts; merge two entities',
     ],
   },
   {

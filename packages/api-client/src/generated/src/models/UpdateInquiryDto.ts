@@ -62,6 +62,18 @@ export interface UpdateInquiryDto {
      */
     findingValueRegex?: Array<string>;
     /**
+     * Glossary term keys: the finding must be evidence of one of them (an APPROVED binding of its output, or a manual link). Empty = any. Unknown keys are rejected.
+     * @type {Array<string>}
+     * @memberof UpdateInquiryDto
+     */
+    termKeys?: Array<string>;
+    /**
+     * Include the narrower concepts of termKeys.
+     * @type {boolean}
+     * @memberof UpdateInquiryDto
+     */
+    termsIncludeNarrower?: boolean;
+    /**
      * 
      * @type {string}
      * @memberof UpdateInquiryDto
@@ -145,6 +157,8 @@ export function UpdateInquiryDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'findingTypes': json['findingTypes'] == null ? undefined : json['findingTypes'],
         'findingTypeRegex': json['findingTypeRegex'] == null ? undefined : json['findingTypeRegex'],
         'findingValueRegex': json['findingValueRegex'] == null ? undefined : json['findingValueRegex'],
+        'termKeys': json['termKeys'] == null ? undefined : json['termKeys'],
+        'termsIncludeNarrower': json['termsIncludeNarrower'] == null ? undefined : json['termsIncludeNarrower'],
         'title': json['title'] == null ? undefined : json['title'],
         'description': json['description'] == null ? undefined : json['description'],
         'status': json['status'] == null ? undefined : json['status'],
@@ -170,6 +184,8 @@ export function UpdateInquiryDtoToJSONTyped(value?: UpdateInquiryDto | null, ign
         'findingTypes': value['findingTypes'],
         'findingTypeRegex': value['findingTypeRegex'],
         'findingValueRegex': value['findingValueRegex'],
+        'termKeys': value['termKeys'],
+        'termsIncludeNarrower': value['termsIncludeNarrower'],
         'title': value['title'],
         'description': value['description'],
         'status': value['status'],

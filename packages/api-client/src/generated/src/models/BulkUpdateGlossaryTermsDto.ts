@@ -28,37 +28,53 @@ import {
  */
 export interface BulkUpdateGlossaryTermsDto {
     /**
-     * Explicit term IDs to update. Use either ids or filters.
+     * 
      * @type {Array<string>}
      * @memberof BulkUpdateGlossaryTermsDto
      */
     ids?: Array<string>;
     /**
-     * Update every term matching this filter snapshot.
+     * 
      * @type {BulkUpdateGlossaryFiltersDto}
      * @memberof BulkUpdateGlossaryTermsDto
      */
     filters?: BulkUpdateGlossaryFiltersDto;
     /**
-     * True marks the selected terms verified, false returns them to unverified. Omit to leave verification unchanged.
-     * @type {boolean}
+     * 
+     * @type {string}
      * @memberof BulkUpdateGlossaryTermsDto
      */
-    verified?: boolean;
+    status?: BulkUpdateGlossaryTermsDtoStatusEnum;
     /**
-     * New entity type. Omit to leave entity types unchanged.
+     * 
      * @type {string}
      * @memberof BulkUpdateGlossaryTermsDto
      */
     entityType?: BulkUpdateGlossaryTermsDtoEntityTypeEnum;
     /**
-     * Operator identity recorded as verifiedBy. Defaults to "operator".
+     * null clears the scheme
      * @type {string}
      * @memberof BulkUpdateGlossaryTermsDto
      */
-    verifiedBy?: string;
+    schemeId?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof BulkUpdateGlossaryTermsDto
+     */
+    kind?: BulkUpdateGlossaryTermsDtoKindEnum;
 }
 
+
+/**
+ * @export
+ */
+export const BulkUpdateGlossaryTermsDtoStatusEnum = {
+    Draft: 'DRAFT',
+    Approved: 'APPROVED',
+    Deprecated: 'DEPRECATED'
+} as const;
+export type BulkUpdateGlossaryTermsDtoStatusEnum = typeof BulkUpdateGlossaryTermsDtoStatusEnum[keyof typeof BulkUpdateGlossaryTermsDtoStatusEnum];
 
 /**
  * @export
@@ -72,6 +88,15 @@ export const BulkUpdateGlossaryTermsDtoEntityTypeEnum = {
     Other: 'OTHER'
 } as const;
 export type BulkUpdateGlossaryTermsDtoEntityTypeEnum = typeof BulkUpdateGlossaryTermsDtoEntityTypeEnum[keyof typeof BulkUpdateGlossaryTermsDtoEntityTypeEnum];
+
+/**
+ * @export
+ */
+export const BulkUpdateGlossaryTermsDtoKindEnum = {
+    Concept: 'CONCEPT',
+    Entity: 'ENTITY'
+} as const;
+export type BulkUpdateGlossaryTermsDtoKindEnum = typeof BulkUpdateGlossaryTermsDtoKindEnum[keyof typeof BulkUpdateGlossaryTermsDtoKindEnum];
 
 
 /**
@@ -93,9 +118,10 @@ export function BulkUpdateGlossaryTermsDtoFromJSONTyped(json: any, ignoreDiscrim
         
         'ids': json['ids'] == null ? undefined : json['ids'],
         'filters': json['filters'] == null ? undefined : BulkUpdateGlossaryFiltersDtoFromJSON(json['filters']),
-        'verified': json['verified'] == null ? undefined : json['verified'],
+        'status': json['status'] == null ? undefined : json['status'],
         'entityType': json['entityType'] == null ? undefined : json['entityType'],
-        'verifiedBy': json['verifiedBy'] == null ? undefined : json['verifiedBy'],
+        'schemeId': json['schemeId'] == null ? undefined : json['schemeId'],
+        'kind': json['kind'] == null ? undefined : json['kind'],
     };
 }
 
@@ -112,9 +138,10 @@ export function BulkUpdateGlossaryTermsDtoToJSONTyped(value?: BulkUpdateGlossary
         
         'ids': value['ids'],
         'filters': BulkUpdateGlossaryFiltersDtoToJSON(value['filters']),
-        'verified': value['verified'],
+        'status': value['status'],
         'entityType': value['entityType'],
-        'verifiedBy': value['verifiedBy'],
+        'schemeId': value['schemeId'],
+        'kind': value['kind'],
     };
 }
 

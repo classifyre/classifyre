@@ -29,6 +29,7 @@ import { FingerprintsGraph } from "@/components/fingerprints-graph";
 import { LineageView } from "@/components/lineage-view";
 import { ColumnLineagePanel } from "@/components/column-lineage-panel";
 import { AssetMetadataCard } from "@/components/asset-metadata-card";
+import { AssetMeaningCard } from "@/components/glossary/meaning-card";
 import { AssetKindBadge } from "@/components/asset-kind-badge";
 import { ReferencingFindingsPanel } from "@/components/referencing-findings-panel";
 import { formatAssetKind } from "@/lib/asset-kind";
@@ -296,6 +297,8 @@ export default function AssetDetailPage() {
         Object.keys(assetDetails.metadata).length > 0 && (
           <AssetMetadataCard metadata={assetDetails.metadata} />
         )}
+
+      <AssetMeaningCard assetId={assetDetails.id} />
 
       {lockedFilters && (
         <Tabs defaultValue="findings" urlParam="tab" className="space-y-4">

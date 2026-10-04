@@ -73,8 +73,7 @@ import { ChatSessionService } from './chat-gateway/chat-session.service';
 import { EmbeddingModule } from './embedding/embedding.module';
 import { FindingStatsModule } from './stats/finding-stats.module';
 import { SourceGraphModule } from './stats/source-graph.module';
-import { GlossaryController } from './glossary/glossary.controller';
-import { GlossaryService } from './glossary/glossary.service';
+import { GlossaryModule } from './glossary/glossary.module';
 import { CaseLeadsController } from './controllers/case-leads.controller';
 import { CaseEventsController } from './controllers/case-events.controller';
 import { CaseLeadsService } from './case-leads.service';
@@ -137,6 +136,7 @@ import {
     FindingStatsModule,
     SourceGraphModule,
     MaintenanceModule,
+    GlossaryModule,
   ],
   controllers: [
     HealthController,
@@ -165,7 +165,6 @@ import {
     CaseThreadsController,
     GraphController,
     ChatBotsController,
-    GlossaryController,
     CaseLeadsController,
     CaseEventsController,
     NamespacesController,
@@ -236,7 +235,6 @@ import {
     ChatAgentService,
     ChatGatewayService,
     ChatBotsService,
-    GlossaryService,
     CaseLeadsService,
     // Keeps each case's leads current: asked for by CaseActivityService (so it
     // is provided wherever that is), run by the worker below.

@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://classifyre.io/schemas/semantic_link.json",
+  "title": "Meaning",
+  "description": "Contract C11 (docs/prd/SL3 \u00a74): one meaning of a finding, asset or case, and how we know.",
+  "type": "object",
+  "required": [
+    "term",
+    "method",
+    "confidence",
+    "support"
+  ],
+  "properties": {
+    "term": {
+      "type": "object",
+      "required": [
+        "id",
+        "key",
+        "name",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "CONCEPT",
+            "ENTITY"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "scheme": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "BINDING",
+        "DECLARED",
+        "MANUAL",
+        "SUGGESTED",
+        "MENTION",
+        "BROADER"
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "support": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "binding": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "declaredBy": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "linkedBy": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "via": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "For BROADER: the narrower term it is implied by."
+    },
+    "since": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "goneAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}

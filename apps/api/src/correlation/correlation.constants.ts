@@ -37,6 +37,32 @@ export function scanHandoffJobOptions(sourceId: string) {
 }
 
 /**
+ * pg-boss queue carrying value-index work *without* duplicate scoring (G5 R9).
+ *
+ * The value index (`asset_correlation_values`) has two readers: duplicate
+ * detection, which scores pairs over it, and entities, whose mentions are a
+ * join against it. While duplicate detection is on, CORRELATION_QUEUE indexes
+ * and scores in one pass, as it always did. While it is off and entities are
+ * on, the same payloads come here instead and only the index is written —
+ * then entities are resolved and the scan is handed to the autopilot. With
+ * both off nothing is indexed, and scans go to SCAN_HANDOFF_QUEUE.
+ */
+export const VALUES_INDEX_QUEUE = 'values.index';
+
+/** Job options for one scan's index-only pass; coalesced per source. */
+export function valuesIndexJobOptions(sourceId: string) {
+  return {
+    singletonKey: `values-index:${sourceId}`,
+    singletonSeconds: CORRELATION_SCAN_COALESCE_SECONDS,
+    singletonNextSlot: true,
+    retryLimit: 2,
+    retryDelay: 60,
+    retryBackoff: true,
+    expireInSeconds: 3 * 3600,
+  };
+}
+
+/**
  * Coalescing window for the per-scan correlation job.
  *
  * Must be passed as `singletonSeconds` alongside the source's `singletonKey`:

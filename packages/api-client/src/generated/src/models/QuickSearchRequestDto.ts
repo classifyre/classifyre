@@ -63,7 +63,8 @@ export interface QuickSearchRequestDto {
  */
 export const QuickSearchRequestDtoKindsEnum = {
     Assets: 'assets',
-    Findings: 'findings'
+    Findings: 'findings',
+    Terms: 'terms'
 } as const;
 export type QuickSearchRequestDtoKindsEnum = typeof QuickSearchRequestDtoKindsEnum[keyof typeof QuickSearchRequestDtoKindsEnum];
 

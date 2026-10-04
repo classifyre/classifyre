@@ -51,6 +51,29 @@ import { CorrelationService } from './correlation/correlation.service';
 import { AgentKind, CaseActivityType, CaseThreadKind } from '@prisma/client';
 import { EmbeddingService } from './embedding/embedding.service';
 import { GlossaryService } from './glossary/glossary.service';
+import { GlossaryRelationsService } from './glossary/glossary-relations.service';
+import { GlossaryImportExportService } from './glossary/glossary-import-export.service';
+import { BindingsService } from './semantic/bindings/bindings.service';
+import { VocabularyService } from './semantic/vocabulary/vocabulary.service';
+import { MeaningService } from './semantic/links/meaning.service';
+import { GlossaryPacksService } from './semantic/packs/glossary-packs.service';
+import { FindInTextService } from './semantic/find-in-text/find-in-text.service';
+import { GlossaryProposalsService } from './semantic/suggestions/glossary-proposals.service';
+import { SemanticSuggestionsService } from './semantic/suggestions/semantic-suggestions.service';
+import { SemanticMapService } from './semantic/map/semantic-map.service';
+import {
+  registerSemanticMcpTools,
+  type SemanticMcpServer,
+} from './semantic/semantic-mcp-tools';
+import { EntitiesService } from './entities/entities.service';
+import { EntityValuesService } from './entities/entity-values.service';
+import { EntityMentionsService } from './entities/entity-mentions.service';
+import { EntityCandidatesService } from './entities/entity-candidates.service';
+import { EntitySwitchService } from './entities/entity-switch.service';
+import {
+  registerEntityMcpTools,
+  type EntityMcpServer,
+} from './entities/entities-mcp-tools';
 import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
 import { AutopilotService } from './autopilot/autopilot.service';
@@ -336,6 +359,21 @@ export class McpServerFactoryService {
     private readonly caseCleanup: CaseCleanupService,
     private readonly caseBoardTools: CaseBoardToolsService,
     private readonly customDetectorFiles: CustomDetectorFilesService,
+    private readonly glossaryRelations: GlossaryRelationsService,
+    private readonly glossaryTransfer: GlossaryImportExportService,
+    private readonly bindingsService: BindingsService,
+    private readonly vocabularyService: VocabularyService,
+    private readonly meaningService: MeaningService,
+    private readonly glossaryPacks: GlossaryPacksService,
+    private readonly findInText: FindInTextService,
+    private readonly glossaryProposals: GlossaryProposalsService,
+    private readonly semanticSuggestions: SemanticSuggestionsService,
+    private readonly semanticMap: SemanticMapService,
+    private readonly entitiesService: EntitiesService,
+    private readonly entityValues: EntityValuesService,
+    private readonly entityMentions: EntityMentionsService,
+    private readonly entityCandidates: EntityCandidatesService,
+    private readonly entitySwitch: EntitySwitchService,
   ) {}
 
   /**
@@ -371,6 +409,7 @@ export class McpServerFactoryService {
     this.registerCaseBoardTools(srv);
     this.registerCorrelationTools(srv);
     this.registerGlossaryTools(srv);
+    this.registerEntityTools(srv);
     this.registerCaseLeadTools(srv);
     this.registerAutopilotTools(srv);
 
@@ -887,86 +926,41 @@ export class McpServerFactoryService {
   }
 
   private registerGlossaryTools(server: McpServerCompat) {
-    server.registerTool(
-      'list_glossary_terms',
+    registerSemanticMcpTools(
+      server as unknown as SemanticMcpServer,
       {
-        title: 'List Glossary Terms',
-        description:
-          'List the shared investigation glossary: canonical terms, aliases, entity types and verification state. The vocabulary investigators and agents share.',
-        inputSchema: {
-          query: z.string().optional(),
-          entityType: z
-            .enum([
-              'PERSON',
-              'ORGANIZATION',
-              'LOCATION',
-              'REFERENCE',
-              'TERM',
-              'OTHER',
-            ])
-            .optional(),
-          take: z.number().int().min(1).max(200).optional(),
-          skip: z.number().int().min(0).optional(),
-        },
-        annotations: { readOnlyHint: true, idempotentHint: true },
+        glossary: this.glossaryService,
+        relations: this.glossaryRelations,
+        transfer: this.glossaryTransfer,
+        bindings: this.bindingsService,
+        vocabulary: this.vocabularyService,
+        meaning: this.meaningService,
+        packs: this.glossaryPacks,
+        findInText: this.findInText,
+        proposals: this.glossaryProposals,
+        suggestions: this.semanticSuggestions,
+        map: this.semanticMap,
       },
-      async ({ query, entityType, take, skip }) =>
-        jsonResult(
-          await this.glossaryService.list({ query, entityType, take, skip }),
-        ),
+      {
+        json: jsonResult,
+        assertNotDemoMode: () => this.mcpToolExecutor.assertNotDemoMode(),
+      },
     );
+  }
 
-    server.registerTool(
-      'lookup_glossary',
+  private registerEntityTools(server: McpServerCompat) {
+    registerEntityMcpTools(
+      server as unknown as EntityMcpServer,
       {
-        title: 'Lookup Glossary',
-        description:
-          'Resolve a name, alias or concept against the glossary (exact, alias and semantic matching). Use before treating two spellings as separate entities.',
-        inputSchema: {
-          query: z.string().min(1).max(200),
-          limit: z.number().int().min(1).max(50).optional(),
-        },
-        annotations: { readOnlyHint: true, idempotentHint: true },
+        entities: this.entitiesService,
+        values: this.entityValues,
+        mentions: this.entityMentions,
+        candidates: this.entityCandidates,
+        switchService: this.entitySwitch,
       },
-      async ({ query, limit }) =>
-        jsonResult(await this.glossaryService.lookup(query, limit ?? 10)),
-    );
-
-    server.registerTool(
-      'upsert_glossary_term',
       {
-        title: 'Upsert Glossary Term',
-        description:
-          'Create or update a glossary term (canonical name, aliases, entity type, notes). Terms written through MCP are operator-curated and verified.',
-        inputSchema: {
-          term: z.string().min(1).max(200),
-          aliases: z.array(z.string()).max(50).optional(),
-          entityType: z
-            .enum([
-              'PERSON',
-              'ORGANIZATION',
-              'LOCATION',
-              'REFERENCE',
-              'TERM',
-              'OTHER',
-            ])
-            .optional(),
-          notes: z.string().optional(),
-        },
-        annotations: { readOnlyHint: false, destructiveHint: false },
-      },
-      async ({ term, aliases, entityType, notes }) => {
-        this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(
-          await this.glossaryService.upsert({
-            term,
-            aliases,
-            entityType,
-            notes,
-            origin: 'OPERATOR',
-            author: 'mcp',
-          }),
-        );
+        json: jsonResult,
+        assertNotDemoMode: () => this.mcpToolExecutor.assertNotDemoMode(),
       },
     );
   }
@@ -3381,6 +3375,17 @@ export class McpServerFactoryService {
       findingTypes: z.array(z.string()).optional(),
       findingTypeRegex: z.array(z.string()).optional(),
       findingValueRegex: z.array(z.string()).optional(),
+      termKeys: z
+        .array(z.string())
+        .max(50)
+        .optional()
+        .describe(
+          'Glossary term keys: the finding must be evidence of one of these concepts (an APPROVED binding of its output, or a manual link). Prefer this over a value regex when a concept exists. Unknown keys are rejected.',
+        ),
+      termsIncludeNarrower: z
+        .boolean()
+        .optional()
+        .describe('Include the narrower concepts of termKeys.'),
     };
 
     server.registerTool(

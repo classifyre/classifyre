@@ -59,8 +59,10 @@ describe('SourceGraphService rebuild', () => {
     // of the edge indexes, which turns the connected-asset count into a full
     // scan of `edges` on every rebuild.
     expect(sql()).toMatch(
-      /FROM edges WHERE from_type = 'asset'\s+UNION\s+SELECT to_id/,
+      /FROM edges\s+WHERE from_type = 'asset'[^]*?\s+UNION\s+SELECT to_id/,
     );
+    // Meaning edges (asset → term) are not connections between assets (SL-4).
+    expect(sql()).toMatch(/to_type NOT IN \('term', 'term_ref'\)/);
   });
 
   it('counts a source as connected via Asset.links, not only typed edges', async () => {

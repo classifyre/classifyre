@@ -1,0 +1,659 @@
+{
+  "format": "classifyre.glossary-pack/v1",
+  "key": "gdpr-personal-data",
+  "version": "1.0.0",
+  "name": "GDPR personal data",
+  "language": "en",
+  "description": "Categories of personal data under the GDPR, bound to the built-in PII detector's outputs. Art. 9 special categories have no built-in detector; G2 detector bundles bind to them by key.",
+  "sources": [
+    "https://eur-lex.europa.eu/eli/reg/2016/679/oj"
+  ],
+  "schemes": [
+    {
+      "key": "gdpr-personal-data",
+      "name": "GDPR personal data",
+      "description": "Personal data and its categories (GDPR Art. 4(1) and Art. 9)."
+    }
+  ],
+  "terms": [
+    {
+      "key": "personal-data",
+      "kind": "CONCEPT",
+      "term": "Personal data",
+      "scheme": "gdpr-personal-data",
+      "definition": "Any information relating to an identified or identifiable natural person (GDPR Art. 4(1)).",
+      "aliases": [
+        "personenbezogene Daten",
+        "PII"
+      ]
+    },
+    {
+      "key": "identification-data",
+      "kind": "CONCEPT",
+      "term": "Identification data",
+      "scheme": "gdpr-personal-data",
+      "definition": "Data that identifies a person directly: names and official identifiers."
+    },
+    {
+      "key": "person-name",
+      "kind": "CONCEPT",
+      "term": "Person name",
+      "scheme": "gdpr-personal-data",
+      "definition": "A natural person's name.",
+      "aliases": [
+        "name of a person",
+        "Personenname"
+      ]
+    },
+    {
+      "key": "national-identification-number",
+      "kind": "CONCEPT",
+      "term": "National identification number",
+      "scheme": "gdpr-personal-data",
+      "definition": "An identifier a state issues to a person: social security, tax, health or national ID numbers.",
+      "aliases": [
+        "national ID",
+        "Sozialversicherungsnummer",
+        "social security number"
+      ]
+    },
+    {
+      "key": "passport-number",
+      "kind": "CONCEPT",
+      "term": "Passport number",
+      "scheme": "gdpr-personal-data",
+      "definition": "The number of a passport.",
+      "aliases": [
+        "Reisepassnummer"
+      ]
+    },
+    {
+      "key": "driver-licence-number",
+      "kind": "CONCEPT",
+      "term": "Driver's licence number",
+      "scheme": "gdpr-personal-data",
+      "definition": "The number of a driving licence.",
+      "aliases": [
+        "driver license number",
+        "Führerscheinnummer"
+      ]
+    },
+    {
+      "key": "contact-data",
+      "kind": "CONCEPT",
+      "term": "Contact data",
+      "scheme": "gdpr-personal-data",
+      "definition": "Data used to reach a person.",
+      "aliases": [
+        "Kontaktdaten"
+      ]
+    },
+    {
+      "key": "email-address",
+      "kind": "CONCEPT",
+      "term": "E-mail address",
+      "scheme": "gdpr-personal-data",
+      "definition": "An electronic mail address.",
+      "aliases": [
+        "email",
+        "e-mail",
+        "E-Mail-Adresse"
+      ]
+    },
+    {
+      "key": "phone-number",
+      "kind": "CONCEPT",
+      "term": "Phone number",
+      "scheme": "gdpr-personal-data",
+      "definition": "A telephone number.",
+      "aliases": [
+        "telephone number",
+        "Telefonnummer"
+      ]
+    },
+    {
+      "key": "location-or-address",
+      "kind": "CONCEPT",
+      "term": "Location or address",
+      "scheme": "gdpr-personal-data",
+      "definition": "A postal address or a place associated with a person.",
+      "aliases": [
+        "address",
+        "Adresse",
+        "location"
+      ]
+    },
+    {
+      "key": "financial-data",
+      "kind": "CONCEPT",
+      "term": "Financial data",
+      "scheme": "gdpr-personal-data",
+      "definition": "Data about a person's finances, accounts and payment instruments.",
+      "aliases": [
+        "Finanzdaten"
+      ]
+    },
+    {
+      "key": "bank-account-iban",
+      "kind": "CONCEPT",
+      "term": "Bank account (IBAN)",
+      "scheme": "gdpr-personal-data",
+      "definition": "An International Bank Account Number.",
+      "aliases": [
+        "IBAN",
+        "bank account",
+        "Bankverbindung"
+      ]
+    },
+    {
+      "key": "payment-card-number",
+      "kind": "CONCEPT",
+      "term": "Payment card number",
+      "scheme": "gdpr-personal-data",
+      "definition": "The number of a credit or debit card.",
+      "aliases": [
+        "credit card number",
+        "Kreditkartennummer"
+      ]
+    },
+    {
+      "key": "online-identifiers",
+      "kind": "CONCEPT",
+      "term": "Online identifiers",
+      "scheme": "gdpr-personal-data",
+      "definition": "Identifiers devices and services assign: IP addresses, cookie and device IDs (GDPR Recital 30).",
+      "aliases": [
+        "online identifier"
+      ]
+    },
+    {
+      "key": "ip-address",
+      "kind": "CONCEPT",
+      "term": "IP address",
+      "scheme": "gdpr-personal-data",
+      "definition": "An Internet Protocol address.",
+      "aliases": [
+        "IP-Adresse"
+      ]
+    },
+    {
+      "key": "nationality-religious-political-group",
+      "kind": "CONCEPT",
+      "term": "Nationality, religious or political group",
+      "scheme": "gdpr-personal-data",
+      "definition": "A person's nationality or membership of a religious or political group (Presidio NRP).",
+      "aliases": [
+        "NRP"
+      ]
+    },
+    {
+      "key": "special-categories",
+      "kind": "CONCEPT",
+      "term": "Special categories (Art. 9)",
+      "scheme": "gdpr-personal-data",
+      "definition": "Personal data revealing racial or ethnic origin, political opinions, religious or philosophical beliefs, trade-union membership, genetic, biometric or health data, or data concerning sex life or sexual orientation (GDPR Art. 9(1)).",
+      "aliases": [
+        "sensitive personal data",
+        "besondere Kategorien personenbezogener Daten"
+      ]
+    },
+    {
+      "key": "health-data",
+      "kind": "CONCEPT",
+      "term": "Health data",
+      "scheme": "gdpr-personal-data",
+      "definition": "Personal data related to the physical or mental health of a person (GDPR Art. 4(15)).",
+      "aliases": [
+        "Gesundheitsdaten",
+        "data concerning health"
+      ]
+    },
+    {
+      "key": "genetic-data",
+      "kind": "CONCEPT",
+      "term": "Genetic data",
+      "scheme": "gdpr-personal-data",
+      "definition": "Personal data relating to inherited or acquired genetic characteristics (GDPR Art. 4(13)).",
+      "aliases": [
+        "genetische Daten"
+      ]
+    },
+    {
+      "key": "biometric-data",
+      "kind": "CONCEPT",
+      "term": "Biometric data",
+      "scheme": "gdpr-personal-data",
+      "definition": "Personal data from technical processing of physical, physiological or behavioural characteristics that allow unique identification (GDPR Art. 4(14)).",
+      "aliases": [
+        "biometrische Daten"
+      ]
+    },
+    {
+      "key": "racial-or-ethnic-origin",
+      "kind": "CONCEPT",
+      "term": "Racial or ethnic origin",
+      "scheme": "gdpr-personal-data",
+      "definition": "Data revealing racial or ethnic origin.",
+      "aliases": [
+        "ethnic origin"
+      ]
+    },
+    {
+      "key": "political-opinions",
+      "kind": "CONCEPT",
+      "term": "Political opinions",
+      "scheme": "gdpr-personal-data",
+      "definition": "Data revealing political opinions.",
+      "aliases": [
+        "politische Meinungen"
+      ]
+    },
+    {
+      "key": "religious-or-philosophical-beliefs",
+      "kind": "CONCEPT",
+      "term": "Religious or philosophical beliefs",
+      "scheme": "gdpr-personal-data",
+      "definition": "Data revealing religious or philosophical beliefs.",
+      "aliases": [
+        "religious beliefs"
+      ]
+    },
+    {
+      "key": "trade-union-membership",
+      "kind": "CONCEPT",
+      "term": "Trade-union membership",
+      "scheme": "gdpr-personal-data",
+      "definition": "Data revealing trade-union membership.",
+      "aliases": [
+        "Gewerkschaftszugehörigkeit"
+      ]
+    },
+    {
+      "key": "sex-life-or-sexual-orientation",
+      "kind": "CONCEPT",
+      "term": "Sex life or sexual orientation",
+      "scheme": "gdpr-personal-data",
+      "definition": "Data concerning a person's sex life or sexual orientation.",
+      "aliases": [
+        "sexual orientation"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "identification-data",
+      "type": "BROADER",
+      "to": "personal-data"
+    },
+    {
+      "from": "contact-data",
+      "type": "BROADER",
+      "to": "personal-data"
+    },
+    {
+      "from": "financial-data",
+      "type": "BROADER",
+      "to": "personal-data"
+    },
+    {
+      "from": "online-identifiers",
+      "type": "BROADER",
+      "to": "personal-data"
+    },
+    {
+      "from": "special-categories",
+      "type": "BROADER",
+      "to": "personal-data"
+    },
+    {
+      "from": "nationality-religious-political-group",
+      "type": "BROADER",
+      "to": "personal-data"
+    },
+    {
+      "from": "person-name",
+      "type": "BROADER",
+      "to": "identification-data"
+    },
+    {
+      "from": "national-identification-number",
+      "type": "BROADER",
+      "to": "identification-data"
+    },
+    {
+      "from": "passport-number",
+      "type": "BROADER",
+      "to": "identification-data"
+    },
+    {
+      "from": "driver-licence-number",
+      "type": "BROADER",
+      "to": "identification-data"
+    },
+    {
+      "from": "email-address",
+      "type": "BROADER",
+      "to": "contact-data"
+    },
+    {
+      "from": "phone-number",
+      "type": "BROADER",
+      "to": "contact-data"
+    },
+    {
+      "from": "location-or-address",
+      "type": "BROADER",
+      "to": "contact-data"
+    },
+    {
+      "from": "bank-account-iban",
+      "type": "BROADER",
+      "to": "financial-data"
+    },
+    {
+      "from": "payment-card-number",
+      "type": "BROADER",
+      "to": "financial-data"
+    },
+    {
+      "from": "ip-address",
+      "type": "BROADER",
+      "to": "online-identifiers"
+    },
+    {
+      "from": "health-data",
+      "type": "BROADER",
+      "to": "special-categories"
+    },
+    {
+      "from": "genetic-data",
+      "type": "BROADER",
+      "to": "special-categories"
+    },
+    {
+      "from": "biometric-data",
+      "type": "BROADER",
+      "to": "special-categories"
+    },
+    {
+      "from": "racial-or-ethnic-origin",
+      "type": "BROADER",
+      "to": "special-categories"
+    },
+    {
+      "from": "political-opinions",
+      "type": "BROADER",
+      "to": "special-categories"
+    },
+    {
+      "from": "religious-or-philosophical-beliefs",
+      "type": "BROADER",
+      "to": "special-categories"
+    },
+    {
+      "from": "trade-union-membership",
+      "type": "BROADER",
+      "to": "special-categories"
+    },
+    {
+      "from": "sex-life-or-sexual-orientation",
+      "type": "BROADER",
+      "to": "special-categories"
+    },
+    {
+      "from": "nationality-religious-political-group",
+      "type": "RELATED",
+      "to": "special-categories"
+    }
+  ],
+  "bindings": [
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "PERSON"
+      },
+      "termKey": "person-name"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "EMAIL_ADDRESS"
+      },
+      "termKey": "email-address"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "PHONE_NUMBER"
+      },
+      "termKey": "phone-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "LOCATION"
+      },
+      "termKey": "location-or-address"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "IP_ADDRESS"
+      },
+      "termKey": "ip-address"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "IBAN_CODE"
+      },
+      "termKey": "bank-account-iban"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "CREDIT_CARD"
+      },
+      "termKey": "payment-card-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "US_SSN"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "US_ITIN"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "UK_NHS"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "ES_NIF"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "ES_NIE"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "IT_FISCAL_CODE"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "IT_IDENTITY_CARD"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "SG_NRIC_FIN"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "AU_TFN"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "AU_MEDICARE"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "IN_PAN"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "IN_AADHAAR"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "IN_VOTER"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "FI_PERSONAL_IDENTITY_CODE"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "PL_PESEL"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "AT_SVNR"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "CH_AHV"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "DE_TAX_ID"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "EU_NATIONAL_ID"
+      },
+      "termKey": "national-identification-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "US_PASSPORT"
+      },
+      "termKey": "passport-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "IT_PASSPORT"
+      },
+      "termKey": "passport-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "US_DRIVER_LICENSE"
+      },
+      "termKey": "driver-licence-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "IT_DRIVER_LICENSE"
+      },
+      "termKey": "driver-licence-number"
+    },
+    {
+      "mode": "OUTPUT",
+      "output": {
+        "detectorType": "PII",
+        "findingType": "NRP"
+      },
+      "termKey": "nationality-religious-political-group"
+    }
+  ]
+}

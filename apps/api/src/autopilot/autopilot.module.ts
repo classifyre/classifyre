@@ -37,7 +37,7 @@ import { FingerprintsToolset } from './tools/fingerprints/fingerprints.toolset';
 import { AlertToolset } from './tools/alert/alert.toolset';
 import { SemanticToolset } from './tools/semantic/semantic.toolset';
 import { GlossaryToolset } from './tools/glossary/glossary.toolset';
-import { GlossaryService } from '../glossary/glossary.service';
+import { GlossaryModule } from '../glossary/glossary.module';
 import { CaseLeadsToolset } from './tools/leads/case-leads.toolset';
 import { ScheduleToolset } from './tools/schedule/schedule.toolset';
 import { HypothesesToolset } from './tools/hypotheses/hypotheses.toolset';
@@ -85,6 +85,7 @@ import { SourceGraphModule } from '../stats/source-graph.module';
     // adaptive scheduler and the agents share one implementation rather than
     // each having their own idea of when a source should run.
     SchedulerModule,
+    GlossaryModule,
   ],
   controllers: [
     AutopilotController,
@@ -132,7 +133,6 @@ import { SourceGraphModule } from '../stats/source-graph.module';
     FingerprintsToolset,
     AlertToolset,
     SemanticToolset,
-    GlossaryService,
     GlossaryToolset,
     CaseLeadsService,
     CaseEventsService,

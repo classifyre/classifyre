@@ -38,6 +38,9 @@ import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
 import { useTimelineLink } from "../hooks/use-timeline-link";
+import { useVisibleCentre } from "../hooks/use-visible-centre";
+import { placeTerm } from "../store/commands";
+import { useNsPath } from "@/lib/ns-path";
 
 /** The statuses a case moves between while it is being worked; closing has its own button. */
 const STATUSES = ["OPEN", "IN_PROGRESS"] as const;
@@ -78,10 +81,74 @@ export function CaseFilePanel({
   return (
     <div className="space-y-6" data-testid="case-file-panel">
       <DetailsSection caseId={caseId} caseData={caseData} readOnly={readOnly} onSaved={onCaseChanged} onStatusChanged={onChanged} />
+      <MeaningSection readOnly={readOnly} />
       <AutopilotSection caseId={caseId} caseData={caseData} readOnly={readOnly} onChanged={onChanged} />
       <CleanupSection caseId={caseId} caseData={caseData} readOnly={readOnly} onChanged={onChanged} />
       <ConclusionSection caseId={caseId} caseData={caseData} readOnly={readOnly} onSaved={onCaseChanged} onClosed={onChanged} />
     </div>
+  );
+}
+
+/**
+ * The Meaning lens as a list (SL5 A2): the concepts this case's evidence is
+ * about, how much evidence each covers, and a way to pin one to the board.
+ */
+function MeaningSection({ readOnly }: { readOnly: boolean }) {
+  const { t } = useTranslation();
+  const store = useBoardStore();
+  const centre = useVisibleCentre();
+  const nsPath = useNsPath();
+  const semantic = useBoard((s) => s.semantic);
+  if (!semantic || semantic.terms.length === 0) return null;
+  const terms = [...semantic.terms]
+    .filter((term) => !term.deleted)
+    .sort((a, b) => b.linkedItems.length - a.linkedItems.length);
+  return (
+    <section className="space-y-2" data-testid="case-meaning-section">
+      <SectionHeading>{t("caseBoard.meaning.title")}</SectionHeading>
+      <ul className="space-y-1.5">
+        {terms.map((term) => (
+          <li key={term.termId} className="flex items-center justify-between gap-2 text-sm">
+            <span className="flex min-w-0 items-center gap-2">
+              <span
+                aria-hidden
+                className="size-2.5 shrink-0 rounded-full border border-border"
+                style={{ backgroundColor: term.scheme?.color ?? "transparent" }}
+              />
+              <a
+                href={nsPath(`/glossary/terms/${encodeURIComponent(term.key)}`)}
+                className="truncate hover:underline"
+              >
+                {term.name}
+              </a>
+              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                {t("caseBoard.term.linked", { count: String(term.linkedItems.length) })}
+              </span>
+            </span>
+            {!readOnly && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 shrink-0 rounded-[4px] text-[11px]"
+                onClick={() => {
+                  const at = centre();
+                  store
+                    .getState()
+                    .run(placeTerm(term.termId, term.placedItemId, { x: at.x - 100, y: at.y - 32 }));
+                }}
+              >
+                {term.placedItemId ? t("caseBoard.meaning.show") : t("caseBoard.meaning.place")}
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {semantic.truncated > 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          {t("caseBoard.meaning.truncated", { count: String(semantic.truncated) })}
+        </p>
+      )}
+    </section>
   );
 }
 

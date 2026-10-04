@@ -111,7 +111,11 @@ export const CaseActivityDtoActivityTypeEnum = {
     InquirySettingsUpdated: 'INQUIRY_SETTINGS_UPDATED',
     FindingsEscalated: 'FINDINGS_ESCALATED',
     EscalationCleared: 'ESCALATION_CLEARED',
-    LeadsGenerated: 'LEADS_GENERATED'
+    LeadsGenerated: 'LEADS_GENERATED',
+    BoardTermPlaced: 'BOARD_TERM_PLACED',
+    BoardTermRemoved: 'BOARD_TERM_REMOVED',
+    MeaningLinked: 'MEANING_LINKED',
+    MeaningUnlinked: 'MEANING_UNLINKED'
 } as const;
 export type CaseActivityDtoActivityTypeEnum = typeof CaseActivityDtoActivityTypeEnum[keyof typeof CaseActivityDtoActivityTypeEnum];
 

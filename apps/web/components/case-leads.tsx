@@ -13,6 +13,7 @@ import {
   Loader2,
   Plus,
   Radar,
+  Users,
   RefreshCw,
   Search,
   Sparkles,
@@ -68,6 +69,8 @@ const ORIGIN_ICON: Record<LeadReason, LucideIcon> = {
   // The Watches panel's own icon: an answer of a watch reads as one.
   INQUIRY: Sparkles,
   SEMANTIC_NEIGHBOR: Radar,
+  // A finding that mentions an entity linked to the case (G5 R17).
+  ENTITY: Users,
   SAME_VALUE: Equal,
   AUTOPILOT: Bot,
   MANUAL: Bookmark,

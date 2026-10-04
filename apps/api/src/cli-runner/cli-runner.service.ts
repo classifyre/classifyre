@@ -1,3 +1,4 @@
+import { enqueueSemanticAfterRun } from '../semantic/semantic-jobs.scheduler';
 import {
   Injectable,
   Logger,
@@ -19,7 +20,9 @@ import {
   CORRELATION_QUEUE,
   CORRELATION_SCAN_COALESCE_SECONDS,
   SCAN_HANDOFF_QUEUE,
+  VALUES_INDEX_QUEUE,
   scanHandoffJobOptions,
+  valuesIndexJobOptions,
 } from '../correlation/correlation.constants';
 import { AUTO_SCHEDULE_QUEUE } from '../scheduler/auto-schedule.constants';
 import { ClsService } from 'nestjs-cls';
@@ -378,6 +381,21 @@ export class CliRunnerService {
    * `autopilotDirtyAt`, so the source is still enrolled in the next cycle even
    * when a redundant recompute is coalesced away.
    */
+  private async enqueueSemanticWork(
+    sourceId: string,
+    runnerId: string,
+  ): Promise<void> {
+    if (!this.pgBossService) return;
+    try {
+      const boss = await this.pgBossService.getBossAsync();
+      await enqueueSemanticAfterRun(this.prisma, boss, runnerId, sourceId);
+    } catch (error) {
+      this.logger.warn(
+        `Could not queue semantic linking for runner ${runnerId}: ${String(error)}`,
+      );
+    }
+  }
+
   private async enqueueQuestionMatching(
     sourceId: string,
     runnerId: string,
@@ -398,8 +416,10 @@ export class CliRunnerService {
       // deterministic duplicate detection and then hands off to the autopilot
       // cycle, so inquiry/case agents can consider the duplicate/cluster
       // results. With duplicate detection turned off its queue is held
-      // paused, so the scan goes straight to the hand-off instead — the agents
-      // must not stop hearing about scans because duplicates did.
+      // paused, so the scan goes to the value-index queue instead (entities
+      // read that index too, G5 R9) — or, with entities off as well, straight
+      // to the hand-off: the agents must not stop hearing about scans because
+      // duplicates did.
       if (await this.duplicateDetectionEnabled()) {
         await boss.send(
           CORRELATION_QUEUE,
@@ -413,6 +433,13 @@ export class CliRunnerService {
             retryBackoff: true,
             expireInSeconds: 3 * 3600,
           },
+        );
+      } else if (await this.entitiesEnabled()) {
+        await boss.createQueue(VALUES_INDEX_QUEUE);
+        await boss.send(
+          VALUES_INDEX_QUEUE,
+          { sourceId, runnerId },
+          valuesIndexJobOptions(sourceId),
         );
       } else {
         await boss.send(
@@ -443,6 +470,23 @@ export class CliRunnerService {
       return row?.enabled ?? true;
     } catch {
       return true;
+    }
+  }
+
+  /**
+   * The Entities switch, read the same way. A missing row is a new workspace,
+   * where entities are on; unreadable means the table is not there yet, and
+   * then nothing could resolve entities anyway.
+   */
+  private async entitiesEnabled(): Promise<boolean> {
+    try {
+      const row = await this.prisma.entityConfig.findUnique({
+        where: { id: 1 },
+        select: { enabled: true },
+      });
+      return row?.enabled ?? true;
+    } catch {
+      return false;
     }
   }
 
@@ -3435,6 +3479,9 @@ export class CliRunnerService {
 
     // Kick the question-matching engine for this source (fire-and-forget).
     await this.enqueueQuestionMatching(runner.sourceId, runnerId);
+    // Meaning: relink the assets this run touched and refresh the source's
+    // observed vocabulary (SL2 F8, SL3 R2). Never on the scan's critical path.
+    await this.enqueueSemanticWork(runner.sourceId, runnerId);
     await this.enqueueAutoScheduleKick(runner.sourceId, runnerId);
 
     if (runner?.source) {

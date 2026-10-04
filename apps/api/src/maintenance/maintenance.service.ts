@@ -24,10 +24,12 @@ import {
   CLEANABLE_DATASETS,
   PROTECTED_DATASETS,
   SCORED_EDGE_RELATION_TYPES,
+  VALUE_INDEX_TABLES,
   isCleanupKey,
   type CleanableDataset,
   type CleanupKey,
 } from './maintenance.datasets';
+import { glossaryEvents } from '../glossary/glossary-events';
 
 export interface TableStat {
   table: string;
@@ -542,6 +544,38 @@ export class MaintenanceService {
         );
         touched = [...dataset.tables];
         break;
+      case 'vocabulary':
+      case 'semanticLinks':
+      case 'semanticMap':
+        result = await this.wipeTables(
+          dataset,
+          [],
+          this.tick(run, dataset.tables[0] ?? key),
+        );
+        touched = [...dataset.tables];
+        glossaryEvents.emit({ type: 'semantic.derived_cleared', dataset: key });
+        break;
+      case 'entities': {
+        const cleaned = await this.cleanupEntities(run);
+        result = cleaned.result;
+        touched = cleaned.touched;
+        // Still switched on (cleaned from the Cleanup tab, not by turning the
+        // feature off): everything removed here is rebuilt.
+        glossaryEvents.emit({ type: 'semantic.derived_cleared', dataset: key });
+        break;
+      }
+      case 'suggestions': {
+        const deleted = await this.deleteChunks(
+          'semantic_suggestions',
+          `WHERE status IN ('PROPOSED', 'EXPIRED')`,
+          false,
+          'ctid',
+          this.tick(run, 'semantic_suggestions'),
+        );
+        result = { deleted: { semantic_suggestions: deleted }, skipped: {} };
+        touched = ['semantic_suggestions'];
+        break;
+      }
       case 'transfers':
         result = await this.cleanupTransfers(this.tick(run, 'transfers'));
         touched = ['data_transfer_jobs', 'data_transfer_chunks'];
@@ -728,10 +762,21 @@ export class MaintenanceService {
   ): Promise<Omit<CleanupResult, 'key' | 'durationMs'>> {
     const work = async () => {
       run.note = null;
+      // The value index is shared with entities (G5 R9): it survives this
+      // wipe while they are on, because their mentions are a join against it.
+      const keepIndex = await this.entitiesOn();
+      const scope: CleanableDataset = keepIndex
+        ? {
+            ...dataset,
+            tables: dataset.tables.filter(
+              (table) => !VALUE_INDEX_TABLES.includes(table),
+            ),
+          }
+        : dataset;
       const wiped = await this.wipeTables(
-        dataset,
+        scope,
         ['asset_cluster_members', 'asset_clusters'],
-        this.tick(run, dataset.tables[0] ?? 'duplicates'),
+        this.tick(run, scope.tables[0] ?? 'duplicates'),
       );
       const deleted = { ...wiped.deleted };
       if (dataset.sharedRows) {
@@ -749,6 +794,83 @@ export class MaintenanceService {
     if (!this.correlationLock) return work();
     run.note = 'Waiting for a running duplicate check to finish';
     return this.correlationLock.runExclusive(work);
+  }
+
+  // ── entities ────────────────────────────────────────────────────────────
+
+  /** The Entities switch, read fresh: a cleanup decides once, at its start. */
+  private async entitiesOn(): Promise<boolean> {
+    try {
+      const row = await this.prisma.entityConfig.findUnique({
+        where: { id: 1 },
+        select: { enabled: true },
+      });
+      return row?.enabled ?? true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async duplicatesOn(): Promise<boolean> {
+    try {
+      const row = await this.prisma.correlationConfig.findUnique({
+        where: { id: 1 },
+        select: { enabled: true },
+      });
+      return row?.enabled ?? true;
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * Remove what entity resolution derived: pending candidates, mention links
+   * and the counters on the terms. Decisions (confirmed and rejected values)
+   * and the entities themselves are curated and stay. The shared value index
+   * is removed as well, but only when duplicate detection is off — otherwise
+   * it is still that feature's working data.
+   */
+  private async cleanupEntities(run: CleanupProgress): Promise<{
+    result: Omit<CleanupResult, 'key' | 'durationMs'>;
+    touched: string[];
+  }> {
+    const deleted: Record<string, number> = {};
+    deleted['entity_values (PROPOSED)'] = await this.deleteChunks(
+      'entity_values',
+      `WHERE verdict = 'PROPOSED'`,
+      false,
+      'ctid',
+      this.tick(run, 'entity_values'),
+    );
+    deleted['asset_terms (MENTION)'] = await this.deleteChunks(
+      'asset_terms',
+      `WHERE method = 'MENTION'`,
+      false,
+      'ctid',
+      this.tick(run, 'asset_terms'),
+    );
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE "glossary_terms" SET mention_count = 0, asset_count = 0, source_count = 0 ` +
+        `WHERE kind = 'ENTITY' AND (mention_count <> 0 OR asset_count <> 0 OR source_count <> 0)`,
+    );
+    const touched = ['entity_values', 'asset_terms'];
+    if (!(await this.duplicatesOn())) {
+      const wipe = async () => {
+        run.note = null;
+        return this.wipeTables(
+          { key: 'entities', tables: [...VALUE_INDEX_TABLES] },
+          [],
+          this.tick(run, VALUE_INDEX_TABLES[0]),
+        );
+      };
+      run.note = 'Waiting for a running value-index pass to finish';
+      const wiped = this.correlationLock
+        ? await this.correlationLock.runExclusive(wipe)
+        : await wipe();
+      Object.assign(deleted, wiped.deleted);
+      touched.push(...VALUE_INDEX_TABLES);
+    }
+    return { result: { deleted, skipped: {} }, touched };
   }
 
   /**
