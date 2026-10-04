@@ -8,6 +8,10 @@ Name | Type
 ------------ | -------------
 `query` | string
 `entityType` | string
+`kind` | string
+`schemeId` | string
+`status` | Array&lt;string&gt;
+`steward` | string
 
 ## Example
 
@@ -18,6 +22,10 @@ import type { BulkUpdateGlossaryFiltersDto } from '@workspace/api-client'
 const example = {
   "query": null,
   "entityType": null,
+  "kind": null,
+  "schemeId": null,
+  "status": null,
+  "steward": null,
 } satisfies BulkUpdateGlossaryFiltersDto
 
 console.log(example)

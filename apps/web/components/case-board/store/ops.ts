@@ -564,6 +564,31 @@ export function applyLocal(d: BoardDomain, op: BoardOp, ctx: LocalContext): Loca
       next = withThread(next, { ...thread, itemId: op.itemId, onBoard: true });
       return { domain: next, exact: false };
     }
+    case "term.place": {
+      // One card per term: placing it again moves (or revives) that card.
+      const live = [...d.items.values()].find(
+        (item) => item.kind === "TERM" && item.refId === op.termId,
+      );
+      if (live) {
+        return {
+          domain: withItem(d, { ...live, x: op.x ?? live.x, y: op.y ?? live.y }),
+          exact: false,
+        };
+      }
+      const buried = d.graveyard.items.get(op.itemId);
+      if (buried) return { domain: reviveItem(d, buried, op), exact: false };
+      return {
+        domain: withItem(
+          d,
+          newItem(op.itemId, "TERM", ctx, {
+            refId: op.termId,
+            x: op.x ?? null,
+            y: op.y ?? null,
+          }),
+        ),
+        exact: false,
+      };
+    }
   }
 }
 

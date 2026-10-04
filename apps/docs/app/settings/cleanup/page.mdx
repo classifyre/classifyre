@@ -8,9 +8,9 @@ description: Decide which storage-heavy engines run in a workspace, see how much
 
 **Settings → Cleanup** has two parts:
 
-- **Features** — on/off switches for the two background engines that build
-  most of a workspace's derived data: **embeddings** and **duplicate
-  detection**. Turning one off stops its work everywhere, pauses its workers,
+- **Features** — on/off switches for the three background engines that build
+  most of a workspace's derived data: **embeddings**, **duplicate
+  detection** and **entities**. Turning one off stops its work everywhere, pauses its workers,
   and asks whether to keep or delete what it built.
 - **Datasets** — every storage dataset of the workspace with live row
   estimates (`~`, from the planner) and byte sizes (indexes included), plus a
@@ -28,8 +28,9 @@ assets, cases, inquiries and the glossary.
 | --- | --- | --- |
 | **Embeddings** | Vectors of finding evidence and document text, the importance rankings derived from them, and the document text chunks they are embedded from | Importance ranking, near-duplicate text groups, semantic search, similar findings, semantic case leads, the AI harness's evidence lookups |
 | **Duplicate detection** | Correlation values, signatures, clusters, patterns and the scored duplicate links in the asset graph | [Duplicate review](/duplicates/), "where else found", similar-asset links in the graph, look-alike [case leads](/investigations/cases/leads/), the harness duplicates tools |
+| **Entities** | Alias and identifier values of entities, spelling-variant candidates, mention counters and the semantic links that mentions create | [Entity pages and review](/how-it-works/glossary/#entities-from-mentions-to-things), entity watches, entity-based [case leads](/investigations/cases/leads/), "Make entity" |
 
-Both are on in a new workspace. (Embeddings follow the deployment's default
+All three are on in a new workspace; in an existing workspace the entities switch starts off. (Embeddings follow the deployment's default
 until a workspace chooses; a deployment that ships them off shows **Off by
 default**.) Each row shows the feature's state, when it last changed, how much
 data it owns right now, and — while off — which workers it holds paused.
@@ -105,6 +106,23 @@ A recompute that is running when the switch goes off stops at its next page of
 assets — it does not finish writing another few million pairs first — and is
 recorded in the harness log as skipped, not failed.
 
+#### Entities
+
+| | Keep data (pause) | Delete data |
+| --- | --- | --- |
+| Entity resolution after scans, candidates, counters | Stopped | Stopped |
+| Mentions on entity pages, entity watches, entity case leads | Frozen as of turning off | Empty |
+| Pending candidates, mention links, counters | Kept | Deleted |
+| The entities themselves and every confirmed or rejected value | Kept | Kept |
+| "Make entity" and creating entities | Unavailable | Unavailable |
+| Workers held | `entities.resolve`, `entities.recount` | The same |
+| Turning back on | Alias values and counters are rebuilt, and candidates are generated again | The same |
+
+Entities and duplicate detection share one piece of derived data, the *value
+index* behind "where else found". It keeps being written while **either** is on.
+With both off nothing is indexed, and turning entities back on first rebuilds
+the index from the findings.
+
 ### Turning a feature back on
 
 The switch opens a dialog that says what catching up costs before it starts:
@@ -116,6 +134,10 @@ The switch opens a dialog that says what catching up costs before it starts:
   large corpus that is about an hour of worker time; Duplicate review fills in
   as it finishes. It is one recompute, not a backlog — the scans, edits and
   tuning changes made while it was off were deliberately not queued one by one.
+- **Entities** rebuild the alias and identifier values of every entity, replay
+  the entities that sources declared while it was off, generate candidates over
+  the whole index and recount mentions. Existing workspaces start with the
+  switch off, so the first time is a full pass.
 
 ### Deleting what a paused feature kept
 

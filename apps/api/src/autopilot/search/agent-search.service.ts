@@ -1233,7 +1233,7 @@ export class AgentSearchService {
         aliases: term.aliases,
         entityType: String(term.entityType),
         notes: term.notes,
-        verified: term.verifiedAt !== null,
+        status: String(term.status),
       })),
       linkedInquiryIds: row.inquiryLinks.map((l) => l.inquiryId),
     };

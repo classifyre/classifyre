@@ -64,6 +64,11 @@ export type CleanupKey =
   | 'scheduler'
   | 'stats'
   | 'graph'
+  | 'vocabulary'
+  | 'semanticLinks'
+  | 'suggestions'
+  | 'semanticMap'
+  | 'entities'
   | 'transfers';
 
 export const CLEANUP_KEYS: readonly CleanupKey[] = [
@@ -74,6 +79,11 @@ export const CLEANUP_KEYS: readonly CleanupKey[] = [
   'scheduler',
   'stats',
   'graph',
+  'vocabulary',
+  'semanticLinks',
+  'suggestions',
+  'semanticMap',
+  'entities',
   'transfers',
 ];
 
@@ -128,10 +138,32 @@ export const PROTECTED_DATASETS: readonly ProtectedDataset[] = [
     key: 'inquiries',
     tables: ['inquiries'],
   },
+  // Curated meaning (SL-9): terms, schemes, relations, bindings, manual
+  // links and the history of all of it.
   {
     key: 'glossary',
-    tables: ['glossary_terms', 'glossary_references'],
+    tables: [
+      'glossary_terms',
+      'glossary_schemes',
+      'glossary_relations',
+      'glossary_bindings',
+      'glossary_references',
+      'glossary_activities',
+      // The Entities switch and its label configuration.
+      'entity_config',
+    ],
   },
+];
+
+/**
+ * The value index (G5 R9): one normalised finding value per asset, read by
+ * duplicate detection (pair scoring) and by entities (mentions). It is listed
+ * under `duplicates`, which has always measured it, but neither feature's
+ * cleanup may remove it while the other feature is on.
+ */
+export const VALUE_INDEX_TABLES: readonly string[] = [
+  'asset_correlation_values',
+  'asset_signatures',
 ];
 
 export const CLEANABLE_DATASETS: readonly CleanableDataset[] = [
@@ -220,6 +252,27 @@ export const CLEANABLE_DATASETS: readonly CleanableDataset[] = [
       'source_graph_boundary_assets',
       'source_graph_state',
     ],
+  },
+  // The semantic layer's derived tables (SL-9), each rebuilt from the curated
+  // glossary and the scanned data. The vocabulary inventory is refreshed from
+  // findings and assets; semantic links are re-derived by a backfill.
+  { key: 'vocabulary', tables: ['vocabulary_items', 'vocabulary_fields'] },
+  {
+    key: 'semanticLinks',
+    tables: ['asset_terms', 'semantic_stats', 'semantic_link_jobs'],
+  },
+  // Pending suggestions only: decided rows are the operator's decisions and
+  // stay, so a dismissed suggestion is not proposed again.
+  { key: 'suggestions', tables: ['semantic_suggestions'] },
+  // What entity resolution derived: pending candidates, mention links
+  // (`asset_terms` rows with method MENTION) and the counters on the terms.
+  // Confirmed and rejected values are decisions and stay, as do the entities
+  // themselves. The value index goes too when duplicate detection is off.
+  // Owned by the Entities switch.
+  { key: 'entities', tables: ['entity_values'] },
+  {
+    key: 'semanticMap',
+    tables: ['term_graph_nodes', 'term_graph_links', 'term_graph_state'],
   },
   // Finished transfers (uploads waiting for import are staged, not finished,
   // and stay). Chunks cascade from their job.

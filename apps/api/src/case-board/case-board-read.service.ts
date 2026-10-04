@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
+import { SemanticBoardLayerService } from '../semantic/board/semantic-board-layer.service';
 import {
   CaseActivityType,
   CaseBoardItem,
@@ -99,6 +105,7 @@ export class CaseBoardReadService {
     private readonly prisma: PrismaService,
     private readonly graph: GraphService,
     private readonly activity: CaseActivityService,
+    @Optional() private readonly semanticLayer?: SemanticBoardLayerService,
   ) {}
 
   /**
@@ -357,7 +364,14 @@ export class CaseBoardReadService {
       };
     });
 
+    // The Meaning layer rides along whatever the lens says, so switching the
+    // lens needs no round trip and snapshots keep it (SL5 A2).
+    const semantic = this.semanticLayer
+      ? await this.semanticLayer.compute(caseId, items)
+      : null;
+
     return {
+      semantic: semantic as unknown as CaseBoardResponseDto['semantic'],
       board: {
         id: board.id,
         caseId: board.caseId,

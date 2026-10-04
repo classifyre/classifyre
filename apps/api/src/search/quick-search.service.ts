@@ -8,7 +8,10 @@ import {
   type QuickSearchFindingDto,
   type QuickSearchResponseDto,
   type QuickSearchSeverityCountsDto,
+  type QuickSearchTermDto,
 } from '../dto/quick-search.dto';
+import { glossaryNorm } from '../glossary/glossary-norm';
+import { lexicalRank } from '../glossary/glossary.service';
 
 /**
  * Search as you type, cheap enough to run on every keystroke of a big
@@ -54,7 +57,7 @@ const SETTLED: FindingStatus[] = [
 
 export const QuickSearchSchema = z.strictObject({
   q: z.string().trim().min(2).max(200),
-  kinds: z.array(z.enum(QuickSearchKind)).min(1).max(2).optional(),
+  kinds: z.array(z.enum(QuickSearchKind)).min(1).max(3).optional(),
   sourceId: z.string().trim().min(1).max(200).optional(),
   severity: z.array(z.enum(Severity)).max(5).optional(),
   detectorType: z.array(z.enum(DetectorType)).max(50).optional(),
@@ -109,19 +112,87 @@ export class QuickSearchService {
     const input = parsed.data;
     const kinds = new Set(input.kinds ?? Object.values(QuickSearchKind));
     const limit = input.limit ?? LIMIT_DEFAULT;
-    const [assets, findings] = await Promise.all([
+    const [assets, findings, terms] = await Promise.all([
       kinds.has(QuickSearchKind.ASSETS)
         ? this.assets(input, limit)
         : { items: [], truncated: false },
       kinds.has(QuickSearchKind.FINDINGS)
         ? this.bounded((tx) => this.findings(tx, input, limit))
         : { items: [], truncated: false },
+      kinds.has(QuickSearchKind.TERMS)
+        ? this.bounded((tx) => this.terms(tx, input, limit))
+        : { items: [] as QuickSearchTermDto[], truncated: false },
     ]);
     return {
       assets: assets.items,
       findings: findings.items,
-      truncated: assets.truncated || findings.truncated,
+      terms: terms.items,
+      truncated: assets.truncated || findings.truncated || terms.truncated,
     };
+  }
+
+  /**
+   * Glossary terms by label, ranked like the glossary lookup (exact term,
+   * code, alias, then prefix, then substring). The glossary is small, so a
+   * bounded substring read is enough. Deprecated terms are left out.
+   */
+  private async terms(
+    tx: Prisma.TransactionClient,
+    input: QuickSearchInput,
+    limit: number,
+  ): Promise<QuickSearchTermDto[]> {
+    const needle = glossaryNorm(input.q);
+    if (!needle) return [];
+    const like = `%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const rows = await tx.$queryRaw<
+      Array<{
+        id: string;
+        key: string;
+        term: string;
+        kind: string;
+        status: string;
+        aliases: string[];
+        codes: string[];
+        hidden_aliases: string[];
+        scheme_name: string | null;
+      }>
+    >`
+      SELECT t.id, t.key, t.term, t.kind::text AS kind, t.status::text AS status,
+             t.aliases, t.codes, t.hidden_aliases, s.name AS scheme_name
+        FROM glossary_terms t
+        LEFT JOIN glossary_schemes s ON s.id = t.scheme_id
+       WHERE t.status <> 'DEPRECATED'
+         AND (t.key LIKE ${like}
+              OR t.codes @> ARRAY[${input.q.trim()}]
+              OR EXISTS (SELECT 1 FROM unnest(t.match_keys) mk WHERE mk LIKE ${like}))
+       LIMIT ${CANDIDATES}`;
+    return rows
+      .map((row) => {
+        const rank = lexicalRank(input.q, {
+          term: row.term,
+          aliases: row.aliases,
+          codes: row.codes,
+          hiddenAliases: row.hidden_aliases,
+        }) ?? { order: 5, matchedOn: 'term' as const };
+        return { row, rank };
+      })
+      .sort(
+        (a, b) =>
+          a.rank.order - b.rank.order ||
+          (a.row.status === 'APPROVED' ? 0 : 1) -
+            (b.row.status === 'APPROVED' ? 0 : 1) ||
+          a.row.term.localeCompare(b.row.term),
+      )
+      .slice(0, limit)
+      .map(({ row, rank }) => ({
+        id: row.id,
+        key: row.key,
+        term: row.term,
+        kind: row.kind,
+        status: row.status,
+        schemeName: row.scheme_name,
+        matchedOn: rank.matchedOn,
+      }));
   }
 
   /** One step, in its own transaction under a statement timeout. */

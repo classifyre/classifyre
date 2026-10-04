@@ -1,0 +1,304 @@
+{
+  "format": "classifyre.glossary-pack/v1",
+  "key": "dach-company-law",
+  "version": "1.0.0",
+  "name": "DACH company law",
+  "language": "de",
+  "description": "Austrian and German legal forms with Firmenbuch register codes, and company-register vocabulary from the Firmenbuch showcase. Template bindings resolve TAG detectors legal_form and representation by code; they wait as DRAFT until those TAG detectors exist.",
+  "sources": [
+    "https://www.justiz.gv.at/firmenbuch",
+    "https://www.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=10001702"
+  ],
+  "schemes": [
+    {
+      "key": "rechtsformen",
+      "name": "Rechtsformen",
+      "description": "Legal forms of companies, with Firmenbuch register codes."
+    },
+    {
+      "key": "firmenbuch",
+      "name": "Firmenbuch",
+      "description": "Company-register vocabulary."
+    }
+  ],
+  "terms": [
+    {
+      "key": "gesellschaft",
+      "kind": "CONCEPT",
+      "term": "Gesellschaft",
+      "scheme": "rechtsformen",
+      "definition": "A company or partnership.",
+      "aliases": [
+        "company",
+        "Unternehmen"
+      ]
+    },
+    {
+      "key": "kapitalgesellschaft",
+      "kind": "CONCEPT",
+      "term": "Kapitalgesellschaft",
+      "scheme": "rechtsformen",
+      "definition": "A company whose members' liability is limited to their capital contribution.",
+      "aliases": [
+        "corporation",
+        "capital company"
+      ]
+    },
+    {
+      "key": "personengesellschaft",
+      "kind": "CONCEPT",
+      "term": "Personengesellschaft",
+      "scheme": "rechtsformen",
+      "definition": "A partnership in which at least one partner is personally liable.",
+      "aliases": [
+        "partnership"
+      ]
+    },
+    {
+      "key": "gmbh",
+      "kind": "CONCEPT",
+      "term": "GmbH",
+      "scheme": "rechtsformen",
+      "definition": "Gesellschaft mit beschränkter Haftung — a limited-liability company.",
+      "aliases": [
+        "Gesellschaft mit beschränkter Haftung",
+        "limited liability company",
+        "Ltd"
+      ],
+      "codes": [
+        "GES"
+      ]
+    },
+    {
+      "key": "aktiengesellschaft",
+      "kind": "CONCEPT",
+      "term": "Aktiengesellschaft",
+      "scheme": "rechtsformen",
+      "definition": "A stock corporation.",
+      "aliases": [
+        "AG",
+        "stock corporation",
+        "public limited company"
+      ],
+      "codes": [
+        "AG"
+      ]
+    },
+    {
+      "key": "europaeische-gesellschaft",
+      "kind": "CONCEPT",
+      "term": "Europäische Gesellschaft",
+      "scheme": "rechtsformen",
+      "definition": "Societas Europaea, a public company under EU law.",
+      "aliases": [
+        "Societas Europaea",
+        "SE"
+      ],
+      "codes": [
+        "SE"
+      ]
+    },
+    {
+      "key": "kommanditgesellschaft",
+      "kind": "CONCEPT",
+      "term": "Kommanditgesellschaft",
+      "scheme": "rechtsformen",
+      "definition": "A limited partnership with general and limited partners.",
+      "aliases": [
+        "limited partnership"
+      ],
+      "codes": [
+        "KG"
+      ]
+    },
+    {
+      "key": "offene-gesellschaft",
+      "kind": "CONCEPT",
+      "term": "Offene Gesellschaft",
+      "scheme": "rechtsformen",
+      "definition": "A general partnership in which all partners are personally liable.",
+      "aliases": [
+        "OG",
+        "general partnership"
+      ],
+      "codes": [
+        "OG"
+      ]
+    },
+    {
+      "key": "genossenschaft",
+      "kind": "CONCEPT",
+      "term": "Genossenschaft",
+      "scheme": "rechtsformen",
+      "definition": "A cooperative.",
+      "aliases": [
+        "cooperative"
+      ],
+      "codes": [
+        "GEN"
+      ]
+    },
+    {
+      "key": "privatstiftung",
+      "kind": "CONCEPT",
+      "term": "Privatstiftung",
+      "scheme": "rechtsformen",
+      "definition": "A private foundation.",
+      "aliases": [
+        "private foundation"
+      ],
+      "codes": [
+        "PRS"
+      ]
+    },
+    {
+      "key": "eigenmittelquote",
+      "kind": "CONCEPT",
+      "term": "Eigenmittelquote",
+      "scheme": "firmenbuch",
+      "definition": "Equity divided by total assets; below 8% indicates a need for reorganisation under the URG.",
+      "aliases": [
+        "equity ratio",
+        "capital ratio"
+      ]
+    },
+    {
+      "key": "einzelvertretung",
+      "kind": "CONCEPT",
+      "term": "Einzelvertretung",
+      "scheme": "firmenbuch",
+      "definition": "Sole power of representation: one officer may represent the company alone.",
+      "aliases": [
+        "sole representation"
+      ],
+      "hiddenAliases": [
+        "E"
+      ]
+    },
+    {
+      "key": "gesamtvertretung",
+      "kind": "CONCEPT",
+      "term": "Gesamtvertretung",
+      "scheme": "firmenbuch",
+      "definition": "Joint representation: officers represent the company together.",
+      "aliases": [
+        "joint representation"
+      ]
+    },
+    {
+      "key": "euid",
+      "kind": "CONCEPT",
+      "term": "EUID",
+      "scheme": "firmenbuch",
+      "definition": "European Unique Identifier of a company in the business-registers interconnection system.",
+      "aliases": [
+        "European Unique Identifier"
+      ]
+    },
+    {
+      "key": "firmenbuchnummer",
+      "kind": "CONCEPT",
+      "term": "Firmenbuchnummer",
+      "scheme": "firmenbuch",
+      "definition": "The number of an entry in the Austrian company register.",
+      "aliases": [
+        "FN",
+        "company register number"
+      ]
+    },
+    {
+      "key": "stammkapital",
+      "kind": "CONCEPT",
+      "term": "Stammkapital",
+      "scheme": "firmenbuch",
+      "definition": "The registered share capital of a GmbH.",
+      "aliases": [
+        "share capital",
+        "registered capital"
+      ]
+    },
+    {
+      "key": "geschaeftsfuehrer",
+      "kind": "CONCEPT",
+      "term": "Geschäftsführer",
+      "scheme": "firmenbuch",
+      "definition": "Managing director of a GmbH.",
+      "aliases": [
+        "managing director"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "kapitalgesellschaft",
+      "type": "BROADER",
+      "to": "gesellschaft"
+    },
+    {
+      "from": "personengesellschaft",
+      "type": "BROADER",
+      "to": "gesellschaft"
+    },
+    {
+      "from": "gmbh",
+      "type": "BROADER",
+      "to": "kapitalgesellschaft"
+    },
+    {
+      "from": "aktiengesellschaft",
+      "type": "BROADER",
+      "to": "kapitalgesellschaft"
+    },
+    {
+      "from": "europaeische-gesellschaft",
+      "type": "BROADER",
+      "to": "kapitalgesellschaft"
+    },
+    {
+      "from": "kommanditgesellschaft",
+      "type": "BROADER",
+      "to": "personengesellschaft"
+    },
+    {
+      "from": "offene-gesellschaft",
+      "type": "BROADER",
+      "to": "personengesellschaft"
+    },
+    {
+      "from": "gmbh",
+      "type": "RELATED",
+      "to": "stammkapital"
+    },
+    {
+      "from": "geschaeftsfuehrer",
+      "type": "RELATED",
+      "to": "gmbh"
+    }
+  ],
+  "bindings": [
+    {
+      "mode": "OUTPUT_LOOKUP",
+      "output": {
+        "detectorType": "CUSTOM",
+        "customDetectorKey": "legal_form",
+        "findingType": "tag:legal_form"
+      },
+      "lookup": {
+        "schemeKey": "rechtsformen",
+        "match": "CODES"
+      }
+    },
+    {
+      "mode": "OUTPUT_LOOKUP",
+      "output": {
+        "detectorType": "CUSTOM",
+        "customDetectorKey": "representation",
+        "findingType": "tag:representation"
+      },
+      "lookup": {
+        "schemeKey": "firmenbuch",
+        "match": "ANY"
+      }
+    }
+  ]
+}

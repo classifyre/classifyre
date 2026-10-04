@@ -35,6 +35,7 @@ from src.notebook.contract import (  # noqa: E402
 from src.notebook.sdk import (  # noqa: E402
     Asset,
     Context,
+    Entity,
     FieldMapping,
     FlowType,
     NotebookFile,
@@ -260,6 +261,13 @@ def build() -> dict[str, Any]:
                 "insertText": "Tag",
             },
             {
+                "label": "Entity",
+                "kind": "class",
+                "detail": 'Entity(name, type="ORGANIZATION", identifiers={...})',
+                "documentation": _summary(Entity),
+                "insertText": "Entity",
+            },
+            {
                 "label": "Ref",
                 "kind": "class",
                 "detail": "Ref.asset(id) | Ref.urn(urn)",
@@ -303,6 +311,10 @@ def build() -> dict[str, Any]:
             "Tag": {
                 "documentation": _summary(Tag),
                 "fields": _fields(Tag),
+            },
+            "Entity": {
+                "documentation": _summary(Entity),
+                "fields": _fields(Entity),
             },
             "AugmentedAsset": {
                 "documentation": _summary(augmentation_sdk.AugmentedAsset),

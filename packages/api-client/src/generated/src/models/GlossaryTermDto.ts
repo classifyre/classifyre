@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { GlossarySchemeRefDto } from './GlossarySchemeRefDto';
+import {
+    GlossarySchemeRefDtoFromJSON,
+    GlossarySchemeRefDtoFromJSONTyped,
+    GlossarySchemeRefDtoToJSON,
+    GlossarySchemeRefDtoToJSONTyped,
+} from './GlossarySchemeRefDto';
+
 /**
  * 
  * @export
@@ -26,6 +34,18 @@ export interface GlossaryTermDto {
      */
     id: string;
     /**
+     * Stable key (C8).
+     * @type {string}
+     * @memberof GlossaryTermDto
+     */
+    key: string;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof GlossaryTermDto
+     */
+    previousKeys: Array<string>;
+    /**
      * 
      * @type {string}
      * @memberof GlossaryTermDto
@@ -33,16 +53,46 @@ export interface GlossaryTermDto {
     term: string;
     /**
      * 
+     * @type {string}
+     * @memberof GlossaryTermDto
+     */
+    kind: GlossaryTermDtoKindEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryTermDto
+     */
+    status: GlossaryTermDtoStatusEnum;
+    /**
+     * 
      * @type {Array<string>}
      * @memberof GlossaryTermDto
      */
     aliases: Array<string>;
     /**
-     * Unverified aliases suggested by agents for operator review
+     * 
+     * @type {Array<string>}
+     * @memberof GlossaryTermDto
+     */
+    codes: Array<string>;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof GlossaryTermDto
+     */
+    hiddenAliases: Array<string>;
+    /**
+     * Aliases suggested by agents, waiting for an operator
      * @type {Array<string>}
      * @memberof GlossaryTermDto
      */
     proposedAliases: Array<string>;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryTermDto
+     */
+    definition?: string | null;
     /**
      * 
      * @type {string}
@@ -56,23 +106,65 @@ export interface GlossaryTermDto {
      */
     notes?: string | null;
     /**
-     * AGENT proposals are unverified hypotheses
+     * 
+     * @type {string}
+     * @memberof GlossaryTermDto
+     */
+    steward?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryTermDto
+     */
+    schemeId?: string | null;
+    /**
+     * 
+     * @type {GlossarySchemeRefDto}
+     * @memberof GlossaryTermDto
+     */
+    scheme?: GlossarySchemeRefDto | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryTermDto
+     */
+    replacedById?: string | null;
+    /**
+     * 
+     * @type {Date}
+     * @memberof GlossaryTermDto
+     */
+    deprecatedAt?: Date | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryTermDto
+     */
+    sourceIri?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof GlossaryTermDto
+     */
+    packKey?: string | null;
+    /**
+     * AGENT proposals are DRAFT hypotheses
      * @type {string}
      * @memberof GlossaryTermDto
      */
     origin: string;
     /**
      * 
-     * @type {boolean}
-     * @memberof GlossaryTermDto
-     */
-    verified: boolean;
-    /**
-     * 
      * @type {string}
      * @memberof GlossaryTermDto
      */
-    verifiedBy?: string | null;
+    approvedBy?: string | null;
+    /**
+     * 
+     * @type {Date}
+     * @memberof GlossaryTermDto
+     */
+    approvedAt?: Date | null;
     /**
      * 
      * @type {Date}
@@ -85,8 +177,75 @@ export interface GlossaryTermDto {
      * @memberof GlossaryTermDto
      */
     updatedAt: Date;
+    /**
+     * Entities: URN of the record that is this entity (a register entry).
+     * @type {string}
+     * @memberof GlossaryTermDto
+     */
+    anchorUrn?: string | null;
+    /**
+     * Entities: free-form attributes from connectors or people.
+     * @type {object}
+     * @memberof GlossaryTermDto
+     */
+    attributes?: object | null;
+    /**
+     * Entities: occurrences of a confirmed value in the value index (asset × value).
+     * @type {number}
+     * @memberof GlossaryTermDto
+     */
+    mentionCount: number;
+    /**
+     * Entities: distinct assets that mention it.
+     * @type {number}
+     * @memberof GlossaryTermDto
+     */
+    assetCount: number;
+    /**
+     * Entities: distinct sources that mention it.
+     * @type {number}
+     * @memberof GlossaryTermDto
+     */
+    sourceCount: number;
+    /**
+     * 
+     * @type {Date}
+     * @memberof GlossaryTermDto
+     */
+    firstSeenAt?: Date | null;
+    /**
+     * 
+     * @type {Date}
+     * @memberof GlossaryTermDto
+     */
+    lastSeenAt?: Date | null;
+    /**
+     * Entities: set when this entity was merged into `replacedById`.
+     * @type {Date}
+     * @memberof GlossaryTermDto
+     */
+    mergedAt?: Date | null;
 }
 
+
+/**
+ * @export
+ */
+export const GlossaryTermDtoKindEnum = {
+    Concept: 'CONCEPT',
+    Entity: 'ENTITY'
+} as const;
+export type GlossaryTermDtoKindEnum = typeof GlossaryTermDtoKindEnum[keyof typeof GlossaryTermDtoKindEnum];
+
+/**
+ * @export
+ */
+export const GlossaryTermDtoStatusEnum = {
+    Draft: 'DRAFT',
+    Approved: 'APPROVED',
+    Deprecated: 'DEPRECATED'
+} as const;
+export type GlossaryTermDtoStatusEnum = typeof GlossaryTermDtoStatusEnum[keyof typeof GlossaryTermDtoStatusEnum];
 
 /**
  * @export
@@ -107,14 +266,22 @@ export type GlossaryTermDtoEntityTypeEnum = typeof GlossaryTermDtoEntityTypeEnum
  */
 export function instanceOfGlossaryTermDto(value: object): value is GlossaryTermDto {
     if (!('id' in value) || value['id'] === undefined) return false;
+    if (!('key' in value) || value['key'] === undefined) return false;
+    if (!('previousKeys' in value) || value['previousKeys'] === undefined) return false;
     if (!('term' in value) || value['term'] === undefined) return false;
+    if (!('kind' in value) || value['kind'] === undefined) return false;
+    if (!('status' in value) || value['status'] === undefined) return false;
     if (!('aliases' in value) || value['aliases'] === undefined) return false;
+    if (!('codes' in value) || value['codes'] === undefined) return false;
+    if (!('hiddenAliases' in value) || value['hiddenAliases'] === undefined) return false;
     if (!('proposedAliases' in value) || value['proposedAliases'] === undefined) return false;
     if (!('entityType' in value) || value['entityType'] === undefined) return false;
     if (!('origin' in value) || value['origin'] === undefined) return false;
-    if (!('verified' in value) || value['verified'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
+    if (!('mentionCount' in value) || value['mentionCount'] === undefined) return false;
+    if (!('assetCount' in value) || value['assetCount'] === undefined) return false;
+    if (!('sourceCount' in value) || value['sourceCount'] === undefined) return false;
     return true;
 }
 
@@ -129,16 +296,38 @@ export function GlossaryTermDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
     return {
         
         'id': json['id'],
+        'key': json['key'],
+        'previousKeys': json['previousKeys'],
         'term': json['term'],
+        'kind': json['kind'],
+        'status': json['status'],
         'aliases': json['aliases'],
+        'codes': json['codes'],
+        'hiddenAliases': json['hiddenAliases'],
         'proposedAliases': json['proposedAliases'],
+        'definition': json['definition'] == null ? undefined : json['definition'],
         'entityType': json['entityType'],
         'notes': json['notes'] == null ? undefined : json['notes'],
+        'steward': json['steward'] == null ? undefined : json['steward'],
+        'schemeId': json['schemeId'] == null ? undefined : json['schemeId'],
+        'scheme': json['scheme'] == null ? undefined : GlossarySchemeRefDtoFromJSON(json['scheme']),
+        'replacedById': json['replacedById'] == null ? undefined : json['replacedById'],
+        'deprecatedAt': json['deprecatedAt'] == null ? undefined : (new Date(json['deprecatedAt'])),
+        'sourceIri': json['sourceIri'] == null ? undefined : json['sourceIri'],
+        'packKey': json['packKey'] == null ? undefined : json['packKey'],
         'origin': json['origin'],
-        'verified': json['verified'],
-        'verifiedBy': json['verifiedBy'] == null ? undefined : json['verifiedBy'],
+        'approvedBy': json['approvedBy'] == null ? undefined : json['approvedBy'],
+        'approvedAt': json['approvedAt'] == null ? undefined : (new Date(json['approvedAt'])),
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
+        'anchorUrn': json['anchorUrn'] == null ? undefined : json['anchorUrn'],
+        'attributes': json['attributes'] == null ? undefined : json['attributes'],
+        'mentionCount': json['mentionCount'],
+        'assetCount': json['assetCount'],
+        'sourceCount': json['sourceCount'],
+        'firstSeenAt': json['firstSeenAt'] == null ? undefined : (new Date(json['firstSeenAt'])),
+        'lastSeenAt': json['lastSeenAt'] == null ? undefined : (new Date(json['lastSeenAt'])),
+        'mergedAt': json['mergedAt'] == null ? undefined : (new Date(json['mergedAt'])),
     };
 }
 
@@ -154,16 +343,38 @@ export function GlossaryTermDtoToJSONTyped(value?: GlossaryTermDto | null, ignor
     return {
         
         'id': value['id'],
+        'key': value['key'],
+        'previousKeys': value['previousKeys'],
         'term': value['term'],
+        'kind': value['kind'],
+        'status': value['status'],
         'aliases': value['aliases'],
+        'codes': value['codes'],
+        'hiddenAliases': value['hiddenAliases'],
         'proposedAliases': value['proposedAliases'],
+        'definition': value['definition'],
         'entityType': value['entityType'],
         'notes': value['notes'],
+        'steward': value['steward'],
+        'schemeId': value['schemeId'],
+        'scheme': GlossarySchemeRefDtoToJSON(value['scheme']),
+        'replacedById': value['replacedById'],
+        'deprecatedAt': value['deprecatedAt'] == null ? value['deprecatedAt'] : value['deprecatedAt'].toISOString(),
+        'sourceIri': value['sourceIri'],
+        'packKey': value['packKey'],
         'origin': value['origin'],
-        'verified': value['verified'],
-        'verifiedBy': value['verifiedBy'],
+        'approvedBy': value['approvedBy'],
+        'approvedAt': value['approvedAt'] == null ? value['approvedAt'] : value['approvedAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
+        'anchorUrn': value['anchorUrn'],
+        'attributes': value['attributes'],
+        'mentionCount': value['mentionCount'],
+        'assetCount': value['assetCount'],
+        'sourceCount': value['sourceCount'],
+        'firstSeenAt': value['firstSeenAt'] == null ? value['firstSeenAt'] : value['firstSeenAt'].toISOString(),
+        'lastSeenAt': value['lastSeenAt'] == null ? value['lastSeenAt'] : value['lastSeenAt'].toISOString(),
+        'mergedAt': value['mergedAt'] == null ? value['mergedAt'] : value['mergedAt'].toISOString(),
     };
 }
 

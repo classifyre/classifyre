@@ -144,3 +144,13 @@ describe('looksLikeUrn', () => {
     expect(looksLikeUrn(null)).toBe(false);
   });
 });
+
+describe('glossary term URNs (C8)', () => {
+  // Mirrors TestTermRef in apps/cli/tests/test_semantic_declarations.py.
+  it('folds the whole term URN to lower case', () => {
+    expect(normalizeUrn('TERM://Glossary/Bank-Account-IBAN')).toBe(
+      'term://glossary/bank-account-iban',
+    );
+    expect(urn('term', 'glossary', 'GmbH')).toBe('term://glossary/gmbh');
+  });
+});

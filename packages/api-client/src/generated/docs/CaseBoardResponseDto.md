@@ -13,6 +13,7 @@ Name | Type
 `graph` | [GraphResponseDto](GraphResponseDto.md)
 `supports` | [Array&lt;BoardSupportDto&gt;](BoardSupportDto.md)
 `threads` | [Array&lt;BoardThreadSummaryDto&gt;](BoardThreadSummaryDto.md)
+`semantic` | { [key: string]: any; }
 
 ## Example
 
@@ -28,6 +29,7 @@ const example = {
   "graph": null,
   "supports": null,
   "threads": null,
+  "semantic": null,
 } satisfies CaseBoardResponseDto
 
 console.log(example)

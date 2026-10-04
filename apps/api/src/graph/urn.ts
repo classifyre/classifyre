@@ -49,6 +49,10 @@ const PLATFORMS: Record<string, PlatformRules> = {
   powerbi: { authorityCase: 'lower', pathCase: 'preserve' },
   kafka: { authorityCase: 'lower', pathCase: 'preserve' },
   file: { authorityCase: 'lower', pathCase: 'preserve' },
+
+  // Glossary terms (contract C8): `term://glossary/<key>`. Keys are lower-case
+  // by definition, so both halves fold to lower.
+  term: { authorityCase: 'lower', pathCase: 'lower' },
 };
 
 const ALIASES: Record<string, string> = {
