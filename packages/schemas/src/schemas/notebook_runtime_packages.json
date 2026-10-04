@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.106",
+      "version": "1.43.108",
       "modules": [
         "boto3"
       ],
@@ -137,7 +137,7 @@
     },
     {
       "name": "google-cloud-storage",
-      "version": "3.15.1",
+      "version": "3.16.0",
       "modules": [
         "google.cloud.storage"
       ],
@@ -181,7 +181,7 @@
     },
     {
       "name": "litellm",
-      "version": "1.103.2",
+      "version": "1.104.0",
       "modules": [
         "litellm"
       ],
@@ -394,7 +394,7 @@
     },
     {
       "name": "slack-sdk",
-      "version": "3.44.1",
+      "version": "3.45.0",
       "modules": [
         "slack_sdk"
       ],

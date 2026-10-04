@@ -1,0 +1,2 @@
+supplier_id,component_id,process_revision,status,yield_basis,price_valid_until,recorded_at
+S003,CSTEEL,R2,APPROVED_FOR_PLANNING,POOLED_PILOT_MASS,2026-10-09,2026-10-05T11:00:00Z

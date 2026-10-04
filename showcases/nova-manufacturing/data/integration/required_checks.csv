@@ -1,0 +1,5 @@
+batch_id,semantic_measure,unit,minimum_value,maximum_value,specification_id
+QT61,temperature,C,0,95,QS-TEMP
+QT62,temperature,C,0,95,QS-TEMP
+QT63,temperature,C,0,95,QS-TEMP
+QT63,conductivity,US_CM,1800,2200,QS-COND

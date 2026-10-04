@@ -12,6 +12,12 @@ This is **Classifyre**, a monorepo-based metadata ingestion system for unstructu
 
 Shared code lives in workspace packages (`packages/*`), including JSON schemas and UI components.
 
+`apps/studio` is a Remotion video studio for product videos. It is a workspace
+only so videos can import the real UI (`@workspace/ui`); it is never shipped —
+the root `Dockerfile` filters it out of the install. Scenarios and renders
+(`apps/studio/videos/`, `apps/studio/out/`) are gitignored. See
+`apps/studio/README.md`.
+
 ## Core Architecture
 
 ### Monorepo Structure

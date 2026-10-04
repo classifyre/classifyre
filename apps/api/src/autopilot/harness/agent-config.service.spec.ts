@@ -109,6 +109,22 @@ describe('AgentConfigService', () => {
     expect(dream.enabled).toBe(true);
   });
 
+  it('reports the supervisor as enabled on a fresh workspace', async () => {
+    agentConfig.findMany.mockResolvedValue([]);
+    instanceSettings.findUnique.mockResolvedValue({
+      autopilotInquiryEnabled: true,
+      autopilotCaseEnabled: true,
+      autopilotConfigEnabled: true,
+      autopilotDetectorEnabled: true,
+      autopilotEscalationEnabled: true,
+      supervisorEnabled: true,
+    });
+    const list = await service.list();
+    const supervisor = list.find((a) => a.kind === AgentKind.SUPERVISOR)!;
+    expect(supervisor.enableable).toBe(true);
+    expect(supervisor.enabled).toBe(true);
+  });
+
   it('treats a not-yet-created settings singleton as enabled defaults', async () => {
     instanceSettings.findUnique.mockResolvedValue(null);
     agentConfig.findMany.mockResolvedValue([]);

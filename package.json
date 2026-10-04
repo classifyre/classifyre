@@ -1,6 +1,6 @@
 {
   "name": "classifyre",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "private": true,
   "scripts": {
     "build": "turbo build --filter=!@workspace/devops",
@@ -13,6 +13,8 @@
     "docs:dev": "turbo dev --filter=@classifyre/docs",
     "web:dev": "turbo dev --filter=@classifyre/web",
     "blog:dev": "turbo dev --filter=@classifyre/blog",
+    "studio": "bun run --cwd apps/studio studio",
+    "studio:render": "bun run --cwd apps/studio render",
     "lint": "turbo lint --filter=!@workspace/devops",
     "typecheck": "turbo check-types --filter=!@workspace/devops",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",

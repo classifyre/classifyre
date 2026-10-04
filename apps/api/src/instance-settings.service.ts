@@ -69,6 +69,7 @@ export class InstanceSettingsService {
         autopilotDetectorEnabled: true,
         autopilotEscalationEnabled: true,
         autopilotMcpEnabled: true,
+        supervisorEnabled: true,
         language: 'AUTOMATIC',
         timezone: 'AUTOMATIC',
         timeFormat: 'AUTOMATIC',

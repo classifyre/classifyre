@@ -1,0 +1,4 @@
+inspection_id,schema_version,batch_id,value,local_event_time,source_timezone,units_in_lot
+IQ61,1,QT61,185,2026-10-01T01:30:00,Europe/Vienna,40
+IQ62,2,QT62,90,2026-10-01T00:30:00,Europe/Vienna,60
+IQ63,3,QT63,2040,2026-10-01T12:00:00,Europe/Vienna,30

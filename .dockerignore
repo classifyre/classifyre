@@ -35,3 +35,7 @@ temp
 
 dist
 build
+
+# Video studio working files (scenarios, renders) — never part of an image.
+apps/studio/out
+apps/studio/videos

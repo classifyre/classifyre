@@ -1,0 +1,5 @@
+# The studio is committed; what it produces is not. Scenarios and the videos
+# written from them live in videos/, renders land in out/.
+videos/*
+!videos/.gitkeep
+out/

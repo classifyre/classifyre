@@ -1,0 +1,4 @@
+supplier_id,upstream_supplier_id,component_id
+S001,F001,C431
+S002,F001,C431
+S004,F002,C431

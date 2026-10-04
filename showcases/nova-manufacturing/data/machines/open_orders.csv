@@ -1,0 +1,3 @@
+machine_id,sales_order_id,customer_id,product_id,open_units,revenue_eur
+M001,SO301,CU01,P100,60,150000
+M002,SO302,CU02,P100,20,50000

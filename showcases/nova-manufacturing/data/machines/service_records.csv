@@ -1,0 +1,2 @@
+maintenance_id,machine_id,component_id,findings,action_taken,started_at,completed_at,recorded_at
+MW301,M001,CBRG,OUTER_RACE_SPALLING,REPLACED_ONE_BEARING_KIT,2026-10-03T08:00:00Z,2026-10-03T10:00:00Z,2026-10-03T10:05:00Z
