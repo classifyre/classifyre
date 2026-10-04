@@ -1,0 +1,2 @@
+purchase_order_id,supplier_id,component_id,quantity,promised_date,revised_eta,destination
+PO101,S001,C431,500,2026-10-04,2026-10-18,MUC

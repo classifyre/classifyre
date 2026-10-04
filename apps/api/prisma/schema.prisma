@@ -1004,11 +1004,10 @@ model InstanceSettings {
   autopilotEscalationEnabled Boolean @default(true) @map("autopilot_escalation_enabled")
   // Allow the harness to call tools from connected external MCP servers.
   autopilotMcpEnabled        Boolean @default(true) @map("autopilot_mcp_enabled")
-  // The self-directed supervisor. Ships OFF: it sets its own pace, commands the
+  // The self-directed supervisor. Ships ON: it sets its own pace, commands the
   // other agents and — once its hygiene capability is granted — deletes data.
-  // That is a switch to throw deliberately, after reading a journal, not one to
-  // inherit from an upgrade.
-  supervisorEnabled          Boolean @default(false) @map("supervisor_enabled")
+  // An operator that does not want it turns it off per workspace.
+  supervisorEnabled          Boolean @default(true) @map("supervisor_enabled")
 
   // ── Supervisor budgets ─────────────────────────────────────────────────────
   // A self-paced agent decides how often it costs money, so the ceiling has to

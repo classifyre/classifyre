@@ -1,0 +1,38 @@
+{
+  "name": "@classifyre/studio",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Video production studio (Remotion). Never part of the shipped product.",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render",
+    "still": "remotion still",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "test": "echo 'No tests configured for studio'",
+    "test:e2e": "echo 'No e2e tests configured for studio'"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.532",
+    "@remotion/google-fonts": "4.0.532",
+    "@remotion/tailwind-v4": "4.0.532",
+    "@remotion/transitions": "4.0.532",
+    "@workspace/ui": "workspace:*",
+    "lucide-react": "^1.7.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "remotion": "4.0.532"
+  },
+  "devDependencies": {
+    "@remotion/eslint-plugin": "4.0.532",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "eslint": "^9.39.4",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3"
+  }
+}

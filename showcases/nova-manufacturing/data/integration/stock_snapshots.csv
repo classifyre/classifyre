@@ -1,0 +1,4 @@
+source_system,source_material_id,plant_id,quantity,snapshot_at,description
+SAP,00000124,MUC,20,2026-10-01T05:00:00Z,GASKET-SET-FLANGE
+WMS,124-GS,MUC,35,2026-10-02T07:45:00Z,Flange Gasket Set
+WMS,GS124-A,MUC,900,2026-10-02T07:45:00Z,Gasket Adaptor

@@ -1002,8 +1002,6 @@
     "stateOn": "An",
     "stateOffKept": "Aus · Daten behalten",
     "stateOffDeleted": "Aus · Daten gelöscht",
-    "stateDefaultOff": "Standardmäßig aus",
-    "defaultOffHint": "Diese Installation liefert die Funktion ausgeschaltet aus. Das Einschalten gilt nur für diesen Arbeitsbereich.",
     "since": "seit {{when}}",
     "dataSize": "{{size}} Daten · ~{{rows}} Zeilen",
     "noData": "Keine Daten gespeichert",

@@ -1,0 +1,4 @@
+sales_order_id,work_order_id,customer_id,plant_id,product_id,units,material_need_date,priority,revenue_eur
+SO101,WO101,CU01,MUC,P100,120,2026-10-05,1,300000
+SO102,WO102,CU02,MUC,P100,100,2026-10-06,2,250000
+SO103,WO103,CU04,MUC,P200,80,2026-10-07,3,320000

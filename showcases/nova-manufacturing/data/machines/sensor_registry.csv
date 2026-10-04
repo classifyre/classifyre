@@ -1,0 +1,4 @@
+sensor_id,actual_unit,max_age_minutes,alarm_c,effective_from
+T_PRIMARY,F,15,95,2026-09-30T00:00:00Z
+T_REFERENCE,C,15,95,2026-09-30T00:00:00Z
+T_CONTROL,C,15,95,2026-09-30T00:00:00Z

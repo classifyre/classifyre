@@ -72,7 +72,7 @@ export class SupervisorController {
       this.supervisor.countPending(),
     ]);
     return {
-      enabled: settings?.supervisorEnabled ?? false,
+      enabled: settings?.supervisorEnabled ?? true,
       nextWakeAt: state.nextWakeAt,
       wakeOnEvents: state.wakeOnEvents,
       wakeReason: state.wakeReason,
