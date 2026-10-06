@@ -1,5 +1,3 @@
-import base64
-import json
 import logging
 import os
 import threading
@@ -13,6 +11,7 @@ from ..outputs.rest import IngestEdge
 if TYPE_CHECKING:
     from ..utils.file_parser import ParsedBytes
 from ..utils.hashing import calculate_checksum, normalize_http_url
+from ..utils.sampling_cursor import decode_sampling_cursor
 from ..utils.validation import validate_output
 from .recipe_normalizer import normalize_source_recipe
 
@@ -34,8 +33,8 @@ class BaseSource(ABC):
     # Default batch size for streaming asset results
     BATCH_SIZE: int = 50
     HAS_SUCCESSFUL_RUN_ENV = "CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN"
-    # The API injects the saved AUTOMATIC sampling cursor here (base64-encoded
-    # JSON) before launching the CLI job. The recipe itself cannot carry it
+    # The API injects the saved cursor here (gzip + base64 JSON, see
+    # utils/sampling_cursor.py) before launching the CLI job. The recipe itself cannot carry it
     # because every source schema sets ``additionalProperties: false``.
     SAMPLING_CURSOR_ENV = "CLASSIFYRE_SAMPLING_CURSOR"
 
@@ -128,12 +127,10 @@ class BaseSource(ABC):
         if not raw:
             return {}
         try:
-            decoded = base64.b64decode(raw).decode("utf-8")
-            data = json.loads(decoded)
+            return decode_sampling_cursor(raw)
         except Exception as exc:
             logger.warning("Ignoring malformed %s: %s", self.SAMPLING_CURSOR_ENV, exc)
             return {}
-        return data if isinstance(data, dict) else {}
 
     def sampling_cursor(self) -> dict[str, Any]:
         """Return the cursor saved by the previous run (empty on first run)."""

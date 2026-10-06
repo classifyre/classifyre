@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import base64
-import json
 from typing import Any
 
 import pytest
 import requests
 
 from src.sources.opensearch.source import OpenSearchSource
+from src.utils.sampling_cursor import encode_sampling_cursor
 
 _INDICES = [
     {
@@ -235,7 +234,7 @@ def test_opensearch_automatic_strategy_starts_at_offset_zero(
 def test_opensearch_automatic_strategy_resumes_and_wraps_on_underfill(
     _patch_requests: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    saved_cursor = base64.b64encode(json.dumps({"index:logs-app": 10}).encode()).decode()
+    saved_cursor = encode_sampling_cursor({"index:logs-app": 10})
     monkeypatch.setenv("CLASSIFYRE_SAMPLING_CURSOR", saved_cursor)
 
     src = OpenSearchSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))

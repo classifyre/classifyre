@@ -14,6 +14,7 @@ import type {
 } from '@kubernetes/client-node';
 import { InstanceSettingsService } from '../instance-settings.service';
 import { InternalApiKeyService } from '../internal-api-key.service';
+import { MAX_ENV_VALUE_BYTES } from './sampling-cursor';
 
 type KubernetesModule = typeof import('@kubernetes/client-node');
 
@@ -43,11 +44,6 @@ export interface NotebookInputFile {
   /** The name the notebook knows it by, and the name it lands under. */
   name: string;
 }
-
-// MAX_ARG_STRLEN: Linux allows one environment variable to be at most 32
-// pages. Over it, execve fails with E2BIG and the kernel's message —
-// "argument list too long" — mentions neither the variable nor its size.
-const MAX_ENV_VALUE_BYTES = 128 * 1024;
 
 const EVALUATION_INPUT_MOUNT_PATH = '/evaluation-input';
 
@@ -600,7 +596,8 @@ export class KubernetesCliJobService {
       });
     }
     if (params.samplingCursorB64) {
-      // AUTOMATIC sampling cursor (base64 JSON) carried over from the prior run.
+      // The cursor the prior run saved (gzip + base64 JSON), already checked
+      // against MAX_ENV_VALUE_BYTES by encodeSamplingCursor().
       envMap.set('CLASSIFYRE_SAMPLING_CURSOR', {
         name: 'CLASSIFYRE_SAMPLING_CURSOR',
         value: params.samplingCursorB64,

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import base64
-import json
 from typing import Any
 
 import pytest
 import requests
 
 from src.sources.elasticsearch.source import ElasticsearchSource
+from src.utils.sampling_cursor import encode_sampling_cursor
 
 _INDICES = [
     {
@@ -237,7 +236,7 @@ def test_elasticsearch_automatic_strategy_starts_at_offset_zero(
 def test_elasticsearch_automatic_strategy_resumes_and_wraps_on_underfill(
     _patch_requests: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    saved_cursor = base64.b64encode(json.dumps({"index:orders": 10}).encode()).decode()
+    saved_cursor = encode_sampling_cursor({"index:orders": 10})
     monkeypatch.setenv("CLASSIFYRE_SAMPLING_CURSOR", saved_cursor)
 
     src = ElasticsearchSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
@@ -274,7 +273,7 @@ async def test_elasticsearch_all_strategy_scrolls_the_whole_index(
 def test_elasticsearch_automatic_strategy_wraps_at_max_result_window(
     _patch_requests: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    saved_cursor = base64.b64encode(json.dumps({"index:orders": 10}).encode()).decode()
+    saved_cursor = encode_sampling_cursor({"index:orders": 10})
     monkeypatch.setenv("CLASSIFYRE_SAMPLING_CURSOR", saved_cursor)
 
     src = ElasticsearchSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))

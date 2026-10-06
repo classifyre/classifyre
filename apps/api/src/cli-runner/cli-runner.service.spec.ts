@@ -1,6 +1,9 @@
 import { CliRunnerService } from './cli-runner.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import * as fs from 'fs/promises';
+import { randomBytes } from 'crypto';
+import { gunzipSync } from 'zlib';
+import { MAX_ENV_VALUE_BYTES, encodeSamplingCursor } from './sampling-cursor';
 import { AssetType, RunnerExecutionMode, RunnerStatus } from '@prisma/client';
 import { computeScopeFingerprint } from '../utils/scope-fingerprint';
 
@@ -458,9 +461,9 @@ describe('CliRunnerService', () => {
       samplingCursor: cursor,
     });
 
-    expect(JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'))).toEqual(
-      cursor,
-    );
+    expect(
+      JSON.parse(gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8')),
+    ).toEqual(cursor);
     expect(
       (service as any).encodeSamplingCursor({ samplingCursor: {} }),
     ).toBeUndefined();
@@ -468,6 +471,43 @@ describe('CliRunnerService', () => {
       (service as any).encodeSamplingCursor({ samplingCursor: null }),
     ).toBeUndefined();
     expect((service as any).encodeSamplingCursor({})).toBeUndefined();
+  });
+
+  it('hands over a cursor that is too large as plain base64', () => {
+    // The shape that broke a production source: a connector carried a
+    // person -> companies map in its cursor. 100 KB of JSON is 133 KB as plain
+    // base64, over the 128 KiB a single environment variable may hold, and the
+    // pod died with `exec /bin/sh: argument list too long` on every retry.
+    const personCompanies: Record<string, string[]> = {};
+    for (let i = 0; i < 2400; i += 1) {
+      const n = String(i).padStart(6, '0');
+      personCompanies[
+        `person-${n}--19${String(i % 100).padStart(2, '0')}-01-01`
+      ] = [`${n}a`, `${n}b`];
+    }
+    const cursor = { person_companies: personCompanies };
+    const json = JSON.stringify(cursor);
+    expect(Buffer.from(json, 'utf8').toString('base64').length).toBeGreaterThan(
+      MAX_ENV_VALUE_BYTES,
+    );
+
+    const encoded = encodeSamplingCursor(cursor);
+
+    expect(encoded!.length).toBeLessThan(MAX_ENV_VALUE_BYTES);
+    expect(
+      JSON.parse(gunzipSync(Buffer.from(encoded!, 'base64')).toString('utf8')),
+    ).toEqual(cursor);
+  });
+
+  it('refuses a cursor that would not fit even compressed, naming it', () => {
+    const cursor: Record<string, string> = {};
+    for (let i = 0; i < 12000; i += 1) {
+      cursor[String(i)] = randomBytes(12).toString('base64');
+    }
+
+    expect(() => encodeSamplingCursor(cursor)).toThrow(
+      /cursor this source saved on its last run is \d+ bytes compressed/,
+    );
   });
 
   it('passes successful-run state into CLI execution context', async () => {

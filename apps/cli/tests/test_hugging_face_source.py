@@ -11,6 +11,7 @@ from src.models.generated_single_asset_scan_results import AssetType as OutputAs
 from src.sources.asset_metadata import resolve_fields
 from src.sources.hugging_face.source import HuggingFaceObjectRef, HuggingFaceSource
 from src.sources.object_storage.base import ContentSnapshot
+from src.utils.sampling_cursor import encode_sampling_cursor
 
 REPO_SHA = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c"
 
@@ -462,8 +463,6 @@ def test_hugging_face_sampling_random_is_deterministic():
 
 
 def test_hugging_face_sampling_automatic_advances_window_across_runs(monkeypatch):
-    import base64
-    import json
 
     refs = [_ref(f"data/f{index:02d}.parquet", days_ago=index) for index in range(25)]
 
@@ -476,7 +475,7 @@ def test_hugging_face_sampling_automatic_advances_window_across_runs(monkeypatch
 
     monkeypatch.setenv(
         HuggingFaceSource.SAMPLING_CURSOR_ENV,
-        base64.b64encode(json.dumps(cursor).encode()).decode(),
+        encode_sampling_cursor(cursor),
     )
     resumed = _source(strategy="AUTOMATIC", rows_per_page=10)
     second = resumed._apply_sampling(iter(refs))
