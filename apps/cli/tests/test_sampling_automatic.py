@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import base64
-import json
 from collections.abc import AsyncGenerator
 from types import SimpleNamespace
 from typing import Any
@@ -12,6 +10,7 @@ import pytest
 
 from src.models.generated_single_asset_scan_results import SingleAssetScanResults
 from src.sources.base import BaseSource
+from src.utils.sampling_cursor import encode_sampling_cursor
 
 CURSOR_ENV = "CLASSIFYRE_SAMPLING_CURSOR"
 
@@ -47,7 +46,7 @@ def _src(rows: int = 3) -> _DummySource:
 
 
 def _encode(cursor: dict[str, Any]) -> str:
-    return base64.b64encode(json.dumps(cursor).encode()).decode()
+    return encode_sampling_cursor(cursor)
 
 
 def test_default_strategy_is_automatic() -> None:

@@ -47,6 +47,7 @@ from ..graph.edges import (
     same_as,
     uses,
 )
+from ..utils.sampling_cursor import check_cursor_fits
 from ..utils.urn import Urn
 from .cohort import CohortItem, normalize_bands, select_cohort
 from .files import DEFAULT_PAGE_SIZE, ParsedContent, pages, parse
@@ -700,7 +701,13 @@ class Context:
         no longer implies a deleted one. Worse, the discard was silent: the call
         succeeded, the notebook believed it had saved state, and the next run
         started from nothing.
+
+        Raises ``ValueError`` for a cursor too large to start the next run with
+        (128 KiB compressed). Keep a cursor to positions and counters; state
+        that grows with the corpus belongs in assets, read back with
+        ``ctx.query_assets()``.
         """
+        check_cursor_fits(cursor)
         self._next_cursor = dict(cursor)
 
     @property

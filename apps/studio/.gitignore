@@ -1,5 +1,10 @@
 # The studio is committed; what it produces is not. Scenarios and the videos
 # written from them live in videos/, renders land in out/.
-videos/*
+#
+# Ignore the files in videos/, not its folders. Tailwind reads this file as
+# well, and it will not look inside an ignored folder even when studio.css
+# names it as a source: a video's own classes would then produce no CSS.
+videos/**
+!videos/**/
 !videos/.gitkeep
 out/

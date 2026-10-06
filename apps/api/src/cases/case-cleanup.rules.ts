@@ -96,6 +96,36 @@ export function findingRemoval(
   return rules.removeResolvedFindings ? { reason: 'FINDING_RESOLVED' } : null;
 }
 
+/** Case evidence, as far as "did the clean-up empty it" is concerned. */
+export interface EvidenceHoldings {
+  note: string | null;
+  /** The case's findings on this evidence (case-finding ids). */
+  findings: ReadonlyArray<{ id: string }>;
+}
+
+/**
+ * Whether the findings a clean-up pass takes out leave this evidence with
+ * nothing, so that it goes with them.
+ *
+ * A case that adds answers by itself holds most of its assets only because a
+ * finding sits on them. When the scans stop seeing that finding the reason
+ * for the asset is gone too, and keeping it leaves an empty card for every
+ * company that ever matched: the list never shrinks, which is the one thing
+ * a watchlist must do.
+ *
+ * Two kinds of evidence stay. An asset that held no finding to begin with was
+ * added on its own. And an asset someone wrote a note on carries a person's
+ * words, which no rule removes.
+ */
+export function emptiedByCleanup(
+  evidence: EvidenceHoldings,
+  leavingFindingIds: ReadonlySet<string>,
+): boolean {
+  if (evidence.findings.length === 0) return false;
+  if (evidence.note && evidence.note.trim() !== '') return false;
+  return evidence.findings.every((f) => leavingFindingIds.has(f.id));
+}
+
 /**
  * Whether a RESOLVED finding was retired by the platform rather than by a
  * person: a scan no longer saw it (or its asset or file), its detector was

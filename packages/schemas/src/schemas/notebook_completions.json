@@ -242,7 +242,7 @@
           "label": "set_cursor",
           "kind": "method",
           "detail": "(cursor: 'Mapping[str, Any]') -> 'None'",
-          "documentation": "Record where this run got to, for the next run to resume from.\n\nHonoured under every sampling strategy. It used to be kept only under\nAUTOMATIC, which meant a connector that wanted run-to-run state had to\nadopt a sampling strategy chosen for something else entirely -- and one\nthat changes deletion semantics, since under AUTOMATIC an absent asset\nno longer implies a deleted one. Worse, the discard was silent: the call\nsucceeded, the notebook believed it had saved state, and the next run\nstarted from nothing.",
+          "documentation": "Record where this run got to, for the next run to resume from.\n\nHonoured under every sampling strategy. It used to be kept only under\nAUTOMATIC, which meant a connector that wanted run-to-run state had to\nadopt a sampling strategy chosen for something else entirely -- and one\nthat changes deletion semantics, since under AUTOMATIC an absent asset\nno longer implies a deleted one. Worse, the discard was silent: the call\nsucceeded, the notebook believed it had saved state, and the next run\nstarted from nothing.\n\nRaises ``ValueError`` for a cursor too large to start the next run with\n(128 KiB compressed). Keep a cursor to positions and counters; state\nthat grows with the corpus belongs in assets, read back with\n``ctx.query_assets()``.",
           "insertText": "set_cursor(${1:cursor})"
         },
         {

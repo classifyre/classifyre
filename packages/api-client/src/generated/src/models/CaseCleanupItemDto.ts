@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface CaseCleanupItemDto {
     /**
-     * FILTER_EMPTIED: an asset a filter left without any finding in the case
+     * FILTER_EMPTIED: an asset a filter left without any finding in the case. EMPTIED: an asset the clean-up rules left without any finding (one that carries a note stays)
      * @type {string}
      * @memberof CaseCleanupItemDto
      */
@@ -66,7 +66,8 @@ export const CaseCleanupItemDtoReasonEnum = {
     FindingResolved: 'FINDING_RESOLVED',
     Filter: 'FILTER',
     AssetGone: 'ASSET_GONE',
-    FilterEmptied: 'FILTER_EMPTIED'
+    FilterEmptied: 'FILTER_EMPTIED',
+    Emptied: 'EMPTIED'
 } as const;
 export type CaseCleanupItemDtoReasonEnum = typeof CaseCleanupItemDtoReasonEnum[keyof typeof CaseCleanupItemDtoReasonEnum];
 

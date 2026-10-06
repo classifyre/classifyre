@@ -1,0 +1,31 @@
+{
+  "pixelsPerUnit": 128,
+  "width": 1600,
+  "height": 1600,
+  "origin": [
+    800,
+    1472
+  ],
+  "poses": {
+    "idle": {},
+    "pockets": {},
+    "hips": {},
+    "wave": {},
+    "point": {},
+    "present": {},
+    "think": {},
+    "shrug": {},
+    "shock": {}
+  },
+  "emotions": {
+    "wry": {},
+    "neutral": {},
+    "stern": {},
+    "worried": {},
+    "skeptical": {},
+    "surprised": {},
+    "focused": {},
+    "suspicious": {},
+    "happy": {}
+  }
+}

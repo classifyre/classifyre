@@ -2,6 +2,7 @@ import {
   anyRule,
   assetRemoval,
   compileFindingFilters,
+  emptiedByCleanup,
   filterPatternProblem,
   findingRemoval,
   firstMatchingFilter,
@@ -18,6 +19,38 @@ const ALL: CleanupRules = {
 };
 
 describe('case clean-up rules', () => {
+  describe('emptiedByCleanup', () => {
+    const holding = (ids: string[], note: string | null = null) => ({
+      note,
+      findings: ids.map((id) => ({ id })),
+    });
+
+    it('lets an asset go with the last of its findings', () => {
+      expect(emptiedByCleanup(holding(['a', 'b']), new Set(['a', 'b']))).toBe(
+        true,
+      );
+    });
+
+    it('keeps an asset that still holds a finding', () => {
+      expect(emptiedByCleanup(holding(['a', 'b']), new Set(['a']))).toBe(false);
+    });
+
+    it('keeps an asset that was added on its own', () => {
+      expect(emptiedByCleanup(holding([]), new Set(['a']))).toBe(false);
+    });
+
+    it('keeps an asset a person wrote a note on', () => {
+      expect(
+        emptiedByCleanup(
+          holding(['a'], 'Key witness statement'),
+          new Set(['a']),
+        ),
+      ).toBe(false);
+      // A blank note is nobody's words.
+      expect(emptiedByCleanup(holding(['a'], '  '), new Set(['a']))).toBe(true);
+    });
+  });
+
   describe('findingRemoval', () => {
     it('takes nothing out with every switch off', () => {
       expect(findingRemoval(null, NO_CLEANUP)).toBeNull();

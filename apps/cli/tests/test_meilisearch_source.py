@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import base64
-import json
 from typing import Any
 
 import pytest
 import requests
 
 from src.sources.meilisearch.source import MeilisearchSource
+from src.utils.sampling_cursor import encode_sampling_cursor
 
 _INDEX_LIST_PAGE1 = {
     "results": [
@@ -227,7 +226,7 @@ def test_meilisearch_automatic_strategy_starts_at_offset_zero(
 def test_meilisearch_automatic_strategy_resumes_and_wraps_on_underfill(
     _patch_requests: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    saved_cursor = base64.b64encode(json.dumps({"index:products": 10}).encode()).decode()
+    saved_cursor = encode_sampling_cursor({"index:products": 10})
     monkeypatch.setenv("CLASSIFYRE_SAMPLING_CURSOR", saved_cursor)
 
     src = MeilisearchSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))

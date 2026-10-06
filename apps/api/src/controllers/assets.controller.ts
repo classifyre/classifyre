@@ -570,7 +570,12 @@ export class SourceAssetsController {
     // `partialCoverage` is how a connector says so.
     const config = source.config as Record<string, any> | null;
     const samplingStrategy = config?.sampling?.strategy as string | undefined;
-    const isFullScan = samplingStrategy === 'ALL' && partialCoverage !== true;
+    // Two different questions. Did the run read each asset it yielded whole?
+    // Under ALL it did, and a finding it no longer reports on such an asset is
+    // gone. Did it visit every asset of the source? Only if the connector did
+    // not declare partial coverage, and only then is an absent asset gone.
+    const scannedAssetsComplete = samplingStrategy === 'ALL';
+    const isFullScan = scannedAssetsComplete && partialCoverage !== true;
 
     // Persist the AUTOMATIC sampling cursor so the next run resumes where this
     // one stopped. Sent only by AUTOMATIC runs; left untouched otherwise.
@@ -620,6 +625,7 @@ export class SourceAssetsController {
       runnerId,
       seenHashes,
       isFullScan,
+      scannedAssetsComplete,
     );
   }
 }

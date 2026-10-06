@@ -84,6 +84,7 @@ describe('SourceAssetsController', () => {
       'runner-1',
       ['h1'],
       false,
+      false,
     );
     expect(sourceService.updateSamplingCursor).not.toHaveBeenCalled();
   });
@@ -105,6 +106,32 @@ describe('SourceAssetsController', () => {
       'source-1',
       'runner-1',
       ['h1'],
+      true,
+      true,
+    );
+  });
+
+  it('a cohort run under ALL retires no absent asset, but its scanned assets were read whole', async () => {
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'CUSTOM',
+      config: { sampling: { strategy: 'ALL' } },
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-1',
+      seenHashes: ['h1'],
+      partialCoverage: true,
+    });
+
+    // Not a full scan (absence proves nothing), yet findings a completed
+    // detector no longer reports on the assets it did scan may be resolved.
+    expect(assetService.finalizeIngestRun).toHaveBeenCalledWith(
+      'source-1',
+      'runner-1',
+      ['h1'],
+      false,
       true,
     );
   });
@@ -141,6 +168,7 @@ describe('SourceAssetsController', () => {
       'source-1',
       'runner-1',
       ['h1'],
+      false,
       false,
     );
   });

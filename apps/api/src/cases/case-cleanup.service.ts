@@ -33,6 +33,7 @@ import { CompiledMatcher } from '../matching/inquiry-matcher';
 import { ensureTermSnapshotFor } from '../semantic/term-snapshot';
 import { CASE_CLEANUP_ACTOR, type CaseCleanupPort } from './case-cleanup.port';
 import {
+  emptiedByCleanup,
   anyRule,
   assetRemoval,
   compileFindingFilters,
@@ -101,11 +102,11 @@ export interface FindingRemovalPlan {
 }
 
 /**
- * Why evidence leaves by itself: its asset is gone from the source, or a
- * filter just took out every finding the case held on it (and was asked to
- * take out what it empties).
+ * Why evidence leaves by itself: its asset is gone from the source, a filter
+ * just took out every finding the case held on it (and was asked to take out
+ * what it empties), or the clean-up rules took out its last finding.
  */
-export type EvidenceRemovalReason = 'ASSET_GONE' | 'FILTER_EMPTIED';
+export type EvidenceRemovalReason = 'ASSET_GONE' | 'FILTER_EMPTIED' | 'EMPTIED';
 
 interface EvidenceRemovalPlan {
   ev: CaseEvidence & { findings: CaseFinding[] };
@@ -137,6 +138,8 @@ interface ExecuteContext {
 export interface CleanupOutcome extends CaseCleanupResultDto {
   /** Of `evidenceRemoved`: assets a filter left without findings. */
   emptiedRemoved: number;
+  /** Of `evidenceRemoved`: assets the rules left without findings. */
+  leftEmptyRemoved: number;
   /** The board's version after the pass, when it changed one. */
   version: number | null;
 }
@@ -146,6 +149,7 @@ const NOTHING: CleanupOutcome = {
   evidenceRemoved: 0,
   findingsWithEvidence: 0,
   emptiedRemoved: 0,
+  leftEmptyRemoved: 0,
   version: null,
 };
 
@@ -158,6 +162,8 @@ const RULE_FOR: Record<
   ASSET_GONE: 'removeGoneAssets',
   FILTER: null,
   FILTER_EMPTIED: null,
+  // Follows whichever finding rule took the last finding out.
+  EMPTIED: null,
 };
 
 const CLEANUP_SELECT = {
@@ -288,8 +294,9 @@ export class CaseCleanupService implements CaseCleanupPort {
         (r) => r.reason === 'FINDING_RESOLVED',
       ).length,
       goneAssets: plan.evidence.length,
+      // An emptied asset's findings are already counted above, as findings.
       findingsWithAssets: plan.evidence.reduce(
-        (sum, e) => sum + e.ev.findings.length,
+        (sum, e) => sum + (e.reason === 'EMPTIED' ? 0 : e.ev.findings.length),
         0,
       ),
       sample,
@@ -689,6 +696,14 @@ export class CaseCleanupService implements CaseCleanupPort {
           });
         }
       }
+      // An asset the case held only for those findings goes with the last of
+      // them — see emptiedByCleanup for what stays.
+      const leavingFindings = new Set(plan.findings.map((r) => r.cf.id));
+      for (const ev of staying) {
+        if (emptiedByCleanup(ev, leavingFindings)) {
+          plan.evidence.push({ ev, reason: 'EMPTIED' });
+        }
+      }
     }
     return plan;
   }
@@ -937,7 +952,7 @@ export class CaseCleanupService implements CaseCleanupPort {
                 // An emptied asset comes back bare: its findings were filtered
                 // out and stay restorable one by one (`detached`).
                 tombstone: evidenceTombstone(
-                  e.reason === 'FILTER_EMPTIED'
+                  e.reason === 'FILTER_EMPTIED' || e.reason === 'EMPTIED'
                     ? { ...e.ev, findings: [] }
                     : e.ev,
                 ),
@@ -962,7 +977,11 @@ export class CaseCleanupService implements CaseCleanupPort {
       await tx.caseEvidence.deleteMany({
         where: { caseId, id: { in: plan.evidence.map((e) => e.ev.id) } },
       });
-      for (const reason of ['ASSET_GONE', 'FILTER_EMPTIED'] as const) {
+      for (const reason of [
+        'ASSET_GONE',
+        'FILTER_EMPTIED',
+        'EMPTIED',
+      ] as const) {
         const group = plan.evidence.filter((e) => e.reason === reason);
         if (group.length === 0) continue;
         // A gone asset takes its findings along; an emptied one has none left.
@@ -1014,6 +1033,8 @@ export class CaseCleanupService implements CaseCleanupPort {
       findingsWithEvidence,
       emptiedRemoved: plan.evidence.filter((e) => e.reason === 'FILTER_EMPTIED')
         .length,
+      leftEmptyRemoved: plan.evidence.filter((e) => e.reason === 'EMPTIED')
+        .length,
       version,
     };
   }
@@ -1055,7 +1076,10 @@ export class CaseCleanupService implements CaseCleanupPort {
   ): void {
     if (!this.events || outcome.version === null) return;
     const parts: string[] = [];
-    const gone = outcome.evidenceRemoved - outcome.emptiedRemoved;
+    const gone =
+      outcome.evidenceRemoved -
+      outcome.emptiedRemoved -
+      outcome.leftEmptyRemoved;
     if (gone > 0) {
       parts.push(
         gone === 1
@@ -1068,6 +1092,13 @@ export class CaseCleanupService implements CaseCleanupPort {
         outcome.emptiedRemoved === 1
           ? 'took out an asset a filter left without findings'
           : `took out ${outcome.emptiedRemoved} assets a filter left without findings`,
+      );
+    }
+    if (outcome.leftEmptyRemoved > 0) {
+      parts.push(
+        outcome.leftEmptyRemoved === 1
+          ? 'took out an asset with no findings left'
+          : `took out ${outcome.leftEmptyRemoved} assets with no findings left`,
       );
     }
     if (outcome.findingsRemoved > 0) {

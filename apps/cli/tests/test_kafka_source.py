@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import base64
-import json
 from typing import Any
 
 import pytest
 
 from src.models.generated_input import SamplingStrategy
 from src.sources.kafka.source import KafkaSource
+from src.utils.sampling_cursor import encode_sampling_cursor
 
 CURSOR_ENV = "CLASSIFYRE_SAMPLING_CURSOR"
 
@@ -19,7 +19,7 @@ _CA_PEM = "-----BEGIN CERTIFICATE-----\nZmFrZS1jYQ==\n-----END CERTIFICATE-----"
 
 
 def _encode_cursor(cursor: dict[str, Any]) -> str:
-    return base64.b64encode(json.dumps(cursor).encode()).decode()
+    return encode_sampling_cursor(cursor)
 
 
 # ── confluent-kafka fakes ────────────────────────────────────────────────
