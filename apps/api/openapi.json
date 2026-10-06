@@ -24238,9 +24238,10 @@
               "FINDING_RESOLVED",
               "FILTER",
               "ASSET_GONE",
-              "FILTER_EMPTIED"
+              "FILTER_EMPTIED",
+              "EMPTIED"
             ],
-            "description": "FILTER_EMPTIED: an asset a filter left without any finding in the case"
+            "description": "FILTER_EMPTIED: an asset a filter left without any finding in the case. EMPTIED: an asset the clean-up rules left without any finding (one that carries a note stays)"
           },
           "state": {
             "type": "string",

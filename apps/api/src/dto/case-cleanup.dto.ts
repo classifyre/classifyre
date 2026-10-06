@@ -44,16 +44,20 @@ export class CaseCleanupItemDto {
       'FILTER',
       'ASSET_GONE',
       'FILTER_EMPTIED',
+      'EMPTIED',
     ],
     description:
-      'FILTER_EMPTIED: an asset a filter left without any finding in the case',
+      'FILTER_EMPTIED: an asset a filter left without any finding in the case. ' +
+      'EMPTIED: an asset the clean-up rules left without any finding (one that ' +
+      'carries a note stays)',
   })
   reason!:
     | 'FINDING_GONE'
     | 'FINDING_RESOLVED'
     | 'FILTER'
     | 'ASSET_GONE'
-    | 'FILTER_EMPTIED';
+    | 'FILTER_EMPTIED'
+    | 'EMPTIED';
 
   @ApiPropertyOptional({
     enum: ['RETIRED', 'DELETED'],

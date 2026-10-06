@@ -2257,6 +2257,12 @@ export class AssetService {
     runnerId: string,
     seenHashes: string[],
     isFullScan: boolean,
+    /**
+     * Every asset this run yielded was read whole (sampling strategy ALL),
+     * whether or not the run covered the whole source. Defaults to
+     * `isFullScan`: a full scan is one.
+     */
+    scannedAssetsComplete: boolean = isFullScan,
   ): Promise<{
     deleted: number;
     outOfScope: number;
@@ -2283,11 +2289,29 @@ export class AssetService {
         : await this.resolveRemovedDetectorFindings(source, runnerId);
 
     if (!isFullScan) {
-      // Sampling means not all assets appear in every run — no deletion logic.
+      // Not every asset appears in this run, so an asset's absence proves
+      // nothing and none is retired. That is a statement about assets the run
+      // did NOT visit. An asset it did visit, and read whole, is another
+      // matter: its detectors ran to completion on it, and a finding they no
+      // longer report is gone. A connector that picks its own cohort each run
+      // (a change feed, a resumable sweep) declares partial coverage on every
+      // run, so treating both alike meant such a source could never lose a
+      // finding: a company that filed its overdue accounts stayed "overdue",
+      // and a case built on that finding never let it go.
+      //
+      // Only when the assets were read whole. Under RANDOM, LATEST or
+      // AUTOMATIC sampling a run sees part of an asset, and a finding in the
+      // rows it skipped is not absent.
+      const resolvedForAbsence = scannedAssetsComplete
+        ? await this.prisma.$transaction(
+            (tx) => this.resolveFindingsNotRedetected(tx, sourceId, runnerId),
+            { timeout: 60000, maxWait: 10000 },
+          )
+        : 0;
       return {
         deleted: 0,
         outOfScope: 0,
-        resolvedForAbsence: 0,
+        resolvedForAbsence,
         resolvedForRemovedDetectors,
         retainedForCitation: retained,
       };
@@ -2375,17 +2399,6 @@ export class AssetService {
 
     const missingAssetIds = deletableAssets.map((a) => a.id);
 
-    // Which (asset, detector) pairs completed cleanly in this run. Only their
-    // findings may be resolved for absence — see buildResolutionManifest.
-    const runnerAssets = await this.prisma.runnerAsset.findMany({
-      where: { runnerId },
-      select: { assetHash: true, detectorOutcomes: true },
-    });
-    const resolutionManifest = this.buildResolutionManifest(runnerAssets);
-
-    const hasManualStatusOverride = (finding: any): boolean =>
-      this.findingHasManualStatusOverride(finding);
-
     let resolvedForAbsence = 0;
 
     await this.prisma.$transaction(
@@ -2437,7 +2450,7 @@ export class AssetService {
             : [];
 
         const findingsToResolve = openFindings.filter(
-          (f) => !hasManualStatusOverride(f),
+          (f) => !this.findingHasManualStatusOverride(f),
         );
 
         const now = new Date();
@@ -2466,73 +2479,11 @@ export class AssetService {
           });
         }
 
-        // Resolve findings on assets that were scanned but whose findings were
-        // not re-detected. finding.runnerId is updated on create/re-detect, so
-        // a stale runnerId means the finding was absent from this run.
-        //
-        // Absence alone is not enough. It previously was, on the reasoning that
-        // a scanned asset means every detector re-reported — which is false when
-        // a detector crashed, was removed from the config, or never applied to
-        // that content type. The manifest narrows this to detectors that
-        // actually completed on that specific asset.
-        const staleFindings = await tx.finding.findMany({
-          where: {
-            sourceId,
-            status: FindingStatus.OPEN,
-            runnerId: { not: runnerId },
-            asset: {
-              runnerId,
-              status: { not: AssetStatus.DELETED },
-            },
-          },
-          include: { asset: { select: { hash: true } } },
-        });
-
-        const resolvableStaleFindings = staleFindings.filter((f) => {
-          if (hasManualStatusOverride(f)) return false;
-          return resolutionManifest.has(
-            this.resolutionKey(
-              f.asset.hash,
-              f.detectorType,
-              f.customDetectorKey ?? null,
-            ),
-          );
-        });
-
-        const skipped = staleFindings.length - resolvableStaleFindings.length;
-        if (skipped > 0) {
-          console.warn(
-            `[finalizeIngestRun] Source ${sourceId}: leaving ${skipped} finding(s) ` +
-              `OPEN despite not being re-detected — their detector did not complete ` +
-              `on that asset in this run, so its silence is not evidence of absence.`,
-          );
-        }
-        resolvedForAbsence = resolvableStaleFindings.length;
-
-        for (const finding of resolvableStaleFindings) {
-          const currentHistory = Array.isArray(finding.history)
-            ? finding.history
-            : [];
-          await tx.finding.update({
-            where: { id: finding.id },
-            data: {
-              status: FindingStatus.RESOLVED,
-              runnerId,
-              resolvedAt: now,
-              resolutionReason: 'Detection no longer present in scan',
-              history: historyColumn([
-                ...currentHistory,
-                historyEntryForStorage({
-                  timestamp: now,
-                  runnerId,
-                  eventType: HistoryEventType.RESOLVED,
-                  status: FindingStatus.RESOLVED,
-                  changeReason: 'Detection no longer present in scan',
-                }),
-              ]),
-            },
-          });
-        }
+        resolvedForAbsence = await this.resolveFindingsNotRedetected(
+          tx,
+          sourceId,
+          runnerId,
+        );
 
         // Update runner stats with deleted count
         await tx.runner.update({
@@ -2557,6 +2508,91 @@ export class AssetService {
       resolvedForRemovedDetectors,
       retainedForCitation: retained,
     };
+  }
+
+  /**
+   * Resolve the OPEN findings of assets this run scanned that the run did not
+   * re-detect, and return how many.
+   *
+   * `finding.runnerId` is updated on create and on re-detect, so a stale
+   * runnerId on an asset the run visited means the finding was not reported
+   * again. Absence alone is not enough. It previously was, on the reasoning
+   * that a scanned asset means every detector re-reported — which is false
+   * when a detector crashed, was removed from the config, was skipped by the
+   * scan cache, or never applied to that content type. The manifest narrows
+   * this to detectors that completed on that specific asset in this run. A
+   * status a person set is never overwritten.
+   */
+  private async resolveFindingsNotRedetected(
+    tx: Prisma.TransactionClient,
+    sourceId: string,
+    runnerId: string,
+  ): Promise<number> {
+    const runnerAssets = await this.prisma.runnerAsset.findMany({
+      where: { runnerId },
+      select: { assetHash: true, detectorOutcomes: true },
+    });
+    const resolutionManifest = this.buildResolutionManifest(runnerAssets);
+
+    const staleFindings = await tx.finding.findMany({
+      where: {
+        sourceId,
+        status: FindingStatus.OPEN,
+        runnerId: { not: runnerId },
+        asset: {
+          runnerId,
+          status: { not: AssetStatus.DELETED },
+        },
+      },
+      include: { asset: { select: { hash: true } } },
+    });
+
+    const resolvable = staleFindings.filter((f) => {
+      if (this.findingHasManualStatusOverride(f)) return false;
+      return resolutionManifest.has(
+        this.resolutionKey(
+          f.asset.hash,
+          f.detectorType,
+          f.customDetectorKey ?? null,
+        ),
+      );
+    });
+
+    const skipped = staleFindings.length - resolvable.length;
+    if (skipped > 0) {
+      console.warn(
+        `[finalizeIngestRun] Source ${sourceId}: leaving ${skipped} finding(s) ` +
+          `OPEN despite not being re-detected — their detector did not complete ` +
+          `on that asset in this run, so its silence is not evidence of absence.`,
+      );
+    }
+
+    const now = new Date();
+    for (const finding of resolvable) {
+      const currentHistory = Array.isArray(finding.history)
+        ? finding.history
+        : [];
+      await tx.finding.update({
+        where: { id: finding.id },
+        data: {
+          status: FindingStatus.RESOLVED,
+          runnerId,
+          resolvedAt: now,
+          resolutionReason: 'Detection no longer present in scan',
+          history: historyColumn([
+            ...currentHistory,
+            historyEntryForStorage({
+              timestamp: now,
+              runnerId,
+              eventType: HistoryEventType.RESOLVED,
+              status: FindingStatus.RESOLVED,
+              changeReason: 'Detection no longer present in scan',
+            }),
+          ]),
+        },
+      });
+    }
+    return resolvable.length;
   }
 
   /**

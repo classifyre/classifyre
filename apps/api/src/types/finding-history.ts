@@ -61,6 +61,17 @@ const EVENT_CODES: Record<HistoryEventType, string> = {
   [HistoryEventType.RE_OPENED]: 'RO',
 };
 
+/**
+ * A stored history entry of this event, by this run, as a JSON-containment
+ * probe: `history @> [storedEventProbe(RE_OPENED, runnerId)]`.
+ */
+export function storedEventProbe(
+  eventType: HistoryEventType,
+  runnerId: string,
+): Pick<StoredHistoryEntry, 'e' | 'r'> {
+  return { e: EVENT_CODES[eventType], r: runnerId };
+}
+
 const EVENT_BY_CODE = new Map<string, HistoryEventType>(
   Object.entries(EVENT_CODES).map(([event, code]) => [
     code,

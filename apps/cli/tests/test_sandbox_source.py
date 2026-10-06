@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import base64
-import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -9,6 +7,7 @@ import pytest
 from src.sources import get_source, list_available_sources
 from src.sources.object_storage.base import ContentSnapshot, ObjectRef
 from src.sources.sandbox.source import SandboxSource
+from src.utils.sampling_cursor import encode_sampling_cursor
 
 
 def _recipe(strategy: str = "ALL", rows_per_page: int = 10) -> dict:
@@ -76,7 +75,7 @@ def test_sandbox_automatic_sampling_uses_persisted_rolling_window(monkeypatch) -
 
     monkeypatch.setenv(
         "CLASSIFYRE_SAMPLING_CURSOR",
-        base64.b64encode(json.dumps(cursor).encode()).decode(),
+        encode_sampling_cursor(cursor),
     )
     second = SandboxSource(_recipe("AUTOMATIC"), source_id="source-1")
     try:

@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import base64
-import json
 from typing import Any
 
 import pytest
 
 from src.sources.mysql.source import MySQLSource, TableRef
+from src.utils.sampling_cursor import encode_sampling_cursor
 
 CURSOR_ENV = "CLASSIFYRE_SAMPLING_CURSOR"
 PAGE = 10  # rows_per_page (MySQL config enforces a minimum of 10)
@@ -94,7 +93,7 @@ def _make_source(
 
 
 def _encode(cursor: dict[str, Any]) -> str:
-    return base64.b64encode(json.dumps(cursor).encode()).decode()
+    return encode_sampling_cursor(cursor)
 
 
 _TABLE = TableRef(database="app_db", schema=None, table="users")

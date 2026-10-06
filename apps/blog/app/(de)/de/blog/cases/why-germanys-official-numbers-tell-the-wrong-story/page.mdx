@@ -1,0 +1,371 @@
+---
+title: "Warum Deutschlands amtliche Zahlen die falsche Geschichte erzählen"
+description: Jede Zahl stimmt, und die Geschichte ist trotzdem falsch. Wir haben echte Daten von Destatis, BKA und EU in einem System zusammengeführt und dort gesucht, wo eine wahre Zahl etwas Falsches sagt. Wir haben sechs Stellen gefunden.
+date: 2026-10-05T00:00:00.000Z
+tags:
+  - investigations
+  - official-statistics
+  - data-quality
+  - glossary
+  - entities
+categories:
+  - Field Notes
+author: Banandre
+image: /blog/assets/images/why-germanys-official-numbers-tell-the-wrong-story.jpg
+keywords:
+  - amtliche Statistik
+  - Destatis
+  - Zensus 2022 Bevölkerung
+  - irreführende Statistik
+  - Kriminalitätsranking Landkreise
+  - Pro-Kopf-Statistik Fallstricke
+  - wirtschaftliches Frühwarnsystem
+  - Unternehmensglossar
+  - Entity Resolution
+  - Classifyre
+alternates:
+  canonical: /de/blog/cases/why-germanys-official-numbers-tell-the-wrong-story
+  languages:
+    en: /blog/cases/why-germanys-official-numbers-tell-the-wrong-story/
+    de: /de/blog/cases/why-germanys-official-numbers-tell-the-wrong-story/
+    x-default: /blog/cases/why-germanys-official-numbers-tell-the-wrong-story/
+openGraph:
+  type: article
+  title: "Warum Deutschlands amtliche Zahlen die falsche Geschichte erzählen"
+  description: Jede Zahl stimmt, und die Geschichte ist trotzdem falsch. Sechs Stellen, an denen eine wahre Zahl etwas Falsches sagt, gefunden in echten Daten von Destatis, BKA und EU.
+  url: /de/blog/cases/why-germanys-official-numbers-tell-the-wrong-story
+  siteName: Classifyre
+  publishedTime: 2026-10-05T00:00:00.000Z
+  modifiedTime: 2026-10-05T00:00:00.000Z
+  authors:
+    - Banandre
+  section: Field Notes
+  tags:
+    - official statistics
+    - census
+    - data quality
+    - misleading statistics
+  images:
+    - /blog/assets/images/why-germanys-official-numbers-tell-the-wrong-story.jpg
+twitter:
+  card: summary
+  title: "Warum Deutschlands amtliche Zahlen die falsche Geschichte erzählen"
+  description: Jede Zahl stimmt, und die Geschichte ist trotzdem falsch. Sechs Stellen, an denen eine wahre Zahl etwas Falsches sagt.
+  images:
+    - /blog/assets/images/why-germanys-official-numbers-tell-the-wrong-story.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/why-germanys-official-numbers-tell-the-wrong-story.jpg"
+  eyebrow="Feldnotizen"
+  title="Jede Zahl stimmt. Die Geschichte nicht."
+  description="Köln verlor an einem einzigen Tag 64.000 Einwohner, und niemand zog weg. Im Saarland „leben kaum Ausländer“. Ein Kreis sei „der zweitgefährlichste Deutschlands“. Wir haben sechs Geschichten an Deutschlands eigenen amtlichen Daten geprüft."
+/>
+
+<ArticleJsonLd
+  headline="Warum Deutschlands amtliche Zahlen die falsche Geschichte erzählen"
+  description="Jede Zahl stimmt, und die Geschichte ist trotzdem falsch. Wir haben echte Daten von Destatis, BKA und EU in einem System zusammengeführt und dort gesucht, wo eine wahre Zahl etwas Falsches sagt. Wir haben sechs Stellen gefunden."
+  path="/de/blog/cases/why-germanys-official-numbers-tell-the-wrong-story"
+  datePublished="2026-10-05T00:00:00.000Z"
+  dateModified="2026-10-05T00:00:00.000Z"
+  authorName="Banandre"
+  articleSection="Field Notes"
+  about={[
+    "Amtliche Statistik",
+    "Zensus 2022",
+    "Pro-Kopf-Statistik",
+    "Kriminalstatistik",
+    "Wirtschaftliches Frühwarnsystem",
+  ]}
+  mentions={[
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://showcase.classifyre.com/atlas-regional-research",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://showcase.classifyre.com/atlas-regional-research"
+  liveCaseName="Germany's Official Numbers"
+/>
+
+<LiveCaseLink
+  href="https://showcase.classifyre.com/atlas-regional-research"
+  caseName="Workspace „Germany's Official Numbers“"
+/>
+
+<ArticleSideRail
+  title="Jede Zahl stimmt. Die Geschichte nicht."
+  path="/de/blog/cases/why-germanys-official-numbers-tell-the-wrong-story/"
+  tags={["investigations", "official-statistics", "data-quality", "glossary", "entities"]}
+  backHref="/de/blog/cases"
+  backLabel="Alle Fallakten"
+/>
+
+Am 15. Mai 2022 verlor Köln rund 64.000 Einwohner. An einem einzigen Tag.
+
+Niemand zog weg. Niemand starb. Deutschland hatte einen Zensus durchgeführt, der Zensus fand weniger Menschen, als in den
+Registern standen, und die amtliche Zahl wurde neu gesetzt. Köln hat inzwischen dagegen geklagt.
+
+Sehen Sie nun, was dieser eine Tag mit einem Zehnjahrestrend macht. Zwischen 2015 und 2025 verlor Köln laut Statistischem
+Bundesamt 3,3 % seiner Einwohner. Trier verlor 8,6 %. Halle 4,6 %. Daraus lässt sich in etwa einer Minute eine Schlagzeile
+bauen:
+
+> **Deutschlands Städte schrumpfen.**
+
+Jede Zahl in diesem Satz ist amtlich. Und der Satz ist falsch. Misst man beide Jahre auf dieselbe Weise, **ist Köln
+gewachsen, um etwa 3 %.**
+
+Das Problem sind nicht die Zahlen. Das Problem ist, was wir in sie hineinlesen. Eine Zahl kann wahr sein und trotzdem das
+Gegenteil dessen erzählen, was passiert ist.
+
+Also haben wir nach den anderen gesucht.
+
+Wir haben echte Daten von Destatis, vom Bundeskriminalamt (BKA) und aus dem EU-Recht in einem System zusammengeführt: die
+Bevölkerung aller 400 Kreise über zehn Jahre, dazu Kriminalität, Wanderung, die Monatswirtschaft der 16 Länder, Pressemitteilungen
+und der Katalog der Tabellen des Statistischen Bundesamts selbst. Dann haben wir jede Geschichte, die sich leicht aus diesen
+Daten bauen lässt, auf eine einfache Frage geprüft: *Was müsste stimmen, damit das richtig ist, und stimmt es?*
+
+Keine der sechs hat das unbeschadet überstanden. Das steckte jeweils dahinter.
+
+| | Die Geschichte | Die amtliche Zahl dahinter | Was wirklich los ist |
+|---|---|---|---|
+| **1** | Deutschlands Städte schrumpfen | Köln −3,3 %, Trier −8,6 %, Halle −4,6 % | In jeder steckt ein Zensus-Sprung |
+| **2** | Der Osten leert sich wieder, Berlins Umland boomt durch Zuzug | Osten −8.596 netto 2025 | Stimmt, aber anders, als es klingt |
+| **3** | Frankfurt (Oder) ist der zweitgefährlichste Kreis Deutschlands | 14.303 erfasste Fälle je 100.000 | Platz 73, sobald die Grenze draußen ist |
+| **4** | Im Saarland leben kaum Ausländer | Ein Strich in fünf von sechs Kreisen | Der Strich ist eine Adresse, keine Null |
+| **5** | Bayerns Bevölkerungsbilanz geht nicht auf, die Statistik ist also kaputt | 24.814 Menschen 2024 ohne Erklärung | Die Lücke ist echt. „Kaputt“ ist es nicht |
+| **6** | Insolvenzen steigen in Schleswig-Holstein stark, wegen der Bauwirtschaft, und die Arbeitslosigkeit folgt | +36,6 % | Der Anstieg ist echt. Beide Erklärungen scheitern |
+
+**Wessen Zahlen sind das?** Unten stehen zwei Arten von Zahlen, und wir halten sie auseinander. *Amtliche* Zahlen sind direkt aus
+einer veröffentlichten Tabelle oder Pressemitteilung gelesen. *Unsere Schätzungen* haben wir aus diesen Tabellen berechnet: die
+57 Kreise, die bereinigten Kriminalitätsränge, die Größe der bayerischen Lücke. Wo eine Zahl von uns stammt, steht es dabei. Die
+Quellen stehen am Ende.
+
+## Wie verliert eine Stadt an einem Tag 64.000 Einwohner?
+
+Am 15. Mai 2022 führte Deutschland einen Zensus durch und zählte dabei etwa **1,4 Millionen Menschen weniger**, als die
+Fortschreibung angenommen hatte: 82,7 Millionen. Sieben von zehn der Fehlenden waren Ausländer; ein Wegzug ins Ausland ist
+leicht ohne Abmeldung getan. Alle amtlichen Bevölkerungsreihen wurden danach auf die neue Zählung gesetzt, ab 2022. Die Jahre
+davor blieben, wie sie waren.
+
+Jede Zahl, die die Jahre vor 2022 mit den Jahren danach vergleicht, enthält daher zweierlei: Menschen, die umziehen, und eine
+Korrektur.
+
+Für Köln beträgt die amtliche Korrektur **rund 63.800 Einwohner**, 5,9 % der Stadt. Der gesamte veröffentlichte Rückgang von 2015
+bis 2025 beträgt 35.059. Rechnet man die Korrektur heraus, wird aus Kölns −3,3 % etwa +2,7 %. Das städtische Melderegister
+zeigt in dieselbe Richtung: Es zählte Ende 2025 genau 1.092.607 Menschen mit Hauptwohnsitz, rund 67.000 mehr als die amtliche
+Zahl. Im Juni 2025 hat die Stadt gegen das Zensusergebnis geklagt.
+
+Köln hat eine amtliche Zahl für seine Korrektur. Die meisten Kreise haben keine. Also haben wir sie für jeden Kreis geschätzt,
+allein aus den eigenen veröffentlichten Zahlen des Kreises. Die Ausländerzahlen stammen aus einem Register, das der Zensus nicht
+neu gesetzt hat. Wir nehmen deshalb die Einwohner abzüglich der registrierten Ausländer und betrachten den Sprung zwischen 2021
+und 2022, der über den üblichen Jahresschritt des Kreises hinausgeht. Das ist unsere Methode, nicht die von Destatis.
+
+Nach dieser Schätzung verschwindet in **57 Kreisen** ein veröffentlichter Rückgang, sobald der Sprung herausgerechnet ist. Man
+würde Großstädte vermuten. Es sind keine: Nur 22 der 57 sind Städte. Halle geht von −4,6 % auf +2,1 %. Trier von −8,6 % auf
++0,1 %: nicht gewachsen, aber auch nicht geschrumpft. Und es kann andersherum laufen. In Pforzheim hat der Zensus geschätzt
+6.354 Menschen *hinzugefügt*, aus veröffentlichten +10,0 % werden also +4,8 %.
+
+Taugt die Schätzung etwas? Wir haben sie zweimal geprüft. Über das ganze Land addiert ergibt sie −1,48 Millionen gegenüber den
+1,4 Millionen, die Destatis nennt: 5,8 % Abstand. Für Köln, den einen Kreis, in dem wir vergleichen können, ergibt sie −74.346
+gegenüber den amtlichen 63.800. Dort liegt sie also zu hoch, und unsere Zahl für Kölns Wachstum (+3,7 %) liegt einen Punkt über
+der mit der amtlichen Korrektur (+2,7 %). Genau genug, um ein Vorzeichen zu drehen. Nicht genau genug, um sie bis zur letzten
+Stelle zu zitieren.
+
+> **Wer schrumpft denn nun wirklich?** Nach unserer Schätzung schrumpfen 59 Kreise auch nach der Korrektur. 56 davon altern
+> zugleich stark, und 42 dieser 56 liegen im Osten.
+
+Eine Frage können wir nicht beantworten: ob Universitätsstädte die größten Korrekturen tragen. Keine Tabelle sagt, welche Kreise
+eine Universität haben, und wir raten nicht.
+
+## Leert sich der Osten wieder?
+
+Die erste Hälfte dieser Geschichte stimmt. Ostdeutschland, ohne Berlin gerechnet, verlor 2025 **8.596 Menschen netto** an den
+Westen. Destatis nennt dieselbe Zahl, gerundet auf 8.600. Es ist der dritte Verlust in Folge nach sechs Jahren kleiner Gewinne.
+
+Schauen Sie in die Zahl hinein. Allein die Deutschen *gewannen* 3.511. Im Jahr 2000 verlor der Osten 75.951 Menschen, und 68.806
+davon, neun von zehn, waren Deutsche. Das war die alte Abwanderung. Das hier ist sie nicht. Die Wege, die den heutigen Verlust
+tragen, sind überwiegend Ausländer, die weiterziehen: Von Sachsen-Anhalt nach Nordrhein-Westfalen sind **58 %** Ausländer. Von
+Thüringen **53 %**. Von Sachsen **49 %**.
+
+Eine Warnung, damit wir nicht eine bequeme Geschichte gegen die nächste tauschen. Der Überschuss bei den Deutschen schrumpft:
++15.743 im Jahr 2021, +3.511 im Jahr 2025. Kippt er ins Minus, stimmt die alte Schlagzeile wieder, und dieselbe Tabelle zeigt es
+zuerst.
+
+Die zweite Hälfte, Berlins Umland boome durch Zuzug aus dem Ausland, scheitert am gleichen Test. Alle acht wachsenden Kreise
+um Berlin wuchsen zwischen 5 % und 13 %, und **alle acht wachsen auch ohne den Zuwachs an Ausländern noch um 1,8 % bis 5,1 %.**
+Berlin schickt 31.071 Menschen nach Brandenburg und bekommt 18.619 zurück. Das ist gewöhnliche Suburbanisierung.
+
+Und eine Korrektur an uns selbst. Unsere erste Lesart sagte, neun Kreise hätten zu wenig Wohnungen: Die Einwohner wachsen
+schneller als die Wohnungen. An den Rohzahlen geprüft, gilt das in **einem**. In den anderen acht war der „Mangel“ wieder die
+Zensuskorrektur: Die Gebäude- und Wohnungszählung hat auch den Wohnungsbestand neu gesetzt. Das System führt das als eigenen
+Befund, *vom Zensus gemachter Druck*, gleich neben dem echten.
+
+## Ist Frankfurt (Oder) wirklich der zweitgefährlichste Ort Deutschlands?
+
+Nach der Überschriftenzahl ja. In der Kreistabelle des BKA für 2025 hat Frankfurt (Oder), eine Stadt mit 57.000 Einwohnern an der
+polnischen Grenze, 14.303 erfasste Fälle je 100.000 Einwohner. Ordnet man die 400 Kreise nach dieser Rate, liegt es auf Platz
+zwei, vor Berlin.
+
+Aber **48 %** von allem, was dort erfasst wird, 3.935 von 8.168 Fällen, ist eine einzige Art von Delikt: Einreise oder Aufenthalt
+ohne Papiere. Diese Verstöße werden dort erfasst, wo die Polizei sie *feststellt*, und sie stellt sie an der Grenze fest.
+Bundesweit machen sie 3,8 % der erfassten Kriminalität aus. Das BKA veröffentlicht die Summe auch ohne sie. Ordnet man danach,
+liegt Frankfurt (Oder) auf **Platz 73**.
+
+Es ist nicht allein. Freising, neben dem Flughafen München, fällt von 119 auf 324. Berchtesgadener Land von 62 auf 236.
+Dahme-Spreewald, Heimat des Berliner Flughafens, von 18 auf 100. Acht Kreise insgesamt.
+
+Bereinigt sind die ersten zehn alle kreisfreie Städte, angeführt von Bremen, Berlin und Halle. Über 391 Kreise hinweg folgt die
+bereinigte Kriminalitätsrate der Dichte und der sozialen Belastung eines Ortes. Die Ränge stammen von uns, gebaut aus der Tabelle
+des BKA. Und ein Satz gehört unter jede Karte, die aus diesen Daten gebaut wird: *Diese Zahlen sagen, wo Kriminalität erfasst
+wird, nicht, wer sie begeht.*
+
+## Was bedeutet ein Strich in einer Statistiktabelle?
+
+Laut Zeichenerklärung: **nichts vorhanden**.
+
+Fünf von sechs saarländischen Kreisen zeigen bei den Ausländern einen Strich. Nimmt man die Tabelle beim Wort, leben im Saarland
+kaum welche.
+
+Der sechste Kreis, Saarlouis, zeigt **164.395 Ausländer** bei 204.087 Einwohnern. Das sind 81 %. Nimmt man die Tabelle noch
+einmal beim Wort, sind vier von fünf Menschen in Saarlouis Ausländer.
+
+Beides stimmt nicht. Das Saarland hat eine einzige Ausländerbehörde für das ganze Land, und sie sitzt im Kreis Saarlouis. Das
+Register bucht jeden Ausländer des Landes an dieser Adresse. 164.395 ist das ganze Saarland, das gut eine Million Einwohner hat:
+**16 %**, nicht 81 %. Der Strich bedeutet nicht null. Er bedeutet *bei der Behörde gezählt*. Destatis erklärt das durchaus, in
+einer Fußnote. Die Tabelle zeigt einen Strich.
+
+Dasselbe passiert beim Landkreis Kassel, der sich die Behörde mit der Stadt Kassel teilt und dort gebucht ist. Und Spree-Neiße
+zeigt einen Strich, ohne dass eine Fußnote sagt, wohin seine Menschen gebucht sind. Das benachbarte Cottbus liegt nahe. Bestätigen
+konnten wir es nicht, also sagen wir auch das.
+
+Dieselbe Falle erwischt die Autos. Trier zeigt 1.511 Pkw je 1.000 Einwohner, mehr Autos als Menschen. Trier ist keine Stadt der
+Sammler. Es teilt sich die Zulassungsstelle mit dem umliegenden Kreis Trier-Saarburg, der überhaupt keine Pkw-Zahl hat. Zählt
+man beide zusammen, kommen 626 heraus. Wolfsburg mit 954 ist die andere Variante: Firmenflotten, zugelassen am Sitz des
+Autobauers.
+
+Das praktische Ergebnis: **Neun Kreise müssen aus jeder Pro-Kopf-Zahl zu Ausländern herausbleiben**, Trier und Trier-Saarburg aus
+jeder zu Autos, und wir wissen noch nicht, ob sich weitere ohne Strich verstecken.
+
+## Gehen Deutschlands Bevölkerungsbilanzen auf?
+
+Die Bevölkerung am Jahresende sollte der Bevölkerung am Anfang entsprechen, plus Geburten, minus Sterbefälle, plus
+Wanderungssaldo. Vier veröffentlichte Tabellen, eine Gleichung. Wir haben sie für jedes Land und jedes Jahr seit 2000 gerechnet.
+
+Sie bricht in **27** Länderjahren, alle in den Zensusjahren 2011 und 2022, wie es sein muss.
+
+Außerhalb der Zensusjahre haben wir den Rest an den Geburten des jeweiligen Jahres gemessen. In **33 weiteren** Länderjahren ist
+der Rest größer als 5 % der Geburten. Bayern 2024: Die Bevölkerung wuchs um 72.502, Geburten, Sterbefälle und Wanderung erklären
+47.688. Es bleiben **24.814 Menschen**, als wären 21,7 % mehr Kinder geboren worden, als es waren. Sachsen 2025: 4.957 Menschen.
+Mecklenburg-Vorpommern 2025: 7.421, wo die Tabellen einen Verlust von 7.333 erwarten lassen und die Bevölkerung sich nicht bewegt
+hat. Berlin und Bremen verfehlen in je neun Jahren um mehr als 5 % der Geburten.
+
+Behalten Sie die Größenordnung im Blick. 24.814 Menschen sind 0,19 % von Bayern. Das ist eine Lücke in vier Tabellen, keine
+kaputte Statistik.
+
+Zwei Erklärungen liegen auf dem Tisch: Die Wanderung wurde zu niedrig erfasst und wird revidiert, oder Melderegister wurden nach
+dem Zensus bereinigt. Die amtliche Bevölkerungszahl enthält solche Registerkorrekturen, und sie stehen nicht in den vier Tabellen,
+die wir kombiniert haben. Die geladenen Daten können die beiden Erklärungen also nicht trennen. „Die Statistik ist kaputt“ ist
+stärker als alles, was sie hergeben. „Der Zensus war es“ ist für 2024 schlicht falsch.
+
+Dazu eine Nebengeschichte über Vertrauen. Tabellen verschwinden. Am 13. September waren 118 Destatis-Tabellen gelistet, aber
+leer. Vier Tage später waren es nur noch zwei. Am 19. September waren 62 *andere* dunkel. 116 der ersten 118 waren
+Neuladungen, keine Rücknahmen, und ein einzelner Blick kann den Unterschied nicht erkennen. Ein datierter Verlauf kann es.
+
+## Kann man mit monatealten Daten vor einer Krise warnen?
+
+Die Unternehmensinsolvenzen in Schleswig-Holstein steigen um **28,6 %**, dann **31,8 %**, dann **36,6 %** in den
+Dreimonatsfenstern, die im Januar, Februar und Juni 2026 enden: 291 Fälle gegenüber 213 im Vorjahr. Der Anstieg ist echt. Die
+bundesweite Zahl stimmt auf die Stelle mit der Tabelle überein: 2.266 Insolvenzen im Juni, plus 15,8 %.
+
+Dann kommt die Erklärung, und sie fällt an zwei Stellen auseinander.
+
+*Ist die Bauwirtschaft schuld?* Im Februar ja: Das Baugewerbe machte 45 % des Anstiegs aus. Im Juni liegt kein Wirtschaftszweig
+über 40 %, und der breiteste, Handel und Kfz-Reparatur, hat 24 %. Die Geschichte hat sich in vier Monaten geändert.
+
+*Folgt die Arbeitslosigkeit den Insolvenzen?* Wir haben das an der letzten Wende des Zyklus geprüft. Im Januar 2024 stieg die
+Arbeitslosigkeit in Hamburg, Bremen, Rheinland-Pfalz, Berlin und Sachsen **gleichzeitig**. Die Insolvenzwellen in diesen Ländern
+kamen zwei bis drei Monate *später*. Der Arbeitsmarkt bewegte sich zuerst.
+
+Und jedes dieser Signale ist alt, auf zwei Arten. Die Juni-Zahlen wurden am 11. September veröffentlicht, zehn Wochen nach
+Monatsende. Und Destatis weist darauf hin, dass ein Fall erst mit der ersten Entscheidung des Gerichts in die Statistik
+eingeht, die in vielen Fällen etwa drei Monate nach dem Antrag fällt. Eine „Juni“-Insolvenz ist typischerweise ein Antrag
+aus dem März, gelesen im September. Eine Warnung, die darauf baut, sagt etwas über das Frühjahr.
+
+## Wie haben wir das alles gefunden?
+
+Vier Ideen leisten die Arbeit, und keine davon ist ein Dashboard.
+
+**Prüfungen, die urteilen, keine Tags.** Sieben Prüfungen lesen die Datensätze und berechnen jeden Befund selbst: den Zensus-Effekt
+für jeden Kreis, den Strich, der nicht null ist, den Anstieg in dem Monat, in dem eine Serie beginnt. Ändert man eine Zahl in den
+Daten, ändert sich der Befund mit. Nichts ist von Hand eingetragen.
+
+**Ein Glossar, das jedem Befund eine Bedeutung gibt.** „Zensus-Effekt“, „am Sitz gezählt“ und „vom Zensus gemachter Druck“
+sind einmal definiert, in einfacher Sprache, und jede Art von Befund ist an den Begriff gebunden, den sie meint. Die Bindungen
+gehen über Etiketten hinaus: Die Entwicklungsklasse eines Kreises wird aus dem *Wert* eines Befunds gelesen, eine Erwähnung von
+Sachsen bedeutet *Ostdeutschland*, und der Strich in einer Tabellenzelle wird durch eine Definition gelesen, die erklärt, warum
+er nicht immer null ist.
+
+**Benannte Dinge, keine Zeichenketten.** 416 Länder und Kreise, 23 Tabellen und eine Handvoll Herausgeber sind Entitäten. Kölns
+Seite sammelt sein Profil, seinen Kriminalitätsdatensatz und die Notizen, die es erwähnen, aus vier verschiedenen Quellen und zeigt,
+aus welchen Tabellen seine Zahlen stammen.
+
+**Fragen, die der Bedeutung folgen.** *Welche Zahlen werden am falschen Ort gezählt?* ist durch einen Begriff definiert und liefert
+19 Befunde aus vier verschiedenen Prüfungen. Niemand hat dafür eine Suche geschrieben.
+
+Obendrauf wurde jede Geschichte zu einem Fall mit konkurrierenden Erklärungen, Belegen dafür und dagegen und einem Urteil, das
+sich ändern kann. Sechs Fälle, 32 Hypothesen. Einige bestätigt, viele widerlegt, mehrere offen, weil die Daten nicht mehr hergeben.
+
+## Drei Fragen, die alle sechs entlarvt hätten
+
+*Seit wann?* Steckt im Zeitraum ein Sprung, eine neue Definition oder eine Veröffentlichungsverzögerung? Das ist Köln, und es
+ist die Insolvenz, die im März beantragt wurde.
+
+*Wo gezählt?* Am Wohnort oder bei der Behörde? Das ist das Saarland, Trier und die Kriminalitätsrate einer Grenzstadt.
+
+*Wer steckt in der Summe?* Das ist der Osten, wo die Summe und die Deutschen in entgegengesetzte Richtungen zeigen, und Bayern,
+wo die Summe eine Spalte enthält, die die Tabellen nicht zeigen.
+
+## Was wir nicht sagen können
+
+Der Zensus-Effekt ist eine Schätzung, keine Messung, und in der einen Stadt, in der wir sie prüfen können, liegt sie zu hoch.
+Den Sprung herauszurechnen heißt, beide Jahre auf der alten Basis zu vergleichen. Die Register sind über ein Jahrzehnt
+abgedriftet, ein Teil der Überzählung steckte also vermutlich schon in den Zahlen von 2015, und keine Tabelle sagt, wie viel:
+Die Richtung ist belastbar, die letzte Stelle nicht. Die erfasste Kriminalität zählt, was die Polizei registriert, und hängt von
+Anzeigeverhalten und Polizeiarbeit ab. Ein bereinigtes Ranking ist besser, nicht neutral. Ein Zusammenhang zwischen Kriminalität
+und Ausländeranteil wird beschrieben und nie zu einer Ursache gemacht. Und eine Frage, die die Daten nicht entscheiden können,
+wie die Universitätsstädte, bleibt offen, statt geraten zu werden.
+
+## Selbst ansehen
+
+Der Workspace ist live, mit jeder oben beschriebenen Quelle, Prüfung, jedem Begriff, jeder stehenden Frage und jedem Fall:
+
+**[showcase.classifyre.com/atlas-regional-research](https://showcase.classifyre.com/atlas-regional-research)**
+
+Eine Drei-Minuten-Tour:
+
+1. Öffnen Sie den Fall **Are Germany's big cities really shrinking?** und klicken Sie die erste Hypothese an. Sehen Sie zu, wie Köln, Trier und Halle aufleuchten.
+2. Öffnen Sie die Entität **Köln** und schauen Sie, wo sie erwähnt wird.
+3. Öffnen Sie den Fall **Whose people and cars are counted in the wrong place?** und suchen Sie Saarlouis auf dem Board. Es ist der Kreis,
+   der ein ganzes Land trägt.
+
+## Quellen
+
+Die amtlichen Zahlen und wo sie sich nachprüfen lassen:
+
+- Zensus 2022, 82,7 Millionen und etwa 1,4 Millionen weniger: [Pressemitteilung von Destatis](https://www.destatis.de/DE/Presse/Pressemitteilungen/Zensus2022-Pressemitteilungen/PM_zensus2022_44.html) und [die Neuberechnung der Bevölkerungszahlen](https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Bevoelkerungsstand/aktuell-neuberechnung.html).
+- Köln, 1.017.355 und rund 63.800 weniger: [Fragen und Antworten der Stadt zum Zensus](https://www.stadt-koeln.de/politik-und-verwaltung/statistik/fragen-antworten-zum-zensus-2022), [die Klage gegen das Ergebnis](https://www.stadt-koeln.de/politik-und-verwaltung/presseservice/klage-gegen-zensus) und [die Zahl aus dem eigenen Melderegister für 2025](https://www.stadt-koeln.de/mediaasset/content/pdf15/statistik-einwohner-und-haushalte/ksn_3_2026_bev%C3%B6lkerung_in_k%C3%B6ln_2025.pdf).
+- Warum das Ausländerzentralregister nicht neu gesetzt wurde: [Destatis, Unterschiede zwischen den beiden Quellen](https://www.destatis.de/EN/Themes/Society-Environment/Population/Migration-Integration/Methods/differences-between-the-data-on-the-foreign-population.html) (englisch).
+- Ost und West, −8.600 im Jahr 2025: [Destatis, Wanderungsbewegungen in Ost- und Westdeutschland](https://www.destatis.de/DE/Themen/Querschnitt/Demografischer-Wandel/Aspekte/demografie-wanderungen.html); die Aufteilung nach Staatsangehörigkeit steht in der [GENESIS-Tabelle 12711-0022](https://genesis.destatis.de/datenbank/online/statistic/12711/table/12711-0022).
+- Kriminalität: die Kreistabelle der Polizeilichen Kriminalstatistik 2025 des BKA und der [Bericht der Polizei Brandenburg für 2025](https://polizei.brandenburg.de/pressemeldung/erneut-weniger-straftaten-in-brandenburg/5700657), dessen 15.384 ausländerrechtliche Verstöße zu den 15.368 in unseren Kreiszeilen passen.
+- Die eine Ausländerbehörde des Saarlands und die gemeinsame in Kassel: [Destatis, Ausländische Bevölkerung nach Zensus und Ausländerzentralregister](https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Migration-Integration/Tabellen/auslaendische-bevoelkerung-kreise-pdf.pdf?__blob=publicationFile), Fußnoten 1 und 2; die Landessumme von 164.395 steht in [Ausländische Bevölkerung nach Bundesländern](https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Migration-Integration/Tabellen/auslaendische-bevoelkerung-bundeslaender.html).
+- Triers gemeinsame Zulassungsstelle mit Trier-Saarburg: [Stadt Trier](https://www.trier.de/service/dienstleistungen-a-z/15763.Aemter-und-Dienststellen.html?detID=1105).
+- Insolvenzen, 2.266 im Juni 2026 und der Drei-Monats-Hinweis: [Destatis](https://www.destatis.de/DE/Themen/Branchen-Unternehmen/Unternehmen/Gewerbemeldungen-Insolvenzen/_inhalt.html) und [Pressemitteilung 325](https://www.destatis.de/DE/Presse/Pressemitteilungen/2026/09/PD26_325_52411.html).
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/de/blog/cases/why-germanys-official-numbers-tell-the-wrong-story"
+  locale="de"
+  heading="Weitere Fallakten"
+/>

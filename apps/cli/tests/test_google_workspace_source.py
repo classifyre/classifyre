@@ -13,6 +13,7 @@ from src.sources.google_workspace.source import (
     FileRef,
     GoogleWorkspaceSource,
 )
+from src.utils.sampling_cursor import encode_sampling_cursor
 
 
 def _base_recipe(auth_mode: str = "service_account", **overrides: object) -> dict:
@@ -140,11 +141,9 @@ class TestSampling:
         assert cursor_after_first["drive_items:drive-1"] == 10
 
         # Simulate a second run reading the persisted cursor.
-        import base64
-        import json
         import os
 
-        encoded = base64.b64encode(json.dumps(cursor_after_first).encode("utf-8")).decode("utf-8")
+        encoded = encode_sampling_cursor(cursor_after_first)
         os.environ["CLASSIFYRE_SAMPLING_CURSOR"] = encoded
         try:
             source2 = GoogleWorkspaceSource(recipe)
@@ -158,9 +157,7 @@ class TestSampling:
         assert cursor_after_second["drive_items:drive-1"] == 20
 
         # A third page underfills (only 4 items remain) and should wrap to 0.
-        os.environ["CLASSIFYRE_SAMPLING_CURSOR"] = base64.b64encode(
-            json.dumps(cursor_after_second).encode("utf-8")
-        ).decode("utf-8")
+        os.environ["CLASSIFYRE_SAMPLING_CURSOR"] = encode_sampling_cursor(cursor_after_second)
         try:
             source3 = GoogleWorkspaceSource(recipe)
             third = source3._apply_sampling(items, "drive-1")

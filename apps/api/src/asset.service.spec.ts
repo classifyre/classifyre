@@ -2155,6 +2155,64 @@ describe('AssetService', () => {
         expect(resolveCall).toBeUndefined();
       });
 
+      // A cohort connector (a change feed, a resumable sweep) declares partial
+      // coverage on every run. Its assets are still read whole, so a finding a
+      // completed detector no longer reports on a visited asset is gone — the
+      // company filed its overdue accounts. Before this, such a source could
+      // never lose a finding, and a case built on one never let a company go.
+      it('resolves stale findings on scanned assets of a partial-coverage run, and retires no asset', async () => {
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue(
+          cleanPiiOutcome,
+        );
+        const { findingUpdate, mockImpl } = buildFinalizeTx({
+          // The only finding.findMany of this path is the stale-findings read.
+          deletedAssetFindings: [staleFinding],
+        });
+        mockPrismaService.$transaction.mockImplementation(mockImpl);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['scanned-hash'],
+          false,
+          true,
+        );
+
+        expect(result).toMatchObject({ deleted: 0, resolvedForAbsence: 1 });
+        expect(mockPrismaService.asset.findMany).not.toHaveBeenCalled();
+        expect(findingUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: staleFinding.id },
+            data: expect.objectContaining({
+              status: FindingStatus.RESOLVED,
+              resolutionReason: 'Detection no longer present in scan',
+            }),
+          }),
+        );
+      });
+
+      it('keeps a finding of a partial-coverage run whose detector did not complete on the asset', async () => {
+        // Skipped by the scan cache, crashed, or not applicable: no OK outcome.
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue([
+          { assetHash: 'scanned-hash', detectorOutcomes: [] },
+        ]);
+        const { findingUpdate, mockImpl } = buildFinalizeTx({
+          deletedAssetFindings: [staleFinding],
+        });
+        mockPrismaService.$transaction.mockImplementation(mockImpl);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['scanned-hash'],
+          false,
+          true,
+        );
+
+        expect(result.resolvedForAbsence).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
       it('should NOT resolve any findings when isFullScan=false (RANDOM/LATEST)', async () => {
         const result = await service.finalizeIngestRun(
           sourceId,

@@ -156,6 +156,7 @@ const REMOVAL_LABELS: Record<string, string> = {
   FILTER: "Detached by a filter",
   ASSET_GONE: "Taken out: asset gone from its source",
   FILTER_EMPTIED: "Taken out: no findings left after a filter",
+  EMPTIED: "Taken out: no findings left",
 };
 
 /** Filter and escalation rules share their entries; the action names them. */
