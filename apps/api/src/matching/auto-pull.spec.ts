@@ -114,6 +114,49 @@ describe('auto-pull into linked cases', () => {
     );
   });
 
+  // A finding the scans stopped seeing was resolved, and a case that removes
+  // what is gone let it go. When a later scan detects it again the row is
+  // re-opened, not created: it is not NEW, and before this it was never pulled
+  // back — a company whose warning returned stayed out of the case watching
+  // for it.
+  it('pulls a finding the run re-opened back in, without counting it as new', async () => {
+    linkedCase();
+    const BEFORE = new Date('2026-09-01T09:00:00Z');
+    const old = { ...newFindings(1)[0], id: 'back', createdAt: BEFORE };
+    mockPrisma.finding.findMany.mockImplementation(({ where }) =>
+      Promise.resolve(
+        where?.history
+          ? [old] // re-opened by this run
+          : where?.createdAt
+            ? [] // created by this run: nothing
+            : where?.status === 'RESOLVED'
+              ? [] // retired by this run: nothing
+              : [old], // the open candidates, and the pull's own asset read
+      ),
+    );
+
+    await service.processSourceCompletion('s1', 'run-latest');
+
+    const reopened = mockPrisma.finding.findMany.mock.calls
+      .map(([args]) => args.where)
+      .find((where) => where?.history);
+    expect(reopened).toMatchObject({
+      sourceId: 's1',
+      runnerId: 'run-latest',
+      status: 'OPEN',
+      history: { array_contains: [{ e: 'RO', r: 'run-latest' }] },
+    });
+    expect(mockPull.pullFromInquiry).toHaveBeenCalledWith(
+      'c1',
+      { inquiryId: 'q1', findingIds: ['back'] },
+      AUTO_PULL_ACTOR,
+      { sourceId: 's1', runnerId: 'run-latest' },
+    );
+    // Old row: the question's "new" counter does not move.
+    const counters = mockPrisma.inquiry.update.mock.calls[0]?.[0]?.data;
+    expect(counters?.newMatchCount ?? 0).toBe(0);
+  });
+
   it('only considers open cases that opted in, or that escalate', async () => {
     linkedCase();
     mockPrisma.finding.findMany.mockResolvedValue(newFindings(1));

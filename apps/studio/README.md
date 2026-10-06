@@ -26,7 +26,7 @@ The first render downloads Chrome Headless Shell (~95 MB) into `node_modules`.
 
 | Path         | Committed | What it is                                                     |
 | ------------ | --------- | -------------------------------------------------------------- |
-| `src/kit/`   | yes       | `Stage`, `Viewport`, motion helpers, `Logo`, `Mascot`          |
+| `src/kit/`   | yes       | `Stage`, `Viewport`, motion helpers, `Logo`, `Mascot`, `MrFyre` |
 | `src/smoke/` | yes       | `ReuseCheck`                                                   |
 | `videos/`    | no        | One folder per video: its scenario, its code, its local assets |
 | `out/`       | no        | Renders                                                        |
@@ -78,6 +78,31 @@ export default defineVideo({
   render.
 - **No wall-clock or random data.** `Date.now()` and `Math.random()` make two
   renders of the same video differ. Use fixed dates and Remotion's `random()`.
+
+## Mr. Fyre
+
+`MrFyre` is the mascot as a presenter: a 3D model that renders like a drawing
+(`blender/README.md`), shot as sprites the kit reads by itself.
+
+```tsx
+<MrFyre pose="point" emotion="stern" height={600} flip />
+```
+
+`pose` and `emotion` are whatever `blender/mrfyre/poses.py` defines. Poses that
+point, point to screen right; `flip` mirrors him. `MrFyreActor` takes a cue
+sheet instead — which pose and emotion from which frame, and where he stands:
+
+```tsx
+<MrFyreActor
+  cues={[
+    { at: 0, pose: "wave", emotion: "happy", x: 1420, y: 965, height: 760 },
+    { at: 90, pose: "point", emotion: "suspicious", x: 300, y: 1010, height: 600 },
+  ]}
+/>
+```
+
+He holds each pose and cuts to the next, and glides to wherever a cue moves
+him. Nothing else about him moves.
 
 ## Fonts
 

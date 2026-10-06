@@ -20,6 +20,7 @@ from src.sources.asset_metadata import is_open_kind, validate_metadata
 from src.sources.custom.env import ALLOWED_ENV_KEYS, scrubbed_environment
 from src.sources.custom.source import CustomSource, CustomSourceError
 from src.utils.hashing import hash_id
+from src.utils.sampling_cursor import encode_sampling_cursor
 
 SIMPLE_NOTEBOOK = """from classifyre import Asset, ctx
 
@@ -344,12 +345,10 @@ def test_automatic_strategy_pages_across_runs(monkeypatch: pytest.MonkeyPatch) -
 
     # The API carries the cursor to the next run through the environment,
     # because the recipe itself forbids extra keys.
-    import base64
-    import json
 
     monkeypatch.setenv(
         CustomSource.SAMPLING_CURSOR_ENV,
-        base64.b64encode(json.dumps(cursor).encode()).decode(),
+        encode_sampling_cursor(cursor),
     )
     second = get_source(dict(recipe), source_id="s", runner_id="r")
     try:
@@ -378,13 +377,11 @@ def test_an_automatic_window_keeps_the_notebooks_stored_cursor(
 ) -> None:
     # GENESIS field report P15: a window stopped the notebook before it reached
     # ctx.set_cursor(), and the positional offset replaced its whole state.
-    import base64
-    import json
 
     stored = {"no_data": {"51000-0013": "2026-09-13"}, "seed_applied": True}
     monkeypatch.setenv(
         CustomSource.SAMPLING_CURSOR_ENV,
-        base64.b64encode(json.dumps(stored).encode()).decode(),
+        encode_sampling_cursor(stored),
     )
     recipe = build_recipe(counting_notebook(25))
     recipe["sampling"] = {"strategy": "AUTOMATIC", "rows_per_page": 10}
@@ -1020,8 +1017,6 @@ def test_random_is_bounded_and_actually_random_without_cooperation(source) -> No
 
 
 def test_automatic_pages_without_cooperation(monkeypatch) -> None:
-    import base64
-    import json
 
     recipe = build_recipe(IGNORES_CTX)
     recipe["sampling"] = {"strategy": "AUTOMATIC", "rows_per_page": 10}
@@ -1032,7 +1027,7 @@ def test_automatic_pages_without_cooperation(monkeypatch) -> None:
         if cursor is not None:
             monkeypatch.setenv(
                 CustomSource.SAMPLING_CURSOR_ENV,
-                base64.b64encode(json.dumps(cursor).encode()).decode(),
+                encode_sampling_cursor(cursor),
             )
         instance = get_source(dict(recipe), source_id="s", runner_id="r")
         try:
@@ -1050,8 +1045,6 @@ def test_a_notebook_can_take_over_paging_from_the_runtime(monkeypatch) -> None:
     # Without this, run N makes extract() produce N*page items to deliver page
     # of them -- fine for a list in memory, quadratic when each item is a
     # request. Reading ctx.offset hands the skipping to the notebook.
-    import base64
-    import json
 
     notebook = """from classifyre import Asset, ctx
 
@@ -1070,7 +1063,7 @@ def extract():
 
     monkeypatch.setenv(
         CustomSource.SAMPLING_CURSOR_ENV,
-        base64.b64encode(json.dumps({"assets": 20}).encode()).decode(),
+        encode_sampling_cursor({"assets": 20}),
     )
     instance = get_source(dict(recipe), source_id="s", runner_id="r")
     try:

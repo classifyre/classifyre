@@ -11,6 +11,7 @@ from src.models.generated_single_asset_scan_results import AssetType as OutputAs
 from src.sources.asset_metadata import resolve_fields
 from src.sources.dropbox.source import DropboxObjectRef, DropboxScanTarget, DropboxSource
 from src.sources.object_storage.base import ContentSnapshot
+from src.utils.sampling_cursor import encode_sampling_cursor
 
 
 def _recipe(
@@ -146,12 +147,9 @@ def test_dropbox_sampling_automatic_advances_window_across_runs(monkeypatch):
     assert [item.key for item in first] == [f"/f{index:02d}.txt" for index in range(10)]
     assert cursor == {"objects": 10}
 
-    import base64
-    import json
-
     monkeypatch.setenv(
         DropboxSource.SAMPLING_CURSOR_ENV,
-        base64.b64encode(json.dumps(cursor).encode()).decode(),
+        encode_sampling_cursor(cursor),
     )
     resumed = DropboxSource(_recipe(strategy="AUTOMATIC", rows_per_page=10))
     second = resumed._apply_sampling(refs)

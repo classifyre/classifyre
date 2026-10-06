@@ -21,6 +21,7 @@ SKIP_DB=false
 JOB_RETENTION_HOURS="${JOB_RETENTION_HOURS:-24}"   # finished k8s Jobs older than this are deleted
 PGBOSS_RETENTION_DAYS="${PGBOSS_RETENTION_DAYS:-7}" # matches pg-boss deletion_seconds default
 HELPER_POD="disk-cleanup-helper"
+HELPER_NS="kube-system"
 
 for arg in "$@"; do
   case "$arg" in
@@ -42,17 +43,20 @@ NODE="$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')"
 # helper pod: gives us host-level shell access without SSH
 # ---------------------------------------------------------------------------
 helper_up() {
-  if kubectl get pod "$HELPER_POD" -n default >/dev/null 2>&1; then
-    kubectl delete pod "$HELPER_POD" -n default --wait=true >/dev/null 2>&1 || true
+  if kubectl get pod "$HELPER_POD" -n "$HELPER_NS" >/dev/null 2>&1; then
+    kubectl delete pod "$HELPER_POD" -n "$HELPER_NS" --wait=true >/dev/null 2>&1 || true
   fi
   kubectl apply -f - >/dev/null <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
   name: $HELPER_POD
-  namespace: default
+  namespace: $HELPER_NS
 spec:
   restartPolicy: Never
+  # Under DiskPressure the kubelet evicts every ordinary pod, this one included,
+  # before it ever becomes Ready. Critical pods are exempt from eviction.
+  priorityClassName: system-node-critical
   hostPID: true
   nodeName: $NODE
   tolerations: [{operator: "Exists"}]
@@ -66,16 +70,16 @@ spec:
     - name: host
       hostPath: { path: / }
 EOF
-  kubectl wait --for=condition=Ready "pod/$HELPER_POD" -n default --timeout=120s >/dev/null
+  kubectl wait --for=condition=Ready "pod/$HELPER_POD" -n "$HELPER_NS" --timeout=120s >/dev/null
 }
 
 helper_down() {
-  kubectl delete pod "$HELPER_POD" -n default --wait=false >/dev/null 2>&1 || true
+  kubectl delete pod "$HELPER_POD" -n "$HELPER_NS" --wait=false >/dev/null 2>&1 || true
 }
 trap helper_down EXIT
 
 # Run a command in the node's root namespaces.
-on_host() { kubectl exec "$HELPER_POD" -n default -- nsenter -t 1 -m -u -i -n -p -- sh -c "$1"; }
+on_host() { kubectl exec "$HELPER_POD" -n "$HELPER_NS" -- nsenter -t 1 -m -u -i -n -p -- sh -c "$1"; }
 
 disk_free_bytes() { on_host "df --output=avail -B1 / | tail -1" | tr -d ' \r'; }
 

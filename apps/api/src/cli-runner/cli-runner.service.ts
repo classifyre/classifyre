@@ -68,6 +68,7 @@ import {
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { RunnerLogStorageService } from './runner-log-storage.service';
 import { buildNotebookEnvironment } from './notebook-env';
+import { encodeSamplingCursor } from './sampling-cursor';
 import { parseNotebookResult } from './notebook-result';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import {
@@ -2115,9 +2116,9 @@ export class CliRunnerService {
   ): string {
     const escapedCliPath = this.shellEscape(cliPath);
     const escapedVenvPython = this.shellEscape(this.getVenvPython(venvPath));
-    // Inject the AUTOMATIC sampling cursor (base64-encoded JSON) so extraction
-    // resumes where the previous run stopped. Absent on the first run / for
-    // non-AUTOMATIC sampling.
+    // Inject the saved cursor (gzip + base64 JSON) so extraction resumes where
+    // the previous run stopped. Absent on the first run and for a source that
+    // keeps no cursor.
     const samplingCursorEnv = samplingCursorB64
       ? `CLASSIFYRE_SAMPLING_CURSOR=${this.shellEscape(samplingCursorB64)} `
       : '';
@@ -2139,19 +2140,12 @@ export class CliRunnerService {
   }
 
   /**
-   * Base64-encode a source's persisted AUTOMATIC sampling cursor for transport
-   * to the CLI via the CLASSIFYRE_SAMPLING_CURSOR env var. Returns undefined
-   * when there is no cursor to pass (first run / non-AUTOMATIC sampling).
+   * A source's persisted cursor, encoded for the CLASSIFYRE_SAMPLING_CURSOR
+   * env var (gzip + base64). Returns undefined when there is no cursor to
+   * pass; throws when it is too large to hand to a scan.
    */
   private encodeSamplingCursor(source: any): string | undefined {
-    const cursor = source?.samplingCursor;
-    if (!cursor || typeof cursor !== 'object') {
-      return undefined;
-    }
-    if (Object.keys(cursor).length === 0) {
-      return undefined;
-    }
-    return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64');
+    return encodeSamplingCursor(source?.samplingCursor);
   }
 
   private buildCliTestCommand(

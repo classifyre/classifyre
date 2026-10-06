@@ -28,6 +28,8 @@ import {
   RunAnchors,
 } from './match-state';
 import { INQUIRY_MATCH_QUEUE } from './matching.constants';
+import { storedEventProbe } from '../types/finding-history';
+import { HistoryEventType } from '../types/finding-history.types';
 import { AI_ACTOR, OPERATOR_CREATED } from '../autopilot/autopilot.constants';
 import {
   AUTO_PULL_ACTOR,
@@ -405,6 +407,8 @@ export class InquiryMatchingService {
     // than the NEW count, which is corpus-wide: a person should be told about
     // answers THIS scan produced, not re-told about every answer still fresh.
     const created = await this.findingsCreatedByRun(sourceId, runnerId);
+    // Findings this run brought back: resolved once, detected again now.
+    const returned = await this.findingsReopenedByRun(sourceId, runnerId);
 
     let landed = 0;
     for (const q of inquiries) {
@@ -450,7 +454,21 @@ export class InquiryMatchingService {
           newIds,
           goneCount,
         });
-        await this.autoPullToCases(q, newIds, { sourceId, runnerId });
+        // An answer that came back is pulled like a new one. It is not NEW —
+        // its row is old, and counting it would re-announce every re-detected
+        // finding — but a case that let it go when the scans stopped seeing it
+        // has no other way to get it back: a company whose warning returns
+        // would stay out of the case that exists to watch for it.
+        let arriving = newIds;
+        if (returned.length > 0) {
+          await ensureTermSnapshotFor(this.prisma, [q]);
+          const matcher = new CompiledMatcher(q);
+          const back = returned.filter((f) => matcher.matches(f));
+          if (back.length > 0) {
+            arriving = [...new Set([...newIds, ...back.map((f) => f.id)])];
+          }
+        }
+        await this.autoPullToCases(q, arriving, { sourceId, runnerId });
         await this.refreshLinkedLeads(q.id, newIds);
       }
       landed += newCount;
@@ -648,6 +666,31 @@ export class InquiryMatchingService {
   }
 
   /** OPEN findings first created by this run (re-detections keep their createdAt). */
+  /**
+   * OPEN findings this run re-opened: resolved earlier (retired by a scan, or
+   * by hand), and detected again now. Read from the run's own findings only,
+   * so the history probe never walks the corpus.
+   */
+  private async findingsReopenedByRun(
+    sourceId: string,
+    runnerId: string | null,
+  ) {
+    if (!runnerId) return [];
+    return this.prisma.finding.findMany({
+      where: {
+        sourceId,
+        runnerId,
+        status: 'OPEN',
+        history: {
+          array_contains: [
+            storedEventProbe(HistoryEventType.RE_OPENED, runnerId),
+          ],
+        },
+      },
+      select: FINDING_SELECT,
+    });
+  }
+
   private async findingsCreatedByRun(
     sourceId: string,
     runnerId: string | null,
