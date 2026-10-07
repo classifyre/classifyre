@@ -291,6 +291,7 @@ function sourceTables() {
         {
           id: SOURCE_ID,
           name: 'Wiki',
+          lastRunStatus: 'COMPLETED',
           scheduleEnabled: true,
           currentRunnerId: RUNNER_ID,
           config: {
@@ -558,7 +559,9 @@ describe('export → import round trip', () => {
     // schedule the moment it lands.
     expect(source['scheduleEnabled']).toBe(false);
     expect(source['currentRunnerId']).toBeNull();
-    expect(source['runnerStatus']).toBe('PENDING');
+    // …and it must not read as a scan in flight: a source that finished keeps
+    // its outcome, or it would hold an auto-schedule slot forever.
+    expect(source['runnerStatus']).toBe('COMPLETED');
   });
 
   it('never carries a source schedule across instances', async () => {

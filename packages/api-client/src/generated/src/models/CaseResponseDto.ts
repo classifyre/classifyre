@@ -20,6 +20,13 @@ import {
     CaseEvidenceDtoToJSON,
     CaseEvidenceDtoToJSONTyped,
 } from './CaseEvidenceDto';
+import type { CaseHypothesisRuleDto } from './CaseHypothesisRuleDto';
+import {
+    CaseHypothesisRuleDtoFromJSON,
+    CaseHypothesisRuleDtoFromJSONTyped,
+    CaseHypothesisRuleDtoToJSON,
+    CaseHypothesisRuleDtoToJSONTyped,
+} from './CaseHypothesisRuleDto';
 import type { CaseLinkedInquiryDto } from './CaseLinkedInquiryDto';
 import {
     CaseLinkedInquiryDtoFromJSON,
@@ -206,6 +213,12 @@ export interface CaseResponseDto {
      */
     findingFilters?: Array<CaseFindingFilterDto>;
     /**
+     * Hypothesis rules: which hypothesis, with which stance, the answers of each watch are linked to
+     * @type {Array<CaseHypothesisRuleDto>}
+     * @memberof CaseResponseDto
+     */
+    hypothesisRules?: Array<CaseHypothesisRuleDto>;
+    /**
      * On an update that switched a clean-up rule on: what it took out right away
      * @type {CaseCleanupResultDto}
      * @memberof CaseResponseDto
@@ -304,6 +317,7 @@ export function CaseResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'evidence': json['evidence'] == null ? undefined : ((json['evidence'] as Array<any>).map(CaseEvidenceDtoFromJSON)),
         'inquiries': json['inquiries'] == null ? undefined : ((json['inquiries'] as Array<any>).map(CaseLinkedInquiryDtoFromJSON)),
         'findingFilters': json['findingFilters'] == null ? undefined : ((json['findingFilters'] as Array<any>).map(CaseFindingFilterDtoFromJSON)),
+        'hypothesisRules': json['hypothesisRules'] == null ? undefined : ((json['hypothesisRules'] as Array<any>).map(CaseHypothesisRuleDtoFromJSON)),
         'cleanup': json['cleanup'] == null ? undefined : CaseCleanupResultDtoFromJSON(json['cleanup']),
     };
 }
@@ -344,6 +358,7 @@ export function CaseResponseDtoToJSONTyped(value?: CaseResponseDto | null, ignor
         'evidence': value['evidence'] == null ? undefined : ((value['evidence'] as Array<any>).map(CaseEvidenceDtoToJSON)),
         'inquiries': value['inquiries'] == null ? undefined : ((value['inquiries'] as Array<any>).map(CaseLinkedInquiryDtoToJSON)),
         'findingFilters': value['findingFilters'] == null ? undefined : ((value['findingFilters'] as Array<any>).map(CaseFindingFilterDtoToJSON)),
+        'hypothesisRules': value['hypothesisRules'] == null ? undefined : ((value['hypothesisRules'] as Array<any>).map(CaseHypothesisRuleDtoToJSON)),
         'cleanup': CaseCleanupResultDtoToJSON(value['cleanup']),
     };
 }

@@ -7,6 +7,7 @@ export default {
   escalation: "Escalation",
   links: "Lines & links",
   hypothesis: "Hypotheses & threads",
+  "hypothesis-rules": "Hypothesis rules",
   connections: "Connections & neighbours",
   organise: "Notes, frames & comments",
   navigate: "Navigating & shortcuts",

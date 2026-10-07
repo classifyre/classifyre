@@ -115,7 +115,12 @@ export const CaseActivityDtoActivityTypeEnum = {
     BoardTermPlaced: 'BOARD_TERM_PLACED',
     BoardTermRemoved: 'BOARD_TERM_REMOVED',
     MeaningLinked: 'MEANING_LINKED',
-    MeaningUnlinked: 'MEANING_UNLINKED'
+    MeaningUnlinked: 'MEANING_UNLINKED',
+    HypothesisRuleAdded: 'HYPOTHESIS_RULE_ADDED',
+    HypothesisRuleUpdated: 'HYPOTHESIS_RULE_UPDATED',
+    HypothesisRuleRemoved: 'HYPOTHESIS_RULE_REMOVED',
+    FindingsAutoLinked: 'FINDINGS_AUTO_LINKED',
+    ThreadEvidenceRemoved: 'THREAD_EVIDENCE_REMOVED'
 } as const;
 export type CaseActivityDtoActivityTypeEnum = typeof CaseActivityDtoActivityTypeEnum[keyof typeof CaseActivityDtoActivityTypeEnum];
 
