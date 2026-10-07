@@ -22,6 +22,7 @@ import { CaseBoardService } from './case-board.service';
 import {
   buildBoardModel,
   FramePlanError,
+  planArrivals,
   planFrame,
   planPlacement,
   planTidy,
@@ -171,6 +172,77 @@ export class CaseBoardToolsService {
       actor,
     );
     return { placed, ...outcome };
+  }
+
+  /**
+   * Land evidence a hypothesis rule just linked: inside the frame its
+   * hypothesis sits in, or beside the hypothesis on the open canvas (see
+   * planArrivals). Only items with no position yet are touched, and a folded
+   * frame stays folded. Written as ordinary ops, so the board's version, its
+   * socket push and the closed-case guard behave as for a person's edit.
+   *
+   * Never throws for "nothing to do": a case that is closed has a read-only
+   * board and gets `placed: 0` — its evidence is linked all the same and the
+   * board lays it out when it is next opened.
+   */
+  async placeArrivals(
+    caseId: string,
+    evidenceIds: readonly string[],
+    actor?: string,
+  ): Promise<{ placed: number }> {
+    if (evidenceIds.length === 0) return { placed: 0 };
+    let res: CaseBoardResponseDto;
+    try {
+      res = await this.editableBoard(caseId);
+    } catch (error) {
+      if (error instanceof ConflictException) return { placed: 0 };
+      throw error;
+    }
+    const wanted = new Set(evidenceIds);
+    const itemIds = new Set(
+      res.items
+        .filter((i) => i.kind === 'EVIDENCE' && i.refId && wanted.has(i.refId))
+        .map((i) => i.id),
+    );
+    const plan = planArrivals(buildBoardModel(res), itemIds);
+    const ops: BoardOp[] = [];
+    let n = 0;
+    for (const { frameId, plan: framePlan } of plan.frames) {
+      if (framePlan.resize) {
+        ops.push({
+          type: 'item.update',
+          opId: `arrival-frame-${++n}`,
+          id: frameId,
+          patch: {
+            width: framePlan.resize.width,
+            height: framePlan.resize.height,
+          },
+        });
+      }
+      for (const m of framePlan.members) {
+        ops.push({
+          type: 'item.update',
+          opId: `arrival-${++n}`,
+          id: m.itemId,
+          patch: { parentId: frameId, x: m.to.x, y: m.to.y },
+        });
+      }
+    }
+    for (const [itemId, at] of plan.positions) {
+      ops.push({
+        type: 'item.update',
+        opId: `arrival-${++n}`,
+        id: itemId,
+        patch: { x: at.x, y: at.y },
+      });
+    }
+    if (ops.length === 0) return { placed: 0 };
+    await this.applyInBatches(caseId, res.board.version, ops, actor);
+    return {
+      placed:
+        plan.positions.size +
+        plan.frames.reduce((sum, f) => sum + f.plan.members.length, 0),
+    };
   }
 
   /**

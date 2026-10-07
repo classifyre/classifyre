@@ -2430,6 +2430,7 @@
         "Attach evidence and findings to a case",
         "Pull a saved question's current matches into a case, link and unlink watches, and turn their auto-add on or off",
         "Let a case clean itself up and keep kinds of finding out of it with filters — every change previewable first — and escalate the ones that need attention",
+        "Hand a watch's answers to a hypothesis: they are linked as supporting, contradicting or neutral as they arrive, and land beside it on the board",
         "Track hypotheses and discussion threads: supporting/contradicting links, verdicts and confidence on record",
         "Close and reopen cases, archiving or reactivating linked questions"
       ],
@@ -3084,6 +3085,162 @@
           ]
         },
         {
+          "name": "list_case_hypothesis_rules",
+          "title": "List Case Hypothesis Rules",
+          "description": "A case's hypothesis rules: what the case does, by itself, with the answers of one of its linked questions. Each rule names the question (inquiryId), the hypothesis (threadId) and a stance (SUPPORTS, CONTRADICTS or NEUTRAL), and optionally narrows to some answers (kind FINDING_TYPE with the finding type, or VALUE_PATTERN with a regular expression over the matched value; both absent = every answer). linkCount is how many links the rule made and still holds.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            }
+          ]
+        },
+        {
+          "name": "add_case_hypothesis_rule",
+          "title": "Add Case Hypothesis Rule",
+          "description": "Make a linked question hand its answers to a hypothesis. From then on every answer the question brings into the case (its auto-add, a pull-everything, or a person picking) is linked to the hypothesis with the stance — SUPPORTS, CONTRADICTS (a reject) or NEUTRAL — and its evidence lands on the board beside the hypothesis, inside the hypothesis's frame when it has one. A rule is the case's own: the question is untouched and other cases keep their own handling. One answer can go to several hypotheses with different stances. applyToExisting also links what the case already holds from the question; links a person made are never changed. Needs the question linked to the case and the hypothesis to be a HYPOTHESIS thread of it.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "inquiryId",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "threadId",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "stance",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "SUPPORTS",
+                "CONTRADICTS",
+                "NEUTRAL"
+              ]
+            },
+            {
+              "name": "kind",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "pattern",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "description",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "applyToExisting",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "update_case_hypothesis_rule",
+          "title": "Update Case Hypothesis Rule",
+          "description": "Change a hypothesis rule's hypothesis, stance, matcher or description. A new stance or hypothesis carries the links the rule already made along (updateLinks false leaves them as they are); a new matcher only applies to answers from then on.",
+          "readOnly": false,
+          "destructive": false,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "ruleId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "threadId",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "stance",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "SUPPORTS",
+                "CONTRADICTS",
+                "NEUTRAL"
+              ]
+            },
+            {
+              "name": "kind",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "pattern",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "description",
+              "type": "unknown",
+              "required": false
+            },
+            {
+              "name": "updateLinks",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "remove_case_hypothesis_rule",
+          "title": "Remove Case Hypothesis Rule",
+          "description": "Remove a hypothesis rule. The links it made stay (they become the hypothesis's own links) unless removeLinks is true, which takes those links away; evidence stays in the case and on the board either way.",
+          "readOnly": false,
+          "destructive": true,
+          "idempotent": false,
+          "parameters": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "ruleId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "removeLinks",
+              "type": "boolean",
+              "required": false
+            }
+          ]
+        },
+        {
           "name": "clear_case_escalations",
           "title": "Clear Case Escalations",
           "description": "Take the escalation mark off findings of a case once a person has dealt with them (all escalated findings when findingIds is omitted). The findings stay in the case; the timeline records the clearing.",
@@ -3209,7 +3366,12 @@
                 "BOARD_TERM_PLACED",
                 "BOARD_TERM_REMOVED",
                 "MEANING_LINKED",
-                "MEANING_UNLINKED"
+                "MEANING_UNLINKED",
+                "HYPOTHESIS_RULE_ADDED",
+                "HYPOTHESIS_RULE_UPDATED",
+                "HYPOTHESIS_RULE_REMOVED",
+                "FINDINGS_AUTO_LINKED",
+                "THREAD_EVIDENCE_REMOVED"
               ]
             },
             {

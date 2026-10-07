@@ -81,6 +81,7 @@ import { GraphService } from './graph.service';
 import { CaseBoardService } from './case-board/case-board.service';
 import { CaseBoardReadService } from './case-board/case-board-read.service';
 import { CaseFindingFiltersService } from './cases/case-finding-filters.service';
+import { CaseHypothesisRulesService } from './cases/case-hypothesis-rules.service';
 import { CaseEscalationService } from './cases/case-escalation.service';
 import { CaseCleanupService } from './cases/case-cleanup.service';
 import { CaseBoardToolsService } from './case-board/case-board-tools.service';
@@ -355,6 +356,7 @@ export class McpServerFactoryService {
     private readonly caseBoardService: CaseBoardService,
     private readonly caseBoardRead: CaseBoardReadService,
     private readonly caseFindingFilters: CaseFindingFiltersService,
+    private readonly caseHypothesisRules: CaseHypothesisRulesService,
     private readonly caseEscalation: CaseEscalationService,
     private readonly caseCleanup: CaseCleanupService,
     private readonly caseBoardTools: CaseBoardToolsService,
@@ -4150,6 +4152,116 @@ export class McpServerFactoryService {
         return jsonResult({
           filters: await this.caseFindingFilters.remove(id, filterId, 'mcp'),
         });
+      },
+    );
+
+    server.registerTool(
+      'list_case_hypothesis_rules',
+      {
+        title: 'List Case Hypothesis Rules',
+        description:
+          "A case's hypothesis rules: what the case does, by itself, with the " +
+          'answers of one of its linked questions. Each rule names the question ' +
+          '(inquiryId), the hypothesis (threadId) and a stance (SUPPORTS, ' +
+          'CONTRADICTS or NEUTRAL), and optionally narrows to some answers ' +
+          '(kind FINDING_TYPE with the finding type, or VALUE_PATTERN with a ' +
+          'regular expression over the matched value; both absent = every ' +
+          'answer). linkCount is how many links the rule made and still holds.',
+        inputSchema: { id: z.string().uuid() },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ id }) =>
+        jsonResult({ rules: await this.caseHypothesisRules.list(id) }),
+    );
+
+    server.registerTool(
+      'add_case_hypothesis_rule',
+      {
+        title: 'Add Case Hypothesis Rule',
+        description:
+          'Make a linked question hand its answers to a hypothesis. From then on ' +
+          'every answer the question brings into the case (its auto-add, a ' +
+          'pull-everything, or a person picking) is linked to the hypothesis ' +
+          'with the stance — SUPPORTS, CONTRADICTS (a reject) or NEUTRAL — and ' +
+          'its evidence lands on the board beside the hypothesis, inside the ' +
+          "hypothesis's frame when it has one. A rule is the case's own: the " +
+          'question is untouched and other cases keep their own handling. One ' +
+          'answer can go to several hypotheses with different stances. ' +
+          'applyToExisting also links what the case already holds from the ' +
+          'question; links a person made are never changed. Needs the question ' +
+          'linked to the case and the hypothesis to be a HYPOTHESIS thread of it.',
+        inputSchema: z.strictObject({
+          id: z.string().uuid(),
+          inquiryId: z.string(),
+          threadId: z.string(),
+          stance: z.enum(['SUPPORTS', 'CONTRADICTS', 'NEUTRAL']).optional(),
+          kind: z.enum(['FINDING_TYPE', 'VALUE_PATTERN']).nullable().optional(),
+          pattern: z.string().max(500).nullable().optional(),
+          description: z.string().max(500).nullable().optional(),
+          applyToExisting: z.boolean().optional(),
+        }),
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ id, ...rule }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(await this.caseHypothesisRules.add(id, rule, 'mcp'));
+      },
+    );
+
+    server.registerTool(
+      'update_case_hypothesis_rule',
+      {
+        title: 'Update Case Hypothesis Rule',
+        description:
+          "Change a hypothesis rule's hypothesis, stance, matcher or " +
+          'description. A new stance or hypothesis carries the links the rule ' +
+          'already made along (updateLinks false leaves them as they are); a ' +
+          'new matcher only applies to answers from then on.',
+        inputSchema: z.strictObject({
+          id: z.string().uuid(),
+          ruleId: z.string().uuid(),
+          threadId: z.string().optional(),
+          stance: z.enum(['SUPPORTS', 'CONTRADICTS', 'NEUTRAL']).optional(),
+          kind: z.enum(['FINDING_TYPE', 'VALUE_PATTERN']).nullable().optional(),
+          pattern: z.string().max(500).nullable().optional(),
+          description: z.string().max(500).nullable().optional(),
+          updateLinks: z.boolean().optional(),
+        }),
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ id, ruleId, ...patch }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseHypothesisRules.update(id, ruleId, patch, 'mcp'),
+        );
+      },
+    );
+
+    server.registerTool(
+      'remove_case_hypothesis_rule',
+      {
+        title: 'Remove Case Hypothesis Rule',
+        description:
+          'Remove a hypothesis rule. The links it made stay (they become the ' +
+          "hypothesis's own links) unless removeLinks is true, which takes " +
+          'those links away; evidence stays in the case and on the board either way.',
+        inputSchema: {
+          id: z.string().uuid(),
+          ruleId: z.string().uuid(),
+          removeLinks: z.boolean().optional(),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: true },
+      },
+      async ({ id, ruleId, removeLinks }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseHypothesisRules.remove(
+            id,
+            ruleId,
+            { removeLinks },
+            'mcp',
+          ),
+        );
       },
     );
 

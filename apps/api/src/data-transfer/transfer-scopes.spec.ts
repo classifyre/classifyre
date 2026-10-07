@@ -104,3 +104,31 @@ describe('transfer table order', () => {
     expect(new Set(orders).size).toBe(orders.length);
   });
 });
+
+describe('source import runnerStatus', () => {
+  const source = TRANSFER_TABLES.find((t) => t.model === 'source')!;
+  const runnerStatusFor = (lastRunStatus: unknown) =>
+    source.importDerived!({ lastRunStatus })['runnerStatus'];
+
+  // PENDING/RUNNING count as a scan in flight for the auto-scheduler's budget,
+  // the namespace overview and the idle policy, and nothing is in flight on an
+  // imported source.
+  it.each(['COMPLETED', 'WARNING', 'ERROR', 'STOPPED'])(
+    'keeps a finished %s outcome instead of landing as in flight',
+    (status) => {
+      expect(runnerStatusFor(status)).toBe(status);
+    },
+  );
+
+  it.each([null, undefined, 'PENDING', 'RUNNING'])(
+    'lands a source with last run %s as PENDING, the never-run default',
+    (status) => {
+      expect(runnerStatusFor(status)).toBe('PENDING');
+    },
+  );
+
+  it('does not hard-code runnerStatus, and still clears the runner link', () => {
+    expect(source.importDefaults).not.toHaveProperty('runnerStatus');
+    expect(source.importDefaults).toMatchObject({ currentRunnerId: null });
+  });
+});

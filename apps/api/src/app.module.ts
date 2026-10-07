@@ -63,6 +63,9 @@ import { CaseCleanupService } from './cases/case-cleanup.service';
 import { CaseEscalationService } from './cases/case-escalation.service';
 import { CaseFindingFiltersService } from './cases/case-finding-filters.service';
 import { CaseCleanupController } from './controllers/case-cleanup.controller';
+import { CaseHypothesisRulesController } from './controllers/case-hypothesis-rules.controller';
+import { CaseHypothesisRulesService } from './cases/case-hypothesis-rules.service';
+import { CASE_BOARD_ARRIVALS } from './cases/case-board-arrivals.port';
 import { GraphService } from './graph.service';
 import { BuiltinMcpToolsService } from './chat-gateway/builtin-mcp-tools.service';
 import { ChatAgentService } from './chat-gateway/chat-agent.service';
@@ -159,6 +162,7 @@ import {
     CasesController,
     CaseBoardController,
     CaseCleanupController,
+    CaseHypothesisRulesController,
     CaseworkController,
     InquiriesController,
     CaseTimelineController,
@@ -215,6 +219,8 @@ import {
     // Same trick for the matching worker's post-scan clean-up.
     { provide: CASE_CLEANUP, useExisting: CaseCleanupService },
     CaseEscalationService,
+    CaseHypothesisRulesService,
+    { provide: CASE_BOARD_ARRIVALS, useExisting: CaseBoardToolsService },
     CaseFindingFiltersService,
     CaseworkSummaryService,
     ConstellationService,

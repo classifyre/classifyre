@@ -553,11 +553,25 @@ function InquiriesDrawer({
   const watchId = useUi((s) => s.watchId);
   const openTimeline = useTimelineLink();
   const bubbles = useBoard((s) => s.bubbles);
+  const threads = useBoard((s) => s.threads);
   const inCase = React.useMemo(() => {
     const ids = new Set<string>();
     for (const b of bubbles.values()) for (const r of b.rows) ids.add(r.findingId);
     return ids;
   }, [bubbles]);
+  // The case's hypotheses with their board labels (H1, H2, …) and colours.
+  const hypotheses = React.useMemo(() => {
+    const meta = hypothesisMeta(threads);
+    return [...threads.values()]
+      .filter((th) => th.kind === "HYPOTHESIS")
+      .map((th) => ({
+        id: th.id,
+        title: th.title,
+        label: meta.get(th.id)?.label ?? "H",
+        color: meta.get(th.id)?.color ?? "#888",
+        status: th.status,
+      }));
+  }, [threads]);
   if (!caseData) return <Loader2 className="size-4 animate-spin" />;
   return (
     <CaseInquiriesTab
@@ -566,6 +580,8 @@ function InquiriesDrawer({
       isClosed={caseData.status === "CLOSED" || caseData.status === "ARCHIVED"}
       inCaseFindingIds={inCase}
       filters={caseData.findingFilters ?? []}
+      hypothesisRules={caseData.hypothesisRules ?? []}
+      hypotheses={hypotheses}
       clientId={store.getState().clientId}
       selectedId={watchId}
       onSelect={(inquiryId) => ui.getState().set({ watchId: inquiryId })}

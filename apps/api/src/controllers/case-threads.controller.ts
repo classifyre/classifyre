@@ -22,6 +22,11 @@ import {
   ThreadResponseDto,
   UpdateThreadDto,
 } from '../dto/case-thread.dto';
+import { ActorName } from '../actor-name.decorator';
+import {
+  ThreadRemovalPreviewDto,
+  ThreadRemovalResultDto,
+} from '../dto/case-hypothesis-rules.dto';
 import { CaseTimelineResponseDto } from '../dto/case-activity.dto';
 import { activityTypes } from '../activity-page';
 
@@ -120,11 +125,36 @@ export class CaseThreadsController {
     return this.threads.update(id, dto);
   }
 
+  @Get('threads/:id/removal-preview')
+  @ApiOperation({
+    summary:
+      'What deleting a hypothesis together with its evidence would take out of the case (writes nothing)',
+  })
+  @ApiResponse({ status: 200, type: ThreadRemovalPreviewDto })
+  async removalPreview(
+    @Param('id') id: string,
+  ): Promise<ThreadRemovalPreviewDto> {
+    return this.threads.previewRemoval(id);
+  }
+
   @Delete('threads/:id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a thread' })
-  async remove(@Param('id') id: string): Promise<void> {
-    await this.threads.remove(id);
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Delete a thread. With evidence=remove, the findings and assets linked to a hypothesis leave the case with it, except what another hypothesis is linked to and what carries a note. Default: they stay in the case and on the board.',
+  })
+  @ApiQuery({ name: 'evidence', required: false, enum: ['keep', 'remove'] })
+  @ApiResponse({ status: 200, type: ThreadRemovalResultDto })
+  async remove(
+    @Param('id') id: string,
+    @Query('evidence') evidence: string | undefined,
+    @ActorName() actor: string | undefined,
+  ): Promise<ThreadRemovalResultDto> {
+    return this.threads.remove(
+      id,
+      { evidence: evidence === 'remove' ? 'remove' : 'keep' },
+      actor,
+    );
   }
 
   @Post('threads/:id/entries')

@@ -16,6 +16,14 @@ type JsonInput = any;
 import { PrismaService } from './prisma.service';
 import { CaseActivityService } from './case-activity.service';
 import {
+  planThreadRemoval,
+  type ThreadRemovalPlan,
+} from './cases/case-thread-removal.rules';
+import {
+  ThreadRemovalPreviewDto,
+  ThreadRemovalResultDto,
+} from './dto/case-hypothesis-rules.dto';
+import {
   AddThreadEntryDto,
   CreateThreadDto,
   LinkThreadSupportDto,
@@ -207,13 +215,204 @@ export class CaseThreadsService {
     return this.getOne(id);
   }
 
-  async remove(id: string): Promise<void> {
+  /**
+   * Delete a thread. With `evidence: 'remove'` the findings and assets linked
+   * to a hypothesis leave the case with it — except what another hypothesis
+   * is linked to and what carries a note (see planThreadRemoval). The
+   * default keeps everything in the case: only the thread, its links and its
+   * rules go.
+   */
+  async remove(
+    id: string,
+    opts: { evidence?: 'keep' | 'remove' } = {},
+    actor?: string,
+  ): Promise<ThreadRemovalResultDto> {
     const existing = await this.prisma.caseThread.findUnique({
       where: { id },
       select: { id: true, caseId: true, title: true, kind: true },
     });
     if (!existing) throw new NotFoundException(`Thread ${id} not found`);
-    await this.prisma.caseThread.delete({ where: { id } });
+    if (opts.evidence !== 'remove' || existing.kind !== 'HYPOTHESIS') {
+      await this.prisma.caseThread.delete({ where: { id } });
+      return { deleted: true, findingsRemoved: 0, assetsRemoved: 0 };
+    }
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const { plan, evidence } = await this.removalPlan(
+          tx,
+          existing.id,
+          existing.caseId,
+        );
+        // Everything that stops existing in the case, so no link is left
+        // pointing at it: findings of removed assets go with them.
+        const gone = new Set(plan.findingIds);
+        for (const ev of evidence) {
+          if (plan.evidenceIds.has(ev.id)) {
+            for (const fid of ev.findingIds) gone.add(fid);
+          }
+        }
+        const labels = await tx.caseFinding.findMany({
+          where: { id: { in: [...plan.findingIds] } },
+          select: { label: true },
+          take: 10,
+        });
+        const assetLabels = await tx.caseEvidence.findMany({
+          where: { id: { in: [...plan.evidenceIds] } },
+          select: { label: true },
+          take: 10,
+        });
+        if (plan.evidenceIds.size > 0) {
+          await tx.caseEvidence.deleteMany({
+            where: {
+              id: { in: [...plan.evidenceIds] },
+              caseId: existing.caseId,
+            },
+          });
+        }
+        if (plan.findingIds.size > 0) {
+          await tx.caseFinding.deleteMany({
+            where: {
+              id: { in: [...plan.findingIds] },
+              caseId: existing.caseId,
+            },
+          });
+        }
+        if (gone.size > 0 || plan.evidenceIds.size > 0) {
+          await tx.caseThreadSupport.deleteMany({
+            where: {
+              OR: [
+                { targetType: 'finding', targetId: { in: [...gone] } },
+                {
+                  targetType: 'evidence',
+                  targetId: { in: [...plan.evidenceIds] },
+                },
+              ],
+            },
+          });
+        }
+        await this.activity.record(
+          existing.caseId,
+          CaseActivityType.THREAD_EVIDENCE_REMOVED,
+          {
+            threadId: existing.id,
+            threadTitle: existing.title,
+            findings: plan.findingIds.size,
+            assets: plan.evidenceIds.size,
+            keptShared: plan.keptShared,
+            keptNoted: plan.keptNoted,
+            findingLabels: [...new Set(labels.map((l) => l.label))],
+            assetLabels: assetLabels
+              .map((a) => a.label)
+              .filter((l): l is string => !!l),
+          },
+          actor,
+          tx,
+        );
+        await tx.caseThread.delete({ where: { id } });
+        return {
+          deleted: true,
+          findingsRemoved: gone.size,
+          assetsRemoved: plan.evidenceIds.size,
+        };
+      },
+      { timeout: 30_000, maxWait: 10_000 },
+    );
+  }
+
+  /** What deleting a hypothesis together with its evidence would take out. */
+  async previewRemoval(id: string): Promise<ThreadRemovalPreviewDto> {
+    const existing = await this.prisma.caseThread.findUnique({
+      where: { id },
+      select: { id: true, caseId: true, kind: true },
+    });
+    if (!existing) throw new NotFoundException(`Thread ${id} not found`);
+    const rules = await this.prisma.caseHypothesisRule.count({
+      where: { threadId: id },
+    });
+    if (existing.kind !== 'HYPOTHESIS') {
+      return {
+        linkedFindings: 0,
+        linkedAssets: 0,
+        removableFindings: 0,
+        removableAssets: 0,
+        keptShared: 0,
+        keptNoted: 0,
+        rules,
+      };
+    }
+    const { plan, evidence } = await this.removalPlan(
+      this.prisma,
+      existing.id,
+      existing.caseId,
+    );
+    // Findings that leave with a removed asset count as removed.
+    const leaving = new Set(plan.findingIds);
+    for (const ev of evidence) {
+      if (plan.evidenceIds.has(ev.id)) {
+        for (const fid of ev.findingIds) leaving.add(fid);
+      }
+    }
+    return {
+      linkedFindings: plan.linkedFindings,
+      linkedAssets: plan.linkedAssets,
+      removableFindings: leaving.size,
+      removableAssets: plan.evidenceIds.size,
+      keptShared: plan.keptShared,
+      keptNoted: plan.keptNoted,
+      rules,
+    };
+  }
+
+  private async removalPlan(
+    db: Db,
+    threadId: string,
+    caseId: string,
+  ): Promise<{
+    plan: ThreadRemovalPlan;
+    evidence: Array<{ id: string; findingIds: string[] }>;
+  }> {
+    const [own, others, evidenceRows, findings] = await Promise.all([
+      db.caseThreadSupport.findMany({
+        where: { threadId },
+        select: { targetType: true, targetId: true },
+      }),
+      db.caseThreadSupport.findMany({
+        where: {
+          threadId: { not: threadId },
+          thread: { caseId, kind: 'HYPOTHESIS' },
+        },
+        select: { targetType: true, targetId: true },
+      }),
+      db.caseEvidence.findMany({
+        where: { caseId },
+        select: { id: true, note: true, findings: { select: { id: true } } },
+      }),
+      db.caseFinding.findMany({
+        where: { caseId },
+        select: { id: true, caseEvidenceId: true, note: true },
+      }),
+    ]);
+    const asLink = (r: { targetType: string; targetId: string }) => ({
+      targetType: r.targetType as 'finding' | 'evidence',
+      targetId: r.targetId,
+    });
+    const evidence = evidenceRows.map((e) => ({
+      id: e.id,
+      note: e.note,
+      findingIds: e.findings.map((f) => f.id),
+    }));
+    const plan = planThreadRemoval({
+      own: own.map(asLink),
+      others: others.map(asLink),
+      evidence,
+      findings: findings.map((f) => ({
+        id: f.id,
+        evidenceId: f.caseEvidenceId,
+        note: f.note,
+      })),
+    });
+    return { plan, evidence };
   }
 
   async addEntry(

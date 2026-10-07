@@ -6465,6 +6465,173 @@
         ]
       }
     },
+    "/cases/{id}/hypothesis-rules": {
+      "get": {
+        "operationId": "CaseHypothesisRulesController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseHypothesisRuleDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "The case's hypothesis rules, per watch",
+        "tags": [
+          "cases"
+        ]
+      },
+      "post": {
+        "operationId": "CaseHypothesisRulesController_add",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCaseHypothesisRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseHypothesisRulesChangeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add a rule: answers of a watch are linked to a hypothesis with a stance (supports, contradicts, neutral) as they arrive, and their evidence lands beside the hypothesis on the board. With applyToExisting, what the case already holds from the watch is linked too.",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/hypothesis-rules/{ruleId}": {
+      "patch": {
+        "operationId": "CaseHypothesisRulesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ruleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCaseHypothesisRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseHypothesisRulesChangeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change a rule's hypothesis, stance, matcher or description. A new stance or hypothesis carries the links the rule already made (unless updateLinks is false).",
+        "tags": [
+          "cases"
+        ]
+      },
+      "delete": {
+        "operationId": "CaseHypothesisRulesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ruleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "removeLinks",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseHypothesisRuleRemovalResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Remove a rule. The links it made stay (they become the hypothesis' own links) unless removeLinks is true.",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
     "/casework/summary": {
       "get": {
         "description": "What is being investigated right now, for the workspace dashboard. Grouped counts plus the five most recent cases and the five inquiries with the most unseen matches — no scan over findings.",
@@ -7161,14 +7328,64 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "evidence",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "keep",
+                "remove"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
-          "204": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadRemovalResultDto"
+                }
+              }
+            }
           }
         },
-        "summary": "Delete a thread",
+        "summary": "Delete a thread. With evidence=remove, the findings and assets linked to a hypothesis leave the case with it, except what another hypothesis is linked to and what carries a note. Default: they stay in the case and on the board.",
+        "tags": [
+          "threads"
+        ]
+      }
+    },
+    "/threads/{id}/removal-preview": {
+      "get": {
+        "operationId": "CaseThreadsController_removalPreview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadRemovalPreviewDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What deleting a hypothesis together with its evidence would take out of the case (writes nothing)",
         "tags": [
           "threads"
         ]
@@ -22626,6 +22843,87 @@
           "updatedAt"
         ]
       },
+      "CaseHypothesisRuleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "inquiryId": {
+            "type": "string",
+            "description": "The linked watch (inquiry) this rule handles"
+          },
+          "inquiryTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "threadId": {
+            "type": "string",
+            "description": "The hypothesis (thread) answers are linked to"
+          },
+          "threadTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "threadStatus": {
+            "type": "string",
+            "nullable": true,
+            "description": "The hypothesis's own status, for display"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "SUPPORTS",
+              "CONTRADICTS",
+              "NEUTRAL"
+            ],
+            "description": "SUPPORTS: the answer speaks for the hypothesis. CONTRADICTS: against it. NEUTRAL: related, neither."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FINDING_TYPE",
+              "VALUE_PATTERN"
+            ],
+            "nullable": true,
+            "description": "Null together with `pattern`: the rule takes every answer of the watch."
+          },
+          "pattern": {
+            "type": "string",
+            "nullable": true,
+            "description": "FINDING_TYPE: the finding type, exactly. VALUE_PATTERN: a regular expression over the matched value."
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "linkCount": {
+            "type": "number",
+            "description": "How many links in the case this rule made and still holds"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "inquiryId",
+          "threadId",
+          "stance",
+          "linkCount",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "CaseCleanupResultDto": {
         "type": "object",
         "properties": {
@@ -22768,6 +23066,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CaseFindingFilterDto"
+            }
+          },
+          "hypothesisRules": {
+            "description": "Hypothesis rules: which hypothesis, with which stance, the answers of each watch are linked to",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseHypothesisRuleDto"
             }
           },
           "cleanup": {
@@ -24567,6 +24872,132 @@
           "cleared"
         ]
       },
+      "AddCaseHypothesisRuleDto": {
+        "type": "object",
+        "properties": {
+          "inquiryId": {
+            "type": "string",
+            "description": "A watch already linked to the case"
+          },
+          "threadId": {
+            "type": "string",
+            "description": "A hypothesis thread of the case"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "SUPPORTS",
+              "CONTRADICTS",
+              "NEUTRAL"
+            ],
+            "default": "SUPPORTS"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FINDING_TYPE",
+              "VALUE_PATTERN"
+            ],
+            "nullable": true,
+            "description": "Narrow the rule to some answers; needs `pattern` too."
+          },
+          "pattern": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "applyToExisting": {
+            "type": "boolean",
+            "default": false,
+            "description": "Also link what the case already holds from this watch (its current answers that are in the case and match the rule). Links a person made are never changed."
+          }
+        },
+        "required": [
+          "inquiryId",
+          "threadId"
+        ]
+      },
+      "CaseHypothesisRulesChangeResponseDto": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseHypothesisRuleDto"
+            }
+          },
+          "linked": {
+            "type": "number",
+            "description": "Links made, moved or taken away by this change"
+          }
+        },
+        "required": [
+          "rules",
+          "linked"
+        ]
+      },
+      "UpdateCaseHypothesisRuleDto": {
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "description": "Move the rule to another hypothesis"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "SUPPORTS",
+              "CONTRADICTS",
+              "NEUTRAL"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FINDING_TYPE",
+              "VALUE_PATTERN"
+            ],
+            "nullable": true
+          },
+          "pattern": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "updateLinks": {
+            "type": "boolean",
+            "default": true,
+            "description": "When the stance or the hypothesis changes: carry the links this rule already made along. Off leaves them as they are."
+          }
+        }
+      },
+      "CaseHypothesisRuleRemovalResponseDto": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseHypothesisRuleDto"
+            }
+          },
+          "unlinked": {
+            "type": "number",
+            "description": "Links the rule had made that were taken away with it"
+          }
+        },
+        "required": [
+          "rules",
+          "unlinked"
+        ]
+      },
       "CaseworkCaseStatusBreakdownDto": {
         "type": "object",
         "properties": {
@@ -25630,7 +26061,12 @@
               "BOARD_TERM_PLACED",
               "BOARD_TERM_REMOVED",
               "MEANING_LINKED",
-              "MEANING_UNLINKED"
+              "MEANING_UNLINKED",
+              "HYPOTHESIS_RULE_ADDED",
+              "HYPOTHESIS_RULE_UPDATED",
+              "HYPOTHESIS_RULE_REMOVED",
+              "FINDINGS_AUTO_LINKED",
+              "THREAD_EVIDENCE_REMOVED"
             ]
           },
           "actor": {
@@ -25930,6 +26366,69 @@
             "type": "string"
           }
         }
+      },
+      "ThreadRemovalPreviewDto": {
+        "type": "object",
+        "properties": {
+          "linkedFindings": {
+            "type": "number",
+            "description": "Findings of the case linked to the hypothesis (directly or through their asset)"
+          },
+          "linkedAssets": {
+            "type": "number",
+            "description": "Assets of the case linked to the hypothesis"
+          },
+          "removableFindings": {
+            "type": "number",
+            "description": "Findings that would leave the case with the hypothesis: not linked to another hypothesis and without a note"
+          },
+          "removableAssets": {
+            "type": "number",
+            "description": "Assets that would leave the case: every finding of theirs leaves too and they carry no note"
+          },
+          "keptShared": {
+            "type": "number",
+            "description": "Findings that stay because another hypothesis is linked to them too"
+          },
+          "keptNoted": {
+            "type": "number",
+            "description": "Findings and assets that stay because someone wrote a note"
+          },
+          "rules": {
+            "type": "number",
+            "description": "Hypothesis rules that go with the hypothesis"
+          }
+        },
+        "required": [
+          "linkedFindings",
+          "linkedAssets",
+          "removableFindings",
+          "removableAssets",
+          "keptShared",
+          "keptNoted",
+          "rules"
+        ]
+      },
+      "ThreadRemovalResultDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          },
+          "findingsRemoved": {
+            "type": "number",
+            "description": "Findings taken out of the case with it"
+          },
+          "assetsRemoved": {
+            "type": "number",
+            "description": "Assets taken out of the case with it"
+          }
+        },
+        "required": [
+          "deleted",
+          "findingsRemoved",
+          "assetsRemoved"
+        ]
       },
       "AddThreadEntryDto": {
         "type": "object",

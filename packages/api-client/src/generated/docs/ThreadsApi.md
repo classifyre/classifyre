@@ -9,7 +9,8 @@ All URIs are relative to *http://localhost*
 | [**caseThreadsControllerGetEntries**](ThreadsApi.md#casethreadscontrollergetentries) | **GET** /threads/{id}/entries | Paginated thread entry history |
 | [**caseThreadsControllerLinkSupport**](ThreadsApi.md#casethreadscontrollerlinksupport) | **POST** /threads/{id}/support | Link evidence or finding to a thread |
 | [**caseThreadsControllerList**](ThreadsApi.md#casethreadscontrollerlist) | **GET** /cases/{caseId}/threads | List threads (hypothesis + discussion) for a case |
-| [**caseThreadsControllerRemove**](ThreadsApi.md#casethreadscontrollerremove) | **DELETE** /threads/{id} | Delete a thread |
+| [**caseThreadsControllerRemovalPreview**](ThreadsApi.md#casethreadscontrollerremovalpreview) | **GET** /threads/{id}/removal-preview | What deleting a hypothesis together with its evidence would take out of the case (writes nothing) |
+| [**caseThreadsControllerRemove**](ThreadsApi.md#casethreadscontrollerremove) | **DELETE** /threads/{id} | Delete a thread. With evidence&#x3D;remove, the findings and assets linked to a hypothesis leave the case with it, except what another hypothesis is linked to and what carries a note. Default: they stay in the case and on the board. |
 | [**caseThreadsControllerUnlinkSupport**](ThreadsApi.md#casethreadscontrollerunlinksupport) | **DELETE** /threads/{id}/support/{linkId} | Unlink evidence or finding from a thread |
 | [**caseThreadsControllerUpdate**](ThreadsApi.md#casethreadscontrollerupdate) | **PATCH** /threads/{id} | Update thread title / status / confidence / color |
 
@@ -357,11 +358,76 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## caseThreadsControllerRemovalPreview
+
+> ThreadRemovalPreviewDto caseThreadsControllerRemovalPreview(id)
+
+What deleting a hypothesis together with its evidence would take out of the case (writes nothing)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  ThreadsApi,
+} from '@workspace/api-client';
+import type { CaseThreadsControllerRemovalPreviewRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new ThreadsApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies CaseThreadsControllerRemovalPreviewRequest;
+
+  try {
+    const data = await api.caseThreadsControllerRemovalPreview(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**ThreadRemovalPreviewDto**](ThreadRemovalPreviewDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## caseThreadsControllerRemove
 
-> caseThreadsControllerRemove(id)
+> ThreadRemovalResultDto caseThreadsControllerRemove(id, evidence)
 
-Delete a thread
+Delete a thread. With evidence&#x3D;remove, the findings and assets linked to a hypothesis leave the case with it, except what another hypothesis is linked to and what carries a note. Default: they stay in the case and on the board.
 
 ### Example
 
@@ -379,6 +445,8 @@ async function example() {
   const body = {
     // string
     id: id_example,
+    // 'keep' | 'remove' (optional)
+    evidence: evidence_example,
   } satisfies CaseThreadsControllerRemoveRequest;
 
   try {
@@ -399,10 +467,11 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **id** | `string` |  | [Defaults to `undefined`] |
+| **evidence** | `keep`, `remove` |  | [Optional] [Defaults to `undefined`] [Enum: keep, remove] |
 
 ### Return type
 
-`void` (Empty response body)
+[**ThreadRemovalResultDto**](ThreadRemovalResultDto.md)
 
 ### Authorization
 
@@ -411,13 +480,13 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
-- **Accept**: Not defined
+- **Accept**: `application/json`
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **204** |  |  -  |
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

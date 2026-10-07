@@ -580,9 +580,11 @@ export class NamespaceImportService {
       );
     }
 
-    return table.importDefaults
-      ? { ...prepared, ...table.importDefaults }
-      : prepared;
+    return {
+      ...prepared,
+      ...table.importDefaults,
+      ...table.importDerived?.(prepared),
+    };
   }
 
   private async finish(
