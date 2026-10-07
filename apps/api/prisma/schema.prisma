@@ -1467,6 +1467,15 @@ enum CaseActivityType {
   BOARD_TERM_REMOVED
   MEANING_LINKED
   MEANING_UNLINKED
+  // A case's own handling of a watch's answers: link them to a hypothesis with
+  // a stance as they arrive. Payloads name the hypothesis, the stance and the
+  // findings, so the timeline says what a rule did without anyone touching it.
+  HYPOTHESIS_RULE_ADDED
+  HYPOTHESIS_RULE_UPDATED
+  HYPOTHESIS_RULE_REMOVED
+  FINDINGS_AUTO_LINKED
+  // A hypothesis deleted together with the evidence that hung on it.
+  THREAD_EVIDENCE_REMOVED
 }
 
 enum EvidenceStance {
@@ -1991,6 +2000,7 @@ model Case {
   events         CaseEvent[]
   board          CaseBoard?
   findingFilters CaseFindingFilter[]
+  hypothesisRules CaseHypothesisRule[]
 
   @@index([status])
   @@index([severity])
@@ -2210,6 +2220,7 @@ model CaseInquiry {
   case    Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
   inquiry Inquiry             @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   filters CaseFindingFilter[]
+  hypothesisRules CaseHypothesisRule[]
 
   @@unique([caseId, inquiryId])
   @@index([inquiryId])
@@ -2259,6 +2270,38 @@ model CaseFindingFilter {
   @@index([caseId])
   @@index([caseInquiryId])
   @@map("case_finding_filters")
+}
+
+// What a case does, by itself, with the answers one of its watches brings in:
+// link them to a hypothesis with a stance (supports, contradicts, neutral) and
+// let them land next to it on the board. Case-level like a finding filter — the
+// watch itself knows nothing of it — but a rule needs a hypothesis, so it goes
+// when the hypothesis does, and when the watch is unlinked from the case.
+// `kind`/`pattern` narrow it to some of the watch's answers; both null means
+// every answer.
+model CaseHypothesisRule {
+  id            String                 @id @default(uuid())
+  caseId        String                 @map("case_id")
+  caseInquiryId String                 @map("case_inquiry_id")
+  threadId      String                 @map("thread_id")
+  stance        EvidenceStance         @default(SUPPORTS)
+  kind          CaseFindingFilterKind?
+  pattern       String?
+  // Why the rule exists, in the investigator's words.
+  description   String?                @db.Text
+  createdBy     String?                @map("created_by")
+  createdAt     DateTime               @default(now()) @map("created_at")
+  updatedAt     DateTime               @updatedAt @map("updated_at")
+
+  investigation Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  watch         CaseInquiry         @relation(fields: [caseInquiryId], references: [id], onDelete: Cascade)
+  thread        CaseThread          @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  links         CaseThreadSupport[]
+
+  @@index([caseId])
+  @@index([caseInquiryId])
+  @@index([threadId])
+  @@map("case_hypothesis_rules")
 }
 
 // An observed node attached to a CASE. Display
@@ -2358,6 +2401,7 @@ model CaseThread {
   investigation Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
   entries       CaseThreadEntry[]
   support       CaseThreadSupport[]
+  rules         CaseHypothesisRule[]
 
   @@index([caseId])
   @@index([caseId, kind])
@@ -2391,14 +2435,20 @@ model CaseThreadSupport {
   stance     EvidenceStance @default(SUPPORTS)
   weight     Decimal?       @db.Decimal(3, 2)
   note       String?        @db.Text
+  // The case's hypothesis rule that made this link, when one did: a person's
+  // own links have none. Kept (set null) when the rule goes, so removing a
+  // rule never takes a link away unless asked to.
+  ruleId     String?        @map("rule_id")
   createdAt  DateTime       @default(now()) @map("created_at")
 
-  thread CaseThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  entry  CaseThreadEntry? @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  thread CaseThread          @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  entry  CaseThreadEntry?    @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  rule   CaseHypothesisRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
 
   @@unique([threadId, targetType, targetId])
   @@index([threadId])
   @@index([targetType, targetId])
+  @@index([ruleId])
   @@map("case_thread_support")
 }
 

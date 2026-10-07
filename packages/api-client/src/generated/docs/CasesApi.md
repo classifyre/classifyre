@@ -16,6 +16,10 @@ All URIs are relative to *http://localhost*
 | [**caseEventsControllerList**](CasesApi.md#caseeventscontrollerlist) | **GET** /cases/{caseId}/events | List the case chronology (real-world events, ordered by date) |
 | [**caseEventsControllerRemove**](CasesApi.md#caseeventscontrollerremove) | **DELETE** /cases/{caseId}/events/{eventId} | Remove a chronology event |
 | [**caseEventsControllerUpdate**](CasesApi.md#caseeventscontrollerupdate) | **PATCH** /cases/{caseId}/events/{eventId} | Update (and implicitly verify) a chronology event |
+| [**caseHypothesisRulesControllerAdd**](CasesApi.md#casehypothesisrulescontrolleradd) | **POST** /cases/{id}/hypothesis-rules | Add a rule: answers of a watch are linked to a hypothesis with a stance (supports, contradicts, neutral) as they arrive, and their evidence lands beside the hypothesis on the board. With applyToExisting, what the case already holds from the watch is linked too. |
+| [**caseHypothesisRulesControllerList**](CasesApi.md#casehypothesisrulescontrollerlist) | **GET** /cases/{id}/hypothesis-rules | The case\&#39;s hypothesis rules, per watch |
+| [**caseHypothesisRulesControllerRemove**](CasesApi.md#casehypothesisrulescontrollerremove) | **DELETE** /cases/{id}/hypothesis-rules/{ruleId} | Remove a rule. The links it made stay (they become the hypothesis\&#39; own links) unless removeLinks is true. |
+| [**caseHypothesisRulesControllerUpdate**](CasesApi.md#casehypothesisrulescontrollerupdate) | **PATCH** /cases/{id}/hypothesis-rules/{ruleId} | Change a rule\&#39;s hypothesis, stance, matcher or description. A new stance or hypothesis carries the links the rule already made (unless updateLinks is false). |
 | [**caseLeadsControllerGenerate**](CasesApi.md#caseleadscontrollergenerate) | **POST** /cases/{caseId}/leads/generate | Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change |
 | [**caseLeadsControllerList**](CasesApi.md#caseleadscontrollerlist) | **GET** /cases/{caseId}/leads | List leads (exploration candidates) for a case |
 | [**caseLeadsControllerPropose**](CasesApi.md#caseleadscontrollerpropose) | **POST** /cases/{caseId}/leads | Propose a finding as a lead for this case |
@@ -841,6 +845,281 @@ example().catch(console.error);
 ### Return type
 
 [**CaseEventDto**](CaseEventDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseHypothesisRulesControllerAdd
+
+> CaseHypothesisRulesChangeResponseDto caseHypothesisRulesControllerAdd(id, addCaseHypothesisRuleDto)
+
+Add a rule: answers of a watch are linked to a hypothesis with a stance (supports, contradicts, neutral) as they arrive, and their evidence lands beside the hypothesis on the board. With applyToExisting, what the case already holds from the watch is linked too.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseHypothesisRulesControllerAddRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // AddCaseHypothesisRuleDto
+    addCaseHypothesisRuleDto: ...,
+  } satisfies CaseHypothesisRulesControllerAddRequest;
+
+  try {
+    const data = await api.caseHypothesisRulesControllerAdd(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **addCaseHypothesisRuleDto** | [AddCaseHypothesisRuleDto](AddCaseHypothesisRuleDto.md) |  | |
+
+### Return type
+
+[**CaseHypothesisRulesChangeResponseDto**](CaseHypothesisRulesChangeResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseHypothesisRulesControllerList
+
+> Array&lt;CaseHypothesisRuleDto&gt; caseHypothesisRulesControllerList(id)
+
+The case\&#39;s hypothesis rules, per watch
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseHypothesisRulesControllerListRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies CaseHypothesisRulesControllerListRequest;
+
+  try {
+    const data = await api.caseHypothesisRulesControllerList(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**Array&lt;CaseHypothesisRuleDto&gt;**](CaseHypothesisRuleDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseHypothesisRulesControllerRemove
+
+> CaseHypothesisRuleRemovalResponseDto caseHypothesisRulesControllerRemove(id, ruleId, removeLinks)
+
+Remove a rule. The links it made stay (they become the hypothesis\&#39; own links) unless removeLinks is true.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseHypothesisRulesControllerRemoveRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string
+    ruleId: ruleId_example,
+    // boolean (optional)
+    removeLinks: true,
+  } satisfies CaseHypothesisRulesControllerRemoveRequest;
+
+  try {
+    const data = await api.caseHypothesisRulesControllerRemove(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **ruleId** | `string` |  | [Defaults to `undefined`] |
+| **removeLinks** | `boolean` |  | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**CaseHypothesisRuleRemovalResponseDto**](CaseHypothesisRuleRemovalResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseHypothesisRulesControllerUpdate
+
+> CaseHypothesisRulesChangeResponseDto caseHypothesisRulesControllerUpdate(id, ruleId, updateCaseHypothesisRuleDto)
+
+Change a rule\&#39;s hypothesis, stance, matcher or description. A new stance or hypothesis carries the links the rule already made (unless updateLinks is false).
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseHypothesisRulesControllerUpdateRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string
+    ruleId: ruleId_example,
+    // UpdateCaseHypothesisRuleDto
+    updateCaseHypothesisRuleDto: ...,
+  } satisfies CaseHypothesisRulesControllerUpdateRequest;
+
+  try {
+    const data = await api.caseHypothesisRulesControllerUpdate(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **ruleId** | `string` |  | [Defaults to `undefined`] |
+| **updateCaseHypothesisRuleDto** | [UpdateCaseHypothesisRuleDto](UpdateCaseHypothesisRuleDto.md) |  | |
+
+### Return type
+
+[**CaseHypothesisRulesChangeResponseDto**](CaseHypothesisRulesChangeResponseDto.md)
 
 ### Authorization
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   CircleSlash,
+  GitBranch,
   DownloadCloud,
   ExternalLink,
   Filter,
@@ -23,6 +24,7 @@ import { toast } from "sonner";
 import {
   api,
   type CaseFindingFilterDto,
+  type CaseHypothesisRuleDto,
   type CaseLinkedInquiryDto,
   type InquiryResponseDto,
 } from "@workspace/api-client";
@@ -58,6 +60,12 @@ import {
   type FilterDialogRequest,
   type RuleAction,
 } from "@/components/case-cleanup/finding-filter-dialog";
+import { HypothesisRuleChips } from "@/components/case-cleanup/hypothesis-rule-chips";
+import {
+  HypothesisRuleDialog,
+  type HypothesisRuleRequest,
+  type RuleHypothesis,
+} from "@/components/case-cleanup/hypothesis-rule-dialog";
 import { EscalationFlag } from "@workspace/case-board/components/finding-node";
 import { useTranslation } from "@/hooks/use-translation";
 import { withReturnTo } from "@/lib/return-to";
@@ -75,6 +83,10 @@ export type CaseInquiriesTabProps = {
   inCaseFindingIds: Set<string>;
   /** The case's finding filters, case-wide and per watch. */
   filters?: CaseFindingFilterDto[];
+  /** The case's hypothesis rules: which hypothesis each watch's answers are linked to. */
+  hypothesisRules?: CaseHypothesisRuleDto[];
+  /** The case's hypotheses, to pick from and to name on a rule. */
+  hypotheses?: RuleHypothesis[];
   /** The board tab, so its own filter changes do not echo back as someone else's. */
   clientId?: string;
   /** The watch open in the middle; null shows every watch as a card. */
@@ -104,6 +116,8 @@ export function CaseInquiriesTab({
   isClosed,
   inCaseFindingIds,
   filters = [],
+  hypothesisRules = [],
+  hypotheses = [],
   clientId,
   selectedId,
   onSelect,
@@ -114,6 +128,7 @@ export function CaseInquiriesTab({
 
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [filterRequest, setFilterRequest] = React.useState<FilterDialogRequest | null>(null);
+  const [hypothesisRequest, setHypothesisRequest] = React.useState<HypothesisRuleRequest | null>(null);
   const [pulling, setPulling] = React.useState<string | null>(null);
   // Bumped to show the open watch's gone answers (and why each left) in its table.
   const [goneNonce, setGoneNonce] = React.useState(0);
@@ -276,10 +291,13 @@ export function CaseInquiriesTab({
             caseId={caseId}
             watch={focused}
             rules={filtersOf(focused.id)}
+            hypothesisRules={hypothesisRules.filter((r) => r.inquiryId === focused.id)}
+            hypotheses={hypotheses}
             isClosed={isClosed}
             canClose={linked.length > 1}
             onClose={() => onSelect(null)}
             onRules={setFilterRequest}
+            onHypothesisRule={setHypothesisRequest}
             onOpenHistory={onOpenHistory}
             onShowGone={() => showGone(focused.id)}
             onWhatChangedGone={() => whatChanged([focused.id])}
@@ -328,6 +346,14 @@ export function CaseInquiriesTab({
         onClose={() => setFilterRequest(null)}
         onApplied={() => onChanged()}
         clientId={clientId}
+      />
+      <HypothesisRuleDialog
+        caseId={caseId}
+        watches={linked.map((q) => ({ id: q.id, title: q.title }))}
+        hypotheses={hypotheses}
+        request={hypothesisRequest}
+        onClose={() => setHypothesisRequest(null)}
+        onApplied={() => onChanged()}
       />
     </div>
   );
@@ -566,10 +592,13 @@ function FocusedWatch({
   caseId,
   watch,
   rules,
+  hypothesisRules,
+  hypotheses,
   isClosed,
   canClose,
   onClose,
   onRules,
+  onHypothesisRule,
   onOpenHistory,
   onShowGone,
   onWhatChangedGone,
@@ -578,10 +607,13 @@ function FocusedWatch({
   caseId: string;
   watch: CaseLinkedInquiryDto;
   rules: CaseFindingFilterDto[];
+  hypothesisRules: CaseHypothesisRuleDto[];
+  hypotheses: RuleHypothesis[];
   isClosed: boolean;
   canClose: boolean;
   onClose: () => void;
   onRules: (request: FilterDialogRequest) => void;
+  onHypothesisRule: (request: HypothesisRuleRequest) => void;
   onOpenHistory?: (request: WatchHistoryRequest, fallback?: () => void) => void;
   /** Show only the gone answers in the table below. */
   onShowGone: () => void;
@@ -789,6 +821,49 @@ function FocusedWatch({
             onChanged={onChanged}
             testIdPrefix={`watch-${watch.id}`}
           />
+        </div>
+
+        {/* What this case does with the watch's answers beyond keeping them:
+            link them to a hypothesis, as supporting, contradicting or
+            neutral, and land them beside it on the board. */}
+        <div className="space-y-1.5 border-t border-border pt-2.5" data-testid={`hypothesis-rules-${watch.id}`}>
+          <span className="inline-flex items-center gap-1.5 text-xs">
+            <GitBranch className="h-3 w-3 text-muted-foreground" />
+            {t("caseHypothesisRules.title")}
+          </span>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2">
+            {hypothesisRules.length > 0 ? (
+              <HypothesisRuleChips
+                caseId={caseId}
+                rules={hypothesisRules}
+                hypotheses={hypotheses}
+                readOnly={isClosed}
+                onEdit={(rule) => onHypothesisRule({ inquiryId: watch.id, rule })}
+                onChanged={onChanged}
+              />
+            ) : (
+              <span className="text-muted-foreground pt-[2px] text-[11px]">
+                {hypotheses.length === 0 ? t("caseHypothesisRules.noHypotheses") : t("caseHypothesisRules.none")}
+              </span>
+            )}
+            {!isClosed ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                aria-label={t("caseHypothesisRules.add")}
+                title={t("caseHypothesisRules.add")}
+                disabled={hypotheses.length === 0}
+                onClick={() => onHypothesisRule({ inquiryId: watch.id })}
+                data-testid={`add-hypothesis-rule-${watch.id}`}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <span />
+            )}
+          </div>
+          <p className="text-muted-foreground text-[11px]">{t("caseHypothesisRules.hint")}</p>
         </div>
 
         {!isClosed && watch.matchCount > 0 && (

@@ -199,6 +199,11 @@ export interface TransferTableSpec {
    */
   importDefaults?: Record<string, unknown>;
   /**
+   * Values computed from the row being imported, applied after
+   * {@link importDefaults}. For columns whose safe value depends on the row.
+   */
+  importDerived?: (row: Record<string, unknown>) => Record<string, unknown>;
+  /**
    * Singleton configuration rows (`id = 1`, or a fixed enum key). Imported with
    * an upsert on the fixed key instead of a batch insert.
    */
@@ -284,6 +289,18 @@ function remapSuggestionPayload(value: unknown, remapId: IdRemapper): unknown {
   return out;
 }
 
+const SETTLED_RUN_STATUSES: ReadonlySet<unknown> = new Set([
+  'COMPLETED',
+  'WARNING',
+  'ERROR',
+  'STOPPED',
+]);
+
+/** The run status when it is a finished one; PENDING/RUNNING/null are not. */
+function settledRunStatus(status: unknown): string | null {
+  return SETTLED_RUN_STATUSES.has(status) ? (status as string) : null;
+}
+
 /**
  * Ordered so that `order` alone determines import sequencing. Gaps are left
  * between groups to leave room for later models without a renumber.
@@ -344,11 +361,18 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
       autoReason: null,
       autoLastRunnerId: null,
       currentRunnerId: null,
-      runnerStatus: 'PENDING',
       consecutiveFailures: 0,
       lastErrorMessage: null,
       autopilotDirtyAt: null,
     },
+    // PENDING and RUNNING mean "a scan is in flight" to the auto-scheduler's
+    // concurrency budget, the namespace overview and the idle policy. No scan
+    // is in flight on an imported source (currentRunnerId is cleared above), so
+    // a source that has finished before keeps that outcome instead. Only a
+    // source that never ran stays PENDING, the column's default for one.
+    importDerived: (row) => ({
+      runnerStatus: settledRunStatus(row['lastRunStatus']) ?? 'PENDING',
+    }),
   },
   {
     model: 'runner',
@@ -627,9 +651,18 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
     order: 590,
     keys: ['id'],
   },
+  // After case_threads and case_inquiries: a rule needs its hypothesis and its
+  // watch link. Before case_thread_support, whose links name the rule that made them.
+  {
+    model: 'caseHypothesisRule',
+    scope: 'investigations',
+    order: 595,
+    keys: ['id'],
+    idRefs: ['id', 'caseId', 'caseInquiryId', 'threadId'],
+  },
   {
     model: 'caseThreadSupport',
-    idRefs: ['id', 'threadId', 'entryId', 'targetId'],
+    idRefs: ['id', 'threadId', 'entryId', 'targetId', 'ruleId'],
     scope: 'investigations',
     order: 600,
     keys: ['id'],

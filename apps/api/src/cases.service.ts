@@ -27,6 +27,11 @@ import {
 } from './cases/case-cleanup.service';
 import { toFilterDto } from './cases/case-finding-filters.service';
 import {
+  CaseHypothesisRulesService,
+  RULE_INCLUDE,
+  toRuleDto,
+} from './cases/case-hypothesis-rules.service';
+import {
   CaseEscalationService,
   candidateOf,
 } from './cases/case-escalation.service';
@@ -164,6 +169,7 @@ export class CasesService {
     @Optional() private readonly boardRead?: CaseBoardReadService,
     @Optional() private readonly cleanup?: CaseCleanupService,
     @Optional() private readonly escalation?: CaseEscalationService,
+    @Optional() private readonly hypothesisRules?: CaseHypothesisRulesService,
   ) {}
 
   async create(dto: CreateCaseDto): Promise<CaseResponseDto> {
@@ -629,6 +635,10 @@ export class CasesService {
             },
           },
         },
+        hypothesisRules: {
+          orderBy: { createdAt: 'asc' },
+          include: RULE_INCLUDE,
+        },
       },
     });
     if (!row) return null;
@@ -647,6 +657,7 @@ export class CasesService {
       evidence,
       inquiries,
       findingFilters: row.findingFilters.map(toFilterDto),
+      hypothesisRules: row.hypothesisRules.map(toRuleDto),
     };
   }
 
@@ -1306,6 +1317,16 @@ export class CasesService {
         run,
       },
     );
+    // The case's own handling of this watch: link what arrived to the
+    // hypotheses its rules name, and land the evidence beside them.
+    if (this.hypothesisRules && added.length > 0) {
+      await this.hypothesisRules.onArrival(
+        caseId,
+        inquiry,
+        added.map((f) => f.id),
+        actor,
+      );
+    }
     // The same event on the other timeline — but only for a deliberate pull.
     // An automatic one is recorded by the matching pass instead, as AUTO_PULLED
     // and with the run that caused it, so a person reading the inquiry can tell

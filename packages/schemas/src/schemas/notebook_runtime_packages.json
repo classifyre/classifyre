@@ -128,7 +128,7 @@
     },
     {
       "name": "google-auth",
-      "version": "2.59.1",
+      "version": "2.60.0",
       "modules": [
         "google.auth"
       ],
@@ -164,7 +164,7 @@
     },
     {
       "name": "imap-tools",
-      "version": "1.15.0",
+      "version": "1.15.1",
       "modules": [
         "imap_tools"
       ],
@@ -207,7 +207,7 @@
     },
     {
       "name": "neo4j",
-      "version": "6.3.1",
+      "version": "6.4.0",
       "modules": [
         "neo4j"
       ],
@@ -341,7 +341,7 @@
     },
     {
       "name": "pymssql",
-      "version": "2.4.2",
+      "version": "2.4.3",
       "modules": [
         "pymssql"
       ],
@@ -359,7 +359,7 @@
     },
     {
       "name": "pypdfium2",
-      "version": "5.13.0",
+      "version": "5.14.0",
       "modules": [
         "pypdfium2"
       ],

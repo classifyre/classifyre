@@ -1,0 +1,115 @@
+---
+title: Hypothesis rules
+description: Let a watch hand its answers to a hypothesis. They are linked as supporting, contradicting or neutral the moment they arrive, and land on the board next to the hypothesis, inside its frame if it has one.
+---
+
+import { Callout } from "nextra/components"
+
+# Hypothesis rules
+
+A watch that adds its answers to a case by itself fills the board with
+evidence. A **hypothesis rule** says what the case thinks of it: *answers of
+this watch go to that hypothesis, as supporting, contradicting or neutral*.
+From then on, every answer that comes into the case through the watch is:
+
+- **linked to the hypothesis** with the stance you chose, so the hypothesis'
+  balance of evidence moves by itself;
+- **landed on the board next to the hypothesis**, instead of wherever the
+  board happens to have room. If the hypothesis sits **inside a frame**, the
+  evidence lands inside that frame (and the frame grows to hold it);
+- **written on the timeline**: which watch, which hypotheses, which stance and
+  how many findings. A watch that scans every few minutes reads as one growing
+  entry.
+
+Rules belong to the **case**, like [finding filters](/investigations/cases/cleanup/#finding-filters).
+The watch itself is untouched: the same watch can feed other cases that handle
+its answers differently.
+
+---
+
+## Adding a rule
+
+Open the **Watches** panel on the board and pick a watch. Under **Rules** you
+find **Link to hypothesis**. Press **+**:
+
+1. **Hypothesis**: one of the case's hypotheses (shown with its colour and its
+   H-number on the board).
+2. **Stance**: **Supports** (the answer speaks for it), **Contradicts** (it
+   speaks against, a reject) or **Neutral** (related, but it does not decide).
+3. **Which answers**: **All**, only a **finding type**, or only values that
+   match a **pattern** (a regular expression, tested against the matched
+   value).
+4. **Why** (optional): the reason, shown when you hover the rule.
+5. **Also link what the case already holds from this watch**: on by default.
+   Links you made by hand are never changed.
+
+One watch can have several rules. An answer can go to several hypotheses with
+different stances: the same finding can support one theory and contradict
+another.
+
+| You want | Rule |
+|---|---|
+| Everything the watch finds counts for a theory | **All** → hypothesis, **Supports** |
+| Only some answers count against a theory | **A finding type** or **A value pattern** → hypothesis, **Contradicts** |
+| Keep related answers on the hypothesis without a verdict | **All** → hypothesis, **Neutral** |
+
+If two rules name the same hypothesis for the same answer, the narrower one
+(the one with a finding type or pattern) wins, and between equals the older
+one. A rule can't be added twice with another stance: change the first one.
+
+---
+
+## Where evidence lands
+
+New evidence is placed the way the board places things you add yourself, only
+anchored to the hypothesis:
+
+| The hypothesis is… | The evidence lands… |
+|---|---|
+| inside a **frame** | inside the same frame, in the first free spot. A frame that is too small grows. A folded frame stays folded |
+| on the open canvas | right of the hypothesis card, on its band, clear of everything else |
+| not on the board yet | wherever the board places it when it is opened, as before |
+
+An asset that is already on the board keeps its place; only its new finding is
+linked. Nothing you have placed is ever moved.
+
+<Callout type="info">
+  An answer linked to hypotheses in two different frames lands in the first
+  one. You can drag it anywhere afterwards.
+</Callout>
+
+---
+
+## Changing and removing rules
+
+- **Edit** a rule by pressing its hypothesis name: a new stance or a new
+  hypothesis **carries the links the rule already made**. A new filter on the
+  answers applies from then on.
+- **Remove** a rule with **×**. The links it made **stay** by default (they
+  become ordinary links of the hypothesis). Tick **Also take away the links
+  this rule made** to remove them too. The findings and assets stay in the case
+  and on the board either way.
+- **Unlink the watch** from the case, and its rules go with it.
+
+---
+
+## Deleting a hypothesis
+
+A hypothesis' rules go with it. Deleting it asks what to do with its evidence:
+
+| Choice | What happens |
+|---|---|
+| **Keep the evidence in the case** (default) | The findings and assets stay in the case and on the board, without a stance |
+| **Also take out its evidence** | The findings and assets linked to it leave the case, except what another hypothesis is also linked to and what carries a note. An asset leaves only when none of its findings stay |
+
+The dialog counts what would leave and what stays before you confirm, and the
+timeline records what was taken out.
+
+---
+
+## For agents
+
+`list_case_hypothesis_rules`, `add_case_hypothesis_rule`,
+`update_case_hypothesis_rule` and `remove_case_hypothesis_rule` do the same
+over [MCP](/investigations/cases/mcp/). `add_case_hypothesis_rule` takes
+`applyToExisting` to link what the case holds already.
