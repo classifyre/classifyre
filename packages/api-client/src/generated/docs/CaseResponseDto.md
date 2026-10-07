@@ -31,6 +31,7 @@ Name | Type
 `evidence` | [Array&lt;CaseEvidenceDto&gt;](CaseEvidenceDto.md)
 `inquiries` | [Array&lt;CaseLinkedInquiryDto&gt;](CaseLinkedInquiryDto.md)
 `findingFilters` | [Array&lt;CaseFindingFilterDto&gt;](CaseFindingFilterDto.md)
+`hypothesisRules` | [Array&lt;CaseHypothesisRuleDto&gt;](CaseHypothesisRuleDto.md)
 `cleanup` | [CaseCleanupResultDto](CaseCleanupResultDto.md)
 
 ## Example
@@ -65,6 +66,7 @@ const example = {
   "evidence": null,
   "inquiries": null,
   "findingFilters": null,
+  "hypothesisRules": null,
   "cleanup": null,
 } satisfies CaseResponseDto
 

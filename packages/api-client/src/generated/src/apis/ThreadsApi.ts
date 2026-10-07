@@ -19,6 +19,8 @@ import type {
   CreateThreadDto,
   LinkThreadSupportDto,
   ThreadEntriesResponseDto,
+  ThreadRemovalPreviewDto,
+  ThreadRemovalResultDto,
   ThreadResponseDto,
   UpdateThreadDto,
 } from '../models/index';
@@ -31,6 +33,10 @@ import {
     LinkThreadSupportDtoToJSON,
     ThreadEntriesResponseDtoFromJSON,
     ThreadEntriesResponseDtoToJSON,
+    ThreadRemovalPreviewDtoFromJSON,
+    ThreadRemovalPreviewDtoToJSON,
+    ThreadRemovalResultDtoFromJSON,
+    ThreadRemovalResultDtoToJSON,
     ThreadResponseDtoFromJSON,
     ThreadResponseDtoToJSON,
     UpdateThreadDtoFromJSON,
@@ -62,8 +68,13 @@ export interface CaseThreadsControllerListRequest {
     caseId: string;
 }
 
+export interface CaseThreadsControllerRemovalPreviewRequest {
+    id: string;
+}
+
 export interface CaseThreadsControllerRemoveRequest {
     id: string;
+    evidence?: CaseThreadsControllerRemoveEvidenceEnum;
 }
 
 export interface CaseThreadsControllerUnlinkSupportRequest {
@@ -307,9 +318,46 @@ export class ThreadsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Delete a thread
+     * What deleting a hypothesis together with its evidence would take out of the case (writes nothing)
      */
-    async caseThreadsControllerRemoveRaw(requestParameters: CaseThreadsControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async caseThreadsControllerRemovalPreviewRaw(requestParameters: CaseThreadsControllerRemovalPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ThreadRemovalPreviewDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseThreadsControllerRemovalPreview().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/threads/{id}/removal-preview`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ThreadRemovalPreviewDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * What deleting a hypothesis together with its evidence would take out of the case (writes nothing)
+     */
+    async caseThreadsControllerRemovalPreview(requestParameters: CaseThreadsControllerRemovalPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ThreadRemovalPreviewDto> {
+        const response = await this.caseThreadsControllerRemovalPreviewRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Delete a thread. With evidence=remove, the findings and assets linked to a hypothesis leave the case with it, except what another hypothesis is linked to and what carries a note. Default: they stay in the case and on the board.
+     */
+    async caseThreadsControllerRemoveRaw(requestParameters: CaseThreadsControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ThreadRemovalResultDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -318,6 +366,10 @@ export class ThreadsApi extends runtime.BaseAPI {
         }
 
         const queryParameters: any = {};
+
+        if (requestParameters['evidence'] != null) {
+            queryParameters['evidence'] = requestParameters['evidence'];
+        }
 
         const headerParameters: runtime.HTTPHeaders = {};
 
@@ -332,14 +384,15 @@ export class ThreadsApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => ThreadRemovalResultDtoFromJSON(jsonValue));
     }
 
     /**
-     * Delete a thread
+     * Delete a thread. With evidence=remove, the findings and assets linked to a hypothesis leave the case with it, except what another hypothesis is linked to and what carries a note. Default: they stay in the case and on the board.
      */
-    async caseThreadsControllerRemove(requestParameters: CaseThreadsControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.caseThreadsControllerRemoveRaw(requestParameters, initOverrides);
+    async caseThreadsControllerRemove(requestParameters: CaseThreadsControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ThreadRemovalResultDto> {
+        const response = await this.caseThreadsControllerRemoveRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -435,3 +488,12 @@ export class ThreadsApi extends runtime.BaseAPI {
     }
 
 }
+
+/**
+ * @export
+ */
+export const CaseThreadsControllerRemoveEvidenceEnum = {
+    Keep: 'keep',
+    Remove: 'remove'
+} as const;
+export type CaseThreadsControllerRemoveEvidenceEnum = typeof CaseThreadsControllerRemoveEvidenceEnum[keyof typeof CaseThreadsControllerRemoveEvidenceEnum];

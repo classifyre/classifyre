@@ -7,6 +7,7 @@ import type { BoardItemDto, CaseBoardResponseDto } from '../dto/case-board.dto';
 import {
   boxOf,
   buildBoardModel,
+  planArrivals,
   planFrame,
   planPlacement,
   planTidy,
@@ -451,5 +452,135 @@ describe('planFrame', () => {
         frameId: evidenceItems[0].id,
       }),
     ).toThrow(/not a FRAME/);
+  });
+});
+
+describe('planArrivals', () => {
+  /** A board with one hypothesis card, optionally inside a frame, and `n` unplaced evidence items it holds a stance on. */
+  function withHypothesis(opts: {
+    inFrame?: boolean;
+    collapsedFrame?: boolean;
+    hypothesisPlaced?: boolean;
+    arrivals?: number;
+  }) {
+    const frame = item('FRAME', {
+      x: 400,
+      y: 100,
+      width: 600,
+      height: 400,
+      collapsed: opts.collapsedFrame ?? false,
+    });
+    const hypothesis = item('HYPOTHESIS', {
+      refId: 't1',
+      x: opts.hypothesisPlaced === false ? null : opts.inFrame ? 40 : 100,
+      y: opts.hypothesisPlaced === false ? null : opts.inFrame ? 60 : 100,
+      parentId: opts.inFrame ? frame.id : null,
+    });
+    const count = opts.arrivals ?? 2;
+    const { res, evidenceItems } = board({
+      evidence: Array.from({ length: count }, () => ({
+        findings: 1,
+        patch: { x: null, y: null },
+      })),
+      items: opts.inFrame ? [frame, hypothesis] : [hypothesis],
+    });
+    const r = res as unknown as {
+      threads: unknown[];
+      supports: unknown[];
+    };
+    r.threads = [
+      {
+        id: 't1',
+        title: 'Shell company',
+        itemId: hypothesis.id,
+        onBoard: true,
+      },
+    ];
+    r.supports = evidenceItems.map((e, i) => ({
+      id: `s${i}`,
+      threadId: 't1',
+      stance: 'SUPPORTS',
+      endpoint: { itemId: e.id },
+    }));
+    return { res, frame, hypothesis, evidenceItems };
+  }
+
+  it('puts evidence inside the frame its hypothesis sits in, relative to the frame', () => {
+    const { res, frame, evidenceItems } = withHypothesis({ inFrame: true });
+    const model = buildBoardModel(res);
+    const plan = planArrivals(model, new Set(evidenceItems.map((e) => e.id)));
+    expect(plan.positions.size).toBe(0);
+    expect(plan.frames).toHaveLength(1);
+    expect(plan.frames[0].frameId).toBe(frame.id);
+    const members = plan.frames[0].plan.members;
+    expect(members.map((m) => m.itemId).sort()).toEqual(
+      evidenceItems.map((e) => e.id).sort(),
+    );
+    for (const m of members) {
+      expect(m.to.x).toBeGreaterThanOrEqual(0);
+      expect(m.to.y).toBeGreaterThanOrEqual(0);
+    }
+    // two arrivals never share a spot
+    const [a, b] = members.map((m) => `${m.to.x},${m.to.y}`);
+    expect(a).not.toBe(b);
+  });
+
+  it('keeps a folded frame folded', () => {
+    const { res, evidenceItems } = withHypothesis({
+      inFrame: true,
+      collapsedFrame: true,
+    });
+    const plan = planArrivals(
+      buildBoardModel(res),
+      new Set(evidenceItems.map((e) => e.id)),
+    );
+    expect(plan.frames).toHaveLength(1);
+    // the plan may ask for the frame to be opened; the caller decides not to
+    expect(plan.frames[0].plan.members).toHaveLength(2);
+  });
+
+  it('places evidence beside a hypothesis on the open canvas', () => {
+    const { res, hypothesis, evidenceItems } = withHypothesis({ arrivals: 3 });
+    const model = buildBoardModel(res);
+    const plan = planArrivals(model, new Set(evidenceItems.map((e) => e.id)));
+    expect(plan.frames).toEqual([]);
+    expect(plan.positions.size).toBe(3);
+    const hyp = rectOf(model, hypothesis);
+    for (const [, at] of plan.positions) {
+      // right of the hypothesis card, on the same band, never on top of it
+      expect(at.x).toBeGreaterThan(hyp.x);
+      expect(Math.abs(at.y - hyp.y)).toBeLessThan(2000);
+    }
+    const placed = new Map(
+      [...plan.positions].map(([id, at]) => [
+        id,
+        { ...model.items.get(id)!, ...at },
+      ]),
+    );
+    expect(placed.size).toBe(3);
+  });
+
+  it('leaves evidence alone when its hypothesis is not on the canvas yet', () => {
+    const { res, evidenceItems } = withHypothesis({ hypothesisPlaced: false });
+    const plan = planArrivals(
+      buildBoardModel(res),
+      new Set(evidenceItems.map((e) => e.id)),
+    );
+    expect(plan.frames).toEqual([]);
+    expect(plan.positions.size).toBe(0);
+  });
+
+  it('does not move evidence that already has a spot, or items it was not asked about', () => {
+    const { res, evidenceItems } = withHypothesis({ arrivals: 2 });
+    evidenceItems[0].x = 10;
+    evidenceItems[0].y = 10;
+    const plan = planArrivals(
+      buildBoardModel(res),
+      new Set([evidenceItems[0].id]),
+    );
+    expect(plan.positions.size).toBe(0);
+    expect(plan.frames).toEqual([]);
+    const other = planArrivals(buildBoardModel(res), new Set());
+    expect(other.positions.size).toBe(0);
   });
 });

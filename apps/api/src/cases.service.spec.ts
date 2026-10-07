@@ -77,6 +77,7 @@ describe('CasesService', () => {
     removeResolvedFindings: false,
     removeGoneAssets: false,
     findingFilters: [],
+    hypothesisRules: [],
     ...over,
   });
 

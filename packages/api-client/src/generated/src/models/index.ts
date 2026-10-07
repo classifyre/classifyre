@@ -1,6 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export * from './AddCaseFindingFiltersDto';
+export * from './AddCaseHypothesisRuleDto';
 export * from './AddEvidenceDto';
 export * from './AddExclusionDto';
 export * from './AddFindingDto';
@@ -118,6 +119,9 @@ export * from './CaseFindingFilterRuleDto';
 export * from './CaseFindingFiltersChangeResponseDto';
 export * from './CaseFindingFiltersPreviewDto';
 export * from './CaseFindingTypeOptionDto';
+export * from './CaseHypothesisRuleDto';
+export * from './CaseHypothesisRuleRemovalResponseDto';
+export * from './CaseHypothesisRulesChangeResponseDto';
 export * from './CaseLeadDto';
 export * from './CaseLinkedInquiryDto';
 export * from './CaseListResponseDto';
@@ -457,6 +461,8 @@ export * from './TestConnectionResponseDto';
 export * from './TextCoverageDto';
 export * from './ThreadEntriesResponseDto';
 export * from './ThreadEntryDto';
+export * from './ThreadRemovalPreviewDto';
+export * from './ThreadRemovalResultDto';
 export * from './ThreadResponseDto';
 export * from './ThreadSupportLinkDto';
 export * from './TrainCustomDetectorDto';
@@ -479,6 +485,7 @@ export * from './UpdateCaseDto';
 export * from './UpdateCaseEventDto';
 export * from './UpdateCaseFindingFilterDto';
 export * from './UpdateCaseFindingNoteDto';
+export * from './UpdateCaseHypothesisRuleDto';
 export * from './UpdateChatBotDto';
 export * from './UpdateCorrelationConfigDto';
 export * from './UpdateCustomDetectorDto';

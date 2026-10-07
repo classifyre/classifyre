@@ -4,6 +4,7 @@ README.md
 docs/AIApi.md
 docs/AIProviderConfigsApi.md
 docs/AddCaseFindingFiltersDto.md
+docs/AddCaseHypothesisRuleDto.md
 docs/AddEvidenceDto.md
 docs/AddExclusionDto.md
 docs/AddFindingDto.md
@@ -125,6 +126,9 @@ docs/CaseFindingFilterRuleDto.md
 docs/CaseFindingFiltersChangeResponseDto.md
 docs/CaseFindingFiltersPreviewDto.md
 docs/CaseFindingTypeOptionDto.md
+docs/CaseHypothesisRuleDto.md
+docs/CaseHypothesisRuleRemovalResponseDto.md
+docs/CaseHypothesisRulesChangeResponseDto.md
 docs/CaseLeadDto.md
 docs/CaseLinkedInquiryDto.md
 docs/CaseListResponseDto.md
@@ -488,6 +492,8 @@ docs/TestConnectionResponseDto.md
 docs/TextCoverageDto.md
 docs/ThreadEntriesResponseDto.md
 docs/ThreadEntryDto.md
+docs/ThreadRemovalPreviewDto.md
+docs/ThreadRemovalResultDto.md
 docs/ThreadResponseDto.md
 docs/ThreadSupportLinkDto.md
 docs/ThreadsApi.md
@@ -511,6 +517,7 @@ docs/UpdateCaseDto.md
 docs/UpdateCaseEventDto.md
 docs/UpdateCaseFindingFilterDto.md
 docs/UpdateCaseFindingNoteDto.md
+docs/UpdateCaseHypothesisRuleDto.md
 docs/UpdateChatBotDto.md
 docs/UpdateCorrelationConfigDto.md
 docs/UpdateCustomDetectorDto.md
@@ -579,6 +586,7 @@ src/apis/WorkerQueuesApi.ts
 src/apis/index.ts
 src/index.ts
 src/models/AddCaseFindingFiltersDto.ts
+src/models/AddCaseHypothesisRuleDto.ts
 src/models/AddEvidenceDto.ts
 src/models/AddExclusionDto.ts
 src/models/AddFindingDto.ts
@@ -696,6 +704,9 @@ src/models/CaseFindingFilterRuleDto.ts
 src/models/CaseFindingFiltersChangeResponseDto.ts
 src/models/CaseFindingFiltersPreviewDto.ts
 src/models/CaseFindingTypeOptionDto.ts
+src/models/CaseHypothesisRuleDto.ts
+src/models/CaseHypothesisRuleRemovalResponseDto.ts
+src/models/CaseHypothesisRulesChangeResponseDto.ts
 src/models/CaseLeadDto.ts
 src/models/CaseLinkedInquiryDto.ts
 src/models/CaseListResponseDto.ts
@@ -1035,6 +1046,8 @@ src/models/TestConnectionResponseDto.ts
 src/models/TextCoverageDto.ts
 src/models/ThreadEntriesResponseDto.ts
 src/models/ThreadEntryDto.ts
+src/models/ThreadRemovalPreviewDto.ts
+src/models/ThreadRemovalResultDto.ts
 src/models/ThreadResponseDto.ts
 src/models/ThreadSupportLinkDto.ts
 src/models/TrainCustomDetectorDto.ts
@@ -1057,6 +1070,7 @@ src/models/UpdateCaseDto.ts
 src/models/UpdateCaseEventDto.ts
 src/models/UpdateCaseFindingFilterDto.ts
 src/models/UpdateCaseFindingNoteDto.ts
+src/models/UpdateCaseHypothesisRuleDto.ts
 src/models/UpdateChatBotDto.ts
 src/models/UpdateCorrelationConfigDto.ts
 src/models/UpdateCustomDetectorDto.ts

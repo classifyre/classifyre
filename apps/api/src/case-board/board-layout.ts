@@ -322,12 +322,17 @@ function pinSpot(model: BoardModel, parent: BoardItemDto): XY {
  * A board with nothing placed yet gets one layered layout. Positions of
  * children (pins) are parent-relative.
  */
-export function planPlacement(model: BoardModel): Map<string, XY> {
+export function planPlacement(
+  model: BoardModel,
+  only?: ReadonlySet<string>,
+): Map<string, XY> {
   const all = [...model.items.values()];
   const positions = new Map<string, XY>();
   const floating: BoardItemDto[] = [];
   for (const item of all) {
     if (isPlaced(item)) continue;
+    // With `only`, everything else stays unplaced for whoever opens the board.
+    if (only && !only.has(item.id)) continue;
     const parent = item.parentId ? model.items.get(item.parentId) : undefined;
     if (item.kind === 'COMMENT' && parent) {
       positions.set(item.id, pinSpot(model, parent));
@@ -398,6 +403,74 @@ export function planPlacement(model: BoardModel): Map<string, XY> {
     }
   }
   return positions;
+}
+
+/** What {@link planArrivals} decided for evidence that just landed. */
+export interface ArrivalPlan {
+  /** Evidence going inside a frame, one plan per frame (positions are frame-relative). */
+  frames: Array<{ frameId: string; plan: FramePlan }>;
+  /** Evidence going next to its hypothesis on the open canvas (absolute positions). */
+  positions: Map<string, XY>;
+}
+
+/**
+ * Where evidence that a hypothesis rule just linked lands: inside the frame
+ * its hypothesis sits in, or right beside the hypothesis when that is on the
+ * open canvas. It is the board's own placement, only started from the
+ * hypothesis rather than from wherever the browser would put an unplaced item.
+ *
+ * Only unplaced evidence with a placed hypothesis is touched. Anything else
+ * (no hypothesis yet on the canvas, an asset that already has a spot) is left
+ * for the board's own auto-place, exactly as before this existed. A frame that
+ * is folded stays folded: the item goes inside it, the frame is not opened.
+ */
+export function planArrivals(
+  model: BoardModel,
+  itemIds: ReadonlySet<string>,
+): ArrivalPlan {
+  const byFrame = new Map<string, string[]>();
+  const open: string[] = [];
+  for (const id of itemIds) {
+    const item = model.items.get(id);
+    if (!item || item.kind !== 'EVIDENCE' || isPlaced(item) || item.parentId) {
+      continue;
+    }
+    const anchors = neighboursOf(model, id)
+      .map((n) => model.items.get(n))
+      .filter(
+        (n): n is BoardItemDto => !!n && n.kind === 'HYPOTHESIS' && isPlaced(n),
+      );
+    if (anchors.length === 0) continue;
+    // A hypothesis in a frame draws the evidence into it; the first one wins
+    // when the evidence belongs to hypotheses in different frames.
+    const framed = anchors.find((a) => a.parentId);
+    if (framed?.parentId) {
+      const list = byFrame.get(framed.parentId) ?? [];
+      list.push(id);
+      byFrame.set(framed.parentId, list);
+    } else {
+      open.push(id);
+    }
+  }
+
+  const frames: ArrivalPlan['frames'] = [];
+  for (const [frameId, ids] of byFrame) {
+    try {
+      frames.push({
+        frameId,
+        plan: planFrame(model, ids, { kind: 'existing', frameId }),
+      });
+    } catch (error) {
+      // A frame that vanished or is not a frame: fall back to the open canvas.
+      if (!(error instanceof FramePlanError)) throw error;
+      open.push(...ids);
+    }
+  }
+  return {
+    frames,
+    positions:
+      open.length > 0 ? planPlacement(model, new Set(open)) : new Map(),
+  };
 }
 
 export interface PlannedMove {

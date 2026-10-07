@@ -17,6 +17,7 @@ import {
   Severity,
 } from '@prisma/client';
 import { CaseCleanupResultDto, CaseFindingFilterDto } from './case-cleanup.dto';
+import { CaseHypothesisRuleDto } from './case-hypothesis-rules.dto';
 
 export class CreateCaseDto {
   @ApiProperty()
@@ -601,6 +602,13 @@ export class CaseResponseDto {
     description: 'Finding filters, case-wide and per watch',
   })
   findingFilters?: CaseFindingFilterDto[];
+
+  @ApiPropertyOptional({
+    type: [CaseHypothesisRuleDto],
+    description:
+      'Hypothesis rules: which hypothesis, with which stance, the answers of each watch are linked to',
+  })
+  hypothesisRules?: CaseHypothesisRuleDto[];
 
   @ApiPropertyOptional({
     type: CaseCleanupResultDto,

@@ -16,6 +16,7 @@
 import * as runtime from '../runtime';
 import type {
   AddCaseFindingFiltersDto,
+  AddCaseHypothesisRuleDto,
   AddEvidenceDto,
   AddFindingDto,
   AttachFindingsDto,
@@ -29,6 +30,9 @@ import type {
   CaseFindingFilterOptionsDto,
   CaseFindingFiltersChangeResponseDto,
   CaseFindingFiltersPreviewDto,
+  CaseHypothesisRuleDto,
+  CaseHypothesisRuleRemovalResponseDto,
+  CaseHypothesisRulesChangeResponseDto,
   CaseLeadDto,
   CaseListResponseDto,
   CaseResponseDto,
@@ -55,11 +59,14 @@ import type {
   UpdateCaseEventDto,
   UpdateCaseFindingFilterDto,
   UpdateCaseFindingNoteDto,
+  UpdateCaseHypothesisRuleDto,
   UpdateEvidenceNoteDto,
 } from '../models/index';
 import {
     AddCaseFindingFiltersDtoFromJSON,
     AddCaseFindingFiltersDtoToJSON,
+    AddCaseHypothesisRuleDtoFromJSON,
+    AddCaseHypothesisRuleDtoToJSON,
     AddEvidenceDtoFromJSON,
     AddEvidenceDtoToJSON,
     AddFindingDtoFromJSON,
@@ -86,6 +93,12 @@ import {
     CaseFindingFiltersChangeResponseDtoToJSON,
     CaseFindingFiltersPreviewDtoFromJSON,
     CaseFindingFiltersPreviewDtoToJSON,
+    CaseHypothesisRuleDtoFromJSON,
+    CaseHypothesisRuleDtoToJSON,
+    CaseHypothesisRuleRemovalResponseDtoFromJSON,
+    CaseHypothesisRuleRemovalResponseDtoToJSON,
+    CaseHypothesisRulesChangeResponseDtoFromJSON,
+    CaseHypothesisRulesChangeResponseDtoToJSON,
     CaseLeadDtoFromJSON,
     CaseLeadDtoToJSON,
     CaseListResponseDtoFromJSON,
@@ -138,6 +151,8 @@ import {
     UpdateCaseFindingFilterDtoToJSON,
     UpdateCaseFindingNoteDtoFromJSON,
     UpdateCaseFindingNoteDtoToJSON,
+    UpdateCaseHypothesisRuleDtoFromJSON,
+    UpdateCaseHypothesisRuleDtoToJSON,
     UpdateEvidenceNoteDtoFromJSON,
     UpdateEvidenceNoteDtoToJSON,
 } from '../models/index';
@@ -200,6 +215,27 @@ export interface CaseEventsControllerUpdateRequest {
     caseId: string;
     eventId: string;
     updateCaseEventDto: UpdateCaseEventDto;
+}
+
+export interface CaseHypothesisRulesControllerAddRequest {
+    id: string;
+    addCaseHypothesisRuleDto: AddCaseHypothesisRuleDto;
+}
+
+export interface CaseHypothesisRulesControllerListRequest {
+    id: string;
+}
+
+export interface CaseHypothesisRulesControllerRemoveRequest {
+    id: string;
+    ruleId: string;
+    removeLinks?: boolean;
+}
+
+export interface CaseHypothesisRulesControllerUpdateRequest {
+    id: string;
+    ruleId: string;
+    updateCaseHypothesisRuleDto: UpdateCaseHypothesisRuleDto;
 }
 
 export interface CaseLeadsControllerGenerateRequest {
@@ -885,6 +921,194 @@ export class CasesApi extends runtime.BaseAPI {
      */
     async caseEventsControllerUpdate(requestParameters: CaseEventsControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseEventDto> {
         const response = await this.caseEventsControllerUpdateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Add a rule: answers of a watch are linked to a hypothesis with a stance (supports, contradicts, neutral) as they arrive, and their evidence lands beside the hypothesis on the board. With applyToExisting, what the case already holds from the watch is linked too.
+     */
+    async caseHypothesisRulesControllerAddRaw(requestParameters: CaseHypothesisRulesControllerAddRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseHypothesisRulesChangeResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseHypothesisRulesControllerAdd().'
+            );
+        }
+
+        if (requestParameters['addCaseHypothesisRuleDto'] == null) {
+            throw new runtime.RequiredError(
+                'addCaseHypothesisRuleDto',
+                'Required parameter "addCaseHypothesisRuleDto" was null or undefined when calling caseHypothesisRulesControllerAdd().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/hypothesis-rules`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AddCaseHypothesisRuleDtoToJSON(requestParameters['addCaseHypothesisRuleDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseHypothesisRulesChangeResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Add a rule: answers of a watch are linked to a hypothesis with a stance (supports, contradicts, neutral) as they arrive, and their evidence lands beside the hypothesis on the board. With applyToExisting, what the case already holds from the watch is linked too.
+     */
+    async caseHypothesisRulesControllerAdd(requestParameters: CaseHypothesisRulesControllerAddRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseHypothesisRulesChangeResponseDto> {
+        const response = await this.caseHypothesisRulesControllerAddRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * The case\'s hypothesis rules, per watch
+     */
+    async caseHypothesisRulesControllerListRaw(requestParameters: CaseHypothesisRulesControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<CaseHypothesisRuleDto>>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseHypothesisRulesControllerList().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{id}/hypothesis-rules`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(CaseHypothesisRuleDtoFromJSON));
+    }
+
+    /**
+     * The case\'s hypothesis rules, per watch
+     */
+    async caseHypothesisRulesControllerList(requestParameters: CaseHypothesisRulesControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<CaseHypothesisRuleDto>> {
+        const response = await this.caseHypothesisRulesControllerListRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Remove a rule. The links it made stay (they become the hypothesis\' own links) unless removeLinks is true.
+     */
+    async caseHypothesisRulesControllerRemoveRaw(requestParameters: CaseHypothesisRulesControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseHypothesisRuleRemovalResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseHypothesisRulesControllerRemove().'
+            );
+        }
+
+        if (requestParameters['ruleId'] == null) {
+            throw new runtime.RequiredError(
+                'ruleId',
+                'Required parameter "ruleId" was null or undefined when calling caseHypothesisRulesControllerRemove().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['removeLinks'] != null) {
+            queryParameters['removeLinks'] = requestParameters['removeLinks'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{id}/hypothesis-rules/{ruleId}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"ruleId"}}`, encodeURIComponent(String(requestParameters['ruleId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseHypothesisRuleRemovalResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Remove a rule. The links it made stay (they become the hypothesis\' own links) unless removeLinks is true.
+     */
+    async caseHypothesisRulesControllerRemove(requestParameters: CaseHypothesisRulesControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseHypothesisRuleRemovalResponseDto> {
+        const response = await this.caseHypothesisRulesControllerRemoveRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Change a rule\'s hypothesis, stance, matcher or description. A new stance or hypothesis carries the links the rule already made (unless updateLinks is false).
+     */
+    async caseHypothesisRulesControllerUpdateRaw(requestParameters: CaseHypothesisRulesControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseHypothesisRulesChangeResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling caseHypothesisRulesControllerUpdate().'
+            );
+        }
+
+        if (requestParameters['ruleId'] == null) {
+            throw new runtime.RequiredError(
+                'ruleId',
+                'Required parameter "ruleId" was null or undefined when calling caseHypothesisRulesControllerUpdate().'
+            );
+        }
+
+        if (requestParameters['updateCaseHypothesisRuleDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateCaseHypothesisRuleDto',
+                'Required parameter "updateCaseHypothesisRuleDto" was null or undefined when calling caseHypothesisRulesControllerUpdate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/hypothesis-rules/{ruleId}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"ruleId"}}`, encodeURIComponent(String(requestParameters['ruleId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateCaseHypothesisRuleDtoToJSON(requestParameters['updateCaseHypothesisRuleDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseHypothesisRulesChangeResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Change a rule\'s hypothesis, stance, matcher or description. A new stance or hypothesis carries the links the rule already made (unless updateLinks is false).
+     */
+    async caseHypothesisRulesControllerUpdate(requestParameters: CaseHypothesisRulesControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseHypothesisRulesChangeResponseDto> {
+        const response = await this.caseHypothesisRulesControllerUpdateRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

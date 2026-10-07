@@ -134,6 +134,10 @@ All URIs are relative to *http://localhost*
 *CasesApi* | [**caseEventsControllerList**](docs/CasesApi.md#caseeventscontrollerlist) | **GET** /cases/{caseId}/events | List the case chronology (real-world events, ordered by date)
 *CasesApi* | [**caseEventsControllerRemove**](docs/CasesApi.md#caseeventscontrollerremove) | **DELETE** /cases/{caseId}/events/{eventId} | Remove a chronology event
 *CasesApi* | [**caseEventsControllerUpdate**](docs/CasesApi.md#caseeventscontrollerupdate) | **PATCH** /cases/{caseId}/events/{eventId} | Update (and implicitly verify) a chronology event
+*CasesApi* | [**caseHypothesisRulesControllerAdd**](docs/CasesApi.md#casehypothesisrulescontrolleradd) | **POST** /cases/{id}/hypothesis-rules | Add a rule: answers of a watch are linked to a hypothesis with a stance (supports, contradicts, neutral) as they arrive, and their evidence lands beside the hypothesis on the board. With applyToExisting, what the case already holds from the watch is linked too.
+*CasesApi* | [**caseHypothesisRulesControllerList**](docs/CasesApi.md#casehypothesisrulescontrollerlist) | **GET** /cases/{id}/hypothesis-rules | The case\&#39;s hypothesis rules, per watch
+*CasesApi* | [**caseHypothesisRulesControllerRemove**](docs/CasesApi.md#casehypothesisrulescontrollerremove) | **DELETE** /cases/{id}/hypothesis-rules/{ruleId} | Remove a rule. The links it made stay (they become the hypothesis\&#39; own links) unless removeLinks is true.
+*CasesApi* | [**caseHypothesisRulesControllerUpdate**](docs/CasesApi.md#casehypothesisrulescontrollerupdate) | **PATCH** /cases/{id}/hypothesis-rules/{ruleId} | Change a rule\&#39;s hypothesis, stance, matcher or description. A new stance or hypothesis carries the links the rule already made (unless updateLinks is false).
 *CasesApi* | [**caseLeadsControllerGenerate**](docs/CasesApi.md#caseleadscontrollergenerate) | **POST** /cases/{caseId}/leads/generate | Refresh leads now (similar content, watch answers, look-alike documents). The case also refreshes them by itself when its evidence or watches change
 *CasesApi* | [**caseLeadsControllerList**](docs/CasesApi.md#caseleadscontrollerlist) | **GET** /cases/{caseId}/leads | List leads (exploration candidates) for a case
 *CasesApi* | [**caseLeadsControllerPropose**](docs/CasesApi.md#caseleadscontrollerpropose) | **POST** /cases/{caseId}/leads | Propose a finding as a lead for this case
@@ -456,7 +460,8 @@ All URIs are relative to *http://localhost*
 *ThreadsApi* | [**caseThreadsControllerGetEntries**](docs/ThreadsApi.md#casethreadscontrollergetentries) | **GET** /threads/{id}/entries | Paginated thread entry history
 *ThreadsApi* | [**caseThreadsControllerLinkSupport**](docs/ThreadsApi.md#casethreadscontrollerlinksupport) | **POST** /threads/{id}/support | Link evidence or finding to a thread
 *ThreadsApi* | [**caseThreadsControllerList**](docs/ThreadsApi.md#casethreadscontrollerlist) | **GET** /cases/{caseId}/threads | List threads (hypothesis + discussion) for a case
-*ThreadsApi* | [**caseThreadsControllerRemove**](docs/ThreadsApi.md#casethreadscontrollerremove) | **DELETE** /threads/{id} | Delete a thread
+*ThreadsApi* | [**caseThreadsControllerRemovalPreview**](docs/ThreadsApi.md#casethreadscontrollerremovalpreview) | **GET** /threads/{id}/removal-preview | What deleting a hypothesis together with its evidence would take out of the case (writes nothing)
+*ThreadsApi* | [**caseThreadsControllerRemove**](docs/ThreadsApi.md#casethreadscontrollerremove) | **DELETE** /threads/{id} | Delete a thread. With evidence&#x3D;remove, the findings and assets linked to a hypothesis leave the case with it, except what another hypothesis is linked to and what carries a note. Default: they stay in the case and on the board.
 *ThreadsApi* | [**caseThreadsControllerUnlinkSupport**](docs/ThreadsApi.md#casethreadscontrollerunlinksupport) | **DELETE** /threads/{id}/support/{linkId} | Unlink evidence or finding from a thread
 *ThreadsApi* | [**caseThreadsControllerUpdate**](docs/ThreadsApi.md#casethreadscontrollerupdate) | **PATCH** /threads/{id} | Update thread title / status / confidence / color
 *WorkerQueuesApi* | [**workerQueuesControllerOverview**](docs/WorkerQueuesApi.md#workerqueuescontrolleroverview) | **GET** /worker-queues | List background queues with live worker state and backlog
@@ -467,6 +472,7 @@ All URIs are relative to *http://localhost*
 ### Models
 
 - [AddCaseFindingFiltersDto](docs/AddCaseFindingFiltersDto.md)
+- [AddCaseHypothesisRuleDto](docs/AddCaseHypothesisRuleDto.md)
 - [AddEvidenceDto](docs/AddEvidenceDto.md)
 - [AddExclusionDto](docs/AddExclusionDto.md)
 - [AddFindingDto](docs/AddFindingDto.md)
@@ -584,6 +590,9 @@ All URIs are relative to *http://localhost*
 - [CaseFindingFiltersChangeResponseDto](docs/CaseFindingFiltersChangeResponseDto.md)
 - [CaseFindingFiltersPreviewDto](docs/CaseFindingFiltersPreviewDto.md)
 - [CaseFindingTypeOptionDto](docs/CaseFindingTypeOptionDto.md)
+- [CaseHypothesisRuleDto](docs/CaseHypothesisRuleDto.md)
+- [CaseHypothesisRuleRemovalResponseDto](docs/CaseHypothesisRuleRemovalResponseDto.md)
+- [CaseHypothesisRulesChangeResponseDto](docs/CaseHypothesisRulesChangeResponseDto.md)
 - [CaseLeadDto](docs/CaseLeadDto.md)
 - [CaseLinkedInquiryDto](docs/CaseLinkedInquiryDto.md)
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
@@ -923,6 +932,8 @@ All URIs are relative to *http://localhost*
 - [TextCoverageDto](docs/TextCoverageDto.md)
 - [ThreadEntriesResponseDto](docs/ThreadEntriesResponseDto.md)
 - [ThreadEntryDto](docs/ThreadEntryDto.md)
+- [ThreadRemovalPreviewDto](docs/ThreadRemovalPreviewDto.md)
+- [ThreadRemovalResultDto](docs/ThreadRemovalResultDto.md)
 - [ThreadResponseDto](docs/ThreadResponseDto.md)
 - [ThreadSupportLinkDto](docs/ThreadSupportLinkDto.md)
 - [TrainCustomDetectorDto](docs/TrainCustomDetectorDto.md)
@@ -945,6 +956,7 @@ All URIs are relative to *http://localhost*
 - [UpdateCaseEventDto](docs/UpdateCaseEventDto.md)
 - [UpdateCaseFindingFilterDto](docs/UpdateCaseFindingFilterDto.md)
 - [UpdateCaseFindingNoteDto](docs/UpdateCaseFindingNoteDto.md)
+- [UpdateCaseHypothesisRuleDto](docs/UpdateCaseHypothesisRuleDto.md)
 - [UpdateChatBotDto](docs/UpdateChatBotDto.md)
 - [UpdateCorrelationConfigDto](docs/UpdateCorrelationConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)

@@ -16,6 +16,7 @@ import {
   Fingerprint,
   FolderOpen,
   Frame,
+  GitBranch,
   GitCommit,
   Globe,
   Highlighter,
@@ -109,6 +110,11 @@ const TYPE_META: Record<
   FINDING_FILTER_ADDED: { icon: <Filter className="h-3.5 w-3.5" />, label: "Finding filter added", color: "text-blue-600 dark:text-blue-400", group: "case" },
   FINDING_FILTER_UPDATED: { icon: <Filter className="h-3.5 w-3.5" />, label: "Finding filter changed", color: "text-muted-foreground", group: "case" },
   FINDING_FILTER_REMOVED: { icon: <Filter className="h-3.5 w-3.5" />, label: "Finding filter removed", color: "text-muted-foreground", group: "case" },
+  HYPOTHESIS_RULE_ADDED: { icon: <GitBranch className="h-3.5 w-3.5" />, label: "Hypothesis rule added", color: "text-blue-600 dark:text-blue-400", group: "case" },
+  HYPOTHESIS_RULE_UPDATED: { icon: <GitBranch className="h-3.5 w-3.5" />, label: "Hypothesis rule changed", color: "text-muted-foreground", group: "case" },
+  HYPOTHESIS_RULE_REMOVED: { icon: <GitBranch className="h-3.5 w-3.5" />, label: "Hypothesis rule removed", color: "text-muted-foreground", group: "case" },
+  FINDINGS_AUTO_LINKED: { icon: <GitBranch className="h-3.5 w-3.5" />, label: "Linked to a hypothesis", color: "text-blue-600 dark:text-blue-400", group: "evidence" },
+  THREAD_EVIDENCE_REMOVED: { icon: <Eraser className="h-3.5 w-3.5" />, label: "Hypothesis deleted with its evidence", color: "text-red-600 dark:text-red-400", group: "evidence" },
   FINDINGS_ESCALATED: { icon: <TriangleAlert className="h-3.5 w-3.5" />, label: "Escalated", color: ESCALATION_INK, group: "escalation" },
   ESCALATION_CLEARED: { icon: <TriangleAlert className="h-3.5 w-3.5" />, label: "Escalation cleared", color: "text-muted-foreground", group: "escalation" },
   FINDINGS_AUTO_REMOVED: { icon: <Eraser className="h-3.5 w-3.5" />, label: "Findings taken out", color: "text-red-600 dark:text-red-400", group: "evidence" },
@@ -150,6 +156,12 @@ const RULE_LABELS: Record<string, string> = {
 };
 
 /** A removal's heading says which rule (or filter) took things out. */
+const STANCE_WORDS: Record<string, string> = {
+  SUPPORTS: "supports",
+  CONTRADICTS: "contradicts",
+  NEUTRAL: "neutral",
+};
+
 const REMOVAL_LABELS: Record<string, string> = {
   FINDING_GONE: "Taken out: no longer detected",
   FINDING_RESOLVED: "Taken out: resolved",
@@ -460,7 +472,13 @@ function eventSubject(item: CaseActivityDto): string | null {
     case "SUPPORT_LINKED":
     case "SUPPORT_UNLINKED":
     case "SUPPORT_UPDATED":
+    case "HYPOTHESIS_RULE_ADDED":
+    case "HYPOTHESIS_RULE_UPDATED":
+    case "HYPOTHESIS_RULE_REMOVED":
+    case "THREAD_EVIDENCE_REMOVED":
       return str(p.threadTitle);
+    case "FINDINGS_AUTO_LINKED":
+      return str(p.inquiryTitle);
     case "EVIDENCE_ADDED":
     case "EVIDENCE_REMOVED":
     case "EVIDENCE_NOTE_UPDATED":
@@ -690,6 +708,85 @@ function EventDetail({
             truncated={p.truncated === true}
             onShowOnBoard={onShowOnBoard}
           />,
+        );
+      }
+      break;
+    }
+    case "HYPOTHESIS_RULE_ADDED":
+    case "HYPOTHESIS_RULE_UPDATED":
+    case "HYPOTHESIS_RULE_REMOVED": {
+      lines.push(
+        <span key="rule" className="block">
+          {str(p.inquiryTitle) ? <>from “{str(p.inquiryTitle)}” · </> : null}
+          <span className="font-medium text-foreground">{STANCE_WORDS[String(p.stance)] ?? String(p.stance)}</span>
+          {typeof p.matcher === "string" ? <> · {p.matcher}</> : null}
+        </span>,
+      );
+      const changes = Array.isArray(p.changes) ? (p.changes as Array<{ setting?: string; from?: unknown; to?: unknown }>) : [];
+      for (const change of changes) {
+        lines.push(
+          <span key={String(change.setting)} className="block">
+            {String(change.setting)}: {String(change.from ?? "—")} →{" "}
+            <span className="text-foreground">{String(change.to ?? "—")}</span>
+          </span>,
+        );
+      }
+      if (item.activityType === "HYPOTHESIS_RULE_REMOVED") {
+        const unlinked = Number(p.unlinked ?? 0);
+        const kept = Number(p.kept ?? 0);
+        lines.push(
+          <span key="links" className="block italic">
+            {unlinked > 0
+              ? `${unlinked} link${unlinked === 1 ? "" : "s"} it made went with it`
+              : kept > 0
+                ? `${kept} link${kept === 1 ? "" : "s"} it made stay`
+                : "it had made no links"}
+          </span>,
+        );
+      }
+      break;
+    }
+    case "FINDINGS_AUTO_LINKED": {
+      const linked = Number(p.linked ?? 0);
+      const rows = Array.isArray(p.hypotheses)
+        ? (p.hypotheses as Array<{ threadTitle?: string; stance?: string; count?: number }>)
+        : [];
+      for (const [index, row] of rows.entries()) {
+        lines.push(
+          <span key={`h${index}`} className="block">
+            {Number(row.count ?? 0)} finding{Number(row.count ?? 0) === 1 ? "" : "s"} →{" "}
+            <span className="font-medium text-foreground">{row.threadTitle}</span> ·{" "}
+            {STANCE_WORDS[String(row.stance)] ?? String(row.stance)}
+          </span>,
+        );
+      }
+      if (rows.length === 0 && linked > 0) lines.push(<span key="n">{linked} finding(s) linked</span>);
+      const findings = Array.isArray(p.findings) ? (p.findings as Array<{ label?: string; value?: string | null }>) : [];
+      if (findings.length > 0) {
+        lines.push(
+          <span key="what" className="block font-mono text-[11px]">
+            {findings.map((f) => (f.value ? `${f.label}: ${f.value}` : f.label)).join(" · ")}
+          </span>,
+        );
+      }
+      break;
+    }
+    case "THREAD_EVIDENCE_REMOVED": {
+      const f = Number(p.findings ?? 0);
+      const a = Number(p.assets ?? 0);
+      lines.push(
+        <span key="gone" className="block">
+          took out {f} finding{f === 1 ? "" : "s"} and {a} asset{a === 1 ? "" : "s"} with it
+        </span>,
+      );
+      const kept = Number(p.keptShared ?? 0) + Number(p.keptNoted ?? 0);
+      if (kept > 0) {
+        lines.push(
+          <span key="kept" className="block italic">
+            {Number(p.keptShared ?? 0) > 0 ? `${p.keptShared} shared with another hypothesis` : ""}
+            {Number(p.keptShared ?? 0) > 0 && Number(p.keptNoted ?? 0) > 0 ? ", " : ""}
+            {Number(p.keptNoted ?? 0) > 0 ? `${p.keptNoted} with a note` : ""} stayed
+          </span>,
         );
       }
       break;

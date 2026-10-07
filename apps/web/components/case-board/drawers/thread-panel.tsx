@@ -28,10 +28,12 @@ import {
   getActorName,
   AddThreadEntryDtoEntryTypeEnum,
   type ThreadEntryDto,
+  type ThreadRemovalPreviewDto,
   type ThreadResponseDto,
   type ThreadSupportLinkDto,
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
+import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group";
 import { Slider } from "@workspace/ui/components/slider";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
@@ -809,15 +811,50 @@ function ThreadMenu({
   const store = useBoardStore();
   const centre = useVisibleCentre();
   const [confirming, setConfirming] = React.useState(false);
+  // What the case holds on a hypothesis, to say what deleting it with its evidence would take out.
+  const [preview, setPreview] = React.useState<ThreadRemovalPreviewDto | null>(null);
+  const [evidence, setEvidence] = React.useState<"keep" | "remove">("keep");
+  const [deleting, setDeleting] = React.useState(false);
+  const isHypothesis = thread.kind === "HYPOTHESIS";
+  React.useEffect(() => {
+    if (!confirming || !isHypothesis) return;
+    let cancelled = false;
+    setPreview(null);
+    setEvidence("keep");
+    api.threads
+      .caseThreadsControllerRemovalPreview({ id: thread.id })
+      .then((res) => {
+        if (!cancelled) setPreview(res);
+      })
+      .catch(() => {
+        if (!cancelled) setPreview(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [confirming, isHypothesis, thread.id]);
   const remove = async () => {
+    setDeleting(true);
     try {
-      await api.threads.caseThreadsControllerRemove({ id: thread.id });
-      ui.getState().openDrawer(thread.kind === "HYPOTHESIS" ? "hypotheses" : null);
+      const res = await api.threads.caseThreadsControllerRemove({
+        id: thread.id,
+        evidence: isHypothesis && evidence === "remove" ? "remove" : "keep",
+      });
+      if (res.findingsRemoved > 0 || res.assetsRemoved > 0) {
+        toast.success(
+          t("caseBoard.thread.deletedWithEvidence", { findings: res.findingsRemoved, assets: res.assetsRemoved }),
+        );
+      }
+      setConfirming(false);
+      ui.getState().openDrawer(isHypothesis ? "hypotheses" : null);
       store.getState().refetch();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDeleting(false);
     }
   };
+  const linked = (preview?.linkedFindings ?? 0) + (preview?.linkedAssets ?? 0);
   return (
     <>
       <DropdownMenu>
@@ -883,10 +920,57 @@ function ThreadMenu({
             <AlertDialogTitle>{t("caseBoard.thread.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>{t("caseBoard.thread.deleteBody")}</AlertDialogDescription>
           </AlertDialogHeader>
+          {isHypothesis && preview && (linked > 0 || preview.rules > 0) && (
+            <div className="space-y-3 text-sm" data-testid="thread-delete-options">
+              {preview.rules > 0 && (
+                <p className="text-muted-foreground text-xs">{t("caseBoard.thread.deleteRules", { count: preview.rules })}</p>
+              )}
+              {linked > 0 && (
+                <RadioGroup value={evidence} onValueChange={(v) => setEvidence(v as "keep" | "remove")}>
+                  <label className="flex items-start gap-2">
+                    <RadioGroupItem value="keep" className="mt-0.5" data-testid="thread-delete-keep" />
+                    <span>
+                      {t("caseBoard.thread.deleteKeep")}
+                      <span className="text-muted-foreground block text-xs">
+                        {t("caseBoard.thread.deleteKeepHint", { findings: preview.linkedFindings, assets: preview.linkedAssets })}
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2">
+                    <RadioGroupItem
+                      value="remove"
+                      className="mt-0.5"
+                      data-testid="thread-delete-remove"
+                      disabled={preview.removableFindings === 0 && preview.removableAssets === 0}
+                    />
+                    <span>
+                      {t("caseBoard.thread.deleteRemove", {
+                        findings: preview.removableFindings,
+                        assets: preview.removableAssets,
+                      })}
+                      <span className="text-muted-foreground block text-xs">
+                        {t("caseBoard.thread.deleteRemoveHint")}
+                        {preview.keptShared > 0 && ` ${t("caseBoard.thread.deleteKeptShared", { count: preview.keptShared })}`}
+                        {preview.keptNoted > 0 && ` ${t("caseBoard.thread.deleteKeptNoted", { count: preview.keptNoted })}`}
+                      </span>
+                    </span>
+                  </label>
+                </RadioGroup>
+              )}
+            </div>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => void remove()}>
-              {t("caseBoard.thread.delete")}
+            <AlertDialogCancel disabled={deleting}>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deleting}
+              onClick={(event) => {
+                event.preventDefault();
+                void remove();
+              }}
+            >
+              {deleting && <Loader2 className="size-3.5 animate-spin" />}
+              {evidence === "remove" && isHypothesis ? t("caseBoard.thread.deleteWithEvidence") : t("caseBoard.thread.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
