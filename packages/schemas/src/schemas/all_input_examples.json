@@ -1172,6 +1172,106 @@
       }
     }
   ],
+  "DREMIO": [
+    {
+      "name": "Dremio Cloud project",
+      "description": "Scan every table and view in a Dremio Cloud project, with lineage between views and the tables they read from",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "14 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "DREMIO",
+        "required": {
+          "project_id": "your-project-id",
+          "region": "US"
+        },
+        "masked": {
+          "token": "your-personal-access-token"
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Self-hosted Dremio semantic layer",
+      "description": "Scan selected spaces and one source on a self-hosted Dremio using a personal access token, with cross-system lineage to the databases behind Dremio's sources",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "37 13 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "DREMIO",
+        "required": {
+          "url": "https://dremio.example.com:9047"
+        },
+        "masked": {
+          "token": "your-personal-access-token"
+        },
+        "optional": {
+          "scope": {
+            "include_paths": [
+              "Finance",
+              "Marketing.Campaigns",
+              "warehouse_pg.public"
+            ],
+            "exclude_paths": [
+              "Finance.Scratch"
+            ],
+            "include_home_spaces": false
+          },
+          "extraction": {
+            "include_view_lineage": true,
+            "include_source_lineage": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "order_by_column": "updated_at",
+          "fallback_to_random": true,
+          "rows_per_page": 100
+        }
+      }
+    },
+    {
+      "name": "Dremio Community with username and password",
+      "description": "Scan views only on a Dremio Community Edition server that signs in with a username and password",
+      "schedule": {
+        "enabled": false
+      },
+      "config": {
+        "type": "DREMIO",
+        "required": {
+          "url": "http://localhost:9047"
+        },
+        "masked": {
+          "username": "your-username",
+          "password": "your-password"
+        },
+        "optional": {
+          "connection": {
+            "timeout_seconds": 60,
+            "query_timeout_seconds": 600
+          },
+          "scope": {
+            "include_tables": false,
+            "include_views": true,
+            "table_limit": 200
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 100
+        }
+      }
+    }
+  ],
   "MONGODB": [
     {
       "name": "Atlas cluster discovery scan",

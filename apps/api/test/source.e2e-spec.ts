@@ -263,6 +263,7 @@ describe('Source (e2e)', () => {
       'HIVE',
       'DATABRICKS',
       'SNOWFLAKE',
+      'DREMIO',
       'MONGODB',
       'POWERBI',
       'TABLEAU',

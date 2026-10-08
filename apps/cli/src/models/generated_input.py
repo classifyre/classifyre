@@ -35,6 +35,7 @@ class AssetType(StrEnum):
     HIVE = 'HIVE'
     DATABRICKS = 'DATABRICKS'
     SNOWFLAKE = 'SNOWFLAKE'
+    DREMIO = 'DREMIO'
     MONGODB = 'MONGODB'
     NEO4J = 'NEO4J'
     POWERBI = 'POWERBI'
@@ -368,6 +369,7 @@ class Type(StrEnum):
     HIVE = 'HIVE'
     DATABRICKS = 'DATABRICKS'
     SNOWFLAKE = 'SNOWFLAKE'
+    DREMIO = 'DREMIO'
     MONGODB = 'MONGODB'
     NEO4J = 'NEO4J'
     POWERBI = 'POWERBI'
@@ -2152,6 +2154,150 @@ class SnowflakeOptional(BaseModel):
     extraction: SnowflakeOptionalExtraction | None = None
 
 
+class DremioCloudRegion(StrEnum):
+    """
+    Dremio Cloud control plane the project lives in
+    """
+
+    US = 'US'
+    EU = 'EU'
+
+
+class DremioRequiredSoftware(BaseModel):
+    """
+    A Dremio you run yourself (Dremio Software, Enterprise or Community Edition).
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    url: AnyUrl = Field(
+        ...,
+        description='Address you open Dremio at, including the port (for example, https://dremio.example.com:9047)',
+    )
+
+
+class DremioRequiredCloud(BaseModel):
+    """
+    A project in Dremio's hosted service. Signs in with a personal access token.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    project_id: str = Field(
+        ...,
+        description='Dremio Cloud project ID (Project Settings > General Information)',
+    )
+    region: DremioCloudRegion
+
+
+class DremioMaskedPassword(BaseModel):
+    """
+    Self-hosted Dremio only.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    username: str = Field(..., description='Dremio login username')
+    password: str = Field(..., description='Dremio login password')
+
+
+class DremioMaskedToken(BaseModel):
+    """
+    Works for Dremio Cloud and for self-hosted Enterprise Edition.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    token: str = Field(
+        ...,
+        description='Dremio personal access token (Account Settings > Personal Access Tokens)',
+    )
+
+
+class DremioOptionalConnection(BaseModel):
+    """
+    Dremio API and query tuning options.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    verify_ssl: bool | None = Field(
+        True,
+        description="Verify the Dremio server's TLS certificate. Turn off only for a self-hosted Dremio with a self-signed certificate.",
+    )
+    timeout_seconds: int | None = Field(
+        30, description='HTTP timeout for a single Dremio API call', ge=5, le=300
+    )
+    query_timeout_seconds: int | None = Field(
+        300,
+        description='Maximum time to wait for one sampling query to finish before it is cancelled',
+        ge=10,
+        le=3600,
+    )
+
+
+class DremioOptionalScope(BaseModel):
+    """
+    Which Dremio sources, spaces, folders, and datasets to scan.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_paths: list[str] | None = Field(
+        None,
+        description='Optional allowlist of sources, spaces, folders, or datasets, written as dot-separated paths (for example, Marketing or Samples."samples.dremio.com"). Everything beneath a listed path is scanned. Wrap a name that itself contains a dot in double quotes.',
+    )
+    exclude_paths: list[str] | None = Field(
+        [],
+        description='Sources, spaces, folders, or datasets to skip, written the same way as include_paths. Exclusions win over inclusions.',
+    )
+    include_tables: bool | None = Field(
+        True, description='Include tables (physical datasets) in extraction'
+    )
+    include_views: bool | None = Field(
+        True, description='Include views (virtual datasets) in extraction'
+    )
+    include_home_spaces: bool | None = Field(
+        False, description='Include personal home spaces (@username) in extraction'
+    )
+    table_limit: int | None = Field(
+        None, description='Optional cap on number of table/view assets extracted', ge=1
+    )
+
+
+class DremioOptionalExtraction(BaseModel):
+    """
+    Lineage extraction controls for Dremio.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_view_lineage: bool | None = Field(
+        True,
+        description="Link each view to the tables and views it reads from. Uses Dremio's own lineage graph where the edition provides it, and the view's SQL otherwise.",
+    )
+    include_source_lineage: bool | None = Field(
+        True,
+        description="Link tables that Dremio reads from an external database (PostgreSQL, MySQL, SQL Server, Oracle, Snowflake) to that database's own table, so lineage continues across systems. Needs permission to view the Dremio source's settings.",
+    )
+
+
+class DremioOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: DremioOptionalConnection | None = None
+    scope: DremioOptionalScope | None = None
+    extraction: DremioOptionalExtraction | None = None
+
+
 class MongoDBDeployment(StrEnum):
     """
     MongoDB deployment mode
@@ -2703,7 +2849,7 @@ class ConfluenceOptionalConnection(BaseModel):
     )
 
 
-class Type21(StrEnum):
+class Type22(StrEnum):
     """
     Filter spaces by space type
     """
@@ -2740,7 +2886,7 @@ class ConfluenceOptionalScopeSpaces(BaseModel):
     keys: list[str] | None = Field(
         None, description='Filter spaces by keys (up to 250)', max_length=250
     )
-    type: Type21 | None = Field(None, description='Filter spaces by space type')
+    type: Type22 | None = Field(None, description='Filter spaces by space type')
     status: Status | None = Field(None, description='Filter spaces by status')
     labels: list[str] | None = Field(
         None,
@@ -3006,7 +3152,7 @@ class ServiceDeskOptional(BaseModel):
     content: ServiceDeskOptionalContent | None = None
 
 
-class Type22(StrEnum):
+class Type23(StrEnum):
     """
     Type of the asset or source
     """
@@ -3023,6 +3169,7 @@ class Type22(StrEnum):
     HIVE = 'HIVE'
     DATABRICKS = 'DATABRICKS'
     SNOWFLAKE = 'SNOWFLAKE'
+    DREMIO = 'DREMIO'
     MONGODB = 'MONGODB'
     NEO4J = 'NEO4J'
     POWERBI = 'POWERBI'
@@ -5183,6 +5330,30 @@ class SnowflakeInput(CoreInput):
     augmentation: AugmentationConfig | None = None
 
 
+class DremioInput(CoreInput):
+    type: Literal['DREMIO'] = Field(..., description='Type of the asset or source')
+    required: DremioRequiredSoftware | DremioRequiredCloud = Field(
+        ..., title='DremioRequired'
+    )
+    masked: DremioMaskedToken | DremioMaskedPassword = Field(..., title='DremioMasked')
+    optional: DremioOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+    augmentation: AugmentationConfig | None = None
+
+
 class MongoDBInput(CoreInput):
     type: Literal['MONGODB'] = Field(..., description='Type of the asset or source')
     required: MongoDBRequiredAtlas | MongoDBRequiredOnPrem = Field(
@@ -5848,6 +6019,7 @@ class SourceInput(
         | HiveInput
         | DatabricksInput
         | SnowflakeInput
+        | DremioInput
         | MongoDBInput
         | Neo4jInput
         | PowerBIInput
@@ -5889,6 +6061,7 @@ class SourceInput(
         | HiveInput
         | DatabricksInput
         | SnowflakeInput
+        | DremioInput
         | MongoDBInput
         | Neo4jInput
         | PowerBIInput

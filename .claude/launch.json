@@ -1,0 +1,87 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "zsh",
+      "runtimeArgs": [
+        "-c",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && bun run --cwd apps/web dev"
+      ],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "blog",
+      "runtimeExecutable": "zsh",
+      "runtimeArgs": [
+        "-c",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && bun run --cwd apps/blog dev"
+      ],
+      "port": 3003,
+      "autoPort": true
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "zsh",
+      "runtimeArgs": [
+        "-c",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && bun run --cwd apps/docs dev"
+      ],
+      "port": 3002,
+      "autoPort": true
+    },
+    {
+      "name": "desktop-selector-harness",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4173",
+        "-d",
+        "apps/desktop/dist/preview-harness"
+      ],
+      "port": 4173
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "zsh",
+      "runtimeArgs": [
+        "-c",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && bun run --cwd apps/api dev"
+      ],
+      "port": 8000,
+      "autoPort": true
+    },
+    {
+      "name": "marimo-wasm-probe",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4180",
+        "-d",
+        "/private/tmp/claude-501/-Users-andrii-fedorenko-development-private-unstructured/4b7b4c44-7cfc-4b8b-964e-e03ac14da4f0/scratchpad/wasmtest/out"
+      ],
+      "port": 4180
+    },
+    {
+      "name": "studio",
+      "runtimeExecutable": "zsh",
+      "runtimeArgs": [
+        "-c",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && bun run --cwd apps/studio studio --no-open --port=3123"
+      ],
+      "port": 3123
+    },
+    {
+      "name": "studio-hyperframes",
+      "runtimeExecutable": "zsh",
+      "runtimeArgs": [
+        "-c",
+        "source ~/.nvm/nvm.sh && nvm use 22 >/dev/null && bun run --cwd apps/studio-hyperframes studio ReuseCheck --no-open --port 3124"
+      ],
+      "port": 3124
+    }
+  ]
+}

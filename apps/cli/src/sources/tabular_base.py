@@ -908,8 +908,10 @@ class BaseTabularSource(BaseSource):
                         fields=fields,
                         sql=entry.sql,
                         # The catalog said these objects depend on each other;
-                        # only the column detail was parsed out of SQL.
-                        method=Method.SQL_PARSED if fields else Method.SYSTEM_CATALOG,
+                        # only the column detail was parsed out of SQL — unless
+                        # the dialect says the upstreams themselves were parsed.
+                        method=entry.method
+                        or (Method.SQL_PARSED if fields else Method.SYSTEM_CATALOG),
                     )
                 )
 

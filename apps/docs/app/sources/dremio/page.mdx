@@ -1,0 +1,118 @@
+---
+title: Dremio
+description: Scan Dremio tables and views — Dremio Cloud or self-hosted, what Classifyre extracts, lineage across spaces and through to the databases behind Dremio's sources, and every connection setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Dremio
+
+<SourceFacts
+  type="DREMIO"
+  vendor={{ label: "Dremio", href: "https://www.dremio.com/" }}
+  auth={{ label: "Personal access tokens", href: "https://docs.dremio.com/current/security/authentication/personal-access-tokens/" }}
+  links={[
+    { label: "Privileges", href: "https://docs.dremio.com/current/security/rbac/privileges/" },
+    { label: "Dremio Cloud projects", href: "https://docs.dremio.com/cloud/" },
+  ]}
+/>
+
+Dremio sits in front of other systems. Its sources are other people's databases
+and object stores, read in place; its spaces are the layer of views an
+organisation builds on top of them. So a Dremio scan finds sensitive data twice
+over: in the raw tables it can reach, and in every view that quietly carries a
+customer email three joins away from where it started.
+
+## What you need to connect
+
+First, where Dremio runs:
+
+| Deployment | What you supply |
+|---|---|
+| **Self-hosted Dremio** | The URL you open Dremio at |
+| **Dremio Cloud** | The project ID and the region the project lives in |
+
+The URL is the one in your browser's address bar, port included — usually
+`:9047`. Classifyre talks to Dremio only through that address; it needs no
+JDBC driver and no additional open port.
+
+Then, how to sign in:
+
+| Sign-in | Works with |
+|---|---|
+| **Personal access token** | Dremio Cloud, and self-hosted Enterprise Edition — the better choice wherever it exists |
+| **Username and password** | Self-hosted Dremio only. Community Edition has no access tokens, so this is its only option |
+
+Give the user `SELECT` on the spaces and sources you want scanned, and nothing
+more. A dedicated service user is the right identity: what it cannot see is not
+scanned.
+
+## What Classifyre reads
+
+**Tables** (Dremio's physical datasets — a database table, an Iceberg table, a
+promoted file or folder) and **views**, across every source and space the user
+can see. Narrow that with a list of paths to include or exclude, written the way
+Dremio writes them:
+
+- `Finance` — a whole space or source
+- `Marketing.Campaigns` — one folder and everything beneath it
+- `Samples."samples.dremio.com"` — quote a name that itself contains a dot
+
+Personal home spaces (`@username`) are skipped unless you ask for them. Files
+that nobody has promoted to a table are skipped too: Dremio cannot query them,
+so there are no rows to sample.
+
+<SqlSourceNotes viewLineage foreignKeys={false} />
+
+## Metadata on every asset
+
+<SourceMetadata type="DREMIO" />
+
+## Lineage
+
+<LineageNote>
+
+Two kinds, and together they are the reason to scan Dremio at all.
+
+- **View lineage** — each view and the tables and views it reads from. On Dremio
+  Cloud and Enterprise Edition this comes from Dremio's own lineage graph. On
+  Community Edition, which has none, it is read from the view's SQL instead and
+  marked as *SQL parsed*, so you can tell the two apart. Either way the SQL is
+  kept with the edge, and column-level detail is recovered from it where the
+  SQL names its columns.
+- **Source lineage** — a table in a Dremio source is really a table somewhere
+  else. For PostgreSQL, MySQL, SQL Server, Oracle and Snowflake sources,
+  Classifyre links the Dremio table to the underlying table by name. If that
+  database is also connected as its own source — now or later — the two meet,
+  and lineage runs from the original table, through Dremio, to the last view.
+
+Tables and views **outside your scan scope** are not dropped: they are recorded
+by name and the edge completes itself if they are scanned later.
+
+See [Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Every sampled table is a Dremio query**, so scan cost is engine cost. On
+  Dremio Cloud that means the engine has to be running; the sampling strategy is
+  what keeps the bill small.
+- **Source lineage needs to see the source's settings.** The host and database
+  behind a source are only visible to a user who may view that source's
+  configuration. Without that, assets and view lineage are unaffected — only the
+  link through to the underlying database is missing.
+- **Object-storage sources can be deep.** Discovery walks folders, and a data
+  lake has a lot of them. Scope those sources with include paths.
+- **Dremio tables have no keys**, so incremental scans page by row position
+  rather than by key. On a table that is being rewritten between runs, a row can
+  be seen twice or missed until the next full pass.
+- **Self-signed certificates** on a self-hosted Dremio can be accepted with a
+  connection setting. Leave verification on everywhere else.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="DREMIO" />

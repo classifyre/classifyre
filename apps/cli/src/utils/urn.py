@@ -91,6 +91,7 @@ _register(_Platform("postgres", path_case=CasePolicy.LOWER, default_port=5432), 
 _register(_Platform("mysql", path_case=CasePolicy.LOWER, default_port=3306), "mariadb")
 _register(_Platform("mssql", path_case=CasePolicy.LOWER, default_port=1433), "sqlserver")
 _register(_Platform("databricks", path_case=CasePolicy.LOWER))
+_register(_Platform("dremio", path_case=CasePolicy.LOWER))
 _register(_Platform("hive", path_case=CasePolicy.LOWER, default_port=10000))
 _register(_Platform("iceberg", path_case=CasePolicy.LOWER))
 _register(_Platform("delta", path_case=CasePolicy.LOWER), "delta_lake")

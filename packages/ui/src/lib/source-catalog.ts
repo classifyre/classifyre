@@ -185,6 +185,13 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     category: "WAREHOUSE_LAKEHOUSE",
     keywords: ["warehouse", "analytics", "cloud"],
   },
+  DREMIO: {
+    description:
+      "Scan Dremio tables and views with lineage across spaces and sources.",
+    icon: CreateSourceDtoTypeEnum.Dremio,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: ["lakehouse", "semantic layer", "federation", "iceberg"],
+  },
   MONGODB: {
     description: "Scan MongoDB collections for Atlas or on-prem deployments.",
     icon: CreateSourceDtoTypeEnum.Mongodb,
