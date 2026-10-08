@@ -532,6 +532,7 @@ export class SourceAssetsController {
       runnerId,
       seenHashes,
       samplingCursor,
+      samplingFingerprint,
       assetsSkippedCached,
       detectorRunsSkipped,
       relationshipsEmitted,
@@ -589,6 +590,16 @@ export class SourceAssetsController {
       // because a scheduling hint could not be recorded.
       await this.assetService
         .recordRunSamplingCursor(runnerId, samplingCursor)
+        .catch(() => undefined);
+    }
+
+    // The run finished under these settings, so they are what the cursor now
+    // stands for. A built-in source had this stored when the run started; a
+    // notebook source only gets it here, so a run that died before finishing
+    // leaves "the settings changed" still to be told.
+    if (typeof samplingFingerprint === 'string' && samplingFingerprint) {
+      await this.sourceService
+        .acknowledgeSamplingFingerprint(sourceId, samplingFingerprint)
         .catch(() => undefined);
     }
 

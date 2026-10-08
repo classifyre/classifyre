@@ -66,6 +66,12 @@ model Source {
   // of each run and injected into the next run so extraction picks up where it
   // left off (incremental ingestion). The API never interprets its contents.
   samplingCursor             Json?                       @map("sampling_cursor") @db.JsonB
+  // Hash of the settings `samplingCursor` was written under: the config
+  // without its credentials, plus the definition of every custom detector the
+  // source uses. Compared when a run starts; on a mismatch the cursor and the
+  // assets' payload cursors are dropped and the sweep starts from scratch.
+  // Null means never compared, which counts as a mismatch.
+  samplingCursorFingerprint  String?                     @map("sampling_cursor_fingerprint")
   // Per-source autopilot management mode; overrides the instance config flag
   // unless INHERIT. OBSERVE_ONLY blocks the config-tuning agent from changing
   // this source's config.
@@ -1183,6 +1189,7 @@ enum AssetType {
   HIVE
   DATABRICKS
   SNOWFLAKE
+  DREMIO
   MONGODB
   NEO4J
   SQLITE

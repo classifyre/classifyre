@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
+ * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -37,6 +37,12 @@ export interface FinalizeIngestRunDto {
      * @memberof FinalizeIngestRunDto
      */
     samplingCursor?: { [key: string]: any; };
+    /**
+     * The settings fingerprint the run was started with, echoed back. Recorded on the source so the next run can tell whether its settings or detectors changed since. Omitted by runs that were not given one.
+     * @type {string}
+     * @memberof FinalizeIngestRunDto
+     */
+    samplingFingerprint?: string;
     /**
      * Assets this run skipped entirely on scan-cache evidence — content and every applicable detector configuration unchanged since their last completed scan.
      * @type {number}
@@ -115,6 +121,7 @@ export function FinalizeIngestRunDtoFromJSONTyped(json: any, ignoreDiscriminator
         'runnerId': json['runnerId'],
         'seenHashes': json['seenHashes'],
         'samplingCursor': json['samplingCursor'] == null ? undefined : json['samplingCursor'],
+        'samplingFingerprint': json['samplingFingerprint'] == null ? undefined : json['samplingFingerprint'],
         'assetsSkippedCached': json['assetsSkippedCached'] == null ? undefined : json['assetsSkippedCached'],
         'detectorRunsSkipped': json['detectorRunsSkipped'] == null ? undefined : json['detectorRunsSkipped'],
         'relationshipsEmitted': json['relationshipsEmitted'] == null ? undefined : json['relationshipsEmitted'],
@@ -141,6 +148,7 @@ export function FinalizeIngestRunDtoToJSONTyped(value?: FinalizeIngestRunDto | n
         'runnerId': value['runnerId'],
         'seenHashes': value['seenHashes'],
         'samplingCursor': value['samplingCursor'],
+        'samplingFingerprint': value['samplingFingerprint'],
         'assetsSkippedCached': value['assetsSkippedCached'],
         'detectorRunsSkipped': value['detectorRunsSkipped'],
         'relationshipsEmitted': value['relationshipsEmitted'],

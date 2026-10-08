@@ -43,6 +43,9 @@
       "$ref": "#/definitions/SnowflakeInput"
     },
     {
+      "$ref": "#/definitions/DremioInput"
+    },
+    {
       "$ref": "#/definitions/MongoDBInput"
     },
     {
@@ -1168,6 +1171,31 @@
             "lineage": {
               "type": "object",
               "description": "Lineage extraction settings and time window"
+            }
+          }
+        }
+      },
+      "DREMIO": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "object_type": {
+              "type": "string",
+              "description": "Source object type"
+            },
+            "container_type": {
+              "type": "string",
+              "description": "Kind of Dremio container the dataset lives in (SOURCE/SPACE/HOME)"
+            },
+            "source_system": {
+              "type": "string",
+              "description": "Type of the external system behind the Dremio source (for example POSTGRES, S3)"
+            },
+            "format": {
+              "type": "string",
+              "description": "Storage format of the underlying data (for example Parquet, Iceberg)"
             }
           }
         }
@@ -3766,6 +3794,7 @@
         "HIVE",
         "DATABRICKS",
         "SNOWFLAKE",
+        "DREMIO",
         "MONGODB",
         "NEO4J",
         "POWERBI",
@@ -3836,7 +3865,7 @@
         "LATEST",
         "ALL"
       ],
-      "description": "Sampling strategy. AUTOMATIC (recommended default) incrementally ingests a new slice of not-yet-seen data on every run, remembering its position between runs and wrapping around to re-scan from the start once everything has been covered \u2014 eventually ingesting everything at a bounded cost per run. RANDOM samples items randomly. LATEST prioritises the most recently modified/created items. ALL scans every item with no limit."
+      "description": "Sampling strategy. AUTOMATIC (recommended default) reads a bounded slice on every run and remembers where it has been: whatever is new since the last run comes first, the rest of the slice continues backwards through older data, and once everything has been covered only new data is read. Changing the source's settings or one of its detectors starts the sweep over. A table or collection with no increasing key cannot tell new rows from old, so it is paged from the start and wraps around instead. RANDOM samples items randomly. LATEST prioritises the most recently modified/created items. ALL scans every item with no limit."
     },
     "SamplingConfig": {
       "title": "SamplingConfig",
@@ -6927,6 +6956,223 @@
       },
       "additionalProperties": false
     },
+    "DremioCloudRegion": {
+      "title": "DremioCloudRegion",
+      "label": "Dremio Cloud Region",
+      "type": "string",
+      "enum": [
+        "US",
+        "EU"
+      ],
+      "default": "US",
+      "description": "Dremio Cloud control plane the project lives in"
+    },
+    "DremioRequiredSoftware": {
+      "title": "DremioRequiredSoftware",
+      "label": "Self-hosted Dremio",
+      "type": "object",
+      "description": "A Dremio you run yourself (Dremio Software, Enterprise or Community Edition).",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Address you open Dremio at, including the port (for example, https://dremio.example.com:9047)"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "DremioRequiredCloud": {
+      "title": "DremioRequiredCloud",
+      "label": "Dremio Cloud",
+      "type": "object",
+      "description": "A project in Dremio's hosted service. Signs in with a personal access token.",
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "description": "Dremio Cloud project ID (Project Settings > General Information)"
+        },
+        "region": {
+          "$ref": "#/definitions/DremioCloudRegion"
+        }
+      },
+      "required": [
+        "project_id",
+        "region"
+      ],
+      "additionalProperties": false
+    },
+    "DremioRequired": {
+      "title": "DremioRequired",
+      "label": "Dremio Settings",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/DremioRequiredSoftware"
+        },
+        {
+          "$ref": "#/definitions/DremioRequiredCloud"
+        }
+      ]
+    },
+    "DremioMaskedPassword": {
+      "title": "DremioMaskedPassword",
+      "label": "Username & Password",
+      "type": "object",
+      "description": "Self-hosted Dremio only.",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Dremio login username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Dremio login password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "DremioMaskedToken": {
+      "title": "DremioMaskedToken",
+      "label": "Personal Access Token",
+      "type": "object",
+      "description": "Works for Dremio Cloud and for self-hosted Enterprise Edition.",
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "Dremio personal access token (Account Settings > Personal Access Tokens)"
+        }
+      },
+      "required": [
+        "token"
+      ],
+      "additionalProperties": false
+    },
+    "DremioMasked": {
+      "title": "DremioMasked",
+      "label": "Dremio Credentials",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/DremioMaskedToken"
+        },
+        {
+          "$ref": "#/definitions/DremioMaskedPassword"
+        }
+      ]
+    },
+    "DremioOptionalConnection": {
+      "title": "DremioOptionalConnection",
+      "label": "Dremio Connection",
+      "type": "object",
+      "description": "Dremio API and query tuning options.",
+      "properties": {
+        "verify_ssl": {
+          "type": "boolean",
+          "default": true,
+          "description": "Verify the Dremio server's TLS certificate. Turn off only for a self-hosted Dremio with a self-signed certificate."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 300,
+          "default": 30,
+          "description": "HTTP timeout for a single Dremio API call"
+        },
+        "query_timeout_seconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 3600,
+          "default": 300,
+          "description": "Maximum time to wait for one sampling query to finish before it is cancelled"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DremioOptionalScope": {
+      "title": "DremioOptionalScope",
+      "label": "Dremio Scope",
+      "type": "object",
+      "description": "Which Dremio sources, spaces, folders, and datasets to scan.",
+      "properties": {
+        "include_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional allowlist of sources, spaces, folders, or datasets, written as dot-separated paths (for example, Marketing or Samples.\"samples.dremio.com\"). Everything beneath a listed path is scanned. Wrap a name that itself contains a dot in double quotes."
+        },
+        "exclude_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Sources, spaces, folders, or datasets to skip, written the same way as include_paths. Exclusions win over inclusions."
+        },
+        "include_tables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include tables (physical datasets) in extraction"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include views (virtual datasets) in extraction"
+        },
+        "include_home_spaces": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include personal home spaces (@username) in extraction"
+        },
+        "table_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of table/view assets extracted"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DremioOptionalExtraction": {
+      "title": "DremioOptionalExtraction",
+      "label": "Dremio Extraction",
+      "type": "object",
+      "description": "Lineage extraction controls for Dremio.",
+      "properties": {
+        "include_view_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Link each view to the tables and views it reads from. Uses Dremio's own lineage graph where the edition provides it, and the view's SQL otherwise."
+        },
+        "include_source_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Link tables that Dremio reads from an external database (PostgreSQL, MySQL, SQL Server, Oracle, Snowflake) to that database's own table, so lineage continues across systems. Needs permission to view the Dremio source's settings."
+        }
+      },
+      "additionalProperties": false
+    },
+    "DremioOptional": {
+      "title": "DremioOptional",
+      "label": "Dremio Options",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/DremioOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/DremioOptionalScope"
+        },
+        "extraction": {
+          "$ref": "#/definitions/DremioOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
     "MongoDBDeployment": {
       "title": "MongoDBDeployment",
       "label": "MongoDB Deployment",
@@ -8450,6 +8696,61 @@
             },
             "optional": {
               "$ref": "#/definitions/SnowflakeOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            },
+            "augmentation": {
+              "$ref": "#/definitions/AugmentationConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "DremioInput": {
+      "title": "DremioInput",
+      "label": "Dremio",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "DREMIO"
+            },
+            "required": {
+              "$ref": "#/definitions/DremioRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/DremioMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/DremioOptional"
             },
             "detectors": {
               "$ref": "#/definitions/Detectors"

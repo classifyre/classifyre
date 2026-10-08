@@ -65,15 +65,16 @@ Recurring scans are most powerful paired with the **Automatic**
 ```mermaid
 graph LR
     Sched["Scheduled run"] --> Slice["Reads the next fresh slice"]
-    Slice --> More["Next run continues from there"]
+    Slice --> More["Next run: what's new first,<br/>then on from there"]
     More --> Cover["Whole source covered over time"]
-    Cover --> Refresh["Wraps around to catch changes"]
+    Cover --> Refresh["After that, only what's new"]
     Refresh --> Sched
 ```
 
-Each scheduled run reads a bounded slice, picks up where the last one stopped,
-and — over several runs — covers the entire source, then loops back to catch what
-changed. A little, often, automatically.
+Each scheduled run reads a bounded slice — what is new since the last run first,
+then on from where it stopped — and over several runs covers the entire source.
+From then on a run reads only what has been added or changed. A little, often,
+automatically.
 
 ---
 

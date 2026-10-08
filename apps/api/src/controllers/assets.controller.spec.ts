@@ -24,6 +24,7 @@ describe('SourceAssetsController', () => {
   const sourceService = {
     source: jest.fn(),
     updateSamplingCursor: jest.fn(),
+    acknowledgeSamplingFingerprint: jest.fn().mockResolvedValue(undefined),
   };
   const validationService = {
     validateOutput: jest.fn(),
@@ -134,6 +135,32 @@ describe('SourceAssetsController', () => {
       false,
       true,
     );
+  });
+
+  it('records the settings a finished run was started under', async () => {
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'CUSTOM',
+      config: { sampling: { strategy: 'ALL' } },
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-1',
+      seenHashes: [],
+      samplingFingerprint: 'abc123',
+    });
+    expect(sourceService.acknowledgeSamplingFingerprint).toHaveBeenCalledWith(
+      'source-1',
+      'abc123',
+    );
+
+    sourceService.acknowledgeSamplingFingerprint.mockClear();
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-1',
+      seenHashes: [],
+    });
+    expect(sourceService.acknowledgeSamplingFingerprint).not.toHaveBeenCalled();
   });
 
   it('persists the AUTOMATIC sampling cursor and is not a full scan', async () => {

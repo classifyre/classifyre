@@ -186,6 +186,9 @@ class FinalizeIngestRunRequest(BaseModel):
     # AUTOMATIC sampling cursor to persist on the source for the next run.
     # Omitted (None) for other strategies so the stored cursor is left untouched.
     sampling_cursor: dict[str, Any] | None = Field(None, serialization_alias="samplingCursor")
+    # The settings fingerprint the run was started with, echoed back so the API
+    # can record that those settings have now been scanned under.
+    sampling_fingerprint: str | None = Field(None, serialization_alias="samplingFingerprint")
     # What the scan cache saved, so the run can report it.
     assets_skipped_cached: int | None = Field(None, serialization_alias="assetsSkippedCached")
     detector_runs_skipped: int | None = Field(None, serialization_alias="detectorRunsSkipped")
@@ -248,6 +251,7 @@ class RestOutputSink:
         self._runner_id = context.runner_id
         self._seen_hashes: set[str] = set()
         self._sampling_cursor: dict[str, Any] | None = None
+        self._sampling_fingerprint: str | None = None
         self._scan_cache_savings: tuple[int, int] | None = None
         self._partial_coverage: bool = False
         self._partial_coverage_reason: str = ""
@@ -257,6 +261,10 @@ class RestOutputSink:
     def set_sampling_cursor(self, cursor: dict[str, Any] | None) -> None:
         """Record the AUTOMATIC sampling cursor to persist on finalize."""
         self._sampling_cursor = cursor
+
+    def set_sampling_fingerprint(self, fingerprint: str | None) -> None:
+        """Record the settings fingerprint this run was started with."""
+        self._sampling_fingerprint = fingerprint
 
     def set_partial_coverage(self, reason: str = "") -> None:
         """Mark this run as having covered only part of the source."""
@@ -364,6 +372,7 @@ class RestOutputSink:
             runner_id=runner_id,
             seen_hashes=sorted(self._seen_hashes),
             sampling_cursor=self._sampling_cursor,
+            sampling_fingerprint=self._sampling_fingerprint,
             assets_skipped_cached=savings[0] if savings else None,
             detector_runs_skipped=savings[1] if savings else None,
             # Sent even when zero: "this run emitted edges and lost none" is a

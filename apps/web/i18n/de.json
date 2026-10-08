@@ -1955,7 +1955,10 @@
           "gallery_index": "Galerie-Position",
           "video_url": "Video-URL",
           "provider": "Anbieter",
-          "transcript_source": "Transkript-Quelle"
+          "transcript_source": "Transkript-Quelle",
+          "container_type": "Containertyp",
+          "source_system": "Quellsystem",
+          "format": "Format"
         }
       },
       "unknownSource": "Unbekannte Quelle",
@@ -5660,6 +5663,7 @@
     "CONFLUENCE": "Confluence",
     "DATABRICKS": "Databricks",
     "DELTA_LAKE": "Delta Lake",
+    "DREMIO": "Dremio",
     "DROPBOX": "Dropbox",
     "ELASTICSEARCH": "Elasticsearch",
     "EMAIL": "E-Mail",

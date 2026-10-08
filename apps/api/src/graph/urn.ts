@@ -35,6 +35,7 @@ const PLATFORMS: Record<string, PlatformRules> = {
   mysql: { authorityCase: 'lower', pathCase: 'lower', defaultPort: 3306 },
   mssql: { authorityCase: 'lower', pathCase: 'lower', defaultPort: 1433 },
   databricks: { authorityCase: 'lower', pathCase: 'lower' },
+  dremio: { authorityCase: 'lower', pathCase: 'lower' },
   hive: { authorityCase: 'lower', pathCase: 'lower', defaultPort: 10000 },
   iceberg: { authorityCase: 'lower', pathCase: 'lower' },
   delta: { authorityCase: 'lower', pathCase: 'lower' },

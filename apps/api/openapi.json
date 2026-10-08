@@ -134,7 +134,7 @@
     },
     "/sources": {
       "post": {
-        "description": "Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, YouTube).",
+        "description": "Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, YouTube).",
         "operationId": "SourcesController_createSource",
         "parameters": [],
         "requestBody": {
@@ -1703,6 +1703,7 @@
                   "HIVE",
                   "DATABRICKS",
                   "SNOWFLAKE",
+                  "DREMIO",
                   "MONGODB",
                   "NEO4J",
                   "SQLITE",
@@ -2060,6 +2061,7 @@
                   "HIVE",
                   "DATABRICKS",
                   "SNOWFLAKE",
+                  "DREMIO",
                   "MONGODB",
                   "NEO4J",
                   "SQLITE",
@@ -2439,6 +2441,7 @@
                   "HIVE",
                   "DATABRICKS",
                   "SNOWFLAKE",
+                  "DREMIO",
                   "MONGODB",
                   "NEO4J",
                   "SQLITE",
@@ -16078,7 +16081,7 @@
   },
   "info": {
     "title": "Classifyre API",
-    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.",
+    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.",
     "version": "1.0.0",
     "contact": {
       "name": "Classifyre Team",
@@ -16154,6 +16157,7 @@
                 "HIVE",
                 "DATABRICKS",
                 "SNOWFLAKE",
+                "DREMIO",
                 "MONGODB",
                 "NEO4J",
                 "SQLITE",
@@ -16407,6 +16411,7 @@
               "HIVE",
               "DATABRICKS",
               "SNOWFLAKE",
+              "DREMIO",
               "MONGODB",
               "NEO4J",
               "POWERBI",
@@ -16652,6 +16657,7 @@
               "HIVE",
               "DATABRICKS",
               "SNOWFLAKE",
+              "DREMIO",
               "MONGODB",
               "NEO4J",
               "POWERBI",
@@ -17188,6 +17194,7 @@
               "HIVE",
               "DATABRICKS",
               "SNOWFLAKE",
+              "DREMIO",
               "MONGODB",
               "NEO4J",
               "SQLITE",
@@ -17710,6 +17717,7 @@
                 "HIVE",
                 "DATABRICKS",
                 "SNOWFLAKE",
+                "DREMIO",
                 "MONGODB",
                 "NEO4J",
                 "SQLITE",
@@ -18734,6 +18742,7 @@
               "HIVE",
               "DATABRICKS",
               "SNOWFLAKE",
+              "DREMIO",
               "MONGODB",
               "NEO4J",
               "SQLITE",
@@ -19264,6 +19273,10 @@
             "type": "object",
             "description": "Opaque, source-defined AUTOMATIC sampling cursor to persist on the source for the next run. Omitted for non-AUTOMATIC strategies so the stored cursor is left unchanged.",
             "additionalProperties": true
+          },
+          "samplingFingerprint": {
+            "type": "string",
+            "description": "The settings fingerprint the run was started with, echoed back. Recorded on the source so the next run can tell whether its settings or detectors changed since. Omitted by runs that were not given one."
           },
           "assetsSkippedCached": {
             "type": "number",
@@ -26573,6 +26586,7 @@
               "HIVE",
               "DATABRICKS",
               "SNOWFLAKE",
+              "DREMIO",
               "MONGODB",
               "NEO4J",
               "SQLITE",
@@ -28957,6 +28971,7 @@
                 "HIVE",
                 "DATABRICKS",
                 "SNOWFLAKE",
+                "DREMIO",
                 "MONGODB",
                 "NEO4J",
                 "SQLITE",

@@ -1,0 +1,59 @@
+{
+  "skill_name": "classifyre-first-use",
+  "evals": [
+    {
+      "id": 0,
+      "name": "setup-plan-docker-mcp",
+      "prompt": "ok im about to do another first-use run of classifyre against the all-in-one docker image on a new corpus (~2000 pdfs, mix of scanned and native text, sitting in ~/corpora/matter-7). last time was a mess. give me the plan \u2014 how i connect, how i set the source up, and what i should be watching for. i want to drive it through MCP if i can.",
+      "expected_output": "A plan that: records the build under test first; starts from an empty instance with a baseline; profiles the corpus locally before ingesting; drives MCP-first with REST as a recorded fallback; resolves the API base URL for the deployment (the image serves it under /api on the published port) and bind-mounts the corpus into the container; sets max_file_bytes to 100 MiB before PDF work; freezes the detector set before the first scan; avoids narrowing a populated source; warns that RANDOM is seeded and does not broaden coverage; and flags the regression watch list.",
+      "files": [],
+      "assertions": [
+        "Tells the user to record the exact build/version/commit under test",
+        "Says to start from an empty/fresh instance and take a baseline before ingesting",
+        "Says to profile the corpus locally before ingesting anything",
+        "Resolves the API base URL for the deployment rather than assuming one, and mounts the corpus into the container before using its container-side path",
+        "Says to drive MCP first and record each REST fallback as a coverage gap",
+        "Says to raise max_file_bytes to ~100 MiB before PDF work, because larger files are truncated not skipped",
+        "Says to freeze the detector set before the first scan",
+        "Warns not to narrow the scope of a populated source",
+        "Warns RANDOM sampling is seeded and does not broaden coverage across runs",
+        "Says COMPLETED status is not proof of success and detector-level signals must be inspected",
+        "Mentions verifying the recent fixes / regression watch list"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "counter-regression-detection",
+      "prompt": "just finished my first scan on a fresh source \u2014 13 PDFs, all of them brand new, never scanned before. the runner says status COMPLETED, 0 errors, totalFindings 3239. but assetsCreated is 0 and assetsUnchanged is 13. that normal?",
+      "expected_output": "Should identify this as a probable REGRESSION of the known counter bug (G-012/G-020), not normal: on a current build a first run of 13 new assets must report assetsCreated: 13, because counters now derive from an immutable per-run change_type rather than mutable asset status. Should ask for / note the build under test before concluding, since the historical bug produced exactly this signature. Should also note totalFindings is not a discovery count (findingsCreated is), and that COMPLETED with 0 errors is not proof of success.",
+      "files": [],
+      "assertions": [
+        "Answers no \u2014 this is not normal/expected on a current build",
+        "States that a first run of 13 new assets should report assetsCreated: 13",
+        "Identifies this as the known counter bug signature (G-012/G-020) and/or a regression of it",
+        "Asks for or references the build under test before concluding",
+        "Explains counters now derive from an immutable per-run change_type rather than mutable asset status",
+        "Notes totalFindings is not a count of newly discovered findings (findingsCreated is)",
+        "Notes COMPLETED with 0 errors is not proof the run succeeded"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "judgment-signal-vs-noise",
+      "prompt": "run's done. 68,987 findings across 4,235 assets, 7 sources all green. severity breakdown: 6 critical, 10,300 high, 49,732 medium. the 6 criticals are all CREDIT_CARD hits. correlation found 83 duplicate clusters, top pair scored 100%. also the same investigation reference 2018R01618 shows up in 5 different PDFs. write me the summary \u2014 do we have a case?",
+      "expected_output": "Should lead with the answer (no case yet) rather than the volume. Should identify the exact-recurrence of 2018R01618 across 5 PDFs as the strongest and most defensible signal. Should treat the 6 CRITICAL credit-card hits as unreviewed recognizer output likely to be OCR/repeated-digit artifacts \u2014 severity describes the label, not evidence quality \u2014 and require source review before escalation. Should treat the 100% duplicate cluster as a lead only, noting thin-value matches are possible by construction. Should note high volume is not importance. Should not present 68,987 findings as an outcome.",
+      "files": [],
+      "assertions": [
+        "Leads with a direct answer to 'do we have a case' rather than restating the volume",
+        "Concludes there is no case yet / not enough to substantiate one",
+        "Identifies the exact recurrence of 2018R01618 across 5 PDFs as the strongest and most defensible signal",
+        "Treats the 6 CRITICAL CREDIT_CARD hits as unreviewed recognizer output, likely OCR/repeated-digit artifacts",
+        "States that severity describes the label, not evidence quality",
+        "Requires source review of the CRITICAL hits before any escalation",
+        "Treats the 100% duplicate cluster as a lead only, not proof",
+        "Notes that high finding volume is not the same as investigative importance",
+        "Does not present 68,987 findings as an outcome or success measure"
+      ]
+    }
+  ]
+}

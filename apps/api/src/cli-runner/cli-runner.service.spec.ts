@@ -4,7 +4,12 @@ import * as fs from 'fs/promises';
 import { randomBytes } from 'crypto';
 import { gunzipSync } from 'zlib';
 import { MAX_ENV_VALUE_BYTES, encodeSamplingCursor } from './sampling-cursor';
-import { AssetType, RunnerExecutionMode, RunnerStatus } from '@prisma/client';
+import {
+  AssetType,
+  Prisma,
+  RunnerExecutionMode,
+  RunnerStatus,
+} from '@prisma/client';
 import { computeScopeFingerprint } from '../utils/scope-fingerprint';
 
 jest.mock('@kubernetes/client-node', () => ({
@@ -68,6 +73,10 @@ describe('CliRunnerService', () => {
       },
       asset: {
         count: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      customDetector: {
         findMany: jest.fn().mockResolvedValue([]),
       },
       finding: {
@@ -452,6 +461,180 @@ describe('CliRunnerService', () => {
     // base64 payload appear, rather than an exact unquoted match.
     expect(command).toContain('CLASSIFYRE_SAMPLING_CURSOR=');
     expect(command).toContain(cursorB64);
+  });
+
+  describe('the sampling cursor against the source settings', () => {
+    const config = {
+      type: 'LOCAL_FOLDER',
+      required: { path: '/data' },
+      sampling: { strategy: 'AUTOMATIC' },
+      detectors: [
+        { type: 'CUSTOM', enabled: true, custom_detector_key: 'contracts' },
+      ],
+    };
+    const cursor = { objects: { v: 2 } };
+    const detectorRow = (definition: unknown) => ({
+      key: 'contracts',
+      isActive: true,
+      pipelineSchema: definition,
+      lastTrainedAt: null,
+      files: [],
+    });
+    const resolve = (service: unknown, source: Record<string, unknown>) =>
+      (service as any).resolveSamplingState(source);
+
+    it('keeps the cursor while nothing about the source has changed', async () => {
+      const { service, prisma } = createService();
+      prisma.customDetector.findMany.mockResolvedValue([detectorRow({ a: 1 })]);
+      const first = await resolve(service, {
+        id: 'source-1',
+        type: 'LOCAL_FOLDER',
+        config,
+        samplingCursor: null,
+        samplingCursorFingerprint: null,
+      });
+      prisma.source.update.mockClear();
+
+      const second = await resolve(service, {
+        id: 'source-1',
+        type: 'LOCAL_FOLDER',
+        config,
+        samplingCursor: cursor,
+        samplingCursorFingerprint: first.samplingFingerprint,
+      });
+
+      expect(second).toEqual({
+        samplingCursor: cursor,
+        samplingFingerprint: first.samplingFingerprint,
+        samplingReset: false,
+      });
+      expect(prisma.source.update).not.toHaveBeenCalled();
+      expect(prisma.asset.updateMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops the cursor and the row positions when a setting changes', async () => {
+      const { service, prisma } = createService();
+      const state = await resolve(service, {
+        id: 'source-1',
+        type: 'LOCAL_FOLDER',
+        config: {
+          ...config,
+          sampling: { strategy: 'AUTOMATIC', rows_per_page: 5 },
+        },
+        samplingCursor: cursor,
+        samplingCursorFingerprint: 'fingerprint-of-the-old-settings',
+      });
+
+      expect(state.samplingCursor).toBeNull();
+      expect(state.samplingReset).toBe(false);
+      expect(prisma.source.update).toHaveBeenCalledWith({
+        where: { id: 'source-1' },
+        data: {
+          samplingCursor: Prisma.DbNull,
+          samplingCursorFingerprint: state.samplingFingerprint,
+        },
+      });
+      expect(prisma.asset.updateMany).toHaveBeenCalledWith({
+        where: { sourceId: 'source-1', payloadCursor: { not: Prisma.DbNull } },
+        data: { payloadCursor: Prisma.DbNull },
+      });
+    });
+
+    it('drops the cursor when a custom detector the source uses is edited', async () => {
+      const { service, prisma } = createService();
+      const source = {
+        id: 'source-1',
+        type: 'LOCAL_FOLDER',
+        config,
+        samplingCursor: cursor,
+      };
+      prisma.customDetector.findMany.mockResolvedValue([detectorRow({ a: 1 })]);
+      const before = await resolve(service, {
+        ...source,
+        samplingCursorFingerprint: null,
+      });
+
+      prisma.customDetector.findMany.mockResolvedValue([detectorRow({ a: 2 })]);
+      const after = await resolve(service, {
+        ...source,
+        samplingCursorFingerprint: before.samplingFingerprint,
+      });
+
+      expect(prisma.customDetector.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { OR: [{ key: { in: ['contracts'] } }, { id: { in: [] } }] },
+        }),
+      );
+      expect(after.samplingFingerprint).not.toBe(before.samplingFingerprint);
+      expect(after.samplingCursor).toBeNull();
+    });
+
+    it('tells a notebook source instead of taking its cursor', async () => {
+      const { service, prisma } = createService();
+      const notebook = {
+        type: 'CUSTOM',
+        required: { notebook: { cells: [] } },
+      };
+
+      const state = await resolve(service, {
+        id: 'source-1',
+        type: 'CUSTOM',
+        config: notebook,
+        samplingCursor: cursor,
+        samplingCursorFingerprint: 'fingerprint-of-the-old-settings',
+      });
+
+      expect(state.samplingCursor).toEqual(cursor);
+      expect(state.samplingReset).toBe(true);
+      expect(prisma.source.update).not.toHaveBeenCalled();
+      expect((service as any).samplingRunEnv(state)).toEqual({
+        CLASSIFYRE_SAMPLING_FINGERPRINT: state.samplingFingerprint,
+        CLASSIFYRE_SAMPLING_RESET: '1',
+      });
+
+      // Never compared before: a baseline, not a change.
+      const first = await resolve(service, {
+        id: 'source-1',
+        type: 'CUSTOM',
+        config: notebook,
+        samplingCursor: cursor,
+        samplingCursorFingerprint: null,
+      });
+      expect(first.samplingReset).toBe(false);
+    });
+
+    it('keeps the cursor when the comparison itself fails', async () => {
+      const { service, prisma } = createService();
+      prisma.customDetector.findMany.mockRejectedValue(new Error('db down'));
+
+      const state = await resolve(service, {
+        id: 'source-1',
+        type: 'LOCAL_FOLDER',
+        config,
+        samplingCursor: cursor,
+        samplingCursorFingerprint: 'anything',
+      });
+
+      expect(state).toEqual({ samplingCursor: cursor, samplingReset: false });
+    });
+
+    it('passes the fingerprint to the scan', () => {
+      const { service } = createService();
+      const command = (service as any).buildCliCommand(
+        '/tmp/cli',
+        '/tmp/cli/.venv',
+        '/tmp/recipe.json',
+        'source-1',
+        'runner-1',
+        'http://localhost:8000',
+        false,
+        undefined,
+        { CLASSIFYRE_SAMPLING_FINGERPRINT: 'abc123' },
+      );
+      expect(command).toContain('CLASSIFYRE_SAMPLING_FINGERPRINT=');
+      expect(command).toContain('abc123');
+      expect(command).not.toContain('CLASSIFYRE_SAMPLING_RESET');
+    });
   });
 
   it('encodes a non-empty sampling cursor and skips empty/missing ones', () => {

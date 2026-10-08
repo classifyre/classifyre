@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { SourceService } from './source.service';
 import { MASKED_CONFIG_ENCRYPTED_PREFIX } from './utils/masked-config.utils';
@@ -429,8 +430,9 @@ describe('SourceService', () => {
   // duplicates now), and the only remedy was all-or-nothing: destroying 1,352
   // good document assets to retire 372 stale ones.
   describe('purgeAssets predicate', () => {
-    const arrange = (count = 7) => {
+    const arrange = (count = 7, type = 'LOCAL_FOLDER') => {
       const deleteMany = jest.fn().mockResolvedValue({ count });
+      const sourceUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
       const assetCount = jest.fn().mockResolvedValue(count);
       // The purge collects the ids it is about to destroy so it can clear the
       // edges naming them: `edges` has no foreign key to `assets`, so an
@@ -442,12 +444,16 @@ describe('SourceService', () => {
       );
       const edgeDeleteMany = jest.fn().mockResolvedValue({ count: 0 });
       const built = createService({
-        source: { findUnique: jest.fn().mockResolvedValue({ id: 'src-1' }) },
+        source: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'src-1', type }),
+          updateMany: sourceUpdateMany,
+        },
         asset: { deleteMany, count: assetCount, findMany: assetFindMany },
         edge: { deleteMany: edgeDeleteMany },
       });
       return {
         ...built,
+        sourceUpdateMany,
         deleteMany,
         assetCount,
         assetFindMany,
@@ -561,6 +567,33 @@ describe('SourceService', () => {
         'Source with ID missing not found',
       );
       expect(deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('starts the sweep over, since what it had read is gone', async () => {
+      const { service, sourceUpdateMany } = arrange(3);
+
+      await service.purgeAssets('src-1');
+
+      expect(sourceUpdateMany).toHaveBeenCalledWith({
+        where: { id: 'src-1' },
+        data: { samplingCursor: Prisma.DbNull },
+      });
+    });
+
+    it('leaves a notebook source its cursor', async () => {
+      const { service, sourceUpdateMany } = arrange(3, 'CUSTOM');
+
+      await service.purgeAssets('src-1');
+
+      expect(sourceUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it('leaves the cursor alone when nothing was purged', async () => {
+      const { service, sourceUpdateMany } = arrange(0);
+
+      await service.purgeAssets('src-1');
+
+      expect(sourceUpdateMany).not.toHaveBeenCalled();
     });
 
     it('clears the edges that named the purged assets', async () => {

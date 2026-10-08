@@ -35,6 +35,7 @@ from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ...utils.hashing import hash_id, unhash_id
+from ...utils.sampling_frontier import time_rank
 from ...utils.urn import Urn, UrnError
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -588,27 +589,24 @@ class TableauSource(BaseSource):
                 return parsed
         return None
 
-    def _ordered_refs_for_automatic(
-        self, refs: list[TableauAssetRef], order_field: str
-    ) -> list[TableauAssetRef]:
-        values = [self._sampling_sort_datetime(ref, order_field) for ref in refs]
-        scored: list[tuple[bool, datetime, TableauAssetRef]] = []
-        for ref, parsed in zip(refs, values, strict=False):
-            effective = parsed or ref.updated_at
-            scored.append((parsed is not None, effective, ref))
-        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
-        return [item[2] for item in scored]
-
     def _sample_refs(self, refs: list[TableauAssetRef]) -> list[TableauAssetRef]:
         sampling = self._sampling()
         if sampling.strategy == SamplingStrategy.ALL:
             return refs
 
         if sampling.strategy == SamplingStrategy.AUTOMATIC:
-            # Newest-first stable order; window advances each run and wraps around.
+            # Recently changed items first, then the backfill. An item the API
+            # gives no timestamp for has no place on that axis and is paged
+            # round and round instead (see automatic_window).
             order_field = sampling.order_by_column or "updated_at"
-            ordered = self._ordered_refs_for_automatic(refs, order_field)
-            return self.automatic_window(ordered, key="refs")
+            return self.automatic_window(
+                refs,
+                key="refs",
+                order=lambda ref: (
+                    time_rank(self._sampling_sort_datetime(ref, order_field)),
+                    ref.raw_id,
+                ),
+            )
 
         if sampling.strategy == SamplingStrategy.RANDOM:
             limit = int(sampling.rows_per_page or 100)

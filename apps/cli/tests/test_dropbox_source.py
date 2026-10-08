@@ -137,24 +137,28 @@ def test_dropbox_sampling_all_returns_everything():
     assert len(source._apply_sampling(refs)) == 25
 
 
-def test_dropbox_sampling_automatic_advances_window_across_runs(monkeypatch):
-    refs = [_ref(f"/f{index:02d}.txt", days_ago=index) for index in range(25)]
+def test_dropbox_sampling_automatic_reads_new_files_first(monkeypatch):
+    refs = [_ref(f"/f{index:02d}.txt", days_ago=index + 1) for index in range(25)]
 
     source = DropboxSource(_recipe(strategy="AUTOMATIC", rows_per_page=10))
     first = source._apply_sampling(refs)
     cursor = source.current_sampling_cursor()
 
     assert [item.key for item in first] == [f"/f{index:02d}.txt" for index in range(10)]
-    assert cursor == {"objects": 10}
+    assert cursor["objects"]["done"] is False
 
+    # Two files land between runs. They are read first, and the backfill then
+    # carries on from where it stopped instead of re-reading what they shifted.
+    added = [_ref("/new-a.txt", days_ago=0), _ref("/new-b.txt", days_ago=0)]
     monkeypatch.setenv(
         DropboxSource.SAMPLING_CURSOR_ENV,
         encode_sampling_cursor(cursor),
     )
     resumed = DropboxSource(_recipe(strategy="AUTOMATIC", rows_per_page=10))
-    second = resumed._apply_sampling(refs)
+    second = resumed._apply_sampling([*refs, *added])
 
-    assert [item.key for item in second] == [f"/f{index:02d}.txt" for index in range(10, 20)]
+    assert sorted(item.key for item in second[:2]) == ["/new-a.txt", "/new-b.txt"]
+    assert [item.key for item in second[2:]] == [f"/f{index:02d}.txt" for index in range(10, 18)]
 
 
 # ── extraction ───────────────────────────────────────────────────────────

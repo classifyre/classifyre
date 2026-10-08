@@ -5,7 +5,9 @@ apps/web/playwright/.cache/
 **/__pycache__/
 *.py[cod]
 .secrets
-.claude/
+.claude/skills/add-new-source
+reference_project/
+showcases/
 .codex/
 # Dependencies
 node_modules
@@ -61,3 +63,7 @@ genesis/
 
 # Blender's automatic backups
 *.blend1
+
+# Mr. Fyre's moves are drawn for the videos that use them (blender/build.py
+# --moves-for); his poses, beside them, are committed.
+blender/renders/mr-fyre/moves/

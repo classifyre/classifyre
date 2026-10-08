@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from ..graph.edges import Method
 from ..models.generated_single_asset_scan_results import Location
 
 
@@ -53,11 +54,16 @@ class ViewLineage:
     ``ALL_DEPENDENCIES``, ``OBJECT_DEPENDENCIES``. ``sql`` is the view's own
     definition, kept so column-level mappings can be recovered from it where the
     catalog does not provide them.
+
+    ``method`` says how the *upstreams* were found, for a dialect that has more
+    than one way of finding them. Left unset, the edge is credited to the
+    catalog unless its column detail had to be parsed.
     """
 
     view: tuple[str, ...]
     upstreams: tuple[tuple[str, ...], ...]
     sql: str | None = None
+    method: Method | None = None
 
 
 @dataclass(frozen=True)

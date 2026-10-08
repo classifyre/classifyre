@@ -9,6 +9,7 @@ Name | Type
 `runnerId` | string
 `seenHashes` | Array&lt;string&gt;
 `samplingCursor` | { [key: string]: any; }
+`samplingFingerprint` | string
 `assetsSkippedCached` | number
 `detectorRunsSkipped` | number
 `relationshipsEmitted` | number
@@ -29,6 +30,7 @@ const example = {
   "runnerId": runner-123-abc,
   "seenHashes": ["hash-1","hash-2"],
   "samplingCursor": null,
+  "samplingFingerprint": null,
   "assetsSkippedCached": null,
   "detectorRunsSkipped": null,
   "relationshipsEmitted": null,

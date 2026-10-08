@@ -100,6 +100,9 @@ const METADATA_KEY_TO_I18N: Record<string, TranslationKey> = {
   video_url: "assets.detail.assetMetadata.keys.video_url",
   provider: "assets.detail.assetMetadata.keys.provider",
   transcript_source: "assets.detail.assetMetadata.keys.transcript_source",
+  container_type: "assets.detail.assetMetadata.keys.container_type",
+  source_system: "assets.detail.assetMetadata.keys.source_system",
+  format: "assets.detail.assetMetadata.keys.format",
 };
 
 // Keys that carry a human-readable byte size and should be formatted as such.
