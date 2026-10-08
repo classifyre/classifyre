@@ -177,11 +177,17 @@ class KafkaRestClient:
         max_count: int,
         *,
         poll_timeout_ms: int = 5000,
+        stops: dict[int, int] | None = None,
     ) -> list[dict[str, Any]]:
-        """Read up to ``max_count`` records from the given partition offsets."""
+        """Read up to ``max_count`` records from the given partition offsets.
+
+        ``stops`` bounds a partition: records at or past its stop offset are
+        dropped, and reading ends once every bounded partition has got there.
+        """
         if not starts:
             return []
         out: list[dict[str, Any]] = []
+        finished: set[int] = set()
         with self._consumer_instance() as instance_uri:
             self._request(
                 "POST",
@@ -203,6 +209,8 @@ class KafkaRestClient:
                 },
             )
             while len(out) < max_count:
+                if stops and len(finished) >= len(stops):
+                    break
                 records = self._request(
                     "GET",
                     f"{instance_uri}/records",
@@ -212,14 +220,22 @@ class KafkaRestClient:
                 if not records:
                     break
                 for record in records:
+                    partition = int(record.get("partition", 0))
+                    offset = int(record.get("offset", 0))
+                    stop = (stops or {}).get(partition)
+                    if stop is not None and offset >= stop:
+                        finished.add(partition)
+                        continue
                     out.append(
                         {
-                            "partition": int(record.get("partition", 0)),
-                            "offset": int(record.get("offset", 0)),
+                            "partition": partition,
+                            "offset": offset,
                             "key": self._decode(record.get("key")),
                             "value": self._decode(record.get("value")),
                         }
                     )
+                    if stop is not None and offset >= stop - 1:
+                        finished.add(partition)
                     if len(out) >= max_count:
                         break
         return out

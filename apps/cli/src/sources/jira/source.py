@@ -20,6 +20,7 @@ from ...models.generated_single_asset_scan_results import (
 )
 from ...utils.file_parser import resolve_mime_type
 from ...utils.hashing import hash_url, normalize_http_url
+from ...utils.sampling_frontier import iso_time_rank
 from ..atlassian_common import (
     AtlassianCloudClient,
     dedupe_preserve_order,
@@ -206,14 +207,20 @@ class JiraSource(BaseSource):
             reverse=True,
         )
 
+    @staticmethod
+    def _issue_order(issue: dict[str, Any]) -> tuple[int | None, str]:
+        fields = issue.get("fields")
+        updated = fields.get("updated") if isinstance(fields, dict) else None
+        return iso_time_rank(updated), str(issue.get("id") or issue.get("key") or "")
+
     def _sample_issues(self, issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
         sampling = self.config.sampling
         if sampling.strategy == SamplingStrategy.ALL:
             return issues
 
         if sampling.strategy == SamplingStrategy.AUTOMATIC:
-            # Newest-first stable order; window advances each run and wraps around.
-            return self.automatic_window(self._sorted_issues(issues), key="issues")
+            # Recently updated issues first, then the backfill (see automatic_window).
+            return self.automatic_window(issues, key="issues", order=self._issue_order)
 
         limit = int(sampling.rows_per_page or 100)
         if limit >= len(issues):

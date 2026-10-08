@@ -85,6 +85,7 @@ export class KubernetesCliJobService {
     onLogChunk?: CliJobLogHandler,
     onJobCreated?: CliJobCreatedHandler,
     samplingCursorB64?: string,
+    samplingEnv?: Record<string, string>,
   ): Promise<CliJobResult> {
     return this.runJob({
       runnerId,
@@ -94,6 +95,7 @@ export class KubernetesCliJobService {
       outputRestUrl,
       hasSuccessfulRuns,
       samplingCursorB64,
+      samplingEnv,
       onLogChunk,
       onJobCreated,
     });
@@ -299,6 +301,7 @@ export class KubernetesCliJobService {
     outputRestUrl?: string;
     hasSuccessfulRuns?: boolean;
     samplingCursorB64?: string;
+    samplingEnv?: Record<string, string>;
     evaluationInputUrl?: string;
     evaluationFileExt?: string;
     evaluationInputsB64?: string;
@@ -485,6 +488,7 @@ export class KubernetesCliJobService {
       outputRestUrl?: string;
       hasSuccessfulRuns?: boolean;
       samplingCursorB64?: string;
+      samplingEnv?: Record<string, string>;
       evaluationInputUrl?: string;
       evaluationFileExt?: string;
       evaluationInputsB64?: string;
@@ -602,6 +606,11 @@ export class KubernetesCliJobService {
         name: 'CLASSIFYRE_SAMPLING_CURSOR',
         value: params.samplingCursorB64,
       });
+    }
+    // Which settings the run is under, and whether they changed (see
+    // CliRunnerService.resolveSamplingState).
+    for (const [name, value] of Object.entries(params.samplingEnv ?? {})) {
+      envMap.set(name, { name, value });
     }
     if (params.evaluationInputUrl) {
       envMap.set('EVALUATION_INPUT_URL', {

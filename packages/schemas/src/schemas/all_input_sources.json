@@ -3865,7 +3865,7 @@
         "LATEST",
         "ALL"
       ],
-      "description": "Sampling strategy. AUTOMATIC (recommended default) incrementally ingests a new slice of not-yet-seen data on every run, remembering its position between runs and wrapping around to re-scan from the start once everything has been covered \u2014 eventually ingesting everything at a bounded cost per run. RANDOM samples items randomly. LATEST prioritises the most recently modified/created items. ALL scans every item with no limit."
+      "description": "Sampling strategy. AUTOMATIC (recommended default) reads a bounded slice on every run and remembers where it has been: whatever is new since the last run comes first, the rest of the slice continues backwards through older data, and once everything has been covered only new data is read. Changing the source's settings or one of its detectors starts the sweep over. A table or collection with no increasing key cannot tell new rows from old, so it is paged from the start and wraps around instead. RANDOM samples items randomly. LATEST prioritises the most recently modified/created items. ALL scans every item with no limit."
     },
     "SamplingConfig": {
       "title": "SamplingConfig",

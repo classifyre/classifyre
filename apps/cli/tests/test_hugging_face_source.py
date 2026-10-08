@@ -462,27 +462,28 @@ def test_hugging_face_sampling_random_is_deterministic():
     assert len(first) == 10
 
 
-def test_hugging_face_sampling_automatic_advances_window_across_runs(monkeypatch):
+def test_hugging_face_sampling_automatic_backfills_then_stops(monkeypatch):
 
     refs = [_ref(f"data/f{index:02d}.parquet", days_ago=index) for index in range(25)]
 
-    source = _source(strategy="AUTOMATIC", rows_per_page=10)
-    first = source._apply_sampling(iter(refs))
-    cursor = source.current_sampling_cursor()
+    cursor = None
+    windows = []
+    for _ in range(4):
+        if cursor is not None:
+            monkeypatch.setenv(
+                HuggingFaceSource.SAMPLING_CURSOR_ENV,
+                encode_sampling_cursor(cursor),
+            )
+        source = _source(strategy="AUTOMATIC", rows_per_page=10)
+        windows.append([item.key for item in source._apply_sampling(iter(refs))])
+        cursor = source.current_sampling_cursor() or cursor
 
-    assert [item.key for item in first] == [f"data/f{index:02d}.parquet" for index in range(10)]
-    assert cursor == {"objects": 10}
-
-    monkeypatch.setenv(
-        HuggingFaceSource.SAMPLING_CURSOR_ENV,
-        encode_sampling_cursor(cursor),
-    )
-    resumed = _source(strategy="AUTOMATIC", rows_per_page=10)
-    second = resumed._apply_sampling(iter(refs))
-
-    assert [item.key for item in second] == [
-        f"data/f{index:02d}.parquet" for index in range(10, 20)
-    ]
+    assert windows[0] == [f"data/f{index:02d}.parquet" for index in range(10)]
+    assert windows[1] == [f"data/f{index:02d}.parquet" for index in range(10, 20)]
+    assert windows[2] == [f"data/f{index:02d}.parquet" for index in range(20, 25)]
+    # The repository has been read through: nothing is read again.
+    assert windows[3] == []
+    assert cursor["objects"]["done"] is True
 
 
 # ── download ─────────────────────────────────────────────────────────────

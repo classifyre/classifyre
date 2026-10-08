@@ -1,4 +1,8 @@
-import { computeScopeFingerprint } from './scope-fingerprint';
+import {
+  computeSamplingFingerprint,
+  computeScopeFingerprint,
+  type SamplingFingerprintDetector,
+} from './scope-fingerprint';
 
 describe('computeScopeFingerprint', () => {
   const base = {
@@ -139,6 +143,113 @@ describe('augmentation', () => {
     };
     expect(computeScopeFingerprint('LOCAL_FOLDER', augmented)).toBe(
       computeScopeFingerprint('LOCAL_FOLDER', base),
+    );
+  });
+});
+
+describe('computeSamplingFingerprint', () => {
+  const base = {
+    type: 'LOCAL_FOLDER',
+    required: { path: '/data' },
+    masked: { token: 'enc:v1:aaaa' },
+    optional: { scope: { prefix: 'exports/' } },
+    sampling: { strategy: 'AUTOMATIC', rows_per_page: 100 },
+    detectors: [
+      { type: 'SECRETS', enabled: true },
+      { type: 'CUSTOM', enabled: true, custom_detector_key: 'contracts' },
+    ],
+  };
+  const detector: SamplingFingerprintDetector = {
+    key: 'contracts',
+    active: true,
+    definition: { type: 'REGEX', patterns: ['NDA-\\d+'] },
+    trainedAt: null,
+    files: [{ name: 'terms.txt', hash: 'h1' }],
+  };
+  const fingerprint = (
+    config: unknown = base,
+    detectors: SamplingFingerprintDetector[] = [detector],
+  ) => computeSamplingFingerprint('LOCAL_FOLDER', config, detectors);
+
+  it('is stable, whatever the key or detector order', () => {
+    const other: SamplingFingerprintDetector = { ...detector, key: 'invoices' };
+    const reordered = {
+      detectors: base.detectors,
+      sampling: { rows_per_page: 100, strategy: 'AUTOMATIC' },
+      optional: base.optional,
+      masked: base.masked,
+      required: base.required,
+      type: 'LOCAL_FOLDER',
+    };
+    expect(fingerprint(reordered, [other, detector])).toBe(
+      fingerprint(base, [detector, other]),
+    );
+  });
+
+  it('does not change when a credential is rotated', () => {
+    expect(fingerprint({ ...base, masked: { token: 'enc:v1:bbbb' } })).toBe(
+      fingerprint(),
+    );
+    const withSecrets = (value: string) => ({
+      ...base,
+      augmentation: { enabled: true, secrets: { api: value } },
+    });
+    expect(fingerprint(withSecrets('enc:one'))).toBe(
+      fingerprint(withSecrets('enc:two')),
+    );
+  });
+
+  it.each([
+    ['the scope', { ...base, optional: { scope: { prefix: 'other/' } } }],
+    ['the path', { ...base, required: { path: '/elsewhere' } }],
+    [
+      'the window size',
+      { ...base, sampling: { strategy: 'AUTOMATIC', rows_per_page: 50 } },
+    ],
+    [
+      'a detector switched off',
+      {
+        ...base,
+        detectors: [
+          { type: 'SECRETS', enabled: false },
+          { type: 'CUSTOM', enabled: true, custom_detector_key: 'contracts' },
+        ],
+      },
+    ],
+    [
+      'a detector added',
+      {
+        ...base,
+        detectors: [...base.detectors, { type: 'PII', enabled: true }],
+      },
+    ],
+  ])('changes when %s changes', (_label, config) => {
+    expect(fingerprint(config)).not.toBe(fingerprint());
+  });
+
+  it.each([
+    ['edited', { ...detector, definition: { type: 'REGEX', patterns: ['X'] } }],
+    ['retrained', { ...detector, trainedAt: '2026-10-08T10:00:00.000Z' }],
+    ['deactivated', { ...detector, active: false }],
+    [
+      'given a different file',
+      { ...detector, files: [{ name: 'terms.txt', hash: 'h2' }] },
+    ],
+  ])('changes when a custom detector it uses is %s', (_label, changed) => {
+    expect(fingerprint(base, [changed])).not.toBe(fingerprint());
+  });
+
+  it('changes when a custom detector it uses is deleted', () => {
+    expect(fingerprint(base, [])).not.toBe(fingerprint());
+  });
+
+  it('ignores a secret inside a detector definition', () => {
+    const withSecret = (value: string) => ({
+      ...detector,
+      definition: { type: 'CODE_DETECTOR', secrets: { key: value } },
+    });
+    expect(fingerprint(base, [withSecret('one')])).toBe(
+      fingerprint(base, [withSecret('two')]),
     );
   });
 });

@@ -20,6 +20,7 @@ from ...models.generated_single_asset_scan_results import (
 )
 from ...utils.file_parser import resolve_mime_type
 from ...utils.hashing import hash_url, normalize_http_url
+from ...utils.sampling_frontier import iso_time_rank
 from ..atlassian_common import (
     AtlassianCloudClient,
     dedupe_preserve_order,
@@ -205,9 +206,8 @@ class ServiceDeskSource(BaseSource):
             return requests
 
         if sampling.strategy == SamplingStrategy.AUTOMATIC:
-            # Newest-first stable order; window advances each run and wraps around.
-            sorted_requests = sorted(requests, key=self._request_sort_timestamp, reverse=True)
-            return self.automatic_window(sorted_requests, key="requests")
+            # Recently changed requests first, then the backfill (see automatic_window).
+            return self.automatic_window(requests, key="requests", order=self._request_order)
 
         limit = int(sampling.rows_per_page or 100)
         if limit >= len(requests):
@@ -222,6 +222,25 @@ class ServiceDeskSource(BaseSource):
             reverse=True,
         )
         return sorted_requests[:limit]
+
+    def _request_order(self, request: dict[str, Any]) -> tuple[int | None, str]:
+        """Order for AUTOMATIC: last status change, else creation. Never "now"."""
+        current_status = request.get("currentStatus")
+        status_date = current_status.get("statusDate") if isinstance(current_status, dict) else None
+        rank = self._date_dto_rank(status_date)
+        if rank is None:
+            rank = self._date_dto_rank(request.get("createdDate"))
+        return rank, str(request.get("issueId") or request.get("issueKey") or "")
+
+    @staticmethod
+    def _date_dto_rank(value: Any) -> int | None:
+        if isinstance(value, dict):
+            for key in ("iso8601", "jira"):
+                rank = iso_time_rank(value.get(key))
+                if rank is not None:
+                    return rank
+            return None
+        return iso_time_rank(value)
 
     def _request_sort_timestamp(self, request: dict[str, Any]) -> datetime:
         current_status = request.get("currentStatus")

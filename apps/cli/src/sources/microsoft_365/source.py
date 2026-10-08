@@ -38,6 +38,7 @@ from ...utils.file_parser import (
     resolve_mime_type,
 )
 from ...utils.hashing import hash_id
+from ...utils.sampling_frontier import time_rank
 from ..base import BaseSource
 from ..dependencies import require_module
 
@@ -676,9 +677,17 @@ class Microsoft365Source(BaseSource):
             return items
 
         if strategy == SamplingStrategy.AUTOMATIC:
-            # Newest-first stable order; per-drive window advances each run and wraps.
-            items.sort(key=lambda ref: (ref.last_modified, ref.item_id), reverse=True)
-            return self.automatic_window(items, key=cursor_key)
+            # Per drive: recently changed or added items first, then the
+            # backfill. A synced upload keeps its original modification time,
+            # so the later of that and its creation in the drive is used.
+            return self.automatic_window(
+                items,
+                key=cursor_key,
+                order=lambda ref: (
+                    time_rank(max(ref.last_modified, ref.created)),
+                    ref.item_id,
+                ),
+            )
 
         if strategy == SamplingStrategy.RANDOM:
             if limit >= len(items):

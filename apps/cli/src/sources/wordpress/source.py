@@ -1,7 +1,7 @@
 import logging
 import re
 from collections.abc import AsyncGenerator, Generator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -18,6 +18,7 @@ from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ...utils.hashing import hash_url, normalize_http_url, unhash_id
+from ...utils.sampling_frontier import iso_time_rank
 from ..base import BaseSource
 
 logger = logging.getLogger(__name__)
@@ -260,24 +261,73 @@ class WordPressSource(BaseSource):
                 logger.error(f"Failed to fetch {content_type} page {page}: {e}")
                 break
 
-    def _stream_content_type_automatic(
-        self, content_type: str, endpoint: str
-    ) -> Generator[tuple[list[SingleAssetScanResults], int], None, None]:
-        """AUTOMATIC: fetch the next page (modified-desc) and advance the cursor.
+    # ── AUTOMATIC ────────────────────────────────────────────────────────
+    #
+    # A site is read by modification time: what was edited or published since
+    # the last run first, then the next slice of older content, and once the
+    # whole site has been read only what is new. The cursor used to be a page
+    # number in a newest-first listing, which every new post shifted by one.
+    #
+    # The listing is ordered newest-modified first, so what is new is at the
+    # top and reading stops at the first item older than the newest one read.
+    # To reach the backfill without paging through everything above it,
+    # WordPress can filter by modification time (``modified_before``, since
+    # 5.7) -- but it compares against the site's local clock, and to the
+    # second. So the filter only skips most of what is not wanted; which items
+    # are actually unread is decided here, from ``modified_gmt`` and the post
+    # id. A site too old to know the filter ignores it and is simply paged
+    # from the top, slower but no less correct.
 
-        Each run ingests one page of ``rows_per_page`` items (capped at the WP
-        API maximum of 100) per content type, remembering the page number so the
-        next run continues, and wrapping back to page 1 once the last page is
-        reached.
+    # Wider than any daylight-saving shift, so an hour that the local clock
+    # repeats cannot hide a post from the filter.
+    _MODIFIED_SLACK = timedelta(hours=2)
+    _site_offset: timedelta | None = None
+
+    @staticmethod
+    def _modified_order(item: dict[str, Any]) -> tuple[int | None, str]:
+        rank = iso_time_rank(item.get("modified_gmt") or item.get("date_gmt"))
+        return rank, str(item.get("id") or "")
+
+    def _learn_site_offset(self, item: dict[str, Any]) -> None:
+        """Remember how far the site's local clock is from UTC."""
+        if self._site_offset is not None:
+            return
+        local, gmt = iso_time_rank(item.get("modified")), iso_time_rank(item.get("modified_gmt"))
+        if local is not None and gmt is not None:
+            self._site_offset = timedelta(microseconds=local - gmt)
+
+    def _ensure_site_offset(self, endpoint: str) -> None:
+        """Learn the site's clock offset before filtering by its local time.
+
+        A filter built on a guessed offset is not a coarser filter, it is a
+        wrong one: on a site hours from UTC it cuts off posts that are in
+        range, and those are then never read.
         """
-        key = f"wp:{content_type}"
-        saved = self._sampling_cursor.get(key)
-        page = saved if isinstance(saved, int) and saved >= 1 else 1
-        per_page = max(1, min(int(self.config.sampling.rows_per_page or 100), 100))
+        if self._site_offset is not None:
+            return
+        response = self.session.get(
+            endpoint,
+            params={"per_page": 1, "page": 1, "orderby": "modified", "order": "desc"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        items = response.json()
+        for item in items if isinstance(items, list) else []:
+            if isinstance(item, dict):
+                self._learn_site_offset(item)
 
+    def _site_local_iso(self, rank: int, slack: timedelta) -> str:
+        moment = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(microseconds=rank)
+        local = moment + (self._site_offset or timedelta(0)) + slack
+        return local.replace(tzinfo=None).isoformat(timespec="seconds")
+
+    def _iter_modified_range(
+        self, content_type: str, endpoint: str, lower: int | None, upper: int | None
+    ) -> Generator[dict[str, Any], None, None]:
+        """Items of one content type, most recently modified first, within a range of ranks."""
+        per_page = 100
         params: dict[str, Any] = {
             "per_page": per_page,
-            "page": page,
             "_embed": "author,wp:term",
             "orderby": "modified",
             "order": "desc",
@@ -285,22 +335,55 @@ class WordPressSource(BaseSource):
         content_options = self._content_options()
         if content_options.post_status:
             params["status"] = ",".join(content_options.post_status)
+        if upper is not None:
+            self._ensure_site_offset(endpoint)
+            params["modified_before"] = self._site_local_iso(upper, self._MODIFIED_SLACK)
+        # The lower bound needs no filter: the listing is newest first, so
+        # reading simply stops once it is below the range.
+        floor = (
+            lower - self._MODIFIED_SLACK // timedelta(microseconds=1) if lower is not None else None
+        )
 
-        try:
-            response = self.session.get(endpoint, params=params, timeout=30)
+        page = 1
+        while not self._aborted:
+            response = self.session.get(endpoint, params={**params, "page": page}, timeout=30)
+            if response.status_code == 400 and page > 1:
+                return  # past the last page
             response.raise_for_status()
             items = response.json()
+            if not isinstance(items, list) or not items:
+                return
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                self._learn_site_offset(item)
+                rank = self._modified_order(item)[0]
+                if floor is not None and rank is not None and rank < floor:
+                    # Below the range, and everything after it is older still.
+                    return
+                yield item
+            total_pages = int(response.headers.get("X-WP-TotalPages", 1))
+            if page >= total_pages or len(items) < per_page:
+                return
+            page += 1
+
+    def _stream_content_type_automatic(
+        self, content_type: str, endpoint: str
+    ) -> Generator[tuple[list[SingleAssetScanResults], int], None, None]:
+        """AUTOMATIC: ``rows_per_page`` items per content type, new ones first."""
+        try:
+            items = self.automatic_ranged_window(
+                key=f"wp:{content_type}",
+                order=self._modified_order,
+                fetch=lambda lower, upper: self._iter_modified_range(
+                    content_type, endpoint, lower, upper
+                ),
+            )
         except requests.exceptions.RequestException as e:
-            # A request past the final page wraps back to the start next run.
-            logger.error(f"Failed to fetch {content_type} page {page}: {e}")
-            self._record_cursor_key(key, 1)
+            # Nothing was recorded, so the next run asks for the same ground.
+            logger.error(f"Failed to fetch {content_type}: {e}")
             return
 
-        if not items:
-            self._record_cursor_key(key, 1)
-            return
-
-        total_pages = int(response.headers.get("X-WP-TotalPages", 1))
         page_assets: list[SingleAssetScanResults] = []
         extracted = 0
         for item in items:
@@ -318,9 +401,6 @@ class WordPressSource(BaseSource):
 
         if extracted > 0:
             yield page_assets, extracted
-
-        next_page = 1 if (page >= total_pages or len(items) < per_page) else page + 1
-        self._record_cursor_key(key, next_page)
 
     def _fetch_content_type(
         self, content_type: str, limit: int | None

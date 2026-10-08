@@ -127,6 +127,13 @@
           "insertText": "cohort_stats"
         },
         {
+          "label": "config_changed",
+          "kind": "property",
+          "detail": "bool",
+          "documentation": "True on the first run after this source's settings changed.\n\n\"Settings\" is anything in the source's configuration -- scope,\nsampling, variables, the notebook itself, which detectors are on --\nand the definition of any custom detector it uses. Rotating a secret\ndoes not count.\n\nA built-in source starts its sweep over when that happens. A notebook\nowns its own cursor, so nothing is taken from it; it is told instead,\nand decides::\n\n    cursor = {} if ctx.config_changed else ctx.cursor\n\nThe flag stays set until a run finishes, so a run that fails before\nacting on it does not lose it. ``ctx.newest_first()`` acts on it for\nyou.",
+          "insertText": "config_changed"
+        },
+        {
           "label": "cursor",
           "kind": "property",
           "detail": "dict[str, Any]",
@@ -188,6 +195,13 @@
           "detail": "(*parts: 'Any', level: 'str | None' = None) -> 'None'",
           "documentation": "Write a line to the run log. ``level`` (\"warning\", \"error\", \u2026) sets its level there.",
           "insertText": "log()"
+        },
+        {
+          "label": "newest_first",
+          "kind": "method",
+          "detail": "(items: 'Iterable[Any]', *, order: 'Callable[[Any], tuple[Any, str]]', name: 'str' = 'items', limit: 'int | None' = None) -> 'list[Any]'",
+          "documentation": "This run's slice of a listing: what is new first, then the backfill.\n\n::\n\n    def extract():\n        for doc in ctx.newest_first(\n            api.list_documents(),\n            order=lambda doc: (doc[\"updated_at\"], doc[\"id\"]),\n        ):\n            yield Asset(id=doc[\"id\"], ...)\n\nPass the whole listing, in any order. ``order`` maps an item to\n``(rank, id)``: ``rank`` is what makes an item newer -- a timestamp, an\nincreasing number -- and must be an int, float or string of one\nconsistent type that only changes when the item does; ``id`` is unique\nto the item. Each run gets ``limit`` items (``rows_per_page`` by\ndefault): everything newer than what earlier runs read comes first,\nthe rest continues backwards from where the last run stopped, and once\nthe whole listing has been read only new items are returned.\n\nThe position is kept in the cursor beside whatever you store there,\none per ``name``, and starts over when ``ctx.config_changed``. Calling\nit declares this run's coverage partial.",
+          "insertText": "newest_first(${1:items}, order=${2:order})"
         },
         {
           "label": "now",

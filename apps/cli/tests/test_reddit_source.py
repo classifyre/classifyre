@@ -412,26 +412,49 @@ async def test_random_samples_a_stable_subset_of_a_larger_pool() -> None:
     assert [a.hash for a in repeat_assets] == [a.hash for a in assets]
 
 
+def _dated_submissions(count: int, *, first: int = 0) -> list[_FakeSubmission]:
+    """Submissions newest first: ``sub<first>`` is the most recent."""
+    submissions = _submissions(first + count)[first:]
+    for position, submission in enumerate(submissions, start=first):
+        submission.created_utc = 1767225600.0 - position * 60
+    return submissions
+
+
 @pytest.mark.asyncio
-async def test_automatic_advances_a_cursor_and_wraps() -> None:
-    source = _source(_submissions(25), sampling={"strategy": "AUTOMATIC", "rows_per_page": 10})
+async def test_automatic_reads_new_submissions_first_then_backfills_and_stops() -> None:
+    sampling = {"strategy": "AUTOMATIC", "rows_per_page": 10}
+    source = _source(_dated_submissions(25), sampling=sampling)
     first = await _collect(source)
     cursor = source.current_sampling_cursor()
 
-    assert len(first) == 10
-    assert cursor == {"subreddit:testsub": 10}
+    assert [a.metadata["submission_id"] for a in first] == [f"sub{i}" for i in range(10)]
+    assert cursor["subreddit:testsub"]["done"] is False
 
-    # Second run resumes where the first stopped.
-    resumed = _source(_submissions(25), sampling={"strategy": "AUTOMATIC", "rows_per_page": 10})
-    resumed._sampling_cursor = {"subreddit:testsub": 10}
+    # Two submissions were posted since: they come first, then the backfill.
+    newer = [_FakeSubmission("fresh1"), _FakeSubmission("fresh2")]
+    newer[0].created_utc = 1767225600.0 + 120
+    newer[1].created_utc = 1767225600.0 + 60
+    resumed = _source([*newer, *_dated_submissions(25)], sampling=sampling)
+    resumed._sampling_cursor = cursor
     second = await _collect(resumed)
-    assert [a.metadata["submission_id"] for a in second] == [f"sub{i}" for i in range(10, 20)]
+    assert [a.metadata["submission_id"] for a in second] == [
+        "fresh1",
+        "fresh2",
+        *[f"sub{i}" for i in range(10, 18)],
+    ]
+    cursor = resumed.current_sampling_cursor()
 
-    # Third run covers the tail and wraps back to the start.
-    tail = _source(_submissions(25), sampling={"strategy": "AUTOMATIC", "rows_per_page": 10})
-    tail._sampling_cursor = {"subreddit:testsub": 20}
-    await _collect(tail)
-    assert tail.current_sampling_cursor() == {"subreddit:testsub": 0}
+    # The rest of the listing, after which nothing is read again.
+    tail = _source([*newer, *_dated_submissions(25)], sampling=sampling)
+    tail._sampling_cursor = cursor
+    third = await _collect(tail)
+    assert [a.metadata["submission_id"] for a in third] == [f"sub{i}" for i in range(18, 25)]
+    cursor = tail.current_sampling_cursor()
+    assert cursor["subreddit:testsub"]["done"] is True
+
+    settled = _source([*newer, *_dated_submissions(25)], sampling=sampling)
+    settled._sampling_cursor = cursor
+    assert await _collect(settled) == []
 
 
 @pytest.mark.asyncio

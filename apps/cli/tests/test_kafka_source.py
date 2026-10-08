@@ -298,72 +298,152 @@ def test_kafka_latest_strategy_assigns_tail_offsets(_patch_kafka: _FakeKafkaModu
 # ── AUTOMATIC sampling ───────────────────────────────────────────────────
 
 
-def test_kafka_automatic_first_run_starts_at_low_and_records_cursor(
+def _automatic_run(
+    module: _FakeKafkaModule,
+    monkeypatch: pytest.MonkeyPatch,
+    cursor: dict[str, Any] | None,
+    *,
+    budget: int = 5,
+) -> tuple[list[int], dict[str, Any] | None]:
+    """One AUTOMATIC consume of ``payments``: the offsets read and the cursor left."""
+    if cursor is None:
+        monkeypatch.delenv(CURSOR_ENV, raising=False)
+    else:
+        monkeypatch.setenv(CURSOR_ENV, _encode_cursor(cursor))
+    module.last_assigned = []
+    src = KafkaSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
+    out = src._consume("payments", budget)
+    next_cursor = src.current_sampling_cursor()
+    return [m["offset"] for m in out], next_cursor if next_cursor is not None else cursor
+
+
+def _log(module: _FakeKafkaModule, low: int, high: int) -> None:
+    module.watermarks[("payments", 0)] = (low, high)
+    module.messages = _messages(high - low, start=low)
+
+
+def test_kafka_automatic_first_run_reads_the_newest_messages(
     _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv(CURSOR_ENV, raising=False)
+    module = _patch_kafka
+    _log(module, 0, 100)
+
+    offsets, cursor = _automatic_run(module, monkeypatch, None)
+
+    assert module.last_assigned[0].offset == 95
+    assert offsets == [95, 96, 97, 98, 99]
+    assert cursor == {"payments:0": {"v": 2, "head": 100, "tail": 95}}
+
+
+def test_kafka_automatic_reads_what_was_produced_since_before_older_messages(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _patch_kafka
+    _log(module, 0, 100)
+    _, cursor = _automatic_run(module, monkeypatch, None)
+
+    _log(module, 0, 103)  # three produced since
+    offsets, cursor = _automatic_run(module, monkeypatch, cursor)
+    assert offsets == [100, 101, 102]
+    assert cursor == {"payments:0": {"v": 2, "head": 103, "tail": 95}}
+
+    # Nothing new this time: the next slice of older messages.
+    offsets, cursor = _automatic_run(module, monkeypatch, cursor)
+    assert module.last_assigned[0].offset == 90
+    assert offsets == [90, 91, 92, 93, 94]
+    assert cursor == {"payments:0": {"v": 2, "head": 103, "tail": 90}}
+
+
+def test_kafka_automatic_catches_up_on_a_backlog_over_several_runs(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _patch_kafka
+    _log(module, 0, 100)
+    _, cursor = _automatic_run(module, monkeypatch, None)
+
+    _log(module, 0, 112)  # twelve new, five per run
+    read: list[int] = []
+    for _ in range(3):
+        offsets, cursor = _automatic_run(module, monkeypatch, cursor)
+        read += offsets
+    assert read == list(range(100, 112))
+    assert cursor == {"payments:0": {"v": 2, "head": 112, "tail": 95}}
+
+
+def test_kafka_automatic_reads_every_message_once_then_only_new_ones(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _patch_kafka
+    _log(module, 0, 12)
+
+    read: list[int] = []
+    cursor: dict[str, Any] | None = None
+    for _ in range(4):
+        offsets, cursor = _automatic_run(module, monkeypatch, cursor)
+        read += offsets
+    assert sorted(read) == list(range(12))
+    assert len(read) == len(set(read))
+    assert cursor == {"payments:0": {"v": 2, "head": 12, "tail": 0}}
+
+    # Caught up and backfilled: the partition is not read at all, and the
+    # cursor does not move -- it used to wrap back to the start here.
+    offsets, settled = _automatic_run(module, monkeypatch, cursor)
+    assert offsets == []
+    assert module.last_assigned == []
+    assert settled == cursor
+
+    _log(module, 0, 14)
+    offsets, _ = _automatic_run(module, monkeypatch, cursor)
+    assert offsets == [12, 13]
+
+
+def test_kafka_automatic_follows_retention(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _patch_kafka
+    # Everything read so far has since been deleted by retention.
+    _log(module, 20, 100)
+
+    offsets, cursor = _automatic_run(
+        module, monkeypatch, {"payments:0": {"v": 2, "head": 10, "tail": 5}}
+    )
+
+    assert module.last_assigned[0].offset == 20  # the earliest offset still there
+    assert offsets == [20, 21, 22, 23, 24]
+    assert cursor == {"payments:0": {"v": 2, "head": 25, "tail": 20}}
+
+
+def test_kafka_automatic_finishes_a_slice_it_could_not_read_to_the_end(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _patch_kafka
     module.watermarks[("payments", 0)] = (0, 100)
-    module.messages = _messages(12, start=0)
+    # The broker hands over only part of the slice below the tail.
+    module.messages = _messages(2, start=90)
 
-    src = KafkaSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
-    out = src._consume("payments", 5)
+    offsets, cursor = _automatic_run(
+        module, monkeypatch, {"payments:0": {"v": 2, "head": 100, "tail": 95}}
+    )
+    assert offsets == [90, 91]
+    assert cursor == {"payments:0": {"v": 2, "head": 100, "tail": 90, "fill": [92, 95]}}
 
-    assert module.last_assigned[0].offset == 0  # first run: start at low
-    assert [m["offset"] for m in out] == [0, 1, 2, 3, 4]
-    # advanced past the highest offset consumed
-    assert src.current_sampling_cursor() == {"payments:0": 5}
+    # The rest of it is read before going any lower.
+    module.messages = _messages(100)
+    offsets, cursor = _automatic_run(module, monkeypatch, cursor)
+    assert offsets == [92, 93, 94]
+    assert cursor == {"payments:0": {"v": 2, "head": 100, "tail": 90}}
 
 
-def test_kafka_automatic_second_run_resumes_from_saved_cursor(
+def test_kafka_automatic_starts_over_from_the_old_offset_cursor(
     _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _patch_kafka
-    module.watermarks[("payments", 0)] = (0, 100)
-    module.messages = _messages(12, start=0)
-    monkeypatch.setenv(CURSOR_ENV, _encode_cursor({"payments:0": 5}))
+    _log(module, 0, 100)
 
-    src = KafkaSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
-    out = src._consume("payments", 5)
+    offsets, cursor = _automatic_run(module, monkeypatch, {"payments:0": 5})
 
-    assert module.last_assigned[0].offset == 5
-    assert [m["offset"] for m in out] == [5, 6, 7, 8, 9]
-    assert src.current_sampling_cursor() == {"payments:0": 10}
-
-
-def test_kafka_automatic_wraps_to_low_when_caught_up(
-    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    module = _patch_kafka
-    module.watermarks[("payments", 0)] = (0, 10)
-    # Only two messages left before the high watermark.
-    module.messages = _messages(2, start=8)
-    monkeypatch.setenv(CURSOR_ENV, _encode_cursor({"payments:0": 8}))
-
-    src = KafkaSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
-    out = src._consume("payments", 5)
-
-    assert module.last_assigned[0].offset == 8
-    assert [m["offset"] for m in out] == [8, 9]
-    # 9 + 1 == 10 == high watermark → wraps back to low (0) for the next run
-    assert src.current_sampling_cursor() == {"payments:0": 0}
-
-
-def test_kafka_automatic_stale_cursor_below_low_clamps_to_low(
-    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    module = _patch_kafka
-    # Retention has advanced: earliest retained offset is now 20.
-    module.watermarks[("payments", 0)] = (20, 100)
-    module.messages = _messages(5, start=20)
-    monkeypatch.setenv(CURSOR_ENV, _encode_cursor({"payments:0": 5}))
-
-    src = KafkaSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
-    out = src._consume("payments", 5)
-
-    assert module.last_assigned[0].offset == 20  # clamped up to low, not the stale 5
-    assert [m["offset"] for m in out] == [20, 21, 22, 23, 24]
-    assert src.current_sampling_cursor() == {"payments:0": 25}
+    assert offsets == [95, 96, 97, 98, 99]
+    assert cursor == {"payments:0": {"v": 2, "head": 100, "tail": 95}}
 
 
 # ── REST Proxy transport ─────────────────────────────────────────────────
@@ -486,14 +566,22 @@ async def test_kafka_rest_fetch_content_decodes_records(_patch_rest: dict[str, A
 def test_kafka_rest_automatic_positions_from_saved_cursor(
     _patch_rest: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(CURSOR_ENV, _encode_cursor({"payments:0": 5}))
+    # Offsets 0-4 have been read; the log now ends at 12, so 5 onwards is new.
+    monkeypatch.setenv(CURSOR_ENV, _encode_cursor({"payments:0": {"v": 2, "head": 5, "tail": 0}}))
     src = KafkaSource(_rest_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
-    src._consume("payments", 10)
+    out = src._consume("payments", 10)
 
     positions = [
         body for method, url, body in _patch_rest["requests"] if url.endswith("/positions")
     ]
     assert positions == [{"offsets": [{"topic": "payments", "partition": 0, "offset": 5}]}]
+    # The fake proxy replays the log from the start whatever position it was
+    # given, so only the direction is asserted: the head moved up, the tail did not.
+    cursor = src.current_sampling_cursor()
+    assert cursor is not None
+    assert cursor["payments:0"]["head"] > 5
+    assert cursor["payments:0"]["tail"] == 0
+    assert out
 
 
 def test_kafka_rest_plain_http_when_tls_disabled(_patch_rest: dict[str, Any]) -> None:

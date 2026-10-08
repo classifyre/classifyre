@@ -48,6 +48,7 @@ from ...utils.file_parser import (
 )
 from ...utils.hashing import hash_id, unhash_id
 from ...utils.payload import spool
+from ...utils.sampling_frontier import time_rank
 from ..base import BaseSource
 from ..dependencies import require_module
 
@@ -403,9 +404,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         materialized = list(refs)
 
         if strategy == SamplingStrategy.AUTOMATIC:
-            # Newest-first stable order; window advances each run and wraps around.
-            materialized.sort(key=lambda ref: ref.last_modified, reverse=True)
-            return self.automatic_window(materialized, key="objects")
+            return self._automatic_refs(materialized)
 
         if strategy == SamplingStrategy.RANDOM:
             if limit >= len(materialized):
@@ -416,6 +415,25 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         materialized.sort(key=lambda ref: ref.last_modified, reverse=True)
         return materialized[:limit]
+
+    AUTOMATIC_CURSOR_KEY = "objects"
+
+    def _automatic_refs(self, refs: list[ObjectRef]) -> list[ObjectRef]:
+        """This run's AUTOMATIC slice: new objects first, then the backfill."""
+        return self.automatic_window(
+            refs,
+            key=self.AUTOMATIC_CURSOR_KEY,
+            order=lambda ref: (self._automatic_rank(ref), ref.key),
+        )
+
+    def _automatic_rank(self, ref: ObjectRef) -> int:
+        """What makes one object newer than another for AUTOMATIC.
+
+        An object store stamps ``last_modified`` itself, at upload, so it is
+        both "when this changed" and "when this arrived". A source whose
+        timestamps are carried over from somewhere else overrides this.
+        """
+        return time_rank(ref.last_modified)
 
     def _file_extension(self, key: str) -> str:
         return PurePosixPath(key).suffix.lower()

@@ -615,6 +615,8 @@ client = ApiClient(
 | `ctx.sampling` | The whole sampling config. |
 | `ctx.cursor` | What the previous run recorded. Empty on the first run. |
 | `ctx.set_cursor(dict)` | Record where this run got to, for the next one. Kept under every sampling strategy — use it for any run-to-run state, not just pagination. |
+| `ctx.config_changed` | `True` on the first run after the source's settings, or a custom detector it uses, changed. See below. |
+| `ctx.newest_first(items, order=…)` | This run's slice of a listing: what is new first, then older items not read yet. See below. |
 | `ctx.should_abort` | `True` once the run has been asked to stop. |
 | `ctx.log(*parts)` | Write to the scan log. |
 | `ctx.now()` | Current UTC time. |
@@ -641,6 +643,44 @@ def extract():
 
     ctx.set_cursor({"page_token": page.next_token})
 ```
+
+### New items first
+
+A built-in source reads what is new since the last run before it carries on
+with older items, and stops going over old ground once it has covered
+everything. `ctx.newest_first` gives a connector the same behaviour in one call:
+
+```python
+def extract():
+    for doc in ctx.newest_first(
+        api.list_documents(),
+        order=lambda doc: (doc["updated_at"], doc["id"]),
+    ):
+        yield Asset(id=doc["id"], name=doc["title"], content=doc["body"])
+```
+
+Pass the whole listing, in any order. `order` returns `(rank, id)`: `rank` is
+what makes an item newer — a timestamp, an increasing number — and should only
+change when the item does; `id` is unique. Each run gets `ctx.page_size` items
+(or `limit=`). Its position is kept in the cursor beside whatever you store
+there, so you can use both. Calling it declares the run's coverage partial.
+
+### When the settings change
+
+A built-in source starts its sweep over when its configuration changes or a
+custom detector it uses is edited, retrained or deleted. Your cursor is yours —
+it may hold state that cannot be rebuilt — so Classifyre does not clear it.
+It tells you instead:
+
+```python
+def extract():
+    cursor = {} if ctx.config_changed else ctx.cursor
+    ...
+```
+
+The flag stays set until a run finishes, so a run that fails before acting on
+it does not lose it. `ctx.newest_first` restarts by itself, and so does the
+positional offset Classifyre keeps for a connector that just yields everything.
 
 ### Long-running work
 
