@@ -7,6 +7,7 @@ const sourcePages = [
   "custom",
   "databricks",
   "delta-lake",
+  "dremio",
   "dropbox",
   "elasticsearch",
   "email",

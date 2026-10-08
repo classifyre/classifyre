@@ -81,15 +81,17 @@ export default defineVideo({
 
 ## Mr. Fyre
 
-`MrFyre` is the mascot as a presenter: a 3D model that renders like a drawing
+`MrFyre` is the mascot as a presenter: a 3D model that is drawn rather than lit
 (`blender/README.md`), shot as sprites the kit reads by itself.
 
 ```tsx
 <MrFyre pose="point" emotion="stern" height={600} flip />
 ```
 
-`pose` and `emotion` are whatever `blender/mrfyre/poses.py` defines. Poses that
-point, point to screen right; `flip` mirrors him. `MrFyreActor` takes a cue
+`pose` and `emotion` are whatever `blender/mrfyre/poses.py` defines: standing
+ones (`pockets`, `explain`, `think`, …) and ones in which he is going somewhere
+(`walk`, `run`, `dash`, `crouch`, `accuse`, …). Poses that point or go
+somewhere, point and go to screen right; `flip` mirrors him. `MrFyreActor` takes a cue
 sheet instead — which pose and emotion from which frame, and where he stands:
 
 ```tsx
@@ -101,8 +103,22 @@ sheet instead — which pose and emotion from which frame, and where he stands:
 />
 ```
 
-He holds each pose and cuts to the next, and glides to wherever a cue moves
-him. Nothing else about him moves.
+A cue only restates what changes. On a change of pose he moves into it, his tie
+and coat swinging after him, when Blender has drawn that move:
+
+```bash
+/Applications/Blender.app/Contents/MacOS/Blender -b blender/mascot.blend -P blender/build.py -- \
+  --render-only --moves-for apps/studio/videos/<name>/video.tsx
+```
+
+Moves are keyed by the two poses, not by the frame, so retiming a cue needs
+nothing redrawn; a move that has not been drawn is a cut. His brows are drawn
+here, not in the sprite, and ease from one emotion to the next. He glides to
+wherever a cue moves him; mirroring him with `flip` is always a cut.
+
+He is ink on paper, and the stage is dark: both components put a white edge
+round him, the way a sticker is cut, so that his black shoes and outline read.
+On a white ground it does not show; `halo={false}` takes it off.
 
 ## Fonts
 

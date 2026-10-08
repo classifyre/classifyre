@@ -22,6 +22,7 @@ TYPE_TO_DEFINITION = {
     "HIVE": "HiveInput",
     "DATABRICKS": "DatabricksInput",
     "SNOWFLAKE": "SnowflakeInput",
+    "DREMIO": "DremioInput",
     "MONGODB": "MongoDBInput",
     "NEO4J": "Neo4jInput",
     "POWERBI": "PowerBIInput",
