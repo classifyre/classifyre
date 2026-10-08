@@ -73,7 +73,9 @@ import { parseNotebookResult } from './notebook-result';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import {
   computeDetectionFingerprint,
+  computeSamplingFingerprint,
   computeScopeFingerprint,
+  type SamplingFingerprintDetector,
 } from '../utils/scope-fingerprint';
 import {
   SearchRunnersRequestDto,
@@ -1366,7 +1368,10 @@ export class CliRunnerService {
 
     this.startTrackedExecution(
       runner.id,
-      sourceWithDecryptedConfig,
+      {
+        ...sourceWithDecryptedConfig,
+        ...(await this.resolveSamplingState(source)),
+      },
       hasSuccessfulRuns,
     );
 
@@ -1863,6 +1868,7 @@ export class CliRunnerService {
         outputRestUrl,
         hasSuccessfulRuns,
         this.encodeSamplingCursor(source),
+        this.samplingRunEnv(source),
       );
       const { stdout, stderr, exitCode } = await this.executeCli(
         command,
@@ -1908,6 +1914,7 @@ export class CliRunnerService {
       ({ jobName, namespace }) =>
         this.persistKubernetesExecutionIdentity(runnerId, jobName, namespace),
       this.encodeSamplingCursor(source),
+      this.samplingRunEnv(source),
     );
     const output = result.output || '';
     // The CLI reports its own completion over REST while this loop is still
@@ -2113,15 +2120,20 @@ export class CliRunnerService {
     outputRestUrl: string,
     hasSuccessfulRuns: boolean,
     samplingCursorB64?: string,
+    samplingEnv: Record<string, string> = {},
   ): string {
     const escapedCliPath = this.shellEscape(cliPath);
     const escapedVenvPython = this.shellEscape(this.getVenvPython(venvPath));
     // Inject the saved cursor (gzip + base64 JSON) so extraction resumes where
     // the previous run stopped. Absent on the first run and for a source that
     // keeps no cursor.
-    const samplingCursorEnv = samplingCursorB64
-      ? `CLASSIFYRE_SAMPLING_CURSOR=${this.shellEscape(samplingCursorB64)} `
-      : '';
+    const samplingCursorEnv =
+      (samplingCursorB64
+        ? `CLASSIFYRE_SAMPLING_CURSOR=${this.shellEscape(samplingCursorB64)} `
+        : '') +
+      Object.entries(samplingEnv)
+        .map(([name, value]) => `${name}=${this.shellEscape(value)} `)
+        .join('');
     // Keep startup lightweight: core deps are preinstalled in the image, and optional
     // detector groups are installed lazily by the CLI on first use.
     return (
@@ -2146,6 +2158,178 @@ export class CliRunnerService {
    */
   private encodeSamplingCursor(source: any): string | undefined {
     return encodeSamplingCursor(source?.samplingCursor);
+  }
+
+  /**
+   * The environment that tells a scan which settings it is running under
+   * (handed back on finalize) and, for a notebook source, that they changed.
+   */
+  private samplingRunEnv(source: any): Record<string, string> {
+    const env: Record<string, string> = {};
+    if (typeof source?.samplingFingerprint === 'string') {
+      env.CLASSIFYRE_SAMPLING_FINGERPRINT = source.samplingFingerprint;
+    }
+    if (source?.samplingReset === true) {
+      env.CLASSIFYRE_SAMPLING_RESET = '1';
+    }
+    return env;
+  }
+
+  /**
+   * Decide which cursor a run starts from: the saved one, or none.
+   *
+   * A sweep's saved place is only good for the settings it was earned under.
+   * This is the one point every run passes through with the source's current
+   * settings in hand, so it is where they are compared -- rather than at each
+   * of the places a setting can be edited (the UI, bulk edit, MCP, the
+   * autopilot, a notebook save) or a custom detector changed, retrained or
+   * deleted, any one of which is easy to miss and all of which end up here.
+   *
+   * On a change the source's cursor and its assets' row positions are dropped
+   * and the new fingerprint stored, so the run starts from scratch and the
+   * next one continues it.
+   *
+   * A notebook source is the exception. Its cursor holds whatever the
+   * notebook chose to keep there -- resume tokens, counts, state that cannot
+   * be rebuilt -- so it is not ours to drop. The run is told the settings
+   * changed (`ctx.config_changed`) and the fingerprint is only stored once a
+   * run finishes, so a run that dies first does not swallow the signal.
+   *
+   * Never fails a run: if the comparison cannot be made the saved cursor is
+   * used as it is, and the next run compares again.
+   */
+  private async resolveSamplingState(source: {
+    id: string;
+    type: string;
+    config: unknown;
+    samplingCursor?: unknown;
+    samplingCursorFingerprint?: string | null;
+  }): Promise<{
+    samplingCursor: unknown;
+    samplingFingerprint?: string;
+    samplingReset: boolean;
+  }> {
+    const unchanged = {
+      samplingCursor: source.samplingCursor ?? null,
+      samplingReset: false,
+    };
+    try {
+      const fingerprint = computeSamplingFingerprint(
+        source.type,
+        source.config,
+        await this.samplingFingerprintDetectors(source.config),
+      );
+      const stored = source.samplingCursorFingerprint ?? null;
+      if (stored === fingerprint) {
+        return { ...unchanged, samplingFingerprint: fingerprint };
+      }
+
+      if (source.type === AssetType.CUSTOM) {
+        // No stored fingerprint means nothing to have changed from: the first
+        // run after this was introduced sets the baseline when it finishes.
+        return {
+          ...unchanged,
+          samplingFingerprint: fingerprint,
+          samplingReset: stored !== null,
+        };
+      }
+
+      await this.prisma.$transaction([
+        this.prisma.source.update({
+          where: { id: source.id },
+          data: {
+            samplingCursor: Prisma.DbNull,
+            samplingCursorFingerprint: fingerprint,
+          },
+        }),
+        this.prisma.asset.updateMany({
+          where: { sourceId: source.id, payloadCursor: { not: Prisma.DbNull } },
+          data: { payloadCursor: Prisma.DbNull },
+        }),
+      ]);
+      if (source.samplingCursor) {
+        this.logger.log(
+          `Source ${source.id}: settings or detectors changed since its sampling ` +
+            'cursor was written; the cursor was dropped and this run starts from scratch.',
+        );
+      }
+      return {
+        samplingCursor: null,
+        samplingFingerprint: fingerprint,
+        samplingReset: false,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Source ${source.id}: could not compare sampling settings, keeping the ` +
+          `saved cursor: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return unchanged;
+    }
+  }
+
+  /**
+   * The custom detectors a source's config switches on, as the fingerprint
+   * takes them. A detector the config names but which no longer exists is
+   * simply absent, and its absence changes the fingerprint.
+   */
+  private async samplingFingerprintDetectors(
+    config: unknown,
+  ): Promise<SamplingFingerprintDetector[]> {
+    const raw =
+      config && typeof config === 'object'
+        ? (config as Record<string, unknown>)
+        : {};
+    const keys = new Set<string>();
+    for (const entry of Array.isArray(raw.detectors) ? raw.detectors : []) {
+      if (!entry || typeof entry !== 'object') continue;
+      const detector = entry as Record<string, unknown>;
+      const type =
+        typeof detector.type === 'string'
+          ? detector.type.trim().toUpperCase()
+          : '';
+      if (type !== 'CUSTOM' || detector.enabled === false) {
+        continue;
+      }
+      const nested =
+        detector.config && typeof detector.config === 'object'
+          ? (detector.config as Record<string, unknown>).custom_detector_key
+          : undefined;
+      for (const candidate of [detector.custom_detector_key, nested]) {
+        if (typeof candidate === 'string' && candidate.trim()) {
+          keys.add(candidate.trim());
+        }
+      }
+    }
+    const ids = new Set<string>();
+    for (const entry of Array.isArray(raw.custom_detectors)
+      ? raw.custom_detectors
+      : []) {
+      if (typeof entry === 'string' && entry.trim()) ids.add(entry.trim());
+    }
+    if (keys.size === 0 && ids.size === 0) return [];
+
+    const rows = await this.prisma.customDetector.findMany({
+      where: {
+        OR: [{ key: { in: [...keys] } }, { id: { in: [...ids] } }],
+      },
+      select: {
+        key: true,
+        isActive: true,
+        pipelineSchema: true,
+        lastTrainedAt: true,
+        files: { select: { fileName: true, contentHash: true } },
+      },
+    });
+    return rows.map((row) => ({
+      key: row.key,
+      active: row.isActive,
+      definition: row.pipelineSchema,
+      trainedAt: row.lastTrainedAt ? row.lastTrainedAt.toISOString() : null,
+      files: row.files.map((file) => ({
+        name: file.fileName,
+        hash: file.contentHash,
+      })),
+    }));
   }
 
   private buildCliTestCommand(
@@ -5669,6 +5853,7 @@ export class CliRunnerService {
       const sourceWithDecryptedConfig = {
         ...source,
         config: recipeWithFeedback,
+        ...(await this.resolveSamplingState(source)),
       };
       await this.runnerLogStorage.initializeRunner(source.id, pending.id);
 

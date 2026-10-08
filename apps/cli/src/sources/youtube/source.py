@@ -210,7 +210,14 @@ class YouTubeSource(BaseSource):
 
         channel_ids: list[str] = []
         for channel in self.channels:
-            for vid in self._list_channel_video_ids(channel, limit):
+            listed = self._list_channel_video_ids(channel, limit)
+            if strategy == SamplingStrategy.AUTOMATIC:
+                # Per channel: the uploads tab is newest first and says no
+                # more than that, so the place is kept by id. New uploads
+                # first, then the backfill; a finished channel yields only
+                # what is new.
+                listed = self.automatic_ordered_window(listed, key=f"videos:{channel}")
+            for vid in listed:
                 if vid not in channel_ids:
                     channel_ids.append(vid)
 
@@ -219,9 +226,6 @@ class YouTubeSource(BaseSource):
             channel_ids = random.sample(channel_ids, sample_size)
         elif strategy == SamplingStrategy.LATEST and limit is not None:
             channel_ids = channel_ids[:limit]
-        elif strategy == SamplingStrategy.AUTOMATIC and channel_ids:
-            # Newest-first channel listing; window advances each run and wraps.
-            channel_ids = self.automatic_window(channel_ids, key="videos")
 
         # Explicit videos are always included, in addition to sampled channel videos.
         ordered: list[str] = []

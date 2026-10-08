@@ -90,6 +90,27 @@ const Microsoft365Icon: IconComponent = ({ className }) => (
   </svg>
 );
 
+// Dremio's narwhal, reduced to its silhouette so it takes the surrounding text
+// colour like every other source mark. The eye is cut out of the body.
+const DremioIcon: IconComponent = ({ className }) => (
+  <svg
+    viewBox="2.9 -1.9 62 62"
+    className={className}
+    fill="currentColor"
+    role="img"
+    aria-label="Dremio"
+  >
+    <g transform="matrix(1 0 0 -1 6 192)">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M57.8,190.7c-0.5,0.6-1.8,0.6-3.5-0.2l-20.8-10.6c0,0-0.1,0.1-0.1,0.1c-0.4,0.4-0.7,0.7-1.1,1.1 c-0.6,0.5-1.7,1.2-2.4,1.5c-4.5,2.3-9.8,2.1-14.5,0.7c-5.3-1.6-10.3-4.8-14.1-8.8c-1.7-1.8-3.2-3.9-4.4-6.1 c-1.5-2.8-2.4-5.8-2.7-8.9c-0.5-6.1,1.2-14,5.4-18.6c1-1.2,2.1-2.2,3.2-3.3c0.8-0.8,1.7-1.6,2.5-2.5c1.5-1.8,2.3-3.6,3-5.9 l0.1-0.3l0.3,0.2c4.3,3.1,5.9,7.2,2.8,11.8c1.8,1.5,2.7,3.6,2.7,5.9c0,2.2-0.9,4.6-2.8,5.9c0.8,0.3,2,0.9,2.8,1.2 c0-0.7-0.6-1.8-0.1-2.1c1-0.6,4.8,1,6.1,4.4c1.2,0.4,1.9,0.7,3.2,1.2c4.9,2,10.3,4.8,13.3,8.3c1,1.2,3.1,4.7,0.8,5.6 c0.8,0.9,1.3,2.4,1,3.4l17.8,13C57.6,188.5,58.4,190,57.8,190.7z M3.1,146.4c-0.4,2.2,3.4,4.1,5.4,5C8,149.8,7,148.2,5.8,147 C5.2,146.5,3.7,145.1,3.1,146.4z M22.4,174.5c0.7,0.4,1.7,0.1,2.1-0.6c0.4-0.7,0.1-1.6-0.6-2.1c-0.7-0.4-1.7-0.1-2.1,0.6 C21.4,173.2,21.7,174.1,22.4,174.5L22.4,174.5z"
+      />
+      <path d="M0.9,171c0.7,0.1,1.3-0.4,1.3-1.1c0-0.7-0.6-1.4-1.3-1.5c-0.7-0.1-1.3,0.4-1.2,1.1 C-0.4,170.2,0.2,170.9,0.9,171L0.9,171z M5.2,175.7c0.6,0.1,1.1-0.3,1.1-1c0-0.7-0.5-1.3-1.2-1.4c-0.6-0.1-1.1,0.3-1.1,1C4,175,4.6,175.6,5.2,175.7 L5.2,175.7z M18.1,181.9c0.6,0,1-0.6,0.9-1.2c-0.2-0.6-0.8-1.1-1.4-1.1c-0.6,0-1,0.6-0.9,1.2 C16.8,181.5,17.4,182,18.1,181.9L18.1,181.9z M22,182.6c0.5-0.1,0.8-0.6,0.6-1.1c-0.2-0.5-0.8-0.8-1.3-0.7c-0.5,0.1-0.8,0.6-0.6,1.1 C20.9,182.4,21.5,182.7,22,182.6L22,182.6z M5.2,172.8c0.5,0.1,0.8-0.3,0.8-0.7c0-0.5-0.4-0.9-0.9-1c-0.5-0.1-0.8,0.2-0.8,0.7 C4.4,172.2,4.8,172.7,5.2,172.8L5.2,172.8z M-1.4,167.3c0.5,0.1,0.9-0.3,0.9-0.8c0-0.5-0.4-1-0.9-1.1c-0.5-0.1-0.9,0.3-0.9,0.7 C-2.3,166.7-1.9,167.2-1.4,167.3L-1.4,167.3z" />
+    </g>
+  </svg>
+);
+
 const TableauIcon: IconComponent = ({ className }) => (
   <svg
     viewBox="0 0 100.2 98"
@@ -127,6 +148,7 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Hive]: siApachehive,
   [CreateSourceDtoTypeEnum.Databricks]: siDatabricks,
   [CreateSourceDtoTypeEnum.Snowflake]: siSnowflake,
+  [CreateSourceDtoTypeEnum.Dremio]: null,
   [CreateSourceDtoTypeEnum.Mongodb]: siMongodb,
   [CreateSourceDtoTypeEnum.Neo4J]: siNeo4j,
   [CreateSourceDtoTypeEnum.Powerbi]: null,
@@ -161,6 +183,7 @@ const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
   [CreateSourceDtoTypeEnum.Slack]: SlackIcon,
   [CreateSourceDtoTypeEnum.Oracle]: OracleIcon,
   [CreateSourceDtoTypeEnum.Tableau]: TableauIcon,
+  [CreateSourceDtoTypeEnum.Dremio]: DremioIcon,
   [CreateSourceDtoTypeEnum.Microsoft365]: Microsoft365Icon,
 };
 
@@ -186,6 +209,7 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Hive]: simpleIconComponent(siApachehive),
   [CreateSourceDtoTypeEnum.Databricks]: simpleIconComponent(siDatabricks),
   [CreateSourceDtoTypeEnum.Snowflake]: simpleIconComponent(siSnowflake),
+  [CreateSourceDtoTypeEnum.Dremio]: DremioIcon,
   [CreateSourceDtoTypeEnum.Mongodb]: simpleIconComponent(siMongodb),
   [CreateSourceDtoTypeEnum.Neo4J]: simpleIconComponent(siNeo4j),
   [CreateSourceDtoTypeEnum.Powerbi]: FALLBACK_SOURCE_ICON,

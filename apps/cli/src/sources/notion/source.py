@@ -27,6 +27,7 @@ from ...models.generated_single_asset_scan_results import (
 )
 from ...utils.file_parser import resolve_mime_type
 from ...utils.hashing import hash_url, normalize_http_url
+from ...utils.sampling_frontier import iso_time_rank
 from ..atlassian_common import (
     dedupe_preserve_order,
     deterministic_sample,
@@ -362,8 +363,15 @@ class NotionSource(BaseSource):
             return refs
 
         if sampling.strategy == SamplingStrategy.AUTOMATIC:
-            # Newest-first stable order; window advances each run and wraps around.
-            return self.automatic_window(self._sorted_refs(refs), key="refs")
+            # Recently edited pages first, then the backfill (see automatic_window).
+            return self.automatic_window(
+                refs,
+                key="refs",
+                order=lambda ref: (
+                    iso_time_rank(ref.get("edited")),
+                    f"{ref.get('kind')}:{(ref.get('obj') or {}).get('id') or ''}",
+                ),
+            )
 
         limit = int(sampling.rows_per_page or 100)
         if limit >= len(refs):

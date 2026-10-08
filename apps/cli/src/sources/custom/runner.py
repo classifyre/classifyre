@@ -141,6 +141,8 @@ class NotebookRuntime:
         offset: int = 0,
         files_dir: str | None = None,
         cohort_weights: dict[str, Any] | None = None,
+        *,
+        config_changed: bool = False,
     ) -> None:
         self.recipe = recipe
         notebook = _section(recipe, "required", "notebook")
@@ -159,6 +161,7 @@ class NotebookRuntime:
             should_abort=_aborted,
             query_assets=_query_assets,
             cohort_weights=cohort_weights if isinstance(cohort_weights, dict) else None,
+            config_changed=config_changed,
         )
         self.globals: dict[str, Any] = {}
 
@@ -395,6 +398,7 @@ def main() -> int:
         offset=int(payload.get("offset") or 0),
         files_dir=payload.get("filesDir") or None,
         cohort_weights=payload.get("cohortWeights") or None,
+        config_changed=bool(payload.get("configChanged")),
     )
     try:
         runtime.load()

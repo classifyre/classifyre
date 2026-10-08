@@ -899,6 +899,62 @@
         }
       }
     },
+    "DREMIO": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Name the source after the Dremio environment and the part of it you scan.",
+          "suggestions": [
+            "Include the environment and domain (example: Production Dremio - Finance).",
+            "If scoped to specific spaces or sources, include them in the source name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Choose where Dremio runs. A self-hosted Dremio needs required.url; Dremio Cloud needs required.project_id and required.region.",
+          "suggestions": [
+            "For a self-hosted Dremio, required.url is the address you open it at, including the port (usually 9047).",
+            "For Dremio Cloud, copy the project ID from Project Settings and pick the region the project lives in."
+          ],
+          "questions": [
+            "Is this Dremio Cloud or a self-hosted Dremio?",
+            "Which URL (or Dremio Cloud project ID and region) should be scanned?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Sign in with a personal access token, or with a username and password on a self-hosted Dremio. Store them only in masked fields.",
+          "suggestions": [
+            "Dremio Cloud always signs in with masked.token.",
+            "Self-hosted Enterprise Edition can use masked.token; Community Edition has no access tokens and needs masked.username and masked.password.",
+            "Use a dedicated service user that can only read the spaces and sources you want scanned."
+          ],
+          "questions": [
+            "Do you sign in with a personal access token or a username and password?"
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.scope narrows which sources, spaces, and folders are scanned, optional.extraction controls lineage, and optional.connection tunes timeouts.",
+          "suggestions": [
+            "Use optional.scope.include_paths for focused scans (example: Finance or warehouse_pg.public).",
+            "Wrap a name that contains a dot in double quotes (example: Samples.\"samples.dremio.com\").",
+            "Keep optional.extraction.include_view_lineage on to link views to what they read from.",
+            "Keep optional.extraction.include_source_lineage on to connect Dremio tables to the databases behind them.",
+            "Large object-storage sources can hold many folders; scope them with include_paths to keep discovery fast."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls sampled rows per Dremio table or view during detector payload generation.",
+          "suggestions": [
+            "Use LATEST with order_by_column=updated_at for recency-focused monitoring.",
+            "Use RANDOM for broad row coverage across many datasets.",
+            "Use ALL for complete scans only on small scoped datasets; every sampled row is a Dremio query."
+          ]
+        }
+      }
+    },
     "MONGODB": {
       "sections": {
         "name": {
@@ -1311,7 +1367,7 @@
       "RANDOM picks a random subset each run \u2014 useful for broad coverage without recency bias.",
       "ALL scans every item with no limit \u2014 use only on small or static sources to avoid long runs.",
       "The limit field controls how many items are fetched for LATEST and RANDOM strategies.",
-      "For tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake), set order_by_column to a date column (e.g. updated_at) to improve LATEST accuracy.",
+      "For tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, Dremio), set order_by_column to a date column (e.g. updated_at) to improve LATEST accuracy.",
       "For S3-compatible storage, Azure Blob Storage, and Google Cloud Storage, LATEST uses provider last-modified timestamps while RANDOM selects a deterministic random subset from listed objects.",
       "For MongoDB, LATEST uses newest documents first (by _id ordering) and RANDOM uses document-level random sampling per collection.",
       "For PowerBI, sampling applies to discovered workspaces/datasets/reports/dashboards: LATEST sorts by metadata timestamps when available, RANDOM samples assets uniformly, and ALL keeps full inventory coverage.",

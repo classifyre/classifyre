@@ -432,6 +432,12 @@ class RedditSource(BaseSource):
             return subreddit.top(time_filter=time_filter, limit=limit)
         return subreddit.controversial(time_filter=time_filter, limit=limit)
 
+    @staticmethod
+    def _submission_order(submission: Any) -> tuple[int | None, str]:
+        created = getattr(submission, "created_utc", None)
+        rank = int(created) if isinstance(created, (int, float)) else None
+        return rank, str(getattr(submission, "id", "") or "")
+
     def _sample_submissions(self, subreddit_name: str) -> Iterable[Any]:
         """Apply the sampling strategy at submission granularity.
 
@@ -481,9 +487,14 @@ class RedditSource(BaseSource):
         if strategy == SamplingStrategy.RANDOM and limit is not None:
             submissions = deterministic_sample(submissions, min(limit, len(submissions)))
         elif strategy == SamplingStrategy.AUTOMATIC:
-            # The listing order is stable between runs, which is what makes the
-            # saved offset mean the same thing next time.
-            submissions = self.automatic_window(submissions, key=f"subreddit:{subreddit_name}")
+            # By creation time, whatever order the listing came in: new
+            # submissions first, then the backfill through the rest of what
+            # Reddit will list.
+            submissions = self.automatic_window(
+                submissions,
+                key=f"subreddit:{subreddit_name}",
+                order=self._submission_order,
+            )
 
         logger.info(
             "Sampled %d submission(s) from r/%s (%s, %s)",

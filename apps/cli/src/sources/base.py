@@ -2,7 +2,7 @@ import logging
 import os
 import threading
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator, Generator, Mapping
+from collections.abc import AsyncGenerator, Callable, Generator, Iterable, Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from ..utils.file_parser import ParsedBytes
 from ..utils.hashing import calculate_checksum, normalize_http_url
 from ..utils.sampling_cursor import decode_sampling_cursor
+from ..utils.sampling_frontier import ListFrontier, OrderedFrontier, RangeFrontier
 from ..utils.validation import validate_output
 from .recipe_normalizer import normalize_source_recipe
 
@@ -37,6 +38,15 @@ class BaseSource(ABC):
     # utils/sampling_cursor.py) before launching the CLI job. The recipe itself cannot carry it
     # because every source schema sets ``additionalProperties: false``.
     SAMPLING_CURSOR_ENV = "CLASSIFYRE_SAMPLING_CURSOR"
+    # What the API hashed to decide whether this source's settings changed
+    # since its cursor was written. Handed back on finalize so the API records
+    # the settings a cursor was actually written under, not whatever they have
+    # become by the time the run ends.
+    SAMPLING_FINGERPRINT_ENV = "CLASSIFYRE_SAMPLING_FINGERPRINT"
+    # Set when the settings changed but the cursor was left in place because
+    # it is not the platform's to drop: a notebook source keeps its own state
+    # there. The notebook is told instead (``ctx.config_changed``).
+    SAMPLING_RESET_ENV = "CLASSIFYRE_SAMPLING_RESET"
 
     # ── Scan cache opt-in ────────────────────────────────────────────────
     #
@@ -118,9 +128,27 @@ class BaseSource(ABC):
     # API between runs. Each run reads the prior cursor (``sampling_cursor``),
     # ingests the next slice of not-yet-seen data, then records the advanced
     # cursor (``set_next_sampling_cursor``). The output sink persists it back to
-    # the API on finalize via ``current_sampling_cursor``. When a source has
-    # ingested everything it should reset the cursor so the next run wraps
-    # around and re-ingests from the start (data is not stale).
+    # the API on finalize via ``current_sampling_cursor``.
+    #
+    # What a source keeps there is a frontier, not a position (see
+    # ``utils/sampling_frontier.py``): each run reads what is new first, then
+    # carries on with the backfill, and a finished sweep reads only what is
+    # new. A source with nothing to order by -- a table with no increasing key
+    # -- keeps an offset and wraps instead (``automatic_offset``), because it
+    # cannot tell new from old and going round again is the only way to see
+    # everything.
+    #
+    # The API drops the cursor when the source's configuration or one of its
+    # detectors changes, so the next run starts from scratch.
+
+    @property
+    def sampling_reset(self) -> bool:
+        """Whether this run follows a settings change the cursor has not absorbed."""
+        return self._read_bool_env(self.SAMPLING_RESET_ENV) is True
+
+    def sampling_fingerprint(self) -> str | None:
+        """The settings fingerprint this run was started with, if the API sent one."""
+        return os.environ.get(self.SAMPLING_FINGERPRINT_ENV) or None
 
     def _load_sampling_cursor(self) -> dict[str, Any]:
         raw = os.environ.get(self.SAMPLING_CURSOR_ENV)
@@ -182,55 +210,192 @@ class BaseSource(ABC):
             return default
 
     def _record_cursor_key(self, key: str, value: Any) -> None:
-        """Thread-safely set ``key`` in the cursor to persist for the next run."""
+        """Thread-safely set ``key`` in the cursor to persist for the next run.
+
+        Starts from the cursor this run was given, so a key the run did not
+        get to -- a folder that could not be listed, a drive that timed out --
+        keeps its place instead of being forgotten and swept again from the
+        top.
+        """
         with self._sampling_cursor_lock:
-            nxt = self._next_sampling_cursor if isinstance(self._next_sampling_cursor, dict) else {}
+            nxt = (
+                self._next_sampling_cursor
+                if isinstance(self._next_sampling_cursor, dict)
+                else dict(self._sampling_cursor)
+            )
             nxt = {**nxt, key: value}
             self._next_sampling_cursor = nxt
 
     def automatic_offset(self, key: str) -> int:
         """Return the saved offset for a keyed AUTOMATIC DB cursor (0 on first run)."""
         saved = self._sampling_cursor.get(key)
-        return saved if isinstance(saved, int) and saved >= 0 else 0
+        return saved if isinstance(saved, int) and not isinstance(saved, bool) and saved >= 0 else 0
 
     def record_automatic_offset(self, key: str, *, prev_offset: int, fetched: int) -> None:
         """Advance a keyed offset cursor; wrap to 0 once a page underfills.
 
-        Used by sources that page rows directly from the backing store
-        (``skip``/``OFFSET``) rather than materialising a full list.
+        For a store that can only be paged by position (``skip``/``OFFSET``)
+        and offers nothing to order by, so new rows cannot be told from old
+        ones. Wrapping is how such a source ever sees them.
         """
         size = self.sampling_window_size()
         next_offset = 0 if fetched < size else prev_offset + fetched
         self._record_cursor_key(key, next_offset)
 
-    def automatic_window(self, items: list[_T], *, key: str = "items") -> list[_T]:
-        """Return the next AUTOMATIC slice of a stably-ordered in-memory list.
+    def automatic_window(
+        self,
+        items: Iterable[_T],
+        *,
+        order: Callable[[_T], tuple[Any, str]],
+        key: str = "items",
+        below_complete: bool = True,
+    ) -> list[_T]:
+        """Return this run's AUTOMATIC slice of a complete listing.
 
-        Non-tabular sources fetch a list of item references, then call this to
-        ingest only the next ``rows_per_page`` window. A per-``key`` offset is
-        remembered between runs and wraps back to the start once the list has
-        been fully covered (data is not stale, so re-ingesting is desired).
+        Non-tabular sources list their item references, then call this to
+        ingest only ``rows_per_page`` of them: what is newer than anything
+        read so far comes first, the rest of the budget continues the
+        backfill, and once the backfill has reached the end only new items
+        are returned.
 
-        Callers must pass the items in a **stable order** across runs (e.g. by
-        id or timestamp) so the cursor stays meaningful.
+        ``order`` maps an item to ``(rank, id)``. ``rank`` is what makes one
+        item newer than another -- pass a timestamp through ``time_rank`` --
+        and must only change when the item does; ``id`` is unique to the item.
+        The listing itself may be in any order.
+
+        An item with no rank (``None``) cannot be placed on that axis, so it
+        cannot be told from one already read. Those are paged by position and
+        wrap around instead, like a table with no key, on whatever the ranked
+        items leave of the budget.
+
+        ``below_complete=False`` says the listing is complete above the
+        backfill but not below it (see ``ListFrontier.window``).
         """
-        total = len(items)
-        if total == 0:
-            return []
+        ranked: list[tuple[Any, str, _T]] = []
+        unranked: list[tuple[str, _T]] = []
+        for item in items:
+            rank, ident = order(item)
+            if rank is None:
+                unranked.append((str(ident), item))
+            else:
+                ranked.append((rank, str(ident), item))
 
-        saved = self._sampling_cursor.get(key)
-        offset = saved if isinstance(saved, int) and 0 <= saved < total else 0
+        budget = self.sampling_window_size()
+        frontier = self.automatic_frontier(key)
+        # While the ranked backfill still has ground to cover it would take
+        # the whole budget every run; keep a share for the items it can never
+        # reach.
+        reserved = min(len(unranked), max(1, budget // 4)) if ranked and not frontier.done else 0
+        window = (
+            frontier.window(ranked, max(1, budget - reserved), below_complete=below_complete)
+            if ranked
+            else []
+        )
+        self.record_automatic_frontier(key, frontier)
 
-        size = self.sampling_window_size()
-        window = items[offset : offset + size]
-
-        next_offset = offset + len(window)
-        if next_offset >= total:
-            next_offset = 0  # wrap around on the next run
-
-        self._record_cursor_key(key, next_offset)
-
+        if unranked and budget > len(window):
+            window.extend(
+                self._automatic_unranked_window(
+                    unranked, budget - len(window), key=f"{key}:unranked"
+                )
+            )
         return window
+
+    def _automatic_unranked_window(
+        self, items: list[tuple[str, _T]], size: int, *, key: str
+    ) -> list[_T]:
+        """The next ``size`` items of an id-ordered list, wrapping at the end."""
+        items.sort(key=lambda entry: entry[0])
+        saved = self._sampling_cursor.get(key)
+        offset = (
+            saved
+            if isinstance(saved, int) and not isinstance(saved, bool) and 0 <= saved < len(items)
+            else 0
+        )
+        window = items[offset : offset + size]
+        next_offset = offset + len(window)
+        self._record_cursor_key(key, 0 if next_offset >= len(items) else next_offset)
+        return [item for _, item in window]
+
+    def automatic_ranged_window(
+        self,
+        *,
+        fetch: Callable[[Any, Any], Iterable[_T]],
+        order: Callable[[_T], tuple[Any, str]],
+        key: str = "items",
+    ) -> list[_T]:
+        """``automatic_window`` for a listing too long to fetch whole each run.
+
+        ``fetch(lower, upper)`` yields items newest first whose rank lies
+        between the two bounds (either may be None). It is a coarse filter: it
+        may yield items outside the bounds, and is read only as far as it
+        takes to fill the budget. A run asks for what lies at or above the
+        newest rank read, then -- with budget left -- for what lies at or
+        below the rank the backfill has reached.
+        """
+        frontier = self.automatic_frontier(key)
+        budget = self.sampling_window_size()
+        entries: dict[str, tuple[Any, str, _T]] = {}
+
+        def collect(items: Iterable[_T], want: int) -> tuple[int, bool]:
+            """Read until ``want`` unread items are in hand; say if that was all."""
+            pending = 0
+            for item in items:
+                rank, ident = order(item)
+                if rank is None:
+                    continue
+                ident = str(ident)
+                if ident not in entries and frontier.pending(rank, ident):
+                    pending += 1
+                entries[ident] = (rank, ident, item)
+                if pending > want:
+                    return pending, False
+            return pending, True
+
+        if frontier.fresh:
+            _, complete = collect(fetch(None, None), budget)
+            window = frontier.window(entries.values(), budget, below_complete=complete)
+        else:
+            pending, above_complete = collect(fetch(frontier.head_rank, frontier.gap_rank), budget)
+            below_complete = frontier.done
+            if above_complete and pending < budget and not frontier.done:
+                _, below_complete = collect(fetch(None, frontier.tail_rank), budget - pending)
+            window = frontier.window(
+                entries.values(),
+                budget,
+                above_complete=above_complete,
+                below_complete=below_complete,
+            )
+        self.record_automatic_frontier(key, frontier)
+        return window
+
+    def automatic_ordered_window(self, listing: list[str], *, key: str) -> list[str]:
+        """This run's AUTOMATIC slice of a newest-first list of bare ids.
+
+        For a listing that is in order but carries nothing to order by (see
+        ``OrderedFrontier``). Prefer ``automatic_window`` whenever the items
+        have a timestamp.
+        """
+        frontier = OrderedFrontier(self._sampling_cursor.get(key))
+        window = frontier.window(listing, self.sampling_window_size())
+        state = frontier.to_state()
+        if state is not None:
+            self._record_cursor_key(key, state)
+        return window
+
+    def automatic_frontier(self, key: str) -> ListFrontier:
+        """The saved frontier for ``key`` (fresh on a first run or after a reset)."""
+        return ListFrontier(self._sampling_cursor.get(key))
+
+    def automatic_range_frontier(self, key: str) -> RangeFrontier:
+        """The saved range frontier for ``key`` (see ``RangeFrontier``)."""
+        return RangeFrontier(self._sampling_cursor.get(key))
+
+    def record_automatic_frontier(self, key: str, frontier: ListFrontier | RangeFrontier) -> None:
+        """Persist ``frontier`` under ``key``; a still-fresh one records nothing."""
+        state = frontier.to_state()
+        if state is not None:
+            self._record_cursor_key(key, state)
 
     @staticmethod
     def _read_bool_env(name: str) -> bool | None:

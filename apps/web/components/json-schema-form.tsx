@@ -2485,6 +2485,7 @@ export const JsonSchemaForm = React.forwardRef<
     HIVE: true,
     DATABRICKS: true,
     SNOWFLAKE: true,
+    DREMIO: true,
     MONGODB: false,
     NEO4J: false,
     POWERBI: false,

@@ -25,6 +25,7 @@ from ...models.generated_single_asset_scan_results import (
 from ...utils.content_extraction import html_to_text
 from ...utils.file_parser import resolve_mime_type
 from ...utils.hashing import hash_url, normalize_http_url
+from ...utils.sampling_frontier import iso_time_rank
 from ..atlassian_common import (
     AtlassianCloudClient,
     dedupe_preserve_order,
@@ -261,8 +262,15 @@ class ConfluenceSource(BaseSource):
             return refs
 
         if sampling.strategy == SamplingStrategy.AUTOMATIC:
-            # Newest-first stable order; window advances each run and wraps around.
-            return self.automatic_window(self._sorted_page_refs(refs), key="pages")
+            # Recently edited pages first, then the backfill (see automatic_window).
+            return self.automatic_window(
+                refs,
+                key="pages",
+                order=lambda ref: (
+                    iso_time_rank(ref.get("version_created_at") or ref.get("created_at")),
+                    str(ref.get("page_id") or ""),
+                ),
+            )
 
         limit = int(sampling.rows_per_page or 100)
         if limit >= len(refs):

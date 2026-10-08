@@ -38,6 +38,13 @@ class LocalFolderSource(ObjectStorageSourceBase):
 
     _resolved_root: Path | None = None
 
+    # AUTOMATIC orders files by when they arrived, and the cursor remembers if
+    # this folder turned out not to be able to say (see ``_automatic_refs``).
+    ORDER_MODE_KEY = "objects_order"
+    ORDER_CHURN_KEY = "objects_churn"
+    ORDER_BY_MODIFIED = "modified"
+    _MAX_ORDER_CHURN = 2
+
     def _root(self) -> Path:
         if self._resolved_root is not None:
             return self._resolved_root
@@ -122,6 +129,7 @@ class LocalFolderSource(ObjectStorageSourceBase):
             if stat.st_size == 0 and not self._include_empty_objects():
                 continue
 
+            self._changed_at()[key] = max(stat.st_mtime_ns, stat.st_ctime_ns)
             yield ObjectRef(
                 key=key,
                 size=stat.st_size,
@@ -132,7 +140,77 @@ class LocalFolderSource(ObjectStorageSourceBase):
             )
 
     def _list_objects(self) -> Iterator[ObjectRef]:
+        self._changed_at().clear()
         yield from self._walk(self._root(), depth=0)
+
+    # ── AUTOMATIC ordering ───────────────────────────────────────────────
+    #
+    # A file's modification time travels with it. Drag a folder in with
+    # Finder, ``cp -p`` it, unpack an archive, and the new files carry dates
+    # from months ago -- by modification time they sort deep inside ground the
+    # sweep has already covered, and are never read. What does move when a
+    # file lands here is its inode change time, so AUTOMATIC orders by the
+    # later of the two: when the file last changed *or arrived*.
+    #
+    # The change time is only as good as the mount. Some rewrite it for every
+    # file each time the folder is mounted (a volume re-owned at pod start, a
+    # folder re-copied by an init step), and then every file looks new on
+    # every run and the sweep never gets past the top. One such run is
+    # indistinguishable from a folder that really was replaced, and is treated
+    # as one. A second in a row is not a coincidence: the folder is ordered by
+    # modification time from then on, and the sweep starts over on that basis.
+
+    def _changed_at(self) -> dict[str, int]:
+        """Per key, the later of mtime and ctime in nanoseconds, from the last walk."""
+        changed: dict[str, int] = self.__dict__.setdefault("_changed_ns", {})
+        return changed
+
+    def _orders_by_modified(self) -> bool:
+        return self._sampling_cursor.get(self.ORDER_MODE_KEY) == self.ORDER_BY_MODIFIED
+
+    def _automatic_rank(self, ref: ObjectRef) -> int:
+        if not self._orders_by_modified():
+            changed = self._changed_at().get(ref.key)
+            if changed is not None:
+                return changed // 1000
+        return super()._automatic_rank(ref)
+
+    def _automatic_refs(self, refs: list[ObjectRef]) -> list[ObjectRef]:
+        if self._orders_by_modified():
+            return super()._automatic_refs(refs)
+
+        head_rank = self.automatic_frontier(self.AUTOMATIC_CURSOR_KEY).head_rank
+        everything_new = (
+            bool(refs)
+            and isinstance(head_rank, int)
+            and all(self._automatic_rank(ref) > head_rank for ref in refs)
+        )
+        saved_churn = self._sampling_cursor.get(self.ORDER_CHURN_KEY)
+        previous_churn = saved_churn if isinstance(saved_churn, int) else 0
+        churn = previous_churn + 1 if everything_new else 0
+
+        if churn >= self._MAX_ORDER_CHURN:
+            logger.warning(
+                "Every file under %s has looked newly arrived on %d runs in a row, so this "
+                "mount rewrites change times and they cannot order the folder. Ordering by "
+                "modification time from now on; the sweep starts over.",
+                self._root(),
+                churn,
+            )
+            self._sampling_cursor = {
+                key: value
+                for key, value in self._sampling_cursor.items()
+                if key not in {self.AUTOMATIC_CURSOR_KEY, self.ORDER_CHURN_KEY}
+            }
+            self._sampling_cursor[self.ORDER_MODE_KEY] = self.ORDER_BY_MODIFIED
+            window = super()._automatic_refs(refs)
+            self._record_cursor_key(self.ORDER_MODE_KEY, self.ORDER_BY_MODIFIED)
+            return window
+
+        window = super()._automatic_refs(refs)
+        if churn or previous_churn:
+            self._record_cursor_key(self.ORDER_CHURN_KEY, churn)
+        return window
 
     def _open_object(self, ref: ObjectRef) -> tuple[Any, str]:
         """Open the file where it already is.

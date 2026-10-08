@@ -214,6 +214,7 @@ class CustomSource(BaseSource):
             {
                 "recipe": self._plain_recipe(),
                 "cursor": self.sampling_cursor(),
+                "configChanged": self.sampling_reset,
                 # A path, not a URL: the child has no way to reach the API and
                 # is not meant to have one.
                 "filesDir": str(files_dir) if files_dir else None,
@@ -577,7 +578,11 @@ class CustomSource(BaseSource):
 
         if strategy == SamplingStrategy.AUTOMATIC:
             key = "assets"
-            return self.automatic_offset(key), window, key, "window"
+            # This offset is the platform's own position in the notebook's
+            # stream, so it starts over when the source's settings change. The
+            # rest of the cursor is the notebook's and is left to it.
+            offset = 0 if self.sampling_reset else self.automatic_offset(key)
+            return offset, window, key, "window"
 
         if strategy == SamplingStrategy.RANDOM:
             return 0, bounded, None, "reservoir"

@@ -6,10 +6,10 @@ either by branching on ``SamplingStrategy`` itself or by inheriting a shared
 base (``BaseTabularSource``, ``BaseSearchEngineSource``, the object-storage
 base, ...) that already does so on its behalf. ``AUTOMATIC`` additionally
 requires the source (or an ancestor) to participate in the cursor protocol
-defined on ``BaseSource`` (``automatic_window``, ``automatic_offset``,
-``record_automatic_offset``, ``_record_cursor_key``,
-``set_next_sampling_cursor``, ``_automatic_fetch``, or reading
-``self._sampling_cursor``) so that AUTOMATIC runs are incremental rather than
+defined on ``BaseSource`` (``automatic_window`` and its ranged / ordered /
+frontier variants, ``automatic_offset``, ``record_automatic_offset``,
+``_record_cursor_key``, ``set_next_sampling_cursor``, ``_automatic_fetch``, or
+reading ``self._sampling_cursor``) so that AUTOMATIC runs are incremental rather than
 silently re-scanning (or ignoring) the same data every time.
 
 Today this is enforced by convention only: a new source can implement
@@ -119,7 +119,9 @@ _SAMPLING_STRATEGY_MEMBER_RE = re.compile(r"SamplingStrategy\.(\w+)")
 # Cursor primitives from BaseSource that participate in the AUTOMATIC
 # incremental-cursor protocol (see base.py "AUTOMATIC sampling cursor").
 _CURSOR_PRIMITIVE_RE = re.compile(
-    r"\b(automatic_window|automatic_offset|record_automatic_offset|_record_cursor_key|"
+    r"\b(automatic_window|automatic_ranged_window|automatic_ordered_window|"
+    r"automatic_frontier|automatic_range_frontier|record_automatic_frontier|"
+    r"automatic_offset|record_automatic_offset|_record_cursor_key|"
     r"set_next_sampling_cursor|_automatic_fetch)\b"
     r"|self\._sampling_cursor\b"
 )

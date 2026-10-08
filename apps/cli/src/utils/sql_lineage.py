@@ -27,7 +27,12 @@ from ..graph.edges import FieldMapping, FieldTransform
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["column_mappings_from_sql", "sqlglot_dialect", "upstream_tables_from_sql"]
+__all__ = [
+    "column_mappings_from_sql",
+    "sqlglot_dialect",
+    "table_paths_from_sql",
+    "upstream_tables_from_sql",
+]
 
 #: Our source_type -> sqlglot's dialect name, where they differ.
 _DIALECTS = {
@@ -37,6 +42,7 @@ _DIALECTS = {
     "oracle": "oracle",
     "snowflake": "snowflake",
     "databricks": "databricks",
+    "dremio": "dremio",
     "hive": "hive",
     "sqlite": "sqlite",
 }
@@ -231,3 +237,46 @@ def upstream_tables_from_sql(
             # matched against a table key, so it is dropped rather than guessed.
             continue
     return sorted(keys)
+
+
+def table_paths_from_sql(sql: str, *, dialect: str | None = None) -> list[tuple[str, ...]]:
+    """Every table a statement reads from, as the name parts it was written with.
+
+    :func:`upstream_tables_from_sql` assumes ``catalog.schema.table`` and fills
+    in defaults, which is right for a warehouse and wrong for an engine whose
+    names are folder paths of any depth (Dremio's ``source.folder.folder.table``).
+    This returns the parts untouched and leaves resolving them — against a
+    default context, case-insensitively, whatever the engine does — to the
+    caller, who is the only one that knows the rules.
+
+    CTE names are excluded for the same reason as above.
+    """
+    text = (sql or "").strip()
+    if not text:
+        return []
+    sqlglot = _sqlglot()
+    if sqlglot is None:
+        return []
+    from sqlglot import exp
+
+    try:
+        statement = sqlglot.parse_one(text, read=dialect)
+    except Exception as exc:
+        logger.debug("Could not parse SQL for table paths: %s", exc)
+        return []
+    if statement is None:
+        return []
+
+    cte_names = {
+        cte.alias_or_name.lower() for cte in statement.find_all(exp.CTE) if cte.alias_or_name
+    }
+
+    paths: set[tuple[str, ...]] = set()
+    for table in statement.find_all(exp.Table):
+        parts = tuple(part.name for part in table.parts if part.name)
+        if not parts:
+            continue
+        if len(parts) == 1 and parts[0].lower() in cte_names:
+            continue
+        paths.add(parts)
+    return sorted(paths)

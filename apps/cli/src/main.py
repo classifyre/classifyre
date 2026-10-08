@@ -909,6 +909,8 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     # completion path — a timed-out run must not advance it.
                     if hasattr(sink, "set_sampling_cursor"):
                         sink.set_sampling_cursor(source.current_sampling_cursor())
+                    if hasattr(sink, "set_sampling_fingerprint"):
+                        sink.set_sampling_fingerprint(source.sampling_fingerprint())
 
                     # A connector that covered a slice must say so before
                     # finish(), which is what decides whether absence retires

@@ -257,9 +257,10 @@ class EmailSource(BaseSource):
     ) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         """AUTOMATIC sampling: page through each folder's messages by UID.
 
-        Listing UIDs is cheap (no body fetch); we window the UID list (newest
-        first) so each run ingests the next ``rows_per_page`` slice per folder
-        and wraps around once the folder has been fully covered.
+        Listing UIDs is cheap (no body fetch). Per folder, each run ingests
+        ``rows_per_page`` messages: mail that arrived since the last run
+        first, then the next slice of the backfill. A folder that has been
+        fully covered yields only new mail.
         """
         pending: list[SingleAssetScanResults] = []
         total = 0
@@ -273,14 +274,21 @@ class EmailSource(BaseSource):
                 continue
 
             try:
-                uid_ints = sorted((int(u) for u in self._mailbox.uids(criteria)), reverse=True)
+                uid_ints = [int(u) for u in self._mailbox.uids(criteria)]
             except Exception as e:
                 logger.warning("Could not list UIDs for folder %s: %s", folder, e)
                 continue
             if not uid_ints:
                 continue
 
-            window = self.automatic_window([str(u) for u in uid_ints], key=f"folder:{folder}")
+            # A folder's UIDs only ever grow, so a higher UID is a newer
+            # message: new mail first, then the backfill.
+            window = [
+                str(uid)
+                for uid in self.automatic_window(
+                    uid_ints, key=f"folder:{folder}", order=lambda uid: (uid, str(uid))
+                )
+            ]
             if not window:
                 continue
 
