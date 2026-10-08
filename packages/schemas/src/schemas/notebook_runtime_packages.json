@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.108",
+      "version": "1.43.109",
       "modules": [
         "boto3"
       ],
@@ -84,7 +84,7 @@
     },
     {
       "name": "dropbox",
-      "version": "12.2.2",
+      "version": "12.2.3",
       "modules": [
         "dropbox"
       ],
@@ -128,7 +128,7 @@
     },
     {
       "name": "google-auth",
-      "version": "2.60.0",
+      "version": "2.61.0",
       "modules": [
         "google.auth"
       ],
@@ -181,7 +181,7 @@
     },
     {
       "name": "litellm",
-      "version": "1.104.0",
+      "version": "1.104.2",
       "modules": [
         "litellm"
       ],
@@ -306,7 +306,7 @@
     },
     {
       "name": "pydantic",
-      "version": "2.13.5",
+      "version": "2.14.0",
       "modules": [
         "pydantic"
       ],
