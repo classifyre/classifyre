@@ -16,10 +16,11 @@ transports):
 * ``LATEST``    — start near the tail of each partition (newest messages).
 * ``RANDOM``    — start at a random offset within each partition.
 * ``ALL``       — start at the earliest retained offset.
-* ``AUTOMATIC`` — resume each partition from a saved per-partition cursor
-  (keyed ``"{topic}:{partition}"``), advancing it each run. Once a
-  partition's cursor catches up to the high watermark it wraps back to the
-  low watermark so the next run re-ingests from the start.
+* ``AUTOMATIC`` — keep, per partition (keyed ``"{topic}:{partition}"``), the
+  range of offsets already read. The first run reads the newest messages.
+  After that a run reads what was produced since, and when there is nothing
+  new it reads the next slice of older messages, until the earliest retained
+  offset is reached. From then on only new messages are read.
 
 All strategies read up to ``sampling.rows_per_page`` messages per topic.
 """
@@ -42,6 +43,7 @@ from ...models.generated_single_asset_scan_results import (
 )
 from ...utils.file_parser import render_bytes_cell
 from ...utils.hashing import hash_id
+from ...utils.sampling_frontier import FRONTIER_VERSION
 from ..base import BaseSource
 from ..dependencies import require_module
 from .rest import KafkaRestClient
@@ -49,6 +51,11 @@ from .rest import KafkaRestClient
 logger = logging.getLogger(__name__)
 
 _CONSUME_TIMEOUT_SECONDS = 5.0
+
+
+def _is_offset(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
 
 _PEM_BEGIN = re.compile(r"-----BEGIN ([A-Z0-9 ]+)-----")
 
@@ -535,32 +542,72 @@ class KafkaSource(BaseSource):
         # ALL: read from the earliest retained offset.
         return low
 
-    def _automatic_start_offset(self, key: str, low: int, high: int) -> int:
-        """Resume offset for AUTOMATIC sampling, clamped to the retained range.
+    # ── AUTOMATIC ────────────────────────────────────────────────────────
+    #
+    # A partition is a log: offsets only grow, so "new" is everything at or
+    # above the offset the last run stopped at. Per partition the cursor holds
+    # ``head`` (the next unread offset above the covered range), ``tail`` (the
+    # lowest offset covered) and, rarely, ``fill`` (a stretch inside the
+    # covered range that a run timed out before finishing).
+    #
+    # A consumer reads forward from one position, so each partition gets one
+    # ``[start, stop)`` range per run, chosen in this order: what is new; an
+    # unfinished stretch; the next slice below the tail. A partition with
+    # nothing new and nothing left below is not read at all.
 
-        Retention may have deleted the previously saved offset (or this may be
-        the first run), in which case we fall back to the earliest retained
-        offset.
-        """
-        saved = self.automatic_offset(key)
-        if saved < low or saved > high:
-            return low
-        return saved
+    def _saved_partition_state(self, key: str, low: int, high: int) -> dict[str, Any] | None:
+        """The saved range for a partition, fitted to what the broker still has."""
+        saved = self._sampling_cursor.get(key)
+        if not isinstance(saved, dict) or saved.get("v") != FRONTIER_VERSION:
+            return None
+        saved_head, saved_tail = saved.get("head"), saved.get("tail")
+        if not (_is_offset(saved_head) and _is_offset(saved_tail)):
+            return None
+        head, tail = int(saved_head), int(saved_tail)
+        if tail > head or head > high:
+            # The log is shorter than what was read from it: the topic was
+            # recreated. Start over.
+            return None
+        # Retention may have removed part of what was covered, or all of it.
+        head, tail = max(head, low), max(tail, low)
+        state: dict[str, Any] = {"v": FRONTIER_VERSION, "head": head, "tail": tail}
+        fill = saved.get("fill")
+        if isinstance(fill, list) and len(fill) == 2 and all(_is_offset(v) for v in fill):
+            fill_from, fill_to = max(fill[0], low), min(fill[1], head)
+            if fill_from < fill_to:
+                state["fill"] = [fill_from, fill_to]
+        return state
+
+    def _plan_partition(
+        self, key: str, low: int, high: int, per: int
+    ) -> tuple[str, int, int, dict[str, Any] | None] | None:
+        """``(kind, start, stop, state)`` for this run, or None when there is nothing to read."""
+        state = self._saved_partition_state(key, low, high)
+        if state is None:
+            return "fresh", max(low, high - per), high, None
+        head, tail = state["head"], state["tail"]
+        if head < high:
+            return "new", head, min(high, head + per), state
+        fill = state.get("fill")
+        if fill:
+            return "fill", fill[0], min(fill[1], fill[0] + per), state
+        if tail > low:
+            return "backfill", max(low, tail - per), tail, state
+        return None
 
     def _record_automatic_cursors(
         self,
         topic: str,
         messages: list[dict[str, Any]],
-        starts: dict[int, int],
-        watermarks: dict[int, tuple[int, int]],
+        plans: dict[int, tuple[str, int, int, dict[str, Any] | None]],
+        positions: dict[int, int] | None = None,
     ) -> None:
-        """Advance the per-partition AUTOMATIC cursor after a consume pass.
+        """Fold what each partition's range actually yielded into its cursor.
 
-        Partitions that yielded messages resume from one past the highest
-        offset consumed; partitions that were assigned but yielded nothing
-        keep their (already-clamped) start offset. A partition that has
-        caught up to its high watermark wraps back to the low watermark so
-        the next run re-ingests from the start instead of stalling forever.
+        ``positions`` is where the consumer stands in each partition, when the
+        transport can say: it moves past compacted offsets and transaction
+        markers that never arrive as messages, so a range ending in those is
+        still known to have been read to its end.
         """
         consumed_next: dict[int, int] = {}
         for message in messages:
@@ -569,23 +616,44 @@ class KafkaSource(BaseSource):
             if next_offset > consumed_next.get(partition_id, -1):
                 consumed_next[partition_id] = next_offset
 
-        for partition_id, (low, high) in watermarks.items():
-            next_offset = consumed_next.get(partition_id, starts[partition_id])
-            if next_offset >= high:
-                next_offset = low  # fully caught up: wrap for the next run
-            self._record_cursor_key(f"{topic}:{partition_id}", next_offset)
+        for partition_id, (kind, start, stop, saved) in plans.items():
+            reached = max(
+                consumed_next.get(partition_id, start),
+                (positions or {}).get(partition_id, start),
+            )
+            reached = min(max(reached, start), stop)
+            if reached <= start:
+                continue  # nothing read: the cursor stays where it was
+
+            state: dict[str, Any] = dict(saved or {"v": FRONTIER_VERSION})
+            if kind == "fresh":
+                state["head"], state["tail"] = reached, start
+            elif kind == "new":
+                state["head"] = reached
+            elif kind == "fill":
+                if reached >= state["fill"][1]:
+                    state.pop("fill", None)
+                else:
+                    state["fill"] = [reached, state["fill"][1]]
+            else:
+                # The slice below the tail. Read short of the tail, the rest
+                # is remembered and finished before going any lower.
+                if reached < stop:
+                    state["fill"] = [reached, stop]
+                state["tail"] = start
+            self._record_cursor_key(f"{topic}:{partition_id}", state)
 
     def _plan_partition_starts(
         self,
         topic: str,
         max_count: int,
         watermarks_by_partition: dict[int, tuple[int, int]],
-    ) -> tuple[dict[int, int], dict[int, tuple[int, int]]]:
+    ) -> tuple[dict[int, int], dict[int, tuple[str, int, int, dict[str, Any] | None]]]:
         """Map each non-empty partition to its start offset for this strategy.
 
-        Returns ``(starts, automatic_watermarks)``; the second value is only
-        populated for AUTOMATIC, which needs the watermarks again afterwards
-        to advance (or wrap) its per-partition cursor.
+        Returns ``(starts, automatic_plans)``; the second value is only
+        populated for AUTOMATIC, which reads a bounded range per partition and
+        needs the plan again afterwards to advance its cursor.
         """
         strategy = self._sampling().strategy
         non_empty = {
@@ -596,15 +664,18 @@ class KafkaSource(BaseSource):
         per = max(1, max_count // len(non_empty))
 
         starts: dict[int, int] = {}
-        automatic_watermarks: dict[int, tuple[int, int]] = {}
+        automatic_plans: dict[int, tuple[str, int, int, dict[str, Any] | None]] = {}
         for partition_id, (low, high) in sorted(non_empty.items()):
             if strategy == SamplingStrategy.AUTOMATIC:
-                start = self._automatic_start_offset(f"{topic}:{partition_id}", low, high)
-                automatic_watermarks[partition_id] = (low, high)
+                plan = self._plan_partition(f"{topic}:{partition_id}", low, high, per)
+                if plan is None:
+                    continue
+                automatic_plans[partition_id] = plan
+                start = plan[1]
             else:
                 start = self._start_offset(strategy, low, high, per)
             starts[partition_id] = start
-        return starts, automatic_watermarks
+        return starts, automatic_plans
 
     def _consume_rest(self, topic: str, max_count: int) -> list[dict[str, Any]]:
         rest = self._rest()
@@ -614,15 +685,14 @@ class KafkaSource(BaseSource):
             if watermarks is not None:
                 watermarks_by_partition[partition_id] = watermarks
 
-        starts, automatic_watermarks = self._plan_partition_starts(
-            topic, max_count, watermarks_by_partition
-        )
+        starts, plans = self._plan_partition_starts(topic, max_count, watermarks_by_partition)
         if not starts:
             return []
 
-        messages = rest.consume(topic, starts, max_count)
-        if automatic_watermarks:
-            self._record_automatic_cursors(topic, messages, starts, automatic_watermarks)
+        stops = {partition_id: plan[2] for partition_id, plan in plans.items()}
+        messages = rest.consume(topic, starts, max_count, stops=stops or None)
+        if plans:
+            self._record_automatic_cursors(topic, messages, plans)
         return messages
 
     def _consume(self, topic: str, max_count: int) -> list[dict[str, Any]]:
@@ -633,7 +703,8 @@ class KafkaSource(BaseSource):
         timeout = self._request_timeout_seconds()
         out: list[dict[str, Any]] = []
         starts: dict[int, int] = {}
-        watermarks: dict[int, tuple[int, int]] = {}
+        plans: dict[int, tuple[str, int, int, dict[str, Any] | None]] = {}
+        positions: dict[int, int] = {}
         try:
             metadata = self._cluster_metadata(consumer, topic)
             topic_meta = metadata.topics.get(topic)
@@ -652,11 +723,13 @@ class KafkaSource(BaseSource):
                     continue
                 watermarks_by_partition[partition_id] = (int(low), int(high))
 
-            starts, watermarks = self._plan_partition_starts(
-                topic, max_count, watermarks_by_partition
-            )
+            starts, plans = self._plan_partition_starts(topic, max_count, watermarks_by_partition)
             if not starts:
                 return out
+            # AUTOMATIC reads a bounded range per partition; the rest read on
+            # from their start until the budget is spent.
+            stops = {partition_id: plan[2] for partition_id, plan in plans.items()}
+            finished: set[int] = set()
 
             assignments = []
             for partition_id, start in sorted(starts.items()):
@@ -667,6 +740,8 @@ class KafkaSource(BaseSource):
 
             deadline = _CONSUME_TIMEOUT_SECONDS
             while len(out) < max_count:
+                if stops and len(finished) >= len(stops):
+                    break
                 messages = consumer.consume(num_messages=max_count - len(out), timeout=deadline)
                 if not messages:
                     break
@@ -677,23 +752,61 @@ class KafkaSource(BaseSource):
                             continue
                         logger.debug("Kafka consume error on %s: %s", topic, error)
                         continue
+                    partition_id, offset = message.partition(), message.offset()
+                    stop = stops.get(partition_id)
+                    if stop is not None and offset >= stop:
+                        # Past this partition's range for the run.
+                        self._finish_partition(consumer, topic, partition_id, finished)
+                        continue
                     out.append(
                         {
-                            "partition": message.partition(),
-                            "offset": message.offset(),
+                            "partition": partition_id,
+                            "offset": offset,
                             "key": self._decode(message.key()),
                             "value": self._decode(message.value()),
                         }
                     )
+                    if stop is not None and offset >= stop - 1:
+                        self._finish_partition(consumer, topic, partition_id, finished)
                     if len(out) >= max_count:
                         break
+            if plans:
+                positions = self._consumer_positions(consumer, assignments)
         finally:
             consumer.close()
 
-        if strategy == SamplingStrategy.AUTOMATIC and watermarks:
-            self._record_automatic_cursors(topic, out, starts, watermarks)
+        if strategy == SamplingStrategy.AUTOMATIC and plans:
+            self._record_automatic_cursors(topic, out, plans, positions)
 
         return out
+
+    def _finish_partition(
+        self, consumer: Any, topic: str, partition_id: int, finished: set[int]
+    ) -> None:
+        """Stop fetching a partition whose range for this run has been read."""
+        if partition_id in finished:
+            return
+        finished.add(partition_id)
+        try:
+            consumer.pause([self._kafka.TopicPartition(topic, partition_id)])
+        except Exception as exc:
+            logger.debug("Could not pause %s[%s]: %s", topic, partition_id, exc)
+
+    @staticmethod
+    def _consumer_positions(consumer: Any, assignments: list[Any]) -> dict[int, int]:
+        """Where the consumer stands in each assigned partition, when it can say."""
+        try:
+            positioned = consumer.position(assignments)
+        except Exception as exc:
+            logger.debug("Kafka consumer positions unavailable: %s", exc)
+            return {}
+        positions: dict[int, int] = {}
+        for entry in positioned or []:
+            offset = getattr(entry, "offset", None)
+            partition_id = getattr(entry, "partition", None)
+            if _is_offset(offset) and isinstance(partition_id, int):
+                positions[partition_id] = offset
+        return positions
 
     def _format_messages(
         self, topic: str, messages: list[dict[str, Any]], offset: int = 0

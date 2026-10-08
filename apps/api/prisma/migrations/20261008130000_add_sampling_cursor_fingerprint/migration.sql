@@ -1,0 +1,22 @@
+-- Remember which settings a source's sampling cursor was written under.
+--
+-- An AUTOMATIC sweep keeps its place in `sampling_cursor`. That place was
+-- earned under one configuration: one scope, one set of detectors, one
+-- definition of each custom detector. Change any of those and the ground
+-- already covered has not been looked at the way the source is now set up to
+-- look, yet nothing dropped the cursor, so the sweep carried on from where it
+-- was and the earlier part of the source was never revisited.
+--
+-- This is a hash of everything that decides what a scan does (the source's
+-- configuration without its credentials, plus the definition of every custom
+-- detector it uses). It is compared when a run starts; a mismatch drops the
+-- cursor and the per-asset row positions, so the run starts from scratch.
+--
+-- Nullable: null means "never compared", which a run treats as a mismatch.
+-- Existing cursors are therefore dropped once, on the first run after this
+-- migration -- they are positions in a list, a format the new cursor replaces.
+--
+-- prisma migrate runs each migration inside a transaction, so no transaction
+-- control here. The statement is idempotent so a partial apply can be re-run.
+
+ALTER TABLE "sources" ADD COLUMN IF NOT EXISTS "sampling_cursor_fingerprint" TEXT;

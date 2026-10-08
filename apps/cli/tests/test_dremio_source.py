@@ -759,7 +759,7 @@ async def test_dremio_latest_sample_orders_by_the_timestamp_column() -> None:
     )
 
 
-async def test_dremio_automatic_sampling_pages_by_offset(dremio: FakeDremio) -> None:
+def test_dremio_automatic_sampling_pages_by_offset(dremio: FakeDremio) -> None:
     dremio.rows_for = lambda _sql: [{"id": n, "email": f"u{n}@example.com"} for n in range(10)]
     source = DremioSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
     ref = dataset_ref(("Samples", "samples.dremio.com", "customers.json"))
@@ -767,8 +767,12 @@ async def test_dremio_automatic_sampling_pages_by_offset(dremio: FakeDremio) -> 
     source._automatic_fetch(ref)
 
     assert dremio.sql[-1].endswith('"customers.json" LIMIT 10 OFFSET 0')
-    # A full page means there may be more: the next run resumes after it.
-    assert source.current_sampling_cursor() == {"tables": {ref.raw_id: {"offset": 10}}}
+    # A dataset has no key to tell new rows from old, so it is paged by
+    # position and wraps. A full page means there may be more: the next run
+    # resumes after it.
+    assert source.current_sampling_cursor() == {
+        "tables": {ref.raw_id: {"mode": "wrap", "offset": 10}}
+    }
 
 
 async def test_dremio_fetch_content_pages_batches_for_all_strategy(dremio: FakeDremio) -> None:

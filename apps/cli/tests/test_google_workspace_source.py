@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -129,45 +130,48 @@ class TestSampling:
         assert len(sampled) == 10
         assert sampled[0].file_id == "file-19"
 
-    def test_automatic_advances_cursor_and_wraps(self) -> None:
-        recipe = _base_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10})
-        source = GoogleWorkspaceSource(recipe)
-        items = _make_files(24)
-
-        first = source._apply_sampling(items, "drive-1")
-        assert [f.file_id for f in first] == [f"file-{i}" for i in range(23, 13, -1)]
-        cursor_after_first = source.current_sampling_cursor()
-        assert cursor_after_first is not None
-        assert cursor_after_first["drive_items:drive-1"] == 10
-
-        # Simulate a second run reading the persisted cursor.
+    def _automatic_run(
+        self, items: list[Any], cursor: dict[str, Any] | None
+    ) -> tuple[list[str], dict[str, Any]]:
+        """One AUTOMATIC run over a drive listing, the way the next process sees it."""
         import os
 
-        encoded = encode_sampling_cursor(cursor_after_first)
-        os.environ["CLASSIFYRE_SAMPLING_CURSOR"] = encoded
+        recipe = _base_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10})
+        if cursor is not None:
+            os.environ["CLASSIFYRE_SAMPLING_CURSOR"] = encode_sampling_cursor(cursor)
         try:
-            source2 = GoogleWorkspaceSource(recipe)
-            second = source2._apply_sampling(items, "drive-1")
+            source = GoogleWorkspaceSource(recipe)
+            window = source._apply_sampling(items, "drive-1")
         finally:
-            del os.environ["CLASSIFYRE_SAMPLING_CURSOR"]
+            os.environ.pop("CLASSIFYRE_SAMPLING_CURSOR", None)
+        next_cursor = source.current_sampling_cursor()
+        assert next_cursor is not None
+        return [f.file_id for f in window], next_cursor
 
-        assert [f.file_id for f in second] == [f"file-{i}" for i in range(13, 3, -1)]
-        cursor_after_second = source2.current_sampling_cursor()
-        assert cursor_after_second is not None
-        assert cursor_after_second["drive_items:drive-1"] == 20
+    def test_automatic_reads_newest_first_then_backfills_and_stops(self) -> None:
+        items = _make_files(24)
 
-        # A third page underfills (only 4 items remain) and should wrap to 0.
-        os.environ["CLASSIFYRE_SAMPLING_CURSOR"] = encode_sampling_cursor(cursor_after_second)
-        try:
-            source3 = GoogleWorkspaceSource(recipe)
-            third = source3._apply_sampling(items, "drive-1")
-        finally:
-            del os.environ["CLASSIFYRE_SAMPLING_CURSOR"]
+        first, cursor = self._automatic_run(items, None)
+        assert first == [f"file-{i}" for i in range(23, 13, -1)]
+        second, cursor = self._automatic_run(items, cursor)
+        assert second == [f"file-{i}" for i in range(13, 3, -1)]
+        third, cursor = self._automatic_run(items, cursor)
+        assert third == [f"file-{i}" for i in range(3, -1, -1)]
+        assert cursor["drive_items:drive-1"]["done"] is True
 
-        assert [f.file_id for f in third] == [f"file-{i}" for i in range(3, -1, -1)]
-        cursor_after_third = source3.current_sampling_cursor()
-        assert cursor_after_third is not None
-        assert cursor_after_third["drive_items:drive-1"] == 0
+        # Covered: the sweep does not start over.
+        again, settled = self._automatic_run(items, cursor)
+        assert again == []
+        assert settled == cursor
+
+    def test_automatic_reads_files_added_since_the_last_run_first(self) -> None:
+        items = _make_files(24)
+        _, cursor = self._automatic_run(items, None)
+
+        grown = _make_files(27)  # three more, newer than anything read
+        second, _ = self._automatic_run(grown, cursor)
+        assert second[:3] == ["file-26", "file-25", "file-24"]
+        assert second[3:] == [f"file-{i}" for i in range(13, 6, -1)]
 
 
 class TestExtensionFiltering:

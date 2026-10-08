@@ -17,6 +17,7 @@ import logging
 import time
 from collections.abc import AsyncGenerator, Iterable, Iterator
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -411,14 +412,13 @@ class SlackSource(BaseSource):
         directly. ALL walks every page. RANDOM and LATEST both stop after one
         window; RANDOM's randomness is applied across channels (see
         ``_sample_channels``) because Slack offers no way to sample within a
-        channel's history. AUTOMATIC resumes from the cursor saved last run and
-        wraps once the channel is exhausted, so successive runs cover the whole
-        history at a bounded cost each.
+        channel's history. AUTOMATIC reads what was posted since the last run,
+        then the next slice of older history, and once the whole history has
+        been read only what is new (see ``_iter_channel_messages_automatic``).
         """
         ingestion_options = self._ingestion_options()
         time_range_options = self._time_range_options()
         strategy = self.config.sampling.strategy
-        is_automatic = strategy == SamplingStrategy.AUTOMATIC
 
         max_total: int | None = None
         if strategy != SamplingStrategy.ALL:
@@ -428,69 +428,153 @@ class SlackSource(BaseSource):
         latest = self._normalize_ts(time_range_options.latest)
         batch_size = min(int(ingestion_options.batch_size or 200), 200)
 
-        # Slack cursors are page-granular: there is no way to resume from the
-        # middle of a page. For AUTOMATIC the request size is therefore clamped to
-        # the window so one page is exactly one window — otherwise the run would
-        # have to either overshoot to the page boundary or throw away the position
-        # of the messages it did not emit.
-        if is_automatic and max_total is not None:
-            batch_size = max(1, min(batch_size, max_total))
+        if strategy == SamplingStrategy.AUTOMATIC:
+            yield from self._iter_channel_messages_automatic(
+                channel_id, oldest=oldest, latest=latest, batch_size=batch_size
+            )
+            return
 
-        cursor_key = f"channel:{channel_id}"
         cursor: str | None = None
-        if is_automatic:
-            saved = self._sampling_cursor.get(cursor_key)
-            if isinstance(saved, str) and saved:
-                cursor = saved
-
         fetched = 0
-        resume_cursor: str | None = None
-        exhausted = False
-        try:
-            while True:
-                if self._aborted:
-                    break
+        while True:
+            if self._aborted:
+                break
 
-                try:
-                    payload = self._call(
-                        "conversations_history",
-                        channel=channel_id,
-                        limit=batch_size,
-                        cursor=cursor,
-                        oldest=oldest,
-                        latest=latest,
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "Slack conversations.history failed for %s: %s",
-                        channel_id,
-                        self._describe_error(exc),
-                    )
-                    exhausted = True
-                    break
+            try:
+                payload = self._call(
+                    "conversations_history",
+                    channel=channel_id,
+                    limit=batch_size,
+                    cursor=cursor,
+                    oldest=oldest,
+                    latest=latest,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Slack conversations.history failed for %s: %s",
+                    channel_id,
+                    self._describe_error(exc),
+                )
+                break
 
-                messages = [m for m in (payload.get("messages") or []) if isinstance(m, dict)]
-                if not messages:
-                    exhausted = True
-                    break
+            messages = [m for m in (payload.get("messages") or []) if isinstance(m, dict)]
+            if not messages:
+                break
 
-                for message in messages:
-                    yield message
-                    fetched += 1
-                    if max_total is not None and fetched >= max_total and not is_automatic:
-                        return
-
-                cursor = (payload.get("response_metadata") or {}).get("next_cursor")
-                if not payload.get("has_more") or not cursor:
-                    exhausted = True
-                    break
+            for message in messages:
+                yield message
+                fetched += 1
                 if max_total is not None and fetched >= max_total:
-                    resume_cursor = cursor
-                    break
-        finally:
-            if is_automatic:
-                # Wrap on exhaustion, otherwise remember where to resume.
-                self._record_cursor_key(cursor_key, None if exhausted else resume_cursor)
+                    return
+
+            cursor = (payload.get("response_metadata") or {}).get("next_cursor")
+            if not payload.get("has_more") or not cursor:
+                break
+
+    # ── AUTOMATIC ────────────────────────────────────────────────────────
+    #
+    # A message's ``ts`` is unique within its channel and only ever grows, and
+    # conversations.history takes ``oldest``/``latest`` bounds (both exclusive)
+    # and answers newest first. That is exactly a range frontier: ask for what
+    # is above the newest ``ts`` read, then for what is below the oldest.
+
+    def _iter_channel_messages_automatic(
+        self,
+        channel_id: str,
+        *,
+        oldest: str | None,
+        latest: str | None,
+        batch_size: int,
+    ) -> Iterable[dict[str, Any]]:
+        cursor_key = f"channel:{channel_id}"
+        frontier = self.automatic_range_frontier(cursor_key)
+        budget = self.sampling_window_size()
+
+        while budget > 0 and not self._aborted:
+            step = frontier.next_step()
+            if step is None:
+                break
+            try:
+                messages, exhausted = self._history_range(
+                    channel_id,
+                    # The configured time range still bounds every request.
+                    after=self._later_ts(step.after, oldest),
+                    before=self._earlier_ts(step.before, latest),
+                    limit=budget,
+                    batch_size=batch_size,
+                )
+            except Exception as exc:
+                # Nothing is recorded for a range that could not be read, so
+                # the next run asks for it again.
+                logger.warning(
+                    "Slack conversations.history failed for %s: %s",
+                    channel_id,
+                    self._describe_error(exc),
+                )
+                break
+            frontier.record(
+                step,
+                newest=messages[0]["ts"] if messages else None,
+                oldest=messages[-1]["ts"] if messages else None,
+                exhausted=exhausted,
+            )
+            self.record_automatic_frontier(cursor_key, frontier)
+            budget -= len(messages)
+            yield from messages
+
+    def _history_range(
+        self,
+        channel_id: str,
+        *,
+        after: str | None,
+        before: str | None,
+        limit: int,
+        batch_size: int,
+    ) -> tuple[list[dict[str, Any]], bool]:
+        """Up to ``limit`` messages strictly between two timestamps, newest first.
+
+        The second value says the range has nothing more to give.
+        """
+        collected: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while len(collected) < limit:
+            payload = self._call(
+                "conversations_history",
+                channel=channel_id,
+                limit=max(1, min(batch_size, limit - len(collected))),
+                cursor=cursor,
+                oldest=after,
+                latest=before,
+            )
+            messages = [
+                m
+                for m in (payload.get("messages") or [])
+                if isinstance(m, dict) and isinstance(m.get("ts"), str)
+            ]
+            if not messages:
+                return collected, True
+            collected.extend(messages)
+            cursor = (payload.get("response_metadata") or {}).get("next_cursor")
+            if not payload.get("has_more") or not cursor:
+                return collected, True
+        return collected, False
+
+    @staticmethod
+    def _ts_value(value: str) -> Decimal:
+        try:
+            return Decimal(value)
+        except (InvalidOperation, ValueError):
+            return Decimal(0)
+
+    def _later_ts(self, first: str | None, second: str | None) -> str | None:
+        if first is None or second is None:
+            return first or second
+        return first if self._ts_value(first) >= self._ts_value(second) else second
+
+    def _earlier_ts(self, first: str | None, second: str | None) -> str | None:
+        if first is None or second is None:
+            return first or second
+        return first if self._ts_value(first) <= self._ts_value(second) else second
 
     def _normalize_ts(self, value: str | None) -> str | None:
         if not value:

@@ -339,57 +339,121 @@ async def test_all_strategy_walks_every_page(monkeypatch: pytest.MonkeyPatch) ->
     assert len(assets) == 4
 
 
-@pytest.mark.asyncio
-async def test_automatic_saves_resume_cursor(monkeypatch: pytest.MonkeyPatch) -> None:
+def _channel_history(messages: list[dict[str, Any]]) -> Any:
+    """conversations.history over an in-memory channel: bounds, newest first, paged."""
+
+    def history(**kwargs: Any) -> dict[str, Any]:
+        oldest, latest = kwargs.get("oldest"), kwargs.get("latest")
+        matching = sorted(
+            (
+                message
+                for message in messages
+                if (oldest is None or float(message["ts"]) > float(oldest))
+                and (latest is None or float(message["ts"]) < float(latest))
+            ),
+            key=lambda message: float(message["ts"]),
+            reverse=True,
+        )
+        start = int(kwargs.get("cursor") or 0)
+        page = matching[start : start + int(kwargs.get("limit") or 100)]
+        more = start + len(page) < len(matching)
+        return {
+            "ok": True,
+            "messages": page,
+            "has_more": more,
+            "response_metadata": {"next_cursor": str(start + len(page)) if more else ""},
+        }
+
+    return history
+
+
+async def _automatic_slack_run(
+    monkeypatch: pytest.MonkeyPatch,
+    messages: list[dict[str, Any]],
+    cursor: dict[str, Any] | None,
+) -> tuple[list[str], dict[str, Any] | None]:
     source, _ = make_source(
         monkeypatch,
         {
             "auth_test": {"ok": True, "team_id": "T123", "bot_id": "B1"},
-            "conversations_history": lambda **_kwargs: {
-                "ok": True,
-                "messages": _many_messages(10),
-                "has_more": True,
-                "response_metadata": {"next_cursor": "resume-here"},
-            },
+            "conversations_history": _channel_history(messages),
         },
         recipe={
             **slack_recipe(optional={"channels": {"channel_ids": ["C123"]}}),
             "sampling": {"strategy": "AUTOMATIC", "rows_per_page": 10},
         },
     )
-
-    async for _batch in source.extract():
-        pass
-
-    assert source.current_sampling_cursor() == {"channel:C123": "resume-here"}
+    source._sampling_cursor = cursor or {}
+    texts = [
+        asset.name
+        for batch in [b async for b in source.extract()]
+        for asset in batch
+        if asset.metadata.get("ts")
+    ]
+    next_cursor = source.current_sampling_cursor()
+    return texts, next_cursor if next_cursor is not None else cursor
 
 
 @pytest.mark.asyncio
-async def test_automatic_resumes_from_saved_cursor(monkeypatch: pytest.MonkeyPatch) -> None:
-    source, client = make_source(
-        monkeypatch,
-        {
-            "auth_test": {"ok": True, "team_id": "T123", "bot_id": "B1"},
-            "conversations_history": {
-                "ok": True,
-                "messages": _many_messages(2),
-                "has_more": False,
-                "response_metadata": {"next_cursor": ""},
-            },
-        },
-        recipe={
-            **slack_recipe(optional={"channels": {"channel_ids": ["C123"]}}),
-            "sampling": {"strategy": "AUTOMATIC", "rows_per_page": 10},
-        },
-    )
-    source._sampling_cursor = {"channel:C123": "saved-cursor"}
+async def test_automatic_reads_the_newest_messages_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    messages = _many_messages(25)
+    read, cursor = await _automatic_slack_run(monkeypatch, messages, None)
 
-    async for _batch in source.extract():
-        pass
+    assert len(read) == 10
+    assert cursor == {
+        "channel:C123": {
+            "v": 2,
+            "head": messages[24]["ts"],
+            "tail": messages[15]["ts"],
+            "done": False,
+        }
+    }
 
-    assert client.calls_for("conversations_history")[0]["cursor"] == "saved-cursor"
-    # Channel exhausted: the cursor wraps so the next run starts from the top.
-    assert source.current_sampling_cursor() == {"channel:C123": None}
+
+@pytest.mark.asyncio
+async def test_automatic_reads_new_messages_before_older_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    messages = _many_messages(25)
+    _, cursor = await _automatic_slack_run(monkeypatch, messages, None)
+
+    messages = _many_messages(28)  # three posted since
+    _, cursor = await _automatic_slack_run(monkeypatch, messages, cursor)
+
+    # The three new ones, then seven more of the history below where it stopped.
+    assert cursor == {
+        "channel:C123": {
+            "v": 2,
+            "head": messages[27]["ts"],
+            "tail": messages[8]["ts"],
+            "done": False,
+        }
+    }
+
+
+@pytest.mark.asyncio
+async def test_automatic_reads_a_finished_channel_only_for_what_is_new(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    messages = _many_messages(12)
+    cursor: dict[str, Any] | None = None
+    total = 0
+    for _ in range(3):
+        read, cursor = await _automatic_slack_run(monkeypatch, messages, cursor)
+        total += len(read)
+    assert total == 12
+    assert cursor is not None and cursor["channel:C123"]["done"] is True
+
+    # Nothing new: nothing read and the cursor does not move, so the sweep does
+    # not wrap around and start over.
+    read, settled = await _automatic_slack_run(monkeypatch, messages, cursor)
+    assert read == []
+    assert settled == cursor
+
+    read, cursor = await _automatic_slack_run(monkeypatch, _many_messages(14), cursor)
+    assert len(read) == 2
 
 
 @pytest.mark.asyncio

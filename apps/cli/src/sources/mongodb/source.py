@@ -27,6 +27,7 @@ from ...models.generated_single_asset_scan_results import (
 )
 from ...utils.file_parser import json_safe_default
 from ...utils.hashing import hash_id, unhash_id
+from ...utils.sampling_frontier import RangeFrontier
 from ..base import BaseSource
 from ..dependencies import require_module
 
@@ -399,6 +400,115 @@ class MongoDBSource(BaseSource):
         except Exception:
             return None
 
+    # ── AUTOMATIC ────────────────────────────────────────────────────────
+    #
+    # ``_id`` is the one thing every document has, and for the ids MongoDB or
+    # a counter hands out -- ObjectIds, integers -- a higher ``_id`` is a later
+    # document. A collection keyed that way keeps a frontier: documents added
+    # since the last run first, then the backfill, and after that only what is
+    # new. A collection keyed by anything else (strings, UUIDs, a mix) cannot
+    # tell new from old, so it is paged by position and wraps.
+
+    @staticmethod
+    def _increasing_id_kind(value: Any) -> str | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return "int"
+        if type(value).__name__ == "ObjectId":
+            return "oid"
+        return None
+
+    @staticmethod
+    def _encode_id(value: Any) -> Any:
+        return {"$oid": str(value)} if type(value).__name__ == "ObjectId" else value
+
+    @staticmethod
+    def _decode_id(value: Any) -> Any:
+        if isinstance(value, dict) and isinstance(value.get("$oid"), str):
+            from bson import ObjectId
+
+            return ObjectId(value["$oid"])
+        return value
+
+    def _automatic_documents(
+        self, collection: Any, collection_ref: CollectionRef, rows_per_page: int
+    ) -> list[dict[str, Any]]:
+        key = f"collection:{collection_ref.database}.{collection_ref.collection}"
+        saved = self._sampling_cursor.get(key)
+        wrapping = isinstance(saved, int) and not isinstance(saved, bool)
+        if not wrapping:
+            documents = self._automatic_documents_by_id(collection, key, saved, rows_per_page)
+            if documents is not None:
+                return documents
+
+        # Page forward through the collection each run; wrap when exhausted.
+        offset = self.automatic_offset(key)
+        documents = list(collection.find({}).skip(offset).limit(rows_per_page))
+        self.record_automatic_offset(key, prev_offset=offset, fetched=len(documents))
+        return documents
+
+    def _automatic_documents_by_id(
+        self, collection: Any, key: str, saved: Any, rows_per_page: int
+    ) -> list[dict[str, Any]] | None:
+        """Read by ``_id`` frontier, or None when ``_id`` does not order by age."""
+        state = None
+        if isinstance(saved, dict):
+            try:
+                state = {
+                    **saved,
+                    **{
+                        name: self._decode_id(saved[name])
+                        for name in ("head", "tail", "top", "pos")
+                        if saved.get(name) is not None
+                    },
+                }
+            except Exception:
+                state = None
+        frontier = RangeFrontier(state)
+
+        if frontier.fresh:
+            # MongoDB sorts by type before value, so if the smallest and the
+            # largest ``_id`` are of one increasing type, every ``_id`` is.
+            oldest = list(collection.find({}, {"_id": 1}).sort("_id", 1).limit(1))
+            newest = list(collection.find({}, {"_id": 1}).sort("_id", -1).limit(1))
+            if not oldest or not newest:
+                return []
+            kinds = {
+                self._increasing_id_kind(oldest[0].get("_id")),
+                self._increasing_id_kind(newest[0].get("_id")),
+            }
+            if len(kinds) != 1 or None in kinds:
+                return None
+
+        documents: list[dict[str, Any]] = []
+        budget = rows_per_page
+        while budget > 0 and (step := frontier.next_step()) is not None:
+            bounds: dict[str, Any] = {}
+            if step.after is not None:
+                bounds["$gt"] = step.after
+            if step.before is not None:
+                bounds["$lt"] = step.before
+            page = list(
+                collection.find({"_id": bounds} if bounds else {}).sort("_id", -1).limit(budget)
+            )
+            frontier.record(
+                step,
+                newest=page[0].get("_id") if page else None,
+                oldest=page[-1].get("_id") if page else None,
+                exhausted=len(page) < budget,
+            )
+            documents.extend(page)
+            budget -= len(page)
+
+        next_state = frontier.to_state()
+        if next_state is not None:
+            for name in ("head", "tail", "top", "pos"):
+                if next_state.get(name) is not None:
+                    next_state[name] = self._encode_id(next_state[name])
+            self._record_cursor_key(key, next_state)
+        return documents
+
     def _sample_collection_documents(self, collection_ref: CollectionRef) -> list[dict[str, Any]]:
         collection = self._client()[collection_ref.database][collection_ref.collection]
         sampling = self._sampling()
@@ -409,12 +519,7 @@ class MongoDBSource(BaseSource):
             return list(collection.find({}).limit(rows_per_page))
 
         if strategy == SamplingStrategy.AUTOMATIC:
-            # Page forward through the collection each run; wrap when exhausted.
-            key = f"collection:{collection_ref.database}.{collection_ref.collection}"
-            offset = self.automatic_offset(key)
-            documents = list(collection.find({}).skip(offset).limit(rows_per_page))
-            self.record_automatic_offset(key, prev_offset=offset, fetched=len(documents))
-            return documents
+            return self._automatic_documents(collection, collection_ref, rows_per_page)
 
         if strategy == SamplingStrategy.RANDOM:
             return self._sample_random_documents(collection, rows_per_page)

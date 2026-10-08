@@ -39,6 +39,17 @@ export class FinalizeIngestRunDto {
 
   @ApiPropertyOptional({
     description:
+      'The settings fingerprint the run was started with, echoed back. ' +
+      'Recorded on the source so the next run can tell whether its settings ' +
+      'or detectors changed since. Omitted by runs that were not given one.',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  samplingFingerprint?: string;
+
+  @ApiPropertyOptional({
+    description:
       'Assets this run skipped entirely on scan-cache evidence — content and ' +
       'every applicable detector configuration unchanged since their last ' +
       'completed scan.',

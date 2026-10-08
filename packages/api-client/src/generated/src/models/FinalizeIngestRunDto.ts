@@ -38,6 +38,12 @@ export interface FinalizeIngestRunDto {
      */
     samplingCursor?: { [key: string]: any; };
     /**
+     * The settings fingerprint the run was started with, echoed back. Recorded on the source so the next run can tell whether its settings or detectors changed since. Omitted by runs that were not given one.
+     * @type {string}
+     * @memberof FinalizeIngestRunDto
+     */
+    samplingFingerprint?: string;
+    /**
      * Assets this run skipped entirely on scan-cache evidence — content and every applicable detector configuration unchanged since their last completed scan.
      * @type {number}
      * @memberof FinalizeIngestRunDto
@@ -115,6 +121,7 @@ export function FinalizeIngestRunDtoFromJSONTyped(json: any, ignoreDiscriminator
         'runnerId': json['runnerId'],
         'seenHashes': json['seenHashes'],
         'samplingCursor': json['samplingCursor'] == null ? undefined : json['samplingCursor'],
+        'samplingFingerprint': json['samplingFingerprint'] == null ? undefined : json['samplingFingerprint'],
         'assetsSkippedCached': json['assetsSkippedCached'] == null ? undefined : json['assetsSkippedCached'],
         'detectorRunsSkipped': json['detectorRunsSkipped'] == null ? undefined : json['detectorRunsSkipped'],
         'relationshipsEmitted': json['relationshipsEmitted'] == null ? undefined : json['relationshipsEmitted'],
@@ -141,6 +148,7 @@ export function FinalizeIngestRunDtoToJSONTyped(value?: FinalizeIngestRunDto | n
         'runnerId': value['runnerId'],
         'seenHashes': value['seenHashes'],
         'samplingCursor': value['samplingCursor'],
+        'samplingFingerprint': value['samplingFingerprint'],
         'assetsSkippedCached': value['assetsSkippedCached'],
         'detectorRunsSkipped': value['detectorRunsSkipped'],
         'relationshipsEmitted': value['relationshipsEmitted'],

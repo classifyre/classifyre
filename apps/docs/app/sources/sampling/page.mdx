@@ -25,7 +25,7 @@ graph LR
 
 | Strategy | What it reads | Best when |
 |---|---|---|
-| **Automatic** *(default)* | A new slice of not-yet-seen items each run, remembering where it left off | You want full coverage over time at a steady, bounded cost per scan |
+| **Automatic** *(default)* | A bounded slice each run: whatever is new first, then more of what it hasn't seen yet | You want full coverage over time at a steady, bounded cost per scan |
 | **Latest** | The most recently created or modified items first | Freshly added data is what matters most |
 | **Random** | A random sample of items | You want a representative spot-check of a large source |
 | **All** | Every item, with no limit | The source is small, or you need complete coverage in one pass |
@@ -38,29 +38,53 @@ default for almost everything.
 ## Automatic — the recommended default
 
 Automatic sampling gives you complete coverage *without* paying to read the whole
-source every time. Each run ingests a fresh **slice** of items it hasn't seen
-yet, remembers its position, and picks up from there next time. Once it has been
-all the way through, it wraps back to the start and goes again.
+source every time. Each run reads one **slice** and remembers where it has been.
+The first run starts with the newest items. Every run after that reads what is
+**new or changed since the last run first**, then spends the rest of the slice
+working backwards through older items it hasn't seen yet. Once it has been all
+the way through, it stops going over old ground and reads only what is new.
 
 ```mermaid
 graph LR
-    R1["Run 1<br/>items 1–100"] --> R2["Run 2<br/>items 101–200"]
-    R2 --> R3["Run 3<br/>items 201–300"]
-    R3 --> Dots["…keeps going…"]
-    Dots --> Wrap["All covered →<br/>wraps to the start"]
-    Wrap --> R1
+    R1["Run 1<br/>the newest 100"] --> R2["Run 2<br/>anything new,<br/>then the next 100 older"]
+    R2 --> Dots["…keeps going…"]
+    Dots --> Done["All covered"]
+    Done --> New["Later runs<br/>only what is new"]
+    New --> New
 ```
 
 - **Bounded cost per run** — every scan reads roughly one slice, so time and
   spend stay predictable no matter how big the source is.
+- **New things first** — a file added today is read on the next run, not after
+  the sweep has worked its way through everything older.
 - **Eventually everything** — keep scanning (ideally on a
-  [schedule](/sources/testing/)) and the whole source gets covered, then
-  refreshed on the next lap.
-- **Remembers its place** — progress is saved between runs, so no item is
-  repeatedly read while others are ignored.
+  [schedule](/sources/testing/)) and the whole source gets covered.
+- **No laps** — a source that has been fully covered is not read again from the
+  start. If a burst of new items is larger than one slice, the following runs
+  carry on through it until they reach ground already covered.
 
-This pairs naturally with a recurring schedule: a little, often, until it all
-gets seen — then around again to catch changes.
+### When the sweep starts over
+
+The place Automatic keeps is only good for the settings it was earned under. It
+starts again from the newest items when you:
+
+- change anything in the source's configuration — scope, filters, sampling,
+  switching a detector on or off;
+- edit, retrain or delete a custom detector the source uses;
+- purge the source's assets.
+
+Rotating a credential does not restart it. Starting over is cheap for file
+sources: files that haven't changed, under detectors that haven't changed, are
+recognised and skipped.
+
+### Where new can't be told from old
+
+"New first" needs something to order by. Files have dates, messages have
+timestamps, and a table with a single integer key grows upwards. A table with a
+text or composite key — or no key at all — a search index, and a graph database
+give nothing that says which rows arrived later. Those are read from the start,
+slice by slice, and go round again once they reach the end; that lap is how
+their new rows get seen.
 
 ---
 

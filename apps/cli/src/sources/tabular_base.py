@@ -31,6 +31,7 @@ from ..models.generated_single_asset_scan_results import (
 from ..utils.file_metadata import build_columns
 from ..utils.file_parser import render_bytes_cell
 from ..utils.hashing import hash_id, unhash_id
+from ..utils.sampling_frontier import RangeFrontier
 from ..utils.sql_lineage import column_mappings_from_sql, sqlglot_dialect
 from ..utils.urn import Urn, UrnError
 from .base import BaseSource
@@ -590,12 +591,22 @@ class BaseTabularSource(BaseSource):
 
     # ── AUTOMATIC incremental sampling ───────────────────────────────────
     #
-    # The asset is the table; AUTOMATIC pages through each table's rows across
-    # runs. We remember, per table, the position reached last run (the last
-    # primary-key values for keyset pagination, or a row OFFSET when the table
-    # has no primary key) and fetch the next ``rows_per_page`` slice. When a
-    # table is exhausted its cursor is reset so the next run wraps around and
-    # re-ingests from the start (data is not stale).
+    # The asset is the table; AUTOMATIC reads ``rows_per_page`` of its rows per
+    # run and remembers, per table, where it has been.
+    #
+    # A table with a single integer primary key has an order that means
+    # something: a higher key is a later row. Those keep a frontier (see
+    # ``utils/sampling_frontier.py``) -- rows added since the last run come
+    # first, then the backfill towards the start of the table, and once that
+    # is done only new rows are read.
+    #
+    # Any other table cannot tell a new row from an old one. A UUID or a
+    # composite key orders rows but not by age, and a table with no key has no
+    # order at all. Those are walked start to finish (by key where there is
+    # one, by OFFSET otherwise) and then walked again, which is the only way
+    # such a table's new rows are ever seen.
+
+    _WRAP_MODE = "wrap"
 
     @staticmethod
     def _json_safe_value(value: Any) -> Any:
@@ -609,6 +620,22 @@ class BaseTabularSource(BaseSource):
         if isinstance(value, (bytes, bytearray, memoryview)):
             return None
         return str(value)
+
+    @staticmethod
+    def _increasing_key_value(value: Any) -> int | None:
+        """A key value as an integer, or None when it is not one.
+
+        Integers are the keys a database hands out in order (serial, identity,
+        auto-increment). Nothing else is taken to mean "later": a string key
+        may be a UUID, and a timestamp key is rarely unique.
+        """
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, Decimal) and value == value.to_integral_value():
+            return int(value)
+        return None
 
     def _automatic_supports_keyset(self) -> bool:
         """Whether AUTOMATIC may use keyset pagination (primary-key ``WHERE … > ?``).
@@ -646,6 +673,95 @@ class BaseTabularSource(BaseSource):
             self._next_sampling_cursor = nxt
             self._automatic_advanced.add(key)
 
+    def _fetch_page_key_range(
+        self,
+        conn: Any,
+        base_query: str,
+        *,
+        page_size: int,
+        pk_column: str,
+        after: Any,
+        before: Any,
+    ) -> tuple[list[tuple[Any, ...]], list[str]]:
+        """One page of rows whose key lies strictly between two bounds, highest first.
+
+        Either bound may be None. Override where the dialect binds parameters
+        or limits rows differently.
+        """
+        ph = self._param_placeholder()
+        column = self._quote_identifier(pk_column)
+        conditions: list[str] = []
+        params: list[Any] = []
+        if after is not None:
+            conditions.append(f"{column} > {ph}")
+            params.append(after)
+        if before is not None:
+            conditions.append(f"{column} < {ph}")
+            params.append(before)
+        where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        query = (
+            f"{base_query}{where} ORDER BY {column} DESC {self._limit_clause(str(int(page_size)))}"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute(query, params if params else None)
+            rows = list(cursor.fetchall())
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+        return rows, column_names
+
+    def _automatic_fetch_frontier(
+        self,
+        table_ref: TableRef,
+        base_query: str,
+        *,
+        saved: dict[str, Any],
+        pk_column: str,
+        pk_index: int,
+        rows_per_page: int,
+    ) -> tuple[list[tuple[Any, ...]], list[str], dict[str, Any] | None] | None:
+        """Read by frontier: new rows first, then the backfill.
+
+        Returns None when the key turns out not to be an increasing integer,
+        which is only knowable from a row; the caller then walks and wraps.
+        """
+        conn = self._get_cached_connection(table_ref.database)
+        frontier = RangeFrontier(saved)
+        collected: list[tuple[Any, ...]] = []
+        column_names: list[str] = []
+        budget = rows_per_page
+
+        while budget > 0 and (step := frontier.next_step()) is not None:
+            rows, names = self._fetch_page_key_range(
+                conn,
+                base_query,
+                page_size=budget,
+                pk_column=pk_column,
+                after=step.after,
+                before=step.before,
+            )
+            column_names = names or column_names
+            keys = [self._increasing_key_value(row[pk_index]) for row in rows]
+            if any(key is None for key in keys):
+                if frontier.fresh:
+                    return None
+                # A key that was an integer and no longer is: the column
+                # changed under the cursor. Leave the cursor where it was.
+                logger.warning(
+                    "Key column %s of %s no longer holds integers; skipping this run",
+                    pk_column,
+                    table_ref.display_name,
+                )
+                return [], column_names, saved
+            frontier.record(
+                step,
+                newest=keys[0] if keys else None,
+                oldest=keys[-1] if keys else None,
+                exhausted=len(rows) < budget,
+            )
+            collected.extend(rows)
+            budget -= len(rows)
+
+        return collected, column_names, frontier.to_state()
+
     def _automatic_fetch(
         self, table_ref: TableRef
     ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
@@ -667,7 +783,27 @@ class BaseTabularSource(BaseSource):
             and self._automatic_supports_keyset()
         )
 
+        if use_keyset and len(pk_columns) == 1 and saved.get("mode") != self._WRAP_MODE:
+            result = self._automatic_fetch_frontier(
+                table_ref,
+                base_query,
+                saved=saved,
+                pk_column=pk_columns[0],
+                pk_index=pk_indices[0],
+                rows_per_page=rows_per_page,
+            )
+            if result is not None:
+                rows, column_names, next_frontier = result
+                self._record_table_cursor(key, next_frontier)
+                if not column_names:
+                    return None
+                return rows, column_names
+            # Not an increasing key: this table is walked and wrapped from now
+            # on, and remembers that so it is not asked again every run.
+            saved = {}
+
         conn = self._get_cached_connection(table_ref.database)
+        next_state: dict[str, Any] = {"mode": self._WRAP_MODE}
 
         if use_keyset:
             saved_pk = saved.get("pk")
@@ -681,27 +817,20 @@ class BaseTabularSource(BaseSource):
                 pk_order=pk_order,
                 last_pk_values=last_pk_values,
             )
-            if not rows or len(rows) < rows_per_page:
-                next_state: dict[str, Any] | None = None  # exhausted → wrap next run
-            else:
+            # Exhausted (or a key that cannot be stored, e.g. binary) leaves no
+            # position, so the next run starts the walk again.
+            if rows and len(rows) >= rows_per_page:
                 last_row = rows[-1]
-                next_state = {
-                    "pk": [
-                        self._json_safe_value(last_row[pk_indices[j]])
-                        for j in range(len(pk_columns))
-                    ]
-                }
-                if any(v is None for v in next_state["pk"]):
-                    # Non-serialisable PK (e.g. binary) — fall back to a restart
-                    # rather than persisting an unusable cursor.
-                    next_state = None
+                position = [
+                    self._json_safe_value(last_row[pk_indices[j]]) for j in range(len(pk_columns))
+                ]
+                if all(value is not None for value in position):
+                    next_state["pk"] = position
         else:
             offset = int(saved.get("offset") or 0)
             rows, column_names = self._fetch_one_page(table_ref, base_query, rows_per_page, offset)
-            if not rows or len(rows) < rows_per_page:
-                next_state = None
-            else:
-                next_state = {"offset": offset + len(rows)}
+            if rows and len(rows) >= rows_per_page:
+                next_state["offset"] = offset + len(rows)
 
         self._record_table_cursor(key, next_state)
 

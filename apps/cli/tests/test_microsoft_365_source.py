@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -131,30 +132,40 @@ class TestSampling:
         sampled = source._apply_sampling(items)
         assert len(sampled) == 10
 
-    def test_automatic_advances_cursor_between_runs(self) -> None:
+    def test_automatic_reads_newest_first_then_backfills_and_stops(self) -> None:
         recipe = _base_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10})
-        source = Microsoft365Source(recipe)
         items = self._make_items(25)
+        key = "drive_items:drive-1"
 
-        first = source._apply_sampling(list(items), cursor_key="drive_items:drive-1")
-        assert [s.item_id for s in first] == [f"item-{i}" for i in range(24, 14, -1)]
-        assert source.current_sampling_cursor()["drive_items:drive-1"] == 10
+        cursor: dict[str, Any] = {}
+        seen: list[str] = []
+        for _ in range(3):
+            source = Microsoft365Source(recipe)
+            source._sampling_cursor = cursor
+            seen += [s.item_id for s in source._apply_sampling(list(items), cursor_key=key)]
+            cursor = source.current_sampling_cursor()
+        assert seen == [f"item-{i}" for i in range(24, -1, -1)]
+        assert cursor[key]["done"] is True
 
-        # Second run resumes from the persisted cursor
+        # Covered: the sweep does not start over.
+        source = Microsoft365Source(recipe)
+        source._sampling_cursor = cursor
+        assert source._apply_sampling(list(items), cursor_key=key) == []
+
+    def test_automatic_reads_items_added_since_the_last_run_first(self) -> None:
+        recipe = _base_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10})
+        key = "drive_items:drive-1"
+        source = Microsoft365Source(recipe)
+        source._apply_sampling(self._make_items(25), cursor_key=key)
+
         source2 = Microsoft365Source(recipe)
-        source2._sampling_cursor = {"drive_items:drive-1": 10}
-        second = source2._apply_sampling(list(items), cursor_key="drive_items:drive-1")
-        assert [s.item_id for s in second] == [f"item-{i}" for i in range(14, 4, -1)]
-        assert source2.current_sampling_cursor()["drive_items:drive-1"] == 20
-
-    def test_automatic_wraps_around(self) -> None:
-        recipe = _base_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10})
-        source = Microsoft365Source(recipe)
-        source._sampling_cursor = {"drive_items:drive-1": 20}
-        items = self._make_items(25)
-        sampled = source._apply_sampling(list(items), cursor_key="drive_items:drive-1")
-        assert len(sampled) == 5
-        assert source.current_sampling_cursor()["drive_items:drive-1"] == 0
+        source2._sampling_cursor = source.current_sampling_cursor()
+        second = source2._apply_sampling(self._make_items(27), cursor_key=key)
+        assert [s.item_id for s in second] == [
+            "item-26",
+            "item-25",
+            *[f"item-{i}" for i in range(14, 6, -1)],
+        ]
 
     def test_automatic_uses_per_drive_cursor_keys(self) -> None:
         recipe = _base_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10})
@@ -163,8 +174,8 @@ class TestSampling:
         source._apply_sampling(list(items), cursor_key="drive_items:drive-1")
         source._apply_sampling(list(items), cursor_key="drive_items:drive-2")
         cursor = source.current_sampling_cursor()
-        assert cursor["drive_items:drive-1"] == 10
-        assert cursor["drive_items:drive-2"] == 10
+        assert cursor["drive_items:drive-1"]["head"]["id"] == "item-24"
+        assert cursor["drive_items:drive-2"]["head"]["id"] == "item-24"
 
 
 class TestExtensionFiltering:

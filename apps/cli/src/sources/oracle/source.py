@@ -209,6 +209,35 @@ class OracleSource(BaseTabularSource):
             column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
+    def _fetch_page_key_range(
+        self,
+        conn: Any,
+        base_query: str,
+        *,
+        page_size: int,
+        pk_column: str,
+        after: Any,
+        before: Any,
+    ) -> tuple[list[tuple[Any, ...]], list[str]]:
+        column = self._quote_identifier(pk_column)
+        conditions: list[str] = []
+        bind: dict[str, Any] = {}
+        if after is not None:
+            conditions.append(f"{column} > :after")
+            bind["after"] = after
+        if before is not None:
+            conditions.append(f"{column} < :before")
+            bind["before"] = before
+        where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        paginated_query = (
+            f"{base_query}{where} ORDER BY {column} DESC FETCH FIRST {int(page_size)} ROWS ONLY"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query, bind if bind else [])
+            rows = list(cursor.fetchall())
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+        return rows, column_names
+
     # ── Case-insensitive column resolution (Oracle uppercases) ───────────
 
     def _resolve_latest_order_column(self, columns: list[str]) -> str | None:

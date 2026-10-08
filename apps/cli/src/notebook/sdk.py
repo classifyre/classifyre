@@ -48,6 +48,7 @@ from ..graph.edges import (
     uses,
 )
 from ..utils.sampling_cursor import check_cursor_fits
+from ..utils.sampling_frontier import ListFrontier
 from ..utils.urn import Urn
 from .cohort import CohortItem, normalize_bands, select_cohort
 from .files import DEFAULT_PAGE_SIZE, ParsedContent, pages, parse
@@ -511,6 +512,7 @@ class Context:
         should_abort: Callable[[], bool] | None = None,
         query_assets: Callable[[dict[str, Any]], Any] | None = None,
         cohort_weights: Mapping[str, Mapping[str, float]] | None = None,
+        config_changed: bool = False,
     ) -> None:
         self._variables = dict(variables or {})
         self._secrets = dict(secrets or {})
@@ -535,6 +537,8 @@ class Context:
         }
         self._cohort_state: dict[str, Any] = {}
         self._cohort_stats: dict[str, Any] = {}
+        self._config_changed = bool(config_changed)
+        self._frontier_state: dict[str, Any] = {}
 
     # -- configuration -------------------------------------------------------
 
@@ -711,16 +715,96 @@ class Context:
         self._next_cursor = dict(cursor)
 
     @property
+    def config_changed(self) -> bool:
+        """True on the first run after this source's settings changed.
+
+        "Settings" is anything in the source's configuration -- scope,
+        sampling, variables, the notebook itself, which detectors are on --
+        and the definition of any custom detector it uses. Rotating a secret
+        does not count.
+
+        A built-in source starts its sweep over when that happens. A notebook
+        owns its own cursor, so nothing is taken from it; it is told instead,
+        and decides::
+
+            cursor = {} if ctx.config_changed else ctx.cursor
+
+        The flag stays set until a run finishes, so a run that fails before
+        acting on it does not lose it. ``ctx.newest_first()`` acts on it for
+        you.
+        """
+        return self._config_changed
+
+    def newest_first(
+        self,
+        items: Iterable[Any],
+        *,
+        order: Callable[[Any], tuple[Any, str]],
+        name: str = "items",
+        limit: int | None = None,
+    ) -> list[Any]:
+        """This run's slice of a listing: what is new first, then the backfill.
+
+        ::
+
+            def extract():
+                for doc in ctx.newest_first(
+                    api.list_documents(),
+                    order=lambda doc: (doc["updated_at"], doc["id"]),
+                ):
+                    yield Asset(id=doc["id"], ...)
+
+        Pass the whole listing, in any order. ``order`` maps an item to
+        ``(rank, id)``: ``rank`` is what makes an item newer -- a timestamp, an
+        increasing number -- and must be an int, float or string of one
+        consistent type that only changes when the item does; ``id`` is unique
+        to the item. Each run gets ``limit`` items (``rows_per_page`` by
+        default): everything newer than what earlier runs read comes first,
+        the rest continues backwards from where the last run stopped, and once
+        the whole listing has been read only new items are returned.
+
+        The position is kept in the cursor beside whatever you store there,
+        one per ``name``, and starts over when ``ctx.config_changed``. Calling
+        it declares this run's coverage partial.
+        """
+        stored = self._cursor.get("frontier")
+        previous = stored.get(str(name)) if isinstance(stored, dict) else None
+        frontier = ListFrontier(None if self._config_changed else previous)
+        window = frontier.window(
+            ((*order(item), item) for item in items),
+            int(limit) if limit else self.page_size,
+        )
+        state = frontier.to_state()
+        if state is not None:
+            self._frontier_state[str(name)] = state
+        if not self._partial_coverage:
+            self.set_partial_coverage(
+                f"the notebook reads a window ({name}) of a larger listing each run"
+            )
+        return window
+
+    @property
     def next_cursor(self) -> dict[str, Any] | None:
-        if not self._cohort_state:
+        if not self._cohort_state and not self._frontier_state:
             return None if self._next_cursor is None else dict(self._next_cursor)
-        # A cohort's position is kept in the same cursor, beside whatever the
-        # notebook stores -- or, when it stores nothing this run, beside what
-        # the previous run left, which would otherwise be dropped.
+        # A cohort's or a frontier's position is kept in the same cursor,
+        # beside whatever the notebook stores -- or, when it stores nothing
+        # this run, beside what the previous run left, which would otherwise
+        # be dropped.
         base = self._next_cursor if self._next_cursor is not None else self._cursor
-        stored = base.get("cohort")
-        previous: dict[str, Any] = stored if isinstance(stored, dict) else {}
-        return {**base, "cohort": {**previous, **self._cohort_state}}
+        merged = dict(base)
+        for section, state in (
+            ("cohort", self._cohort_state),
+            ("frontier", self._frontier_state),
+        ):
+            if not state:
+                continue
+            stored = base.get(section)
+            previous: dict[str, Any] = stored if isinstance(stored, dict) else {}
+            if section == "frontier" and self._config_changed:
+                previous = {}
+            merged[section] = {**previous, **state}
+        return merged
 
     @property
     def cohort_stats(self) -> dict[str, Any]:

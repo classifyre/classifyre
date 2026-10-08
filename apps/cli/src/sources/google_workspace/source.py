@@ -34,6 +34,7 @@ from ...utils.file_parser import (
     resolve_mime_type,
 )
 from ...utils.hashing import hash_id
+from ...utils.sampling_frontier import time_rank
 from ..base import BaseSource
 from ..dependencies import require_module
 
@@ -572,8 +573,17 @@ class GoogleWorkspaceSource(BaseSource):
             return items
 
         if strategy == SamplingStrategy.AUTOMATIC:
-            ordered = sorted(items, key=lambda ref: ref.modified_time, reverse=True)
-            return self.automatic_window(ordered, key=f"drive_items:{drive_id}")
+            # Drive keeps a file's own modification time when it is uploaded,
+            # so a file added today can carry last year's date. Its creation
+            # time in Drive is when it arrived; order by the later of the two.
+            return self.automatic_window(
+                items,
+                key=f"drive_items:{drive_id}",
+                order=lambda ref: (
+                    time_rank(max(ref.modified_time, ref.created_time)),
+                    ref.file_id,
+                ),
+            )
 
         if strategy == SamplingStrategy.RANDOM:
             if limit >= len(items):

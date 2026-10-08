@@ -64,27 +64,43 @@ def test_sandbox_sampling_all_latest_and_random_are_stable() -> None:
         random_source.cleanup()
 
 
-def test_sandbox_automatic_sampling_uses_persisted_rolling_window(monkeypatch) -> None:
+def test_sandbox_automatic_sampling_reads_new_uploads_first_and_does_not_start_over(
+    monkeypatch,
+) -> None:
     refs = _refs()
-    first = SandboxSource(_recipe("AUTOMATIC"), source_id="source-1")
-    try:
-        first_window = first._apply_sampling(iter(refs))
-        cursor = first.current_sampling_cursor()
-    finally:
-        first.cleanup()
 
-    monkeypatch.setenv(
-        "CLASSIFYRE_SAMPLING_CURSOR",
-        encode_sampling_cursor(cursor),
+    def run(listing: list[ObjectRef], cursor: dict | None) -> tuple[list[str], dict | None]:
+        if cursor is None:
+            monkeypatch.delenv("CLASSIFYRE_SAMPLING_CURSOR", raising=False)
+        else:
+            monkeypatch.setenv("CLASSIFYRE_SAMPLING_CURSOR", encode_sampling_cursor(cursor))
+        source = SandboxSource(_recipe("AUTOMATIC"), source_id="source-1")
+        try:
+            window = source._apply_sampling(iter(listing))
+            next_cursor = source.current_sampling_cursor()
+        finally:
+            source.cleanup()
+        return [ref.key for ref in window], next_cursor if next_cursor is not None else cursor
+
+    first, cursor = run(refs, None)
+    assert first == [ref.key for ref in refs[:10]]
+
+    # A file uploaded between runs is read before the backfill carries on.
+    uploaded = ObjectRef(
+        key="file-new",
+        size=1,
+        last_modified=datetime.now(UTC) + timedelta(minutes=1),
+        etag="hash-new",
+        content_type_hint="text/plain",
     )
-    second = SandboxSource(_recipe("AUTOMATIC"), source_id="source-1")
-    try:
-        second_window = second._apply_sampling(iter(refs))
-        assert [ref.key for ref in first_window] == [ref.key for ref in refs[:10]]
-        assert [ref.key for ref in second_window] == [ref.key for ref in refs[10:]]
-        assert second.current_sampling_cursor() == {"objects": 0}
-    finally:
-        second.cleanup()
+    second, cursor = run([*refs, uploaded], cursor)
+    assert second == ["file-new", *[ref.key for ref in refs[10:]]]
+    assert cursor is not None and cursor["objects"]["done"] is True
+
+    # Everything has been read: the sweep does not wrap around and start over.
+    third, settled = run([*refs, uploaded], cursor)
+    assert third == []
+    assert settled == cursor
 
 
 @pytest.mark.asyncio

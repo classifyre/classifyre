@@ -269,6 +269,20 @@ export class SourceService {
     });
   }
 
+  /**
+   * Record the settings a source's cursor now stands for (see
+   * `computeSamplingFingerprint`). Reported by a run when it finishes.
+   */
+  async acknowledgeSamplingFingerprint(
+    sourceId: string,
+    fingerprint: string,
+  ): Promise<void> {
+    await this.prisma.source.updateMany({
+      where: { id: sourceId },
+      data: { samplingCursorFingerprint: fingerprint },
+    });
+  }
+
   async deleteSource(where: Prisma.SourceWhereUniqueInput): Promise<Source> {
     const existing = await this.prisma.source.findUnique({
       where,
@@ -362,7 +376,7 @@ export class SourceService {
   ): Promise<PurgeSourceAssetsResponseDto> {
     const source = await this.prisma.source.findUnique({
       where: { id: sourceId },
-      select: { id: true },
+      select: { id: true, type: true },
     });
     if (!source) {
       throw new NotFoundException(`Source with ID ${sourceId} not found`);
@@ -394,6 +408,17 @@ export class SourceService {
     const doomedIds = doomed.map((a) => a.id);
 
     const result = await this.prisma.asset.deleteMany({ where });
+
+    // The sweep's saved place says the purged ground has been read. It has,
+    // but what was read is gone, and a sweep that has finished would never go
+    // back for it. Start it over. A notebook source keeps its own state in
+    // the cursor and decides for itself what a purge means.
+    if (result.count > 0 && source.type !== AssetType.CUSTOM) {
+      await this.prisma.source.updateMany({
+        where: { id: sourceId },
+        data: { samplingCursor: Prisma.DbNull },
+      });
+    }
 
     let edgesRemoved = 0;
     for (const slice of chunkIds(doomedIds, PURGE_EDGE_CHUNK)) {
