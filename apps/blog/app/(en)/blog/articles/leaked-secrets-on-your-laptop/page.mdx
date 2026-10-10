@@ -1,0 +1,408 @@
+---
+title: "Your Laptop Remembers: How to Find Leaked Secrets in Screenshots, .env Files and Old Notes"
+description: An API key in a screenshot, a .env file in an abandoned side project, a text note full of passwords. A step-by-step walkthrough of finding every leaked secret on your own laptop with one Docker command, read-only, without anything leaving the machine.
+date: 2026-10-10T00:00:00.000Z
+tags:
+  - secrets
+  - security
+  - how-to
+  - investigations
+  - docker
+categories:
+  - Guides
+author: Classifyre Team
+image: /blog/assets/images/leaked-secrets-on-your-laptop.jpg
+keywords:
+  - find leaked secrets on laptop
+  - secret scanning local files
+  - API key in screenshot
+  - .env file secrets
+  - AWS access key leak
+  - open source secret scanner
+  - scan laptop for passwords
+  - OCR secret detection
+  - Docker secret scanner
+  - Classifyre
+alternates:
+  canonical: /blog/articles/leaked-secrets-on-your-laptop
+  languages:
+    en: /blog/articles/leaked-secrets-on-your-laptop/
+    de: /de/blog/articles/leaked-secrets-on-your-laptop/
+    x-default: /blog/articles/leaked-secrets-on-your-laptop/
+openGraph:
+  type: article
+  title: "Your Laptop Remembers: How to Find Leaked Secrets in Screenshots, .env Files and Old Notes"
+  description: An API key in a screenshot, a .env file in an abandoned side project, a text note full of passwords. Find every leaked secret on your own laptop with one Docker command, read-only.
+  url: /blog/articles/leaked-secrets-on-your-laptop
+  siteName: Classifyre
+  publishedTime: 2026-10-10T00:00:00.000Z
+  modifiedTime: 2026-10-10T00:00:00.000Z
+  authors:
+    - Classifyre Team
+  section: Guides
+  tags:
+    - secret scanning
+    - leaked credentials
+    - local files
+    - Docker
+  images:
+    - /blog/assets/images/leaked-secrets-on-your-laptop.jpg
+twitter:
+  card: summary_large_image
+  title: "Your Laptop Remembers: How to Find Leaked Secrets in Screenshots, .env Files and Old Notes"
+  description: Find every leaked secret on your own laptop with one Docker command, read-only, without anything leaving the machine.
+  images:
+    - /blog/assets/images/leaked-secrets-on-your-laptop.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/leaked-secrets-on-your-laptop.jpg"
+  eyebrow="Guide"
+  title="Your Laptop Remembers"
+  description="An API key in a screenshot, a .env file in an abandoned side project, a text note full of passwords. How to find every leaked secret on your own laptop, read-only, without anything leaving the machine."
+/>
+
+<ArticleJsonLd
+  headline="Your Laptop Remembers: How to Find Leaked Secrets in Screenshots, .env Files and Old Notes"
+  description="An API key in a screenshot, a .env file in an abandoned side project, a text note full of passwords. A step-by-step walkthrough of finding every leaked secret on your own laptop with one Docker command, read-only, without anything leaving the machine."
+  path="/blog/articles/leaked-secrets-on-your-laptop"
+  datePublished="2026-10-10T00:00:00.000Z"
+  dateModified="2026-10-10T00:00:00.000Z"
+  authorName="Classifyre Team"
+  articleSection="Guides"
+  about={[
+    "Secret scanning",
+    "Leaked credentials",
+    "API key exposure",
+    "Local file scanning",
+    "Investigation case management",
+  ]}
+  mentions={[
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://www.classifyre.com",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+/>
+
+<ArticleSideRail
+  title="Your Laptop Remembers"
+  path="/blog/articles/leaked-secrets-on-your-laptop/"
+  tags={["secrets", "security", "how-to", "investigations", "docker"]}
+  backHref="/blog/articles"
+  backLabel="All articles"
+/>
+
+A while ago you took a screenshot. There was an API key on the screen: the one
+moment a cloud console shows it to you, which is exactly why you took the
+picture.
+
+There is a `.env` file in a side project you stopped working on. And somewhere
+a text note with passwords you meant to move into a password manager.
+
+You forgot about all of it. Your laptop did not.
+
+![A laptop desktop with a Finder window showing a .env file in an abandoned side project, an open text note full of passwords, and a screenshot file on the desktop](/blog/assets/images/leaked-secrets-laptop-forgotten-env-file-and-password-note.webp)
+
+This is a walkthrough of finding those things on your own machine with
+Classifyre: one Docker command, your files mounted read-only, nothing uploaded
+anywhere. It takes about fifteen minutes of your attention. The scanning does
+the rest by itself.
+
+<Alert>
+  <AlertTitle>About the screenshots</AlertTitle>
+  <AlertDescription>
+    The laptop in these pictures is a staged one. Every key on it is a vendor's
+    documented example or an obvious placeholder, and the person it belongs to
+    does not exist. The product screens are the real ones.
+  </AlertDescription>
+</Alert>
+
+## What you end up with
+
+- **Every secret the detectors can see**, in every folder you point them at:
+  cloud keys, tokens, private keys, passwords in config files and notes,
+  including text that only exists inside an image.
+- **A standing question** that keeps answering after every scan: *where are
+  secrets leaked on my laptop?*
+- **A case board that fills itself**, and empties itself again as you clean up.
+
+---
+
+## 1. One command, and one extra line
+
+The quick start on [classifyre.com](https://www.classifyre.com) is a single
+`docker run`. Before you paste it, add one line: your home folder, mounted into
+the container **read-only**.
+
+```bash
+docker run -d --name classifyre \
+  -p 3000:3000 \
+  --shm-size=1g \
+  -v classifyre-pgdata:/var/lib/postgresql/data \
+  -v classifyre-data:/var/lib/classifyre \
+  -v classifyre-uv-cache:/cache/uv \
+  -v "$HOME:/my-laptop:ro" \
+  classifyre/all-in-one:latest
+```
+
+![A terminal with the docker run command for Classifyre, the home folder mount highlighted as read-only, and a diagram showing that Classifyre reads the home folder but cannot write to it and that everything stays on the machine](/blog/assets/images/classifyre-docker-run-home-folder-read-only-mount.webp)
+
+Two things are worth knowing about that line.
+
+**`:ro` is the filesystem's promise, not ours.** Classifyre only ever reads
+from a folder source. Mounting it read-only means that even a bug could not
+change, move or delete one of your files: the container has no way to write
+there.
+
+**Nothing leaves the laptop.** The image contains the app, its database and
+its scanner. It serves one port, `3000`, on your own machine. There is no
+account and no signup, and what the scans find is stored in a Docker volume
+next to your other containers.
+
+It needs Docker and about 4 GB of memory. On macOS, the system may ask whether
+Docker is allowed to read your Desktop, Documents and Downloads folders: say
+yes to the ones you want scanned. If mounting the whole home folder is more
+than you are comfortable with, mount only what you want looked at, for example
+`-v "$HOME/Desktop:/my-laptop/Desktop:ro"`. The
+[Docker guide](https://docs.classifyre.com/deployment/docker/) has the rest.
+
+## 2. A workspace, and the Desktop as its first source
+
+Open `http://localhost:3000` and create a workspace. A workspace is one
+investigation with its own sources, findings and cases; call it what it is.
+
+Then tell it where to look. Under **Sources**, choose **Add Source** and pick
+**Mounted Folder**. Most things end up on the Desktop sooner or later, so start
+there.
+
+![The Classifyre form for a new Mounted Folder source, named Desktop, with the path /my-laptop/Desktop being typed into the Path field](/blog/assets/images/classifyre-mounted-folder-source-path.webp)
+
+The path is the one thing people get wrong. It is the path **as the scan sees
+it**, inside the container, not as Finder shows it. You mounted your home
+folder at `/my-laptop`, so your Desktop is `/my-laptop/Desktop`.
+
+### Leave sampling and schedule on Automatic
+
+Both default to **Automatic**, and for a laptop that is the right answer.
+
+![The sampling and ingestion schedule cards of a Classifyre source, both set to Automatic, next to a diagram of thirty files being read one slice of six per scan, newest first, until all are covered](/blog/assets/images/classifyre-automatic-sampling-one-slice-per-scan.webp)
+
+[Automatic sampling](https://docs.classifyre.com/sources/sampling/) reads one
+bounded slice per scan instead of everything at once. The first scan takes the
+newest files; each one after that takes whatever is new first and then works
+backwards through what it has not seen. Once it has been all the way through,
+it stops going over old ground and only reads what is new.
+
+The automatic schedule runs those scans back to back while each one still
+brings in new data, then widens the gap by itself, up to once a day. In
+practice: the laptop stays usable while the first pass runs, and afterwards you
+do not notice it at all.
+
+### Switch on two pre-built detectors
+
+You do not write any rules.
+[Pre-built detectors](https://docs.classifyre.com/detectors/pre-built/) ship
+with the image. For this job, two are enough:
+
+- **Secrets**, with every pattern enabled: AWS, GitHub, Stripe, Slack, OpenAI,
+  private keys, JSON Web Tokens, basic-auth URLs, high-entropy strings,
+  password keywords, and about twenty more.
+- **YARA**, for files that look like malware. Unrelated to secrets, cheap to
+  run, and a laptop's Downloads folder is where you would want it.
+
+![The Secrets detector switched on in a Classifyre source, with the Enterprise Full Sweep preset and all enabled patterns such as aws, github, private key, slack and stripe](/blog/assets/images/classifyre-secrets-detector-enabled-patterns.webp)
+
+Press **Save & Scan**. Then go and get a coffee: there is nothing to do until
+the first scans report.
+
+## 3. The first finding is not in code
+
+When you come back, the Desktop source has run a few scans and the **Findings**
+page has something to say. Findings are ranked, so the one that matters most is
+on top.
+
+![The Classifyre findings table listing twelve secrets found on the Desktop, ranked by importance, starting with an AWS access key found in a screenshot](/blog/assets/images/classifyre-findings-leaked-secrets-on-desktop.webp)
+
+Here it is an **AWS access key**. Not in a repository, not in a config file. In
+a screenshot.
+
+![A Classifyre finding detail page for an AWS access key: the screenshot it was found in, the matched key, and metadata showing the asset is an image whose text was read with OCR](/blog/assets/images/classifyre-aws-access-key-found-in-screenshot.webp)
+
+Classifyre [reads the text inside images](https://docs.classifyre.com/sources/content-extraction/)
+before the detectors run. To a file browser, a screenshot of a cloud console is
+`Screenshot 2024-03-14 at 09.41.12.png`. To the Secrets detector it is two
+lines of text, and one of them is a credential.
+
+This is the finding that changes the question. If a key is sitting in a
+picture on the Desktop, the interesting thing is no longer this key.
+
+It is: **where else?**
+
+## 4. Turn the question into an inquiry watch
+
+In Classifyre a standing question is called an
+[inquiry watch](https://docs.classifyre.com/investigations/inquiry/): a saved
+query over your findings that keeps matching as new scans land.
+
+Under **Investigations**, create a **New inquiry watch**. Give it the question
+as its name, *Where are secrets leaked on my laptop?*, and choose the
+**Secrets** detector. Leave the sources on *All sources*: that is the point.
+
+![The preview of a new Classifyre inquiry watch showing twelve findings that match right now, each with its type, severity, matched value and file, all from the Desktop](/blog/assets/images/classifyre-inquiry-watch-preview-leaked-secrets.webp)
+
+The preview answers before you save anything. On the staged laptop: twelve
+leaked secrets, on the Desktop alone.
+
+Save it. From now on the watch re-answers after every scan, of every source,
+including the ones you have not added yet.
+
+## 5. Open a case that keeps itself
+
+A watch needs somewhere to report to. Open a
+[case](https://docs.classifyre.com/investigations/cases/), link the watch as
+its driving watch, and switch on **Keep this case topped up**: later scans then
+add the watch's new answers to the case by themselves.
+
+Then scroll to **Automatic clean-up** and switch on two rules:
+
+- **Remove findings that disappear.** A finding a scan no longer detects, or
+  one whose file was deleted, leaves the case.
+- **Remove resolved findings.** A finding marked resolved leaves the case.
+
+![The Automatic clean-up section of a new Classifyre case, with the rules Remove findings that disappear and Remove resolved findings switched on](/blog/assets/images/classifyre-case-automatic-clean-up.webp)
+
+Both are off by default, on purpose: a case that drops its own evidence is a
+surprise unless you asked for it. Here you are asking for it. The case is a
+to-do list, and a to-do list should get shorter when the work is done.
+Whatever leaves is written on the case's timeline: which finding, and why.
+
+## 6. Write the hypothesis down
+
+Every case opens on its board: the files as circles, the findings in them as
+smaller circles in their severity's colour.
+
+Add a hypothesis and write down what you actually suspect: *Secrets are leaked
+beyond the Desktop.* Then, in the **Watches** panel, add a
+[hypothesis rule](https://docs.classifyre.com/investigations/cases/hypothesis-rules/):
+everything this watch finds goes to that hypothesis, as **supporting**
+evidence.
+
+![A Classifyre case board with the hypothesis "Secrets are leaked beyond the Desktop" linked by green supporting lines to twelve findings in eleven files, and the Watches panel showing the rule that links all answers of the watch to the hypothesis](/blog/assets/images/classifyre-case-board-hypothesis-supporting-evidence.webp)
+
+Nobody drags anything. Each answer the watch brings in is linked to the
+hypothesis the moment it arrives, and lands next to it on the board.
+
+To test the hypothesis, give it something to be wrong about. Add three more
+Mounted Folder sources, `/my-laptop/Documents`, `/my-laptop/Downloads` and the
+folder your projects live in, with the same two detectors. Then leave the
+laptop running and go to bed.
+
+## 7. The next morning
+
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  className="my-6 w-full border-2 border-border"
+  src="/blog/assets/videos/classifyre-case-board-grows-overnight.mp4"
+  aria-label="The case board growing overnight as evidence from Documents, Downloads and Projects arrives"
+/>
+
+Nobody touched the board, and it grew. On the staged laptop: 38 files, 47
+findings, every one of them already linked to the hypothesis.
+
+![A Classifyre case board the next morning with 38 files and 47 findings in four groups labelled Desktop, Documents, Downloads and Projects, all linked to one hypothesis](/blog/assets/images/classifyre-case-board-next-morning-47-findings.webp)
+
+The folder labels in the picture are ours, for the article; the board places
+new evidence to the right of the hypothesis, in the order it arrives. What it
+found is the kind of thing every working laptop has:
+
+| Where | What |
+| --- | --- |
+| An old infrastructure project | Two AWS access keys in a `credentials` file |
+| An abandoned side project's `.env` | A database password, a Stripe key, an OpenAI token |
+| A text note in Documents | The login for the dentist's portal, the code for the bike lock |
+| Downloads | A service-account key, a `credentials.csv` exported once and never deleted |
+
+![A close-up of the Classifyre case board showing the file budget-bot/.env with three findings: a secret keyword for a database password, a Stripe access key and an OpenAI token](/blog/assets/images/classifyre-case-board-env-file-findings.webp)
+
+The hypothesis holds. More usefully, you now know exactly where everything is:
+which file, which line, which kind of secret, and how bad.
+
+## 8. Clean up, and watch the board get smaller
+
+The next part is yours, and no tool should do it for you.
+
+1. **Rotate the keys.** A key that has been sitting in a file for two years is
+   compromised as far as you can prove. Create a new one, delete the old one.
+2. **Delete the files** you no longer need: the screenshot, the exported CSV,
+   the `.env` of the project you are never going back to.
+3. **Move the passwords** somewhere they belong. A password manager, not a
+   text file.
+
+Then do nothing. The next scan notices the files are gone, the findings
+resolve, and the case, which you told to let go of what is resolved, lets them
+go.
+
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  className="my-6 w-full border-2 border-border"
+  src="/blog/assets/videos/classifyre-case-board-shrinks-after-clean-up.mp4"
+  aria-label="Findings on the case board resolving and leaving after the files were cleaned up"
+/>
+
+The watch stays on. Weeks later, when a new credentials file lands in
+Downloads, it does not wait for you to remember any of this:
+
+![A Classifyre case board after the clean-up: one hypothesis and a single new file, aws-cli-setup.txt, with a new AWS access key finding that the watch added by itself](/blog/assets/images/classifyre-watch-catches-new-secret-after-clean-up.webp)
+
+## What this does not do
+
+A walkthrough like this is only useful if it is honest about its edges.
+
+- **It does not rotate keys or delete files.** Read-only means read-only.
+  Finding is the tool's job; deciding is yours.
+- **It finds what its patterns can see.** A cloud key has a recognisable shape.
+  A four-digit code on a line by itself does not; it is found when the line
+  says what it is (`password:`, `secret=`), or when you add a
+  [custom detector](https://docs.classifyre.com/detectors/custom-detectors/)
+  for your own formats.
+- **A finding is not a verdict.** High-entropy strings are sometimes just
+  checksums. That is what the review on the board is for.
+- **It scans while the laptop is awake.** A sleeping laptop pauses Docker.
+  Automatic sampling simply carries on where it stopped.
+
+## Start with your Desktop
+
+One command, on your own machine:
+
+```bash
+docker run -d --name classifyre \
+  -p 3000:3000 --shm-size=1g \
+  -v classifyre-pgdata:/var/lib/postgresql/data \
+  -v classifyre-data:/var/lib/classifyre \
+  -v classifyre-uv-cache:/cache/uv \
+  -v "$HOME:/my-laptop:ro" \
+  classifyre/all-in-one:latest
+```
+
+And when one laptop is not enough, a team's shared drive, a file server, the
+buckets nobody has looked into since the migration, the same Classifyre runs on
+a cluster with the same sources, detectors, watches and cases.
+
+<Button asChild size="lg">
+  <a href="/get">Get Classifyre</a>
+</Button>
+
+<RelatedCasePosts
+  section="articles"
+  currentPath="/blog/articles/leaked-secrets-on-your-laptop"
+  heading="More from the blog"
+/>
