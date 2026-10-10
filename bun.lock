@@ -17,7 +17,7 @@
     },
     "apps/api": {
       "name": "@classifyre/api",
-      "version": "0.6.4-SNAPSHOT",
+      "version": "0.6.9-SNAPSHOT",
       "dependencies": {
         "@ai-sdk/openai-compatible": "^3.0.11",
         "@anthropic-ai/sdk": "^0.117.1",
@@ -105,7 +105,7 @@
     },
     "apps/blog": {
       "name": "@classifyre/blog",
-      "version": "0.6.4-SNAPSHOT",
+      "version": "0.6.9-SNAPSHOT",
       "dependencies": {
         "@workspace/schemas": "workspace:*",
         "@workspace/ui": "workspace:*",
@@ -134,11 +134,11 @@
     },
     "apps/cli": {
       "name": "@classifyre/cli",
-      "version": "0.6.4-SNAPSHOT",
+      "version": "0.6.9-SNAPSHOT",
     },
     "apps/docs": {
       "name": "@classifyre/docs",
-      "version": "0.6.4-SNAPSHOT",
+      "version": "0.6.9-SNAPSHOT",
       "dependencies": {
         "@theguild/remark-mermaid": "^0.3.0",
         "@workspace/case-board": "workspace:*",
@@ -185,7 +185,9 @@
         "@remotion/google-fonts": "4.0.532",
         "@remotion/tailwind-v4": "4.0.532",
         "@remotion/transitions": "4.0.532",
+        "@workspace/case-board": "workspace:*",
         "@workspace/ui": "workspace:*",
+        "@xyflow/react": "^12.12.0",
         "lucide-react": "^1.7.0",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
@@ -205,7 +207,7 @@
     },
     "apps/web": {
       "name": "@classifyre/web",
-      "version": "0.6.4-SNAPSHOT",
+      "version": "0.6.9-SNAPSHOT",
       "dependencies": {
         "@hookform/resolvers": "^5.2.2",
         "@monaco-editor/react": "^4.7.0",
@@ -267,7 +269,7 @@
     },
     "packages/api-client": {
       "name": "@workspace/api-client",
-      "version": "0.6.4-SNAPSHOT",
+      "version": "0.6.9-SNAPSHOT",
       "devDependencies": {
         "@openapitools/openapi-generator-cli": "2.40.1",
         "@types/jest": "^30.0.0",
@@ -299,7 +301,7 @@
     },
     "packages/devops": {
       "name": "@workspace/devops",
-      "version": "0.6.4-SNAPSHOT",
+      "version": "0.6.9-SNAPSHOT",
     },
     "packages/eslint-config": {
       "name": "@workspace/eslint-config",
@@ -323,7 +325,7 @@
     },
     "packages/schemas": {
       "name": "@workspace/schemas",
-      "version": "0.6.4-SNAPSHOT",
+      "version": "0.6.9-SNAPSHOT",
       "dependencies": {
         "zod": "^4.3.6",
       },
@@ -4778,6 +4780,10 @@
     "@vitejs/plugin-react/vite": ["vite@6.4.3", "", { "dependencies": { "esbuild": "^0.25.0", "fdir": "^6.4.4", "picomatch": "^4.0.2", "postcss": "^8.5.3", "rollup": "^4.34.9", "tinyglobby": "^0.2.13" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^18.0.0 || ^20.0.0 || >=22.0.0", "jiti": ">=1.21.0", "less": "*", "lightningcss": "^1.21.0", "sass": "*", "sass-embedded": "*", "stylus": "*", "sugarss": "*", "terser": "^5.16.0", "tsx": "^4.8.1", "yaml": "^2.4.2" }, "optionalPeers": ["@types/node", "jiti", "less", "lightningcss", "sass", "sass-embedded", "stylus", "sugarss", "terser", "tsx", "yaml"], "bin": { "vite": "bin/vite.js" } }, "sha512-NTKlcQjlAK7MlQoyb6LgaqHc8sso/pVyUJYWMws3jg21uTJw/LddqIFPcPqP6PzpgbIcZyKI85sFE4HBrQDA8A=="],
 
     "@workspace/api-client/@openapitools/openapi-generator-cli": ["@openapitools/openapi-generator-cli@2.40.1", "", { "dependencies": { "@inquirer/select": "1.3.3", "@nestjs/axios": "4.0.1", "@nestjs/common": "11.1.28", "@nestjs/core": "11.1.28", "@nuxtjs/opencollective": "0.3.2", "axios": "^1.18.1", "chalk": "4.1.2", "commander": "8.3.0", "compare-versions": "6.1.1", "concurrently": "^10.0.3", "console.table": "0.10.0", "fs-extra": "11.4.0", "glob": "13.0.6", "proxy-agent": "8.0.2", "reflect-metadata": "0.2.2", "rxjs": "7.8.2", "tslib": "2.8.1" }, "bin": { "openapi-generator-cli": "main.js" } }, "sha512-cZsMY3DhFduUlTL9a0L0h4MKNGBvIutxuZSTGTyeUgKbmYeAdrfyRYdGaPtdO3lCcuu3pDs6v9stuZFGkYbe9w=="],
+
+    "@workspace/schemas/zod": ["zod@4.5.4", "", {}, "sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA=="],
+
+    "@workspace/ui/zod": ["zod@4.5.4", "", {}, "sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA=="],
 
     "@xyflow/react/zustand": ["zustand@4.5.7", "", { "dependencies": { "use-sync-external-store": "^1.2.2" }, "peerDependencies": { "@types/react": ">=16.8", "immer": ">=9.0.6", "react": ">=16.8" }, "optionalPeers": ["@types/react", "immer", "react"] }, "sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw=="],
 

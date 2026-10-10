@@ -3650,25 +3650,7 @@
           "readOnly": false,
           "destructive": true,
           "idempotent": true,
-          "parameters": [
-            {
-              "name": "caseId",
-              "type": "string",
-              "required": true,
-              "format": "uuid"
-            },
-            {
-              "name": "baseVersion",
-              "type": "integer",
-              "required": false,
-              "description": "board.version you read; defaults to the current version"
-            },
-            {
-              "name": "ops",
-              "type": "unknown[]",
-              "required": true
-            }
-          ]
+          "parameters": []
         },
         {
           "name": "place_case_board_items",
