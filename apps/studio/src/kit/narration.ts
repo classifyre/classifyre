@@ -38,6 +38,14 @@ export interface VoiceSpec {
   model: string;
   voice: string;
   instructions: string;
+  /**
+   * The longest a silence inside a clip may be, in seconds. A speech model
+   * leaves up to a second between sentences, which a film cut to the voice
+   * then sits through; with this set, `tools/voice.ts` shortens every longer
+   * silence to about this much. A longer pause stays a little longer than a
+   * shorter one, so the captions can still tell a full stop from a comma.
+   */
+  maxPause?: number;
 }
 
 export interface LineCue<Id extends string = string> {
