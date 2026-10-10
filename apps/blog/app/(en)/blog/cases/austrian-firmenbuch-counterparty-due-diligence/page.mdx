@@ -29,7 +29,7 @@ openGraph:
   url: /blog/cases/austrian-firmenbuch-counterparty-due-diligence
   siteName: Classifyre
   publishedTime: 2026-09-08T00:00:00.000Z
-  modifiedTime: 2026-10-07T00:00:00.000Z
+  modifiedTime: 2026-10-10T00:00:00.000Z
   authors:
     - Banandre
   section: Field Notes
@@ -60,7 +60,7 @@ twitter:
   description="Three cases on Austria's company register that add and drop companies on their own as filings arrive: early warning for insolvency, registrations without a business, and growth worth a closer look."
   path="/blog/cases/austrian-firmenbuch-counterparty-due-diligence"
   datePublished="2026-09-08T00:00:00.000Z"
-  dateModified="2026-10-07T00:00:00.000Z"
+  dateModified="2026-10-10T00:00:00.000Z"
   authorName="Banandre"
   articleSection="Field Notes"
   about={[
@@ -120,9 +120,30 @@ stop saying so.
 > themselves. Every flag is a register fact or a filed figure, and every flag
 > says what it cannot know.
 
-The numbers in this article are a snapshot from the first hours of the live
-run. The live workspace is further along by the time you read this, and that is
-the point.
+The numbers in this article come from two days. The opening is the first
+seven hours of the live run, on 7 October. Everything else was counted on
+**10 October 2026**, four days in, when the workspace held **89,274 records**
+and the three cases had taken in **929 answers** by themselves. The live
+workspace is further along by the time you read this, and that is the point.
+
+## The same story as a film
+
+*Before you sign* is this workspace told in six and a half minutes, from the
+question a supplier, a landlord or a bank asks first: who am I about to sign
+with?
+
+![Title card of the film Before you sign: a contract and a register extract on a dark table, with the title set over them](/blog/assets/images/before-you-sign-counterparty-due-diligence-film.webp)
+
+<Alert>
+  <AlertTitle>About the pictures</AlertTitle>
+  <AlertDescription>
+    The pictures in this article are stills from the film. Every company named
+    in them is invented, with an invented register number and invented figures,
+    and each name was searched in the official register and matched nothing.
+    The product screens, the rules, the counts and the hypothesis results are
+    real.
+  </AlertDescription>
+</Alert>
 
 ## Why we built it a second time
 
@@ -180,6 +201,8 @@ One Austrian company in five shows negative equity in a given year, often
 because its owners finance it with loans. So negative equity alone is not what
 the rules look for. They look for **direction**.
 
+![A sheet of fifty slips, one a company, eleven of them marked with a minus sign, next to the count: of 584 companies with negative equity and real debts, 289 are stable or recovering and 295 are getting worse](/blog/assets/images/negative-equity-half-stable-half-getting-worse.webp)
+
 ## Rules you can read
 
 Every rule fits on a page and says what it assumes. The early-warning rule, in
@@ -218,11 +241,13 @@ The other detectors read the register the same way:
   lookup**, and one that links every company number and officer named anywhere
   to the same page.
 
-In that first run, among **914 financial profiles**, the rules had flagged 42
-companies as acute risk, 17 as newly over-indebted, 30 as needing
-reorganisation and 45 as persistently over-indebted. Twelve companies were
-promising and 17 more on the growth watch. Among the register records, 17 were
-suspected shells and 34 more were on the watch.
+On 10 October, among **5,198 financial profiles**, the rules had flagged 208
+companies as acute risk, 87 as newly over-indebted, 180 as needing
+reorganisation and 289 as persistently over-indebted. Eighty-two companies were
+promising and 103 more on the growth watch. Among 14,499 active companies on
+the register records, 152 were suspected shells and 203 more were on the watch.
+
+![The score sheet of the substance check for an invented company: no accounts on file although due, three points; its only manager runs five or more companies, two points; five points in all, stamped suspected shell](/blog/assets/images/substance-check-points-suspected-shell.webp)
 
 ## Three cases that keep themselves
 
@@ -246,8 +271,18 @@ the question, with **auto-add** switched on, and every new answer is taken in.
 for it takes the company off by itself. The timeline says why: *finding gone,
 retired by the scan*.
 
-The early-warning case held **122 records** on the board at that point, the
-shell case 16 and the promising case 12.
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  className="my-6 w-full border-2 border-border"
+  src="/blog/assets/videos/classifyre-case-lets-a-company-leave.mp4"
+  aria-label="The board of the suspected-shell case: an invented company files its accounts, its finding goes, the company leaves the board and the timeline records one finding taken out by the scan"
+/>
+
+On 10 October the early-warning case held **748 records** on the board, the
+shell case 152 and the promising case 82.
 
 ### The board arranges itself around the theories
 
@@ -264,32 +299,40 @@ heap, and the balance of evidence on each hypothesis moves by itself as the
 scans go. The rule belongs to the case, not to the watch, so another case can
 read the same watch differently. [How it works](https://docs.classifyre.com/investigations/cases/hypothesis-rules/).
 
+![The board of the early-warning case: a frame for the hypothesis "A second year of falling negative equity ends before the insolvency court", with four invented companies' findings linked to it, and the film's tally of 295 companies at risk of which 21 are also before the court](/blog/assets/images/classifyre-case-board-hypothesis-insolvency-court.webp)
+
 ### What the hypotheses say, today
 
-We stated nine, and re-tested each against the corpus at the end of those first hours. Some of the
-results are the point of having them.
+We stated nine, and counted each again on 10 October. Some of the results are
+the point of having them.
 
-- **"Negative equity alone is not a warning."** Of 104 companies with negative
-  equity and material debts, 45 (43%) are stable or recovering and 59 are
-  getting worse. A rule that flagged every negative balance sheet would raise
-  the alarm about 43% too many companies. That is why the rules compare years.
-- **"Companies in trouble file their accounts late."** 18 of 89 companies with
-  a distress finding filed late at least once (20%), against 84 of 825 other
-  profiled companies (10%): twice as often.
-- **"A shared address on its own does not mark a shell."** Ten active companies
-  sit at an address shared by five or more. None of them is a suspected shell.
-  A business park or a formation agent looks the same from the register.
-- **"A second year of falling equity ends before the insolvency court."** Only
-  4 of the 59 companies at acute risk are already before a court. We say so
-  plainly: accounts reach the register up to 21 months after the year they
-  describe, so the court is often faster than the balance sheet, and a small
-  count is not a verdict.
-- **"Two good years are followed by a third."** Only one company has four
-  consecutive years on file so far, which is what the test needs. It is too
-  early to say, and the case says that too.
+- **"Negative equity alone is not a warning."** Of 584 companies with negative
+  equity and material debts, 289 are stable or recovering and 295 are getting
+  worse. A rule that flagged every negative balance sheet would raise the alarm
+  about twice as many companies as it should. That is why the rules compare
+  years.
+- **"A second year of falling equity ends before the insolvency court."** Of
+  the 295 companies at risk on their accounts, 21 are also before a court. And
+  363 companies are before a court in all, so 342 of them are there without
+  that warning. Accounts are due nine months after the year they describe, so
+  the court is often faster than the balance sheet. For anyone checking a
+  counterparty the consequence is plain: read the accounts *and* the court
+  notices.
+- **"A shared address on its own does not mark a shell."** 365 active
+  companies sit at an address shared by five or more. Seven of them are
+  suspected shells. A business park or a formation agent looks the same from
+  the register.
+- **"Companies in trouble file their accounts late."** 58 of 475 companies with
+  a distress finding filed late at least once (12%), against 359 of 4,723 other
+  profiled companies (8%). In the first hours this looked like twice as often;
+  with ten times the companies it is one and a half times.
+- **"Two good years are followed by a third."** 92 companies now have four
+  consecutive years on file. Eight of them grew twice, and three of those grew
+  a third time. It is too early to say, and the case says that too.
 
 A hypothesis here carries the sentence that tests it, the counts, and the date
-it was tested. When the register has been walked further, the tallies move.
+it was tested. The notes stored on the live cases are older than these counts;
+when the build is run again they are replaced, and the tallies move.
 
 ## It is living
 
@@ -324,20 +367,22 @@ Every finding means a concept. A question is asked by concept, not by string, so
 *"over-indebted"*, *Überschuldung* and the register's own code find the same
 records. And companies and people are **entities**: a mention of a company
 number or an officer, in any source, lands on that company's or person's page.
-By then the workspace knew 2,275 companies and 3,069 people.
+On 10 October the workspace knew 15,260 companies and 19,400 people.
+
+![A board with four slips from four sources, each naming the same invented register number, tied by threads to one entity card for the company](/blog/assets/images/company-number-four-sources-one-entity.webp)
 
 ## What it will not claim
 
 A tool that implies more than it has is worse than one that admits less.
 
-**No profit and no revenue for most companies.** Small companies under § 242
+**No profit and no revenue for most companies.** Small companies under § 278
 UGB are not required to publish a profit and loss account. Growth here is read
 from the balance sheet across years, and the *"year's result"* is the change in
 accumulated profit.
 
 **A refusal is a finding, not a silence.** The trade-licence register refuses
 per-company lookups to our key. Instead of dropping that into a log, each
-refusal is recorded: 596 companies carry a *trade licence unknown* finding, so
+refusal is recorded: 5,050 lookups carry a *trade licence unknown* finding, so
 no case can read "no licence" into "we were not allowed to ask".
 
 **The register is only partly walked.** For any company the honest answer is
@@ -348,8 +393,9 @@ insolvency: whether a company can carry on is a forecast no filing contains.
 The promising list is a shortlist, not advice: the register does not say who
 owns a company, whether it is for sale, or who its customers are.
 
-**Nothing in this article names a company**, and nothing in the workspace
-accuses one. A flag is built from public filings and can be wrong.
+**Nothing in this article names a real company**, and nothing in the workspace
+accuses one. The companies named in the film and in its stills are invented. A
+flag is built from public filings and can be wrong.
 
 ## How it was built
 

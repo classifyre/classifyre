@@ -33,7 +33,7 @@ openGraph:
   url: /de/blog/cases/austrian-firmenbuch-counterparty-due-diligence
   siteName: Classifyre
   publishedTime: 2026-09-08T00:00:00.000Z
-  modifiedTime: 2026-10-07T00:00:00.000Z
+  modifiedTime: 2026-10-10T00:00:00.000Z
   authors:
     - Banandre
   section: Field Notes
@@ -64,7 +64,7 @@ twitter:
   description="Drei Fälle im österreichischen Firmenbuch, die Firmen von selbst aufnehmen und wieder abgeben, sobald Abschlüsse eintreffen: Frühwarnung vor Insolvenz, Eintragungen ohne Geschäftsbetrieb und Wachstum, das einen genaueren Blick lohnt."
   path="/de/blog/cases/austrian-firmenbuch-counterparty-due-diligence"
   datePublished="2026-09-08T00:00:00.000Z"
-  dateModified="2026-10-07T00:00:00.000Z"
+  dateModified="2026-10-10T00:00:00.000Z"
   authorName="Banandre"
   articleSection="Field Notes"
   about={[
@@ -127,9 +127,32 @@ geht, wenn sie es nicht mehr sagen.
 > Registertatsache oder eine eingereichte Zahl, und jede sagt dazu, was sie
 > nicht wissen kann.
 
-Die Zahlen in diesem Artikel sind eine Momentaufnahme aus den ersten Stunden
-des Live-Laufs. Der Live-Arbeitsbereich
-ist weiter, wenn Sie das lesen, und genau das ist der Punkt.
+Die Zahlen in diesem Artikel stammen von zwei Tagen. Der Einstieg beschreibt
+die ersten sieben Stunden des Live-Laufs am 7. Oktober. Alles andere wurde am
+**10. Oktober 2026** gezählt, vier Tage später: Da hielt der Arbeitsbereich
+**89.274 Datensätze**, und die drei Fälle hatten **929 Antworten** von selbst
+übernommen. Der Live-Arbeitsbereich ist weiter, wenn Sie das lesen, und genau
+das ist der Punkt.
+
+## Dieselbe Geschichte als Film
+
+*Before you sign* erzählt diesen Arbeitsbereich in sechseinhalb Minuten, von
+der Frage aus, die ein Lieferant, ein Vermieter oder eine Bank zuerst stellt:
+Mit wem unterschreibe ich da eigentlich? Der Film ist auf Englisch, mit
+deutschen Untertiteln.
+
+![Titelbild des Films Before you sign: ein Vertrag und ein Firmenbuchauszug auf einem dunklen Tisch, darüber der Titel](/blog/assets/images/before-you-sign-counterparty-due-diligence-film.webp)
+
+<Alert>
+  <AlertTitle>Zu den Bildern</AlertTitle>
+  <AlertDescription>
+    Die Bilder in diesem Artikel sind Standbilder aus dem Film. Jede darin
+    genannte Firma ist erfunden, samt Firmenbuchnummer und Zahlen, und jeder
+    Name wurde im Firmenbuch gesucht und ergab keinen Treffer. Die
+    Produktansichten, die Regeln, die Zählungen und die Ergebnisse der
+    Hypothesen sind echt.
+  </AlertDescription>
+</Alert>
 
 ## Warum wir ihn ein zweites Mal gebaut haben
 
@@ -191,6 +214,8 @@ Eigenkapital aus, oft weil die Eigentümer sie mit Darlehen finanzieren. Negativ
 Eigenkapital allein ist deshalb nicht das, wonach die Regeln suchen. Sie suchen
 die **Richtung**.
 
+![Ein Blatt mit fünfzig Zetteln, je einer pro Firma, elf davon mit einem Minus, daneben die Zählung: Von 584 Firmen mit negativem Eigenkapital und echten Schulden sind 289 stabil oder erholen sich, 295 verschlechtern sich](/blog/assets/images/negative-equity-half-stable-half-getting-worse.webp)
+
 ## Regeln, die man lesen kann
 
 Jede Regel passt auf eine Seite und sagt, was sie voraussetzt. Die
@@ -231,11 +256,14 @@ Die übrigen Detektoren lesen das Register auf dieselbe Weise:
   **Abfrage der Gewerbeberechtigung** und einer, der jede irgendwo genannte
   Firmenbuchnummer und jede Funktionsperson auf dieselbe Seite führt.
 
-In diesem ersten Lauf hatten die Regeln unter **914 Finanzprofilen** 42 Firmen mit
-akutem Risiko markiert, 17 als neu überschuldet, 30 mit Reorganisationsbedarf
-und 45 als anhaltend überschuldet. Zwölf Firmen waren vielversprechend und
-17 weitere auf der Wachstums-Beobachtung. Unter den Registerdatensätzen waren
-17 mutmaßliche Scheinfirmen und 34 weitere auf der Beobachtungsliste.
+Am 10. Oktober hatten die Regeln unter **5.198 Finanzprofilen** 208 Firmen mit
+akutem Risiko markiert, 87 als neu überschuldet, 180 mit Reorganisationsbedarf
+und 289 als anhaltend überschuldet. 82 Firmen waren vielversprechend und
+103 weitere auf der Wachstums-Beobachtung. Unter 14.499 aktiven Firmen in den
+Registerdatensätzen waren 152 mutmaßliche Scheinfirmen und 203 weitere auf der
+Beobachtungsliste.
+
+![Das Punkteblatt der Substanzprüfung für eine erfundene Firma: kein Jahresabschluss im Akt, obwohl fällig, drei Punkte; ihr einziger Geschäftsführer führt fünf oder mehr Firmen, zwei Punkte; zusammen fünf Punkte, gestempelt als mutmaßliche Scheinfirma](/blog/assets/images/substance-check-points-suspected-shell.webp)
 
 ## Drei Fälle, die sich selbst führen
 
@@ -261,8 +289,18 @@ jede neue Antwort wird übernommen.
 Fall, der ihn wollte, die Firma von selbst heraus. Die Zeitleiste sagt, warum:
 *Befund weg, vom Scan zurückgezogen*.
 
-Der Frühwarn-Fall hielt zu diesem Zeitpunkt **122 Datensätze** auf dem Board, der
-Scheinfirmen-Fall 16 und der Fall der vielversprechenden Firmen 12.
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  className="my-6 w-full border-2 border-border"
+  src="/blog/assets/videos/classifyre-case-lets-a-company-leave.mp4"
+  aria-label="Das Board des Scheinfirmen-Falls: Eine erfundene Firma reicht ihren Jahresabschluss ein, ihr Befund verschwindet, die Firma verlässt das Board, und die Zeitleiste hält fest, dass der Scan einen Befund herausgenommen hat"
+/>
+
+Am 10. Oktober hielt der Frühwarn-Fall **748 Datensätze** auf dem Board, der
+Scheinfirmen-Fall 152 und der Fall der vielversprechenden Firmen 82.
 
 ### Das Board ordnet sich um die Theorien
 
@@ -279,34 +317,41 @@ während die Scans laufen. Die Regel gehört dem Fall, nicht der Watch, ein
 anderer Fall kann dieselbe Watch also anders lesen.
 [So funktioniert es](https://docs.classifyre.com/investigations/cases/hypothesis-rules/).
 
+![Das Board des Frühwarn-Falls: ein Rahmen für die Hypothese, dass ein zweites Jahr fallenden Eigenkapitals vor dem Insolvenzgericht endet, mit den Befunden von vier erfundenen Firmen, daneben die Zählung des Films: 295 gefährdete Firmen, davon 21 auch vor dem Gericht](/blog/assets/images/classifyre-case-board-hypothesis-insolvency-court.webp)
+
 ### Was die Hypothesen heute sagen
 
-Wir haben neun formuliert und am Ende dieser ersten Stunden jede gegen den Bestand neu geprüft.
-Manche Ergebnisse sind der Grund, überhaupt Hypothesen zu haben.
+Wir haben neun formuliert und jede am 10. Oktober neu gezählt. Manche
+Ergebnisse sind der Grund, überhaupt Hypothesen zu haben.
 
-- **„Negatives Eigenkapital allein ist keine Warnung.“** Von 104 Firmen mit
-  negativem Eigenkapital und wesentlichen Schulden sind 45 (43 %) stabil oder
-  erholen sich, 59 verschlechtern sich. Eine Regel, die jede negative Bilanz
-  meldet, würde bei 43 % zu vielen Firmen Alarm schlagen. Deshalb vergleichen
-  die Regeln Jahre.
-- **„Firmen in Schwierigkeiten reichen ihre Abschlüsse spät ein.“** 18 von 89
-  Firmen mit einem Krisenbefund reichten mindestens einmal verspätet ein (20 %),
-  gegenüber 84 von 825 übrigen Firmen mit Finanzprofil (10 %): doppelt so oft.
-- **„Eine gemeinsame Adresse allein macht keine Scheinfirma.“** Zehn aktive
-  Firmen sitzen an einer Adresse, die fünf oder mehr teilen. Keine davon ist eine
-  mutmaßliche Scheinfirma. Ein Büropark oder ein Gründungsdienstleister sieht im
-  Register genauso aus.
+- **„Negatives Eigenkapital allein ist keine Warnung.“** Von 584 Firmen mit
+  negativem Eigenkapital und wesentlichen Schulden sind 289 stabil oder erholen
+  sich, 295 verschlechtern sich. Eine Regel, die jede negative Bilanz meldet,
+  würde bei etwa doppelt so vielen Firmen Alarm schlagen, wie sie sollte.
+  Deshalb vergleichen die Regeln Jahre.
 - **„Ein zweites Jahr fallenden Eigenkapitals endet vor dem Insolvenzgericht.“**
-  Nur 4 der 59 Firmen mit akutem Risiko stehen schon vor einem Gericht. Das
-  sagen wir offen: Abschlüsse erreichen das Register bis zu 21 Monate nach dem
-  Jahr, das sie beschreiben, das Gericht ist also oft schneller als die Bilanz,
-  und eine kleine Zahl ist kein Urteil.
-- **„Auf zwei gute Jahre folgt ein drittes.“** Erst eine Firma hat vier
-  aufeinanderfolgende Jahre im Bestand, was der Test braucht. Für ein Urteil ist
-  es zu früh, und der Fall sagt auch das.
+  Von den 295 nach ihren Abschlüssen gefährdeten Firmen stehen 21 auch vor
+  einem Gericht. Insgesamt stehen 363 Firmen vor einem Gericht, 342 davon also
+  ohne diese Warnung. Abschlüsse sind neun Monate nach dem Jahr fällig, das sie
+  beschreiben, das Gericht ist also oft schneller als die Bilanz. Wer einen
+  Geschäftspartner prüft, liest deshalb beides: die Abschlüsse *und* die
+  Bekanntmachungen des Gerichts.
+- **„Eine gemeinsame Adresse allein macht keine Scheinfirma.“** 365 aktive
+  Firmen sitzen an einer Adresse, die fünf oder mehr teilen. Sieben davon sind
+  mutmaßliche Scheinfirmen. Ein Büropark oder ein Gründungsdienstleister sieht
+  im Register genauso aus.
+- **„Firmen in Schwierigkeiten reichen ihre Abschlüsse spät ein.“** 58 von 475
+  Firmen mit einem Krisenbefund reichten mindestens einmal verspätet ein
+  (12 %), gegenüber 359 von 4.723 übrigen Firmen mit Finanzprofil (8 %). In den
+  ersten Stunden sah das nach doppelt so oft aus; mit zehnmal so vielen Firmen
+  ist es anderthalbmal so oft.
+- **„Auf zwei gute Jahre folgt ein drittes.“** 92 Firmen haben inzwischen vier
+  aufeinanderfolgende Jahre im Bestand. Acht davon wuchsen zweimal, drei davon
+  ein drittes Mal. Für ein Urteil ist es zu früh, und der Fall sagt auch das.
 
 Eine Hypothese trägt hier den Satz, der sie prüft, die Zahlen und das Datum der
-Prüfung. Wird das Register weiter durchlaufen, verschieben sich die Zahlen.
+Prüfung. Die Notizen an den Live-Fällen sind älter als diese Zählungen; läuft
+der Aufbau erneut, werden sie ersetzt, und die Zahlen verschieben sich.
 
 ## Er lebt
 
@@ -342,8 +387,10 @@ Jeder Befund bedeutet einen Begriff. Eine Frage wird nach Begriff gestellt, nich
 nach Zeichenkette, *„überschuldet“*, *over-indebted* und der Registercode
 finden also dieselben Datensätze. Und Firmen und Personen sind **Entitäten**:
 Eine Nennung einer Firmenbuchnummer oder einer Funktionsperson, in welcher
-Quelle auch immer, landet auf der Seite dieser Firma oder Person. Bis dahin
-kannte der Arbeitsbereich 2.275 Firmen und 3.069 Personen.
+Quelle auch immer, landet auf der Seite dieser Firma oder Person. Am
+10. Oktober kannte der Arbeitsbereich 15.260 Firmen und 19.400 Personen.
+
+![Ein Board mit vier Zetteln aus vier Quellen, die alle dieselbe erfundene Firmenbuchnummer nennen und mit Fäden an eine Karte für die Firma gebunden sind](/blog/assets/images/company-number-four-sources-one-entity.webp)
 
 ## Was er nicht behauptet
 
@@ -351,13 +398,13 @@ Ein Werkzeug, das mehr andeutet, als es hat, ist schlimmer als eines, das
 weniger zugibt.
 
 **Kein Gewinn und kein Umsatz für die meisten Firmen.** Kleine Gesellschaften
-nach § 242 UGB müssen keine Gewinn- und Verlustrechnung offenlegen. Wachstum
+nach § 278 UGB müssen keine Gewinn- und Verlustrechnung offenlegen. Wachstum
 wird hier aus der Bilanz über mehrere Jahre gelesen, und das *„Jahresergebnis“*
 ist die Veränderung des Bilanzgewinns.
 
 **Eine Verweigerung ist ein Befund, keine Stille.** Das Gewerberegister
 verweigert unserem Schlüssel Abfragen je Firma. Statt das in ein Log zu
-schreiben, wird jede Verweigerung festgehalten: 596 Firmen tragen den Befund
+schreiben, wird jede Verweigerung festgehalten: 5.050 Abfragen tragen den Befund
 *Gewerbeberechtigung unbekannt*, damit kein Fall „keine Berechtigung“ aus „wir
 durften nicht fragen“ herausliest.
 
@@ -371,8 +418,10 @@ die in keinem Abschluss steht. Die Liste der vielversprechenden Firmen ist eine
 Auswahl, keine Anlageberatung: Das Register sagt nicht, wem eine Firma gehört,
 ob sie zu verkaufen ist oder wer ihre Kunden sind.
 
-**Dieser Artikel nennt keine Firma**, und nichts im Arbeitsbereich beschuldigt
-eine. Eine Markierung entsteht aus öffentlichen Abschlüssen und kann falsch sein.
+**Dieser Artikel nennt keine echte Firma**, und nichts im Arbeitsbereich
+beschuldigt eine. Die im Film und in seinen Standbildern genannten Firmen sind
+erfunden. Eine Markierung entsteht aus öffentlichen Abschlüssen und kann falsch
+sein.
 
 ## Wie er gebaut wurde
 
