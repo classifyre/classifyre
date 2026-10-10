@@ -2371,6 +2371,12 @@
         "tagline": "Rules and checks in Python",
         "description": "Checks and rules over rows, text, bytes or metadata: you write detect(asset, ctx) in a notebook and yield findings. For what a pattern or a model cannot express: totals that must add up, list screening, co-occurrence of other findings, checksummed IDs, your own model.",
         "tags": "Python, Rows & metadata, Tests"
+      },
+      "code_detector": {
+        "title": "Code detector",
+        "tagline": "Rules and checks in Python",
+        "description": "Checks and rules over rows, text, bytes or metadata: you write detect(asset, ctx) in a notebook and yield findings. For what a pattern or a model cannot express: totals that must add up, list screening, co-occurrence of other findings, checksummed IDs, your own model.",
+        "tags": "Python, Rows & metadata, Tests"
       }
     },
     "tag": {

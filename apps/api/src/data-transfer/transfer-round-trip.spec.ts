@@ -1065,4 +1065,71 @@ describe('export → import round trip', () => {
 
     await expect(importer(state.prisma).run(job)).rejects.toThrow();
   });
+
+  it('queues a value-index rebuild after importing assets', async () => {
+    // Regression: an imported workspace arrived with Entities on but an empty
+    // asset_correlation_values, so every entity page showed zero mentions —
+    // the switch-on rebuild never fired because nothing was ever switched.
+    const { archiveId } = await runExport(
+      ['sources', 'assets', 'scanData'],
+      sourceTables(),
+    );
+
+    const target = {
+      source: { keys: ['id'], rows: [] },
+      runner: { keys: ['id'], rows: [] },
+      runnerAsset: { keys: ['runnerId', 'assetHash'], rows: [] },
+      asset: { keys: ['id'], rows: [] },
+    } as unknown as Record<string, FakeTable>;
+    const scopes = ['sources', 'assets', 'scanData'];
+    const state = makePrisma(
+      target,
+      { ...baseJob, kind: 'IMPORT', archived: true, scopes },
+      chunkStore,
+    );
+
+    const scheduleFull = jest.fn(() => Promise.resolve(true));
+    await new NamespaceImportService(state.prisma, store, {
+      scheduleFull,
+    } as never).run(
+      stageImport(archiveId, {
+        ...baseJob,
+        kind: 'IMPORT',
+        archived: true,
+        scopes,
+      }),
+    );
+
+    expect(state.job.status).toBe('COMPLETED');
+    // The same catch-up switching Duplicates/Entities on schedules: with
+    // duplicates on it recomputes everything, with only entities on it
+    // rebuilds the value index and then resolves.
+    expect(scheduleFull).toHaveBeenCalledTimes(1);
+    expect(scheduleFull).toHaveBeenCalledWith('workspace imported', true);
+  });
+
+  it('skips the value-index rebuild when no assets or findings were imported', async () => {
+    const { archiveId } = await runExport(['sources'], sourceTables());
+
+    const state = makePrisma(
+      { source: { keys: ['id'], rows: [] } },
+      { ...baseJob, kind: 'IMPORT', archived: true, scopes: ['sources'] },
+      chunkStore,
+    );
+
+    const scheduleFull = jest.fn(() => Promise.resolve(true));
+    await new NamespaceImportService(state.prisma, store, {
+      scheduleFull,
+    } as never).run(
+      stageImport(archiveId, {
+        ...baseJob,
+        kind: 'IMPORT',
+        archived: true,
+        scopes: ['sources'],
+      }),
+    );
+
+    expect(state.job.status).toBe('COMPLETED');
+    expect(scheduleFull).not.toHaveBeenCalled();
+  });
 });
