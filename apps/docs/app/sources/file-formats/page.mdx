@@ -45,9 +45,10 @@ storage tends to label almost everything as generic binary data.
 | **Video**             | MP4, MOV, MKV, WEBM, AVI, WMV, FLV                         | A transcript **and** the text visible on screen                       |
 | **Archives**          | ZIP, TAR, GZ, TGZ, 7Z, RAR                                 | Each file inside, unpacked and scanned on its own                     |
 
-Images, audio, and video need [OCR and transcription](/sources/content-extraction/)
-switched on for the source — they're off by default because they cost more time
-per item than reading text.
+Images, audio, and video go through [OCR and transcription](/sources/content-extraction/)
+automatically — no switch needed. They cost more time per item than reading
+text, so exclude paths or extensions you don't need searched in the source's
+configuration.
 
 ---
 
@@ -193,9 +194,8 @@ supports.
 ## Common questions
 
 **Does Classifyre read scanned PDFs?**
-Yes. PDFs with a text layer are read directly; pages that are images get OCR, so
-scanned contracts and faxes are searchable. Turn on
-[OCR](/sources/content-extraction/) for the source.
+Yes. PDFs with a text layer are read directly; pages that are images get [OCR](/sources/content-extraction/)
+automatically, so scanned contracts and faxes are searchable. No switch needed.
 
 **Can it read files inside a ZIP?**
 Yes — for file-based sources, each file in the archive becomes its own asset with
@@ -213,8 +213,8 @@ files such as `Dockerfile` and `Makefile`. Each is read line by line as text, so
 a secret in a config file is found the same way one in a document is.
 
 **What about audio and video?**
-Both are transcribed, and video also has the text on screen read via OCR. Enable
-[transcription](/sources/content-extraction/) on the source.
+Both are [transcribed](/sources/content-extraction/) automatically, and video also
+has the text on screen read via OCR. No switch needed.
 
 **Will very large files break a scan?**
 No. Files are streamed rather than loaded whole, and tables are read in bounded
