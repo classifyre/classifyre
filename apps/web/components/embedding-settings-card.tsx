@@ -8,6 +8,7 @@ import {
   Cpu,
   Database,
   Gauge,
+  Layers,
   Loader2,
   Plus,
   Power,
@@ -63,25 +64,32 @@ function key(suffix: string): TranslationKey {
 const POLL_MS = 4000;
 
 /**
- * Curated Transformers.js models with the dimensions they actually output.
- *
- * The dimension is not a preference — it is a property of the model, and
- * getting it wrong fails every batch at the provider's dimension check rather
- * than producing bad vectors. Pairing them here means picking a model fills in
- * the number that must go with it, and the field stays editable for models not
- * on this list.
+ * The kinds of content a model can embed besides text, in the order they are
+ * offered. Which of them the selected model supports comes from the API: the
+ * built-in models from its catalogue, a remote one from its provider.
  */
-const LOCAL_MODELS: Array<{ id: string; dimensions: number; label: string }> = [
-  { id: "Xenova/all-MiniLM-L6-v2", dimensions: 384, label: "all-MiniLM-L6-v2 — fastest, general purpose" },
-  { id: "Xenova/all-MiniLM-L12-v2", dimensions: 384, label: "all-MiniLM-L12-v2 — slower, a little sharper" },
-  { id: "Xenova/bge-small-en-v1.5", dimensions: 384, label: "bge-small-en-v1.5 — strong English retrieval" },
-  { id: "Xenova/bge-base-en-v1.5", dimensions: 768, label: "bge-base-en-v1.5 — best English quality, heaviest" },
-  { id: "Xenova/gte-small", dimensions: 384, label: "gte-small — balanced retrieval" },
-  { id: "Xenova/multilingual-e5-small", dimensions: 384, label: "multilingual-e5-small — non-English corpora" },
+const MEDIA: Array<{
+  modality: "image" | "audio";
+  field: "embedImages" | "embedAudio";
+  label: string;
+  hint: string;
+}> = [
+  {
+    modality: "image",
+    field: "embedImages",
+    label: "contentImages",
+    hint: "contentImagesHint",
+  },
+  {
+    modality: "audio",
+    field: "embedAudio",
+    label: "contentAudio",
+    hint: "contentAudioHint",
+  },
 ];
 
 const CUSTOM_MODEL = "__custom__";
-const POOLING_OPTIONS = ["mean", "cls", "none"];
+const POOLING_OPTIONS = ["mean", "cls", "last_token", "none"];
 const DTYPE_OPTIONS = ["q8", "fp32", "fp16", "q4"];
 const DEVICE_OPTIONS = ["cpu", "gpu", "webgpu", "wasm", "auto"];
 
@@ -343,8 +351,33 @@ export function EmbeddingSettingsCard() {
   const provider = String(value("provider"));
   const isRemote = provider === "openai-compatible";
   const model = String(value("model") ?? "");
-  const knownModel = LOCAL_MODELS.some((entry) => entry.id === model);
+  // The curated list is the API's: a model's width and what it can embed are
+  // facts about the model, and one list means the page and the server cannot
+  // disagree about them.
+  const localModels = settings.localModels;
+  const localModel = localModels.find(
+    (entry) =>
+      entry.id === model ||
+      entry.aliases.some((alias) => alias.toLowerCase() === model.toLowerCase()),
+  );
+  const knownModel = Boolean(localModel);
   const stats = settings.stats;
+  // What the model being looked at can embed besides text — the one in the
+  // unsaved edit, not only the saved one, so the switches answer the choice
+  // being made rather than the one being replaced.
+  const selectedProvider = settings.aiProviders.find(
+    (option) => option.id === value("aiProviderConfigId"),
+  );
+  const unchangedModel =
+    provider === settings.provider &&
+    model === settings.model &&
+    (value("aiProviderConfigId") ?? null) ===
+      (settings.aiProviderConfigId ?? null);
+  const supportedMedia: string[] = unchangedModel
+    ? settings.supportedMedia
+    : isRemote
+      ? (selectedProvider?.embeddingModalities ?? [])
+      : (localModel?.mediaModalities ?? []);
   const coverage =
     stats.embeddableFindings > 0
       ? Math.min(
@@ -557,6 +590,17 @@ export function EmbeddingSettingsCard() {
                       {model || "—"} · {String(value("dimensions"))}d ·{" "}
                       {String(value("pooling"))}
                     </p>
+                    <p className="text-[11px]">
+                      {supportedMedia.length > 0
+                        ? t(key("inheritedMedia"), {
+                            list: MEDIA.filter((entry) =>
+                              supportedMedia.includes(entry.modality),
+                            )
+                              .map((entry) => t(key(entry.label)))
+                              .join(", "),
+                          })
+                        : t(key("inheritedTextOnly"))}
+                    </p>
                     <p className="text-[10px] text-muted-foreground">
                       {t(key("inheritedHint"))}
                     </p>
@@ -581,19 +625,22 @@ export function EmbeddingSettingsCard() {
                     }}
                   >
                     <Select
-                      value={customModel || !knownModel ? CUSTOM_MODEL : model}
+                      value={customModel || !localModel ? CUSTOM_MODEL : localModel.id}
                       onValueChange={(next) => {
                         if (next === CUSTOM_MODEL) {
                           setCustomModel(true);
                           return;
                         }
                         setCustomModel(false);
-                        const entry = LOCAL_MODELS.find((m) => m.id === next);
+                        const entry = localModels.find((m) => m.id === next);
                         // Dimensions travel with the model: picking one and
                         // leaving the old dimension behind fails every batch.
+                        // So does pooling, more quietly: cleared here, it
+                        // follows the model the API knows.
                         set({
                           model: next,
                           dimensions: entry?.dimensions ?? null,
+                          pooling: null,
                           revision: "main",
                         });
                       }}
@@ -602,7 +649,7 @@ export function EmbeddingSettingsCard() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {LOCAL_MODELS.map((entry) => (
+                        {localModels.map((entry) => (
                           <SelectItem key={entry.id} value={entry.id}>
                             {entry.label}
                           </SelectItem>
@@ -755,6 +802,93 @@ export function EmbeddingSettingsCard() {
             </CardContent>
           </Card>
 
+          <Card
+            className="panel-card rounded-[6px]"
+            data-testid="embedding-content"
+          >
+            <CardContent className="space-y-5 p-5">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                <p className="text-xs font-mono uppercase tracking-[0.14em]">
+                  {t(key("contentHeading"))}
+                </p>
+              </div>
+              <p className="-mt-3 text-xs text-muted-foreground">
+                {t(key("contentDesc"))}
+              </p>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-4 rounded-[4px] border border-border p-3">
+                  <div>
+                    <Label className="text-[11px] font-mono uppercase tracking-[0.12em]">
+                      {t(key("contentText"))}
+                    </Label>
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      {t(key("contentTextHint"))}
+                    </p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground"
+                  >
+                    {t(key("contentAlways"))}
+                  </Badge>
+                </div>
+                {MEDIA.map((entry) => {
+                  const supported = supportedMedia.includes(entry.modality);
+                  const download = isRemote
+                    ? undefined
+                    : localModel?.downloadMb?.[entry.modality];
+                  const id = `embedding-content-${entry.modality}`;
+                  return (
+                    <div
+                      key={entry.modality}
+                      className={`flex items-center justify-between gap-4 rounded-[4px] border border-border p-3 ${
+                        supported ? "" : "opacity-60"
+                      }`}
+                    >
+                      <div>
+                        <Label
+                          htmlFor={id}
+                          className="text-[11px] font-mono uppercase tracking-[0.12em]"
+                        >
+                          {t(key(entry.label))}
+                        </Label>
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                          {supported
+                            ? [
+                                t(key(entry.hint)),
+                                download
+                                  ? t(key("contentDownload"), {
+                                      size: String(download),
+                                    })
+                                  : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")
+                            : t(key("contentUnsupported"))}
+                        </p>
+                      </div>
+                      <Switch
+                        id={id}
+                        disabled={!supported}
+                        checked={supported && Boolean(value(entry.field))}
+                        onCheckedChange={(checked) =>
+                          set({ [entry.field]: checked } as Draft)
+                        }
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              {supportedMedia.length > 0 ? (
+                <p className="text-[10px] text-muted-foreground">
+                  {t(key("contentRescanNote"))}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+
           <Card className="panel-card rounded-[6px]">
             <CardContent className="space-y-5 p-5">
               <div className="flex items-center gap-2">
@@ -861,6 +995,13 @@ export function EmbeddingSettingsCard() {
               label={t(key("statChunks"))}
               value={formatCount(stats.chunks)}
             />
+            {stats.mediaChunks > 0 || settings.mediaModalities.length > 0 ? (
+              <Stat
+                label={t(key("statMedia"))}
+                value={formatCount(stats.mediaChunks)}
+                hint={formatBytes(stats.mediaBytes)}
+              />
+            ) : null}
             <Stat
               label={t(key("statFindings"))}
               value={formatCount(stats.embeddableFindings)}

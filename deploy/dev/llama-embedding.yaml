@@ -5,6 +5,9 @@
 #   base URL  http://llama-embedding.classifyre-dev.svc:8080/v1
 #   model     embeddinggemma-2
 #
+# It takes pictures and sound as well as text: on the provider, set "How media
+# is sent" to "llama.cpp server" and tick what the workspace should embed.
+#
 # Why llama.cpp and not Ollama (deploy/dev/ollama.yaml): on 2026-10-11 Ollama
 # 0.40.3 runs this model on Apple Silicon only. Its library tags are MLX builds
 # ("this model requires MLX support, but the MLX runtime is not available",
@@ -15,9 +18,10 @@
 #
 #   kubectl --context k3d-classifyre apply -f deploy/dev/llama-embedding.yaml
 #
-# The first start downloads the weights (about 310 MB for the text tower) into
-# the volume. The node has no GPU, so this is CPU inference; `--threads` and
-# the CPU limit are the numbers to change when measuring.
+# The first start downloads the weights into the volume: about 310 MB for the
+# text model and 555 MB for the projector that holds the vision and audio
+# encoders. The node has no GPU, so this is CPU inference; `--threads` and the
+# CPU limit are the numbers to change when measuring.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -54,9 +58,10 @@ spec:
           args:
             - --hf-repo
             - ggml-org/embeddinggemma-2-GGUF:Q8_0
-            # Text tower only (the 270M configuration). The vision and audio
-            # encoders live in the repo's mmproj file and are not loaded.
-            - --no-mmproj
+            # The repo's mmproj file (the vision and audio encoders) is loaded
+            # with it, which is what lets `/v1/embeddings` take a picture or a
+            # clip. It brings the pod from about 1 GB to about 2 GB resident;
+            # add `--no-mmproj` here to serve text only.
             - --alias
             - embeddinggemma-2
             - --embedding

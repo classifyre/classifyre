@@ -81,6 +81,10 @@ type Draft = {
   embeddingPooling: string;
   embeddingDocumentPrefix: string;
   embeddingQueryPrefix: string;
+  /** What the embedding model takes besides text: "image", "audio". */
+  embeddingModalities: string[];
+  /** Request shape the endpoint takes media in; "" for a text-only model. */
+  embeddingMediaFormat: string;
   inputCostPerMTok: string;
   outputCostPerMTok: string;
   cachedInputCostPerMTok: string;
@@ -156,6 +160,8 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
       embeddingPooling: "mean",
       embeddingDocumentPrefix: "",
       embeddingQueryPrefix: "",
+      embeddingModalities: [],
+      embeddingMediaFormat: "",
       inputCostPerMTok: "",
       outputCostPerMTok: "",
       cachedInputCostPerMTok: "",
@@ -177,6 +183,8 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
     embeddingPooling: config.embeddingPooling ?? "mean",
     embeddingDocumentPrefix: config.embeddingDocumentPrefix ?? "",
     embeddingQueryPrefix: config.embeddingQueryPrefix ?? "",
+    embeddingModalities: config.embeddingModalities ?? [],
+    embeddingMediaFormat: config.embeddingMediaFormat ?? "",
     inputCostPerMTok:
       config.inputCostPerMTok != null ? String(config.inputCostPerMTok) : "",
     outputCostPerMTok:
@@ -201,6 +209,62 @@ function parseCost(value: string): number | null | undefined {
   if (!trimmed) return null;
   const n = Number.parseFloat(trimmed);
   return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
+/** How each media request format is offered, and what it can carry. */
+const MEDIA_FORMATS: Array<{
+  id: string;
+  labelKey: TranslationKey;
+  modalities: string[];
+}> = [
+  {
+    id: "llama-cpp",
+    labelKey: "aiProvider.embeddingMediaFormatLlamaCpp",
+    modalities: ["image", "audio"],
+  },
+  {
+    id: "gemini",
+    labelKey: "aiProvider.embeddingMediaFormatGemini",
+    modalities: ["image", "audio"],
+  },
+  {
+    id: "openrouter",
+    labelKey: "aiProvider.embeddingMediaFormatOpenRouter",
+    modalities: ["image", "audio"],
+  },
+];
+
+const MEDIA_MODALITIES: Array<{ id: string; labelKey: TranslationKey }> = [
+  { id: "image", labelKey: "aiProvider.embeddingModalityImage" },
+  { id: "audio", labelKey: "aiProvider.embeddingModalityAudio" },
+];
+
+const NO_MEDIA_FORMAT = "__none__";
+
+/**
+ * What the provider says about media, as the API stores it: a format and the
+ * kinds of content sent in it, or neither. A text-only model, and a provider
+ * that is not an embedding provider at all, are the same thing here.
+ */
+function mediaSupport(draft: Draft): {
+  embeddingModalities: Array<"image" | "audio">;
+  embeddingMediaFormat: "llama-cpp" | "gemini" | "openrouter" | null;
+} {
+  const format = MEDIA_FORMATS.find(
+    (entry) => entry.id === draft.embeddingMediaFormat,
+  );
+  const modalities =
+    draft.supportsEmbedding && format
+      ? draft.embeddingModalities.filter((modality) =>
+          format.modalities.includes(modality),
+        )
+      : [];
+  return {
+    embeddingModalities: modalities as Array<"image" | "audio">,
+    embeddingMediaFormat: modalities.length
+      ? (format!.id as "llama-cpp" | "gemini" | "openrouter")
+      : null,
+  };
 }
 
 function buildCreatePayload(draft: Draft): CreateAiProviderConfigDto {
@@ -237,6 +301,7 @@ function buildCreatePayload(draft: Draft): CreateAiProviderConfigDto {
     embeddingQueryPrefix: draft.supportsEmbedding
       ? draft.embeddingQueryPrefix || undefined
       : undefined,
+    ...mediaSupport(draft),
     ...(typeof inputCost === "number" ? { inputCostPerMTok: inputCost } : {}),
     ...(typeof outputCost === "number"
       ? { outputCostPerMTok: outputCost }
@@ -285,6 +350,9 @@ function buildUpdatePayload(draft: Draft): UpdateAiProviderConfigDto {
           embeddingQueryPrefix: draft.embeddingQueryPrefix,
         }
       : {}),
+    // Always sent, cleared included: this is how a provider goes back to
+    // text-only, and a workspace bound to it then drops its stored media.
+    ...mediaSupport(draft),
     ...(inputCost !== undefined ? { inputCostPerMTok: inputCost } : {}),
     ...(outputCost !== undefined ? { outputCostPerMTok: outputCost } : {}),
     ...(cachedInputCost !== undefined
@@ -814,6 +882,97 @@ export function AiProviderForm({
                     <p className="text-xs text-muted-foreground">
                       {t("aiProvider.embeddingQueryPrefixDesc")}
                     </p>
+                  </div>
+                  <div
+                    className="space-y-3 sm:col-span-2"
+                    data-testid="ai-provider-embedding-media"
+                  >
+                    <div className="space-y-1">
+                      <Label>{t("aiProvider.embeddingModalities")}</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {t("aiProvider.embeddingModalitiesDesc")}
+                      </p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="ai-provider-embedding-media-format">
+                          {t("aiProvider.embeddingMediaFormat")}
+                        </Label>
+                        <Select
+                          value={draft.embeddingMediaFormat || NO_MEDIA_FORMAT}
+                          onValueChange={(next) =>
+                            setDraft((current) => ({
+                              ...current,
+                              embeddingMediaFormat:
+                                next === NO_MEDIA_FORMAT ? "" : next,
+                              // A format is chosen in order to send pictures,
+                              // so they start ticked; "none" clears the lot.
+                              embeddingModalities:
+                                next === NO_MEDIA_FORMAT
+                                  ? []
+                                  : current.embeddingModalities.length
+                                    ? current.embeddingModalities
+                                    : ["image"],
+                            }))
+                          }
+                        >
+                          <SelectTrigger id="ai-provider-embedding-media-format">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NO_MEDIA_FORMAT}>
+                              {t("aiProvider.embeddingMediaFormatNone")}
+                            </SelectItem>
+                            {MEDIA_FORMATS.map((format) => (
+                              <SelectItem key={format.id} value={format.id}>
+                                {t(format.labelKey)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          {t("aiProvider.embeddingMediaFormatDesc")}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        {MEDIA_MODALITIES.map((modality) => {
+                          const id = `ai-provider-embedding-modality-${modality.id}`;
+                          return (
+                            <div
+                              key={modality.id}
+                              className="flex items-center justify-between gap-4 rounded-[4px] border border-border px-3 py-2"
+                            >
+                              <Label htmlFor={id}>{t(modality.labelKey)}</Label>
+                              <Switch
+                                id={id}
+                                disabled={!draft.embeddingMediaFormat}
+                                checked={
+                                  Boolean(draft.embeddingMediaFormat) &&
+                                  draft.embeddingModalities.includes(
+                                    modality.id,
+                                  )
+                                }
+                                onCheckedChange={(checked) =>
+                                  setDraft((current) => ({
+                                    ...current,
+                                    embeddingModalities: checked
+                                      ? [
+                                          ...current.embeddingModalities.filter(
+                                            (entry) => entry !== modality.id,
+                                          ),
+                                          modality.id,
+                                        ]
+                                      : current.embeddingModalities.filter(
+                                          (entry) => entry !== modality.id,
+                                        ),
+                                  }))
+                                }
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : null}

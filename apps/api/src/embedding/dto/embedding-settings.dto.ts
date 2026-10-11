@@ -4,6 +4,10 @@ import {
   ApiPropertyOptional,
   getSchemaPath,
 } from '@nestjs/swagger';
+import {
+  EMBEDDING_MEDIA_FORMATS,
+  MEDIA_MODALITIES,
+} from '../embedding-modality';
 
 /**
  * One configuration knob, as the settings page needs to render it.
@@ -63,6 +67,15 @@ export class EmbeddingStatsDto {
   })
   storageBytes?: number | null;
 
+  @ApiProperty({
+    description:
+      'Pictures and sound clips stored for embedding, of every modality',
+  })
+  mediaChunks!: number;
+
+  @ApiProperty({ description: 'Bytes those prepared media items occupy' })
+  mediaBytes!: number;
+
   @ApiPropertyOptional({
     nullable: true,
     description:
@@ -70,7 +83,9 @@ export class EmbeddingStatsDto {
   })
   analysisStorageBytes?: number | null;
 
-  @ApiProperty({ description: 'Text chunks eligible for embedding' })
+  @ApiProperty({
+    description: 'Text chunks eligible for embedding (media is counted apart)',
+  })
   chunks!: number;
 
   @ApiProperty({ description: 'Findings carrying embeddable evidence text' })
@@ -94,6 +109,60 @@ export class EmbeddingAiProviderOptionDto {
       'Whether the provider is marked as serving an embeddings endpoint',
   })
   supportsEmbedding!: boolean;
+
+  @ApiProperty({
+    enum: MEDIA_MODALITIES,
+    isArray: true,
+    description: 'What its embedding model takes besides text',
+  })
+  embeddingModalities!: string[];
+
+  @ApiPropertyOptional({ nullable: true, enum: EMBEDDING_MEDIA_FORMATS })
+  embeddingMediaFormat?: string | null;
+}
+
+/** Megabytes a local model downloads, per part. */
+export class EmbeddingLocalModelDownloadDto {
+  @ApiProperty() text!: number;
+  @ApiPropertyOptional() image?: number;
+  @ApiPropertyOptional() audio?: number;
+}
+
+/** A model the built-in provider is known to run, for the model picker. */
+export class EmbeddingLocalModelDto {
+  @ApiProperty({
+    description: 'Hugging Face repository holding the ONNX files',
+  })
+  id!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty() dimensions!: number;
+  @ApiProperty({
+    enum: ['mean', 'cls', 'last_token', 'none'],
+    description:
+      'How the model is pooled. Picking the model resets pooling to this.',
+  })
+  pooling!: string;
+
+  @ApiProperty({
+    enum: MEDIA_MODALITIES,
+    isArray: true,
+    description: 'What it embeds besides text. Empty for a text-only model.',
+  })
+  mediaModalities!: string[];
+
+  @ApiProperty({
+    type: [String],
+    description:
+      'Other names accepted for it, such as the repository of the original (non-ONNX) weights',
+  })
+  aliases!: string[];
+
+  @ApiPropertyOptional({
+    nullable: true,
+    type: EmbeddingLocalModelDownloadDto,
+    description: 'Megabytes fetched on first use at q8, where stated',
+  })
+  downloadMb?: EmbeddingLocalModelDownloadDto | null;
 }
 
 @ApiExtraModels(EmbeddingSettingValueDto)
@@ -132,6 +201,47 @@ export class EmbeddingSettingsResponseDto {
   @ApiProperty() hnswM!: number;
   @ApiProperty() hnswEfConstruction!: number;
   @ApiProperty() hnswEfSearch!: number;
+
+  @ApiProperty({
+    description:
+      'Whether this workspace wants pictures embedded as pictures. Takes effect only on a model that can (see supportedMedia).',
+  })
+  embedImages!: boolean;
+
+  @ApiProperty({
+    description:
+      'Whether this workspace wants sound embedded as sound. Takes effect only on a model that can.',
+  })
+  embedAudio!: boolean;
+
+  @ApiProperty({
+    enum: MEDIA_MODALITIES,
+    isArray: true,
+    description:
+      'What the model in use can embed besides text, in the same vector space',
+  })
+  supportedMedia!: string[];
+
+  @ApiProperty({
+    enum: MEDIA_MODALITIES,
+    isArray: true,
+    description:
+      'What is embedded besides text right now: wanted by the workspace and supported by the model',
+  })
+  mediaModalities!: string[];
+
+  @ApiPropertyOptional({
+    nullable: true,
+    enum: EMBEDDING_MEDIA_FORMATS,
+    description: 'Request shape the bound remote provider takes media in',
+  })
+  mediaFormat?: string | null;
+
+  @ApiProperty({
+    type: [EmbeddingLocalModelDto],
+    description: 'Models the built-in provider is known to run',
+  })
+  localModels!: EmbeddingLocalModelDto[];
 
   @ApiPropertyOptional({
     nullable: true,
@@ -197,7 +307,10 @@ export class UpdateEmbeddingSettingsDto {
   @ApiPropertyOptional({ nullable: true }) revision?: string | null;
   @ApiPropertyOptional({ nullable: true, minimum: 1, maximum: 2000 })
   dimensions?: number | null;
-  @ApiPropertyOptional({ nullable: true, enum: ['mean', 'cls', 'none'] })
+  @ApiPropertyOptional({
+    nullable: true,
+    enum: ['mean', 'cls', 'last_token', 'none'],
+  })
   pooling?: string | null;
   @ApiPropertyOptional({ nullable: true }) normalize?: boolean | null;
   @ApiPropertyOptional({ nullable: true }) aiProviderConfigId?: string | null;
@@ -212,6 +325,18 @@ export class UpdateEmbeddingSettingsDto {
   @ApiPropertyOptional({ nullable: true }) dtype?: string | null;
   @ApiPropertyOptional({ nullable: true }) device?: string | null;
   @ApiPropertyOptional({ nullable: true }) autoBackfill?: boolean | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Embed pictures as pictures when the model can. Turning it off deletes the stored pictures and their vectors.',
+  })
+  embedImages?: boolean | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Embed sound as sound when the model can. Turning it off deletes the stored clips and their vectors.',
+  })
+  embedAudio?: boolean | null;
   @ApiPropertyOptional({ nullable: true, minimum: 2, maximum: 100 })
   hnswM?: number | null;
   @ApiPropertyOptional({ nullable: true, minimum: 4, maximum: 2000 })

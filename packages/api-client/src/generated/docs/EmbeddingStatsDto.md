@@ -10,6 +10,8 @@ Name | Type
 `vectors` | number
 `vectorsAllSpaces` | number
 `storageBytes` | number
+`mediaChunks` | number
+`mediaBytes` | number
 `analysisStorageBytes` | number
 `chunks` | number
 `embeddableFindings` | number
@@ -26,6 +28,8 @@ const example = {
   "vectors": null,
   "vectorsAllSpaces": null,
   "storageBytes": null,
+  "mediaChunks": null,
+  "mediaBytes": null,
   "analysisStorageBytes": null,
   "chunks": null,
   "embeddableFindings": null,

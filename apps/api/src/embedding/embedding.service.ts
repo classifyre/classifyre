@@ -32,6 +32,13 @@ import {
 import { embeddingContentHash } from './embedding-text';
 import { reasonsForStorage, type StoredReason } from './reason-labels';
 import { MAX_INDEXED_DIMENSIONS, vectorCast } from './embedding-vector';
+import {
+  MAX_MEDIA_BYTES,
+  isMediaModality,
+  mediaContentHash,
+  mediaScanCacheKey,
+  type MediaModality,
+} from './embedding-modality';
 
 type SimilarityRow = { id: string; score: number };
 /** One neighbour of a (content hash, finding type) pair. */
@@ -106,6 +113,29 @@ const RECALIBRATE_REFRESH_BATCHES = 20;
  */
 function candidateBudget(limit: number): number {
   return Math.max(limit * 5, 200);
+}
+
+/**
+ * One ranked list out of two, keeping each id's better score.
+ *
+ * An asset can be in both — a scanned page is found by its text and by its
+ * picture — and it is one result, as good as its best match.
+ */
+export function mergeBestScores(
+  left: SimilarityRow[],
+  right: SimilarityRow[],
+  limit: number,
+): SimilarityRow[] {
+  const best = new Map<string, number>();
+  for (const row of [...left, ...right]) {
+    const score = Number(row.score);
+    const known = best.get(row.id);
+    if (known === undefined || score > known) best.set(row.id, score);
+  }
+  return [...best.entries()]
+    .map(([id, score]) => ({ id, score }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 }
 
 @Injectable()
@@ -991,7 +1021,21 @@ export class EmbeddingService {
     return calibrated;
   }
 
-  async putChunks(sourceId: string, dto: PutAssetChunksDto) {
+  /**
+   * Replace what is stored for an asset: its text passages and, for the
+   * modalities in `accepted`, the media prepared from it.
+   *
+   * Both in one transaction because a scan sends both in one request and the
+   * pair describes one reading of the asset — keeping last week's picture next
+   * to this week's text would be a state no scan ever produced. Media of a
+   * kind this workspace does not embed is dropped here rather than stored:
+   * the bytes would only wait for a setting that may never change.
+   */
+  async putChunks(
+    sourceId: string,
+    dto: PutAssetChunksDto,
+    accepted: readonly MediaModality[] = [],
+  ) {
     const asset = await this.prisma.asset.findUnique({
       where: { sourceId_hash: { sourceId, hash: dto.assetHash } },
       select: { id: true },
@@ -1006,6 +1050,25 @@ export class EmbeddingService {
       const text = chunk.text.split('\u0000').join('');
       return { ...chunk, text, contentHash: embeddingContentHash(text) };
     });
+    const media = (dto.media ?? []).flatMap((item) => {
+      if (
+        !isMediaModality(item.modality) ||
+        !accepted.includes(item.modality)
+      ) {
+        return [];
+      }
+      const data = Buffer.from(String(item.data ?? ''), 'base64');
+      if (!data.byteLength || data.byteLength > MAX_MEDIA_BYTES) return [];
+      return [
+        {
+          modality: item.modality,
+          mimeType: String(item.mimeType || 'application/octet-stream'),
+          page: item.page ?? null,
+          data,
+          contentHash: mediaContentHash(data),
+        },
+      ];
+    });
     await this.prisma.$transaction(async (tx) => {
       await tx.assetChunk.deleteMany({ where: { assetId: asset.id } });
       if (chunks.length) {
@@ -1018,14 +1081,133 @@ export class EmbeddingService {
           })),
         });
       }
+      if (media.length) {
+        // Numbered after the text so the two cannot collide on the asset's
+        // (asset, ordinal) key whatever the scan numbered them.
+        const first =
+          chunks.reduce((max, chunk) => Math.max(max, chunk.ordinal), -1) + 1;
+        await tx.assetChunk.createMany({
+          data: media.map((item, index) => ({
+            id: randomUUID(),
+            assetId: asset.id,
+            sourceId,
+            ordinal: first + index,
+            page: item.page,
+            charOffset: 0,
+            charLength: 0,
+            text: '',
+            modality: item.modality,
+            mimeType: item.mimeType,
+            data: item.data,
+            contentHash: item.contentHash,
+          })),
+        });
+      }
     });
     return {
-      stored: chunks.length,
-      contents: chunks.map((chunk) => ({
-        hash: chunk.contentHash,
-        text: chunk.text,
-      })),
+      stored: chunks.length + media.length,
+      contents: [
+        ...chunks.map((chunk) => ({
+          hash: chunk.contentHash,
+          text: chunk.text,
+        })),
+        ...media.map((item) => ({
+          hash: item.contentHash,
+          text: '',
+          media: true,
+        })),
+      ],
     };
+  }
+
+  /**
+   * Bring what is stored in line with a change in what the workspace embeds
+   * besides text: delete what is no longer embedded, and have scans go back
+   * for what now is.
+   *
+   * Called by whatever changed the answer — the embedding settings, or the
+   * provider a workspace is bound to — with the configuration before and
+   * after. Best effort: the setting is already saved, and a failure here
+   * leaves rows nothing reads, or pictures a full rescan would still collect.
+   */
+  async applyMediaChange(
+    before: readonly MediaModality[],
+    after: readonly MediaModality[],
+  ): Promise<void> {
+    const removed = before.filter((modality) => !after.includes(modality));
+    const added = after.filter((modality) => !before.includes(modality));
+    try {
+      if (removed.length) await this.dropMedia(removed);
+      if (added.length) await this.revisitScannedSources();
+    } catch (error) {
+      this.logger.warn(
+        `Could not apply the change in embedded media (removed: ${removed.join(', ') || 'none'}; added: ${added.join(', ') || 'none'}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * Make the next scans walk every source again from the start.
+   *
+   * A source on the AUTOMATIC sweep keeps its place between runs, and one
+   * that has covered everything discovers nothing more — so pictures it
+   * passed before the workspace could embed them would wait until their files
+   * changed. Dropping the place is all it takes: the scan cache still skips
+   * every unchanged asset without running a detector, and only reads again
+   * the ones that owe media. Notebook sources keep their own state in the
+   * cursor, which is not ours to drop.
+   */
+  private async revisitScannedSources(): Promise<number> {
+    return this.prisma.$executeRaw`
+      UPDATE sources
+      SET sampling_cursor = NULL
+      WHERE sampling_cursor IS NOT NULL
+        AND type::text <> 'CUSTOM'
+    `;
+  }
+
+  /**
+   * Remove everything held for media the workspace no longer embeds: the
+   * prepared bytes and the vectors taken over them.
+   *
+   * Without this a picture would stay findable after pictures were turned
+   * off, and its bytes would stay on disk for a model that will not read
+   * them. Text is untouched — it is the same space, and nothing about the
+   * text vectors depended on the pictures beside them.
+   */
+  async dropMedia(
+    modalities: readonly MediaModality[],
+  ): Promise<{ chunks: number; vectors: number }> {
+    const kinds = modalities.filter(isMediaModality);
+    if (!kinds.length) return { chunks: 0, vectors: 0 };
+    // Forget that these assets' media was ever sent, while the chunks still
+    // say which assets those are. The scan cache skips an unchanged asset on
+    // the strength of that record, so without this the media could never come
+    // back: turned on again, every picture would read as already collected.
+    for (const kind of kinds) {
+      await this.prisma.$executeRaw`
+        UPDATE assets
+        SET scan_cache = scan_cache #- ARRAY['detectors', ${mediaScanCacheKey(kind)}]
+        WHERE scan_cache IS NOT NULL
+          AND id IN (
+            SELECT asset_id FROM asset_chunks WHERE modality = ${kind}
+          )
+      `;
+    }
+    const vectors = await this.prisma.$executeRaw`
+      DELETE FROM content_embeddings ce
+      USING (
+        SELECT DISTINCT content_hash FROM asset_chunks
+        WHERE modality = ANY(${kinds}::text[])
+      ) gone
+      WHERE ce.content_hash = gone.content_hash
+    `;
+    const chunks = await this.prisma.assetChunk.deleteMany({
+      where: { modality: { in: [...kinds] } },
+    });
+    return { chunks: chunks.count, vectors };
   }
 
   private async rowsForVector(
@@ -1137,7 +1319,7 @@ export class EmbeddingService {
       // and therefore uses relaxed_order, which is the setting that pattern
       // needs.
       await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = strict_order`;
-      return tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
+      const nearest = await tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
         WITH nearest AS (
           SELECT ce.content_hash,
             1 - (
@@ -1158,6 +1340,32 @@ export class EmbeddingService {
         ORDER BY score DESC
         LIMIT ${limit}
       `);
+      if (!this.cfg.mediaModalities.length) return nearest;
+
+      // Pictures and clips are scored on their own, exactly, and then take
+      // their place among the text by the same score. The pass above stops at
+      // a fixed number of nearest vectors, and in a space that is mostly text
+      // those are text: a matching picture a little further out would never be
+      // looked at. Media is the small side of the corpus, so reading every
+      // one of its vectors costs little, and it is driven from the media
+      // chunks (their own partial index) rather than from the vector index,
+      // which cannot filter by what a vector was taken over.
+      const media = await tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
+        SELECT ac.asset_id AS id, MAX(1 - (
+          ce.vec::public.${vecType}(${dim}) <=>
+          ${vector}::public.${vecType}(${dim})
+        )) AS score
+        FROM asset_chunks ac
+        JOIN content_embeddings ce
+          ON ce.content_hash = ac.content_hash
+         AND ce.space_id = ${this.spaceIdLiteral(space.id)}
+        WHERE ac.modality <> 'text'
+          AND (${sourceId ?? null}::text IS NULL OR ac.source_id = ${sourceId ?? null})
+        GROUP BY ac.asset_id
+        ORDER BY score DESC
+        LIMIT ${limit}
+      `);
+      return mergeBestScores(nearest, media, limit);
     });
   }
 

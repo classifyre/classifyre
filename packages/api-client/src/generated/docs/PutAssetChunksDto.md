@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `assetHash` | string
 `chunks` | [Array&lt;AssetChunkDto&gt;](AssetChunkDto.md)
+`media` | [Array&lt;AssetMediaChunkDto&gt;](AssetMediaChunkDto.md)
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { PutAssetChunksDto } from '@workspace/api-client'
 const example = {
   "assetHash": null,
   "chunks": null,
+  "media": null,
 } satisfies PutAssetChunksDto
 
 console.log(example)

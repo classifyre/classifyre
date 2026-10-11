@@ -24,6 +24,12 @@ Name | Type
 `hnswM` | number
 `hnswEfConstruction` | number
 `hnswEfSearch` | number
+`embedImages` | boolean
+`embedAudio` | boolean
+`supportedMedia` | Array&lt;string&gt;
+`mediaModalities` | Array&lt;string&gt;
+`mediaFormat` | string
+`localModels` | [Array&lt;EmbeddingLocalModelDto&gt;](EmbeddingLocalModelDto.md)
 `aiProviderConfigId` | string
 `allowRemoteModels` | boolean
 `fields` | [{ [key: string]: EmbeddingSettingValueDto; }](EmbeddingSettingValueDto.md)
@@ -61,6 +67,12 @@ const example = {
   "hnswM": null,
   "hnswEfConstruction": null,
   "hnswEfSearch": null,
+  "embedImages": null,
+  "embedAudio": null,
+  "supportedMedia": null,
+  "mediaModalities": null,
+  "mediaFormat": null,
+  "localModels": null,
   "aiProviderConfigId": null,
   "allowRemoteModels": null,
   "fields": null,

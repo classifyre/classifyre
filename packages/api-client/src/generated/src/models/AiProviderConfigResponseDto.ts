@@ -104,6 +104,18 @@ export interface AiProviderConfigResponseDto {
      */
     embeddingQueryPrefix: string | null;
     /**
+     * What this embedding model takes besides text, in the same vector space. Empty for a text-only model.
+     * @type {Array<string>}
+     * @memberof AiProviderConfigResponseDto
+     */
+    embeddingModalities: Array<AiProviderConfigResponseDtoEmbeddingModalitiesEnum>;
+    /**
+     * Request shape the endpoint takes media in: "llama-cpp" (llama.cpp server with a multimodal projector), "gemini" (Google Gemini API) or "openrouter" (OpenRouter). Null for a text-only model.
+     * @type {string}
+     * @memberof AiProviderConfigResponseDto
+     */
+    embeddingMediaFormat: AiProviderConfigResponseDtoEmbeddingMediaFormatEnum | null;
+    /**
      * Cost in USD per 1M input tokens. Null when pricing is not configured.
      * @type {number}
      * @memberof AiProviderConfigResponseDto
@@ -146,6 +158,25 @@ export const AiProviderConfigResponseDtoProviderEnum = {
 } as const;
 export type AiProviderConfigResponseDtoProviderEnum = typeof AiProviderConfigResponseDtoProviderEnum[keyof typeof AiProviderConfigResponseDtoProviderEnum];
 
+/**
+ * @export
+ */
+export const AiProviderConfigResponseDtoEmbeddingModalitiesEnum = {
+    Image: 'image',
+    Audio: 'audio'
+} as const;
+export type AiProviderConfigResponseDtoEmbeddingModalitiesEnum = typeof AiProviderConfigResponseDtoEmbeddingModalitiesEnum[keyof typeof AiProviderConfigResponseDtoEmbeddingModalitiesEnum];
+
+/**
+ * @export
+ */
+export const AiProviderConfigResponseDtoEmbeddingMediaFormatEnum = {
+    LlamaCpp: 'llama-cpp',
+    Gemini: 'gemini',
+    Openrouter: 'openrouter'
+} as const;
+export type AiProviderConfigResponseDtoEmbeddingMediaFormatEnum = typeof AiProviderConfigResponseDtoEmbeddingMediaFormatEnum[keyof typeof AiProviderConfigResponseDtoEmbeddingMediaFormatEnum];
+
 
 /**
  * Check if a given object implements the AiProviderConfigResponseDto interface.
@@ -165,6 +196,8 @@ export function instanceOfAiProviderConfigResponseDto(value: object): value is A
     if (!('embeddingPooling' in value) || value['embeddingPooling'] === undefined) return false;
     if (!('embeddingDocumentPrefix' in value) || value['embeddingDocumentPrefix'] === undefined) return false;
     if (!('embeddingQueryPrefix' in value) || value['embeddingQueryPrefix'] === undefined) return false;
+    if (!('embeddingModalities' in value) || value['embeddingModalities'] === undefined) return false;
+    if (!('embeddingMediaFormat' in value) || value['embeddingMediaFormat'] === undefined) return false;
     if (!('inputCostPerMTok' in value) || value['inputCostPerMTok'] === undefined) return false;
     if (!('outputCostPerMTok' in value) || value['outputCostPerMTok'] === undefined) return false;
     if (!('cachedInputCostPerMTok' in value) || value['cachedInputCostPerMTok'] === undefined) return false;
@@ -197,6 +230,8 @@ export function AiProviderConfigResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'embeddingPooling': json['embeddingPooling'],
         'embeddingDocumentPrefix': json['embeddingDocumentPrefix'],
         'embeddingQueryPrefix': json['embeddingQueryPrefix'],
+        'embeddingModalities': json['embeddingModalities'],
+        'embeddingMediaFormat': json['embeddingMediaFormat'],
         'inputCostPerMTok': json['inputCostPerMTok'],
         'outputCostPerMTok': json['outputCostPerMTok'],
         'cachedInputCostPerMTok': json['cachedInputCostPerMTok'],
@@ -230,6 +265,8 @@ export function AiProviderConfigResponseDtoToJSONTyped(value?: AiProviderConfigR
         'embeddingPooling': value['embeddingPooling'],
         'embeddingDocumentPrefix': value['embeddingDocumentPrefix'],
         'embeddingQueryPrefix': value['embeddingQueryPrefix'],
+        'embeddingModalities': value['embeddingModalities'],
+        'embeddingMediaFormat': value['embeddingMediaFormat'],
         'inputCostPerMTok': value['inputCostPerMTok'],
         'outputCostPerMTok': value['outputCostPerMTok'],
         'cachedInputCostPerMTok': value['cachedInputCostPerMTok'],

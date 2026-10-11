@@ -28,6 +28,10 @@ export interface EmbeddingStats {
   analysisStorageBytes: number | null;
   /** Text chunks eligible for embedding. */
   chunks: number;
+  /** Pictures and clips stored for embedding. */
+  mediaChunks: number;
+  /** Bytes those prepared media items occupy. */
+  mediaBytes: number;
   /** Findings carrying embeddable evidence text. */
   embeddableFindings: number;
   /** Findings with a ranking score derived from the active space. */
@@ -58,6 +62,8 @@ export class EmbeddingStatsService {
       storageBytes: null,
       analysisStorageBytes: null,
       chunks: 0,
+      mediaChunks: 0,
+      mediaBytes: 0,
       embeddableFindings: 0,
       rankedFindings: 0,
     };
@@ -66,14 +72,15 @@ export class EmbeddingStatsService {
       // Read in parallel rather than in a transaction: these are independent
       // counters for a status panel, and wrapping them would hold a connection
       // from a pool that ingestion is already competing for.
-      const [spaces, perSpace, sizes, chunks, embeddable, ranked] =
+      const [spaces, perSpace, sizes, chunks, media, embeddable, ranked] =
         await Promise.all([
           this.prisma.embeddingSpace.findMany({
             orderBy: { createdAt: 'desc' },
           }),
           this.vectorsPerSpace(),
           this.sizes(),
-          this.prisma.assetChunk.count(),
+          this.prisma.assetChunk.count({ where: { modality: 'text' } }),
+          this.media(),
           this.prisma.finding.count({
             where: { embedContentHash: { not: null } },
           }),
@@ -105,6 +112,8 @@ export class EmbeddingStatsService {
         storageBytes: sizes.embeddings,
         analysisStorageBytes: sizes.analyses,
         chunks,
+        mediaChunks: media.count,
+        mediaBytes: media.bytes,
         embeddableFindings: embeddable,
         rankedFindings: ranked,
       };
@@ -117,6 +126,25 @@ export class EmbeddingStatsService {
       );
       return empty;
     }
+  }
+
+  /**
+   * Stored media, counted from its own partial index. The length of a stored
+   * value is read from its header, so this does not load the bytes.
+   */
+  private async media(): Promise<{ count: number; bytes: number }> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ count: bigint; bytes: bigint | null }>
+    >`
+      SELECT count(*)::bigint AS count,
+             coalesce(sum(octet_length(data)), 0)::bigint AS bytes
+      FROM asset_chunks
+      WHERE modality <> 'text'
+    `;
+    return {
+      count: Number(rows[0]?.count ?? 0),
+      bytes: Number(rows[0]?.bytes ?? 0),
+    };
   }
 
   private async vectorsPerSpace(): Promise<Map<string, number>> {
