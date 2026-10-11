@@ -19322,6 +19322,13 @@
           "cohortStats": {
             "type": "object",
             "description": "Per ctx.cohort() of the run: keys each band visited and the weights used. The API adds how many of those keys produced a new HIGH/CRITICAL finding."
+          },
+          "detectorsDegraded": {
+            "description": "Detectors the circuit breaker disabled mid-run (scan-cache identity keys). Their skipped assets carry breaker_open ERROR outcomes and were never evaluated, so the saved sweep position is dropped and the next run starts the sweep over; the scan cache still skips assets whose banked detectors all match, so only the skipped work re-runs.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [

@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Logger,
   NotFoundException,
   Optional,
   UseGuards,
@@ -24,6 +25,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
+import { AssetType } from '@prisma/client';
 import { PgStreamService } from '../export/pg-stream.service';
 import { ExportQueryService } from '../export/export-query.service';
 import { LiveQueryService } from '../export/live-query.service';
@@ -345,6 +347,8 @@ export class SearchAssetsController {
 @Controller('sources/:sourceId/assets')
 @ApiTags('Sources', 'Assets')
 export class SourceAssetsController {
+  private readonly logger = new Logger(SourceAssetsController.name);
+
   constructor(
     private readonly assetService: AssetService,
     private readonly sourceService: SourceService,
@@ -542,6 +546,7 @@ export class SourceAssetsController {
       relationshipErrors,
       partialCoverage,
       cohortStats,
+      detectorsDegraded,
     } = finalizeDto;
     if (!runnerId) {
       throw new BadRequestException('runnerId is required');
@@ -578,9 +583,35 @@ export class SourceAssetsController {
     const scannedAssetsComplete = samplingStrategy === 'ALL';
     const isFullScan = scannedAssetsComplete && partialCoverage !== true;
 
+    // A detector the breaker disabled mid-run never evaluated the assets it
+    // skipped: the sweep's saved place must not claim that ground as covered,
+    // or the next run rediscovers nothing and the skipped assets are never
+    // retried. Start the sweep over instead; the scan cache still skips assets
+    // whose banked detectors all match, so only the skipped work re-runs. A
+    // notebook source keeps its own state in the cursor and decides for
+    // itself, so its cursor is left alone.
+    const degraded =
+      detectorsDegraded?.filter(
+        (key): key is string => typeof key === 'string' && key.length > 0,
+      ) ?? [];
+    if (degraded.length > 0 && source.type !== AssetType.CUSTOM) {
+      this.logger.warn(
+        `Run ${runnerId} ended with ${degraded.length} detector(s) disabled ` +
+          `mid-run (${degraded.join(', ')}); the sampling cursor was dropped ` +
+          `and the next run restarts the sweep so the skipped assets are retried.`,
+      );
+      await this.sourceService.updateSamplingCursor(sourceId, undefined);
+    } else if (degraded.length > 0) {
+      this.logger.warn(
+        `Run ${runnerId} ended with ${degraded.length} detector(s) disabled ` +
+          `mid-run (${degraded.join(', ')}); the notebook source keeps its own ` +
+          `cursor, so the next run retries the skipped assets only if it re-yields them.`,
+      );
+    }
     // Persist the AUTOMATIC sampling cursor so the next run resumes where this
-    // one stopped. Sent only by AUTOMATIC runs; left untouched otherwise.
-    if (samplingCursor !== undefined) {
+    // one stopped. Sent only by AUTOMATIC runs; left untouched otherwise — and
+    // never when a degraded run just dropped it above.
+    if (samplingCursor !== undefined && degraded.length === 0) {
       await this.sourceService.updateSamplingCursor(sourceId, samplingCursor);
       // Snapshot it on the run too. The source row holds only the latest value
       // and is overwritten in place, so without a per-run copy there is no way

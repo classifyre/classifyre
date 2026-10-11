@@ -90,6 +90,70 @@ describe('SourceAssetsController', () => {
     expect(sourceService.updateSamplingCursor).not.toHaveBeenCalled();
   });
 
+  it('persists the sent sampling cursor on a clean run', async () => {
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'LOCAL_FOLDER',
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+    const cursor = { objects: { v: 1 } };
+
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-1',
+      seenHashes: ['h1'],
+      samplingCursor: cursor,
+    });
+
+    expect(sourceService.updateSamplingCursor).toHaveBeenCalledWith(
+      'source-1',
+      cursor,
+    );
+  });
+
+  it('drops the sampling cursor when a detector was disabled mid-run', async () => {
+    // The skipped assets were never evaluated: keeping the sweep position
+    // would rediscover nothing on the next run, so the sweep restarts and the
+    // scan cache retries the skipped detectors.
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'LOCAL_FOLDER',
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-1',
+      seenHashes: ['h1'],
+      samplingCursor: { objects: { v: 1 } },
+      detectorsDegraded: ['CUSTOM::ticket_triage'],
+    });
+
+    expect(sourceService.updateSamplingCursor).toHaveBeenCalledTimes(1);
+    expect(sourceService.updateSamplingCursor).toHaveBeenCalledWith(
+      'source-1',
+      undefined,
+    );
+    expect(assetService.recordRunSamplingCursor).not.toHaveBeenCalled();
+  });
+
+  it('leaves a notebook source cursor alone when a detector was disabled mid-run', async () => {
+    // A CUSTOM source keeps its own resume state in the cursor; only it can
+    // decide what a degraded run means for its position.
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'CUSTOM',
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-1',
+      seenHashes: ['h1'],
+      samplingCursor: { notebook: { offset: 3 } },
+      detectorsDegraded: ['CUSTOM::ticket_triage'],
+    });
+
+    expect(sourceService.updateSamplingCursor).not.toHaveBeenCalled();
+  });
+
   it('treats ALL sampling as a full scan (enables deletion)', async () => {
     sourceService.source.mockResolvedValue({
       id: 'source-1',

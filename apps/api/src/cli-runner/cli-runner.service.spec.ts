@@ -618,6 +618,62 @@ describe('CliRunnerService', () => {
       expect(state).toEqual({ samplingCursor: cursor, samplingReset: false });
     });
 
+    it('restarts the sweep on a forced full rescan', async () => {
+      // Disabling the scan cache alone still leaves the AUTOMATIC cursor
+      // where the last run stopped, so a covered source would discover
+      // nothing. The sweep starts over instead.
+      const { service, prisma } = createService();
+      prisma.customDetector.findMany.mockResolvedValue([detectorRow({ a: 1 })]);
+      const first = await resolve(service, {
+        id: 'source-1',
+        type: 'LOCAL_FOLDER',
+        config,
+        samplingCursor: null,
+        samplingCursorFingerprint: null,
+      });
+      prisma.source.update.mockClear();
+      prisma.asset.updateMany.mockClear();
+
+      const state = await (service as any).resolveSamplingState(
+        {
+          id: 'source-1',
+          type: 'LOCAL_FOLDER',
+          config,
+          samplingCursor: cursor,
+          samplingCursorFingerprint: first.samplingFingerprint,
+        },
+        { restartSweep: true },
+      );
+
+      expect(state.samplingCursor).toBeNull();
+      expect(state.samplingFingerprint).toBe(first.samplingFingerprint);
+      expect(prisma.source.update).toHaveBeenCalledWith({
+        where: { id: 'source-1' },
+        data: { samplingCursor: Prisma.DbNull },
+      });
+      expect(prisma.asset.updateMany).toHaveBeenCalledWith({
+        where: { sourceId: 'source-1', payloadCursor: { not: Prisma.DbNull } },
+        data: { payloadCursor: Prisma.DbNull },
+      });
+    });
+
+    it('leaves a notebook source cursor alone on a forced full rescan', async () => {
+      const { service, prisma } = createService();
+      const state = await (service as any).resolveSamplingState(
+        {
+          id: 'source-1',
+          type: 'CUSTOM',
+          config: { type: 'CUSTOM', required: {} },
+          samplingCursor: cursor,
+          samplingCursorFingerprint: 'fingerprint-of-the-old-settings',
+        },
+        { restartSweep: true },
+      );
+
+      expect(state.samplingCursor).toEqual(cursor);
+      expect(prisma.source.update).not.toHaveBeenCalled();
+    });
+
     it('passes the fingerprint to the scan', () => {
       const { service } = createService();
       const command = (service as any).buildCliCommand(
