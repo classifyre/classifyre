@@ -80,6 +80,18 @@ export interface UpdateAiProviderConfigDto {
      */
     embeddingPooling?: string;
     /**
+     * Text put in front of every document before it is embedded. An empty string clears it. Changing it re-embeds the corpus of a workspace bound to this provider.
+     * @type {string}
+     * @memberof UpdateAiProviderConfigDto
+     */
+    embeddingDocumentPrefix?: string;
+    /**
+     * Text put in front of every search query before it is embedded. An empty string clears it.
+     * @type {string}
+     * @memberof UpdateAiProviderConfigDto
+     */
+    embeddingQueryPrefix?: string;
+    /**
      * Cost in USD per 1M input tokens. Pass null to clear the price.
      * @type {number}
      * @memberof UpdateAiProviderConfigDto
@@ -138,6 +150,8 @@ export function UpdateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscrimi
         'supportsEmbedding': json['supportsEmbedding'] == null ? undefined : json['supportsEmbedding'],
         'embeddingDimensions': json['embeddingDimensions'] == null ? undefined : json['embeddingDimensions'],
         'embeddingPooling': json['embeddingPooling'] == null ? undefined : json['embeddingPooling'],
+        'embeddingDocumentPrefix': json['embeddingDocumentPrefix'] == null ? undefined : json['embeddingDocumentPrefix'],
+        'embeddingQueryPrefix': json['embeddingQueryPrefix'] == null ? undefined : json['embeddingQueryPrefix'],
         'inputCostPerMTok': json['inputCostPerMTok'] == null ? undefined : json['inputCostPerMTok'],
         'outputCostPerMTok': json['outputCostPerMTok'] == null ? undefined : json['outputCostPerMTok'],
         'cachedInputCostPerMTok': json['cachedInputCostPerMTok'] == null ? undefined : json['cachedInputCostPerMTok'],
@@ -165,6 +179,8 @@ export function UpdateAiProviderConfigDtoToJSONTyped(value?: UpdateAiProviderCon
         'supportsEmbedding': value['supportsEmbedding'],
         'embeddingDimensions': value['embeddingDimensions'],
         'embeddingPooling': value['embeddingPooling'],
+        'embeddingDocumentPrefix': value['embeddingDocumentPrefix'],
+        'embeddingQueryPrefix': value['embeddingQueryPrefix'],
         'inputCostPerMTok': value['inputCostPerMTok'],
         'outputCostPerMTok': value['outputCostPerMTok'],
         'cachedInputCostPerMTok': value['cachedInputCostPerMTok'],
