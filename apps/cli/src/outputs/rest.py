@@ -205,6 +205,11 @@ class FinalizeIngestRunRequest(BaseModel):
     partial_coverage: bool | None = Field(None, serialization_alias="partialCoverage")
     # Per ctx.cohort(): keys each band visited, and the weights it ran with.
     cohort_stats: dict[str, Any] | None = Field(None, serialization_alias="cohortStats")
+    # Detectors the circuit breaker disabled mid-run (scan-cache identity
+    # keys). Their skipped assets carry breaker_open ERROR outcomes and were
+    # never evaluated, so the API must not treat this run's sweep position as
+    # covering them: the next run starts the sweep over and retries them.
+    detectors_degraded: list[str] | None = Field(None, serialization_alias="detectorsDegraded")
 
 
 class UpdateRunnerStatusRequest(BaseModel):
@@ -255,6 +260,7 @@ class RestOutputSink:
         self._scan_cache_savings: tuple[int, int] | None = None
         self._partial_coverage: bool = False
         self._partial_coverage_reason: str = ""
+        self._detectors_degraded: list[str] = []
         self._cohort_stats: dict[str, Any] | None = None
         self.relationship_report = RelationshipReport()
 
@@ -271,6 +277,14 @@ class RestOutputSink:
         self._partial_coverage = True
         if reason:
             self._partial_coverage_reason = str(reason)
+
+    def set_detectors_degraded(self, keys: list[str]) -> None:
+        """Record detectors the breaker disabled mid-run, for the next run's sweep."""
+        seen: set[str] = set(self._detectors_degraded)
+        for key in keys:
+            if key and key not in seen:
+                seen.add(key)
+                self._detectors_degraded.append(key)
 
     def set_cohort_stats(self, stats: dict[str, Any]) -> None:
         """Record what each cohort band visited, to report on finalize."""
@@ -385,6 +399,7 @@ class RestOutputSink:
             relationship_errors=lineage.errors or None,
             partial_coverage=True if self._partial_coverage else None,
             cohort_stats=self._cohort_stats,
+            detectors_degraded=self._detectors_degraded or None,
         )
         self._request_json(
             "POST",

@@ -385,6 +385,63 @@ async def test_rest_output_finalize_includes_sampling_cursor(
 
 
 @pytest.mark.asyncio
+async def test_rest_output_finalize_reports_detectors_degraded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A breaker-disabled detector must reach finalize so the next run retries it.
+
+    The skipped assets were never evaluated; without this flag the API keeps
+    the sweep position and the next run rediscovers nothing.
+    """
+    fake_session = _FakeSession(responses=[_FakeResponse({}), _FakeResponse({})])
+    monkeypatch.setattr("src.outputs.rest.requests.Session", lambda: fake_session)
+
+    context = OutputRuntimeContext(
+        source_id="source-1",
+        runner_id="runner-1",
+        managed_runner=True,
+        batch_size=20,
+    )
+    sink = RestOutputSink(
+        context, base_url="http://localhost:8000", timeout_sec=DEFAULT_REST_TIMEOUT_SEC
+    )
+
+    sink.set_detectors_degraded(["CUSTOM::ticket_triage", "CUSTOM::ticket_triage"])
+    await sink.start()
+    await sink.finish()
+
+    finalize_call = fake_session.calls[0]
+    assert finalize_call["url"].endswith("/sources/source-1/assets/finalize")
+    assert finalize_call["json"]["detectorsDegraded"] == ["CUSTOM::ticket_triage"]
+
+
+@pytest.mark.asyncio
+async def test_rest_output_finalize_omits_detectors_degraded_when_clean(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A clean run sends no flag, so the API keeps the sweep position."""
+    fake_session = _FakeSession(responses=[_FakeResponse({}), _FakeResponse({})])
+    monkeypatch.setattr("src.outputs.rest.requests.Session", lambda: fake_session)
+
+    context = OutputRuntimeContext(
+        source_id="source-1",
+        runner_id="runner-1",
+        managed_runner=True,
+        batch_size=20,
+    )
+    sink = RestOutputSink(
+        context, base_url="http://localhost:8000", timeout_sec=DEFAULT_REST_TIMEOUT_SEC
+    )
+
+    await sink.start()
+    await sink.finish()
+
+    finalize_call = fake_session.calls[0]
+    assert finalize_call["url"].endswith("/sources/source-1/assets/finalize")
+    assert "detectorsDegraded" not in finalize_call["json"]
+
+
+@pytest.mark.asyncio
 async def test_rest_output_omits_null_fields_in_nested_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

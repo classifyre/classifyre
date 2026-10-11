@@ -150,4 +150,18 @@ export class FinalizeIngestRunDto {
   })
   @IsOptional()
   cohortStats?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description:
+      'Detectors the circuit breaker disabled mid-run (scan-cache identity ' +
+      'keys). Their skipped assets carry breaker_open ERROR outcomes and were ' +
+      'never evaluated, so the saved sweep position is dropped and the next ' +
+      'run starts the sweep over; the scan cache still skips assets whose ' +
+      'banked detectors all match, so only the skipped work re-runs.',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  detectorsDegraded?: string[];
 }

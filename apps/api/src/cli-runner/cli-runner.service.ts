@@ -1370,7 +1370,9 @@ export class CliRunnerService {
       runner.id,
       {
         ...sourceWithDecryptedConfig,
-        ...(await this.resolveSamplingState(source)),
+        ...(await this.resolveSamplingState(source, {
+          restartSweep: forceFullRescan,
+        })),
       },
       hasSuccessfulRuns,
     );
@@ -2198,13 +2200,16 @@ export class CliRunnerService {
    * Never fails a run: if the comparison cannot be made the saved cursor is
    * used as it is, and the next run compares again.
    */
-  private async resolveSamplingState(source: {
-    id: string;
-    type: string;
-    config: unknown;
-    samplingCursor?: unknown;
-    samplingCursorFingerprint?: string | null;
-  }): Promise<{
+  private async resolveSamplingState(
+    source: {
+      id: string;
+      type: string;
+      config: unknown;
+      samplingCursor?: unknown;
+      samplingCursorFingerprint?: string | null;
+    },
+    options?: { restartSweep?: boolean },
+  ): Promise<{
     samplingCursor: unknown;
     samplingFingerprint?: string;
     samplingReset: boolean;
@@ -2221,6 +2226,37 @@ export class CliRunnerService {
       );
       const stored = source.samplingCursorFingerprint ?? null;
       if (stored === fingerprint) {
+        // A forced full rescan redoes the whole sweep, not just the cache:
+        // disabling the scan cache alone still leaves the AUTOMATIC cursor
+        // where the last run stopped, so a covered source would discover
+        // nothing. Start from scratch instead. A notebook source keeps its
+        // own state in the cursor and decides for itself.
+        if (
+          options?.restartSweep === true &&
+          source.type !== AssetType.CUSTOM &&
+          source.samplingCursor !== null &&
+          source.samplingCursor !== undefined
+        ) {
+          await this.prisma.$transaction([
+            this.prisma.source.update({
+              where: { id: source.id },
+              data: { samplingCursor: Prisma.DbNull },
+            }),
+            this.prisma.asset.updateMany({
+              where: { sourceId: source.id, payloadCursor: { not: Prisma.DbNull } },
+              data: { payloadCursor: Prisma.DbNull },
+            }),
+          ]);
+          this.logger.log(
+            `Source ${source.id}: forced full rescan; the sampling cursor was ` +
+              'dropped and this run starts the sweep from scratch.',
+          );
+          return {
+            samplingCursor: null,
+            samplingFingerprint: fingerprint,
+            samplingReset: false,
+          };
+        }
         return { ...unchanged, samplingFingerprint: fingerprint };
       }
 
