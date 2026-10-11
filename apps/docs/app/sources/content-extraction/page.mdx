@@ -1,14 +1,15 @@
 ---
 title: OCR & Transcription
-description: Read more than plain text — turn on OCR to extract text from images and documents, and transcription to turn audio and video into text for detectors.
+description: Read more than plain text — Classifyre automatically extracts text from images and documents with OCR, and turns audio and video into text with transcription, so detectors can see it.
 ---
 
 # OCR & Transcription
 
 Detectors work on **text**. A lot of important content, though, isn't text to
 begin with — it's locked inside scanned PDFs, screenshots, images, and audio or
-video files. Two optional switches let Classifyre unlock that content so your
-detectors can see it.
+video files. Classifyre unlocks that content automatically, so your detectors
+can see it. There is no switch to flip: this runs for every source, on every
+scan.
 
 ```mermaid
 graph TD
@@ -22,9 +23,9 @@ graph TD
     Trans --> Detect
 ```
 
-By default both are **off**: Classifyre reads the text that's already text and
-leaves the rest as metadata-only. Turn these on per source when there's value
-hidden in non-text content.
+There is nothing to configure per source. If a file's content calls for it, the
+text is extracted; if there is no text to find, the file is still catalogued
+with its metadata and tracked across scans.
 
 ---
 
@@ -33,19 +34,32 @@ hidden in non-text content.
 **OCR** (Optical Character Recognition) extracts readable text from images and
 supported binary documents before the text-capable detectors run.
 
-**Turn it on when** a source holds content like:
+It runs on content like:
 
 - Scanned PDFs and faxes
 - Screenshots and photos of documents
 - Images that may contain text (whiteboards, ID cards, forms)
 
-With OCR on, a screenshot that contains a leaked API key or a scanned form with
+A screenshot that contains a leaked API key or a scanned form with
 personal data becomes searchable by your detectors — instead of slipping through
 as "just an image."
 
-> **Trade-off:** OCR does extra work per image, so scans take a little longer.
-> Enable it on sources where image content genuinely matters, and leave it off
-> where everything is already text.
+How it works under the hood:
+
+- PDFs with a real text layer are read directly — no heavy machinery involved.
+  Only PDFs with almost no extractable text (fewer than 50 characters, the sign
+  of a scanned or image-only file) go through the full OCR pipeline.
+- Images (PNG, JPG, TIFF, BMP, WEBP, GIF, HEIC / HEIF) are read with OCR.
+  Animated GIFs contribute their first frame; HEIC / HEIF files are converted
+  to PNG first.
+- Tiny images are skipped: anything under 32 pixels on one axis — tracking
+  pixels, spacer images, favicons, page icons — holds no legible text, so it is
+  left as metadata rather than sent through OCR.
+
+> **Trade-off:** OCR does extra work per image, so scans of image-heavy sources
+> take a little longer. There is no per-source switch — to keep a scan focused,
+> exclude image extensions or paths in the source's
+> **[configuration](/sources/configuration/)** instead.
 
 ---
 
@@ -54,35 +68,48 @@ as "just an image."
 **Transcription** converts the speech in **audio and video** files into text, so
 detectors can run over what was *said*, not just the file's metadata.
 
-**Turn it on when** a source holds content like:
+It runs on content like:
 
 - Meeting or call recordings
 - Video posts and webinars
 - Voice notes and podcasts
 
-With transcription on, a recorded meeting where someone reads out a customer's
+A recorded meeting where someone reads out a customer's
 details becomes text your detectors can flag.
 
+How it works under the hood:
+
+- Audio files are transcribed with a speech model (faster-whisper, medium by
+  default, CPU).
+- Video files get both: a transcript of what was said **and** the text visible
+  on screen, read from sampled frames.
+- Deployments can trade speed for accuracy with the `CLASSIFYRE_WHISPER_MODEL`,
+  `CLASSIFYRE_WHISPER_DEVICE`, `CLASSIFYRE_WHISPER_COMPUTE_TYPE`,
+  `CLASSIFYRE_WHISPER_BEAM_SIZE`, `CLASSIFYRE_WHISPER_VAD_FILTER`, and
+  `CLASSIFYRE_WHISPER_WORD_TIMESTAMPS` environment variables. These are
+  deployment-wide settings, not per-source options.
+
 > **Trade-off:** Transcription is the heaviest content step — it's noticeably
-> slower than reading text or doing OCR, and it relies on the transcription
-> capability being available in your deployment. Reserve it for sources where
-> spoken content is worth the extra processing.
+> slower than reading text or doing OCR, and it needs the transcription
+> capability present in your deployment. If a source holds hours of recordings
+> you don't need searched, exclude those paths or extensions in the source's
+> **[configuration](/sources/configuration/)**.
 
 ---
 
 ## How they fit with the rest of a source
 
-- Both are part of a source's **[sampling](/sources/sampling/)** settings — they
-  decide *what content* is read from each sampled item, while sampling decides
+- Content extraction is automatic per file type — it decides *what content* is
+  read from each sampled item, while [sampling](/sources/sampling/) decides
   *which items* are read.
 - Extracted text flows into exactly the same detectors as ordinary text — there's
   nothing extra to configure on the detector side.
-- They're independent: turn on either, both, or neither.
+- They're independent: a file gets whichever of the two its content calls for.
 
-| Switch | Unlocks | Cost | Default |
-|---|---|---|---|
-| **OCR** | Text inside images & scanned documents | Some extra time per image | Off |
-| **Transcription** | Speech inside audio & video | Significant extra time; needs the capability available | Off |
+| Step | Unlocks | Cost |
+|---|---|---|
+| **OCR** | Text inside images & scanned documents | Some extra time per image |
+| **Transcription** | Speech inside audio & video | Significant extra time; needs the capability available |
 
 Next: confirm a source connects, and put scans on a schedule —
 **[Testing & Scheduling](/sources/testing/)**.

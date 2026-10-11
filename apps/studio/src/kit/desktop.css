@@ -1,0 +1,36 @@
+/*
+ * Only what a film needs of pages that were written for a browser.
+ *
+ * The landing page moves on CSS animations, which run on wall-clock time: a
+ * renderer that takes frames out of order would catch each at a different
+ * moment. They are switched off here; what should move is moved from the frame.
+ */
+[data-film-page] .cl-float,
+[data-film-page] .cl-net-svg,
+[data-film-page] .cl-thread,
+[data-film-page] .cl-pin-pulse,
+[data-film-page] .cl-tag-swap,
+[data-film-page] .cl-stamp {
+  animation: none !important;
+}
+
+[data-film-page] .cl-reveal,
+[data-film-page] .cl-stage {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* A full-bleed section is as wide as the browser window it is shown in, not
+   as the frame. */
+[data-film-page] .cl-bleed {
+  left: 0;
+  width: 100%;
+  max-width: 100%;
+  transform: none;
+}
+
+/* Nothing in a film is hovered or focused. */
+[data-film-page] * {
+  transition: none !important;
+  caret-color: transparent;
+}

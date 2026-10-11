@@ -20,6 +20,10 @@ import {
 import type { CustomDetectorEditorHandle } from "@/components/custom-detector-editor";
 import { LLMDetectorEditor } from "@/components/llm-detector-editor";
 import type { LLMDetectorEditorHandle } from "@/components/llm-detector-editor";
+import {
+  DecisionDetectorEditor,
+  type DecisionDetectorEditorHandle,
+} from "@/components/decision-detector-editor";
 import { TagDetectorEditor } from "@/components/tag-detector-editor";
 import type { TagDetectorEditorHandle } from "@/components/tag-detector-editor";
 import {
@@ -60,6 +64,7 @@ export const DetectorEditorForm = React.forwardRef<
   const regexRef = React.useRef<RegexDetectorEditorHandle>(null);
   const transformerRef = React.useRef<TransformerDetectorEditorHandle>(null);
   const llmRef = React.useRef<LLMDetectorEditorHandle>(null);
+  const decisionRef = React.useRef<DecisionDetectorEditorHandle>(null);
   const tagRef = React.useRef<TagDetectorEditorHandle>(null);
   const customRef = React.useRef<CustomDetectorEditorHandle>(null);
   const codeRef = React.useRef<CodeDetectorEditorHandle>(null);
@@ -75,6 +80,7 @@ export const DetectorEditorForm = React.forwardRef<
   const isPipelineDetector = detectorKind !== "legacy";
   const isRegexPipeline = detectorKind === "regex";
   const isLLMPipeline = detectorKind === "llm";
+  const isDecisionPipeline = detectorKind === "decision";
   const isTagPipeline = detectorKind === "tag";
   const isCodePipeline = detectorKind === "code";
   const isTransformerPipeline = detectorKind === "transformer";
@@ -130,6 +136,10 @@ export const DetectorEditorForm = React.forwardRef<
             await llmRef.current?.submit();
             return true;
           }
+          if (isDecisionPipeline) {
+            await decisionRef.current?.submit();
+            return true;
+          }
           if (isTagPipeline) {
             await tagRef.current?.submit();
             return true;
@@ -157,6 +167,7 @@ export const DetectorEditorForm = React.forwardRef<
       isPipelineDetector,
       isRegexPipeline,
       isLLMPipeline,
+      isDecisionPipeline,
       isTagPipeline,
       isCodePipeline,
       isTransformerPipeline,
@@ -217,6 +228,36 @@ export const DetectorEditorForm = React.forwardRef<
             isActive: payload.isActive,
             pipelineSchema: payload.pipelineSchema,
             aiProviderConfigId: payload.aiProviderConfigId,
+          });
+        }}
+      />
+    );
+  }
+
+  if (isDecisionPipeline) {
+    return (
+      <DecisionDetectorEditor
+        ref={decisionRef}
+        mode="edit"
+        detectorId={detector.id}
+        submitLabel={t("common.save")}
+        isSubmitting={isSaving}
+        embedded={embedded}
+        initialPipelineSchema={detector.pipelineSchema}
+        initialSecretKeys={
+          (detector as { secretKeys?: string[] }).secretKeys ?? []
+        }
+        initialName={detector.name}
+        initialKey={detector.key}
+        initialDescription={detector.description ?? ""}
+        initialIsActive={detector.isActive}
+        onSubmit={async (payload) => {
+          await handleSave({
+            name: payload.name,
+            key: payload.key,
+            description: payload.description,
+            isActive: payload.isActive,
+            pipelineSchema: payload.pipelineSchema,
           });
         }}
       />

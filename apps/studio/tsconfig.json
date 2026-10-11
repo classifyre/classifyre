@@ -9,6 +9,6 @@
       "@workspace/ui/*": ["../../packages/ui/src/*"]
     }
   },
-  "include": ["src", "videos", "remotion.config.ts"],
+  "include": ["src", "videos", "tools", "remotion.config.ts"],
   "exclude": ["node_modules", "out"]
 }

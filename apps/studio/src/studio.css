@@ -7,3 +7,9 @@
 
 @source "./**/*.{ts,tsx}";
 @source "../videos/**/*.{ts,tsx}";
+
+/* Components a video films where they live (src/borrow/README.md): their
+   classes exist only if Tailwind has read their files. */
+@source "../../blog/components/**/*.{ts,tsx}";
+@source "../../web/components/**/*.{ts,tsx}";
+@source "../../../packages/case-board/src/**/*.{ts,tsx}";

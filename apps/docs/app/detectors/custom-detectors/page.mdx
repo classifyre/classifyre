@@ -26,7 +26,7 @@ import {
 
 Custom detectors let you extend Classifyre with signals that are specific to your team, domain, or compliance requirements. You define what to detect — a business policy, a content category, an image label — and pick the method that fits the job.
 
-Each custom detector runs one of six detection engines, or your own Python as a **[code detector](/detectors/custom-detectors/code/)** — plus **Tag**, which runs nothing at all and instead records a fact a [Custom connector](/sources/custom-connectors/) already knows. This page describes each and links to its configuration reference.
+Each custom detector runs one of seven detection engines, or your own Python as a **[code detector](/detectors/custom-detectors/code/)** — plus **Tag**, which runs nothing at all and instead records a fact a [Custom connector](/sources/custom-connectors/) already knows. This page describes each and links to its configuration reference.
 
 <Separator className="my-8" />
 
@@ -46,6 +46,7 @@ Each custom detector runs one of six detection engines, or your own Python as a 
 | **GLiNER2**              | Text     | Pretrained (zero-shot)    | Entity extraction without labelled data           |
 | **Regex**                | Text     | No                        | Codes, IDs, structured patterns                   |
 | **AI Detector**          | Text     | LLM (via provider)        | Nuanced classification, structured extraction     |
+| **Decision Detector**    | Text     | Decision model (via provider) | Yes/no, pick-one and scale questions, answered with a probability |
 | **Text Classification**  | Text     | Fine-tuned HF model       | Spam, toxicity, sentiment, topic labels           |
 | **Image Classification** | Image    | Fine-tuned HF model       | NSFW, content moderation, custom image categories |
 | **Object Detection**     | Image    | Object-detection HF model | Bounding-box localisation, label-based severity   |
@@ -59,6 +60,8 @@ Each custom detector runs one of six detection engines, or your own Python as a 
 **Use GLiNER2** when you need entity extraction (names, places, custom concepts) but you don't want to manage a labelled training set. It generalises from label names alone.
 
 **Use AI Detector** for nuanced classification that would be hard to capture with a ruleset — risk signals, renewal intent, escalation tone, or any case where the context matters as much as the words.
+
+**Use a [Decision Detector](/detectors/custom-detectors/decision/)** when you already know the possible answers and want a probability for each: is this a complaint, which team owns it, how urgent is it. A decision model returns numbers rather than text, so there is nothing to parse.
 
 **Use Text or Image Classification** when you have a specific HuggingFace model already suited to your task. You get full control over the model checkpoint, device, and confidence threshold.
 

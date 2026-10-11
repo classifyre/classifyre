@@ -1098,7 +1098,7 @@ export type CustomDetectorResponseDto = {
   sourcesWithFindingsCount: number;
   recentSourceNames: string[];
   sourcesUsing: Array<{ id: string; name: string }>;
-  /** Code detectors (CODE_DETECTOR): names of the write-only secrets. */
+  /** Code (CODE_DETECTOR) and decision (DECISION) detectors: names of the write-only secrets. */
   secretKeys?: string[];
   createdAt: string;
   updatedAt: string;

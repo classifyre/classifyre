@@ -14,6 +14,7 @@ from ._base import (
     _resolve_pipeline_severity,
 )
 from ._custom_detector import CustomDetectorRunner
+from ._decision import DecisionRunner
 from ._factory import create_runner
 from ._gliner2 import (
     GLiNER2Runner,
@@ -37,6 +38,7 @@ __all__ = [
     "_TEXT_CONTENT_TYPES",
     "BaseRunner",
     "CustomDetectorRunner",
+    "DecisionRunner",
     "GLiNER2Runner",
     "ImageClassificationRunner",
     "LLMRunner",

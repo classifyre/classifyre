@@ -214,6 +214,18 @@ const CODE_DETECTOR_GUIDANCE =
   'Workflow: list_custom_detector_examples (copy a CODE_DETECTOR template and its testScenarios) -> create_custom_detector -> upload_custom_detector_file if the rule reads one -> run_custom_detector_notebook mode "preview_detect" on a real asset -> create_detector_test_scenario (input_asset fixtures) and run_detector_tests -> attach it to a source. ' +
   'Writing one needs the custom_source_code capability group.';
 
+/**
+ * When a decision detector is the right tool, and its whole shape. Repeated in
+ * the create tool's description for the same reason as the code detector's.
+ */
+const DECISION_GUIDANCE =
+  'DECISION asks a decision model typed questions and gets a probability back instead of text: yes_no (probability that the answer is yes; OpenAI "predicate", System One "noul"), choice (one of 2-255 options), score (a level on a 2-10 step scale, options ordered lowest first). ' +
+  'Choose it when the answer is a judgement with a fixed shape -- is this a complaint, which team owns it, how severe is it -- and no text needs to come back; use LLM when you need extracted fields or free text. ' +
+  'model is a LiteLLM name "<provider>/<model>" (typesafe/jev-latest, openai/gpt-6-luna, cloudflare/clef, perplexity/..., openrouter/..., strands_decider/<model> for any self-hosted /v1/systemone server); api_base is needed for self-hosted servers and Cloudflare. ' +
+  'The provider key is secrets.api_key: write-only, encrypted, returned only as secretKeys; on update `secrets` is a patch (omit it to keep the stored key, null removes it). The stored key is bound to its provider and api_base: change either and the key is dropped unless the same update sends it again. It takes no aiProviderConfigId. ' +
+  'Findings: a yes_no question yields finding type <name> when the probability reaches its threshold (default 0.5); choice and score yield <name>:<option label> with the model confidence, unless that option has report: false. Severity resolves option -> question -> detector. ' +
+  'Ask about something observable, one thing per question, and give choice questions a catch-all option with report: false.';
+
 function jsonResult(payload: unknown) {
   let bounded = payload;
   let truncated = false;
@@ -1975,7 +1987,7 @@ export class McpServerFactoryService {
       {
         title: 'List Custom Detector Examples',
         description:
-          'Return starter examples for every engine: rulesets, classifiers, entity detectors, AI (LLM) detectors and code detectors (CODE_DETECTOR). Code-detector templates include their notebook and ready-made testScenarios -- copy both when creating one.',
+          'Return starter examples for every engine: rulesets, classifiers, entity detectors, AI (LLM) detectors, decision detectors (DECISION) and code detectors (CODE_DETECTOR). Code-detector templates include their notebook and ready-made testScenarios -- copy both when creating one.',
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
@@ -1989,7 +2001,9 @@ export class McpServerFactoryService {
       {
         title: 'Create Custom Detector',
         description:
-          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, TAG or CODE_DETECTOR. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={"<key>": "<value>"}), and it is not selectable on a source. ' +
+          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), DECISION, TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, TAG or CODE_DETECTOR. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={"<key>": "<value>"}), and it is not selectable on a source. ' +
+          DECISION_GUIDANCE +
+          ' ' +
           CODE_DETECTOR_GUIDANCE,
         inputSchema: {
           key: z.string().optional(),
@@ -2003,7 +2017,7 @@ export class McpServerFactoryService {
               'AI provider credential ID. Required for LLM (AI) detectors.',
             ),
           pipeline_schema: jsonObjectSchema.describe(
-            'Pipeline schema. GLiNER2 example: { type: "GLINER2", entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } } }. LLM (AI) example: { type: "LLM", system_prompt: "Classify the sentiment of the text.", labels: [{ name: "good" }, { name: "bad" }, { name: "violent" }], severity_map: [{ pattern: "violent", severity: "critical" }], output_fields: [{ name: "language", type: "string" }] }. TAG example: { type: "TAG", label: "Cardholder data", severity: "high" }. CODE_DETECTOR example: { type: "CODE_DETECTOR", notebook: { cells: [{ id: "c1", type: "code", source: "def detect(asset, ctx):\\n    for i, row in enumerate(asset.rows()):\\n        if row[\'total\'] != row[\'a\'] + row[\'b\']:\\n            yield Finding(label=\'total_mismatch\', value=str(row[\'total\']), identity=f\'row-{i}\', location={\'row\': i})\\n" }] }, severity: "high", category: "QUALITY", fields: [{ name: "expected", type: "number" }], variables: {}, secrets: {}, needs_findings: false }',
+            'Pipeline schema. GLiNER2 example: { type: "GLINER2", entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } } }. LLM (AI) example: { type: "LLM", system_prompt: "Classify the sentiment of the text.", labels: [{ name: "good" }, { name: "bad" }, { name: "violent" }], severity_map: [{ pattern: "violent", severity: "critical" }], output_fields: [{ name: "language", type: "string" }] }. TAG example: { type: "TAG", label: "Cardholder data", severity: "high" }. DECISION example: { type: "DECISION", model: "typesafe/jev-latest", secrets: { api_key: "<provider key>" }, severity: "medium", questions: [{ name: "refund_request", type: "yes_no", instructions: "Is the customer asking for a refund?" }, { name: "urgency", type: "choice", instructions: "How urgent is this?", options: [{ label: "low", description: "can wait a week", report: false }, { label: "high", description: "needs action today", severity: "high" }] }, { name: "frustration", type: "score", instructions: "How frustrated is the customer?", options: [{ label: "calm", report: false }, { label: "annoyed", severity: "low" }, { label: "angry", severity: "high" }] }] }. CODE_DETECTOR example: { type: "CODE_DETECTOR", notebook: { cells: [{ id: "c1", type: "code", source: "def detect(asset, ctx):\\n    for i, row in enumerate(asset.rows()):\\n        if row[\'total\'] != row[\'a\'] + row[\'b\']:\\n            yield Finding(label=\'total_mismatch\', value=str(row[\'total\']), identity=f\'row-{i}\', location={\'row\': i})\\n" }] }, severity: "high", category: "QUALITY", fields: [{ name: "expected", type: "number" }], variables: {}, secrets: {}, needs_findings: false }',
           ),
           isActive: z.boolean().optional(),
         },
@@ -2028,7 +2042,7 @@ export class McpServerFactoryService {
       {
         title: 'Update Custom Detector',
         description:
-          'Update detector metadata, pipeline schema, AI provider credential, or activation status. For a CODE_DETECTOR, send the whole pipeline_schema (notebook included); `secrets` is a patch -- a string sets a key, null deletes it, and omitting `secrets` keeps every stored secret (values are never returned, only secretKeys). Saving a changed notebook bumps notebook.revision.',
+          'Update detector metadata, pipeline schema, AI provider credential, or activation status. For a CODE_DETECTOR, send the whole pipeline_schema (notebook included); `secrets` is a patch -- a string sets a key, null deletes it, and omitting `secrets` keeps every stored secret (values are never returned, only secretKeys). Saving a changed notebook bumps notebook.revision. A DECISION detector follows the same `secrets` patch rule for its api_key: send the whole pipeline_schema and leave `secrets` out to keep the stored key.',
         inputSchema: {
           id: z.string().uuid(),
           key: z.string().optional(),
@@ -2236,6 +2250,7 @@ export class McpServerFactoryService {
           '{"entities": {label: [{value}]}}) is also accepted. ' +
           'Labels compare case-insensitively with underscores treated as spaces, so ' +
           '"market_gaming_instruction" matches "Market gaming instruction". ' +
+          'DECISION detectors: expected {"label": "<question name>"} for a yes_no question or {"label": "<question name>:<option label>"} for choice and score, with an optional "minConfidence". ' +
           'CODE_DETECTOR (code) detectors: expected {"findings": [{"label": "total_mismatch", "identity": "row-2", "severity": "high", "count": 1}], "match": "subset"|"exact"} or {"shouldMatch": false}; ' +
           'and instead of input_text they may take input_asset, a whole asset: ' +
           '{"name": "t.csv", "kind": "table", "mime_type": "text/csv", "metadata": {...}, "rows": [{...}], "pages": ["..."], "text": "..."}.',

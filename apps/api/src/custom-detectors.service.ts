@@ -26,11 +26,20 @@ import {
   CODE_DETECTOR_PIPELINE_TYPE,
   isCodeDetectorSchema,
   withNotebookRevision,
-  maskCodeDetectorSchema,
-  mergeCodeDetectorSecrets,
   validateCodeDetectorSchema,
-  versionedShape,
 } from './custom-detector-code';
+import {
+  DECISION_PIPELINE_TYPE,
+  decisionEndpointKey,
+  isDecisionSchema,
+  validateDecisionSchema,
+} from './custom-detector-decision';
+import {
+  carriesSecrets,
+  maskDetectorSecrets,
+  mergeDetectorSecrets,
+  versionedShape,
+} from './custom-detector-secrets';
 import { stableStringify } from './utils/masked-config.utils';
 import { resolveSchemaFile } from './utils/schema-path';
 import { CreateCustomDetectorDto } from './dto/create-custom-detector.dto';
@@ -168,8 +177,10 @@ function answerDimensionFor(
   if (!pipelineType) return null;
   switch (pipelineType.toUpperCase()) {
     // A code detector's label names the problem ("total_mismatch"); its value
-    // is the evidence ("total 523 != 520").
+    // is the evidence ("total 523 != 520"). A decision's answer is the
+    // finding type too: `urgency:high`.
     case 'CODE_DETECTOR':
+    case 'DECISION':
     case 'LLM':
     case 'TEXT_CLASSIFICATION':
     case 'IMAGE_CLASSIFICATION':
@@ -772,6 +783,7 @@ export class CustomDetectorsService {
       'OBJECT_DETECTION',
       CustomDetectorsService.TAG_PIPELINE_TYPE,
       CODE_DETECTOR_PIPELINE_TYPE,
+      DECISION_PIPELINE_TYPE,
     ];
     if (!validTypes.includes(schemaType)) {
       throw new BadRequestException(
@@ -783,6 +795,12 @@ export class CustomDetectorsService {
       // Its own rules: code, packages, variables, secrets, fields, limits.
       // None of the numeric knobs below mean anything to a notebook.
       validateCodeDetectorSchema(schema);
+      return;
+    }
+
+    if (schemaType === DECISION_PIPELINE_TYPE) {
+      // Its own rules too: a model name, typed questions, one secret.
+      validateDecisionSchema(schema);
       return;
     }
 
@@ -937,24 +955,35 @@ export class CustomDetectorsService {
   }
 
   /**
-   * The pipeline schema as it is stored: a code detector's secrets encrypted,
-   * merged as a patch onto what is already stored (see
-   * mergeCodeDetectorSecrets). Other pipeline types pass through untouched.
+   * The pipeline schema as it is stored: the secrets of an engine that carries
+   * them (a code detector's credentials, a decision detector's API key)
+   * encrypted and merged as a patch onto what is already stored (see
+   * mergeDetectorSecrets). Other pipeline types pass through untouched.
+   *
+   * Stored secrets carry over only within one engine: a detector switched from
+   * code to decision does not inherit credentials meant for something else.
+   *
+   * A decision detector's key also stays with the endpoint it was entered for
+   * (see decisionEndpointKey): change the provider or the API base and the
+   * stored key is dropped unless the same request supplies a new one.
    */
   private withStoredSecrets(
     incoming: Record<string, unknown>,
     existing: Record<string, unknown> | null,
   ): Record<string, unknown> {
-    if (!isCodeDetectorSchema(incoming)) {
+    if (!carriesSecrets(incoming)) {
       return incoming;
     }
-    const stored = isCodeDetectorSchema(existing)
-      ? existing?.secrets
-      : undefined;
-    const secrets = mergeCodeDetectorSecrets(
-      stored,
-      incoming.secrets,
-      (value) => this.crypto.encryptString(value),
+    const sameEngine =
+      carriesSecrets(existing) &&
+      String(existing?.type).toUpperCase() ===
+        String(incoming.type).toUpperCase();
+    const sameEndpoint =
+      !isDecisionSchema(incoming) ||
+      decisionEndpointKey(existing) === decisionEndpointKey(incoming);
+    const stored = sameEngine && sameEndpoint ? existing?.secrets : undefined;
+    const secrets = mergeDetectorSecrets(stored, incoming.secrets, (value) =>
+      this.crypto.encryptString(value),
     );
     const next: Record<string, unknown> = { ...incoming };
     delete next.secrets;
@@ -966,9 +995,10 @@ export class CustomDetectorsService {
 
   /**
    * Everything a CLI process needs to run a detector, injected at dispatch and
-   * never stored: LLM provider credentials, and for a code detector its
-   * decrypted secrets, its database id and its uploaded files (name + content
-   * hash, and a download URL when the caller knows the namespaced API base).
+   * never stored: LLM provider credentials, a decision detector's decrypted
+   * API key, and for a code detector its decrypted secrets, its database id
+   * and its uploaded files (name + content hash, and a download URL when the
+   * caller knows the namespaced API base).
    * Public: scans, test scenarios and notebook previews all dispatch through it.
    *
    * `filesBaseUrl` is required for every dispatch that reaches a CLI process
@@ -989,7 +1019,7 @@ export class CustomDetectorsService {
       asRecord(row.pipelineSchema),
       row.aiProviderConfigId ?? null,
     );
-    if (!isCodeDetectorSchema(schema)) {
+    if (!carriesSecrets(schema)) {
       return schema;
     }
     const secrets = asRecord(schema.secrets);
@@ -999,6 +1029,10 @@ export class CustomDetectorsService {
       decrypted[key] = this.crypto.isEncryptedValue(value)
         ? this.crypto.decryptString(value)
         : value;
+    }
+    if (!isCodeDetectorSchema(schema)) {
+      // A decision detector: the key is all the scan needs from here.
+      return { ...schema, secrets: decrypted };
     }
     const files = await this.prisma.customDetectorFile.findMany({
       where: { customDetectorId: row.id },
@@ -1096,7 +1130,7 @@ export class CustomDetectorsService {
   ): CustomDetectorResponseDto {
     const latestRun = detector.trainingRuns?.[0] ?? null;
     // Secret values are write-only: a response carries their names only.
-    const { schema: pipelineSchema, secretKeys } = maskCodeDetectorSchema(
+    const { schema: pipelineSchema, secretKeys } = maskDetectorSecrets(
       asRecord((detector as any).pipelineSchema),
     );
     const detectorType =
@@ -1117,7 +1151,7 @@ export class CustomDetectorsService {
           ? pipelineSchema.severity
           : null,
       answerDimension: answerDimensionFor(detectorType),
-      ...(isCodeDetectorSchema(pipelineSchema) ? { secretKeys } : {}),
+      ...(carriesSecrets(pipelineSchema) ? { secretKeys } : {}),
       aiProviderConfigId: (detector as any).aiProviderConfigId ?? null,
       isActive: detector.isActive,
       version: detector.version,
@@ -1639,6 +1673,10 @@ export class CustomDetectorsService {
     [
       'LLM',
       'nuanced judgement no smaller model captures (needs aiProviderConfigId; never provider_runtime)',
+    ],
+    [
+      'DECISION',
+      'yes/no, pick-one or scale questions that a decision model (System One / Decisions API) answers with a probability instead of text (needs a provider API key a person enters)',
     ],
   ];
 

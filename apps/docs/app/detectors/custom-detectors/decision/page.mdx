@@ -1,0 +1,406 @@
+---
+title: Decision Detector
+description: Ask a decision model yes/no, pick-one and scale questions about your content. Each answer comes back as a probability and becomes a finding.
+---
+
+import { PipelineSchemaTable } from "@/components/pipeline-schema-table"
+import { Badge, Separator } from "@workspace/ui/components"
+import { Callout } from "nextra/components"
+
+# Decision Detector
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  Text · System One · Decisions API
+</Badge>
+
+A Decision Detector asks a model **questions with a fixed shape** about your
+content, and gets **numbers back instead of text**.
+
+You write questions such as *"Is the customer asking for a refund?"*. The model
+answers *"yes, 97% sure"*. Classifyre turns that answer into a finding, with the
+name and the severity you chose.
+
+<Separator className="my-6" />
+
+## The idea in one minute
+
+A normal AI model writes text. A **decision model** does not. You give it some
+content and a list of questions, and for every question it returns a
+probability.
+
+| You ask | The model returns | It becomes |
+| --- | --- | --- |
+| *Is the customer asking for a refund?* | `0.97` (97% yes) | A finding called `refund_request` |
+| *How urgent is this: low or high?* | `high`, 93% sure | A finding called `urgency:high` |
+| *How frustrated is the customer: calm, annoyed or angry?* | `angry`, 86% sure | A finding called `frustration:angry` |
+
+There is no generated text to parse, and the same question on the same content
+gives a comparable number every time. That makes a decision model a good fit
+when you already know what the possible answers are.
+
+Decision models are also called **System One** models. Several providers offer
+them, and they do not all speak the same API. Classifyre calls every one of them
+through [LiteLLM](https://docs.litellm.ai/), so you pick a model by name and the
+rest is handled for you.
+
+<Separator className="my-6" />
+
+## When to use
+
+Use a Decision Detector when the answer is a **judgement with a fixed shape**:
+
+- **Yes or no** — is this a complaint, does this contract renew automatically,
+  does this message threaten legal action.
+- **One of a few options** — which team owns this, which topic is it about, who
+  carries the liability.
+- **A level on a scale** — how urgent, how frustrated, how risky.
+
+Pick a different detector when the job is different:
+
+| Reach for | When |
+| --- | --- |
+| **Decision Detector** | You know the possible answers and want a probability for each. |
+| **[AI Detector](/detectors/custom-detectors/llm/)** | You need text back: extracted fields, a quoted passage, a reason. |
+| **[Regex](/detectors/custom-detectors/regex/)** | The answer is a fixed token in the content, such as an order number. |
+| **[Text Classification](/detectors/custom-detectors/text-classification/)** | A ready-made HuggingFace classifier already does exactly this, and you want it to run locally. |
+| **[Code detector](/detectors/custom-detectors/code/)** | The rule is a calculation or a lookup, not a judgement. |
+
+<Separator className="my-6" />
+
+## The three question types
+
+Every question has a **name**, a **type** and the **question itself**. The name
+is short, because it becomes the finding type.
+
+### Yes / No
+
+The model returns how likely the answer is *yes*.
+
+```json
+{
+  "name": "refund_request",
+  "type": "yes_no",
+  "instructions": "Is the customer asking for a refund?"
+}
+```
+
+- A finding called `refund_request` is recorded when the probability reaches the
+  **threshold**. The default threshold is `0.5`.
+- A *no* is never a finding. Ask the question so that *yes* is the thing you
+  want to hear about.
+
+### Pick one
+
+The model picks exactly one answer from your list.
+
+```json
+{
+  "name": "urgency",
+  "type": "choice",
+  "instructions": "How soon does this ticket need a reply?",
+  "options": [
+    { "label": "routine", "description": "No deadline is mentioned", "report": false },
+    { "label": "this_week", "description": "A deadline within days is mentioned" },
+    { "label": "today", "description": "The customer is blocked now", "severity": "high" }
+  ]
+}
+```
+
+- The finding is called `<name>:<answer>`, for example `urgency:today`.
+- `"report": false` means *this answer is fine, do not record it*. Use it for
+  the normal case and for a catch-all such as `other`.
+- Each answer can have its own severity.
+- A question takes 2 to 255 answers.
+
+### Score
+
+The model places the content on a scale you define. List the levels from
+**lowest to highest**.
+
+```json
+{
+  "name": "frustration",
+  "type": "score",
+  "instructions": "How frustrated is the customer?",
+  "options": [
+    { "label": "calm", "report": false },
+    { "label": "annoyed", "severity": "low" },
+    { "label": "angry", "description": "Hostile language or threats", "severity": "high" }
+  ]
+}
+```
+
+- The model returns a score between the levels, such as `1.9` on a scale from
+  `0` to `2`. Classifyre reports the level the score is nearest to, here
+  `angry`.
+- The finding is called `<name>:<level>`, for example `frustration:angry`.
+- A scale takes 2 to 10 levels.
+
+<Callout type="info">
+  The two APIs use different words for the same thing. A `yes_no` question is a
+  **predicate** in OpenAI's Decisions API and a **noul** in the System One
+  format. You always write `yes_no`; Classifyre translates.
+</Callout>
+
+<Separator className="my-6" />
+
+## Set it up
+
+**1. Create the detector.** Go to *Detectors → New* and choose **Decision
+detector**.
+
+**2. Pick the model.** Choose a provider. The model name is filled in for you
+and you can change it.
+
+**3. Paste the API key.** It is stored encrypted and never shown again. A
+self-hosted model usually needs no key.
+
+**4. Write your questions.** Add a Yes / No, Pick-one or Score question. Under
+every question the form shows the findings it will produce, so you can see the
+result before you scan anything.
+
+**5. Add the detector to a source and scan.** Open the source, select the
+detector, and run a scan. The findings appear like those of any other detector.
+
+<Callout type="info">
+  Not sure where to begin? In the Questions section, **Start from an example**
+  loads a complete, working set of questions that you can edit.
+</Callout>
+
+<Separator className="my-6" />
+
+## Providers
+
+You choose a provider in the form. Behind it is one field, the **model**, written
+as `provider/model`.
+
+| Provider | Example model | API key | Endpoint URL |
+| --- | --- | --- | --- |
+| **TypeSafe Jev** | `typesafe/jev-latest` | Required | Not needed |
+| **OpenAI Decisions** | `openai/gpt-6-luna` | Required | Not needed |
+| **Cloudflare Clef** | `cloudflare/clef`, `cloudflare/clef-flash` | Required | Required. It contains your account ID. |
+| **Perplexity** | `perplexity/pplx-decider-v1-27b` | Required | Not needed |
+| **OpenRouter** | `openrouter/typesafe/jev-1.13` | Required | Not needed |
+| **Self-hosted (System One)** | `strands_decider/<your model>` | Optional | Required. Your server's address. |
+| **Other** | Any `provider/model` LiteLLM supports | Optional | Depends on the provider |
+
+**Cloudflare.** Use this endpoint URL, with your own account ID in it:
+
+```text
+https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/ai/run
+```
+
+**Self-hosted.** Choose *Self-hosted (System One)* for a model you run yourself:
+Strands Decider, Laya, Nimble, OpenJev, or any server that answers
+`POST /v1/systemone`. Enter the server's address as the endpoint URL. Classifyre
+calls `<address>/v1/systemone`.
+
+**OpenRouter.** One OpenRouter key reaches many decision models. Write the model as
+`openrouter/<vendor>/<model>`, for example `openrouter/typesafe/jev-1.13`,
+`openrouter/openai/gpt-6-luna-decisions` or `openrouter/cloudflare/clef-flash`. This is the quickest way to
+try the same questions on several models.
+
+**A gateway.** To send calls through a gateway such as a LiteLLM proxy, keep the
+provider and set the endpoint URL under *Advanced*. Extra headers for routing go
+there too.
+
+<Callout type="info">
+  Classifyre ships LiteLLM 1.104.2. That release serves the providers in the
+  table above. LiteLLM is adding Databricks, Microsoft Foundry and vLLM; once a
+  release that includes them is installed, they work here by typing the model
+  name under *Other*. Nothing in the detector changes.
+</Callout>
+
+<Separator className="my-6" />
+
+## How an answer becomes a finding
+
+One call to the model answers all the questions of a detector. Each answer is
+then checked on its own.
+
+| Finding field | Comes from |
+| --- | --- |
+| Detector | Your Decision Detector. |
+| Type | The question name, or `<name>:<answer>` for Pick one and Score. |
+| Severity | The answer's severity, else the question's, else the detector's. |
+| Confidence | The probability of *yes*, or the model's confidence in the answer it picked. |
+| Matched content | The first 320 characters of the text that was judged. |
+| Extracted data | Every answer from the same call, with its confidence. |
+
+The editor labels severity as **Priority**. It is the same field.
+
+**Thresholds.** A threshold is the lowest confidence that still records a
+finding.
+
+- For **Yes / No** it is compared with the probability of *yes*. The default is
+  `0.5`.
+- For **Pick one** and **Score** it is compared with the model's confidence in
+  its answer. The default is `0`, which records every answer.
+
+An answer below its threshold is not lost silently. The scan log says how many
+answers a threshold discarded and what their confidence was.
+
+**Seeing every answer.** Open a finding and look at **Extracted data**. It lists
+all the questions of the detector with the answer and the confidence for each,
+including the answers that did not become findings.
+
+<Separator className="my-6" />
+
+## The API key
+
+- The key is **stored encrypted** and is **never returned**. The form only shows
+  that a key is stored.
+- To change it, click the field and paste the new key. To delete it, choose
+  **Remove**.
+- The key **belongs to the provider and endpoint you entered it for**. If you
+  change the provider or the endpoint URL, the stored key is removed and you
+  enter the key for the new one. This stops a key from being sent to an address
+  it was never meant for.
+- The key is redacted from scan logs.
+- Changing the key does not cause a rescan. Changing the model or a question
+  does, for this detector only.
+
+<Separator className="my-6" />
+
+## Good to know
+
+- **Text only.** The detector reads text. Images are not sent.
+- **Long content is cut.** The first 8,000 characters of each piece of content
+  are sent. You can raise this under *Advanced*.
+- **Up to 64 questions** per detector.
+- **A declined question.** A model may decline one question and answer the
+  others. The declined one produces no finding and is named in the scan log.
+- **Busy providers are retried.** A rate limit or a server error is retried with
+  a growing pause, up to 4 attempts.
+- **A refused key stops the detector.** If the provider rejects the key or the
+  quota is used up, the detector is switched off for the rest of that scan
+  instead of failing on every asset. Findings that were already recorded are
+  kept.
+- **After you fix the key, scan twice.** The next scan completes with the
+  detector healthy; the scan after that goes back over the assets it had
+  missed and checks them. Nothing else needs to change.
+- **Unchanged content is not asked again.** A rescan only calls the model for
+  content that changed, or after you changed the model or a question.
+
+<Separator className="my-6" />
+
+## Writing good questions
+
+- **Ask about something you can see in the text.** *"Does the writer ask for a
+  manager?"* works better than *"Is this serious?"*.
+- **One thing per question.** Split *"Is this urgent and about billing?"* into
+  two questions.
+- **Describe each answer.** A short description of when an answer applies is
+  what keeps two similar answers apart.
+- **Add a catch-all.** Give Pick-one questions an answer such as `other` or
+  `unclear`, set to *No finding*, so content that fits nothing is not forced
+  into a real answer.
+- **Make scale levels clearly different.** If two neighbouring levels are hard
+  to tell apart for you, they are hard for the model too.
+- **Set thresholds from real examples.** Run the detector on content you
+  already know the answer for, look at the confidence values, and then decide
+  where the threshold belongs.
+- **Keep dependent questions apart.** If one question only makes sense after
+  another, put them in separate detectors.
+
+<Separator className="my-6" />
+
+## Configuration
+
+Everything the form sets is stored as a pipeline schema of type `DECISION`. You
+only need this section when you create detectors through the API or the
+[MCP server](/settings/mcp-server/).
+
+### Detector
+
+<PipelineSchemaTable definition="DecisionPipelineSchema" />
+
+### Question
+
+<PipelineSchemaTable definition="DecisionQuestion" />
+
+### Answer (option)
+
+<PipelineSchemaTable definition="DecisionQuestionOption" />
+
+<Separator className="my-6" />
+
+## Examples
+
+### Support ticket triage
+
+```json
+{
+  "type": "DECISION",
+  "model": "typesafe/jev-latest",
+  "secrets": { "api_key": "<your TypeSafe key>" },
+  "severity": "medium",
+  "questions": [
+    {
+      "name": "refund_request",
+      "type": "yes_no",
+      "instructions": "Is the customer asking for money back, a refund or a chargeback?",
+      "severity": "low"
+    },
+    {
+      "name": "urgency",
+      "type": "choice",
+      "instructions": "How soon does this ticket need a reply?",
+      "options": [
+        { "label": "routine", "description": "No deadline is mentioned and nothing is blocked", "report": false },
+        { "label": "this_week", "description": "A deadline within days is mentioned", "severity": "medium" },
+        { "label": "today", "description": "The customer is blocked now or names today as the deadline", "severity": "high" }
+      ]
+    },
+    {
+      "name": "frustration",
+      "type": "score",
+      "instructions": "How frustrated is the customer?",
+      "options": [
+        { "label": "calm", "description": "Neutral or polite tone", "report": false },
+        { "label": "annoyed", "description": "Complains or repeats the request", "severity": "low" },
+        { "label": "angry", "description": "Hostile language or threats to leave", "severity": "high" }
+      ]
+    }
+  ]
+}
+```
+
+A ticket that says *"I was charged twice and want one charge refunded today.
+This is the third time I am asking."* produces three findings:
+`refund_request`, `urgency:today` and `frustration:angry`.
+
+### One question, on a model you host
+
+```json
+{
+  "type": "DECISION",
+  "model": "strands_decider/strands-decider-2B-hobson-v19",
+  "api_base": "http://decider.internal:8080",
+  "severity": "high",
+  "questions": [
+    {
+      "name": "needs_escalation",
+      "type": "yes_no",
+      "instructions": "Does the writer ask for a manager, threaten legal action or say they will go to the press?",
+      "threshold": 0.7
+    }
+  ]
+}
+```
+
+No key is stored, because the server does not ask for one. The higher threshold
+means a finding is recorded only when the model is at least 70% sure.
+
+<Separator className="my-6" />
+
+## Troubleshooting
+
+| What you see | What it means | What to do |
+| --- | --- | --- |
+| `authentication refused` in the scan log | The provider rejected the key. | Paste a valid key and check that it belongs to the provider you selected. The next scan checks the assets that were missed. |
+| `Unknown Decisions provider` | The part of the model name before the `/` is not a provider LiteLLM can call for decisions. | Check the spelling. The message lists the providers that work. |
+| `api_base is required` or `Missing CLOUDFLARE_ACCOUNT_ID` | The provider has no address of its own. | Enter the endpoint URL. |
+| No findings at all | Every answer was a *no*, or landed on an answer set to *No finding*. | Open the scan log, then loosen a threshold or change which answers are reported. |
+| `thresholds discarded N model answer(s)` | The model answered, but below your threshold. | Lower the threshold if you want those answers recorded. |
+| `returned no usable answer` | The model declined a question, or picked an answer that is not in your list. | Reword the question, or add the missing answer. |

@@ -12,6 +12,7 @@ from src.detectors.custom.detector import CustomDetector
 from src.detectors.custom.runners import GLiNER2Runner, RegexRunner
 from src.models.generated_detectors import (
     CustomDetectorConfig,
+    DecisionPipelineSchema,
     ImageClassificationPipelineSchema,
     LLMPipelineSchema,
     ObjectDetectionPipelineSchema,
@@ -23,6 +24,8 @@ _EXTERNAL_RUNTIME_SCHEMA_TYPES = (
     ImageClassificationPipelineSchema,
     ObjectDetectionPipelineSchema,
     LLMPipelineSchema,
+    # Calls a hosted decision model; its runner has its own test module.
+    DecisionPipelineSchema,
 )
 
 

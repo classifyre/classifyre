@@ -97,6 +97,12 @@ export interface FinalizeIngestRunDto {
      * @memberof FinalizeIngestRunDto
      */
     cohortStats?: object;
+    /**
+     * Detectors the circuit breaker disabled mid-run (scan-cache identity keys). Their skipped assets carry breaker_open ERROR outcomes and were never evaluated. The keys are remembered on the source while the sweep keeps advancing; the first later run that completes with none of them degraded restarts the sweep, and the scan cache still skips assets whose banked detectors all match, so only the skipped work re-runs.
+     * @type {Array<string>}
+     * @memberof FinalizeIngestRunDto
+     */
+    detectorsDegraded?: Array<string>;
 }
 
 /**
@@ -131,6 +137,7 @@ export function FinalizeIngestRunDtoFromJSONTyped(json: any, ignoreDiscriminator
         'relationshipErrors': json['relationshipErrors'] == null ? undefined : json['relationshipErrors'],
         'partialCoverage': json['partialCoverage'] == null ? undefined : json['partialCoverage'],
         'cohortStats': json['cohortStats'] == null ? undefined : json['cohortStats'],
+        'detectorsDegraded': json['detectorsDegraded'] == null ? undefined : json['detectorsDegraded'],
     };
 }
 
@@ -158,6 +165,7 @@ export function FinalizeIngestRunDtoToJSONTyped(value?: FinalizeIngestRunDto | n
         'relationshipErrors': value['relationshipErrors'],
         'partialCoverage': value['partialCoverage'],
         'cohortStats': value['cohortStats'],
+        'detectorsDegraded': value['detectorsDegraded'],
     };
 }
 

@@ -24,6 +24,7 @@ describe('SourceAssetsController', () => {
   const sourceService = {
     source: jest.fn(),
     updateSamplingCursor: jest.fn(),
+    updateDegradedDetectors: jest.fn(),
     acknowledgeSamplingFingerprint: jest.fn().mockResolvedValue(undefined),
   };
   const validationService = {
@@ -88,6 +89,149 @@ describe('SourceAssetsController', () => {
       false,
     );
     expect(sourceService.updateSamplingCursor).not.toHaveBeenCalled();
+  });
+
+  it('persists the sent sampling cursor on a clean run', async () => {
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'LOCAL_FOLDER',
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+    const cursor = { objects: { v: 1 } };
+
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-1',
+      seenHashes: ['h1'],
+      samplingCursor: cursor,
+    });
+
+    expect(sourceService.updateSamplingCursor).toHaveBeenCalledWith(
+      'source-1',
+      cursor,
+    );
+  });
+
+  it('persists an advancing cursor across degraded runs and remembers them', async () => {
+    // Dropping the cursor on every degraded run would pin the sweep to its
+    // first window for as long as the detector stays refused. The sweep keeps
+    // advancing instead; the degraded keys are remembered for later.
+    for (const [runnerId, cursor] of [
+      ['runner-1', { objects: { v: 1 } }],
+      ['runner-2', { objects: { v: 2 } }],
+    ] as const) {
+      sourceService.source.mockResolvedValue({
+        id: 'source-1',
+        type: 'LOCAL_FOLDER',
+        degradedDetectors: runnerId === 'runner-1' ? null : ['CUSTOM::ticket_triage'],
+      });
+      assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+
+      await controller.finalizeIngest('source-1', {
+        runnerId,
+        seenHashes: ['h1'],
+        samplingCursor: cursor,
+        detectorsDegraded: ['CUSTOM::ticket_triage'],
+      });
+
+      expect(sourceService.updateSamplingCursor).toHaveBeenCalledWith(
+        'source-1',
+        cursor,
+      );
+    }
+    expect(assetService.recordRunSamplingCursor).toHaveBeenCalledTimes(2);
+    expect(sourceService.updateDegradedDetectors).toHaveBeenLastCalledWith(
+      'source-1',
+      ['CUSTOM::ticket_triage'],
+    );
+  });
+
+  it('unions newly degraded detectors with the remembered ones', async () => {
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'LOCAL_FOLDER',
+      degradedDetectors: ['CUSTOM::old_detector'],
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-2',
+      seenHashes: ['h1'],
+      samplingCursor: { objects: { v: 2 } },
+      detectorsDegraded: ['CUSTOM::ticket_triage'],
+    });
+
+    expect(sourceService.updateSamplingCursor).toHaveBeenCalledWith(
+      'source-1',
+      { objects: { v: 2 } },
+    );
+    expect(sourceService.updateDegradedDetectors).toHaveBeenCalledWith(
+      'source-1',
+      ['CUSTOM::old_detector', 'CUSTOM::ticket_triage'],
+    );
+  });
+
+  it('drops the cursor once on the first clean run after degraded ones', async () => {
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'LOCAL_FOLDER',
+      degradedDetectors: ['CUSTOM::ticket_triage'],
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-3',
+      seenHashes: ['h1'],
+      samplingCursor: { objects: { v: 3 } },
+    });
+
+    // The sent cursor is ignored: this is the one run that restarts the
+    // sweep so the skipped assets are retried.
+    expect(sourceService.updateSamplingCursor).toHaveBeenCalledTimes(1);
+    expect(sourceService.updateSamplingCursor).toHaveBeenCalledWith(
+      'source-1',
+      undefined,
+    );
+    expect(sourceService.updateDegradedDetectors).toHaveBeenCalledWith(
+      'source-1',
+      null,
+    );
+    expect(assetService.recordRunSamplingCursor).not.toHaveBeenCalled();
+  });
+
+  it('leaves a notebook source cursor alone across the degraded episode', async () => {
+    // A CUSTOM source keeps its own resume state in the cursor; only it can
+    // decide what a degraded run means for its position.
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'CUSTOM',
+      degradedDetectors: ['CUSTOM::ticket_triage'],
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-1',
+      seenHashes: ['h1'],
+      samplingCursor: { notebook: { offset: 3 } },
+      detectorsDegraded: ['CUSTOM::ticket_triage'],
+    });
+    expect(sourceService.updateSamplingCursor).toHaveBeenCalledWith(
+      'source-1',
+      { notebook: { offset: 3 } },
+    );
+
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-2',
+      seenHashes: ['h1'],
+      samplingCursor: { notebook: { offset: 4 } },
+    });
+    expect(sourceService.updateSamplingCursor).toHaveBeenLastCalledWith(
+      'source-1',
+      { notebook: { offset: 4 } },
+    );
+    expect(sourceService.updateDegradedDetectors).toHaveBeenLastCalledWith(
+      'source-1',
+      null,
+    );
   });
 
   it('treats ALL sampling as a full scan (enables deletion)', async () => {

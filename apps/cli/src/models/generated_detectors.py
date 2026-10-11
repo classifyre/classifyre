@@ -972,7 +972,7 @@ class DetectorBudget(BaseModel):
 
     Without a budget a detector keeps being called after it has stopped working: an LLM detector on a provider that refused its key retried every asset for 15-40 seconds and held the only runner slot for 10 hours a day, failing on 451 of 451 assets. Every run already disables a detector after a non-retryable provider refusal (quota, auth, billing) and after 10 consecutive failures; these fields tighten or loosen that per detector.
 
-    A disabled detector records an ERROR outcome on the assets it skipped, so their existing findings are kept and the assets are retried on the next run. Changing the budget never invalidates the scan cache.
+    A disabled detector records an ERROR outcome on the assets it skipped, so their existing findings are kept; the sweep keeps advancing, and the skipped assets are retried once the detector works again. Changing the budget never invalidates the scan cache.
     """
 
     model_config = ConfigDict(
@@ -980,7 +980,7 @@ class DetectorBudget(BaseModel):
     )
     max_attempts: int | None = Field(
         None,
-        description='LLM detectors only: provider calls per asset, including the first. Overrides CLASSIFYRE_LLM_MAX_ATTEMPTS. A non-retryable refusal is never retried regardless.',
+        description='LLM and decision detectors only: provider calls per asset, including the first. Overrides CLASSIFYRE_LLM_MAX_ATTEMPTS. A non-retryable refusal is never retried regardless.',
         ge=1,
         le=10,
     )
@@ -1202,7 +1202,156 @@ class LLMPipelineSchema(BaseModel):
     )
 
 
+class DecisionQuestionType(StrEnum):
+    """
+    What kind of answer a decision question asks for. yes_no returns the probability that the answer is yes (OpenAI calls it predicate, System One calls it noul). choice picks one option from a fixed list. score places the content on an ordered scale.
+    """
+
+    yes_no = 'yes_no'
+    choice = 'choice'
+    score = 'score'
+
+
+class DecisionQuestionOption(BaseModel):
+    """
+    One answer a choice or score question can land on.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    label: str = Field(
+        ...,
+        description='The answer as the model sees it. It becomes the second half of the finding type: <question name>:<label>.',
+        max_length=200,
+        min_length=1,
+    )
+    description: str | None = Field(
+        '',
+        description='When this answer applies. Optional, but it is what keeps two neighbouring answers apart.',
+        max_length=2000,
+    )
+    severity: Severity | None = Field(
+        None,
+        description="Severity of the finding when the model lands on this answer. Null uses the question's severity.",
+    )
+    report: bool | None = Field(
+        True,
+        description='False for the expected, uninteresting answer ("other", "calm", "no risk"): the model may land on it and no finding is recorded.',
+    )
+
+
+class DecisionQuestion(BaseModel):
+    """
+    One typed question a decision model answers about the content. The model returns a probability, never text, so the answer is cheap, fast and comparable from one run to the next.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(
+        ...,
+        description='Short identifier, unique within the detector. It is the finding type for a yes_no question and the first half of it (<name>:<answer>) for choice and score.',
+        pattern='^[A-Za-z][A-Za-z0-9_-]{0,63}$',
+    )
+    type: DecisionQuestionType
+    instructions: str = Field(
+        ...,
+        description='The question, in plain language. Ask about something observable in the content and ask one thing per question.',
+        max_length=4000,
+        min_length=1,
+    )
+    options: list[DecisionQuestionOption] | None = Field(
+        [],
+        description='choice: the 2 to 255 answers to pick from. score: the 2 to 10 levels of the scale, lowest first. Not used by yes_no.',
+        max_length=255,
+        validate_default=True,
+    )
+    severity: Severity | None = Field(
+        None,
+        description="Severity of the findings this question produces. Null uses the detector's severity.",
+    )
+    threshold: float | None = Field(
+        None,
+        description="Minimum certainty to record a finding. yes_no compares it with the probability of yes and defaults to 0.5. choice and score compare it with the model's confidence in its answer and default to 0, which records every answer.",
+        ge=0.0,
+        le=1.0,
+    )
+
+
 class Type5(StrEnum):
+    DECISION = 'DECISION'
+
+
+class ApiBase(RootModel[str]):
+    root: str = Field(
+        None,
+        description="Endpoint URL. Null uses the provider's own. Required for self-hosted servers and for Cloudflare, where it carries the account id.",
+        max_length=2048,
+    )
+
+
+class ExtraHeaders(RootModel[str]):
+    root: str = Field(..., max_length=2048)
+
+
+class Secrets(RootModel[str]):
+    root: str = Field(..., max_length=8192)
+
+
+class DecisionPipelineSchema(BaseModel):
+    """
+    Decision detector. Sends content to a decision model (the Decisions API and System One family: TypeSafe Jev, OpenAI, Cloudflare Clef, Perplexity, OpenRouter, or a self-hosted server) with a list of typed questions. The model answers each with a probability instead of text; an answer that passes its threshold becomes a finding with your label, your severity, and the probability as its confidence. Calls go through LiteLLM, so any model LiteLLM serves on its decisions route works by its model name alone.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['DECISION'] = 'DECISION'
+    model: str = Field(
+        ...,
+        description='LiteLLM model name: <provider>/<model>, for example typesafe/jev-latest, openai/gpt-6-luna or cloudflare/clef. The provider prefix decides which API is called.',
+        max_length=200,
+        min_length=1,
+    )
+    api_base: ApiBase | None = Field(
+        None,
+        description="Endpoint URL. Null uses the provider's own. Required for self-hosted servers and for Cloudflare, where it carries the account id.",
+    )
+    extra_headers: dict[str, ExtraHeaders] | None = Field(
+        None,
+        description='Extra HTTP headers sent with every call, for a gateway that routes or attributes requests by header. Not for credentials: headers are stored and returned in plain text.',
+        max_length=20,
+    )
+    secrets: dict[str, Secrets] | None = Field(
+        None,
+        description='Credentials. api_key is the provider key. Write-only over the API, encrypted at rest, decrypted only into the scan process, redacted from every log. Send it as a patch: an absent key keeps what is stored, null removes it.',
+        max_length=8,
+    )
+    questions: list[DecisionQuestion] = Field(
+        ...,
+        description='The questions the model answers about each piece of content, all in one call.',
+        max_length=64,
+        min_length=1,
+    )
+    severity: Severity | None = Field(
+        Severity.medium,
+        description='Default severity for a finding whose question and answer do not set one.',
+    )
+    content_limit: int | None = Field(
+        8000, description='Maximum characters of content sent to the model.', ge=1
+    )
+    scope: DetectorScope | None = Field(
+        None,
+        description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
+    )
+    budget: DetectorBudget | None = Field(
+        None,
+        description='Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures.',
+    )
+
+
+class Type6(StrEnum):
     TEXT_CLASSIFICATION = 'TEXT_CLASSIFICATION'
 
 
@@ -1300,7 +1449,7 @@ class TextClassificationPipelineSchema(BaseModel):
     )
 
 
-class Type6(StrEnum):
+class Type7(StrEnum):
     IMAGE_CLASSIFICATION = 'IMAGE_CLASSIFICATION'
 
 
@@ -1361,7 +1510,7 @@ class ImageClassificationPipelineSchema(BaseModel):
     )
 
 
-class Type7(StrEnum):
+class Type8(StrEnum):
     OBJECT_DETECTION = 'OBJECT_DETECTION'
 
 
@@ -1426,7 +1575,7 @@ class ObjectDetectionPipelineSchema(BaseModel):
     )
 
 
-class Type8(StrEnum):
+class Type9(StrEnum):
     TAG = 'TAG'
 
 
@@ -1469,7 +1618,7 @@ class TagPipelineSchema(BaseModel):
     )
 
 
-class Type9(StrEnum):
+class Type10(StrEnum):
     code = 'code'
     markdown = 'markdown'
 
@@ -1487,7 +1636,7 @@ class DetectorNotebookCell(BaseModel):
         description='Stable cell identifier, unique within the notebook',
         pattern='^[A-Za-z0-9_-]{1,64}$',
     )
-    type: Type9
+    type: Type10
     source: str = Field(..., max_length=100000)
 
 
@@ -1533,7 +1682,7 @@ class DetectorNotebookPackage(BaseModel):
     )
 
 
-class Type10(StrEnum):
+class Type11(StrEnum):
     string = 'string'
     number = 'number'
     boolean = 'boolean'
@@ -1555,7 +1704,7 @@ class DetectorOutputField(BaseModel):
         description='Field name; a key in Finding(fields={...}) and in extracted_data.',
         pattern='^[A-Za-z_][A-Za-z0-9_]{0,63}$',
     )
-    type: Type10 | None = 'string'
+    type: Type11 | None = 'string'
     description: str | None = Field('', max_length=1000)
 
 
@@ -1627,15 +1776,11 @@ class CodeDetectorFileRuntime(BaseModel):
     )
 
 
-class Type11(StrEnum):
+class Type12(StrEnum):
     CODE_DETECTOR = 'CODE_DETECTOR'
 
 
 class Variables(RootModel[str]):
-    root: str = Field(..., max_length=8192)
-
-
-class Secrets(RootModel[str]):
     root: str = Field(..., max_length=8192)
 
 
@@ -1745,6 +1890,7 @@ class CustomDetectorConfig(DetectorConfig):
         | ObjectDetectionPipelineSchema
         | TagPipelineSchema
         | CodeDetectorPipelineSchema
+        | DecisionPipelineSchema
         | None
     ) = Field(None, discriminator='type', title='AnyPipelineSchema')
     max_findings: int | None = Field(

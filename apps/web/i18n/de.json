@@ -735,7 +735,7 @@
     },
     "cleanup": {
       "title": "Speicher & Bereinigung",
-      "description": "Wie viel Speicher dieser Arbeitsbereich belegt, und ein sicherer Weg, ihn zurückzugewinnen. Die Untersuchung selbst — Quellen, Befunde, Assets, Fälle, Anfrage-Beobachtung-Beobachtungen, Glossar — wird gemessen, aber hier nie gelöscht.",
+      "description": "Wie viel Speicher dieser Arbeitsbereich belegt, und ein sicherer Weg, ihn zurückzugewinnen. Die Untersuchung selbst — Quellen, Befunde, Assets, Fälle, Anfrage-Beobachtungen, Glossar — wird gemessen, aber hier nie gelöscht.",
       "totalData": "{{size}} Arbeitsbereichsdaten",
       "totalQueues": "{{size}} abgeschlossene Queue-Jobs",
       "colDataset": "Datensatz",
@@ -787,7 +787,7 @@
           "desc": "Fallakten mit Spuren, Threads, Nachweislinks und Hypothesen."
         },
         "inquiries": {
-          "name": "Anfrage-Beobachtung-Beobachtungen",
+          "name": "Anfrage-Beobachtungen",
           "desc": "Gespeicherte Untersuchungsfragen."
         },
         "glossary": {
@@ -904,7 +904,7 @@
     "autopilot": {
       "subtitle": "Ermittlungs-Autopilot",
       "title": "Autopilot",
-      "description": "Autonome KI-Agenten, die nach jedem Scan Anfrage-Beobachtung-Beobachtungen und Ermittlungsfälle verwalten. Alle Aktionen werden der KI zugeordnet und vollständig protokolliert.",
+      "description": "Autonome KI-Agenten, die nach jedem Scan Anfrage-Beobachtungen und Ermittlungsfälle verwalten. Alle Aktionen werden der KI zugeordnet und vollständig protokolliert.",
       "inquiryEnable": "Automatische Anfragenverwaltung",
       "inquiryEnableDesc": "Nach jedem Scan prüft die KI neue Funde, erstellt oder erweitert Anfragen, vermeidet Duplikate und signalisiert, wenn ein Fall angebracht ist.",
       "inquiryDesired": "Was gewünscht ist",
@@ -912,7 +912,7 @@
       "inquirySearchable": "Was durchsuchbar ist",
       "inquirySearchablePlaceholder": "Beschreiben Sie, welche Daten vorhanden und relevant sind, z. B. Confluence-Bereiche mit API-Doku, Jira-Projekte mit Support-Tickets…",
       "caseEnable": "Vollständige Fallverwaltung",
-      "caseEnableDesc": "Die KI erstellt und entwickelt Ermittlungsfälle aus Anfrage-Beobachtung-Beobachtungen: Hypothesen, Beweise, Funde, Notizen, Kanten und Statusänderungen.",
+      "caseEnableDesc": "Die KI erstellt und entwickelt Ermittlungsfälle aus Anfrage-Beobachtungen: Hypothesen, Beweise, Funde, Notizen, Kanten und Statusänderungen.",
       "caseGuidance": "Fall-Leitlinien",
       "caseGuidancePlaceholder": "Zusätzliche Anweisungen für die Fallverwaltung, z. B. Schweregrad-Konventionen, wann ein Fall geschlossen wird, Namensregeln…",
       "enabledToast": "Autopilot-Einstellung gespeichert",
@@ -1218,7 +1218,7 @@
       },
       "investigations": {
         "label": "Untersuchungen",
-        "description": "Fälle und Anfrage-Beobachtung-Beobachtungen mit Belegen, Spuren, Chronologie, Notizen und Threads."
+        "description": "Fälle und Anfrage-Beobachtungen mit Belegen, Spuren, Chronologie, Notizen und Threads."
       },
       "scanData": {
         "label": "Scan-Verlauf",
@@ -2293,12 +2293,166 @@
       "saving": "Wird gespeichert…",
       "validationProviderRequired": "KI-Anbieter auswählen",
       "budgetTitle": "Laufbudget",
-      "budgetHint": "Wie viel eines Laufs dieser Detektor mit Fehlschlägen verbringen darf. Jeder Lauf stoppt ihn bereits nach einer Ablehnung, die kein Wiederholen behebt (Kontingent, ungültiger Schlüssel, Abrechnung), oder nach 10 Fehlschlägen in Folge. Übersprungene Assets behalten ihre Befunde und werden im nächsten Lauf erneut geprüft. Eine Budgetänderung löst keinen erneuten Scan aus.",
+      "budgetHint": "Wie viel eines Laufs dieser Detektor mit Fehlschlägen verbringen darf. Jeder Lauf stoppt ihn bereits nach einer Ablehnung, die kein Wiederholen behebt (Kontingent, ungültiger Schlüssel, Abrechnung), oder nach 10 Fehlschlägen in Folge. Übersprungene Assets behalten ihre Befunde und werden erneut geprüft, sobald der Detektor wieder funktioniert. Eine Budgetänderung löst keinen erneuten Scan aus.",
       "budgetMaxAttempts": "Versuche pro Asset",
       "budgetMaxAttemptsPlaceholder": "Standard der Installation",
       "budgetMaxConsecutiveFailures": "Stopp nach Fehlschlägen in Folge",
       "budgetMaxWallClockSeconds": "Zeitbudget pro Lauf (Sekunden)",
       "budgetMaxWallClockSecondsPlaceholder": "kein Limit"
+    },
+    "decision": {
+      "createSubtitle": "Erstellen Sie einen Entscheidungs-Detektor. Wählen Sie ein Entscheidungsmodell, formulieren Sie die Fragen, die es zu Ihren Inhalten beantworten soll, und legen Sie fest, welche Antworten zu Funden werden.",
+      "stepIdentity": "Identität",
+      "stepIdentityDesc": "Name, Schlüssel und Status",
+      "stepModel": "Modell",
+      "stepModelDesc": "Anbieter, Modell und API-Schlüssel",
+      "stepQuestions": "Fragen",
+      "stepQuestionsDesc": "Was gefragt wird und was zum Fund wird",
+      "identityTitle": "Detektor-Identität",
+      "name": "Name",
+      "namePlaceholder": "z. B. Support-Ticket-Triage",
+      "keyLabel": "Schlüssel",
+      "keyHint": "Wird aus dem Namen abgeleitet, wenn leer",
+      "descriptionLabel": "Beschreibung",
+      "descriptionPlaceholder": "Was entscheidet dieser Detektor, und für wen?",
+      "activeLabel": "Aktiv — für die Quellenkonfiguration verfügbar",
+      "modelTitle": "Entscheidungsmodell",
+      "modelHint": "Das Modell, das Ihre Fragen beantwortet. Die Aufrufe laufen über LiteLLM, daher funktioniert hier jedes Entscheidungsmodell, das LiteLLM unterstützt.",
+      "provider": "Anbieter",
+      "model": "Modell",
+      "modelFieldHint": "Geschrieben als anbieter/modell. Wählen Sie einen Vorschlag oder geben Sie einen eigenen Namen ein.",
+      "providers": {
+        "typesafe": {
+          "name": "TypeSafe Jev",
+          "hint": "Die System-One-Modelle von TypeSafe. Benötigt einen TypeSafe-API-Schlüssel.",
+          "apiBaseHint": "Leer lassen, um TypeSafe direkt aufzurufen. Nur setzen, wenn Aufrufe über ein Gateway laufen sollen."
+        },
+        "openai": {
+          "name": "OpenAI Decisions",
+          "hint": "Die Decisions API von OpenAI. Benötigt einen OpenAI-API-Schlüssel.",
+          "apiBaseHint": "Leer lassen, um OpenAI direkt aufzurufen. Nur setzen, wenn Aufrufe über ein Gateway laufen sollen."
+        },
+        "cloudflare": {
+          "name": "Cloudflare Clef",
+          "hint": "Clef auf Workers AI. Benötigt ein API-Token und Ihre Konto-ID in der Endpunkt-URL.",
+          "apiBaseHint": "Ersetzen Sie <ACCOUNT_ID> durch Ihre Cloudflare-Konto-ID."
+        },
+        "perplexity": {
+          "name": "Perplexity",
+          "hint": "Die Entscheidungsmodelle von Perplexity. Benötigt einen Perplexity-API-Schlüssel.",
+          "apiBaseHint": "Leer lassen, um Perplexity direkt aufzurufen. Nur setzen, wenn Aufrufe über ein Gateway laufen sollen."
+        },
+        "openrouter": {
+          "name": "OpenRouter",
+          "hint": "Entscheidungsmodelle, die OpenRouter vermittelt. Benötigt einen OpenRouter-API-Schlüssel.",
+          "apiBaseHint": "Leer lassen, um OpenRouter direkt aufzurufen. Nur setzen, wenn Aufrufe über ein Gateway laufen sollen."
+        },
+        "self_hosted": {
+          "name": "Selbst betrieben (System One)",
+          "hint": "Ein Entscheidungsmodell, das Sie selbst betreiben: Strands Decider, Laya, Nimble, OpenJev oder jeder Server, der POST /v1/systemone beantwortet. Ein Schlüssel ist nur nötig, wenn Ihr Server einen verlangt.",
+          "apiBaseHint": "Die Adresse Ihres Servers. Aufrufe gehen an <Adresse>/v1/systemone."
+        },
+        "other": {
+          "name": "Anderes (beliebiges LiteLLM-Modell)",
+          "hint": "Jedes Entscheidungsmodell, das LiteLLM unterstützt. Geben Sie den vollständigen Namen als anbieter/modell ein.",
+          "apiBaseHint": "Nur nötig, wenn der Anbieter keine feste Adresse hat."
+        }
+      },
+      "apiKey": "API-Schlüssel",
+      "apiKeyPlaceholder": "API-Schlüssel des Anbieters einfügen",
+      "apiKeyReplacePlaceholder": "Neuen Schlüssel einfügen, um den gespeicherten zu ersetzen",
+      "apiKeyHint": "Wird verschlüsselt gespeichert und nie wieder angezeigt. Er wird nur verwendet, um das Modell während eines Scans aufzurufen.",
+      "apiKeyOptionalHint": "Optional. Leer lassen, wenn Ihr Server keinen Schlüssel benötigt.",
+      "apiKeyStored": "Ein Schlüssel ist gespeichert. Klicken Sie in das Feld, um ihn zu ersetzen.",
+      "apiKeyWillBeDropped": "Sie haben den Anbieter oder den Endpunkt geändert, daher wird der gespeicherte Schlüssel beim Speichern entfernt. Geben Sie den Schlüssel für den neuen ein.",
+      "apiKeyRemove": "Entfernen",
+      "apiKeyKeep": "Behalten",
+      "apiKeyRemoved": "Der Schlüssel wird beim Speichern entfernt",
+      "apiBase": "Endpunkt-URL",
+      "advancedTitle": "Erweitert",
+      "headers": "Zusätzliche Header",
+      "headersHint": "Werden mit jedem Aufruf gesendet, für ein Gateway, das Anfragen anhand von Headern weiterleitet oder zuordnet. Nicht für Zugangsdaten: Header werden im Klartext gespeichert und angezeigt.",
+      "headerName": "Header-Name",
+      "headerValue": "Header-Wert",
+      "addHeader": "Header hinzufügen",
+      "removeHeader": "Header entfernen",
+      "contentLimit": "Gesendete Zeichen pro Aufruf",
+      "contentLimitHint": "Längere Inhalte werden vor dem Senden auf diese Länge gekürzt. Leer bedeutet 8000.",
+      "questionsTitle": "Fragen",
+      "questionsHint": "Das Modell beantwortet jede Frage mit einer Wahrscheinlichkeit, nicht mit Text. Ein Aufruf beantwortet alle Fragen. Eine Antwort, die ihre Schwelle erreicht, wird zu einem Fund.",
+      "loadExample": "Mit einem Beispiel beginnen",
+      "defaultPriority": "Standard-Priorität",
+      "defaultPriorityHint": "Wird verwendet, wenn eine Frage oder eine Antwort keine eigene festlegt.",
+      "questionNumber": "Frage {{number}}",
+      "removeQuestion": "Frage entfernen",
+      "types": {
+        "yes_no": {
+          "title": "Ja / Nein",
+          "hint": "Das Modell gibt zurück, wie wahrscheinlich die Antwort Ja ist. Ein Fund wird erfasst, wenn dieser Wert die Schwelle erreicht.",
+          "placeholder": "Verlangt der Kunde eine Rückerstattung?"
+        },
+        "choice": {
+          "title": "Auswahl",
+          "hint": "Das Modell wählt genau eine Antwort aus Ihrer Liste. Jede Antwort kann zu einem Fund mit eigener Priorität werden oder zu keinem Fund.",
+          "placeholder": "Welches Team soll das bearbeiten?"
+        },
+        "score": {
+          "title": "Skala",
+          "hint": "Das Modell ordnet den Inhalt auf einer von Ihnen definierten Skala ein. Jede Stufe kann zu einem Fund mit eigener Priorität werden oder zu keinem Fund.",
+          "placeholder": "Wie verärgert ist der Kunde?"
+        }
+      },
+      "instructions": "Frage",
+      "questionName": "Fund-Name",
+      "questionPriority": "Priorität",
+      "priorityDetectorDefault": "Standard des Detektors",
+      "threshold": "Schwelle",
+      "thresholdYesNoHint": "Schwelle: wie wahrscheinlich „Ja“ sein muss, bevor ein Fund erfasst wird. Leer bedeutet 0,5.",
+      "thresholdPickHint": "Schwelle: wie sicher sich das Modell bei seiner Antwort sein muss, bevor ein Fund erfasst wird. Leer bedeutet 0, dann wird jede Antwort erfasst.",
+      "choices": "Antworten",
+      "choicesHint": "Mindestens 2. Fügen Sie eine Auffangantwort wie „sonstiges“ hinzu und stellen Sie sie auf Kein Fund, damit Inhalte, die zu nichts passen, nicht in eine echte Antwort gezwungen werden.",
+      "levels": "Stufen",
+      "levelsHint": "2 bis 10, von der niedrigsten zur höchsten. Stellen Sie die Stufe, die „nichts zu melden“ bedeutet, auf Kein Fund.",
+      "optionLabel": "Antwort",
+      "optionLabelPlaceholder": "antwort",
+      "optionDescription": "Wann sie zutrifft",
+      "optionDescriptionPlaceholder": "Wann trifft das zu? (optional)",
+      "optionFinding": "Fund",
+      "findingNone": "Kein Fund",
+      "findingDefault": "Priorität der Frage",
+      "addChoice": "Antwort hinzufügen",
+      "addLevel": "Stufe hinzufügen",
+      "removeOption": "Entfernen",
+      "moveUp": "Nach oben",
+      "moveDown": "Nach unten",
+      "becomes": "Funde:",
+      "becomesNothing": "noch keine",
+      "add": {
+        "yes_no": "Ja/Nein-Frage",
+        "choice": "Auswahlfrage",
+        "score": "Skalenfrage"
+      },
+      "saving": "Wird gespeichert…",
+      "problem": {
+        "nameMissing": "Geben Sie dem Detektor einen Namen",
+        "modelMissing": "Geben Sie ein Modell ein",
+        "modelFormat": "Schreiben Sie das Modell als anbieter/modell, ohne Leerzeichen",
+        "apiKeyMissing": "Dieser Anbieter benötigt einen API-Schlüssel",
+        "apiBaseMissing": "Dieser Anbieter benötigt eine Endpunkt-URL",
+        "apiBaseFormat": "Die Endpunkt-URL muss mit http:// oder https:// beginnen",
+        "headerName": "Ein Header-Name darf nur Buchstaben, Ziffern und Bindestriche enthalten. Authorization und Content-Type werden für Sie gesetzt.",
+        "contentLimit": "Geben Sie eine ganze Zahl ab 1 ein",
+        "noQuestions": "Fügen Sie mindestens eine Frage hinzu",
+        "tooManyQuestions": "Ein Detektor kann höchstens 64 Fragen stellen",
+        "questionName": "Mit einem Buchstaben beginnen und nur Buchstaben, Ziffern, _ und - verwenden",
+        "duplicateQuestion": "Eine andere Frage verwendet diesen Namen bereits",
+        "questionInstructions": "Formulieren Sie die Frage",
+        "optionCount": "Benötigt {{min}} bis {{max}} Einträge",
+        "optionLabel": "Jeder Eintrag braucht einen Namen",
+        "duplicateOption": "Zwei Einträge haben denselben Namen",
+        "threshold": "Geben Sie eine Zahl von 0 bis 1 ein",
+        "inQuestion": "Frage {{number}} ist unvollständig"
+      }
     },
     "startBlank": "Leer beginnen",
     "startBlankDesc": "Detektor ohne vorausgefüllte Werte von Grund auf konfigurieren.",
@@ -2342,6 +2496,12 @@
         "description": "Verwende ein Large Language Model mit einem natürlichsprachigen Prompt, um Inhalte zu klassifizieren und strukturierte Felder zu extrahieren. Am besten für nuancierte, kontextabhängige Erkennung, bei der Beispiele und Regeln schwer explizit zu definieren sind.",
         "tags": "Prompt-basiert, Klassifikation, Extraktion"
       },
+      "decision": {
+        "title": "Entscheidungs-Detektor",
+        "tagline": "Typisierte Fragen, beantwortet mit Wahrscheinlichkeiten",
+        "description": "Stellen Sie einem Entscheidungsmodell Ja/Nein-, Auswahl- und Skalenfragen zu Ihren Inhalten. Es beantwortet jede mit einer Wahrscheinlichkeit statt mit Text, und jede Antwort wird zu einem Fund mit Ihrem Label und Ihrer Priorität. Funktioniert mit TypeSafe Jev, OpenAI Decisions, Cloudflare Clef und selbst betriebenen System-One-Modellen.",
+        "tags": "System One, Decisions API, Wahrscheinlichkeiten"
+      },
       "text_classification": {
         "title": "Text-Klassifizierung",
         "tagline": "Feinabgestimmter HuggingFace-Klassifikator",
@@ -2367,6 +2527,12 @@
         "tags": "Manuell, Custom-Quellen, Kein Modell"
       },
       "custom_detector": {
+        "title": "Code-Detektor",
+        "tagline": "Regeln und Prüfungen in Python",
+        "description": "Prüfungen und Regeln über Zeilen, Text, Bytes oder Metadaten: Sie schreiben detect(asset, ctx) in einem Notebook und liefern Funde. Für das, was ein Muster oder Modell nicht ausdrücken kann: Summen, die aufgehen müssen, Listenabgleich, gemeinsames Auftreten anderer Funde, Kennungen mit Prüfziffer, Ihr eigenes Modell.",
+        "tags": "Python, Zeilen & Metadaten, Tests"
+      },
+      "code_detector": {
         "title": "Code-Detektor",
         "tagline": "Regeln und Prüfungen in Python",
         "description": "Prüfungen und Regeln über Zeilen, Text, Bytes oder Metadaten: Sie schreiben detect(asset, ctx) in einem Notebook und liefern Funde. Für das, was ein Muster oder Modell nicht ausdrücken kann: Summen, die aufgehen müssen, Listenabgleich, gemeinsames Auftreten anderer Funde, Kennungen mit Prüfziffer, Ihr eigenes Modell.",
@@ -2410,8 +2576,8 @@
       "reasonPatternRemoved": "Muster \"{{value}}\" wurde entfernt",
       "keptCited": "Behalten — in einem Fall zitiert: {{count}}",
       "keptWatched": "Behalten — von einer aktiven Anfrage-Beobachtung beobachtet: {{count}}",
-      "includeWatched": "Auch die {{count}} Befunde zurückziehen, die aktive Anfrage-Beobachtung-Beobachtungen beobachten",
-      "includeWatchedHint": "Diese Anfrage-Beobachtung-Beobachtungen verlieren diese Treffer. In einem Fall zitierte Befunde werden nie zurückgezogen.",
+      "includeWatched": "Auch die {{count}} Befunde zurückziehen, die aktive Anfrage-Beobachtungen beobachten",
+      "includeWatchedHint": "Diese Anfrage-Beobachtungen verlieren diese Treffer. In einem Fall zitierte Befunde werden nie zurückgezogen.",
       "willRetire": "{{count}} Befunde werden als erledigt markiert. Es wird kein Detektor-Feedback gespeichert, und sie öffnen sich automatisch wieder, wenn der Geltungsbereich erneut erweitert wird.",
       "notProvable": "Was diese Prüfung nicht beurteilen kann",
       "retireButton": "{{count}} Befunde zurückziehen",
@@ -2848,7 +3014,7 @@
       "title": "Titel",
       "status": "Status",
       "severity": "Priorität",
-      "inquiries": "Anfrage-Beobachtung-Beobachtungen",
+      "inquiries": "Anfrage-Beobachtungen",
       "updated": "Aktualisiert"
     },
     "statusLabels": {
@@ -3111,12 +3277,14 @@
     "provider": "Anbieter",
     "model": "Modell",
     "baseUrl": "Basis-URL",
-    "baseUrlDesc": "Endpunkt für OpenAI-kompatible Anfrage-Beobachtung-Beobachtungen (z.B. OpenRouter, Ollama, Azure OpenAI).",
+    "baseUrlDesc": "Endpunkt für OpenAI-kompatible Anfragen (z.B. OpenRouter, Ollama, Azure OpenAI).",
     "apiKey": "API-Schlüssel",
     "keyStored": "Schlüssel gespeichert. Klicken Sie auf das Feld, um ihn zu ersetzen.",
     "keyNotStored": "Der Schlüssel wird im Ruhezustand verschlüsselt und niemals zurückgegeben.",
     "enterNewKey": "Neuen Schlüssel zum Ersetzen eingeben…",
     "enterApiKey": "API-Schlüssel eingeben…",
+    "keyWillBeDropped": "Sie haben den Anbieter oder die Basis-URL geändert, daher wird der gespeicherte Schlüssel beim Speichern entfernt. Geben Sie den Schlüssel für den neuen Endpunkt ein.",
+    "apiKeyMissing": "Für diesen Anbieter ist ein API-Schlüssel erforderlich.",
     "testConnection": "Verbindung testen",
     "save": "Speichern",
     "testing": "Wird getestet…",
@@ -3184,7 +3352,7 @@
     "backToProviders": "Zurück zur Harness-Konfiguration",
     "editorDesc": "Konfigurieren Sie Zugangsdaten, Modellgrenzen und Funktionszuweisungen und prüfen Sie den Anbieter vor der Verwendung.",
     "providerAndModel": "Anbieter und Modell",
-    "providerAndModelDesc": "Wählen Sie Endpunkt und Modellkennung für Anfrage-Beobachtung-Beobachtungen.",
+    "providerAndModelDesc": "Wählen Sie Endpunkt und Modellkennung für Anfragen.",
     "runtimeAndPricing": "Laufzeit und Preise",
     "runtimeAndPricingDesc": "Beschreiben Sie Modellgrenzen und optionale Preise für Harness-Schätzungen.",
     "featureAssignments": "Funktionszuweisungen",
@@ -3281,7 +3449,7 @@
   },
   "casework": {
     "title": "Fallarbeit",
-    "subtitle": "Laufende Fälle und Anfrage-Beobachtung-Beobachtungen",
+    "subtitle": "Laufende Fälle und Anfrage-Beobachtungen",
     "viewAll": "Alle anzeigen"
   },
   "connections": {
@@ -3355,7 +3523,7 @@
       "newInquiry": "Neue Anfrage-Beobachtung",
       "newCase": "Neuer Fall",
       "tabCases": "Fälle",
-      "tabInquiries": "Anfrage-Beobachtung-Beobachtungen",
+      "tabInquiries": "Anfrage-Beobachtungen",
       "tabAutopilot": "Autopilot",
       "tabFingerprints": "Fingerabdrücke"
     },
@@ -3435,7 +3603,7 @@
       "aiModeUpdated": "KI-Modus aktualisiert",
       "archived": "Anfrage-Beobachtung archiviert",
       "deleted": "Anfrage-Beobachtung gelöscht",
-      "failedToLoadInquiries": "Anfrage-Beobachtung-Beobachtungen konnten nicht geladen werden",
+      "failedToLoadInquiries": "Anfrage-Beobachtungen konnten nicht geladen werden",
       "failedToLoadMatches": "Anfrage-Beobachtung-Treffer konnten nicht geladen werden"
     },
     "matchState": {
@@ -3518,15 +3686,15 @@
       "severityLabel": "Priorität",
       "assigneeLabel": "Zugewiesen an",
       "assigneePlaceholder": "Wer leitet diesen Fall? (optional)",
-      "drivingInquiries": "Treibende Anfrage-Beobachtung-Beobachtungen",
-      "selectInquiries": "Anfrage-Beobachtung-Beobachtungen auswählen (optional)",
-      "searchInquiries": "Anfrage-Beobachtung-Beobachtungen suchen…",
-      "noInquiriesFound": "Keine Anfrage-Beobachtung-Beobachtungen gefunden",
+      "drivingInquiries": "Treibende Anfrage-Beobachtungen",
+      "selectInquiries": "Anfrage-Beobachtungen auswählen (optional)",
+      "searchInquiries": "Anfrage-Beobachtungen suchen…",
+      "noInquiriesFound": "Keine Anfrage-Beobachtungen gefunden",
       "matchCount": "({{count}} Treffer)",
       "inquiryDrivesMany": "Eine Anfrage-Beobachtung kann mehrere Fälle gleichzeitig treiben.",
       "openCaseWithFindings": "Fall mit {{count}} Fund/Funden öffnen",
       "openCase": "Fall öffnen",
-      "emptyStartDesc": "Dieser Fall startet leer. Wählen Sie links Anfrage-Beobachtung-Beobachtungen aus, um deren Treffer als erste Beweise einzubringen – oder fügen Sie Beweise später direkt aus dem Fallarbeitsbereich hinzu.",
+      "emptyStartDesc": "Dieser Fall startet leer. Wählen Sie links Anfrage-Beobachtungen aus, um deren Treffer als erste Beweise einzubringen – oder fügen Sie Beweise später direkt aus dem Fallarbeitsbereich hinzu.",
       "loadingMatches": "Treffer werden geladen…",
       "selectionCount": "{{selected}}/{{total}} ausgewählt",
       "selectionDesc": "Ausgewählte Treffer werden als Beweise in den Fall kopiert – der Fall behält seinen eigenen Snapshot und Sie können jederzeit neuere Treffer ziehen.",
@@ -3535,7 +3703,7 @@
       "pullFailed": "Fall geöffnet, aber einige Beweise konnten nicht übernommen werden – erneut aus dem Fall ziehen.",
       "failedToOpenCase": "Fall konnte nicht geöffnet werden",
       "titleRequired": "Geben Sie dem Fall einen Titel",
-      "failedToLoadInquiries": "Anfrage-Beobachtung-Beobachtungen konnten nicht geladen werden",
+      "failedToLoadInquiries": "Anfrage-Beobachtungen konnten nicht geladen werden",
       "failedToLoadMatches": "Anfrage-Beobachtung-Treffer konnten nicht geladen werden"
     },
     "autopilot": {
@@ -3655,7 +3823,7 @@
       "runDialog": {
         "titleGeneral": "Autopilot jetzt starten",
         "titleCase": "KI auf diesen Fall anwenden",
-        "descGeneral": "Überprüft alle vorhandenen offenen Befunde — nicht nur neue — und verwaltet Anfrage-Beobachtung-Beobachtungen und Fälle. Auf „Nur beobachten” gesetzte Elemente werden nie berührt.",
+        "descGeneral": "Überprüft alle vorhandenen offenen Befunde — nicht nur neue — und verwaltet Anfrage-Beobachtungen und Fälle. Auf „Nur beobachten” gesetzte Elemente werden nie berührt.",
         "descCase": "Der Fall-Agent arbeitet an {{title}} mit vollständigen Details: Er kann Kanten verbinden oder trennen, Beweispfade erstellen und Hypothesen mit unterstützenden Beweisen erstellen oder aktualisieren. Beschreiben Sie in einfacher Sprache, was Sie wollen — die KI löst die Ziele selbst.",
         "instructionLabelGeneral": "Worauf soll geachtet werden?",
         "instructionLabelCase": "Was soll in diesem Fall getan werden?",
@@ -3683,11 +3851,11 @@
         "agents": {
           "inquiry": {
             "label": "Anfrage",
-            "desc": "Prüft offene Funde und hält gespeicherte Monitore (Anfrage-Beobachtung-Beobachtungen) aktuell."
+            "desc": "Prüft offene Funde und hält gespeicherte Monitore (Anfrage-Beobachtungen) aktuell."
           },
           "case": {
             "label": "Fall",
-            "desc": "Erstellt und erweitert Ermittlungsfälle aus Anfrage-Beobachtung-Beobachtungen mit neuen Treffern."
+            "desc": "Erstellt und erweitert Ermittlungsfälle aus Anfrage-Beobachtungen mit neuen Treffern."
           },
           "config": {
             "label": "Konfiguration",
@@ -3772,7 +3940,7 @@
       "updated": "Anfrage-Beobachtung aktualisiert",
       "createFailed": "Anfrage-Beobachtung konnte nicht erstellt werden",
       "updateFailed": "Anfrage-Beobachtung konnte nicht aktualisiert werden",
-      "assistantTitle": "Assistent für Anfrage-Beobachtung-Beobachtungen",
+      "assistantTitle": "Assistent für Anfrage-Beobachtungen",
       "loading": "Anfrage-Beobachtung wird geladen…",
       "optionsLoading": "Optionen werden geladen…",
       "sourcesMultiselectPlaceholder": "Quellen wählen…",
@@ -3793,15 +3961,15 @@
       "casesDescCreate": "Die Fälle, die diese Beobachtung treiben soll. Sie werden verknüpft, sobald Sie sie anlegen."
     },
     "inquiries": {
-      "searchPlaceholder": "Anfrage-Beobachtung-Beobachtungen suchen…",
+      "searchPlaceholder": "Anfrage-Beobachtungen suchen…",
       "statusPlaceholder": "Status",
       "searchStatuses": "Status suchen…",
       "noStatusesFound": "Kein Status gefunden",
       "updating": "Wird aktualisiert…",
-      "loading": "Anfrage-Beobachtung-Beobachtungen werden geladen…",
-      "loadFailed": "Anfrage-Beobachtung-Beobachtungen konnten nicht geladen werden",
-      "emptyTitle": "Keine Anfrage-Beobachtung-Beobachtungen gefunden",
-      "emptyFiltered": "Keine Anfrage-Beobachtung-Beobachtungen entsprechen den aktuellen Filtern.",
+      "loading": "Anfrage-Beobachtungen werden geladen…",
+      "loadFailed": "Anfrage-Beobachtungen konnten nicht geladen werden",
+      "emptyTitle": "Keine Anfrage-Beobachtungen gefunden",
+      "emptyFiltered": "Keine Anfrage-Beobachtungen entsprechen den aktuellen Filtern.",
       "emptyDescription": "Erstellen Sie eine Anfrage-Beobachtung, um Funde über Ihre Quellen hinweg zu überwachen.",
       "colInquiry": "Anfrage-Beobachtung",
       "colInquiryHint": "Die gespeicherte Frage und ihr Umfang",
@@ -3820,7 +3988,7 @@
       "openCaseFromInquiry": "Fall aus Anfrage-Beobachtung öffnen",
       "editInquiry": "Anfrage-Beobachtung bearbeiten",
       "editQuery": "Abfrage bearbeiten",
-      "noInquiries": "0 Anfrage-Beobachtung-Beobachtungen"
+      "noInquiries": "0 Anfrage-Beobachtungen"
     }
   },
   "caseBoard": {
@@ -6262,18 +6430,18 @@
       "descriptionWithEntity": "{{name}} — Konfiguration, Trainingsverlauf und Testszenarien."
     },
     "investigations": {
-      "title": "Ermittlungen — Fälle, Anfrage-Beobachtung-Beobachtungen & KI-Autopilot",
-      "description": "Führen Sie Ermittlungen, in denen aus Funden Antworten werden: Anfrage-Beobachtung-Beobachtungen wachen über Treffer, Fingerabdrücke verknüpfen Duplikate systemübergreifend, und Fälle sammeln Belege, Hypothesen und ein Fazit — mit oder ohne KI-Autopilot.",
-      "ogTitle": "Ermittlungen — Fälle & Anfrage-Beobachtung-Beobachtungen | Classifyre",
-      "ogDescription": "Anfrage-Beobachtung-Beobachtungen, die auf Treffer achten, Duplikat-Fingerabdrücke und belegte Fälle — automatisch oder manuell."
+      "title": "Ermittlungen — Fälle, Anfrage-Beobachtungen & KI-Autopilot",
+      "description": "Führen Sie Ermittlungen, in denen aus Funden Antworten werden: Anfrage-Beobachtungen wachen über Treffer, Fingerabdrücke verknüpfen Duplikate systemübergreifend, und Fälle sammeln Belege, Hypothesen und ein Fazit — mit oder ohne KI-Autopilot.",
+      "ogTitle": "Ermittlungen — Fälle & Anfrage-Beobachtungen | Classifyre",
+      "ogDescription": "Anfrage-Beobachtungen, die auf Treffer achten, Duplikat-Fingerabdrücke und belegte Fälle — automatisch oder manuell."
     },
     "caseDetail": {
       "title": "Falldetails — Belegdiagramm, Hypothesen & Zeitachse",
-      "description": "Untersuchen Sie einen Fall mit Belegdiagramm, Diskussionssträngen, Chronologie und Fallakte. Verknüpfen Sie Anfrage-Beobachtung-Beobachtungen, ziehen Sie Treffer heran, ergänzen Sie Hypothesen und halten Sie ein Fazit fest — oder lassen Sie das KI-Harness auf dem Fall laufen.",
+      "description": "Untersuchen Sie einen Fall mit Belegdiagramm, Diskussionssträngen, Chronologie und Fallakte. Verknüpfen Sie Anfrage-Beobachtungen, ziehen Sie Treffer heran, ergänzen Sie Hypothesen und halten Sie ein Fazit fest — oder lassen Sie das KI-Harness auf dem Fall laufen.",
       "ogTitle": "Falldetails — Belege & Hypothesen | Classifyre",
-      "ogDescription": "Belegdiagramm, verknüpfte Anfrage-Beobachtung-Beobachtungen, Hypothesen und Aktivitätsverlauf eines Ermittlungsfalls.",
+      "ogDescription": "Belegdiagramm, verknüpfte Anfrage-Beobachtungen, Hypothesen und Aktivitätsverlauf eines Ermittlungsfalls.",
       "titleWithEntity": "{{name}} — Falldetails",
-      "descriptionWithEntity": "{{name}} — Belegdiagramm, Hypothesen, verknüpfte Anfrage-Beobachtung-Beobachtungen und Zeitachse."
+      "descriptionWithEntity": "{{name}} — Belegdiagramm, Hypothesen, verknüpfte Anfrage-Beobachtungen und Zeitachse."
     },
     "inquiryDetail": {
       "title": "Anfragedetails — gespeicherte Abfrage, Treffer & verknüpfte Fälle",
@@ -6291,9 +6459,9 @@
     },
     "caseNew": {
       "title": "Fall eröffnen — Belege & Hypothesen sammeln",
-      "description": "Eröffnen Sie einen neuen Ermittlungsfall. Ergänzen Sie Titel, Beschreibung, Schweregrad und treibende Anfrage-Beobachtung-Beobachtungen — übernehmen Sie deren laufende Treffer als erste Belege oder beginnen Sie leer und hängen Sie Funde später an.",
+      "description": "Eröffnen Sie einen neuen Ermittlungsfall. Ergänzen Sie Titel, Beschreibung, Schweregrad und treibende Anfrage-Beobachtungen — übernehmen Sie deren laufende Treffer als erste Belege oder beginnen Sie leer und hängen Sie Funde später an.",
       "ogTitle": "Fall eröffnen — neue Ermittlung | Classifyre",
-      "ogDescription": "Titel, Schweregrad, Anfrage-Beobachtung-Beobachtungen und Belege — starten Sie einen neuen Ermittlungsfall."
+      "ogDescription": "Titel, Schweregrad, Anfrage-Beobachtungen und Belege — starten Sie einen neuen Ermittlungsfall."
     },
     "duplicates": {
       "title": "Duplikatprüfung — Kopien über alle Quellen hinweg finden",
@@ -6305,7 +6473,7 @@
       "title": "Duplikatentscheidungen — Verlauf & Verwendung in Fällen",
       "description": "Prüfen Sie jede Duplikatentscheidung — behalten, verworfen oder eskaliert — und sehen Sie, ob sie in einem Fall oder einer Anfrage-Beobachtung verwendet wurde. Der vollständige Verlauf der Duplikatprüfung dieses Arbeitsbereichs.",
       "ogTitle": "Duplikatentscheidungen — Verlauf | Classifyre",
-      "ogDescription": "Jede getroffene Duplikatentscheidung und wo sie verwendet wurde — Fälle und Anfrage-Beobachtung-Beobachtungen."
+      "ogDescription": "Jede getroffene Duplikatentscheidung und wo sie verwendet wurde — Fälle und Anfrage-Beobachtungen."
     },
     "duplicatePair": {
       "title": "Duplikatpaar — zwei Assets nebeneinander vergleichen",

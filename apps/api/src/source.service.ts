@@ -283,6 +283,26 @@ export class SourceService {
     });
   }
 
+  /**
+   * Remember which detectors ended a run degraded (scan-cache identity keys),
+   * or clear the memory with null. The finalize handler, not the sweep,
+   * owns this: a degraded run keeps advancing, and the first later run that
+   * completes with none of the remembered detectors degraded drops the
+   * cursor once so the skipped assets are retried.
+   */
+  updateDegradedDetectors(
+    sourceId: string,
+    keys: string[] | null,
+  ): Promise<Source> {
+    return this.prisma.source.update({
+      where: { id: sourceId },
+      data: {
+        degradedDetectors:
+          keys === null ? Prisma.DbNull : (keys as Prisma.InputJsonValue),
+      },
+    });
+  }
+
   async deleteSource(where: Prisma.SourceWhereUniqueInput): Promise<Source> {
     const existing = await this.prisma.source.findUnique({
       where,

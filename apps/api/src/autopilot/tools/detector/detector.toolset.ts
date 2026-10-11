@@ -21,6 +21,7 @@ const PIPELINE_REQUIREMENTS = [
   'REGEX → patterns{<name>:{pattern,...}} (≥1 pattern)',
   'GLINER2 → entities{<label>:{description}} and/or classification{<task>:{labels[]}}',
   'LLM → system_prompt + labels[] (and an aiProviderConfigId; never provider_runtime)',
+  'DECISION → model ("<provider>/<model>", a LiteLLM decision model) + questions[{name,type: yes_no|choice|score,instructions,options[]}]; it calls a provider with an API key only a person can enter (secrets.api_key), so do not create one — refine the questions of an existing one, or propose a new one with operator.notify',
   'TEXT_CLASSIFICATION / IMAGE_CLASSIFICATION / OBJECT_DETECTION → model (HuggingFace id; IMAGE_CLASSIFICATION has a default)',
   'TAG → not authorable here: a TAG detector runs nothing and only records a fact a CUSTOM connector notebook asserts, so it can never find anything you have not already been told',
   `CODE_DETECTOR → not authorable here: ${'a code detector runs Python inside every scan it is attached to'}; propose the rule to a person with operator.notify (include the notebook code) instead`,

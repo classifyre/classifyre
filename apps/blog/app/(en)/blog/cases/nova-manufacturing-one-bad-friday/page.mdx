@@ -1,6 +1,6 @@
 ---
-title: "One Bad Friday at a Pump Factory: Six Questions Where the Obvious Answer Was Wrong"
-description: A delivery slips, a discount isn't one, a machine is quietly failing, and the numbers disagree about all of it. Inside Nova Manufacturing, the showcase built from problems real manufacturers recognise.
+title: "One Bad Friday at a Pump Factory: Four Rescue Ideas, and the One the Evidence Left Standing"
+description: "A delivery slips by two weeks and three orders hang on it. Four rescue ideas go on a case board as hypotheses, and one survives. A case file on Nova Manufacturing: an invented pump maker on a real workspace."
 date: 2026-10-05T00:00:00.000Z
 tags:
   - investigations
@@ -28,12 +28,12 @@ alternates:
     x-default: /blog/cases/nova-manufacturing-one-bad-friday/
 openGraph:
   type: article
-  title: "One Bad Friday at a Pump Factory: Six Questions Where the Obvious Answer Was Wrong"
-  description: A delivery slips, a discount isn't one, a machine is quietly failing, and the numbers disagree about all of it. Inside Nova Manufacturing.
+  title: "One Bad Friday at a Pump Factory: Four Rescue Ideas, and the One the Evidence Left Standing"
+  description: "A delivery slips by two weeks and three orders hang on it. Four rescue ideas go on a case board as hypotheses, and one survives. A case file on Nova Manufacturing: an invented pump maker on a real workspace."
   url: /blog/cases/nova-manufacturing-one-bad-friday
   siteName: Classifyre
   publishedTime: 2026-10-05T00:00:00.000Z
-  modifiedTime: 2026-10-05T00:00:00.000Z
+  modifiedTime: 2026-10-10T00:00:00.000Z
   authors:
     - Banandre
   section: Field Notes
@@ -46,8 +46,8 @@ openGraph:
     - /blog/assets/images/nova-manufacturing-one-bad-friday.jpg
 twitter:
   card: summary
-  title: "One Bad Friday at a Pump Factory: Six Questions Where the Obvious Answer Was Wrong"
-  description: A delivery slips, a discount isn't one, a machine is quietly failing, and the numbers disagree about all of it.
+  title: "One Bad Friday at a Pump Factory: Four Rescue Ideas, and the One the Evidence Left Standing"
+  description: "A delivery slips by two weeks and three orders hang on it. Four rescue ideas go on a case board as hypotheses, and one survives. A case file on Nova Manufacturing: an invented pump maker on a real workspace."
   images:
     - /blog/assets/images/nova-manufacturing-one-bad-friday.jpg
 ---
@@ -56,15 +56,15 @@ twitter:
   image="/blog/assets/images/nova-manufacturing-one-bad-friday.jpg"
   eyebrow="Field notes"
   title="One Bad Friday at a Pump Factory"
-  description="A delivery slips, a discount isn't one, a machine is quietly failing, and the numbers disagree about all of it. Six questions at Nova Manufacturing, and what the evidence said instead of the obvious."
+  description="A delivery slips by two weeks and three orders hang on it. Four rescue ideas go on a case board as hypotheses. One survives, and it is still only an offer."
 />
 
 <ArticleJsonLd
-  headline="One Bad Friday at a Pump Factory: Six Questions Where the Obvious Answer Was Wrong"
-  description="A delivery slips, a discount isn't one, a machine is quietly failing, and the numbers disagree about all of it. Inside Nova Manufacturing, the showcase built from problems real manufacturers recognise."
+  headline="One Bad Friday at a Pump Factory: Four Rescue Ideas, and the One the Evidence Left Standing"
+  description="A delivery slips by two weeks and three orders hang on it. Four rescue ideas go on a case board as hypotheses, and one survives. A case file on Nova Manufacturing: an invented pump maker on a real workspace."
   path="/blog/cases/nova-manufacturing-one-bad-friday"
   datePublished="2026-10-05T00:00:00.000Z"
-  dateModified="2026-10-05T00:00:00.000Z"
+  dateModified="2026-10-10T00:00:00.000Z"
   authorName="Banandre"
   articleSection="Field Notes"
   about={[
@@ -88,7 +88,7 @@ twitter:
 
 <LiveCaseLink
   href="https://showcase.classifyre.com/nova-manufacturing"
-  caseName="Nova Manufacturing namespace"
+  caseName="Nova Manufacturing workspace"
 />
 
 <ArticleSideRail
@@ -99,209 +99,221 @@ twitter:
   backLabel="All case files"
 />
 
-It is Friday, ten o'clock, in Munich. The planning meeting is nine minutes old when someone says the sentence
-everyone dreads: *the housings have moved to the 18th.*
+Friday, ten o'clock, Munich. Nine minutes into the planning meeting somebody
+says it: *the housings have moved to the eighteenth.*
 
-Five hundred pump housings from Elbe Precision Castings, due on 4 October, will now arrive two weeks late. Three customer
-orders need them between the 5th and the 7th. Together they are worth **€870,000**. Customer service would like a list of
-people to call before lunch.
+Five hundred pump housings from Elbe Precision Castings, due on 4 October,
+will arrive two weeks late. Three customer orders need them between the 5th
+and the 7th. Together they are worth **€870,000**.
 
-Everyone in the room has an idea.
+Everyone in the room has an idea. *Hamburg has stock.* *Somebody found a cheap
+lot of a thousand.* *We booked a second supplier for exactly this.*
 
-*Hamburg has stock.* Somebody found a cheap lot of a thousand. *We booked a second supplier for exactly this.*
-And at half past eleven a recovery offer arrives with a 15:00 deadline.
-
-Which of those ideas survive contact with the data?
-
-> **The short answer:** one of the four does, and only conditionally. The other three each fail for a reason that
-> sits in a different system: a truck slot, an engineering revision, a foundry that two "different" suppliers
-> share. This is the story of the namespace we built to find that out in minutes, and of five more questions like it
-> at the same factory.
-
-Nova Manufacturing is fictional. Every number is invented, and none of it belongs to a real company. But each trap in
-this article is one that real manufacturers will recognise, because the namespace was built from the problems they bring us.
-
-## The company
-
-Nova makes industrial pumps in three plants: **Munich**, **Hamburg** and **Brno**. It sells three models (a utility
-pump, a duplex industrial pump and a sanitary process pump) to four customers, runs twenty machines, sixteen of them
-with sensors, and buys from four tier-one suppliers, some of which depend in turn on two foundries Nova never deals with directly.
-
-That is a small company on purpose. The point is not scale. It is that the *same few names* turn up in very different
-places: a supplier in the purchasing sheet, in a quality report, in a maintenance note and in a data ticket. Nobody has
-joined them up. That is the real Friday-morning problem.
-
-## What is in the namespace
-
-Seven sources, each a business desk rather than a technology:
-
-| Source | What it holds | Why it is there |
-|---|---|---|
-| **Company master data** | Suppliers, foundries, customers, plants, machines, parts, pumps | The directory everything else points at |
-| **Supply & orders** | Orders, purchase orders, warehouse stock, truck slots, supplier offers, the supplier-operations note | What planners see when a delivery slips |
-| **Purchasing & costing** | Steel quotes, resin offers, the finishing-station sheet, sourcing notes | Where "cheaper" gets tested |
-| **Machines & maintenance** | 34,560 hourly readings from 16 machines, maintenance history, M003's temperature feed, handovers | Which machine is really sick |
-| **Quality & traceability** | 400 housing inspections, 2,000 final inspections, shipments, finished lots, the quality log | Does the defect follow the batch or the machine |
-| **Inventory control** | Stock, lots, reservations and transfers in three plants | Why stock on paper is not stock you can use |
-| **Data integration feeds** | SAP, MES, warehouse, order-event and quality-device extracts, plus stewardship tickets | Where the data itself can lie |
-
-Together they contain 196 business records, twelve of them memos. On top of them sit:
-
-- **Eight detectors** that read those records and say what is wrong, in plain sentences, showing their arithmetic.
-- **A glossary of 65 concepts** (what a "late delivery", a "hidden shared dependency" or a "unit mismatch" *is*),
-  plus **44 named entities** such as Elbe Precision Castings or Machine M001.
-- **Twelve standing questions** that keep watching for things like "where do two suppliers rely on the same source?"
-- **Six cases**, one per question below, each testing competing explanations as hypotheses.
-
-## Six questions, six obvious answers that were wrong
-
-### 1. The delayed delivery: who gets hurt, and what can we do?
-
-Four rescue ideas, laid side by side as hypotheses.
-
-**"Hamburg's stock covers it."** Hamburg shows 260 released housings, so it looks easy. But 160 protect local
-reservations and safety stock, 100 are free, and the only truck slot that arrives in time carries **80**. That saves
-one order (€300,000) and leaves €570,000 uncovered. *Refuted.*
-
-**"The cheap thousand will do."** For the sanitary pump, Adria Value Metals offers 1,000 housings at €145. They are
-revision C with industrial approval; the pump needs revision D with sanitary approval, and engineering cannot waive
-it. The only compliant offer that arrives on time covers 60 of the 80 needed. *Refuted.*
-
-**"We are dual-sourced."** Elbe and Morava are two names on the booking sheet. Look one level up and both cast at
-**Central Alloy Works**, which is in a confirmed outage from 2 to 16 October. All 100 booked housings fall inside it.
-*Refuted, and the most dangerous of the four.*
-
-**"The recovery lot covers everything."** Nord Independent Foundry has 200 finished housings from a different foundry,
-released by engineering for exactly these pumps, arriving on the 5th. With it, 380 housings meet 380 of demand. This
-one is *supported*, at 75% confidence, because it is still only an offer and it expires at 15:00 today.
+> **The short answer:** none of the three holds. Each fails for a reason that
+> sits on a different desk: a truck slot, an engineering revision, a foundry
+> that two suppliers share. A fourth idea arrives by memo at half past eleven.
+> It covers every order, and it is still only an offer.
 
 <Alert>
-  <AlertTitle>Why the verdict moved</AlertTitle>
+  <AlertTitle>Nova Manufacturing does not exist</AlertTitle>
   <AlertDescription>
-    At 10:00 the board had three refuted hypotheses and one open question. At 11:30 a memo arrived, and the fourth
-    hypothesis changed from *proposed* to *supported*. The log shows when and why. Nobody rewrote history.
+    The company is invented, and so are its suppliers, its customers and every
+    order, price, reading and date below. Any resemblance to a real company is
+    coincidence. The workspace is real: its sources, checks, findings and
+    cases are what you see when you open it. The counts in this article were
+    taken on 10 October 2026.
   </AlertDescription>
 </Alert>
 
-### 2. Is the cheaper option really cheaper?
+## The same story as a film
 
-Three purchasing decisions where the lowest number is not the answer.
+*One bad Friday* is this case told in five minutes.
 
-- **Steel.** Adria quotes 9% less per kilogram than Elbe. But prices are per kilogram *bought* and demand is per
-  kilogram *usable*. At Adria's 86% yield, 10,000 usable kilograms cost **€53,372** against **€49,184**: €4,188 *more*.
-- **Resin.** A quarter-end offer at €4.00 per kilogram, minimum 5,000 kg. Storage holds 4,000 and already contains 600.
-  1,600 kg has nowhere to go, and 3,000 kg would still be sitting there when everything expires on 30 October.
-  A smaller offer at €5.20 fits, wastes nothing and commits €10,400 instead of €20,000.
-- **Pumps.** The duplex pump earns more *per pump*. The utility pump earns more *per finishing hour*, and finishing
-  hours are the bottleneck. With a binding contract minimum, the best feasible plan is 80 + 20 for €80,000.
+![Title card of the film One bad Friday: a planning-meeting table, a note moving a delivery from 4 to 18 October, three customer orders and the title set over them](/blog/assets/images/one-bad-friday-supply-chain-case-film.webp)
 
-Then a twist. On 5 October engineering pilots a revised cutting process and Adria's yield climbs to 97%. The
-discount *survives*: €1,864 cheaper, but only as a modelled saving from three pilot runs, for the next order only.
-The case keeps both conclusions, with dates, because both were right when they were written.
+The pictures in this article are stills from it. Paper on a black table is the
+film explaining; a dark browser window is the workspace itself. The
+photographs were generated for the film and show no real place or product.
 
-### 3. Which machine should maintenance visit first?
+## The answer was already in the building
 
-Sixteen machines send readings every hour. A plant-wide alert line makes **M002** look sick. It has run at 6.0 mm/s
-for ninety days in its approved high-speed mode. It is simply loud.
+On a Friday like this nobody lacks data. The orders are in the ERP. The stock
+is in the warehouse system. The truck slots are with the carrier. And the
+reason the delivery moved is in a memo somebody wrote at 07:15.
 
-**M001** looks fine against that line, yet inside its *own* mode it has gone from 2.0 to 8.0 mm/s and from 60 to
-80 °C in a week. It has had two bearing repairs and €150,000 of orders assigned. Inspected on 3 October: outer-race
-spalling. After the swap it reads 2.2 mm/s and 61 °C, while the untouched control M002 hasn't moved.
+What is missing is one place where those four meet. So the workspace connects
+**seven desks**:
 
-And **M003**, which was "running at 190 degrees"? Its sensor was switched to Fahrenheit on 30 September while the
-adapter kept labelling it Celsius. 190 °F is 87.8 °C, the reading is a day old, and the independent reference sensor
-says 87.8 °C against a 95 °C alarm. No overheating.
+| Source | What it holds |
+|---|---|
+| **Company master data** | Suppliers, foundries, customers, plants, machines, parts, pumps |
+| **Supply & orders** | Orders, the purchase order and its new date, stock, truck slots, offers, the operations note |
+| **Purchasing & costing** | Steel quotes, resin offers, the finishing-station sheet, sourcing notes |
+| **Machines & maintenance** | Ninety days of hourly readings from 16 machines, maintenance history, handovers |
+| **Quality & traceability** | 400 housing inspections, 2,000 final inspections, shipments, finished lots |
+| **Inventory control** | Stock, lots, reservations and transfers in three plants |
+| **Data integration feeds** | SAP, MES, warehouse, order-event and quality-device extracts, and the tickets that explain them |
 
-### 4. Why are pumps leaking: the batch, the machine, or the product mix?
+Together that is **196 records**. Eight detectors read them. Six are *checks*,
+one per desk: plain rules that say what is wrong in one sentence and show the
+arithmetic. This is one, word for word:
 
-Housing batch B994 from Elbe fails 19% of inspections. B990 from Morava fails 2.5%. The gap shows on *both*
-machines. The defects follow the material.
+> PO101 from Elbe Precision Castings (500 housings) now arrives 18 Oct, 14 days
+> after the promised 4 Oct — too late for all 3 orders that need it.
 
-This is where the namespace earns its keep. M001 is a fair suspect: it really is drifting. But the evidence is one click
-away in a different source. Batch B990 running on the same M001 fails only 2%, and the perfectly steady M002 fails 18%
-on B994. The failing bearing is real, and it is not what is leaking the pumps.
+The seventh detector finds the sentences in memos that change what is allowed.
+The eighth finds names and codes, so that a supplier is the same supplier
+wherever it is written. Both come back later.
 
-Meanwhile the scrap rate jumped from 1.9% to 9.1% and operations wants to stop the line. Within each product nothing
-moved: one stayed at 1%, the other at 10%. What changed was the mix, from 10% to 90% of the harder pump. At the same
-mix, both months score 5.5%.
+## Four ideas, each with a test
 
-And lot FG42, 30 units for Danube Bioprocess, had no material scan. Unknown is not clean. Containment was 50 to 80
-units until a recovered production traveler showed 12 units on B994 and 18 on B990: **exactly 62 exposed**.
+Every rescue idea goes on the case board as a **hypothesis**, with the test it
+has to pass. For the first one: *if true, the stock that can reach Munich by
+4 October is at least 380 housings.*
 
-### 5. Plenty of stock on paper: why do we still run short?
+### 1. "Hamburg has stock"
 
-Hamburg shows 1,300 seal cartridges while Munich needs 400. Only 650 are free (the rest is reserved, safety or
-quarantined), and the trucks carry 250 from Hamburg and 180 from Brno. The cheapest feasible plan is 250 + 130 for
-**€1,270**. The emergency purchase would cost €17,480 and arrive on 23 October.
+It does. Hamburg shows 260 housings. But 160 of them protect reservations and
+safety stock, which leaves 100 free. And the only truck slot that arrives in
+time carries 80.
 
-Resin is worse: 700 kg on paper, 20 kg usable. One lot expires before it is needed, 180 kg of the other is reserved,
-and the cheap route isn't cold-chain. 100 kg stay unresolved, and the case says so rather than inventing a fix.
+That saves one order. **€570,000** stays exposed. The check says it in its own
+words: *"Hamburg has 100 free housings, but the only truck slot arriving by
+4 Oct carries 80: 20 housings that exist cannot reach Munich in time."*
+**Refuted.**
 
-Then a retry. An approval for Hamburg's bearing kits was repeated, and someone worried it reserved the stock twice. It
-didn't: the system returned the original decision. Adding up every response would claim 280 kits; distinct reservations
-are 160.
+### 2. "There is a cheap lot of a thousand"
 
-### 6. Which of our numbers can we trust?
+A fourth order, for sanitary pumps, is short as well, and Adria Value Metals
+offers 1,000 housings at €145 apiece. They are revision C with industrial
+approval. That pump takes revision D with sanitary approval.
 
-Four alarms arrive on Friday morning. Three were manufactured by the data.
+![An offer for 1,000 housings at 145 euros, revision C, next to a memo with one sentence marked: purchasing cannot waive this requirement, and the two findings that quote it](/blog/assets/images/cheap-housing-lot-wrong-revision-memo-sentence.webp)
 
-- *"380 gasket sets short."* The warehouse counts 35 boxes of 12, which is 420 pieces. SAP's 20 are 27 hours old.
-  A look-alike part with 900 pieces isn't the same part. No purchase needed.
-- *"340 impellers needed."* Five messages, one delivered twice, one old version replayed after a newer one. The real
-  current demand is 60.
-- *"Lot QT61 breached 95 degrees."* It reported 185 under a schema that means Fahrenheit. That is 85 °C.
-- *"Lot QT63 reads 2,040."* This one really was unresolved until the producer recovered the missing contract: the field
-  is conductivity, not temperature. All checks pass. Quality may *review* the lot. Nothing has been released.
+Whether that can be waived is not in any table. It is in the operations note,
+and the memo detector found the sentence and quoted it next to the price:
+*"Revision C has a different seal interface; purchasing cannot waive this
+requirement."* **Refuted.**
 
-## The threads that join the cases
+### 3. "We are dual-sourced"
 
-The best moments weren't inside any one case.
+This is the comfortable one. The next hundred housings are booked with two
+suppliers, Elbe and Morava, and the booking sheet has two ticks on it.
 
-**Elbe Precision Castings appears in four sources.** It is late on a purchase order, it shares a foundry with a supplier
-it competes with, it sells the housings in batch B994, and its steel is the incumbent in a cost sheet. No single system
-shows that. The entity page does.
+![Two supplier cards, Elbe and Morava, tied by lime thread to one photograph of a foundry stamped down from 2 to 16 October, with the finding shared upstream dependency under them](/blog/assets/images/two-suppliers-one-foundry-shared-dependency.webp)
 
-**Machine M001 appears in two cases.** It is the deteriorating machine in one and the alibi in the other. Without the
-cross-link, the failing bearing would have been blamed for leaks it didn't cause.
+One level up, both have their housings cast at the same foundry, and that
+foundry is down from 2 to 16 October. All 100 booked housings fall inside the
+outage. Two names, one foundry. **Refuted**, and the most dangerous of the
+three, because the purchasing sheet looked fine.
 
-**One foundry, two apparent suppliers.** Central Alloy Works is the quiet villain in the supply case, and its outage
-window is in the register, in the notes, and in a standing question that will catch the next one.
+### 4. The memo at half past eleven
 
-## What makes it more than a dashboard
+At 11:30 a procurement note lands. A fourth supplier offers 200 finished
+housings, cast at a different foundry and released by engineering for exactly
+these pumps.
 
-A dashboard shows numbers. This namespace shows the **reasoning**.
+![A procurement note with a recovery offer, and under it a bar: 100 housings in Munich, 80 from Hamburg, 200 from the new lot, 380 of 380, with all three orders marked covered](/blog/assets/images/recovery-offer-380-of-380-housings-covered.webp)
 
-- **Checks that show their work.** Every finding is a sentence a planner can read ("SO102 cannot be completed by
-  6 Oct: 40 of 100 housings are still missing even after the best available transfer"). The numbers are computed from
-  the records, not typed in, so change a quantity and the finding changes with it.
-- **A shared vocabulary.** "Late delivery", "hidden shared dependency" and "unit mismatch" are defined once, in plain
-  English. Every finding is bound to the concept it means, so a standing question about *supply risk* reaches findings
-  from three different checks.
-- **Named things, not strings.** Suppliers, customers, plants, machines and parts are entities. A memo that says
-  "S001", a sheet that says "Elbe Precision Castings" and a batch record that names its supplier all land on the same page.
-- **Competing explanations.** Each case keeps hypotheses with evidence *for* and *against*, and a log that explains
-  every change of verdict. Newer evidence changes the verdict, not the history.
-- **Quoted memos.** The sentences in the notes that change what is allowed ("purchasing cannot waive this
-  requirement") are found and quoted verbatim, so a number can always be set next to the sentence behind it.
+100 in Munich, 80 from Hamburg, 200 from the new lot: 380 of 380. Every order
+is covered. The board moves this hypothesis to **supported, at 75%**, and says
+why it is not more: it is an offer, not stock, it expires that afternoon, and
+the same memo states that no purchase or transfer has been approved.
 
-## What it deliberately does not claim
+![The case board in Classifyre, zoomed out: three hypothesis frames marked refuted and a fourth marked supported at 75 percent, with the ten o'clock supply position and the noon update both on the board](/blog/assets/images/classifyre-case-board-three-refuted-one-supported.webp)
 
-Honesty is built in. Revenue at risk is exposure, not a loss. A probability is a planning input, not a prediction.
-Exposed units are not defective units. A short post-repair window doesn't prove reliability. A recovered paper trail
-is not a release. An offer isn't stock. These caveats are in the findings themselves, because the first thing a good
-analyst asks is *what can't we say?*
+Ten o'clock is still there. The position as it was known then and the
+position at noon are two records on the same board. Newer evidence changed the
+verdict, not the history. (The labels at the sides of the board are the
+film's notes; everything inside the window is the workspace.)
 
-## See it yourself
+## One supplier, four desks
 
-The namespace is live, with every source, check, concept, standing question and case described above:
+Now the part no single system shows. Take one name from that Friday: Elbe
+Precision Castings. It is late on the purchase order. It shares a foundry
+with its rival. It cast the housing batch behind a quality complaint. And it
+is the incumbent in a steel quote.
+
+![The entity page of Elbe Precision Castings in Classifyre: 21 mentions in 13 records from four sources, its supplier code and its name as identifiers, and the list of every record that mentions it](/blog/assets/images/classifyre-entity-page-one-supplier-four-sources.webp)
+
+Four desks, thirteen records, one page. A memo says "S001", a sheet says
+"Elbe Precision Castings", and both land on the same entity, because to the
+workspace a supplier is a thing, not a string.
+
+## The machine that was not the leak
+
+That quality complaint: pumps are leaking in the field. There is an obvious
+suspect, machine M001. Its vibration has gone from 2.0 to 8.0 mm/s in a week,
+inside its own operating mode. That part is true, and an inspection the next
+day finds the bearing damaged.
+
+![A table of failed housing inspections, batch by machine: the clean batch fails 2 and 3 percent, the suspect batch 20 and 18 percent, on a drifting machine and on a steady one](/blog/assets/images/defects-follow-the-batch-not-the-machine.webp)
+
+But the inspections say something else. A clean batch on that machine fails
+2%. The suspect batch fails 18% on a machine that is perfectly steady. The
+defects follow the material. The bearing needed replacing; it just was not
+the leak.
+
+M001 is the same record in both cases: the failing machine in the maintenance
+case, and the alibi in the quality one. Without that link the bearing would
+have been blamed for leaks it did not cause. With it, the claim stays what it
+is: an association strong enough to act on, not a proven cause. No lab report
+exists yet, and the case says so.
+
+## Three more numbers from the same Friday
+
+![Three sheets: a steel quote 9 percent off that costs 4,188 euros more, a machine at 190 degrees that is 87.8 degrees Celsius, and a shortage of 380 gasket sets that is a stock of 420](/blog/assets/images/steel-discount-fahrenheit-alarm-gasket-boxes.webp)
+
+- **Steel at 9% off** costs **€4,188 more** per 10,000 usable kilograms. The
+  price is per kilogram bought; at the cheaper supplier's 86% yield you buy a
+  lot more of them.
+- **A machine at 190 degrees.** Fahrenheit: the sensor had been switched on
+  30 September and the label had not. It is 87.8 °C, under a 95 °C alarm.
+- **380 gasket sets short.** SAP's count was a day old. The warehouse had 35
+  boxes of twelve: 420, against 400 needed. Nothing to buy.
+
+Each is a finding in a different case, from a different check. The workspace
+holds more of the same kind: a resin deal that would expire in storage, a
+scrap "crisis" that was a change of product mix, a retried approval that did
+not reserve anything twice.
+
+## The count
+
+Six cases. **Twenty-five hypotheses. Twenty refuted.**
+
+And twelve standing questions stay on watch. One of them asks: *where do two
+suppliers rely on the same source?* It is asked by meaning, through the
+glossary concept "hidden shared dependency", not by keyword, so the next scan
+that finds one puts it in front of you. Before the Friday.
+
+## What it does not do
+
+It does not decide. And it will not let a figure pass for more than it is:
+
+- Revenue at risk is exposure, not a loss.
+- An offer is not stock.
+- Exposed units are not defective units.
+- A short window after a repair does not prove reliability.
+
+Those caveats are written into the findings and quoted from the memos: *"No
+purchase or transfer has been approved yet."* Somebody still has to make the
+call that afternoon.
+
+## Open it
+
+The workspace is open, with every source, check, concept, standing question
+and case above:
 
 **[showcase.classifyre.com/nova-manufacturing](https://showcase.classifyre.com/nova-manufacturing)**
 
-A three-minute tour:
+Three things to try:
 
-1. Open the **supply case** and click each hypothesis. Notice that the evidence lights up and the others fade.
-2. Open the entity **Elbe Precision Castings** and look at where it is mentioned.
-3. Open the **quality case** and find M001 on the board. It is the same machine you saw in maintenance.
+1. Open the **supply case** and click a hypothesis. Its evidence lights up
+   and the rest fades.
+2. Open the entity **Elbe Precision Castings** and read where it is
+   mentioned.
+3. Open the **quality case** and find M001 on the board. It is the same
+   machine you saw in maintenance.
 
 <RelatedCasePosts
   section="cases"

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   DataTransferConflict,
   DataTransferStatus,
@@ -23,6 +23,7 @@ import { modelDelegate, scalarFields } from './prisma-delegate';
 import { createIdRemapper, type IdRemapper } from './id-remap';
 import { cursorArg, keyOf } from './namespace-export.service';
 import { glossaryEvents } from '../glossary/glossary-events';
+import { CorrelationJobScheduler } from '../correlation/correlation-job-scheduler.service';
 
 /**
  * Loads an archive into the current namespace.
@@ -89,6 +90,9 @@ export class NamespaceImportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly store: ArchiveStoreService,
+    // Optional and last so the specs' positional construction keeps working;
+    // absent (unit tests) the post-import catch-up is skipped.
+    @Optional() private readonly correlationJobs?: CorrelationJobScheduler,
   ) {}
 
   async run(job: DataTransferJob): Promise<void> {
@@ -259,6 +263,30 @@ export class NamespaceImportService {
           updated: 0,
           skipped: progress.skippedRows,
         });
+      }
+
+      // The value index (asset_correlation_values) is derived data built
+      // during scans: an entity mention is entity_values (CONFIRMED) JOIN the
+      // index on value_hash, so imported assets/findings without it leave
+      // every entity page at zero mentions. The index travels only in the
+      // `fingerprints` scope, and the Entities/Duplicates switch arrives
+      // already "on" in the imported config — so the rebuild that runs when
+      // either feature is switched on never fires. Trigger the same catch-up
+      // a switch-on schedules: scheduleFull routes to a full duplicate
+      // recompute while duplicates are on, and to a value-index rebuild
+      // followed by entity resolution while only entities are on; it refuses
+      // when both are off.
+      if (['assets', 'findings'].some((id) => selected.has(id))) {
+        try {
+          await this.correlationJobs?.scheduleFull('workspace imported', true);
+        } catch (error) {
+          // The rows already landed and the job is COMPLETED; a missed
+          // catch-up must not flip it to FAILED. The nightly recount and a
+          // manual toggle repair it instead.
+          this.logger.warn(
+            `Import ${job.id} completed but the value-index rebuild could not be queued: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       }
 
       this.logger.log(

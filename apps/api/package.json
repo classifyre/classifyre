@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/api",
-  "version": "0.6.9",
+  "version": "0.6.10",
   "description": "",
   "author": "",
   "private": true,
@@ -80,7 +80,7 @@
     "rxjs": "^7.8.2",
     "socket.io": "^4.8.3",
     "uuid": "^14.0.0",
-    "zod": "^4.3.6"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
