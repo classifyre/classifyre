@@ -432,7 +432,7 @@
             },
             {
               "name": "description",
-              "type": "unknown",
+              "type": "string | null",
               "required": false
             },
             {
@@ -2969,7 +2969,7 @@
             },
             {
               "name": "inquiryId",
-              "type": "unknown",
+              "type": "string | null",
               "required": false,
               "description": "A linked question to scope the rules to; omit for the whole case"
             },
@@ -3005,7 +3005,7 @@
             },
             {
               "name": "inquiryId",
-              "type": "unknown",
+              "type": "string | null",
               "required": false
             },
             {
@@ -3650,7 +3650,25 @@
           "readOnly": false,
           "destructive": true,
           "idempotent": true,
-          "parameters": []
+          "parameters": [
+            {
+              "name": "caseId",
+              "type": "string",
+              "required": true,
+              "format": "uuid"
+            },
+            {
+              "name": "baseVersion",
+              "type": "integer",
+              "required": false,
+              "description": "board.version you read; defaults to the current version"
+            },
+            {
+              "name": "ops",
+              "type": "unknown[]",
+              "required": true
+            }
+          ]
         },
         {
           "name": "place_case_board_items",
@@ -3881,7 +3899,7 @@
             },
             {
               "name": "goal",
-              "type": "unknown",
+              "type": "string | null",
               "required": false,
               "description": "Goal override; null resets to the factory default"
             },
@@ -4271,12 +4289,12 @@
             },
             {
               "name": "label",
-              "type": "unknown",
+              "type": "string | null",
               "required": false
             },
             {
               "name": "value",
-              "type": "unknown",
+              "type": "string | null",
               "required": false
             }
           ]
@@ -5814,7 +5832,7 @@
             },
             {
               "name": "spec.field",
-              "type": "unknown",
+              "type": "string | null",
               "required": false
             },
             {
@@ -5834,12 +5852,12 @@
             },
             {
               "name": "spec.termKey",
-              "type": "unknown",
+              "type": "string | null",
               "required": false
             },
             {
               "name": "spec.termId",
-              "type": "unknown",
+              "type": "string | null",
               "required": false
             },
             {
@@ -5892,7 +5910,7 @@
             },
             {
               "name": "spec.field",
-              "type": "unknown",
+              "type": "string | null",
               "required": false
             },
             {
@@ -5912,12 +5930,12 @@
             },
             {
               "name": "spec.termKey",
-              "type": "unknown",
+              "type": "string | null",
               "required": false
             },
             {
               "name": "spec.termId",
-              "type": "unknown",
+              "type": "string | null",
               "required": false
             },
             {
