@@ -2293,12 +2293,166 @@
       "saving": "Wird gespeichert…",
       "validationProviderRequired": "KI-Anbieter auswählen",
       "budgetTitle": "Laufbudget",
-      "budgetHint": "Wie viel eines Laufs dieser Detektor mit Fehlschlägen verbringen darf. Jeder Lauf stoppt ihn bereits nach einer Ablehnung, die kein Wiederholen behebt (Kontingent, ungültiger Schlüssel, Abrechnung), oder nach 10 Fehlschlägen in Folge. Übersprungene Assets behalten ihre Befunde und werden im nächsten Lauf erneut geprüft. Eine Budgetänderung löst keinen erneuten Scan aus.",
+      "budgetHint": "Wie viel eines Laufs dieser Detektor mit Fehlschlägen verbringen darf. Jeder Lauf stoppt ihn bereits nach einer Ablehnung, die kein Wiederholen behebt (Kontingent, ungültiger Schlüssel, Abrechnung), oder nach 10 Fehlschlägen in Folge. Übersprungene Assets behalten ihre Befunde und werden erneut geprüft, sobald der Detektor wieder funktioniert. Eine Budgetänderung löst keinen erneuten Scan aus.",
       "budgetMaxAttempts": "Versuche pro Asset",
       "budgetMaxAttemptsPlaceholder": "Standard der Installation",
       "budgetMaxConsecutiveFailures": "Stopp nach Fehlschlägen in Folge",
       "budgetMaxWallClockSeconds": "Zeitbudget pro Lauf (Sekunden)",
       "budgetMaxWallClockSecondsPlaceholder": "kein Limit"
+    },
+    "decision": {
+      "createSubtitle": "Erstellen Sie einen Entscheidungs-Detektor. Wählen Sie ein Entscheidungsmodell, formulieren Sie die Fragen, die es zu Ihren Inhalten beantworten soll, und legen Sie fest, welche Antworten zu Funden werden.",
+      "stepIdentity": "Identität",
+      "stepIdentityDesc": "Name, Schlüssel und Status",
+      "stepModel": "Modell",
+      "stepModelDesc": "Anbieter, Modell und API-Schlüssel",
+      "stepQuestions": "Fragen",
+      "stepQuestionsDesc": "Was gefragt wird und was zum Fund wird",
+      "identityTitle": "Detektor-Identität",
+      "name": "Name",
+      "namePlaceholder": "z. B. Support-Ticket-Triage",
+      "keyLabel": "Schlüssel",
+      "keyHint": "Wird aus dem Namen abgeleitet, wenn leer",
+      "descriptionLabel": "Beschreibung",
+      "descriptionPlaceholder": "Was entscheidet dieser Detektor, und für wen?",
+      "activeLabel": "Aktiv — für die Quellenkonfiguration verfügbar",
+      "modelTitle": "Entscheidungsmodell",
+      "modelHint": "Das Modell, das Ihre Fragen beantwortet. Die Aufrufe laufen über LiteLLM, daher funktioniert hier jedes Entscheidungsmodell, das LiteLLM unterstützt.",
+      "provider": "Anbieter",
+      "model": "Modell",
+      "modelFieldHint": "Geschrieben als anbieter/modell. Wählen Sie einen Vorschlag oder geben Sie einen eigenen Namen ein.",
+      "providers": {
+        "typesafe": {
+          "name": "TypeSafe Jev",
+          "hint": "Die System-One-Modelle von TypeSafe. Benötigt einen TypeSafe-API-Schlüssel.",
+          "apiBaseHint": "Leer lassen, um TypeSafe direkt aufzurufen. Nur setzen, wenn Aufrufe über ein Gateway laufen sollen."
+        },
+        "openai": {
+          "name": "OpenAI Decisions",
+          "hint": "Die Decisions API von OpenAI. Benötigt einen OpenAI-API-Schlüssel.",
+          "apiBaseHint": "Leer lassen, um OpenAI direkt aufzurufen. Nur setzen, wenn Aufrufe über ein Gateway laufen sollen."
+        },
+        "cloudflare": {
+          "name": "Cloudflare Clef",
+          "hint": "Clef auf Workers AI. Benötigt ein API-Token und Ihre Konto-ID in der Endpunkt-URL.",
+          "apiBaseHint": "Ersetzen Sie <ACCOUNT_ID> durch Ihre Cloudflare-Konto-ID."
+        },
+        "perplexity": {
+          "name": "Perplexity",
+          "hint": "Die Entscheidungsmodelle von Perplexity. Benötigt einen Perplexity-API-Schlüssel.",
+          "apiBaseHint": "Leer lassen, um Perplexity direkt aufzurufen. Nur setzen, wenn Aufrufe über ein Gateway laufen sollen."
+        },
+        "openrouter": {
+          "name": "OpenRouter",
+          "hint": "Entscheidungsmodelle, die OpenRouter vermittelt. Benötigt einen OpenRouter-API-Schlüssel.",
+          "apiBaseHint": "Leer lassen, um OpenRouter direkt aufzurufen. Nur setzen, wenn Aufrufe über ein Gateway laufen sollen."
+        },
+        "self_hosted": {
+          "name": "Selbst betrieben (System One)",
+          "hint": "Ein Entscheidungsmodell, das Sie selbst betreiben: Strands Decider, Laya, Nimble, OpenJev oder jeder Server, der POST /v1/systemone beantwortet. Ein Schlüssel ist nur nötig, wenn Ihr Server einen verlangt.",
+          "apiBaseHint": "Die Adresse Ihres Servers. Aufrufe gehen an <Adresse>/v1/systemone."
+        },
+        "other": {
+          "name": "Anderes (beliebiges LiteLLM-Modell)",
+          "hint": "Jedes Entscheidungsmodell, das LiteLLM unterstützt. Geben Sie den vollständigen Namen als anbieter/modell ein.",
+          "apiBaseHint": "Nur nötig, wenn der Anbieter keine feste Adresse hat."
+        }
+      },
+      "apiKey": "API-Schlüssel",
+      "apiKeyPlaceholder": "API-Schlüssel des Anbieters einfügen",
+      "apiKeyReplacePlaceholder": "Neuen Schlüssel einfügen, um den gespeicherten zu ersetzen",
+      "apiKeyHint": "Wird verschlüsselt gespeichert und nie wieder angezeigt. Er wird nur verwendet, um das Modell während eines Scans aufzurufen.",
+      "apiKeyOptionalHint": "Optional. Leer lassen, wenn Ihr Server keinen Schlüssel benötigt.",
+      "apiKeyStored": "Ein Schlüssel ist gespeichert. Klicken Sie in das Feld, um ihn zu ersetzen.",
+      "apiKeyWillBeDropped": "Sie haben den Anbieter oder den Endpunkt geändert, daher wird der gespeicherte Schlüssel beim Speichern entfernt. Geben Sie den Schlüssel für den neuen ein.",
+      "apiKeyRemove": "Entfernen",
+      "apiKeyKeep": "Behalten",
+      "apiKeyRemoved": "Der Schlüssel wird beim Speichern entfernt",
+      "apiBase": "Endpunkt-URL",
+      "advancedTitle": "Erweitert",
+      "headers": "Zusätzliche Header",
+      "headersHint": "Werden mit jedem Aufruf gesendet, für ein Gateway, das Anfragen anhand von Headern weiterleitet oder zuordnet. Nicht für Zugangsdaten: Header werden im Klartext gespeichert und angezeigt.",
+      "headerName": "Header-Name",
+      "headerValue": "Header-Wert",
+      "addHeader": "Header hinzufügen",
+      "removeHeader": "Header entfernen",
+      "contentLimit": "Gesendete Zeichen pro Aufruf",
+      "contentLimitHint": "Längere Inhalte werden vor dem Senden auf diese Länge gekürzt. Leer bedeutet 8000.",
+      "questionsTitle": "Fragen",
+      "questionsHint": "Das Modell beantwortet jede Frage mit einer Wahrscheinlichkeit, nicht mit Text. Ein Aufruf beantwortet alle Fragen. Eine Antwort, die ihre Schwelle erreicht, wird zu einem Fund.",
+      "loadExample": "Mit einem Beispiel beginnen",
+      "defaultPriority": "Standard-Priorität",
+      "defaultPriorityHint": "Wird verwendet, wenn eine Frage oder eine Antwort keine eigene festlegt.",
+      "questionNumber": "Frage {{number}}",
+      "removeQuestion": "Frage entfernen",
+      "types": {
+        "yes_no": {
+          "title": "Ja / Nein",
+          "hint": "Das Modell gibt zurück, wie wahrscheinlich die Antwort Ja ist. Ein Fund wird erfasst, wenn dieser Wert die Schwelle erreicht.",
+          "placeholder": "Verlangt der Kunde eine Rückerstattung?"
+        },
+        "choice": {
+          "title": "Auswahl",
+          "hint": "Das Modell wählt genau eine Antwort aus Ihrer Liste. Jede Antwort kann zu einem Fund mit eigener Priorität werden oder zu keinem Fund.",
+          "placeholder": "Welches Team soll das bearbeiten?"
+        },
+        "score": {
+          "title": "Skala",
+          "hint": "Das Modell ordnet den Inhalt auf einer von Ihnen definierten Skala ein. Jede Stufe kann zu einem Fund mit eigener Priorität werden oder zu keinem Fund.",
+          "placeholder": "Wie verärgert ist der Kunde?"
+        }
+      },
+      "instructions": "Frage",
+      "questionName": "Fund-Name",
+      "questionPriority": "Priorität",
+      "priorityDetectorDefault": "Standard des Detektors",
+      "threshold": "Schwelle",
+      "thresholdYesNoHint": "Schwelle: wie wahrscheinlich „Ja“ sein muss, bevor ein Fund erfasst wird. Leer bedeutet 0,5.",
+      "thresholdPickHint": "Schwelle: wie sicher sich das Modell bei seiner Antwort sein muss, bevor ein Fund erfasst wird. Leer bedeutet 0, dann wird jede Antwort erfasst.",
+      "choices": "Antworten",
+      "choicesHint": "Mindestens 2. Fügen Sie eine Auffangantwort wie „sonstiges“ hinzu und stellen Sie sie auf Kein Fund, damit Inhalte, die zu nichts passen, nicht in eine echte Antwort gezwungen werden.",
+      "levels": "Stufen",
+      "levelsHint": "2 bis 10, von der niedrigsten zur höchsten. Stellen Sie die Stufe, die „nichts zu melden“ bedeutet, auf Kein Fund.",
+      "optionLabel": "Antwort",
+      "optionLabelPlaceholder": "antwort",
+      "optionDescription": "Wann sie zutrifft",
+      "optionDescriptionPlaceholder": "Wann trifft das zu? (optional)",
+      "optionFinding": "Fund",
+      "findingNone": "Kein Fund",
+      "findingDefault": "Priorität der Frage",
+      "addChoice": "Antwort hinzufügen",
+      "addLevel": "Stufe hinzufügen",
+      "removeOption": "Entfernen",
+      "moveUp": "Nach oben",
+      "moveDown": "Nach unten",
+      "becomes": "Funde:",
+      "becomesNothing": "noch keine",
+      "add": {
+        "yes_no": "Ja/Nein-Frage",
+        "choice": "Auswahlfrage",
+        "score": "Skalenfrage"
+      },
+      "saving": "Wird gespeichert…",
+      "problem": {
+        "nameMissing": "Geben Sie dem Detektor einen Namen",
+        "modelMissing": "Geben Sie ein Modell ein",
+        "modelFormat": "Schreiben Sie das Modell als anbieter/modell, ohne Leerzeichen",
+        "apiKeyMissing": "Dieser Anbieter benötigt einen API-Schlüssel",
+        "apiBaseMissing": "Dieser Anbieter benötigt eine Endpunkt-URL",
+        "apiBaseFormat": "Die Endpunkt-URL muss mit http:// oder https:// beginnen",
+        "headerName": "Ein Header-Name darf nur Buchstaben, Ziffern und Bindestriche enthalten. Authorization und Content-Type werden für Sie gesetzt.",
+        "contentLimit": "Geben Sie eine ganze Zahl ab 1 ein",
+        "noQuestions": "Fügen Sie mindestens eine Frage hinzu",
+        "tooManyQuestions": "Ein Detektor kann höchstens 64 Fragen stellen",
+        "questionName": "Mit einem Buchstaben beginnen und nur Buchstaben, Ziffern, _ und - verwenden",
+        "duplicateQuestion": "Eine andere Frage verwendet diesen Namen bereits",
+        "questionInstructions": "Formulieren Sie die Frage",
+        "optionCount": "Benötigt {{min}} bis {{max}} Einträge",
+        "optionLabel": "Jeder Eintrag braucht einen Namen",
+        "duplicateOption": "Zwei Einträge haben denselben Namen",
+        "threshold": "Geben Sie eine Zahl von 0 bis 1 ein",
+        "inQuestion": "Frage {{number}} ist unvollständig"
+      }
     },
     "startBlank": "Leer beginnen",
     "startBlankDesc": "Detektor ohne vorausgefüllte Werte von Grund auf konfigurieren.",
@@ -2341,6 +2495,12 @@
         "tagline": "Prompt-gesteuerte Erkennung",
         "description": "Verwende ein Large Language Model mit einem natürlichsprachigen Prompt, um Inhalte zu klassifizieren und strukturierte Felder zu extrahieren. Am besten für nuancierte, kontextabhängige Erkennung, bei der Beispiele und Regeln schwer explizit zu definieren sind.",
         "tags": "Prompt-basiert, Klassifikation, Extraktion"
+      },
+      "decision": {
+        "title": "Entscheidungs-Detektor",
+        "tagline": "Typisierte Fragen, beantwortet mit Wahrscheinlichkeiten",
+        "description": "Stellen Sie einem Entscheidungsmodell Ja/Nein-, Auswahl- und Skalenfragen zu Ihren Inhalten. Es beantwortet jede mit einer Wahrscheinlichkeit statt mit Text, und jede Antwort wird zu einem Fund mit Ihrem Label und Ihrer Priorität. Funktioniert mit TypeSafe Jev, OpenAI Decisions, Cloudflare Clef und selbst betriebenen System-One-Modellen.",
+        "tags": "System One, Decisions API, Wahrscheinlichkeiten"
       },
       "text_classification": {
         "title": "Text-Klassifizierung",

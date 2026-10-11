@@ -911,7 +911,7 @@ export class CustomDetectorTestsService {
       status: 'FAIL',
       explanation:
         'Unrecognized expected_outcome shape. Use {"shouldMatch": true|false} for REGEX, ' +
-        '{"label": "...", "minConfidence": 0.6} for classifier/LLM detectors, or ' +
+        '{"label": "...", "minConfidence": 0.6} for classifier/LLM/decision detectors, or ' +
         '{"entities": [{"label": "...", "text": "..."}]} for entity detectors ' +
         '(the nested pipeline-output shape {"classification": {task: {label, confidence}}} / ' +
         '{"entities": {label: [{value}]}} is also accepted).',

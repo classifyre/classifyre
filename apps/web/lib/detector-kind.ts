@@ -1,5 +1,6 @@
 import {
   CODE_DETECTOR_PIPELINE_TYPE,
+  DECISION_PIPELINE_TYPE,
   TAG_PIPELINE_TYPE,
 } from "./custom-detector-badge";
 
@@ -19,6 +20,8 @@ export const TRANSFORMER_PIPELINE_TYPES = [
 export type DetectorKind =
   | "regex"
   | "llm"
+  // A decision detector: typed questions answered with probabilities.
+  | "decision"
   | "tag"
   // A code detector: a Python notebook defining detect(asset, ctx).
   | "code"
@@ -58,6 +61,7 @@ export function resolveDetectorKind(
   }
   if (isTransformerPipelineType(type)) return "transformer";
   if (type === "LLM") return "llm";
+  if (type === DECISION_PIPELINE_TYPE) return "decision";
   if (type === TAG_PIPELINE_TYPE) return "tag";
   if (type === CODE_DETECTOR_PIPELINE_TYPE) return "code";
   if (type === "REGEX") return "regex";
@@ -70,6 +74,7 @@ export function isNonTrainableKind(kind: DetectorKind): boolean {
   return (
     kind === "regex" ||
     kind === "llm" ||
+    kind === "decision" ||
     kind === "tag" ||
     kind === "code" ||
     kind === "transformer"

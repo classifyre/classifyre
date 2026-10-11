@@ -4,9 +4,9 @@ How a Classifyre product video is made, so that the next one looks and sounds
 like the last. `README.md` says what the studio is and what its rules are;
 this says how to use it for a narrated film, from a scenario to a YouTube
 upload and a blog post. It was written after the first one, "Leaked secrets on
-your laptop", and revised after the second, "Before you sign" (both October
-2026). Everything in it was learnt on one of the two, mostly by getting it
-wrong first.
+your laptop", and revised after the second, "Before you sign", the third,
+"One bad Friday", and the fourth, "One look" (all October 2026). Everything
+in it was learnt on one of the four, mostly by getting it wrong first.
 
 Videos themselves are not committed (`videos/` is ignored). What carries over
 from one to the next is the kit in `src/kit/`, the tools in `tools/`, and this
@@ -29,7 +29,7 @@ file.
   cases runs longer (the second is 6:30). Decide the length from the word
   count before a line is spoken, not from the first cut.
 
-Two arcs have worked.
+Four arcs have worked.
 
 A walkthrough: cold open (the problem, in the viewer's world) → title card →
 install → the steps in the app → the finding that changes the question → the
@@ -41,6 +41,26 @@ the sources in the app → the research finding that shaped the rules → the
 detectors, each tied to a question → glossary and entities → a notice of what
 is invented → the cases, one invented example each → that it is live → what
 it will not tell you → where to open it.
+
+A case file on an invented company: cold open (the bad news, in the meeting
+room) → title card → a notice that all of it is invented → where the answer
+already was, and the workspace that joins it → the room's ideas one by one,
+each explained on the table and ended on the case board's verdict → the idea
+that holds, and why only so far → one name across the cases (an entity page)
+→ a second case in brief → three more findings at speed → the tally → what
+the tool does not do → where to open it. The table explains and the product
+decides: every idea ends on the real board, and that rhythm is the film.
+
+An explainer of an idea, with the product last: cold open (one small thing
+somebody has to notice, on the table) → title card → where the idea's name
+comes from → how it works, on one worked example → why it is suddenly
+everywhere, with dates and a price that was measured → what is not new about
+it → a rule of thumb the viewer can keep → our own small test, said to be
+invented → the two or three things the test taught, each on one message →
+the product, briefly, as where the test was run → what the thing will not do
+→ the rule again, and where the write-up is. Nothing in it asks the viewer to
+buy or install anything. The product part is four screens and twenty seconds,
+and the film would still stand without it.
 
 ## A video's folder
 
@@ -78,13 +98,17 @@ videos/<name>/
 3. **Speak it**: `bun apps/studio/tools/voice.ts <name>`. One clip a line, and
    `audio/pauses.json` with where the speaker pauses in each. Naming lines
    does not make it a trial run: every line that has no clip yet is spoken,
-   named or not. Then check what was said (see "Sound").
+   named or not, unless `--only` is given. Then check what was said
+   (`bun apps/studio/tools/hear.ts <name>`) and fit the stops
+   (`bun apps/studio/tools/stops.ts <name> --write`); see "Sound".
 4. **Cut to the voice.** `timeline.ts` gives `at("line", n)`: the frame, in
    its scene, on which the nth phrase of a line starts. Hang every picture on
    those, never on a number typed by hand. A phrase is whatever lies between
-   two pauses, so `n` is not the sentence number: the second video's
-   `timeline.ts` adds `sentence(id, n)`, which reads the line's `stops`, and
-   that is the one to hang pictures on.
+   two pauses, so `n` is not the sentence number: the cut also gives
+   `sentence(id, n)`, which reads the line's `stops`, and that is the one to
+   hang pictures on (`phrase(id, n)` is the end of pause `n`, for a clause
+   inside a sentence). A line nobody has spoken yet is timed at an even rate,
+   so scenes can be laid out before the voice exists.
 5. **Build scene by scene**, with stills after each, and look at them:
    `bun run still <Id> out/x.png --frame=<n> --scale=0.5`. Several can run at
    once. Take them where everything is on screen (the end of a scene's last
@@ -122,7 +146,7 @@ videos/<name>/
 | --- | --- |
 | Frame | 1920×1080, 30 fps. `Stage` round every scene. |
 | Laptop | `Desktop` (menu bar with a clock), `Window`, `Browser` from the kit. The clock tells the story's time and must agree from scene to scene. |
-| Browser | `BROWSER` and `ZOOM` from `src/kit/app-shell`: one window, 1780×900 at (70, 50), page magnified 1.2. Leave the bottom 130 px of the frame to the captions. |
+| Browser | `BROWSER` and `ZOOM` from `src/kit/app-shell`: one window, 1780×900 at (70, 50), page magnified 1.2. Leave the bottom 130 px of the frame to the captions. A film without burnt-in captions keeps the window where it is (YouTube draws its own subtitles there) and may put a row of its own notes under it. |
 | Camera | `Camera` with keys `[frame, x, y, zoom]`. Zoom in (1.3 to 1.5) when something is typed or read, back out to 1 before the page changes. Ease over 20 to 30 frames. |
 | Pointer | `Cursor` with `route(spots, visits)`. It arrives on the frame it clicks; it leaves 20 to 30 frames earlier. Measure targets with `useSpots`, never by eye. |
 | Typing | `typed(text, frame, start, perSecond)`: 12 to 20 a second for things the viewer reads, 30 and up for long things they do not. |
@@ -133,7 +157,10 @@ videos/<name>/
 
 - **Captions** are the kit's `Captions`: bottom centre, white on black with a
   lime bar, a sentence or two at a time. They follow the voice's pauses; where
-  they guess wrong, name the right pauses in the line's `stops`.
+  they guess wrong, name the right pauses in the line's `stops`. The third
+  video has none: it goes out with its subtitle files only, so its
+  `video.tsx` leaves `Captions` out. The stops are fitted all the same: the
+  subtitle files are cut by them, and so are the pictures.
 - **Lettering** is the kit's `Chip`, `Headline` and `Mark`: a lime chip in mono
   capitals, a League Gothic headline, one word of it on lime. Title card,
   the question the story turns on, the closing line. Three times a video is
@@ -150,19 +177,26 @@ videos/<name>/
 
 ### The table
 
-The second video's look for everything that is not the product: paper on a
-black table. It is in `videos/firmenbuch-austria/film/paper.tsx` (`Desk`,
-`Sheet`, `Cutout`, `Stamp`, `Tag`, `Panel`, `Marker`, `Thread`, `Pin`,
-`Stroke`, `Provenance`), not yet in the kit.
+The look for everything that is not the product: paper on a black table. It
+is in the kit, imported by its own path, `src/kit/paper` (`Desk`, `Sheet`,
+`Cutout`, `Print`, `Stamp`, `Tag`, `Panel`, `Marker`, `Marked`, `Thread`,
+`Pin`, `Stroke`, `Greeking`). `Marker` is one piece and cannot wrap; `Marked`
+goes over a sentence in the middle of a paragraph, word by word. A `Cutout` is handed its `Photo`: the file, its size and its
+outline, which a video keeps in `film/photos/`.
 
 - Sheets lie a degree or two off straight and are put down from the frame
   (`put()`), with a drop shadow on a wrapper: `clip-path` on an element clips
   its own shadow.
 - **Photographs are cut out with scissors, not masked.** Ask the image model
   for one object, complete and centred, as a black-and-white archival press
-  photograph on a white seamless ground (`google/gemini-3-pro-image` through
-  OpenRouter's chat completions with `modalities: ["image", "text"]`; the
-  picture comes back as a data URL in `message.images`). Removing the ground
+  photograph on a white seamless ground (`google/gemini-3-pro-image` or
+  `google/gemini-3.1-flash-image` through OpenRouter's chat completions with
+  `modalities: ["image", "text"]`; the picture comes back as a data URL in
+  `message.images`). About one in four comes back on a grey studio ground
+  with a film edge: ask again and add "bright, clean, pure white paper
+  (#FFFFFF), no grey gradient, no film edge", or keep it as a print (below).
+  Crop to the object before cutting, or the outline is a sliver of a wide
+  picture. Removing the ground
   by flood fill fails: it stops at a grey vignette and eats glass and other
   light parts. Keep the white ground instead and cut a few straight snips
   round the object: ImageMagick's convex hull of the dark pixels, grown by
@@ -176,6 +210,12 @@ black table. It is in `videos/firmenbuch-austria/film/paper.tsx` (`Desk`,
   the grey in the corners counts as part of the object.
 - A cut-out goes at a sheet's corner, clear of its title. Two of them
   covered the name of the company they were illustrating.
+- A photograph of a place (a foundry floor, a meeting table from above) is
+  not cut out: it is a print, with a white border and a mono caption strip,
+  lying a little off straight. Prints and cut-outs mix well on one table.
+- A stamp is inked for what it lands on: lime or paper on the black table,
+  ink on paper or on a white cut-out. A lime stamp on a white photograph
+  cannot be read.
 - A paper form that looks official (a register extract) says "Illustration"
   on it. The film does not imitate a court's or an authority's own document.
 
@@ -190,6 +230,17 @@ black table. It is in `videos/firmenbuch-austria/film/paper.tsx` (`Desk`,
   plain form-filling does not need him.
 - Poses that point, point right; `flip` mirrors him. Pick the emotion with the
   pose: `stern` for a warning, `surprised` with `shock`, `wry` by default.
+- In a film that is mostly table, the same man in the same corner for five
+  minutes is what makes one film look like the last. Let him come and go: he
+  walks in (`walk`, from x below zero to his mark; a pose glides to wherever
+  a cue puts it), leaves a scene at a `dash` and comes into the next at a
+  `run`, opens a dry passage with his `back` turned, gets down to look
+  (`ponder` → `crouch` → `accuse` are drawn), and crosses the table when the
+  words give him a reason to (`crossed` → `walk`, to stand where "a person"
+  is called for). One such thing a scene is plenty.
+- A pointing hand reaches about half his height to the right of his feet. At
+  580 tall and x = 170, what lies on the table starts at x = 470 or his hand
+  is on it.
 - A pose change plays the move Blender drew for it, about a second. Do not
   change pose more often than that. Going down and coming up somewhere else
   is a cut and needs no move; so is `flip`, so set it on the cue he comes up
@@ -224,7 +275,10 @@ black table. It is in `videos/firmenbuch-austria/film/paper.tsx` (`Desk`,
   is its share of the line's time. Re-voicing a line moves its pauses, so its
   `stops` are worked out again each time. Where `say` breaks a sentence in two
   for the voice, count the sentences of `text`: that is what the captions
-  show.
+  show. `tools/stops.ts <name> --write` does all of this and puts the stops
+  into the script. Read its list once against the words: of 38 lines it got
+  one wrong, a first sentence of three words with two commas in it ("Friday,
+  ten a.m., Munich."), where the even rate lands a comma early.
 - **What the voice gets wrong**, and what fixed it:
   - A name the model has never seen. "Mr. Fyre" is said "Mister Fire" in
     `say`. An invented German name that opens a sentence gets swallowed; give
@@ -235,13 +289,38 @@ black table. It is in `videos/firmenbuch-austria/film/paper.tsx` (`Desk`,
   - A stray "mm" or a changed word. Speak the line again.
   - Every line is its own take. A line spoken again later can sound like a
     different afternoon; if it stands out, speak it once more.
-- **Check the words by machine.** Send each clip to a model that takes audio
-  (`google/gemini-3.8-flash`, a `{type: "input_audio", input_audio: {data,
-  format: "mp3"}}` part in a chat completion) and ask for a word-for-word
-  transcript with numbers as words; compare it with `say`, case and
-  punctuation aside. It finds dropped, added and changed words. It mishears
-  brand names and invented names every time, and it cannot time anything: it
-  reported pauses of two seconds where the file has 0.4.
+  - A short opening clause before a full stop ("Then the case.", "Now, the
+    case.") came out as "In the case" and "In either case". Cut it: the
+    line was better without.
+  - A number that ends in a short word ("two hundred new") grew a stray
+    "no". Give the number something to hold ("two hundred from the new
+    lot").
+- **Check the words by machine.** `tools/hear.ts <name>` sends each clip to a
+  model that takes audio (`google/gemini-3.8-flash`, a `{type: "input_audio",
+  input_audio: {data, format: "mp3"}}` part in a chat completion), asks for a
+  word-for-word transcript with numbers as words, and compares it with `say`,
+  case and punctuation aside. It finds dropped, added and changed words. It
+  mishears brand names and invented names every time ("I'm Mister Fire" came
+  back three different ways from one clip), it writes a homophone as it
+  pleases ("steel" as "steal"), and it cannot time anything: it reported
+  pauses of two seconds where the file has 0.4. Where it differs on a name,
+  ask it the question outright ("is 'I'm Mister Fire' spoken clearly and
+  completely?") before paying for the line again.
+  - A sentence that opens "And the…?" was heard as "In the…" by the checker
+    and was in fact right: ask outright before paying again. Two short
+    sentences the voice keeps running together ("…every message. It would
+    write…") stay run together on a second take; change the caption to what
+    is said instead.
+  - `hear.ts` sends its clips at once, and a key with little credit answers
+    some of them 402 "in-flight budget". Those lines were not checked: run
+    it again.
+- **Small sounds.** The fourth film has two, made with ffmpeg in two lines
+  each: a stamp coming down (a sine falling from 95 Hz with a breath of pink
+  noise) and a typewriter key (a 30 ms burst of band-passed white noise).
+  They are played at 0.4 and 0.22, are tied to the frame the stamp lands on
+  or the letter is typed on, and a render leaves them out with
+  `--props='{"sfx":false}'`. Like the voice and the bed, nobody has heard
+  them in the mix until a person plays the export.
 - **Music.** `tools/bed.sh` makes a stand-in drone. The second video's bed is
   a generated noir-jazz trio, which suits a man in a trench coat:
   `google/lyria-3-pro-preview` through OpenRouter (audio output needs
@@ -252,8 +331,10 @@ black table. It is in `videos/firmenbuch-austria/film/paper.tsx` (`Desk`,
   before using it: instruments, where the energy changes, where it ends. Loop
   it with five-second crossfades, cutting each pass before the piece's own
   ending and letting the last pass run into it; dip 2 kHz by 4 dB; level to
-  -30 LUFS; play it at 0.55. The bed is exactly as long as the video, so it is
-  made again whenever a line is.
+  -30 LUFS; play it at 0.55. `tools/loop.sh <name> <piece> <seconds>` does
+  that. The bed is exactly as long as the video, so it is made again whenever
+  a line is. The series keeps one piece (`audio/takes/bed-noir-source.mp3` in
+  the second and third videos): the same man, the same music.
 
 ## Where the UI comes from
 
@@ -271,6 +352,18 @@ In this order:
    hand-over which screens were built this way. Better still, split its drawing
    part into `packages/ui` first.
 
+4. A page the film only reads (nobody types into it, nothing on it moves) can
+   be a screenshot of the running app instead: Playwright, the kit's page
+   size (1483×707), three times the size, the dev overlay hidden, scrolled so
+   that what the line is about sits under the top. Put it in the kit's
+   `Browser` as an image, move the camera over it, and draw the film's marks
+   (lime boxes, lime tags) inside the same `Camera`, placed in the page's own
+   pixels, so that they stay on what they mark. It is the real page with
+   nothing to drift, it took minutes where a rebuilt page takes hours, and
+   the hand-over and the blog post say that these are screenshots. The fourth
+   film's four product screens are made this way
+   (`film/shots/capture.mjs`).
+
 A rebuilt page has the real page's columns and no others. Put it next to the
 screenshot from step 1 before exporting. The second video's Sources table had
 a "Records" column the product does not have; it was found after the first
@@ -282,9 +375,20 @@ film shows what the dictionary says it should, and the fault is reported.
 `AppShell` (`src/kit/app-shell`) is the app round a page. `FilmBoard`
 (`src/kit/case-board`) is the case board with the camera in the video's hands.
 Its drawing covers board coordinates -120 to 3000 across and -150 to 1030
-down: three frames of 900 with 60 between them fit. Give every record a place
-that does not depend on which others are there, or the board shuffles when
-one leaves.
+down: three frames of 900 with 60 between them fit. A board laid out another
+way says what it covers with `world` (the third video's frames stand one
+under the other). Give every record a place that does not depend on which
+others are there, or the board shuffles when one leaves.
+
+A board that exists is filmed as it is. The case's own API answer
+(`/api/<workspace>/cases/<id>/board/`: frames, hypothesis cards, records with
+their findings, and every stance) is trimmed into a fixture and turned into
+the scene the board package draws, so every label, place and line is the
+workspace's. What a film may change is time: a hypothesis shown before it was
+decided reads PROPOSED, its frame's title does not announce the result yet,
+and its lines to the evidence are left out until the film argues it (a line
+only faded out leaves its stance mark and the card's tally behind). Say in the
+hand-over that the board is replayed.
 
 A component that keeps its own state is driven, not rebuilt: `fill()` types
 into its input, `useSpots` finds its buttons. `useSpots` measures where things
@@ -317,6 +421,16 @@ tag) is drawn outside the `Camera`.
   company. The names, the date and the search go in `research.md`.
 - **Say only what the data read can say.** "The register does not name
   owners" was false; "the records we read name managers, not owners" is true.
+- **Open every page the film shows on the instance viewers will open.** The
+  third video's entity page showed 21 mentions on the workspace as built and
+  none on production: the value index there had been deleted along with
+  duplicate detection. A count that matches (records, findings) says nothing
+  about a page that is derived from them.
+- **When the whole company is invented**, the three labels shrink to one
+  notice early on (the company and every figure are invented; the workspace,
+  its checks and their findings are real), a small "invented" tag on each
+  table scene, and the line again on the last card. Findings are then quoted
+  word for word: they are the workspace's own, about its own invented data.
 
 ## Things that break renders
 
@@ -334,6 +448,12 @@ tag) is drawn outside the `Camera`.
   touching `remotion.config.ts`.
 - **A render films the code as it was when it started.** An edit made while
   one runs is not in it.
+- **Measuring under a moving camera.** `useOffsets` and `useSpots` measure
+  what is on screen, camera included. Under a `Camera` that is zooming, a
+  scroll worked out from `useOffsets` moves what is measured, and on some
+  frames it never settles: the render stops on React error 185, "Maximum
+  update depth exceeded". A check reel of every 15th frame passed; the full
+  export did not. Measure once with the camera flat and keep the numbers.
 - **Something hidden with opacity still takes its room.** A list whose rows
   arrive one by one leaves a hole where the next will be; leave the row out
   until it is due.
@@ -348,6 +468,20 @@ tag) is drawn outside the `Camera`.
 - ImageMagick's `montage` wants a font and fails without one. Join stills with
   `magick \( a.png b.png +append \) \( c.png d.png +append \) -append`.
 - The showcase's REST paths end in a slash; without it the answer is a 308.
+  They are public under `/api/<workspace>/…` on the showcase's own host.
+- This machine's Python has no certificates for `urllib`: a script that calls
+  OpenRouter is written for `bun`, whose `fetch` has them.
+- A still taken while a scene is scrolling or cross-fading looks like a bug.
+  Take it a second after the cue it is meant to show.
+- A scene that opens on one note on an empty table for three seconds reads as
+  a stall on the contact sheet. Put the scene's things down at the start and
+  bring their labels on cue. Where a scene's first things belong at the top
+  and the rest arrives ten seconds later, put the first group in the middle
+  of the table and let it glide up when the rest comes (`glide` on a wrapper's
+  `translate`): the fourth film does this three times.
+- A claim with "most" in it is counted before it is spoken. "That model
+  reports lower numbers on most answers" was true of 24 of 31 answers of two
+  kinds and of 31 of 70 overall; the line was spoken again as "tends to".
 
 ## Honesty
 
@@ -371,7 +505,11 @@ tag) is drawn outside the `Camera`.
   YouTube gives a 4K upload its better codec at every resolution.
 - Thumbnail: the title card without captions,
   `bun run still <Id> out/t.png --frame=<n> --props='{"captions":false}'`,
-  scaled to 1280×720.
+  scaled to 1280×720. Or a composition of its own, when the film should not
+  look like the last three in a list: `videos/<name>/thumb/video.tsx` with
+  one frame (the studio finds every `video.tsx` under `videos/`), built from
+  the film's own props. The blog cover can be made the same way
+  (`cover/video.tsx`), with its left third left dark.
 - `youtube.md`: three titles under 75 characters (problem first), a
   description whose first two lines stand alone, the command, chapters from
   the timeline (a chapter is at least ten seconds; merge shorter scenes), 20
@@ -413,13 +551,11 @@ tag) is drawn outside the `Camera`.
 - Extract the drawing parts of the sources table, findings table, inquiry
   form and new-case page into `packages/ui`, so that videos film them instead
   of rebuilding them. The second video added the detectors table, the
-  glossary table and the case page to that list.
-- Three checks were scripts written for one video and thrown away: printing
-  the cut (scenes, lines, phrases as frames), fitting each line's `stops`,
-  and transcribing every clip against the script. They belong in `tools/`.
-- `tools/voice.ts` speaks every line that has no clip; it has no way to speak
-  only the lines it is given.
-- `sentence()` and `phrase()` are in the second video's `timeline.ts`, and the
-  paper table is in its `film/paper.tsx`. Both move to the kit when a third
-  video wants them.
+  glossary table and the case page to that list; the third the entity page
+  and the inquiry-watch list.
+- Printing the cut (scenes, lines, phrases as frames) is still a one-off
+  script each time. It belongs in `tools/`, next to `stops.ts` and `hear.ts`.
+- The case page round the board (`film/casepage.tsx`), the board built from
+  a case's API answer (`film/board.ts`) and the verdict beat are in the third
+  video's folder. They move to the kit when a fourth video wants them.
 - Music a person chose.

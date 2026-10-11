@@ -8,6 +8,7 @@ import { api } from "@workspace/api-client";
 import { PipelineDetectorEditor } from "@/components/pipeline-detector-editor";
 import { RegexDetectorEditor } from "@/components/regex-detector-editor";
 import { LLMDetectorEditor } from "@/components/llm-detector-editor";
+import { DecisionDetectorEditor } from "@/components/decision-detector-editor";
 import { TagDetectorEditor } from "@/components/tag-detector-editor";
 import { CodeDetectorEditor } from "@/components/code-detector-editor";
 import {
@@ -157,6 +158,8 @@ export function DetectorCreatorForm({
           ? "Build a regex pattern detector. Define precise pattern-matching rules — fast, deterministic, zero ML overhead."
           : selectedKind === "llm"
             ? "Build an AI detector. Write a prompt, define labels and extraction fields, and a configured LLM provider classifies and extracts from content."
+            : selectedKind === "decision"
+              ? t("detectors.decision.createSubtitle")
             : selectedKind === "custom_detector"
               ? t("detectors.code.createSubtitle")
             : selectedKind === "tag"
@@ -273,6 +276,16 @@ export function DetectorCreatorForm({
       {/* Phase 2: AI (LLM) form with stepper */}
       {selectedKind === "llm" && (
         <LLMDetectorEditor
+          mode="create"
+          submitLabel={t("detectors.create")}
+          isSubmitting={isSaving}
+          onSubmit={handleCreate}
+        />
+      )}
+
+      {/* Phase 2: decision form — a model, then the questions it answers */}
+      {selectedKind === "decision" && (
+        <DecisionDetectorEditor
           mode="create"
           submitLabel={t("detectors.create")}
           isSubmitting={isSaving}

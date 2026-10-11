@@ -8,6 +8,7 @@ import {
   Brain,
   Code2,
   Image,
+  Scale,
   ScanSearch,
   Tag,
 } from "lucide-react";
@@ -19,6 +20,8 @@ export type DetectorKind =
   | "gliner2"
   | "regex"
   | "llm"
+  // Typed questions a decision model answers with probabilities.
+  | "decision"
   | "text_classification"
   | "image_classification"
   | "object_detection"
@@ -36,6 +39,7 @@ const DETECTOR_ICONS: Record<
   gliner2: Layers,
   regex: Regex,
   llm: Bot,
+  decision: Scale,
   text_classification: Brain,
   image_classification: Image,
   object_detection: ScanSearch,
@@ -129,7 +133,7 @@ export function DetectorTypeSelector({
   onSelect: (kind: DetectorKind) => void;
 }) {
   const { t } = useTranslation();
-  const generalIds: DetectorKind[] = ["gliner2", "regex", "llm"];
+  const generalIds: DetectorKind[] = ["gliner2", "regex", "llm", "decision"];
   const transformerIds: DetectorKind[] = [
     "text_classification",
     "image_classification",
@@ -138,7 +142,7 @@ export function DetectorTypeSelector({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {generalIds.map((id) => (
           <DetectorTypeCard key={id} kind={id} onSelect={onSelect} />
         ))}

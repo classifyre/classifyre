@@ -15,8 +15,11 @@ up on YouTube with a blog post next to it) read `apps/studio/PLAYBOOK.md` as
 well, before writing anything: it is the house style and the whole pipeline,
 from script and voice to export, subtitles, upload sheet and blog post. Start
 from the kit it describes (`Desktop`, `Browser`, `Cursor`, `Camera`,
-`AppShell`, `FilmBoard`, `cut`, `Captions`, `Narrator`, `Chip`/`Headline`)
-rather than drawing a laptop, a caption or a title card again.
+`AppShell`, `FilmBoard`, `cut`, `Captions`, `Narrator`, `Chip`/`Headline`, and
+the paper table in `src/kit/paper`) rather than drawing a laptop, a caption, a
+title card or a sheet of paper again, and from the tools in
+`apps/studio/tools/` (voice, its two checks, the music bed, subtitles, the
+export) rather than writing a one-off script.
 
 For Remotion itself (sequencing, transitions, audio, captions, API lookups) use
 the `remotion-best-practices` skill and its references. Where they say to

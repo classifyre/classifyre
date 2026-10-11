@@ -48,6 +48,8 @@ NON_CACHEABLE_DETECTOR_TYPES: Final[frozenset[str]] = frozenset({"BROKEN_LINKS"}
 PIPELINE_ENGINE_VERSION: Final[dict[str, int]] = {
     # The code-detector runtime: SDK surface, finding mapping, payload shapes.
     "CODE_DETECTOR": 1,
+    # The decision runner: question wire shape, answer-to-finding mapping.
+    "DECISION": 1,
 }
 
 

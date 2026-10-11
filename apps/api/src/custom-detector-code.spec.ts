@@ -1,11 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 import {
   definesDetect,
-  maskCodeDetectorSchema,
-  mergeCodeDetectorSecrets,
   validateCodeDetectorSchema,
-  versionedShape,
 } from './custom-detector-code';
+import {
+  maskDetectorSecrets,
+  mergeDetectorSecrets,
+  versionedShape,
+} from './custom-detector-secrets';
 import { CustomDetectorsService } from './custom-detectors.service';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 
@@ -120,7 +122,7 @@ describe('code detector schema rules', () => {
   });
 
   it('masks secret values but keeps their names', () => {
-    const { schema: masked, secretKeys } = maskCodeDetectorSchema(
+    const { schema: masked, secretKeys } = maskDetectorSecrets(
       schema({ secrets: { b: 'x', a: 'y' } }),
     );
     expect(masked).not.toHaveProperty('secrets');
@@ -128,7 +130,7 @@ describe('code detector schema rules', () => {
   });
 
   it('applies a secrets patch: set, delete, keep', () => {
-    const merged = mergeCodeDetectorSecrets(
+    const merged = mergeDetectorSecrets(
       { keep: 'enc-keep', drop: 'enc-drop', rotate: 'enc-old' },
       { drop: null, rotate: 'new', added: 'fresh' },
       (value) => `enc(${value})`,

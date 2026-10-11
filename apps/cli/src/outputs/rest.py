@@ -207,8 +207,9 @@ class FinalizeIngestRunRequest(BaseModel):
     cohort_stats: dict[str, Any] | None = Field(None, serialization_alias="cohortStats")
     # Detectors the circuit breaker disabled mid-run (scan-cache identity
     # keys). Their skipped assets carry breaker_open ERROR outcomes and were
-    # never evaluated, so the API must not treat this run's sweep position as
-    # covering them: the next run starts the sweep over and retries them.
+    # never evaluated. The API remembers the keys while the sweep keeps
+    # advancing; the first later run that completes with none of them degraded
+    # restarts the sweep and retries the skipped work.
     detectors_degraded: list[str] | None = Field(None, serialization_alias="detectorsDegraded")
 
 

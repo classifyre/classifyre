@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class CustomDetector(BaseDetector):
     """Schema-driven detector backed by a pluggable runner.
 
-    GLINER2 | REGEX | LLM | transformer run over content. TAG does not: it
+    GLINER2 | REGEX | LLM | DECISION | transformer run over content. TAG does not: it
     produces findings only from tags a CUSTOM connector attached to an asset,
     which the pipeline applies through ``runner.tag_finding``.
     """

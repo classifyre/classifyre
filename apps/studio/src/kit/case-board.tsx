@@ -46,8 +46,16 @@ import { DEMO_NODE_TYPES } from "../../../../packages/case-board/src/demo/demo-n
 
 type FlowNode = ReturnType<typeof buildFlow>["nodes"][number];
 
-/** The board coordinates the drawing covers. */
-const WORLD = { x: -120, y: -150, w: 3120, h: 1180 } as const;
+/** The board coordinates a drawing covers. */
+export interface BoardWorld {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** What it covers unless a film says otherwise: three frames of 900 side by side. */
+const WORLD: BoardWorld = { x: -120, y: -150, w: 3120, h: 1180 };
 
 const ASSET_HANDLES = roundPortHandles({
   cx: ASSET_NODE.cx,
@@ -114,12 +122,15 @@ export function FilmBoard({
   height,
   shown,
   linked,
+  world = WORLD,
   children,
 }: {
   scene: DemoScene;
   camera: BoardCamera;
   width: number;
   height: number;
+  /** The board coordinates the drawing covers, for a board laid out another way (frames one under the other). */
+  world?: BoardWorld;
   /** 0 → 1 for a node that is arriving or leaving; 1 when it says nothing. */
   shown?: (id: string) => number;
   /** 0 → 1 for a hypothesis's line to a finding, as it is being drawn. */
@@ -168,9 +179,9 @@ export function FilmBoard({
       <div
         className="absolute left-0 top-0 origin-top-left"
         style={{
-          width: WORLD.w,
-          height: WORLD.h,
-          transform: `translate(${width / 2 - (camera.x - WORLD.x) * camera.zoom}px, ${height / 2 - (camera.y - WORLD.y) * camera.zoom}px) scale(${camera.zoom})`,
+          width: world.w,
+          height: world.h,
+          transform: `translate(${width / 2 - (camera.x - world.x) * camera.zoom}px, ${height / 2 - (camera.y - world.y) * camera.zoom}px) scale(${camera.zoom})`,
         }}
       >
         <ReactFlowProvider>
@@ -181,7 +192,7 @@ export function FilmBoard({
             nodeTypes={DEMO_NODE_TYPES}
             edgeTypes={DEMO_EDGE_TYPES}
             connectionMode={ConnectionMode.Loose}
-            defaultViewport={{ x: -WORLD.x, y: -WORLD.y, zoom: 1 }}
+            defaultViewport={{ x: -world.x, y: -world.y, zoom: 1 }}
             minZoom={1}
             maxZoom={1}
             nodesDraggable={false}
@@ -199,7 +210,7 @@ export function FilmBoard({
         </ReactFlowProvider>
         <div
           className="pointer-events-none absolute"
-          style={{ left: -WORLD.x, top: -WORLD.y }}
+          style={{ left: -world.x, top: -world.y }}
         >
           {children}
         </div>

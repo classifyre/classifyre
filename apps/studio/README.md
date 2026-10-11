@@ -20,11 +20,14 @@ bun run --cwd apps/studio still <id> out/frame.png --frame=90
 `ReuseCheck` is the built-in composition: a short smoke test made entirely of
 `@workspace/ui` components. If it renders correctly, reuse works.
 
-For a narrated video there are four more, all run from the repo root:
+For a narrated video there are seven more, all run from the repo root:
 
 ```bash
 bun apps/studio/tools/voice.ts <video-folder>              # speak its script, one clip a line
+bun apps/studio/tools/hear.ts <video-folder>               # check what was said against the script
+bun apps/studio/tools/stops.ts <video-folder> [--write]    # fit each line's sentence stops
 sh apps/studio/tools/bed.sh <video-folder>                 # a stand-in music bed
+sh apps/studio/tools/loop.sh <video-folder> <piece> <sec>  # a bed looped from a piece of music
 bun apps/studio/tools/subtitles.ts <video-folder> <id>     # out/<id>.en.srt, and translations
 sh apps/studio/tools/youtube.sh <id> [1080p|4k|both]       # out/<id>-1080p.mp4 and -4k.mp4
 ```
@@ -42,7 +45,7 @@ The first render downloads Chrome Headless Shell (~95 MB) into `node_modules`.
 | `src/kit/`   | yes       | What every video is made of (below)                            |
 | `src/borrow/` | yes      | What lets a video import a component from `apps/web` or `apps/blog` in place (`src/borrow/README.md`) |
 | `src/smoke/` | yes       | `ReuseCheck`                                                   |
-| `tools/`     | yes       | Voice, music bed, subtitles, YouTube export                    |
+| `tools/`     | yes       | Voice and its checks, music bed, subtitles, YouTube export     |
 | `PLAYBOOK.md` | yes      | How a narrated product video is made, and its house style      |
 | `videos/`    | no        | One folder per video: its scenario, its code, its local assets |
 | `out/`       | no        | Renders                                                        |
@@ -58,12 +61,12 @@ The first render downloads Chrome Headless Shell (~95 MB) into `node_modules`.
 | `glide`, `arrive`, `during`, `track`, `typed` | Plain functions of the frame, for everything else |
 | `Desktop`, `Window`, `Browser`, `Cursor`, `Camera` | The laptop a story happens on, its pointer, and the camera |
 | `useSpots`, `route`, `useOffsets`, `fill`, `useHands` | Measuring the product's components and typing into them |
-| `cut`, `captionParts`, `subtitles` | A script and its spoken clips, as frame numbers |
+| `cut`, `captionParts`, `subtitles` | A script and its spoken clips, as frame numbers (`at`, `sentence`, `phrase`, `end`) |
 | `Voice`, `Captions`, `Bed`, `Narrator` | What lies over every scene of a narrated video |
 | `Chip`, `Headline`, `Mark` | The words a video sets itself |
 | `Logo`, `Mascot`, `MrFyre`, `MrFyreActor` | The brand |
 
-Two heavier pieces are imported by their own path, because not every video
+Three heavier pieces are imported by their own path, because not every video
 wants what they bring with them:
 
 - `src/kit/app-shell`: `AppShell`, the app's sidebar and header round a page,
@@ -71,6 +74,10 @@ wants what they bring with them:
   scenes share (`BROWSER`, `ZOOM`, `PAGE`).
 - `src/kit/case-board`: `FilmBoard`, the case board drawn by
   `@workspace/case-board` with the camera in the video's hands.
+- `src/kit/paper`: what a film is made of when it is not showing the product:
+  `Desk`, `Sheet`, `Cutout`, `Print`, `Stamp`, `Tag`, `Panel`, `Marker`,
+  `Marked`, `Thread`, `Pin`, `Stroke`. Paper on a black table, so that nobody takes the film's
+  own explaining for the product.
 
 A render can leave things out: `--props='{"captions":false}'` for a picture
 without the words burnt in, `--props='{"fyre":false}'` for the product alone.

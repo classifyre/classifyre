@@ -50,7 +50,7 @@ export interface UpdateCustomDetectorDto {
      */
     aiProviderConfigId?: string;
     /**
-     * Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION | TAG). TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={"<key>": "<value>"}), and it is not selectable on a source.
+     * Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | DECISION | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION | TAG | CODE_DETECTOR). DECISION asks a decision model (Decisions API / System One, reached through LiteLLM) typed questions and carries its own write-only secrets.api_key. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={"<key>": "<value>"}), and it is not selectable on a source.
      * @type {object}
      * @memberof UpdateCustomDetectorDto
      */

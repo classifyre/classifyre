@@ -98,7 +98,7 @@ export interface FinalizeIngestRunDto {
      */
     cohortStats?: object;
     /**
-     * Detectors the circuit breaker disabled mid-run (scan-cache identity keys). Their skipped assets carry breaker_open ERROR outcomes and were never evaluated, so the saved sweep position is dropped and the next run starts the sweep over; the scan cache still skips assets whose banked detectors all match, so only the skipped work re-runs.
+     * Detectors the circuit breaker disabled mid-run (scan-cache identity keys). Their skipped assets carry breaker_open ERROR outcomes and were never evaluated. The keys are remembered on the source while the sweep keeps advancing; the first later run that completes with none of them degraded restarts the sweep, and the scan cache still skips assets whose banked detectors all match, so only the skipped work re-runs.
      * @type {Array<string>}
      * @memberof FinalizeIngestRunDto
      */

@@ -2293,12 +2293,166 @@
       "saving": "Saving…",
       "validationProviderRequired": "Select an AI provider",
       "budgetTitle": "Run budget",
-      "budgetHint": "How much of a run this detector may spend failing. Every run already stops it after a refusal that retrying cannot fix (quota, invalid key, billing) or 10 consecutive failures. Skipped assets keep their findings and are evaluated again on the next run. Changing the budget does not re-scan anything.",
+      "budgetHint": "How much of a run this detector may spend failing. Every run already stops it after a refusal that retrying cannot fix (quota, invalid key, billing) or 10 consecutive failures. Skipped assets keep their findings and are evaluated again once the detector works. Changing the budget does not re-scan anything.",
       "budgetMaxAttempts": "Attempts per asset",
       "budgetMaxAttemptsPlaceholder": "deployment default",
       "budgetMaxConsecutiveFailures": "Stop after consecutive failures",
       "budgetMaxWallClockSeconds": "Time budget per run (seconds)",
       "budgetMaxWallClockSecondsPlaceholder": "no limit"
+    },
+    "decision": {
+      "createSubtitle": "Build a decision detector. Pick a decision model, write the questions it should answer about your content, and choose which answers become findings.",
+      "stepIdentity": "Identity",
+      "stepIdentityDesc": "Name, key, and status",
+      "stepModel": "Model",
+      "stepModelDesc": "Provider, model and API key",
+      "stepQuestions": "Questions",
+      "stepQuestionsDesc": "What to ask, and what becomes a finding",
+      "identityTitle": "Detector identity",
+      "name": "Name",
+      "namePlaceholder": "e.g. Support ticket triage",
+      "keyLabel": "Key",
+      "keyHint": "Derived from the name when empty",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "What does this detector decide, and for whom?",
+      "activeLabel": "Active — available for source configuration",
+      "modelTitle": "Decision model",
+      "modelHint": "The model that answers your questions. Calls go through LiteLLM, so any decision model LiteLLM supports works here.",
+      "provider": "Provider",
+      "model": "Model",
+      "modelFieldHint": "Written as provider/model. Pick a suggestion or type your own.",
+      "providers": {
+        "typesafe": {
+          "name": "TypeSafe Jev",
+          "hint": "TypeSafe's System One models. Needs a TypeSafe API key.",
+          "apiBaseHint": "Leave empty to call TypeSafe directly. Set it only to send calls through a gateway."
+        },
+        "openai": {
+          "name": "OpenAI Decisions",
+          "hint": "OpenAI's Decisions API. Needs an OpenAI API key.",
+          "apiBaseHint": "Leave empty to call OpenAI directly. Set it only to send calls through a gateway."
+        },
+        "cloudflare": {
+          "name": "Cloudflare Clef",
+          "hint": "Clef on Workers AI. Needs an API token, and your account ID in the endpoint URL.",
+          "apiBaseHint": "Replace <ACCOUNT_ID> with your Cloudflare account ID."
+        },
+        "perplexity": {
+          "name": "Perplexity",
+          "hint": "Perplexity's decision models. Needs a Perplexity API key.",
+          "apiBaseHint": "Leave empty to call Perplexity directly. Set it only to send calls through a gateway."
+        },
+        "openrouter": {
+          "name": "OpenRouter",
+          "hint": "Decision models routed by OpenRouter. Needs an OpenRouter API key.",
+          "apiBaseHint": "Leave empty to call OpenRouter directly. Set it only to send calls through a gateway."
+        },
+        "self_hosted": {
+          "name": "Self-hosted (System One)",
+          "hint": "A decision model you run yourself: Strands Decider, Laya, Nimble, OpenJev or any server that answers POST /v1/systemone. No key is needed unless your server asks for one.",
+          "apiBaseHint": "Your server's address. Calls go to <address>/v1/systemone."
+        },
+        "other": {
+          "name": "Other (any LiteLLM model)",
+          "hint": "Any decision model LiteLLM supports. Type its full name as provider/model.",
+          "apiBaseHint": "Only needed when the provider has no fixed address."
+        }
+      },
+      "apiKey": "API key",
+      "apiKeyPlaceholder": "Paste the provider's API key",
+      "apiKeyReplacePlaceholder": "Paste a new key to replace the stored one",
+      "apiKeyHint": "Stored encrypted and never shown again. It is used only to call the model during a scan.",
+      "apiKeyOptionalHint": "Optional. Leave empty if your server needs no key.",
+      "apiKeyStored": "A key is stored. Click the field to replace it.",
+      "apiKeyWillBeDropped": "You changed the provider or the endpoint, so the stored key will be removed when you save. Enter the key for the new one.",
+      "apiKeyRemove": "Remove",
+      "apiKeyKeep": "Keep",
+      "apiKeyRemoved": "The key will be removed when you save",
+      "apiBase": "Endpoint URL",
+      "advancedTitle": "Advanced",
+      "headers": "Extra headers",
+      "headersHint": "Sent with every call, for a gateway that routes or attributes requests by header. Not for credentials: headers are stored and shown in plain text.",
+      "headerName": "Header name",
+      "headerValue": "Header value",
+      "addHeader": "Add header",
+      "removeHeader": "Remove header",
+      "contentLimit": "Characters sent per call",
+      "contentLimitHint": "Longer content is cut to this length before it is sent. Empty means 8000.",
+      "questionsTitle": "Questions",
+      "questionsHint": "The model answers each question with a probability, not with text. One call answers all of them. An answer that passes its threshold becomes a finding.",
+      "loadExample": "Start from an example",
+      "defaultPriority": "Default priority",
+      "defaultPriorityHint": "Used when a question or an answer does not set its own.",
+      "questionNumber": "Question {{number}}",
+      "removeQuestion": "Remove question",
+      "types": {
+        "yes_no": {
+          "title": "Yes / No",
+          "hint": "The model returns how likely the answer is yes. A finding is recorded when that reaches the threshold.",
+          "placeholder": "Is the customer asking for a refund?"
+        },
+        "choice": {
+          "title": "Pick one",
+          "hint": "The model picks exactly one answer from your list. Each answer can become a finding with its own priority, or no finding at all.",
+          "placeholder": "Which team should handle this?"
+        },
+        "score": {
+          "title": "Score",
+          "hint": "The model places the content on a scale you define. Each level can become a finding with its own priority, or no finding at all.",
+          "placeholder": "How frustrated is the customer?"
+        }
+      },
+      "instructions": "Question",
+      "questionName": "Finding name",
+      "questionPriority": "Priority",
+      "priorityDetectorDefault": "Detector default",
+      "threshold": "Threshold",
+      "thresholdYesNoHint": "Threshold: how likely \"yes\" must be before a finding is recorded. Empty means 0.5.",
+      "thresholdPickHint": "Threshold: how confident the model must be in its answer before a finding is recorded. Empty means 0, which records every answer.",
+      "choices": "Answers",
+      "choicesHint": "At least 2. Add a catch-all such as \"other\" and set it to No finding, so content that fits nothing is not forced into a real answer.",
+      "levels": "Levels",
+      "levelsHint": "2 to 10, from lowest to highest. Set the level that means \"nothing to report\" to No finding.",
+      "optionLabel": "Answer",
+      "optionLabelPlaceholder": "answer",
+      "optionDescription": "When it applies",
+      "optionDescriptionPlaceholder": "When does this apply? (optional)",
+      "optionFinding": "Finding",
+      "findingNone": "No finding",
+      "findingDefault": "Question priority",
+      "addChoice": "Add answer",
+      "addLevel": "Add level",
+      "removeOption": "Remove",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "becomes": "Findings:",
+      "becomesNothing": "none yet",
+      "add": {
+        "yes_no": "Yes / No question",
+        "choice": "Pick-one question",
+        "score": "Score question"
+      },
+      "saving": "Saving…",
+      "problem": {
+        "nameMissing": "Give the detector a name",
+        "modelMissing": "Enter a model",
+        "modelFormat": "Write the model as provider/model, without spaces",
+        "apiKeyMissing": "This provider needs an API key",
+        "apiBaseMissing": "This provider needs an endpoint URL",
+        "apiBaseFormat": "The endpoint URL must start with http:// or https://",
+        "headerName": "A header name may use only letters, digits and hyphens. Authorization and Content-Type are set for you.",
+        "contentLimit": "Enter a whole number of 1 or more",
+        "noQuestions": "Add at least one question",
+        "tooManyQuestions": "A detector can ask at most 64 questions",
+        "questionName": "Start with a letter and use only letters, digits, _ and -",
+        "duplicateQuestion": "Another question already uses this name",
+        "questionInstructions": "Write the question",
+        "optionCount": "Needs {{min}} to {{max}} entries",
+        "optionLabel": "Every entry needs a name",
+        "duplicateOption": "Two entries have the same name",
+        "threshold": "Enter a number from 0 to 1",
+        "inQuestion": "Question {{number}} is incomplete"
+      }
     },
     "startBlank": "Start blank",
     "startBlankDesc": "Configure the detector from scratch with no pre-filled values.",
@@ -2341,6 +2495,12 @@
         "tagline": "Prompt-driven detection",
         "description": "Use a large language model with a natural-language prompt to classify content and extract structured fields. Best for nuanced, context-dependent detection where examples and rules are hard to define explicitly.",
         "tags": "Prompt-based, Classification, Extraction"
+      },
+      "decision": {
+        "title": "Decision detector",
+        "tagline": "Typed questions, answered with probabilities",
+        "description": "Ask a decision model yes/no, pick-one and scale questions about your content. It answers each with a probability instead of text, and every answer becomes a finding with your label and priority. Works with TypeSafe Jev, OpenAI Decisions, Cloudflare Clef and self-hosted System One models.",
+        "tags": "System One, Decisions API, Probabilities"
       },
       "text_classification": {
         "title": "Text Classification",
