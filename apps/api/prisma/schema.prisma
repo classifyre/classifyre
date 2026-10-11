@@ -72,6 +72,13 @@ model Source {
   // assets' payload cursors are dropped and the sweep starts from scratch.
   // Null means never compared, which counts as a mismatch.
   samplingCursorFingerprint  String?                     @map("sampling_cursor_fingerprint")
+  // Detector keys the circuit breaker disabled at the end of the latest
+  // finalized run (scan-cache identity keys), or null when the latest run
+  // ended with none degraded. A degraded run keeps advancing the sweep, so
+  // this is what makes the skipped assets retried later: the first run that
+  // completes with none of these degraded drops the cursor once, and the next
+  // run restarts the sweep while the scan cache retries the skipped work.
+  degradedDetectors          Json?                       @map("degraded_detectors") @db.JsonB
   // Per-source autopilot management mode; overrides the instance config flag
   // unless INHERIT. OBSERVE_ONLY blocks the config-tuning agent from changing
   // this source's config.

@@ -92,10 +92,26 @@ export interface Cut<SceneId extends string, LineId extends string> {
   at: (id: LineId, phrase?: number) => number;
   /** The frame, in its own scene, on which a line ends. */
   end: (id: LineId) => number;
+  /**
+   * The frame, in its own scene, on which the nth sentence of a line starts
+   * (the first is 0). It reads the line's `stops`, so a picture can be hung
+   * on the sentence it belongs to. A line nobody has spoken yet is given an
+   * even rate, so that scenes can be laid out before the voice exists.
+   */
+  sentence: (id: LineId, n: number) => number;
+  /** The frame, in its own scene, on which the pause numbered `n` in a line ends: a phrase inside a sentence. */
+  phrase: (id: LineId, n: number) => number;
 }
 
 /** Frames of silence between two lines unless the line says otherwise. */
 const GAP = 9;
+
+/**
+ * Where one sentence ends and the next begins. A full stop ends a sentence
+ * only where a space follows ("classifyre.com" is one word), and not after a
+ * title ("Mr. Fyre" is one man).
+ */
+export const SENTENCE_END = /(?<=[.?!])(?<!Mr\.)\s+/;
 
 export function cut<const S extends readonly SceneSpec[]>(
   script: S,
@@ -106,12 +122,14 @@ export function cut<const S extends readonly SceneSpec[]>(
   type LineId = LineIdOf<S>;
 
   const scenes: SceneCue<SceneId, LineId>[] = [];
+  const unspoken = new Set<string>();
   let start = 0;
   for (const spec of script) {
     let cursor = spec.lead;
     const lines: LineCue<LineId>[] = [];
     spec.lines.forEach((line, index) => {
       // A line nobody has spoken yet is given the time it would take to read.
+      if (clips.durations[line.id] === undefined) unspoken.add(line.id);
       const seconds = clips.durations[line.id] ?? line.text.length / 14;
       const frames = Math.ceil(seconds * fps);
       const from = cursor;
@@ -165,6 +183,23 @@ export function cut<const S extends readonly SceneSpec[]>(
       );
     },
     end: (id) => line(id).from + line(id).frames,
+    sentence: (id, n) => {
+      const found = line(id);
+      if (n === 0) return found.from;
+      const pause = found.pauses[found.stops?.[n - 1] ?? -1];
+      if (pause) return pause[1];
+      if (!unspoken.has(id)) throw new Error(`Line ${id} has no sentence ${n}`);
+      const sentences = found.text.split(SENTENCE_END);
+      const before = sentences.slice(0, n).join(" ").length;
+      return found.from + Math.round((found.frames * before) / found.text.length);
+    },
+    phrase: (id, n) => {
+      const found = line(id);
+      const pause = found.pauses[n];
+      if (pause) return pause[1];
+      if (!unspoken.has(id)) throw new Error(`Line ${id} has no pause ${n}`);
+      return found.from + Math.round((found.frames * (n + 1)) / (n + 2));
+    },
   };
 }
 
@@ -189,9 +224,7 @@ export function captionParts(
   text = line.text,
   longest = 76,
 ): CaptionPart[] {
-  // A full stop ends a sentence only where a space follows ("classifyre.com"
-  // is one word), and not after a title ("Mr. Fyre" is one man).
-  const sentences = text.split(/(?<=[.?!])(?<!Mr\.)\s+/);
+  const sentences = text.split(SENTENCE_END);
   const stops = (
     line.stops
       ? line.stops.flatMap((index) => {

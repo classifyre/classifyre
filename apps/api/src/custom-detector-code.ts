@@ -304,56 +304,6 @@ export function validateCodeDetectorSchema(schema: JsonRecord): void {
   }
 }
 
-/** The schema without its secrets, plus the names of the secrets it holds. */
-export function maskCodeDetectorSchema(schema: JsonRecord): {
-  schema: JsonRecord;
-  secretKeys: string[];
-} {
-  if (!isCodeDetectorSchema(schema)) {
-    return { schema, secretKeys: [] };
-  }
-  const { secrets, ...rest } = schema;
-  return {
-    schema: rest,
-    secretKeys: isRecord(secrets) ? Object.keys(secrets).sort() : [],
-  };
-}
-
-/**
- * Apply a secrets patch: a non-empty string sets a key, null or "" deletes it,
- * an absent key keeps what is stored. The editor never receives secret values,
- * so replacing the bag wholesale would wipe every credential it did not retype.
- */
-export function mergeCodeDetectorSecrets(
-  existing: unknown,
-  incoming: unknown,
-  encrypt: (value: string) => string,
-): Record<string, string> {
-  const merged: Record<string, string> = isRecord(existing)
-    ? Object.fromEntries(
-        Object.entries(existing).filter(
-          (entry): entry is [string, string] => typeof entry[1] === 'string',
-        ),
-      )
-    : {};
-  if (!isRecord(incoming)) return merged;
-  for (const [key, value] of Object.entries(incoming)) {
-    if (value === null || value === '') {
-      delete merged[key];
-    } else if (typeof value === 'string') {
-      merged[key] = encrypt(value);
-    }
-  }
-  return merged;
-}
-
-/** What decides a new detector version: everything but the secrets. */
-export function versionedShape(schema: unknown): unknown {
-  if (!isCodeDetectorSchema(schema)) return schema;
-  const { secrets: _secrets, ...rest } = schema as JsonRecord;
-  return rest;
-}
-
 /**
  * Set a code detector's notebook revision: the server owns it. It starts at 1
  * and moves by one whenever the cells change, so an execution that names a

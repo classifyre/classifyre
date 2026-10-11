@@ -4,12 +4,15 @@
  * cut to; and where the speaker pauses inside it into audio/pauses.json, which
  * is what pictures and captions are cut to.
  *
- *   bun apps/studio/tools/voice.ts <video-folder> [--force] [--recut] [line-id ...]
+ *   bun apps/studio/tools/voice.ts <video-folder> [--force] [--recut] [--only] [line-id ...]
  *
  * The video's script.ts exports SCRIPT (scenes of lines) and VOICE (the model,
  * the voice and how to speak): see src/kit/narration.ts. A line that already
  * has a clip is left alone unless it is named or --force is given: every call
- * is paid for. The key is OPEN_ROUTER_KEY in the video's own .env.
+ * is paid for. A line that has no clip yet is spoken whether it is named or
+ * not, unless --only is given: then nothing but the named lines is spoken,
+ * which is how a trial run on a fresh folder is made. The key is
+ * OPEN_ROUTER_KEY in the video's own .env.
  *
  * With VOICE.maxPause set, what the model said is kept as it came in
  * audio/takes/<id>.flac, and the clip is that take with its long silences
@@ -30,7 +33,7 @@ import type { SceneSpec, VoiceSpec } from "../src/kit/narration";
 const [video, ...rest] = process.argv.slice(2);
 if (!video) {
   console.error(
-    "usage: voice.ts <video-folder> [--force] [--recut] [line-id ...]",
+    "usage: voice.ts <video-folder> [--force] [--recut] [--only] [line-id ...]",
   );
   process.exit(1);
 }
@@ -39,6 +42,7 @@ const audio = path.join(root, "audio");
 const takes = path.join(audio, "takes");
 const force = rest.includes("--force");
 const recut = rest.includes("--recut");
+const only = rest.includes("--only");
 const named = new Set(rest.filter((arg) => !arg.startsWith("--")));
 
 const { SCRIPT, VOICE } = (await import(path.join(root, "script.ts"))) as {
@@ -193,7 +197,10 @@ for (const scene of SCRIPT) {
     const file = path.join(audio, `${line.id}.mp3`);
     const take = path.join(takes, `${line.id}.flac`);
     const chosen = named.size === 0 || named.has(line.id);
-    if (force || named.has(line.id) || !existsSync(file)) {
+    // A trial run: a line that was not asked for stays as it is, spoken or not.
+    const left = only && !named.has(line.id);
+    if (left && !existsSync(file)) continue;
+    if (!left && (force || named.has(line.id) || !existsSync(file))) {
       if (recut && existsSync(take)) {
         if (cap) tighten(take, file, cap);
         else copyFileSync(take, file);

@@ -38,6 +38,7 @@ import {
 import { PipelineDetectorEditor } from "@/components/pipeline-detector-editor";
 import { RegexDetectorEditor } from "@/components/regex-detector-editor";
 import { LLMDetectorEditor } from "@/components/llm-detector-editor";
+import { DecisionDetectorEditor } from "@/components/decision-detector-editor";
 import { TagDetectorEditor } from "@/components/tag-detector-editor";
 import { CodeDetectorEditor } from "@/components/code-detector-editor";
 import {
@@ -298,6 +299,7 @@ export default function CustomDetectorDetailsPage() {
   )?.type as string | undefined;
   const isRegexPipeline = detectorKind === "regex";
   const isLLMPipeline = detectorKind === "llm";
+  const isDecisionPipeline = detectorKind === "decision";
   const isTagPipeline = detectorKind === "tag";
   const isCodePipeline = detectorKind === "code";
   const isTransformerPipeline = detectorKind === "transformer";
@@ -470,6 +472,22 @@ export default function CustomDetectorDetailsPage() {
                 aiProviderConfigId: payload.aiProviderConfigId,
               })
             }
+          />
+        ) : isDecisionPipeline ? (
+          <DecisionDetectorEditor
+            mode="edit"
+            detectorId={detectorId}
+            submitLabel={t("common.save")}
+            isSubmitting={isSaving}
+            initialPipelineSchema={detector.pipelineSchema}
+            initialSecretKeys={
+              (detector as { secretKeys?: string[] }).secretKeys ?? []
+            }
+            initialName={detector.name}
+            initialKey={detector.key}
+            initialDescription={detector.description ?? ""}
+            initialIsActive={detector.isActive}
+            onSubmit={(payload) => savePipelineDetector(payload)}
           />
         ) : isCodePipeline ? (
           <CodeDetectorEditor

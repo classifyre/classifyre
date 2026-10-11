@@ -35,7 +35,7 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     id: 'custom_detectors',
     title: 'Custom Detectors',
     description:
-      'Manage regex, classifier, entity, AI and code detectors and train them on feedback. Writing a code detector (CODE_DETECTOR) also needs custom_source_code.',
+      'Manage regex, classifier, entity, AI, decision and code detectors and train them on feedback. Writing a code detector (CODE_DETECTOR) also needs custom_source_code.',
     toolNames: [
       'list_custom_detectors',
       'get_custom_detector',

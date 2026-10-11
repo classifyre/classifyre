@@ -67,12 +67,14 @@ def _leaves_at_path(recipe: Mapping[str, Any], path: str) -> list[str]:
     return _leaf_strings(node)
 
 
-def _code_detector_secret_leaves(recipe: Mapping[str, Any]) -> list[str]:
-    """Secrets of every code detector (``CODE_DETECTOR``) in the recipe.
+def _detector_secret_leaves(recipe: Mapping[str, Any]) -> list[str]:
+    """Secrets of every custom detector in the recipe that carries a bag.
 
-    The API decrypts them into ``detectors[].config.pipeline_schema.secrets`` at
+    Code detectors (``CODE_DETECTOR``) and decision detectors (``DECISION``)
+    keep credentials in ``pipeline_schema.secrets``. The API decrypts them at
     dispatch, so the scan process holds them in plain text; anything it logs
-    must not carry them.
+    must not carry them. Read by key rather than by pipeline type, so the next
+    engine with a secrets bag is covered without remembering to list it here.
     """
     leaves: list[str] = []
     detectors = recipe.get("detectors")
@@ -81,9 +83,7 @@ def _code_detector_secret_leaves(recipe: Mapping[str, Any]) -> list[str]:
     for entry in detectors:
         config = entry.get("config") if isinstance(entry, Mapping) else None
         schema = config.get("pipeline_schema") if isinstance(config, Mapping) else None
-        if isinstance(schema, Mapping) and str(schema.get("type") or "").upper() == (
-            "CODE_DETECTOR"
-        ):
+        if isinstance(schema, Mapping):
             leaves.extend(_leaf_strings(schema.get("secrets")))
     return leaves
 
@@ -134,7 +134,7 @@ class Redactor:
         secrets = [
             leaf for path in ENCRYPTED_CONFIG_PATHS for leaf in _leaves_at_path(recipe, path)
         ]
-        secrets.extend(_code_detector_secret_leaves(recipe))
+        secrets.extend(_detector_secret_leaves(recipe))
         return cls(secrets, **kwargs)
 
     @property

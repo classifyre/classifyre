@@ -84,6 +84,8 @@ function pipelineTypeOf(pipelineSchema: unknown): string | null {
  *   REGEX  findingType names the rule; matchedContent is what matched.
  *   LLM /  the predicted label IS the finding type (`insolvenzgefahr_hoch`)
  *   classifiers  and matchedContent is the model's prose reasoning.
+ *   DECISION  the answer IS the finding type (`urgency:high`); matchedContent
+ *          is the head of the content that was judged.
  *
  * Getting it backwards produces zero matches and no error — an inquiry with a
  * wrong matcher and an inquiry with nothing to match look identical. Switching
@@ -94,6 +96,7 @@ function answerDimensionFor(
   pipelineType: string | null,
 ): 'findingType' | 'matchedContent' {
   switch ((pipelineType ?? '').toUpperCase()) {
+    case 'DECISION':
     case 'LLM':
     case 'TEXT_CLASSIFICATION':
     case 'IMAGE_CLASSIFICATION':

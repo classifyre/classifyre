@@ -897,7 +897,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         logger.warning(
                             "Detector %s was disabled mid-run (%s): %s. %d payload(s) "
                             "attempted, %d skipped; the skipped assets keep their "
-                            "findings and are retried on the next run.",
+                            "findings and are retried once the detector works again.",
                             degraded["label"],
                             degraded["cause"],
                             _safe_text(degraded["reason"], redactor),
@@ -905,9 +905,11 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             degraded["skipped_payloads"],
                         )
                     if breaker_disabled and hasattr(sink, "set_detectors_degraded"):
-                        # The skipped assets were never evaluated, so this run's
-                        # sweep position must not stand: the API restarts the
-                        # sweep on the next run and the scan cache retries them.
+                        # The skipped assets were never evaluated. The sweep
+                        # keeps advancing regardless; the API remembers these
+                        # keys and restarts the sweep once a run completes with
+                        # them healthy, and the scan cache retries the skipped
+                        # work then.
                         sink.set_detectors_degraded(
                             [degraded["detector"] for degraded in breaker_disabled]
                         )

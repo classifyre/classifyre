@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ....models.generated_detectors import (
     CodeDetectorPipelineSchema,
+    DecisionPipelineSchema,
     GLiNER2PipelineSchema,
     ImageClassificationPipelineSchema,
     LLMPipelineSchema,
@@ -14,6 +15,7 @@ from ....models.generated_detectors import (
 )
 from ._base import BaseRunner
 from ._custom_detector import CustomDetectorRunner
+from ._decision import DecisionRunner
 from ._gliner2 import GLiNER2Runner
 from ._image_classification import ImageClassificationRunner
 from ._llm import LLMRunner
@@ -33,6 +35,7 @@ def create_runner(
         | ObjectDetectionPipelineSchema
         | TagPipelineSchema
         | CodeDetectorPipelineSchema
+        | DecisionPipelineSchema
     ),
     detector_key: str = "",
     detector_name: str = "",
@@ -48,6 +51,8 @@ def create_runner(
         return RegexRunner(schema, detector_key, detector_name)
     if isinstance(schema, LLMPipelineSchema):
         return LLMRunner(schema, detector_key, detector_name)
+    if isinstance(schema, DecisionPipelineSchema):
+        return DecisionRunner(schema, detector_key, detector_name)
     # Branched explicitly, not left to the fall-through below: a TAG schema that
     # reached the GLiNER2 default would try to load a transformer model for a
     # detector that is not supposed to run anything at all.
