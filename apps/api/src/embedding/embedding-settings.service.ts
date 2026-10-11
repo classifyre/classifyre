@@ -48,6 +48,12 @@ export interface EmbeddingSwitchState {
  * meaning. EmbeddingSpace's unique tuple is exactly this list, which is why
  * changing any of them cannot be a live edit — the stored corpus has to be
  * rebuilt in the new system before it can be searched again.
+ *
+ * `documentPrefix` is not in that tuple and belongs here all the same: a
+ * model trained with task prompts puts "title: none | text: X" somewhere else
+ * than plain "X", so vectors stored under one prefix cannot be searched under
+ * another. The rebuild purges and re-embeds into the same space row. The
+ * query prefix is deliberately absent — it only shapes the next question.
  */
 export const SPACE_DEFINING_FIELDS = [
   'provider',
@@ -56,6 +62,7 @@ export const SPACE_DEFINING_FIELDS = [
   'dimensions',
   'pooling',
   'normalize',
+  'documentPrefix',
 ] as const;
 
 export type SpaceDefiningField = (typeof SPACE_DEFINING_FIELDS)[number];
@@ -95,6 +102,13 @@ export interface ResolvedEmbeddingConfig {
   baseUrl?: string;
   apiKey?: string;
   aiProviderConfigId?: string | null;
+  /**
+   * Task prompts of the bound provider's model, put in front of what is
+   * stored and of what is asked. Undefined sends the text as it is, which is
+   * right for every model not trained with prompts (the built-in one included).
+   */
+  documentPrefix?: string;
+  queryPrefix?: string;
 }
 
 /** One knob as the settings page shows it: what it is now, and what it would be. */
@@ -146,6 +160,11 @@ export function resolvedFromEnv(
     baseUrl: d.baseUrl,
     apiKey: d.apiKey,
     aiProviderConfigId: null,
+    // Present though unset: `update()` reports what changed by walking the
+    // keys of the configuration it ends up with, and a workspace that goes
+    // back from a provider with prompts to one without has to show up there.
+    documentPrefix: undefined,
+    queryPrefix: undefined,
   };
 }
 
@@ -281,6 +300,10 @@ export class EmbeddingSettingsService {
             if (row.pooling == null && runtime.embeddingPooling) {
               resolved.pooling = runtime.embeddingPooling;
             }
+            // Prompts belong to the model, so only the provider states them.
+            resolved.documentPrefix =
+              runtime.embeddingDocumentPrefix || undefined;
+            resolved.queryPrefix = runtime.embeddingQueryPrefix || undefined;
           }
         } catch (error) {
           this.logger.warn(

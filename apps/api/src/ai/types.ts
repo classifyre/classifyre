@@ -70,10 +70,21 @@ export interface AiResponse<T = string> {
 
 export type AiProviderType = 'OPENAI_COMPATIBLE' | 'CLAUDE' | 'GEMINI';
 
+/**
+ * What a client library is given when the endpoint takes no key. The OpenAI
+ * SDK and LiteLLM both refuse an empty key before sending anything.
+ */
+export const KEYLESS_API_KEY = 'not-needed';
+
 /** Runtime config derived from DB + decrypted key. */
 export interface AiProviderRuntimeConfig {
   provider: AiProviderType;
   model: string;
+  /**
+   * Empty for an OpenAI-compatible endpoint that takes no key (a self-hosted
+   * server). Clients that insist on a non-empty key are handed
+   * {@link KEYLESS_API_KEY} instead; such servers ignore the header.
+   */
   apiKey: string;
   baseUrl?: string | null;
   contextSize?: number | null;
@@ -82,6 +93,9 @@ export interface AiProviderRuntimeConfig {
   /** Shape of the embedding model, when this provider serves one. */
   embeddingDimensions?: number | null;
   embeddingPooling?: string | null;
+  /** Task prompts of the embedding model: what is stored, and what is asked. */
+  embeddingDocumentPrefix?: string | null;
+  embeddingQueryPrefix?: string | null;
 }
 
 /** One provider request's result: the raw text plus reported token usage. */

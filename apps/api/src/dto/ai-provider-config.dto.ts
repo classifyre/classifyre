@@ -99,6 +99,22 @@ export class AiProviderConfigResponseDto {
 
   @ApiProperty({
     description:
+      'Text put in front of every document before it is embedded, for models trained with task prompts. Null sends the text as it is.',
+    nullable: true,
+    example: 'title: none | text: ',
+  })
+  embeddingDocumentPrefix: string | null;
+
+  @ApiProperty({
+    description:
+      'Text put in front of every search query before it is embedded. Null sends the query as it is.',
+    nullable: true,
+    example: 'task: search result | query: ',
+  })
+  embeddingQueryPrefix: string | null;
+
+  @ApiProperty({
+    description:
       'Cost in USD per 1M input tokens. Null when pricing is not configured.',
     example: 3,
     nullable: true,
@@ -220,6 +236,26 @@ export class CreateAiProviderConfigDto {
 
   @ApiPropertyOptional({
     description:
+      'Text put in front of every document before it is embedded, exactly as the model card writes it (trailing space included).',
+    example: 'title: none | text: ',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  embeddingDocumentPrefix?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Text put in front of every search query before it is embedded.',
+    example: 'task: search result | query: ',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  embeddingQueryPrefix?: string;
+
+  @ApiPropertyOptional({
+    description:
       'Optional cost in USD per 1M input tokens (enables cost estimates on autopilot runs).',
     example: 3,
     nullable: true,
@@ -338,6 +374,26 @@ export class UpdateAiProviderConfigDto {
   @IsOptional()
   @IsString()
   embeddingPooling?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Text put in front of every document before it is embedded. An empty string clears it. Changing it re-embeds the corpus of a workspace bound to this provider.',
+    example: 'title: none | text: ',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  embeddingDocumentPrefix?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Text put in front of every search query before it is embedded. An empty string clears it.',
+    example: 'task: search result | query: ',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  embeddingQueryPrefix?: string;
 
   @ApiPropertyOptional({
     description:

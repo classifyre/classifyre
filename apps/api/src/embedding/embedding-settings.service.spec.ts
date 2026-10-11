@@ -1,4 +1,7 @@
-import { EmbeddingSettingsService } from './embedding-settings.service';
+import {
+  EmbeddingSettingsService,
+  SPACE_DEFINING_FIELDS,
+} from './embedding-settings.service';
 import { EmbeddingConfigService } from './embedding-config.service';
 
 /**
@@ -270,6 +273,69 @@ describe('EmbeddingSettingsService', () => {
 
     expect(resolved.model).toBe('nvidia/nemotron-3-embed-1b');
     expect(resolved.dimensions).toBe(2048);
+  });
+
+  it("takes the model's task prompts from the bound provider", async () => {
+    aiProviders.getRuntimeConfig.mockResolvedValue({
+      baseUrl: 'http://llama-embedding.classifyre-dev.svc:8080/v1',
+      apiKey: '',
+      model: 'embeddinggemma-2',
+      embeddingDimensions: 768,
+      embeddingDocumentPrefix: 'title: none | text: ',
+      embeddingQueryPrefix: 'task: search result | query: ',
+    });
+    const service = build();
+
+    await service.update({
+      provider: 'openai-compatible',
+      aiProviderConfigId: 'provider-1',
+    });
+
+    const resolved = await service.resolve(0);
+    expect(resolved.documentPrefix).toBe('title: none | text: ');
+    expect(resolved.queryPrefix).toBe('task: search result | query: ');
+  });
+
+  it('rebuilds when the document prompt changes, and not for the query prompt', async () => {
+    const runtime = {
+      baseUrl: 'http://llama-embedding.classifyre-dev.svc:8080/v1',
+      apiKey: '',
+      model: 'embeddinggemma-2',
+      embeddingDimensions: 768,
+      embeddingDocumentPrefix: null as string | null,
+      embeddingQueryPrefix: null as string | null,
+    };
+    aiProviders.getRuntimeConfig.mockImplementation(() =>
+      Promise.resolve({ ...runtime }),
+    );
+    const service = build();
+    await service.update({
+      provider: 'openai-compatible',
+      aiProviderConfigId: 'provider-1',
+    });
+    // Exactly what the provider page does around an edit: resolve, apply,
+    // resolve again, and rebuild if a space-defining field moved.
+    const moved = async (edit: () => void) => {
+      const before = await service.resolve(0);
+      edit();
+      service.invalidate();
+      const after = await service.resolve(0);
+      return SPACE_DEFINING_FIELDS.filter(
+        (field) => before[field] !== after[field],
+      );
+    };
+
+    // A new way of asking searches the same stored vectors.
+    expect(
+      await moved(() => {
+        runtime.embeddingQueryPrefix = 'task: search result | query: ';
+      }),
+    ).toEqual([]);
+    expect(
+      await moved(() => {
+        runtime.embeddingDocumentPrefix = 'title: none | text: ';
+      }),
+    ).toEqual(['documentPrefix']);
   });
 
   it('never reports the API key as a changed field', async () => {

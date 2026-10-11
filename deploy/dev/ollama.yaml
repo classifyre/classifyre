@@ -1,0 +1,90 @@
+# Ollama for the local k3d cluster: a CPU-only embedding endpoint the API and
+# worker can be pointed at as an OpenAI-compatible AI provider
+# (http://ollama.classifyre-dev.svc:11434/v1).
+#
+# Not part of the Helm chart and not deployed by `skaffold dev`: apply it by
+# hand when a workspace should embed through it, and pull a model once.
+#
+#   kubectl --context k3d-classifyre apply -f deploy/dev/ollama.yaml
+#   kubectl --context k3d-classifyre -n classifyre-dev exec deploy/ollama -- \
+#     ollama pull embeddinggemma-2:270m
+#
+# The node has no GPU, so everything here runs on CPU. The CPU limit is the
+# number to change when measuring how throughput follows cores.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models
+  namespace: classifyre-dev
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 6Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: ollama
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ollama
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ollama
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          ports:
+            - name: http
+              containerPort: 11434
+          env:
+            - name: OLLAMA_HOST
+              value: 0.0.0.0:11434
+            # Keep the model resident between embedding batches: a cold load
+            # per batch would be measured as inference time.
+            - name: OLLAMA_KEEP_ALIVE
+              value: 30m
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+          readinessProbe:
+            httpGet:
+              path: /api/version
+              port: http
+            periodSeconds: 5
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ollama-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: ollama
+spec:
+  selector:
+    app.kubernetes.io/name: ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: http

@@ -18,6 +18,7 @@ import type {
   AiProviderRuntimeConfig,
   IAiProvider,
 } from '../types';
+import { KEYLESS_API_KEY } from '../types';
 
 /** Providers can be slow when busy — allow very long requests. */
 const REQUEST_TIMEOUT_MS = 30 * 60 * 1000;
@@ -29,7 +30,7 @@ export class OpenAiProvider implements IAiProvider {
     options: AiCompletionOptions,
   ): Promise<AiProviderResult> {
     const client = new OpenAI({
-      apiKey: config.apiKey,
+      apiKey: config.apiKey || KEYLESS_API_KEY,
       baseURL: config.baseUrl ?? undefined,
       timeout: REQUEST_TIMEOUT_MS,
       maxRetries: 1,

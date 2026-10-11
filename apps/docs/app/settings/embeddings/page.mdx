@@ -120,6 +120,46 @@ This moves the CPU cost off your machine and generally improves quality — at
 the price of sending evidence text to a third party. That is a data-governance
 decision, not a performance one.
 
+### A server you run yourself
+
+"Remote" means "not the built-in worker", not "somebody else's computer". Any
+server that answers `POST /v1/embeddings` in the OpenAI shape works the same
+way: llama.cpp's `llama-server --embedding`, Ollama, vLLM, LM Studio, Text
+Embeddings Inference. Save it as an OpenAI-compatible provider with its base
+URL (`http://llama-embedding.my-namespace.svc:8080/v1`), mark it **Embedding
+model**, and leave the API key empty: such servers take none, and nothing
+leaves your network.
+
+That is how a larger open model is run on your own hardware. EmbeddingGemma 2,
+for example, is too new for the built-in Transformers.js worker and runs well
+enough behind llama.cpp on CPU: about a tenth of a second for a search, and
+well under one passage a second while indexing on four cores, against about
+six a second for the bundled MiniLM. Searching is fast on a CPU; building the
+index for a large corpus is not.
+
+### Task prompts
+
+Some models are trained to be told which side of a search a text is on. They
+expect a short prompt in front of every stored passage and a different one in
+front of every question, and they retrieve worse without them: short strings
+that merely look like the question outrank the passage that answers it.
+
+| Model family | Document prompt | Query prompt |
+| --- | --- | --- |
+| EmbeddingGemma, EmbeddingGemma 2 | `title: none \| text: ` | `task: search result \| query: ` |
+| E5 (`multilingual-e5-*`) | `passage: ` | `query: ` |
+| Nomic Embed | `search_document: ` | `search_query: ` |
+
+A library such as sentence-transformers applies these by name. A bare
+embeddings endpoint embeds whatever string arrives, so Classifyre puts the
+prompt there itself: set **Document prompt** and **Query prompt** on the
+provider, exactly as the model card writes them, trailing space included.
+Leave both empty for a model that has none (OpenAI's, the bundled MiniLM).
+
+The document prompt is part of what a stored vector means, so changing it
+rebuilds the corpus like a model change does. The query prompt only shapes
+the next search; nothing is re-embedded.
+
 ### Dimensions must match the model
 
 **Dimensions** is not a preference. It is a property of the model you chose,
@@ -127,6 +167,13 @@ and a mismatch fails every batch rather than degrading quietly. Picking a model
 from the dropdown fills in the right number automatically; if you type a custom
 model, you must supply the number its documentation states. For a remote
 provider the number comes from the provider itself.
+
+Models trained to be shortened (Matryoshka models such as EmbeddingGemma and
+OpenAI's `text-embedding-3-*`) can return fewer dimensions on request, and
+Classifyre sends the provider's dimensions with every request. Whether that
+does anything is up to the server: OpenAI's and Google's APIs honour it,
+llama.cpp ignores it and returns the full vector, which the connection test
+then reports as a mismatch. Set the dimensions to what the server returns.
 
 How large a model can be is a question about the *index*, not about storage:
 
@@ -316,4 +363,8 @@ produce is text, which is then embedded like anything else.
 That means an image is currently findable by what a detector *said* about it,
 not by what it looks like. Multimodal embedding models, which place pictures
 and text in a single space so "a photo of a passport" retrieves the picture
-itself, are not wired in.
+itself, are not wired in. Pointing a workspace at a multimodal model
+(EmbeddingGemma 2, Gemini Embedding 2) therefore uses its text side only:
+photographs, scans, audio and video are searchable through the text that OCR
+and transcription read out of them, and a picture with no words in it has
+nothing to index.
