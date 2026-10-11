@@ -3123,6 +3123,8 @@
     "keyNotStored": "The key is encrypted at rest and never returned.",
     "enterNewKey": "Enter new key to replace…",
     "enterApiKey": "Enter API key…",
+    "keyWillBeDropped": "You changed the provider or base URL, so the stored key will be removed when you save. Enter the key for the new endpoint.",
+    "apiKeyMissing": "An API key is required for this provider.",
     "testConnection": "Test connection",
     "save": "Save",
     "testing": "Testing…",
