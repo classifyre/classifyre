@@ -473,6 +473,96 @@ class TestDoclingConverterSingleton:
         assert text1 == text2 == "ocr output"
         assert len(init_count) == 1, "DocumentConverter() must not be re-instantiated per file"
 
+    def _install_fake_ocr_selection(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        engine: object | None,
+        raises: Exception | None = None,
+    ) -> list[int]:
+        """Inject the Docling modules the OCR-engine check asks, on top of the fake converter.
+
+        `engine` is what Docling's automatic selection ends up with: None is
+        the state it logs as "No OCR engine found" and then ignores.
+        """
+        selections: list[int] = []
+
+        class FakeAutoModel:
+            def __init__(self, **_kwargs: Any) -> None:
+                selections.append(1)
+                if raises is not None:
+                    raise raises
+                self._engine = engine
+
+        modules = {
+            "docling.datamodel": {},
+            "docling.datamodel.accelerator_options": {"AcceleratorOptions": object},
+            "docling.datamodel.pipeline_options": {"OcrAutoOptions": object},
+            "docling.models": {},
+            "docling.models.stages": {},
+            "docling.models.stages.ocr": {},
+            "docling.models.stages.ocr.auto_ocr_model": {"OcrAutoModel": FakeAutoModel},
+        }
+        for name, attributes in modules.items():
+            module = ModuleType(name)
+            for attribute, value in attributes.items():
+                setattr(module, attribute, value)
+            monkeypatch.setitem(sys.modules, name, module)
+        return selections
+
+    def test_image_without_an_ocr_engine_is_engine_unavailable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Docling converting pixels with no engine is missing coverage, not an empty file."""
+        self._install_fake_docling(monkeypatch, [])
+        self._install_fake_ocr_selection(monkeypatch, engine=None)
+
+        text, error = extract_text(png_stub(), "image/png", file_name="whiteboard.png")
+        assert text == ""
+        assert error is not None and "OCR engine unavailable" in error
+
+        with pytest.raises(TextExtractionCoverageError) as raised:
+            list(iter_file_pages(png_stub(), "image/png", file_name="whiteboard.png"))
+        assert raised.value.code == TextExtractionCoverageCode.ENGINE_UNAVAILABLE
+
+    def test_ocr_engine_that_fails_to_build_is_engine_unavailable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._install_fake_docling(monkeypatch, [])
+        selections = self._install_fake_ocr_selection(
+            monkeypatch, engine=None, raises=ImportError("rapidocr does not expose PP_OCRV6_LANGS")
+        )
+
+        for name in ("scan-1.png", "scan-2.png", "scan-3.png"):
+            _text, error = extract_text(png_stub(), "image/png", file_name=name)
+            assert error == "OCR engine unavailable: rapidocr does not expose PP_OCRV6_LANGS"
+        # Tried again once, in case the first failure was a download that did
+        # not finish, and then no more: every further image costs nothing.
+        assert len(selections) == 2
+
+    def test_ocr_engine_is_asked_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._install_fake_docling(monkeypatch, [])
+        selections = self._install_fake_ocr_selection(monkeypatch, engine=object())
+
+        text1, error1 = extract_text(png_stub(), "image/png", file_name="a.png")
+        text2, error2 = extract_text(png_stub(), "image/png", file_name="b.png")
+
+        assert (text1, error1) == (text2, error2) == ("ocr output", None)
+        assert len(selections) == 1, "the engine selection loads models: once per process"
+
+    def test_native_document_formats_do_not_need_an_ocr_engine(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An .odt has no pixels to read; a missing OCR engine must not cost its text."""
+        self._install_fake_docling(monkeypatch, [])
+        selections = self._install_fake_ocr_selection(monkeypatch, engine=None)
+
+        text, error = extract_text(
+            b"odt-bytes", "application/vnd.oasis.opendocument.text", file_name="doc.odt"
+        )
+        assert (text, error) == ("ocr output", None)
+        assert selections == []
+
 
 # ---------------------------------------------------------------------------
 # parse_file

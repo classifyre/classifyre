@@ -466,9 +466,15 @@ class _DoclingState:
         # sync itself failed (transient: network blip, registry timeout). A
         # genuine broken package fails on the retry too and is cached then.
         self.install_retry_remaining: int = 1
+        # Whether Docling resolved an OCR engine, asked once per process.
+        self.ocr_engine_checked: bool = False
+        self.ocr_engine_error: str | None = None
+        self.ocr_engine_failures: int = 0
 
 
 _docling_state = _DoclingState()
+# How often building the OCR engine may fail before the failure is taken as settled.
+_OCR_ENGINE_ATTEMPTS = 2
 _docling_lock = threading.Lock()
 # Limits concurrent converter.convert() calls to prevent OOM. The docling
 # StandardPdfPipeline alone holds ~1 GB of model weights; additional working
@@ -538,6 +544,71 @@ def _reset_docling_singleton() -> None:
         _docling_state.error = None
         _docling_state.attempted = False
         _docling_state.install_retry_remaining = 1
+        _docling_state.ocr_engine_checked = False
+        _docling_state.ocr_engine_error = None
+        _docling_state.ocr_engine_failures = 0
+
+
+def _docling_ocr_engine_error() -> str | None:
+    """Why Docling cannot read pixels in this environment, or None when it can.
+
+    Docling picks its OCR engine by trying each one and catching ImportError.
+    When none constructs it logs "No OCR engine found" and carries on: every
+    image and every scanned PDF then converts to an empty document, with no
+    error for the caller to see. That is how rapidocr 3.10.0 (which dropped a
+    name Docling imports) turned a whole drive of photographs and scans into
+    "extraction completed, no text" instead of a failure.
+
+    So the same selection is run once here and its outcome kept. The answer
+    contains "unavailable" on purpose: iter_file_pages reports such an error as
+    ENGINE_UNAVAILABLE, which a scan counts as missing coverage and retries,
+    rather than as an empty file.
+    """
+    if _docling_state.ocr_engine_checked:
+        return _docling_state.ocr_engine_error
+    with _docling_lock:
+        if _docling_state.ocr_engine_checked:
+            return _docling_state.ocr_engine_error
+        import importlib
+
+        try:
+            accelerator = importlib.import_module("docling.datamodel.accelerator_options")
+            options = importlib.import_module("docling.datamodel.pipeline_options")
+            auto = importlib.import_module("docling.models.stages.ocr.auto_ocr_model")
+            build = auto.OcrAutoModel
+            auto_options = options.OcrAutoOptions
+            accelerator_options = accelerator.AcceleratorOptions
+        except Exception:
+            # A Docling laid out differently from the one this was written
+            # against: nothing to ask, so do not second-guess it.
+            _docling_state.ocr_engine_checked = True
+            return None
+        try:
+            model = build(
+                enabled=True,
+                artifacts_path=None,
+                options=auto_options(),
+                accelerator_options=accelerator_options(),
+            )
+        except Exception as exc:
+            # Building an engine can fail for a reason that passes (its model
+            # files are fetched on first use), so this answer is kept only
+            # once it has been given twice.
+            _docling_state.ocr_engine_failures += 1
+            if _docling_state.ocr_engine_failures >= _OCR_ENGINE_ATTEMPTS:
+                _docling_state.ocr_engine_error = f"OCR engine unavailable: {exc}"
+                _docling_state.ocr_engine_checked = True
+            return f"OCR engine unavailable: {exc}"
+        error: str | None = None
+        # Absent attribute (a later Docling) reads as "resolved".
+        if getattr(model, "_engine", model) is None:
+            error = (
+                "OCR engine unavailable: Docling found no usable OCR engine "
+                "(see the 'cannot be used because' lines it logged above)"
+            )
+        _docling_state.ocr_engine_error = error
+        _docling_state.ocr_engine_checked = True
+        return error
 
 
 def _require_file_processing(module_name: str) -> object:
@@ -1004,6 +1075,12 @@ def _extract_docling_markdown(
         return "", error
     if converter is None:
         return "", "Docling converter unavailable"
+    # Pixels need an OCR engine; the document formats Docling parses natively
+    # (pptx, odt, msg) do not, and must keep working without one.
+    if _normalize_mime_type(mime_type).startswith("image/") or mime_type == "application/pdf":
+        engine_error = _docling_ocr_engine_error()
+        if engine_error:
+            return "", engine_error
 
     temp_fname = _temp_file_name(file_name, mime_type)
     try:

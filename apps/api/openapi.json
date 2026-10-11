@@ -21954,6 +21954,18 @@
             "nullable": true,
             "example": "mean"
           },
+          "embeddingDocumentPrefix": {
+            "type": "string",
+            "description": "Text put in front of every document before it is embedded, for models trained with task prompts. Null sends the text as it is.",
+            "nullable": true,
+            "example": "title: none | text: "
+          },
+          "embeddingQueryPrefix": {
+            "type": "string",
+            "description": "Text put in front of every search query before it is embedded. Null sends the query as it is.",
+            "nullable": true,
+            "example": "task: search result | query: "
+          },
           "inputCostPerMTok": {
             "type": "number",
             "description": "Cost in USD per 1M input tokens. Null when pricing is not configured.",
@@ -21994,6 +22006,8 @@
           "supportsEmbedding",
           "embeddingDimensions",
           "embeddingPooling",
+          "embeddingDocumentPrefix",
+          "embeddingQueryPrefix",
           "inputCostPerMTok",
           "outputCostPerMTok",
           "cachedInputCostPerMTok",
@@ -22057,6 +22071,16 @@
             "type": "string",
             "description": "Pooling strategy for the embedding model.",
             "example": "mean"
+          },
+          "embeddingDocumentPrefix": {
+            "type": "string",
+            "description": "Text put in front of every document before it is embedded, exactly as the model card writes it (trailing space included).",
+            "example": "title: none | text: "
+          },
+          "embeddingQueryPrefix": {
+            "type": "string",
+            "description": "Text put in front of every search query before it is embedded.",
+            "example": "task: search result | query: "
           },
           "inputCostPerMTok": {
             "type": "number",
@@ -22138,6 +22162,16 @@
             "type": "string",
             "description": "Pooling strategy.",
             "example": "mean"
+          },
+          "embeddingDocumentPrefix": {
+            "type": "string",
+            "description": "Text put in front of every document before it is embedded. An empty string clears it. Changing it re-embeds the corpus of a workspace bound to this provider.",
+            "example": "title: none | text: "
+          },
+          "embeddingQueryPrefix": {
+            "type": "string",
+            "description": "Text put in front of every search query before it is embedded. An empty string clears it.",
+            "example": "task: search result | query: "
           },
           "inputCostPerMTok": {
             "type": "number",
