@@ -16,6 +16,8 @@ Name | Type
 `supportsEmbedding` | boolean
 `embeddingDimensions` | number
 `embeddingPooling` | string
+`embeddingDocumentPrefix` | string
+`embeddingQueryPrefix` | string
 `inputCostPerMTok` | number
 `outputCostPerMTok` | number
 `cachedInputCostPerMTok` | number
@@ -37,6 +39,8 @@ const example = {
   "supportsEmbedding": false,
   "embeddingDimensions": 2048,
   "embeddingPooling": mean,
+  "embeddingDocumentPrefix": title: none | text: ,
+  "embeddingQueryPrefix": task: search result | query: ,
   "inputCostPerMTok": 3,
   "outputCostPerMTok": 15,
   "cachedInputCostPerMTok": 0.3,

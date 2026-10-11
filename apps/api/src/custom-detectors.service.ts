@@ -19,6 +19,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { PrismaService } from './prisma.service';
 import { AiProviderConfigService } from './ai-provider-config.service';
+import { KEYLESS_API_KEY } from './ai/types';
 // Value import: injected with @Optional(), and a type-only import would
 // silently resolve to undefined (see nest-type-import-breaks-optional-di).
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
@@ -1090,7 +1091,7 @@ export class CustomDetectorsService {
       provider_runtime: {
         provider: runtime.provider,
         model: runtime.model,
-        api_key: runtime.apiKey,
+        api_key: runtime.apiKey || KEYLESS_API_KEY,
         base_url: runtime.baseUrl ?? null,
         context_size: runtime.contextSize ?? null,
         supports_vision: runtime.supportsVision ?? false,

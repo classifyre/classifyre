@@ -25,7 +25,7 @@ function createService() {
     decryptString: jest.fn((s: string) => s.replace(/^enc:/, '')),
   };
   const service = new AiProviderConfigService(prisma as any, crypto as any);
-  return { service, prisma };
+  return { service, prisma, crypto };
 }
 
 describe('AiProviderConfigService.remove', () => {
@@ -276,5 +276,76 @@ describe('AiProviderConfigService endpoint-bound key', () => {
 
     const data = prisma.aiProviderConfig.update.mock.calls[0][0].data;
     expect(data.apiKeyEnc).toBe('enc:the-new-key');
+  });
+});
+
+describe('AiProviderConfigService keyless endpoints', () => {
+  const row = {
+    id: 'ai-1',
+    name: 'Embedding pod',
+    provider: 'OPENAI_COMPATIBLE',
+    model: 'embeddinggemma-2',
+    apiKeyEnc: null as string | null,
+    baseUrl: 'http://llama-embedding.classifyre-dev.svc:8080/v1' as
+      | string
+      | null,
+    contextSize: null,
+    supportsVision: false,
+    supportsEmbedding: true,
+    embeddingDimensions: 768,
+    embeddingPooling: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  it('resolves a self-hosted OpenAI-compatible endpoint that has no key', async () => {
+    const { service, prisma } = createService();
+    prisma.aiProviderConfig.findUnique.mockResolvedValue(row);
+
+    const runtime = await service.getRuntimeConfig('ai-1');
+
+    expect(runtime.apiKey).toBe('');
+    expect(runtime.baseUrl).toBe(row.baseUrl);
+    expect(runtime.embeddingDimensions).toBe(768);
+  });
+
+  it('still refuses a managed provider without a key', async () => {
+    const { service, prisma } = createService();
+    prisma.aiProviderConfig.findUnique.mockResolvedValue({
+      ...row,
+      provider: 'GEMINI',
+      baseUrl: null,
+    });
+
+    await expect(service.getRuntimeConfig('ai-1')).rejects.toThrow(
+      'has no API key configured',
+    );
+  });
+
+  it('still refuses an OpenAI-compatible provider with neither key nor endpoint', async () => {
+    const { service, prisma } = createService();
+    prisma.aiProviderConfig.findUnique.mockResolvedValue({
+      ...row,
+      baseUrl: '  ',
+    });
+
+    await expect(service.getRuntimeConfig('ai-1')).rejects.toThrow(
+      'has no API key configured',
+    );
+  });
+
+  it('does not treat a stored key that no longer decrypts as keyless', async () => {
+    const { service, prisma, crypto } = createService();
+    prisma.aiProviderConfig.findUnique.mockResolvedValue({
+      ...row,
+      apiKeyEnc: 'enc:from-another-deployment',
+    });
+    crypto.decryptString.mockImplementation(() => {
+      throw new Error('bad decrypt');
+    });
+
+    await expect(service.getRuntimeConfig('ai-1')).rejects.toThrow(
+      'has no API key configured',
+    );
   });
 });

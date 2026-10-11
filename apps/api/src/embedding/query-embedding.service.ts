@@ -35,7 +35,9 @@ export class QueryEmbeddingService {
     }
     try {
       if (!this.provider) throw new Error('embedding provider is unavailable');
-      const vector = (await this.provider.embedMany([text], cfg))[0];
+      // A question, not a stored text: a model with task prompts embeds the
+      // two differently, and every caller of this service is searching.
+      const vector = (await this.provider.embedMany([text], cfg, 'query'))[0];
       if (!vector?.length) throw new Error('provider returned no vector');
       return vector;
     } catch (error) {

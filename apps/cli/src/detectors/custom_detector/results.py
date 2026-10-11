@@ -215,9 +215,7 @@ class FindingMapper:
         # Overlong keys are hashed, never truncated: truncation collides
         # ("row-111..." vs "row-111..." with a different tail become one
         # finding), and the API applies the same hash, so both sides agree.
-        identity_key = (
-            _identity_key(str(identity)) if identity not in (None, "") else None
-        )
+        identity_key = _identity_key(str(identity)) if identity not in (None, "") else None
         if identity_key is not None:
             metadata["identity"] = identity_key
 
@@ -263,4 +261,4 @@ class FindingMapper:
         return kept or None
 
 
-__all__ = ["RUNNER", "FindingMapper", "bound_severity", "_identity_key"]
+__all__ = ["RUNNER", "FindingMapper", "_identity_key", "bound_severity"]

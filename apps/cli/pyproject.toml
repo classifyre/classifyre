@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.6.10"
+version = "0.6.11"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 # Upper bound is load-bearing: onnxruntime publishes no cp315 wheels (notably
@@ -483,6 +483,21 @@ package = true
 # distribution declared by our video and OCR groups. Installing both would
 # overwrite the same cv2 namespace and add GUI libraries to CPU-only containers.
 exclude-dependencies = ["opencv-python"]
+# Two transitive dependencies whose latest release breaks the package that
+# pulls it in, while that package's own requirement still allows it. Both
+# failures were silent in a scan: images and scans came back with no text, and
+# every audio and video file failed. Lift a bound when its consumer catches up.
+constraint-dependencies = [
+    # faster-whisper 1.2.1 (its latest) decodes with
+    # av.open(..., metadata_errors="ignore"), and so does utils/transcription.py.
+    # PyAV 19 removed the argument: every transcription raised TypeError.
+    "av>=11,<19",
+    # Docling (through 2.135) imports rapidocr.utils.model_resolver.PP_OCRV6_LANGS
+    # while building its RapidOCR engine. rapidocr 3.10.0 no longer has it;
+    # Docling catches the ImportError, logs "No OCR engine found" and converts
+    # every image and scanned PDF to an empty document.
+    "rapidocr>=3.9.1,<3.10",
+]
 # Every platform we ship must resolve to versions with
 # usable wheels. Without this, uv happily locks versions that are missing a
 # platform — e.g. deltalake 1.6.1 published no win_amd64 wheel, which broke the

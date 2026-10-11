@@ -92,6 +92,18 @@ export interface AiProviderConfigResponseDto {
      */
     embeddingPooling: string | null;
     /**
+     * Text put in front of every document before it is embedded, for models trained with task prompts. Null sends the text as it is.
+     * @type {string}
+     * @memberof AiProviderConfigResponseDto
+     */
+    embeddingDocumentPrefix: string | null;
+    /**
+     * Text put in front of every search query before it is embedded. Null sends the query as it is.
+     * @type {string}
+     * @memberof AiProviderConfigResponseDto
+     */
+    embeddingQueryPrefix: string | null;
+    /**
      * Cost in USD per 1M input tokens. Null when pricing is not configured.
      * @type {number}
      * @memberof AiProviderConfigResponseDto
@@ -151,6 +163,8 @@ export function instanceOfAiProviderConfigResponseDto(value: object): value is A
     if (!('supportsEmbedding' in value) || value['supportsEmbedding'] === undefined) return false;
     if (!('embeddingDimensions' in value) || value['embeddingDimensions'] === undefined) return false;
     if (!('embeddingPooling' in value) || value['embeddingPooling'] === undefined) return false;
+    if (!('embeddingDocumentPrefix' in value) || value['embeddingDocumentPrefix'] === undefined) return false;
+    if (!('embeddingQueryPrefix' in value) || value['embeddingQueryPrefix'] === undefined) return false;
     if (!('inputCostPerMTok' in value) || value['inputCostPerMTok'] === undefined) return false;
     if (!('outputCostPerMTok' in value) || value['outputCostPerMTok'] === undefined) return false;
     if (!('cachedInputCostPerMTok' in value) || value['cachedInputCostPerMTok'] === undefined) return false;
@@ -181,6 +195,8 @@ export function AiProviderConfigResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'supportsEmbedding': json['supportsEmbedding'],
         'embeddingDimensions': json['embeddingDimensions'],
         'embeddingPooling': json['embeddingPooling'],
+        'embeddingDocumentPrefix': json['embeddingDocumentPrefix'],
+        'embeddingQueryPrefix': json['embeddingQueryPrefix'],
         'inputCostPerMTok': json['inputCostPerMTok'],
         'outputCostPerMTok': json['outputCostPerMTok'],
         'cachedInputCostPerMTok': json['cachedInputCostPerMTok'],
@@ -212,6 +228,8 @@ export function AiProviderConfigResponseDtoToJSONTyped(value?: AiProviderConfigR
         'supportsEmbedding': value['supportsEmbedding'],
         'embeddingDimensions': value['embeddingDimensions'],
         'embeddingPooling': value['embeddingPooling'],
+        'embeddingDocumentPrefix': value['embeddingDocumentPrefix'],
+        'embeddingQueryPrefix': value['embeddingQueryPrefix'],
         'inputCostPerMTok': value['inputCostPerMTok'],
         'outputCostPerMTok': value['outputCostPerMTok'],
         'cachedInputCostPerMTok': value['cachedInputCostPerMTok'],

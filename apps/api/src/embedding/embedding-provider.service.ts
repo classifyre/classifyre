@@ -20,6 +20,23 @@ import {
   type ResolvedEmbeddingConfig,
 } from './embedding-settings.service';
 
+/**
+ * Which side of a search a text is on. Models trained with task prompts
+ * (EmbeddingGemma, E5, Nomic) embed "what is stored" and "what is asked"
+ * differently, and the caller is the only one who knows which it is sending.
+ */
+export type EmbeddingRole = 'document' | 'query';
+
+/** The texts as the model must see them: its task prompt in front of each. */
+export function withTaskPrompt(
+  texts: string[],
+  cfg: Pick<ResolvedEmbeddingConfig, 'documentPrefix' | 'queryPrefix'>,
+  role: EmbeddingRole,
+): string[] {
+  const prefix = role === 'query' ? cfg.queryPrefix : cfg.documentPrefix;
+  return prefix ? texts.map((text) => prefix + text) : texts;
+}
+
 type PendingRequest = {
   resolve: (vectors: number[][]) => void;
   reject: (error: Error) => void;
@@ -222,13 +239,16 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
   async embedMany(
     texts: string[],
     override?: ResolvedEmbeddingConfig,
+    // Everything that is stored is a document. Only a search says otherwise.
+    role: EmbeddingRole = 'document',
   ): Promise<number[][]> {
     if (!texts.length) return [];
     const cfg = this.resolve(override);
+    const inputs = withTaskPrompt(texts, cfg, role);
     const vectors =
       cfg.provider === 'openai-compatible'
-        ? await this.embedRemote(texts, cfg)
-        : await this.embedLocal(texts, cfg);
+        ? await this.embedRemote(inputs, cfg)
+        : await this.embedLocal(inputs, cfg);
     const invalid = vectors.find((vector) => vector.length !== cfg.dimensions);
     if (invalid) {
       throw new Error(
@@ -268,7 +288,9 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     const provider = createOpenAICompatible({
       name: 'classifyreEmbedding',
       baseURL,
-      apiKey: cfg.apiKey,
+      // Empty for a self-hosted endpoint that takes no key: send no
+      // Authorization header rather than "Bearer " with nothing after it.
+      apiKey: cfg.apiKey || undefined,
     });
     try {
       const result = await embedMany({
