@@ -1126,6 +1126,13 @@ model AiProviderConfig {
   // supportsEmbedding is true.
   embeddingDimensions    Int?           @map("embedding_dimensions")
   embeddingPooling       String?        @map("embedding_pooling")
+  // Text put in front of every input before it is embedded, for models trained
+  // with task prompts (EmbeddingGemma, E5, Nomic, Qwen3 Embedding): one for
+  // what is stored, one for what is asked. Null sends the text as it is. The
+  // document prefix is part of what a stored vector means, so changing it
+  // rebuilds the corpus; the query prefix only shapes the next search.
+  embeddingDocumentPrefix String?       @map("embedding_document_prefix")
+  embeddingQueryPrefix    String?       @map("embedding_query_prefix")
   // Optional pricing in USD per 1M tokens — enables cost estimates on
   // autopilot runs and the harness usage charts. Null = unknown/not billed.
   inputCostPerMTok       Decimal?       @map("input_cost_per_mtok") @db.Decimal(10, 4)

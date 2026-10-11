@@ -122,7 +122,8 @@ describe('SourceAssetsController', () => {
       sourceService.source.mockResolvedValue({
         id: 'source-1',
         type: 'LOCAL_FOLDER',
-        degradedDetectors: runnerId === 'runner-1' ? null : ['CUSTOM::ticket_triage'],
+        degradedDetectors:
+          runnerId === 'runner-1' ? null : ['CUSTOM::ticket_triage'],
       });
       assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
 

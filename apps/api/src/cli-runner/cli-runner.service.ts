@@ -2243,7 +2243,10 @@ export class CliRunnerService {
               data: { samplingCursor: Prisma.DbNull },
             }),
             this.prisma.asset.updateMany({
-              where: { sourceId: source.id, payloadCursor: { not: Prisma.DbNull } },
+              where: {
+                sourceId: source.id,
+                payloadCursor: { not: Prisma.DbNull },
+              },
               data: { payloadCursor: Prisma.DbNull },
             }),
           ]);
