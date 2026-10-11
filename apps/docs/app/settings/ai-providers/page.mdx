@@ -73,10 +73,11 @@ into one column and the save controls remain available at the bottom.
 | **Name**                    | A recognizable label, such as “Production Claude”. Maximum 120 characters.                   |
 | **Provider**                | `OpenAI-Compatible`, `Claude (Anthropic)`, or `Gemini (Google)`.                             |
 | **Model**                   | The provider's exact model identifier. Maximum 200 characters.                               |
-| **API key**                 | Stored encrypted at rest and never returned in plaintext after saving.                       |
+| **API key**                 | Stored encrypted at rest and never returned in plaintext after saving. Optional for an OpenAI-compatible provider with a base URL: a server you run yourself (Ollama, llama.cpp, vLLM) takes none. |
 | **Base URL**                | Available for OpenAI-compatible providers; leave blank for the default OpenAI endpoint or enter a compatible endpoint. |
 | **Context size**            | Optional model context window in tokens. Used by Harness capacity analysis.                  |
 | **Vision support**          | Whether the model accepts image and PDF input.                                               |
+| **Document prompt**, **Query prompt** | For an embedding model trained with task prompts: the text put in front of what is stored and of what is asked. See [Embeddings](/settings/embeddings#task-prompts). |
 | **Input/output token cost** | Optional USD price per one million tokens, used for Harness cost estimates and usage charts. |
 
 Testing a new provider saves its credential first. A later save updates that

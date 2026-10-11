@@ -79,6 +79,8 @@ type Draft = {
   supportsEmbedding: boolean;
   embeddingDimensions: string;
   embeddingPooling: string;
+  embeddingDocumentPrefix: string;
+  embeddingQueryPrefix: string;
   inputCostPerMTok: string;
   outputCostPerMTok: string;
   cachedInputCostPerMTok: string;
@@ -152,6 +154,8 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
       supportsEmbedding: false,
       embeddingDimensions: "",
       embeddingPooling: "mean",
+      embeddingDocumentPrefix: "",
+      embeddingQueryPrefix: "",
       inputCostPerMTok: "",
       outputCostPerMTok: "",
       cachedInputCostPerMTok: "",
@@ -171,6 +175,8 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
         ? String(config.embeddingDimensions)
         : "",
     embeddingPooling: config.embeddingPooling ?? "mean",
+    embeddingDocumentPrefix: config.embeddingDocumentPrefix ?? "",
+    embeddingQueryPrefix: config.embeddingQueryPrefix ?? "",
     inputCostPerMTok:
       config.inputCostPerMTok != null ? String(config.inputCostPerMTok) : "",
     outputCostPerMTok:
@@ -224,6 +230,13 @@ function buildCreatePayload(draft: Draft): CreateAiProviderConfigDto {
     embeddingPooling: draft.supportsEmbedding
       ? draft.embeddingPooling || undefined
       : undefined,
+    // Not trimmed: a task prompt ends in a space the model was trained with.
+    embeddingDocumentPrefix: draft.supportsEmbedding
+      ? draft.embeddingDocumentPrefix || undefined
+      : undefined,
+    embeddingQueryPrefix: draft.supportsEmbedding
+      ? draft.embeddingQueryPrefix || undefined
+      : undefined,
     ...(typeof inputCost === "number" ? { inputCostPerMTok: inputCost } : {}),
     ...(typeof outputCost === "number"
       ? { outputCostPerMTok: outputCost }
@@ -263,6 +276,14 @@ function buildUpdatePayload(draft: Draft): UpdateAiProviderConfigDto {
       : {}),
     ...(draft.supportsEmbedding && draft.embeddingPooling
       ? { embeddingPooling: draft.embeddingPooling }
+      : {}),
+    // Always sent for an embedding provider, empty included: an empty string
+    // is how a prompt is cleared again.
+    ...(draft.supportsEmbedding
+      ? {
+          embeddingDocumentPrefix: draft.embeddingDocumentPrefix,
+          embeddingQueryPrefix: draft.embeddingQueryPrefix,
+        }
       : {}),
     ...(inputCost !== undefined ? { inputCostPerMTok: inputCost } : {}),
     ...(outputCost !== undefined ? { outputCostPerMTok: outputCost } : {}),
@@ -356,6 +377,9 @@ export function AiProviderForm({
   const keyWillBeDropped =
     hasStoredKey && !keyIsKept && draft.apiKey.length === 0;
   const keyWillExist = draft.apiKey.length > 0 || keyIsKept;
+  // A server the operator runs themselves (Ollama, llama.cpp, vLLM) takes no
+  // key. A managed provider always needs one.
+  const keyOptional = isOpenAiCompatible && draft.baseUrl.trim().length > 0;
 
   const handleProviderChange = React.useCallback(
     (value: AiProviderConfigResponseDtoProviderEnum) => {
@@ -393,7 +417,7 @@ export function AiProviderForm({
       setError(t("aiProvider.nameRequired"));
       return;
     }
-    if (keyWillBeDropped) {
+    if (keyWillBeDropped && !keyOptional) {
       setError(t("aiProvider.apiKeyMissing"));
       return;
     }
@@ -411,14 +435,22 @@ export function AiProviderForm({
     } finally {
       setSaving(false);
     }
-  }, [assignments, draft.name, keyWillBeDropped, persist, onSaved, t]);
+  }, [
+    assignments,
+    draft.name,
+    keyOptional,
+    keyWillBeDropped,
+    persist,
+    onSaved,
+    t,
+  ]);
 
   const handleTest = React.useCallback(async () => {
     if (!draft.name.trim()) {
       setError(t("aiProvider.nameRequired"));
       return;
     }
-    if (keyWillBeDropped) {
+    if (keyWillBeDropped && !keyOptional) {
       setError(t("aiProvider.apiKeyMissing"));
       return;
     }
@@ -458,9 +490,18 @@ export function AiProviderForm({
     } finally {
       setTesting(false);
     }
-  }, [assignments, draft.name, persist, onSaved, t, testType]);
+  }, [
+    assignments,
+    draft.name,
+    keyOptional,
+    keyWillBeDropped,
+    persist,
+    onSaved,
+    t,
+    testType,
+  ]);
 
-  const canTest = keyWillExist;
+  const canTest = keyWillExist || keyOptional;
 
   const connectionFailed =
     testResult !== null &&
@@ -734,6 +775,46 @@ export function AiProviderForm({
                       {t("aiProvider.embeddingPoolingDesc")}
                     </p>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-provider-embedding-document-prefix">
+                      {t("aiProvider.embeddingDocumentPrefix")}
+                    </Label>
+                    <Input
+                      id="ai-provider-embedding-document-prefix"
+                      className="font-mono"
+                      placeholder="title: none | text: "
+                      value={draft.embeddingDocumentPrefix}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          embeddingDocumentPrefix: event.target.value,
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("aiProvider.embeddingDocumentPrefixDesc")}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-provider-embedding-query-prefix">
+                      {t("aiProvider.embeddingQueryPrefix")}
+                    </Label>
+                    <Input
+                      id="ai-provider-embedding-query-prefix"
+                      className="font-mono"
+                      placeholder="task: search result | query: "
+                      value={draft.embeddingQueryPrefix}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          embeddingQueryPrefix: event.target.value,
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("aiProvider.embeddingQueryPrefixDesc")}
+                    </p>
+                  </div>
                 </div>
               ) : null}
             </CardContent>
@@ -832,7 +913,9 @@ export function AiProviderForm({
                   ? t("aiProvider.keyWillBeDropped")
                   : hasStoredKey
                     ? t("aiProvider.keyStored")
-                    : t("aiProvider.keyNotStored")}
+                    : keyOptional
+                      ? t("aiProvider.keyOptional")
+                      : t("aiProvider.keyNotStored")}
               </p>
             </CardContent>
           </Card>

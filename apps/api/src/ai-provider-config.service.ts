@@ -82,6 +82,8 @@ export class AiProviderConfigService {
       supportsEmbedding: config.supportsEmbedding,
       embeddingDimensions: config.embeddingDimensions,
       embeddingPooling: config.embeddingPooling,
+      embeddingDocumentPrefix: config.embeddingDocumentPrefix ?? null,
+      embeddingQueryPrefix: config.embeddingQueryPrefix ?? null,
       inputCostPerMTok:
         config.inputCostPerMTok != null
           ? Number(config.inputCostPerMTok)
@@ -138,6 +140,10 @@ export class AiProviderConfigService {
         supportsEmbedding: dto.supportsEmbedding ?? false,
         embeddingDimensions: dto.embeddingDimensions ?? null,
         embeddingPooling: dto.embeddingPooling ?? null,
+        // Stored exactly as given: these prompts end in a space that is part
+        // of what the model was trained on, so nothing here trims them.
+        embeddingDocumentPrefix: dto.embeddingDocumentPrefix || null,
+        embeddingQueryPrefix: dto.embeddingQueryPrefix || null,
         inputCostPerMTok: dto.inputCostPerMTok ?? null,
         outputCostPerMTok: dto.outputCostPerMTok ?? null,
         cachedInputCostPerMTok: dto.cachedInputCostPerMTok ?? null,
@@ -184,6 +190,12 @@ export class AiProviderConfigService {
     }
     if (dto.embeddingPooling !== undefined) {
       data.embeddingPooling = dto.embeddingPooling;
+    }
+    if (dto.embeddingDocumentPrefix !== undefined) {
+      data.embeddingDocumentPrefix = dto.embeddingDocumentPrefix || null;
+    }
+    if (dto.embeddingQueryPrefix !== undefined) {
+      data.embeddingQueryPrefix = dto.embeddingQueryPrefix || null;
     }
     if (dto.inputCostPerMTok !== undefined) {
       data.inputCostPerMTok = dto.inputCostPerMTok;
@@ -280,9 +292,20 @@ export class AiProviderConfigService {
     }
 
     if (!apiKey) {
-      throw new AiConfigError(
-        `AI provider "${config.name}" has no API key configured.`,
-      );
+      // A server the operator runs themselves (Ollama, llama.cpp, vLLM, an
+      // embedding pod in the same cluster) has no key to give, and demanding
+      // one made every such endpoint unusable. Only that case is let through:
+      // a managed provider without a key is a misconfiguration, and so is a
+      // stored key that no longer decrypts.
+      const selfHosted =
+        config.provider === 'OPENAI_COMPATIBLE' &&
+        Boolean(config.baseUrl?.trim()) &&
+        !config.apiKeyEnc;
+      if (!selfHosted) {
+        throw new AiConfigError(
+          `AI provider "${config.name}" has no API key configured.`,
+        );
+      }
     }
     if (!config.model.trim()) {
       throw new AiConfigError(
@@ -293,13 +316,15 @@ export class AiProviderConfigService {
     return {
       provider: config.provider,
       model: config.model,
-      apiKey,
+      apiKey: apiKey ?? '',
       baseUrl: config.baseUrl,
       contextSize: config.contextSize,
       supportsVision: config.supportsVision,
       supportsEmbedding: config.supportsEmbedding,
       embeddingDimensions: config.embeddingDimensions,
       embeddingPooling: config.embeddingPooling,
+      embeddingDocumentPrefix: config.embeddingDocumentPrefix ?? null,
+      embeddingQueryPrefix: config.embeddingQueryPrefix ?? null,
     };
   }
 }
