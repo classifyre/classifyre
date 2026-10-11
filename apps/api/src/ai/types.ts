@@ -96,6 +96,9 @@ export interface AiProviderRuntimeConfig {
   /** Task prompts of the embedding model: what is stored, and what is asked. */
   embeddingDocumentPrefix?: string | null;
   embeddingQueryPrefix?: string | null;
+  /** What the embedding model takes besides text, and how it is sent. */
+  embeddingModalities?: string[];
+  embeddingMediaFormat?: string | null;
 }
 
 /** One provider request's result: the raw text plus reported token usage. */

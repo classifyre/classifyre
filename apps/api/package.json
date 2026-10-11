@@ -38,7 +38,7 @@
     "@fastify/static": "^9.3.0",
     "@fastify/under-pressure": "^9.0.3",
     "@google/genai": "^2.6.0",
-    "@huggingface/transformers": "^4.2.0",
+    "@huggingface/transformers": "^4.3.1",
     "@kubernetes/client-node": "^1.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@nestjs/common": "^11.1.18",

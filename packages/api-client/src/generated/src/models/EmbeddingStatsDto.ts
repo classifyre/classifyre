@@ -52,13 +52,25 @@ export interface EmbeddingStatsDto {
      */
     storageBytes?: number | null;
     /**
+     * Pictures and sound clips stored for embedding, of every modality
+     * @type {number}
+     * @memberof EmbeddingStatsDto
+     */
+    mediaChunks: number;
+    /**
+     * Bytes those prepared media items occupy
+     * @type {number}
+     * @memberof EmbeddingStatsDto
+     */
+    mediaBytes: number;
+    /**
      * Bytes held by the evidence-ranking table derived from vectors
      * @type {number}
      * @memberof EmbeddingStatsDto
      */
     analysisStorageBytes?: number | null;
     /**
-     * Text chunks eligible for embedding
+     * Text chunks eligible for embedding (media is counted apart)
      * @type {number}
      * @memberof EmbeddingStatsDto
      */
@@ -84,6 +96,8 @@ export function instanceOfEmbeddingStatsDto(value: object): value is EmbeddingSt
     if (!('spaces' in value) || value['spaces'] === undefined) return false;
     if (!('vectors' in value) || value['vectors'] === undefined) return false;
     if (!('vectorsAllSpaces' in value) || value['vectorsAllSpaces'] === undefined) return false;
+    if (!('mediaChunks' in value) || value['mediaChunks'] === undefined) return false;
+    if (!('mediaBytes' in value) || value['mediaBytes'] === undefined) return false;
     if (!('chunks' in value) || value['chunks'] === undefined) return false;
     if (!('embeddableFindings' in value) || value['embeddableFindings'] === undefined) return false;
     if (!('rankedFindings' in value) || value['rankedFindings'] === undefined) return false;
@@ -104,6 +118,8 @@ export function EmbeddingStatsDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'vectors': json['vectors'],
         'vectorsAllSpaces': json['vectorsAllSpaces'],
         'storageBytes': json['storageBytes'] == null ? undefined : json['storageBytes'],
+        'mediaChunks': json['mediaChunks'],
+        'mediaBytes': json['mediaBytes'],
         'analysisStorageBytes': json['analysisStorageBytes'] == null ? undefined : json['analysisStorageBytes'],
         'chunks': json['chunks'],
         'embeddableFindings': json['embeddableFindings'],
@@ -126,6 +142,8 @@ export function EmbeddingStatsDtoToJSONTyped(value?: EmbeddingStatsDto | null, i
         'vectors': value['vectors'],
         'vectorsAllSpaces': value['vectorsAllSpaces'],
         'storageBytes': value['storageBytes'],
+        'mediaChunks': value['mediaChunks'],
+        'mediaBytes': value['mediaBytes'],
         'analysisStorageBytes': value['analysisStorageBytes'],
         'chunks': value['chunks'],
         'embeddableFindings': value['embeddableFindings'],

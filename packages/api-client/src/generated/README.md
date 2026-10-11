@@ -235,6 +235,7 @@ All URIs are relative to *http://localhost*
 *EmbeddingsApi* | [**embeddingControllerBoilerplate**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplate) | **GET** /sources/{sourceId}/boilerplate-clusters | Near-duplicate finding clusters in a source (repeated boilerplate)
 *EmbeddingsApi* | [**embeddingControllerBoilerplateGlobal**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplateglobal) | **GET** /embeddings/boilerplate-clusters | Near-duplicate finding clusters across the corpus, optionally filtered to specific sources
 *EmbeddingsApi* | [**embeddingControllerChunks**](docs/EmbeddingsApi.md#embeddingcontrollerchunks) | **POST** /sources/{sourceId}/embeddings/chunks | Store asset chunk-to-content mappings
+*EmbeddingsApi* | [**embeddingControllerCollection**](docs/EmbeddingsApi.md#embeddingcontrollercollection) | **GET** /embeddings/collection | What a scan should prepare for embedding in this workspace: text chunks, and which media in what form
 *EmbeddingsApi* | [**embeddingControllerGetSettings**](docs/EmbeddingsApi.md#embeddingcontrollergetsettings) | **GET** /embeddings/settings | Embedding configuration for this workspace, the deployment defaults behind it, and corpus size
 *EmbeddingsApi* | [**embeddingControllerRebuild**](docs/EmbeddingsApi.md#embeddingcontrollerrebuild) | **POST** /embeddings/rebuild | Purge every stored vector for this workspace and re-embed the corpus from scratch
 *EmbeddingsApi* | [**embeddingControllerRecalibrate**](docs/EmbeddingsApi.md#embeddingcontrollerrecalibrate) | **POST** /embeddings/recalibrate | Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)
@@ -515,6 +516,7 @@ All URIs are relative to *http://localhost*
 - [AssetFindingTypeCountDto](docs/AssetFindingTypeCountDto.md)
 - [AssetListItemDto](docs/AssetListItemDto.md)
 - [AssetListResponseDto](docs/AssetListResponseDto.md)
+- [AssetMediaChunkDto](docs/AssetMediaChunkDto.md)
 - [AssetResponseDto](docs/AssetResponseDto.md)
 - [AssetSeverityCountsItemDto](docs/AssetSeverityCountsItemDto.md)
 - [AssetSeverityCountsRequestDto](docs/AssetSeverityCountsRequestDto.md)
@@ -677,6 +679,10 @@ All URIs are relative to *http://localhost*
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
 - [EdgeDetailDto](docs/EdgeDetailDto.md)
 - [EmbeddingAiProviderOptionDto](docs/EmbeddingAiProviderOptionDto.md)
+- [EmbeddingCollectionMediaDto](docs/EmbeddingCollectionMediaDto.md)
+- [EmbeddingCollectionPlanDto](docs/EmbeddingCollectionPlanDto.md)
+- [EmbeddingLocalModelDownloadDto](docs/EmbeddingLocalModelDownloadDto.md)
+- [EmbeddingLocalModelDto](docs/EmbeddingLocalModelDto.md)
 - [EmbeddingProviderHealthDto](docs/EmbeddingProviderHealthDto.md)
 - [EmbeddingRebuildResponseDto](docs/EmbeddingRebuildResponseDto.md)
 - [EmbeddingRecalibrateResponseDto](docs/EmbeddingRecalibrateResponseDto.md)

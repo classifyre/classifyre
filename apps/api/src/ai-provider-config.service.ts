@@ -8,6 +8,11 @@ import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { AiConfigError } from './ai/errors';
 import type { AiProviderRuntimeConfig } from './ai/types';
 import type { AiProviderConfig, Prisma } from '@prisma/client';
+import {
+  MEDIA_FORMAT_MODALITIES,
+  isEmbeddingMediaFormat,
+  normalizeMediaModalities,
+} from './embedding/embedding-modality';
 import type {
   AiProviderConfigResponseDto,
   CreateAiProviderConfigDto,
@@ -38,6 +43,29 @@ export function providerEndpointKey(
   baseUrl: string | null | undefined,
 ): string {
   return `${provider}|${normalizeProviderBaseUrl(baseUrl)}`;
+}
+
+/**
+ * What a provider may store about media: a request shape this product can
+ * speak, and only the kinds of content that shape carries. Anything else is
+ * stored as text-only rather than refused — a claim nothing can act on is not
+ * worth failing a save over, and the settings page shows what was kept.
+ */
+function mediaSupport(
+  modalities: unknown,
+  format: unknown,
+): { embeddingModalities: string[]; embeddingMediaFormat: string | null } {
+  if (!isEmbeddingMediaFormat(format)) {
+    return { embeddingModalities: [], embeddingMediaFormat: null };
+  }
+  const carried = MEDIA_FORMAT_MODALITIES[format];
+  const kept = normalizeMediaModalities(modalities).filter((modality) =>
+    carried.includes(modality),
+  );
+  return {
+    embeddingModalities: kept,
+    embeddingMediaFormat: kept.length ? format : null,
+  };
 }
 
 function buildApiKeyPreview(plaintext: string): string {
@@ -84,6 +112,8 @@ export class AiProviderConfigService {
       embeddingPooling: config.embeddingPooling,
       embeddingDocumentPrefix: config.embeddingDocumentPrefix ?? null,
       embeddingQueryPrefix: config.embeddingQueryPrefix ?? null,
+      embeddingModalities: config.embeddingModalities ?? [],
+      embeddingMediaFormat: config.embeddingMediaFormat ?? null,
       inputCostPerMTok:
         config.inputCostPerMTok != null
           ? Number(config.inputCostPerMTok)
@@ -144,6 +174,7 @@ export class AiProviderConfigService {
         // of what the model was trained on, so nothing here trims them.
         embeddingDocumentPrefix: dto.embeddingDocumentPrefix || null,
         embeddingQueryPrefix: dto.embeddingQueryPrefix || null,
+        ...mediaSupport(dto.embeddingModalities, dto.embeddingMediaFormat),
         inputCostPerMTok: dto.inputCostPerMTok ?? null,
         outputCostPerMTok: dto.outputCostPerMTok ?? null,
         cachedInputCostPerMTok: dto.cachedInputCostPerMTok ?? null,
@@ -196,6 +227,22 @@ export class AiProviderConfigService {
     }
     if (dto.embeddingQueryPrefix !== undefined) {
       data.embeddingQueryPrefix = dto.embeddingQueryPrefix || null;
+    }
+    if (
+      dto.embeddingModalities !== undefined ||
+      dto.embeddingMediaFormat !== undefined
+    ) {
+      // The two are one statement about the endpoint, so they are settled
+      // together against whichever half the request left out.
+      Object.assign(
+        data,
+        mediaSupport(
+          dto.embeddingModalities ?? existing.embeddingModalities,
+          dto.embeddingMediaFormat !== undefined
+            ? dto.embeddingMediaFormat
+            : existing.embeddingMediaFormat,
+        ),
+      );
     }
     if (dto.inputCostPerMTok !== undefined) {
       data.inputCostPerMTok = dto.inputCostPerMTok;
@@ -325,6 +372,8 @@ export class AiProviderConfigService {
       embeddingPooling: config.embeddingPooling,
       embeddingDocumentPrefix: config.embeddingDocumentPrefix ?? null,
       embeddingQueryPrefix: config.embeddingQueryPrefix ?? null,
+      embeddingModalities: config.embeddingModalities ?? [],
+      embeddingMediaFormat: config.embeddingMediaFormat ?? null,
     };
   }
 }

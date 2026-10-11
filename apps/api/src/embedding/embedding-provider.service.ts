@@ -9,6 +9,13 @@ import path from 'node:path';
 import { EmbeddingConfigService } from './embedding-config.service';
 import { planInferenceBatches } from './embedding-batching';
 import {
+  MAX_MEDIA_BYTES,
+  type EmbeddingMediaItem,
+  type MediaModality,
+} from './embedding-modality';
+import { embedMediaRemote } from './embedding-media-remote';
+import { probeMedia } from './embedding-media-probe';
+import {
   resolvedFromEnv,
   // A value import, not `import type`: `emitDecoratorMetadata` writes
   // design:paramtypes from the imported binding, and a type-only import is
@@ -36,6 +43,26 @@ export function withTaskPrompt(
   const prefix = role === 'query' ? cfg.queryPrefix : cfg.documentPrefix;
   return prefix ? texts.map((text) => prefix + text) : texts;
 }
+
+/**
+ * Media items handed to one local inference call.
+ *
+ * A picture is a few hundred tokens whatever its content, so unlike text the
+ * cost of a batch is known in advance and small batches are simply the safe
+ * side of it. A clip is 25 tokens a second and its features pad to the longest
+ * clip present, so sound goes one at a time.
+ */
+const LOCAL_MEDIA_BATCH: Record<MediaModality, number> = {
+  image: 2,
+  audio: 1,
+};
+
+/** What the worker is asked to embed: a batch of text, or of one modality. */
+type WorkerPayload =
+  | { texts: string[] }
+  | {
+      media: Array<{ modality: MediaModality; mimeType: string; data: string }>;
+    };
 
 type PendingRequest = {
   resolve: (vectors: number[][]) => void;
@@ -211,6 +238,8 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     dimensions: number;
     expectedDimensions: number | null;
     durationMs: number;
+    /** Media kinds the endpoint was sent, and embedded into the same width. */
+    media: MediaModality[];
   }> {
     const startedAt = Date.now();
     const probe = 'Classifyre embedding connection test.';
@@ -229,10 +258,28 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     if (!vector?.length) {
       throw new Error('The provider returned no vector for the probe text.');
     }
+    // A model that says it takes pictures is sent one. Text answering proves
+    // nothing about the vision encoder being loaded, or about the request
+    // shape chosen for it, and both fail on the first scanned picture
+    // otherwise — after the workspace has been rebuilt for this model.
+    for (const modality of cfg.mediaModalities) {
+      const [mediaVector] = await this.embedMediaRaw(
+        [probeMedia(modality)],
+        cfg,
+        { sendDimensions: declared != null },
+      );
+      if (mediaVector?.length !== vector.length) {
+        throw new Error(
+          `The provider embedded the test ${modality} into ${mediaVector?.length ?? 0} dimensions and the test text into ${vector.length}; ` +
+            'they have to be the same model in the same vector space.',
+        );
+      }
+    }
     return {
       dimensions: vector.length,
       expectedDimensions: declared,
       durationMs: Date.now() - startedAt,
+      media: [...cfg.mediaModalities],
     };
   }
 
@@ -245,10 +292,111 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     if (!texts.length) return [];
     const cfg = this.resolve(override);
     const inputs = withTaskPrompt(texts, cfg, role);
+    const startedAt = Date.now();
     const vectors =
       cfg.provider === 'openai-compatible'
         ? await this.embedRemote(inputs, cfg)
         : await this.embedLocal(inputs, cfg);
+    this.logEmbedded(
+      `${texts.length} ${role} text(s), ${inputs.reduce((sum, text) => sum + text.length, 0)} chars`,
+      startedAt,
+      cfg,
+    );
+    return this.checked(vectors, cfg);
+  }
+
+  /**
+   * One line per inference call, at debug level: what was embedded, how long
+   * it took, with which model. It is the only place the speed of a model on
+   * this machine can be read from; a local call's time includes its wait
+   * behind whatever else the one worker was doing.
+   */
+  private logEmbedded(
+    what: string,
+    startedAt: number,
+    cfg: ResolvedEmbeddingConfig,
+  ): void {
+    this.logger.debug(
+      `Embedded ${what} in ${Date.now() - startedAt} ms with ${cfg.model}`,
+    );
+  }
+
+  /**
+   * Pictures and clips as vectors in the workspace's space, in input order.
+   *
+   * No task prompt: a prompt is words, and a model trained with prompts puts
+   * them in front of text only. Whether the model can take the modality at all
+   * is the caller's to have checked against `cfg.mediaModalities` — this
+   * refuses rather than guesses when it cannot.
+   */
+  async embedMedia(
+    items: EmbeddingMediaItem[],
+    override?: ResolvedEmbeddingConfig,
+  ): Promise<number[][]> {
+    if (!items.length) return [];
+    const cfg = this.resolve(override);
+    const startedAt = Date.now();
+    const vectors = await this.embedMediaRaw(items, cfg);
+    for (const modality of new Set(items.map((item) => item.modality))) {
+      this.logEmbedded(
+        `${items.filter((item) => item.modality === modality).length} ${modality} item(s)`,
+        startedAt,
+        cfg,
+      );
+    }
+    return this.checked(vectors, cfg);
+  }
+
+  /** Media vectors exactly as the model returned them. */
+  private async embedMediaRaw(
+    items: EmbeddingMediaItem[],
+    cfg: ResolvedEmbeddingConfig,
+    options: { sendDimensions?: boolean } = {},
+  ): Promise<number[][]> {
+    const unsupported = items.find(
+      (item) => !cfg.supportedMedia.includes(item.modality),
+    );
+    if (unsupported) {
+      throw new Error(
+        `Embedding model ${cfg.model} does not embed ${unsupported.modality} content`,
+      );
+    }
+    const oversized = items.find(
+      (item) => item.data.byteLength > MAX_MEDIA_BYTES,
+    );
+    if (oversized) {
+      throw new Error(
+        `A ${oversized.modality} item of ${oversized.data.byteLength} bytes exceeds the ${MAX_MEDIA_BYTES}-byte limit`,
+      );
+    }
+    if (cfg.provider !== 'openai-compatible') {
+      return this.embedLocalMedia(items, cfg);
+    }
+    const baseUrl = normalizeEmbeddingBaseUrl(cfg.baseUrl);
+    if (!baseUrl || !cfg.mediaFormat) {
+      throw new Error(
+        'This workspace embeds media through a remote provider, but the provider has no endpoint or no media request format set.',
+      );
+    }
+    return embedMediaRemote(
+      cfg.mediaFormat,
+      {
+        baseUrl,
+        apiKey: cfg.apiKey || undefined,
+        model: cfg.model,
+        dimensions:
+          options.sendDimensions === false ? undefined : cfg.dimensions,
+      },
+      items,
+      { parallel: cfg.maxParallelCalls },
+    );
+  }
+
+  /** The dimension check and normalisation every stored vector goes through. */
+  private checked(
+    vectors: number[][],
+    cfg: ResolvedEmbeddingConfig,
+  ): number[][] {
     const invalid = vectors.find((vector) => vector.length !== cfg.dimensions);
     if (invalid) {
       throw new Error(
@@ -322,12 +470,36 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     // varying.
     cfg: ResolvedEmbeddingConfig = this.resolve(),
   ): Promise<number[][]> {
+    try {
+      this.assertWorkerAvailable();
+    } catch (error) {
+      return Promise.reject(error as Error);
+    }
+    // Bounded, then serialised. Both are needed: the bound caps what ONE
+    // inference call may allocate, the queue stops N callers from each
+    // allocating that much at the same time in the one child process.
+    const batches = planInferenceBatches(texts, {
+      maxRows: cfg.batchSize,
+      maxPaddedChars: this.config.maxBatchChars,
+    });
+    return this.serialize(async () => {
+      const vectors: number[][] = [];
+      for (const batch of batches) {
+        vectors.push(...(await this.sendBatch({ texts: batch }, cfg)));
+      }
+      return vectors;
+    });
+  }
+
+  /**
+   * Refuses while the breaker is open, and turns the first request after its
+   * cooldown into the probe.
+   */
+  private assertWorkerAvailable(): void {
     if (this.workerDisabled) {
       const seconds = Math.ceil((this.disabledUntil! - this.now()) / 1000);
-      return Promise.reject(
-        new Error(
-          `Local embedding provider is paused: the Transformers.js worker failed ${MAX_CONSECUTIVE_WORKER_FAILURES} times in a row. Retrying in ${seconds}s.`,
-        ),
+      throw new Error(
+        `Local embedding provider is paused: the Transformers.js worker failed ${MAX_CONSECUTIVE_WORKER_FAILURES} times in a row. Retrying in ${seconds}s.`,
       );
     }
     if (this.disabledUntil != null) {
@@ -340,17 +512,42 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
         'Cooldown elapsed; probing the Transformers.js worker again',
       );
     }
-    // Bounded, then serialised. Both are needed: the bound caps what ONE
-    // inference call may allocate, the queue stops N callers from each
-    // allocating that much at the same time in the one child process.
-    const batches = planInferenceBatches(texts, {
-      maxRows: cfg.batchSize,
-      maxPaddedChars: this.config.maxBatchChars,
-    });
+  }
+
+  /**
+   * Media through the local worker: grouped by modality (a batch is one kind
+   * of content), bounded per call, and queued behind everything else the one
+   * child is doing.
+   */
+  private embedLocalMedia(
+    items: EmbeddingMediaItem[],
+    cfg: ResolvedEmbeddingConfig,
+  ): Promise<number[][]> {
+    this.assertWorkerAvailable();
     return this.serialize(async () => {
-      const vectors: number[][] = [];
-      for (const batch of batches) {
-        vectors.push(...(await this.sendBatch(batch, cfg)));
+      const vectors: number[][] = new Array<number[]>(items.length);
+      const indexes = items.map((_, index) => index);
+      for (const modality of new Set(items.map((item) => item.modality))) {
+        const group = indexes.filter(
+          (index) => items[index].modality === modality,
+        );
+        const size = LOCAL_MEDIA_BATCH[modality];
+        for (let offset = 0; offset < group.length; offset += size) {
+          const batch = group.slice(offset, offset + size);
+          const answered = await this.sendBatch(
+            {
+              media: batch.map((index) => ({
+                modality,
+                mimeType: items[index].mimeType,
+                data: items[index].data.toString('base64'),
+              })),
+            },
+            cfg,
+          );
+          batch.forEach((index, position) => {
+            vectors[index] = answered[position];
+          });
+        }
       }
       return vectors;
     });
@@ -384,17 +581,21 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
   }
 
   private sendBatch(
-    texts: string[],
+    payload: WorkerPayload,
     cfg: ResolvedEmbeddingConfig,
   ): Promise<number[][]> {
     const worker = this.ensureWorker();
     const id = ++this.sequence;
+    const size =
+      'texts' in payload
+        ? `${payload.texts.length} texts`
+        : `${payload.media.length} ${payload.media[0]?.modality ?? 'media'} item(s)`;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         if (!this.pending.delete(id)) return;
         reject(
           new Error(
-            `Embedding worker did not answer batch ${id} (${texts.length} texts) within ${INFERENCE_TIMEOUT_MS / 60_000} minutes`,
+            `Embedding worker did not answer batch ${id} (${size}) within ${INFERENCE_TIMEOUT_MS / 60_000} minutes`,
           ),
         );
       }, INFERENCE_TIMEOUT_MS);
@@ -413,7 +614,7 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
       });
       worker.send({
         id,
-        texts,
+        ...payload,
         config: {
           model: cfg.model,
           revision: cfg.revision,
@@ -425,6 +626,8 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
           cacheDir: cfg.cacheDir,
           localModelPath: cfg.localModelPath,
           allowRemoteModels: cfg.allowRemoteModels,
+          family: cfg.localFamily,
+          dimensions: cfg.dimensions,
         },
       });
     });

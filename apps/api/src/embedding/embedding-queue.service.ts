@@ -20,6 +20,7 @@ import {
 } from './embedding-settings.service';
 import { EmbeddingProviderService } from './embedding-provider.service';
 import { EmbeddingService } from './embedding.service';
+import { isMediaModality, type MediaModality } from './embedding-modality';
 import { runsBackgroundWorkers } from '../service-role';
 import {
   CLS_DATABASE_LANE,
@@ -51,7 +52,38 @@ const RECALIBRATE_DELAY_SECONDS = 120;
  */
 const MAX_RECALIBRATION_DEFERRALS = 5;
 
-type QueuedContent = { hash: string; text: string };
+/**
+ * Media hashes packed into one queue job.
+ *
+ * Far fewer than text chunks: a picture costs a model seconds where a passage
+ * costs milliseconds, and a job is the unit that is retried, expires and is
+ * re-queued. Eight keeps one job to about a minute of work on a CPU.
+ */
+const MEDIA_QUEUE_BATCH_SIZE = 8;
+/** Media items embedded and stored together inside one handler call. */
+const MEDIA_STEP_SIZE = 4;
+/**
+ * How long one handler call spends on media before handing the rest back.
+ *
+ * A fetch can hold hundreds of pictures, a CPU endpoint can take most of a
+ * minute for each, and every job in the fetch expires together an hour after
+ * it started. Past this budget the remaining pictures are queued again as new
+ * jobs and this call finishes cleanly, so slow inference shows up as a longer
+ * queue rather than as jobs that expire and retry work already done.
+ */
+const MEDIA_HANDLER_BUDGET_MS = 20 * 60_000;
+
+/**
+ * Something to embed, by hash. Text carries its words (they decide whether
+ * there is anything to embed at all); media carries only the fact that it is
+ * media — its bytes stay in the chunk row and are read when it is embedded.
+ */
+type QueuedContent = { hash: string; text: string; media?: boolean };
+
+/** What a hash turned out to be when it was read back for embedding. */
+type ResolvedContent =
+  | { text: string }
+  | { modality: MediaModality; mimeType: string };
 
 /**
  * A queue job carries a *group* of chunks, by hash.
@@ -741,7 +773,13 @@ export class EmbeddingQueueService {
     }
   }
 
-  private async persist(contents: QueuedContent[]): Promise<void> {
+  private async persist(
+    contents: QueuedContent[],
+    // Set when a handler hands back media it ran out of time for. The job
+    // those hashes arrived in is still active, and a job with the same key
+    // would be dropped as its duplicate.
+    options: { requeue?: boolean } = {},
+  ): Promise<void> {
     // Turned off: nothing is queued. Whatever this drops is found again by the
     // catch-up backfill that runs when the switch comes back on.
     if (!(await this.enabledNow())) return;
@@ -750,35 +788,43 @@ export class EmbeddingQueueService {
     if (!rt.queueName || !rt.spaceId) {
       throw new Error('Embedding queue is not initialized');
     }
-    const unique = new Map<string, string>();
+    const text = new Set<string>();
+    const media = new Set<string>();
     for (const content of contents) {
-      const text = normalizeEmbeddingText(content.text);
-      if (text) unique.set(content.hash, text);
+      if (content.media) media.add(content.hash);
+      else if (normalizeEmbeddingText(content.text)) text.add(content.hash);
     }
-    if (!unique.size) return;
+    const total = text.size + media.size;
+    if (!total) return;
 
-    rt.pendingWrites += unique.size;
+    rt.pendingWrites += total;
     try {
       const boss = await this.pgBoss.getBossAsync();
-      const entries = [...unique];
       // Never trust this to be a usable number: a non-positive or NaN size
       // would slice nothing, and the loop would emit jobs carrying no chunks —
       // work silently dropped rather than queued.
       const size =
         Math.max(1, Math.floor(this.cfg.queueBatchSize) || 0) ||
         DEFAULT_QUEUE_BATCH_SIZE;
+      const groups: string[][] = [];
+      const pack = (hashes: string[], groupSize: number) => {
+        for (let offset = 0; offset < hashes.length; offset += groupSize) {
+          groups.push(hashes.slice(offset, offset + groupSize));
+        }
+      };
+      pack([...text], size);
+      // Media travels in its own, much smaller jobs. See MEDIA_QUEUE_BATCH_SIZE.
+      pack([...media], Math.min(size, MEDIA_QUEUE_BATCH_SIZE));
+      const nonce = options.requeue ? [`requeue:${Date.now()}`] : [];
       const jobs: JobInsert<EmbeddingJob>[] = [];
-      for (let offset = 0; offset < entries.length; offset += size) {
-        const hashes = entries
-          .slice(offset, offset + size)
-          .map(([hash]) => hash);
+      for (const hashes of groups) {
         jobs.push({
           data: { spaceId: rt.spaceId, hashes },
           // The queue policy is `exclusive`, so singleton_key is what keeps a
           // job unique; a null key would let only one job exist at a time.
           // Deriving it from the group's contents keeps the old idempotency:
           // re-enqueueing the same chunks collapses instead of duplicating.
-          singletonKey: batchKey(hashes),
+          singletonKey: batchKey([...hashes, ...nonce]),
           group: { id: EMBEDDING_GROUP },
           retryLimit: 5,
           retryDelay: this.cfg.retrySeconds,
@@ -800,12 +846,15 @@ export class EmbeddingQueueService {
         );
       }
     } finally {
-      rt.pendingWrites -= unique.size;
+      rt.pendingWrites -= total;
     }
   }
 
   /**
-   * Read back the text each hash was derived from.
+   * Read back what each hash was derived from: its text, or for a media chunk
+   * what kind of media it is. Media bytes are not read here — a fetch can name
+   * hundreds of pictures, and they are loaded a few at a time as they are
+   * embedded (see {@link mediaItems}).
    *
    * Mirrors the three producers in `backfillStoredContent` exactly, including
    * their use of `normalizeEmbeddingText` — the hash is of the normalized
@@ -817,18 +866,32 @@ export class EmbeddingQueueService {
    * finding deleted between enqueue and dequeue, which is normal during a
    * rescan, and skipping it is correct: there is nothing left to embed.
    */
-  private async resolveTexts(hashes: string[]): Promise<Map<string, string>> {
-    const resolved = new Map<string, string>();
+  private async resolveContents(
+    hashes: string[],
+  ): Promise<Map<string, ResolvedContent>> {
+    const resolved = new Map<string, ResolvedContent>();
     if (!hashes.length) return resolved;
 
     const outstanding = () => hashes.filter((hash) => !resolved.has(hash));
 
     const chunks = await this.prisma.assetChunk.findMany({
       where: { contentHash: { in: outstanding() } },
-      select: { contentHash: true, text: true },
+      select: {
+        contentHash: true,
+        text: true,
+        modality: true,
+        mimeType: true,
+      },
       distinct: ['contentHash'],
     });
     for (const chunk of chunks) {
+      if (isMediaModality(chunk.modality)) {
+        resolved.set(chunk.contentHash, {
+          modality: chunk.modality,
+          mimeType: chunk.mimeType ?? 'application/octet-stream',
+        });
+        continue;
+      }
       // Normalized, because `asset_chunks.text` is stored raw while its
       // `content_hash` is `embeddingContentHash(text)` — which hashes the
       // NORMALIZED form. Embedding the raw text would put a vector under a
@@ -840,7 +903,9 @@ export class EmbeddingQueueService {
       // '' and is dropped by the caller instead of burning an inference slot.
       // The other two producers already hash and resolve through the same
       // function, so this is the only asymmetric path.
-      resolved.set(chunk.contentHash, normalizeEmbeddingText(chunk.text));
+      resolved.set(chunk.contentHash, {
+        text: normalizeEmbeddingText(chunk.text),
+      });
     }
 
     const pendingFindings = outstanding();
@@ -857,14 +922,13 @@ export class EmbeddingQueueService {
       });
       for (const finding of findings) {
         if (!finding.embedContentHash) continue;
-        resolved.set(
-          finding.embedContentHash,
-          normalizeEmbeddingText(
+        resolved.set(finding.embedContentHash, {
+          text: normalizeEmbeddingText(
             finding.contextBefore,
             finding.matchedContent,
             finding.contextAfter,
           ),
-        );
+        });
       }
     }
 
@@ -881,14 +945,41 @@ export class EmbeddingQueueService {
       });
       for (const term of terms) {
         if (!term.embedContentHash) continue;
-        resolved.set(
-          term.embedContentHash,
-          normalizeEmbeddingText(term.term, ...term.aliases, term.notes),
-        );
+        resolved.set(term.embedContentHash, {
+          text: normalizeEmbeddingText(term.term, ...term.aliases, term.notes),
+        });
       }
     }
 
     return resolved;
+  }
+
+  /** The stored bytes of a few media chunks, ready to hand to the model. */
+  private async mediaItems(hashes: string[]): Promise<
+    Array<{
+      hash: string;
+      modality: MediaModality;
+      mimeType: string;
+      data: Buffer;
+    }>
+  > {
+    const rows = await this.prisma.assetChunk.findMany({
+      where: { contentHash: { in: hashes }, modality: { not: 'text' } },
+      select: { contentHash: true, modality: true, mimeType: true, data: true },
+      distinct: ['contentHash'],
+    });
+    return rows.flatMap((row) =>
+      row.data && isMediaModality(row.modality)
+        ? [
+            {
+              hash: row.contentHash,
+              modality: row.modality,
+              mimeType: row.mimeType ?? 'application/octet-stream',
+              data: Buffer.from(row.data),
+            },
+          ]
+        : [],
+    );
   }
 
   private async handle(jobs: Job<EmbeddingJob>[]): Promise<void> {
@@ -923,26 +1014,41 @@ export class EmbeddingQueueService {
     if (!outstanding.length) return;
 
     const lookups = outstanding.filter((hash) => !inline.has(hash));
-    const fetched = await this.resolveTexts(lookups);
+    const fetched = await this.resolveContents(lookups);
+    const cfg = this.cfg;
     const work: QueuedContent[] = [];
+    const media: string[] = [];
     for (const hash of outstanding) {
-      const text = inline.get(hash) ?? fetched.get(hash);
-      if (text) work.push({ hash, text });
+      const inlineText = inline.get(hash);
+      const content = fetched.get(hash);
+      if (inlineText) {
+        work.push({ hash, text: inlineText });
+      } else if (content && 'text' in content) {
+        if (content.text) work.push({ hash, text: content.text });
+      } else if (content && cfg.mediaModalities.includes(content.modality)) {
+        // A modality the workspace no longer embeds (or the model cannot) is
+        // left alone: turning it off removes its chunks, and a job queued just
+        // before that must not put a vector back.
+        media.push(hash);
+      }
     }
-    if (!work.length) return;
+    if (!work.length && !media.length) return;
 
     try {
-      const vectors = await this.provider.embedMany(
-        work.map((content) => content.text),
-        this.cfg,
-      );
-      await this.embeddings.putVectors({
-        spaceId: rt.spaceId as string,
-        items: work.map((content, index) => ({
-          contentHash: content.hash,
-          vector: vectors[index],
-        })),
-      });
+      if (work.length) {
+        const vectors = await this.provider.embedMany(
+          work.map((content) => content.text),
+          cfg,
+        );
+        await this.embeddings.putVectors({
+          spaceId: rt.spaceId as string,
+          items: work.map((content, index) => ({
+            contentHash: content.hash,
+            vector: vectors[index],
+          })),
+        });
+      }
+      await this.embedMedia(rt, media);
       rt.lastEmbedSuccessAt = new Date().toISOString();
     } catch (error) {
       rt.embedJobFailureCount += 1;
@@ -960,6 +1066,47 @@ export class EmbeddingQueueService {
       throw error;
     }
     void this.scheduleRecalibration();
+  }
+
+  /**
+   * Embeds media a few items at a time, storing each step before the next.
+   *
+   * Stored as it goes so that a failure or a retry repeats one step, not the
+   * fetch; and bounded by the clock, because how long a picture takes is the
+   * model's and the hardware's to decide, not this queue's. What is left when
+   * the budget runs out goes back on the queue.
+   */
+  private async embedMedia(
+    rt: EmbeddingRuntime,
+    hashes: string[],
+  ): Promise<void> {
+    if (!hashes.length) return;
+    const deadline = Date.now() + MEDIA_HANDLER_BUDGET_MS;
+    for (let offset = 0; offset < hashes.length; offset += MEDIA_STEP_SIZE) {
+      if (offset > 0 && (Date.now() > deadline || (await this.halted(rt)))) {
+        const rest = hashes.slice(offset);
+        await this.persist(
+          rest.map((hash) => ({ hash, text: '', media: true })),
+          { requeue: true },
+        );
+        this.logger.log(
+          `Handed ${rest.length} media item(s) back to the queue for space ${rt.spaceId}`,
+        );
+        return;
+      }
+      const items = await this.mediaItems(
+        hashes.slice(offset, offset + MEDIA_STEP_SIZE),
+      );
+      if (!items.length) continue;
+      const vectors = await this.provider.embedMedia(items, this.cfg);
+      await this.embeddings.putVectors({
+        spaceId: rt.spaceId as string,
+        items: items.map((item, index) => ({
+          contentHash: item.hash,
+          vector: vectors[index],
+        })),
+      });
+    }
   }
 
   private scheduleRecovery(): void {
@@ -1108,15 +1255,21 @@ export class EmbeddingQueueService {
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         orderBy: { id: 'asc' },
         take: INSERT_BATCH_SIZE,
-        select: { id: true, contentHash: true, text: true },
+        select: { id: true, contentHash: true, text: true, modality: true },
       });
       if (!chunks.length) break;
+      const embedded = this.cfg.mediaModalities;
       await this.persistMissing(
         rt,
-        chunks.map((chunk) => ({
-          hash: chunk.contentHash,
-          text: chunk.text,
-        })),
+        chunks.flatMap((chunk) => {
+          if (!isMediaModality(chunk.modality)) {
+            return [{ hash: chunk.contentHash, text: chunk.text }];
+          }
+          // Media of a kind this workspace does not embed stays unqueued.
+          return embedded.includes(chunk.modality)
+            ? [{ hash: chunk.contentHash, text: '', media: true }]
+            : [];
+        }),
       );
       cursor = chunks.at(-1)?.id;
       await new Promise((resolve) => setImmediate(resolve));

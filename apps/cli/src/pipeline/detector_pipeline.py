@@ -29,6 +29,8 @@ from ..utils.file_parser import TextExtractionCoverageError, resolve_mime_type
 from ..utils.redaction import Redactor, redact_generic, short_id_for_log
 from .content_provider import ContentProvider
 from .detector_breaker import DetectorBreaker
+from .finding_context import attach_context
+from .media_artifact import EmbeddingPlan, prepare_media
 from .text_artifact import TextArtifact
 from .worker_pool import DetectorWorkerPool, is_io_bound_detector
 
@@ -151,11 +153,59 @@ class DetectorPipeline:
         # disabled here is disabled for this run and nothing longer.
         self._breaker = DetectorBreaker()
         self._text_artifacts: dict[str, TextArtifact] = {}
+        # What the workspace wants embedded besides text. Empty until the run
+        # asks the API, and empty for good on a text-only embedding model.
+        self._embedding_plan = EmbeddingPlan()
         self._text_extraction_errors: dict[str, list[str]] = {}
         self._text_extraction_statuses: dict[str, TextExtractionStatus] = {}
 
     def take_text_artifact(self, asset_hash: str) -> TextArtifact | None:
         return self._text_artifacts.pop(asset_hash, None)
+
+    def set_embedding_plan(self, plan: EmbeddingPlan) -> None:
+        """Say which media, if any, this run prepares for embedding."""
+        self._embedding_plan = plan
+
+    async def _collect_media(self, asset: SingleAssetScanResults, artifact: TextArtifact) -> None:
+        """Attach the asset's own picture or recording, prepared for embedding.
+
+        Only for an asset that IS a picture or a recording, and only when the
+        workspace's model embeds that kind of content. Best-effort throughout:
+        media adds a way to find the asset, and failing to prepare it leaves
+        the asset exactly as findable as it was before this existed.
+        """
+        spec = self._embedding_plan.spec_for(asset.asset_type)
+        if spec is None:
+            return
+        for candidate in (asset.external_url, asset.hash):
+            asset_id = str(candidate or "").strip()
+            if not asset_id:
+                continue
+            try:
+                fetched = await self.content_provider.fetch_bytes(asset_id)
+            except Exception as exc:
+                logger.warning(
+                    "Could not read %s to prepare its %s for embedding: %s",
+                    asset.name,
+                    spec.modality,
+                    redact_generic(self._redactor.redact(str(exc))),
+                )
+                return
+            if not fetched or not fetched[0]:
+                continue
+            # Decoding and re-encoding is CPU work; keep it off the event loop
+            # the rest of the scan is running on.
+            items = await asyncio.to_thread(prepare_media, fetched[0], spec)
+            for mime_type, data in items:
+                artifact.add_media(spec.modality, mime_type, data)
+            if items:
+                logger.info(
+                    "Prepared %d %s item(s) of %s for embedding",
+                    len(items),
+                    spec.modality,
+                    asset.name,
+                )
+            return
 
     def _register_detector_info(self, detector: BaseDetector, info: _DetectorInfo) -> None:
         self._detector_info[id(detector)] = info
@@ -400,6 +450,9 @@ class DetectorPipeline:
         findings.extend(code_findings)
         scan_warnings.extend(code_warnings)
         detector_types_run = self._merge_detector_types(detector_types_run, code_types_run)
+
+        if not records_only:
+            await self._collect_media(asset, artifact)
 
         scan_duration = int((datetime.now(UTC) - scan_started).total_seconds() * 1000)
 
@@ -1011,6 +1064,8 @@ class DetectorPipeline:
                             }
                         )
                         detector_findings.append(finding_with_meta)
+            if isinstance(content, str):
+                detector_findings = attach_context(detector_findings, content)
 
             tripped = self._breaker.record(
                 breaker_key,

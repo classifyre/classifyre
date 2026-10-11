@@ -472,6 +472,14 @@ model EmbeddingSettings {
   device            String?
   autoBackfill      Boolean? @map("auto_backfill")
 
+  // ── Content ───────────────────────────────────────────────────────────────
+  // What is embedded besides text, when the model can do it. Not part of the
+  // space: a picture's vector lives in the same coordinate system as the text
+  // around it, so turning these on adds vectors and turning them off removes
+  // them, and nothing already stored changes meaning.
+  embedImages Boolean? @map("embed_images")
+  embedAudio  Boolean? @map("embed_audio")
+
   // ── Index tuning ──────────────────────────────────────────────────────────
   // m and efConstruction are baked into an HNSW index at build time, so
   // changing them only takes effect for indexes built afterwards.
@@ -547,6 +555,10 @@ model ContentEmbedding {
   @@map("content_embeddings")
 }
 
+/// A piece of an asset that is embedded: a passage of its text, or a picture
+/// or sound clip taken from it. Media rows keep the prepared bytes (a
+/// downscaled JPEG, a 16 kHz WAV clip) because that copy is what a rebuild
+/// re-embeds from — the scan that produced it will not send it again.
 model AssetChunk {
   id          String   @id @default(uuid())
   assetId     String   @map("asset_id")
@@ -556,6 +568,11 @@ model AssetChunk {
   charOffset  Int      @map("char_offset")
   charLength  Int      @map("char_length")
   text        String   @db.Text
+  /// "text", "image" or "audio". Text rows carry `text`; the others `data`.
+  modality    String   @default("text")
+  mimeType    String?  @map("mime_type")
+  /// Never selected by a list query: select it by hash, a few rows at a time.
+  data        Bytes?
   contentHash String   @map("content_hash") @db.VarChar(64)
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -1133,6 +1150,12 @@ model AiProviderConfig {
   // rebuilds the corpus; the query prefix only shapes the next search.
   embeddingDocumentPrefix String?       @map("embedding_document_prefix")
   embeddingQueryPrefix    String?       @map("embedding_query_prefix")
+  // What this embedding model takes besides text ("image", "audio"), in the
+  // same vector space, and how the endpoint wants it sent ("llama-cpp" or
+  // "gemini"). Text has one request shape everybody shares; media has one per
+  // server, so it is named. Empty and null for a text-only model.
+  embeddingModalities     String[]      @default([]) @map("embedding_modalities")
+  embeddingMediaFormat    String?       @map("embedding_media_format")
   // Optional pricing in USD per 1M tokens — enables cost estimates on
   // autopilot runs and the harness usage charts. Null = unknown/not billed.
   inputCostPerMTok       Decimal?       @map("input_cost_per_mtok") @db.Decimal(10, 4)

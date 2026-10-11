@@ -338,6 +338,158 @@ describe('EmbeddingSettingsService', () => {
     ).toEqual(['documentPrefix']);
   });
 
+  describe('pictures and sound', () => {
+    const gemma = 'onnx-community/embeddinggemma-2-ONNX';
+
+    // The author's repository holds PyTorch weights this runtime cannot load;
+    // what is stored has to be what will be fetched.
+    it("stores the loadable repository when given the author's name for it", async () => {
+      const service = build();
+
+      await service.update({ model: 'google/embeddinggemma-2' });
+
+      expect(stored?.model).toBe(gemma);
+      expect((await service.resolve()).model).toBe(gemma);
+    });
+
+    // Width is a fact about the model, and the revision pinned for MiniLM
+    // names a commit this repository does not have.
+    it('fills in the width and revision of a model it knows', async () => {
+      const service = build();
+
+      await service.update({ model: 'google/embeddinggemma-2' });
+
+      const resolved = await service.resolve();
+      expect(resolved.dimensions).toBe(768);
+      expect(resolved.revision).toBe('main');
+    });
+
+    // Pooling is part of the model, like its width: a first-token or
+    // last-token model averaged instead answers with a worse vector and no
+    // error to explain it.
+    it('reads a model it knows with the pooling it was trained with', async () => {
+      stored = { id: 1, model: 'onnx-community/Qwen3-Embedding-0.6B-ONNX' };
+      expect((await build().resolve()).pooling).toBe('last_token');
+
+      stored = { id: 1, model: 'onnx-community/bge-m3-ONNX' };
+      expect((await build().resolve()).pooling).toBe('cls');
+    });
+
+    it('leaves a pooling the caller stated alone', async () => {
+      stored = {
+        id: 1,
+        model: 'onnx-community/bge-m3-ONNX',
+        pooling: 'mean',
+      };
+
+      expect((await build().resolve()).pooling).toBe('mean');
+    });
+
+    it('leaves a width the caller stated alone', async () => {
+      const service = build();
+
+      await service.update({ model: gemma, dimensions: 256 });
+
+      expect((await service.resolve()).dimensions).toBe(256);
+    });
+
+    // "Use default" on the width means the deployment's width, which is the
+    // deployment model's. Resetting it must not hand a 768-number model the
+    // 384 of MiniLM, nor MiniLM's pinned commit.
+    it('follows the model when width and revision are reset to default', async () => {
+      const service = build();
+
+      await service.update({ model: gemma, dimensions: null, revision: null });
+
+      const resolved = await service.resolve();
+      expect(resolved.dimensions).toBe(768);
+      expect(resolved.revision).toBe('main');
+    });
+
+    it('points an unlisted model at the head of its own repository', async () => {
+      const service = build();
+      const defaults = service.deploymentDefaults();
+
+      await service.update({ model: 'acme/custom-model' });
+
+      const resolved = await service.resolve();
+      expect(resolved.revision).toBe('main');
+      // Its width is not known, so the stated default stands.
+      expect(resolved.dimensions).toBe(defaults.dimensions);
+    });
+
+    it('keeps the pinned revision for the deployment model itself', async () => {
+      const service = build();
+      const defaults = service.deploymentDefaults();
+
+      await service.update({ model: defaults.model });
+
+      expect((await service.resolve()).revision).toBe(defaults.revision);
+    });
+
+    it('starts embedding pictures when the model can see', async () => {
+      const service = build();
+
+      const result = await service.update({ model: gemma });
+
+      expect((await service.resolve()).mediaModalities).toEqual(['image']);
+      expect(result.changedFields).toEqual(
+        expect.arrayContaining(['model', 'mediaModalities']),
+      );
+      // Worked out from the model, not set: reporting them would only repeat
+      // "the model changed" in words nobody chose.
+      expect(result.changedFields).not.toContain('supportedMedia');
+      expect(result.changedFields).not.toContain('localFamily');
+    });
+
+    // Same model, same space: the text vectors mean what they meant.
+    it('turns pictures off and sound on without a rebuild', async () => {
+      stored = { id: 1, model: gemma, dimensions: 768, revision: 'main' };
+      const service = build();
+
+      const off = await service.update({ embedImages: false });
+      expect(off.requiresRebuild).toBe(false);
+      expect(off.changedFields).toContain('mediaModalities');
+      expect((await service.resolve()).mediaModalities).toEqual([]);
+
+      const audio = await service.update({ embedAudio: true });
+      expect(audio.requiresRebuild).toBe(false);
+      expect((await service.resolve()).mediaModalities).toEqual(['audio']);
+    });
+
+    it('reports no change when nothing about the media changed', async () => {
+      stored = { id: 1, model: gemma, dimensions: 768, revision: 'main' };
+      const service = build();
+
+      const result = await service.update({ batchSize: 8 });
+
+      expect(result.changedFields).toEqual(['batchSize']);
+    });
+
+    it('takes what a remote model embeds from its provider', async () => {
+      aiProviders.getRuntimeConfig.mockResolvedValue({
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        apiKey: 'key',
+        model: 'gemini-embedding-2',
+        embeddingDimensions: 768,
+        embeddingModalities: ['image', 'audio'],
+        embeddingMediaFormat: 'gemini',
+      });
+      stored = {
+        id: 1,
+        provider: 'openai-compatible',
+        aiProviderConfigId: 'provider-1',
+        embedAudio: true,
+      };
+
+      const resolved = await build().resolve();
+
+      expect(resolved.supportedMedia).toEqual(['image', 'audio']);
+      expect(resolved.mediaModalities).toEqual(['image', 'audio']);
+      expect(resolved.mediaFormat).toBe('gemini');
+    });
+  });
+
   it('never reports the API key as a changed field', async () => {
     aiProviders.getRuntimeConfig.mockResolvedValue({
       baseUrl: 'https://api.example.com/v1',

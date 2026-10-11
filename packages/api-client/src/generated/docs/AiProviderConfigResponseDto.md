@@ -20,6 +20,8 @@ Name | Type
 `embeddingPooling` | string
 `embeddingDocumentPrefix` | string
 `embeddingQueryPrefix` | string
+`embeddingModalities` | Array&lt;string&gt;
+`embeddingMediaFormat` | string
 `inputCostPerMTok` | number
 `outputCostPerMTok` | number
 `cachedInputCostPerMTok` | number
@@ -47,6 +49,8 @@ const example = {
   "embeddingPooling": mean,
   "embeddingDocumentPrefix": title: none | text: ,
   "embeddingQueryPrefix": task: search result | query: ,
+  "embeddingModalities": ["image"],
+  "embeddingMediaFormat": gemini,
   "inputCostPerMTok": 3,
   "outputCostPerMTok": 15,
   "cachedInputCostPerMTok": 0.3,
