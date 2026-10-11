@@ -15,8 +15,8 @@ from src.detectors.custom.runners._llm import (
     LLMCompletionError,
     LLMProviderRefusedError,
     LLMRunner,
-    _quota_markers,
 )
+from src.detectors.custom.runners._provider_call import _quota_markers
 from src.detectors.errors import ProviderRefusedError
 from src.models.generated_detectors import (
     DetectorBudget,
@@ -182,7 +182,7 @@ class _AuthError(Exception):
 def test_provider_error_raises_instead_of_empty_result(monkeypatch) -> None:
     # A dead provider must surface as an error the pipeline records, never as
     # a silent zero-findings result indistinguishable from a clean scan.
-    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    monkeypatch.setattr("src.detectors.custom.runners._provider_call.time.sleep", lambda _s: None)
     completion = MagicMock(side_effect=_RateLimitError("rate limited"))
     runner = _runner(_schema(), completion)
     with pytest.raises(LLMCompletionError, match="sentiment"):
@@ -191,7 +191,7 @@ def test_provider_error_raises_instead_of_empty_result(monkeypatch) -> None:
 
 def test_transient_provider_error_retries_then_succeeds(monkeypatch) -> None:
     sleeps: list[float] = []
-    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", sleeps.append)
+    monkeypatch.setattr("src.detectors.custom.runners._provider_call.time.sleep", sleeps.append)
     good = _mock_completion({"labels": [{"name": "bad", "confidence": 0.9}]})
     completion = MagicMock(
         side_effect=[_RateLimitError("429"), _RateLimitError("503"), good.return_value]
@@ -207,7 +207,7 @@ def test_transient_provider_error_retries_then_succeeds(monkeypatch) -> None:
 
 
 def test_non_retryable_provider_error_fails_fast(monkeypatch) -> None:
-    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    monkeypatch.setattr("src.detectors.custom.runners._provider_call.time.sleep", lambda _s: None)
     completion = MagicMock(side_effect=_AuthError("bad key"))
     runner = _runner(_schema(), completion)
     with pytest.raises(LLMCompletionError):
@@ -246,7 +246,7 @@ def test_shared_marker_list_is_the_one_in_use() -> None:
 
 def test_daily_quota_refusal_is_not_retried(monkeypatch) -> None:
     sleeps: list[float] = []
-    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", sleeps.append)
+    monkeypatch.setattr("src.detectors.custom.runners._provider_call.time.sleep", sleeps.append)
     completion = MagicMock(side_effect=_RateLimitError(OPENROUTER_DAILY_QUOTA))
     runner = _runner(_schema(), completion)
 
@@ -258,7 +258,7 @@ def test_daily_quota_refusal_is_not_retried(monkeypatch) -> None:
 
 
 def test_auth_refusal_is_a_provider_refusal(monkeypatch) -> None:
-    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    monkeypatch.setattr("src.detectors.custom.runners._provider_call.time.sleep", lambda _s: None)
     completion = MagicMock(side_effect=_AuthError("invalid api key"))
     runner = _runner(_schema(), completion)
 
@@ -272,7 +272,7 @@ def test_auth_refusal_is_a_provider_refusal(monkeypatch) -> None:
 
 def test_plain_rate_limit_without_quota_wording_is_still_retried(monkeypatch) -> None:
     sleeps: list[float] = []
-    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", sleeps.append)
+    monkeypatch.setattr("src.detectors.custom.runners._provider_call.time.sleep", sleeps.append)
     good = _mock_completion({"labels": [{"name": "bad", "confidence": 0.9}]})
     completion = MagicMock(
         side_effect=[_RateLimitError("429 Too Many Requests, slow down"), good.return_value]
@@ -285,7 +285,7 @@ def test_plain_rate_limit_without_quota_wording_is_still_retried(monkeypatch) ->
 
 
 def test_budget_max_attempts_overrides_the_environment(monkeypatch) -> None:
-    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    monkeypatch.setattr("src.detectors.custom.runners._provider_call.time.sleep", lambda _s: None)
     monkeypatch.setenv("CLASSIFYRE_LLM_MAX_ATTEMPTS", "4")
     completion = MagicMock(side_effect=_RateLimitError("429 slow down"))
     runner = _runner(_schema(budget=DetectorBudget(max_attempts=1)), completion)
@@ -306,7 +306,7 @@ def test_provider_sdk_retries_are_disabled_so_this_loop_is_the_only_one() -> Non
 
 
 def test_attempts_env_is_read_per_call_not_at_import(monkeypatch) -> None:
-    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    monkeypatch.setattr("src.detectors.custom.runners._provider_call.time.sleep", lambda _s: None)
     monkeypatch.setenv("CLASSIFYRE_LLM_MAX_ATTEMPTS", "2")
     completion = MagicMock(side_effect=_RateLimitError("429 slow down"))
     runner = _runner(_schema(), completion)
@@ -463,7 +463,7 @@ def test_exhaustion_wording_is_a_refusal_not_a_retry(
     monkeypatch, body: str, status: int, reason: str
 ) -> None:
     sleeps: list[float] = []
-    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", sleeps.append)
+    monkeypatch.setattr("src.detectors.custom.runners._provider_call.time.sleep", sleeps.append)
     completion = MagicMock(side_effect=_status_error(status, body))
     runner = _runner(_schema(), completion)
 
@@ -479,7 +479,7 @@ def test_unknown_4xx_is_final_but_not_a_refusal(monkeypatch) -> None:
     # A Gemini safety block answers 400 for this input: retrying the same call
     # cannot help, but it is not a quota/billing refusal either — one attempt,
     # then the breaker (not backoff) owns the decision.
-    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    monkeypatch.setattr("src.detectors.custom.runners._provider_call.time.sleep", lambda _s: None)
     completion = MagicMock(
         side_effect=_status_error(
             400, "400 GenerateContent blocked for SAFETY reasons on this input"
@@ -495,7 +495,7 @@ def test_unknown_4xx_is_final_but_not_a_refusal(monkeypatch) -> None:
 
 
 def test_billing_exhaustion_match_is_anchored() -> None:
-    from src.detectors.custom.runners._llm import _billing_exhaustion_match
+    from src.detectors.custom.runners._provider_call import _billing_exhaustion_match
 
     assert (
         _billing_exhaustion_match("error: insufficient_credit, balance empty")

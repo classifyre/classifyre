@@ -1,6 +1,6 @@
 {
   "name": "@workspace/schemas",
-  "version": "0.6.9",
+  "version": "0.6.10",
   "private": true,
   "type": "module",
   "exports": {
@@ -27,7 +27,7 @@
     "src"
   ],
   "dependencies": {
-    "zod": "^4.3.6"
+    "zod": "4.5.4"
   },
   "scripts": {
     "validate-examples": "uv run python scripts/validate_examples.py",

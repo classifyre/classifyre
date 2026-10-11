@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Logger,
   NotFoundException,
   Optional,
   UseGuards,
@@ -24,6 +25,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
+import { AssetType } from '@prisma/client';
 import { PgStreamService } from '../export/pg-stream.service';
 import { ExportQueryService } from '../export/export-query.service';
 import { LiveQueryService } from '../export/live-query.service';
@@ -345,6 +347,8 @@ export class SearchAssetsController {
 @Controller('sources/:sourceId/assets')
 @ApiTags('Sources', 'Assets')
 export class SourceAssetsController {
+  private readonly logger = new Logger(SourceAssetsController.name);
+
   constructor(
     private readonly assetService: AssetService,
     private readonly sourceService: SourceService,
@@ -542,6 +546,7 @@ export class SourceAssetsController {
       relationshipErrors,
       partialCoverage,
       cohortStats,
+      detectorsDegraded,
     } = finalizeDto;
     if (!runnerId) {
       throw new BadRequestException('runnerId is required');
@@ -578,9 +583,62 @@ export class SourceAssetsController {
     const scannedAssetsComplete = samplingStrategy === 'ALL';
     const isFullScan = scannedAssetsComplete && partialCoverage !== true;
 
+    // A detector the breaker disabled mid-run never evaluated the assets it
+    // skipped, but the sweep keeps advancing anyway: dropping the cursor on
+    // every degraded run would pin it to its first window for as long as the
+    // detector stays refused, and every other detector on the source would
+    // stall with it. Instead the degraded keys are remembered on the source,
+    // and the first later run that completes with none of them degraded drops
+    // the cursor once — the run after that restarts the sweep while the scan
+    // cache (which never banks an errored detector) retries exactly the
+    // skipped work. A notebook source keeps its own state in the cursor and
+    // decides for itself, so its cursor is never dropped here.
+    const degraded =
+      detectorsDegraded?.filter(
+        (key): key is string => typeof key === 'string' && key.length > 0,
+      ) ?? [];
+    const rawRemembered = (source as { degradedDetectors?: unknown })
+      .degradedDetectors;
+    const previouslyDegraded = Array.isArray(rawRemembered)
+      ? rawRemembered.filter(
+          (key): key is string => typeof key === 'string' && key.length > 0,
+        )
+      : [];
+    // The cursor is dropped at most once per degraded episode, on the first
+    // clean run — never on a degraded run, which must keep advancing.
+    let dropCursorForRetry = false;
+    if (degraded.length > 0) {
+      const next = [...new Set([...previouslyDegraded, ...degraded])];
+      await this.sourceService.updateDegradedDetectors(sourceId, next);
+      this.logger.warn(
+        `Run ${runnerId} ended with ${degraded.length} detector(s) disabled ` +
+          `mid-run (${degraded.join(', ')}); the sweep keeps advancing and ` +
+          `the skipped assets are retried once these detectors work again.`,
+      );
+    } else if (previouslyDegraded.length > 0) {
+      await this.sourceService.updateDegradedDetectors(sourceId, null);
+      if (source.type !== AssetType.CUSTOM) {
+        dropCursorForRetry = true;
+        await this.sourceService.updateSamplingCursor(sourceId, undefined);
+        this.logger.warn(
+          `Run ${runnerId} completed with previously degraded detector(s) ` +
+            `healthy (${previouslyDegraded.join(', ')}); the sampling cursor ` +
+            `was dropped and the next run restarts the sweep so the skipped ` +
+            `assets are retried.`,
+        );
+      } else {
+        this.logger.warn(
+          `Run ${runnerId} completed with previously degraded detector(s) ` +
+            `healthy (${previouslyDegraded.join(', ')}); the notebook source ` +
+            `keeps its own cursor, so the skipped assets are retried only if ` +
+            `it re-yields them.`,
+        );
+      }
+    }
     // Persist the AUTOMATIC sampling cursor so the next run resumes where this
-    // one stopped. Sent only by AUTOMATIC runs; left untouched otherwise.
-    if (samplingCursor !== undefined) {
+    // one stopped. Sent only by AUTOMATIC runs; left untouched otherwise — and
+    // never on the one clean run that just dropped it above.
+    if (samplingCursor !== undefined && !dropCursorForRetry) {
       await this.sourceService.updateSamplingCursor(sourceId, samplingCursor);
       // Snapshot it on the run too. The source row holds only the latest value
       // and is overwritten in place, so without a per-run copy there is no way

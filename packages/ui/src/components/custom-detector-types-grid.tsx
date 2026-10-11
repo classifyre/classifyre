@@ -6,6 +6,7 @@ import {
   Brain,
   Code2,
   Image,
+  Scale,
   ScanSearch,
   Tag,
   ArrowRight,
@@ -20,6 +21,7 @@ type DetectorKind =
   | "gliner2"
   | "regex"
   | "llm"
+  | "decision"
   | "text_classification"
   | "image_classification"
   | "object_detection"
@@ -33,6 +35,7 @@ const DETECTOR_ICONS: Record<
   gliner2: Layers,
   regex: Regex,
   llm: Bot,
+  decision: Scale,
   text_classification: Brain,
   image_classification: Image,
   object_detection: ScanSearch,
@@ -73,6 +76,14 @@ const DETECTOR_DATA: Record<
       "Use a large language model with a natural-language prompt to classify content and extract structured fields. Best for nuanced, context-dependent detection where examples and rules are hard to define explicitly.",
     tags: ["Prompt-based", "Classification", "Extraction"],
     slug: "llm",
+  },
+  decision: {
+    title: "Decision detector",
+    tagline: "Typed questions, answered with probabilities",
+    description:
+      "Ask a decision model yes/no, pick-one and scale questions about your content. It answers each with a probability instead of text, and every answer becomes a finding with your label and priority. Works with TypeSafe Jev, OpenAI Decisions, Cloudflare Clef and self-hosted System One models.",
+    tags: ["System One", "Decisions API", "Probabilities"],
+    slug: "decision",
   },
   text_classification: {
     title: "Text Classification",
@@ -116,7 +127,7 @@ const DETECTOR_DATA: Record<
   },
 };
 
-const GENERAL_KINDS: DetectorKind[] = ["gliner2", "regex", "llm"];
+const GENERAL_KINDS: DetectorKind[] = ["gliner2", "regex", "llm", "decision"];
 const TRANSFORMER_KINDS: DetectorKind[] = [
   "text_classification",
   "image_classification",
@@ -250,7 +261,7 @@ export function CustomDetectorTypesGrid({
   return (
     <div className="space-y-6">
       {/* General group */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         {GENERAL_KINDS.map((kind) => (
           <DetectorMethodCard
             key={kind}

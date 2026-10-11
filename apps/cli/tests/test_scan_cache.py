@@ -237,6 +237,36 @@ def test_rotating_a_code_detector_secret_does_not_invalidate_the_cache() -> None
     )
 
 
+def test_decision_detector_cache_follows_the_questions_not_the_key() -> None:
+    """Rotating a decision detector's API key re-runs nothing; a new model or
+    a reworded question re-runs that detector."""
+    shape: dict[str, Any] = {}
+
+    def config(**overrides: Any) -> dict[str, Any]:
+        schema: dict[str, Any] = {
+            "type": "DECISION",
+            "model": "typesafe/jev-latest",
+            "secrets": {"api_key": "old-key"},
+            "questions": [
+                {"name": "refund", "type": "yes_no", "instructions": "Is a refund asked for?"}
+            ],
+        }
+        schema.update(overrides)
+        return {"custom_detector_key": "ticket_triage", "pipeline_schema": schema}
+
+    base = detector_fingerprint("CUSTOM", config(), shape)
+
+    assert base == detector_fingerprint("CUSTOM", config(secrets={"api_key": "new-key"}), shape)
+    assert base != detector_fingerprint("CUSTOM", config(model="cloudflare/clef"), shape)
+    assert base != detector_fingerprint(
+        "CUSTOM",
+        config(
+            questions=[{"name": "refund", "type": "yes_no", "instructions": "Is money asked back?"}]
+        ),
+        shape,
+    )
+
+
 def test_changing_a_code_detector_variable_invalidates_the_cache() -> None:
     """Variables are author configuration: they can change what the rule reports."""
     shape: dict[str, Any] = {}

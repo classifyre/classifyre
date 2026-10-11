@@ -65,7 +65,7 @@ export interface CustomDetectorResponseDto {
      */
     pipelineSchema: { [key: string]: any; };
     /**
-     * The engine this detector runs on (TAG, REGEX, LLM, GLINER2, TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION). Lifted out of pipelineSchema so a list response can be audited as it stands: the type and severity of twenty detectors used to mean introspecting twenty opaque pipeline blobs.
+     * The engine this detector runs on (TAG, REGEX, LLM, DECISION, GLINER2, TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, CODE_DETECTOR). Lifted out of pipelineSchema so a list response can be audited as it stands: the type and severity of twenty detectors used to mean introspecting twenty opaque pipeline blobs.
      * @type {string}
      * @memberof CustomDetectorResponseDto
      */
@@ -83,7 +83,7 @@ export interface CustomDetectorResponseDto {
      */
     answerDimension: string | null;
     /**
-     * Code detectors (CODE_DETECTOR) only: names of the secrets the detector holds. Values are write-only and never returned; send `secrets` as a patch on update (a string sets a key, null deletes it, an absent key is kept).
+     * Code detectors (CODE_DETECTOR) and decision detectors (DECISION) only: names of the secrets the detector holds (a decision detector holds `api_key`). Values are write-only and never returned; send `secrets` as a patch on update (a string sets a key, null deletes it, an absent key is kept).
      * @type {Array<string>}
      * @memberof CustomDetectorResponseDto
      */

@@ -16,6 +16,7 @@ _PIPELINE_TYPE_DEFAULTS: dict[str, str] = {
     "LLMPipelineSchema": "LLM",
     "TagPipelineSchema": "TAG",
     "CodeDetectorPipelineSchema": "CODE_DETECTOR",
+    "DecisionPipelineSchema": "DECISION",
 }
 
 # Pipeline schema classes whose `severity` field has a string default from JSON schema
@@ -29,6 +30,7 @@ _SEVERITY_ENUM_DEFAULT_CLASSES = {
     "TextClassificationPipelineSchema": "info",
     "TagPipelineSchema": "medium",
     "CodeDetectorPipelineSchema": "medium",
+    "DecisionPipelineSchema": "medium",
 }
 
 

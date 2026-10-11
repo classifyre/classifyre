@@ -1489,13 +1489,13 @@
     "DetectorBudget": {
       "title": "DetectorBudget",
       "type": "object",
-      "description": "How much of a run this detector may spend failing.\n\nWithout a budget a detector keeps being called after it has stopped working: an LLM detector on a provider that refused its key retried every asset for 15-40 seconds and held the only runner slot for 10 hours a day, failing on 451 of 451 assets. Every run already disables a detector after a non-retryable provider refusal (quota, auth, billing) and after 10 consecutive failures; these fields tighten or loosen that per detector.\n\nA disabled detector records an ERROR outcome on the assets it skipped, so their existing findings are kept and the assets are retried on the next run. Changing the budget never invalidates the scan cache.",
+      "description": "How much of a run this detector may spend failing.\n\nWithout a budget a detector keeps being called after it has stopped working: an LLM detector on a provider that refused its key retried every asset for 15-40 seconds and held the only runner slot for 10 hours a day, failing on 451 of 451 assets. Every run already disables a detector after a non-retryable provider refusal (quota, auth, billing) and after 10 consecutive failures; these fields tighten or loosen that per detector.\n\nA disabled detector records an ERROR outcome on the assets it skipped, so their existing findings are kept; the sweep keeps advancing, and the skipped assets are retried once the detector works again. Changing the budget never invalidates the scan cache.",
       "properties": {
         "max_attempts": {
           "type": "integer",
           "minimum": 1,
           "maximum": 10,
-          "description": "LLM detectors only: provider calls per asset, including the first. Overrides CLASSIFYRE_LLM_MAX_ATTEMPTS. A non-retryable refusal is never retried regardless."
+          "description": "LLM and decision detectors only: provider calls per asset, including the first. Overrides CLASSIFYRE_LLM_MAX_ATTEMPTS. A non-retryable refusal is never retried regardless."
         },
         "max_consecutive_failures": {
           "type": "integer",
@@ -1829,6 +1829,164 @@
         }
       },
       "required": ["system_prompt"],
+      "additionalProperties": false
+    },
+    "DecisionQuestionType": {
+      "title": "DecisionQuestionType",
+      "type": "string",
+      "enum": ["yes_no", "choice", "score"],
+      "description": "What kind of answer a decision question asks for. yes_no returns the probability that the answer is yes (OpenAI calls it predicate, System One calls it noul). choice picks one option from a fixed list. score places the content on an ordered scale."
+    },
+    "DecisionQuestionOption": {
+      "title": "DecisionQuestionOption",
+      "type": "object",
+      "description": "One answer a choice or score question can land on.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The answer as the model sees it. It becomes the second half of the finding type: <question name>:<label>."
+        },
+        "description": {
+          "type": "string",
+          "default": "",
+          "maxLength": 2000,
+          "description": "When this answer applies. Optional, but it is what keeps two neighbouring answers apart."
+        },
+        "severity": {
+          "anyOf": [{ "$ref": "#/definitions/Severity" }, { "type": "null" }],
+          "default": null,
+          "description": "Severity of the finding when the model lands on this answer. Null uses the question's severity."
+        },
+        "report": {
+          "type": "boolean",
+          "default": true,
+          "description": "False for the expected, uninteresting answer (\"other\", \"calm\", \"no risk\"): the model may land on it and no finding is recorded."
+        }
+      },
+      "required": ["label"],
+      "additionalProperties": false
+    },
+    "DecisionQuestion": {
+      "title": "DecisionQuestion",
+      "type": "object",
+      "description": "One typed question a decision model answers about the content. The model returns a probability, never text, so the answer is cheap, fast and comparable from one run to the next.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+          "description": "Short identifier, unique within the detector. It is the finding type for a yes_no question and the first half of it (<name>:<answer>) for choice and score."
+        },
+        "type": {
+          "$ref": "#/definitions/DecisionQuestionType"
+        },
+        "instructions": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "description": "The question, in plain language. Ask about something observable in the content and ask one thing per question."
+        },
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/DecisionQuestionOption" },
+          "maxItems": 255,
+          "default": [],
+          "description": "choice: the 2 to 255 answers to pick from. score: the 2 to 10 levels of the scale, lowest first. Not used by yes_no."
+        },
+        "severity": {
+          "anyOf": [{ "$ref": "#/definitions/Severity" }, { "type": "null" }],
+          "default": null,
+          "description": "Severity of the findings this question produces. Null uses the detector's severity."
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum certainty to record a finding. yes_no compares it with the probability of yes and defaults to 0.5. choice and score compare it with the model's confidence in its answer and default to 0, which records every answer."
+        }
+      },
+      "required": ["name", "type", "instructions"],
+      "additionalProperties": false
+    },
+    "DecisionPipelineSchema": {
+      "title": "DecisionPipelineSchema",
+      "type": "object",
+      "description": "Decision detector. Sends content to a decision model (the Decisions API and System One family: TypeSafe Jev, OpenAI, Cloudflare Clef, Perplexity, OpenRouter, or a self-hosted server) with a list of typed questions. The model answers each with a probability instead of text; an answer that passes its threshold becomes a finding with your label, your severity, and the probability as its confidence. Calls go through LiteLLM, so any model LiteLLM serves on its decisions route works by its model name alone.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["DECISION"],
+          "default": "DECISION"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "LiteLLM model name: <provider>/<model>, for example typesafe/jev-latest, openai/gpt-6-luna or cloudflare/clef. The provider prefix decides which API is called."
+        },
+        "api_base": {
+          "anyOf": [
+            { "type": "string", "maxLength": 2048 },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Endpoint URL. Null uses the provider's own. Required for self-hosted servers and for Cloudflare, where it carries the account id."
+        },
+        "extra_headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "maxProperties": 20,
+          "description": "Extra HTTP headers sent with every call, for a gateway that routes or attributes requests by header. Not for credentials: headers are stored and returned in plain text."
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8192
+          },
+          "maxProperties": 8,
+          "description": "Credentials. api_key is the provider key. Write-only over the API, encrypted at rest, decrypted only into the scan process, redacted from every log. Send it as a patch: an absent key keeps what is stored, null removes it."
+        },
+        "questions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/DecisionQuestion" },
+          "minItems": 1,
+          "maxItems": 64,
+          "description": "The questions the model answers about each piece of content, all in one call."
+        },
+        "severity": {
+          "anyOf": [{ "$ref": "#/definitions/Severity" }, { "type": "null" }],
+          "default": "medium",
+          "description": "Default severity for a finding whose question and answer do not set one."
+        },
+        "content_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 8000,
+          "description": "Maximum characters of content sent to the model."
+        },
+        "scope": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorScope" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces."
+        },
+        "budget": {
+          "anyOf": [
+            { "$ref": "#/definitions/DetectorBudget" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Failure and time budget for this detector within one run. Null uses the defaults: stop after a non-retryable provider refusal or 10 consecutive failures."
+        }
+      },
+      "required": ["type", "model", "questions"],
       "additionalProperties": false
     },
     "TextClassificationPipelineSchema": {
@@ -2439,6 +2597,9 @@
         },
         {
           "$ref": "#/definitions/CodeDetectorPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/DecisionPipelineSchema"
         }
       ],
       "discriminator": {

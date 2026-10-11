@@ -1,0 +1,57 @@
+/*
+ * What a filmed case board needs on top of the board's own stylesheet.
+ */
+
+/* The board's lines as they are being drawn: React Flow gives an edge a class
+   and nothing else, so its opacity comes in tenths. */
+.film-fade-0 {
+  opacity: 0;
+}
+.film-fade-1 {
+  opacity: 0.1;
+}
+.film-fade-2 {
+  opacity: 0.2;
+}
+.film-fade-3 {
+  opacity: 0.3;
+}
+.film-fade-4 {
+  opacity: 0.4;
+}
+.film-fade-5 {
+  opacity: 0.5;
+}
+.film-fade-6 {
+  opacity: 0.6;
+}
+.film-fade-7 {
+  opacity: 0.7;
+}
+.film-fade-8 {
+  opacity: 0.8;
+}
+.film-fade-9 {
+  opacity: 0.9;
+}
+
+/* The board's own "dimmed" state eases in; a film has no time for easing it
+   did not ask for. */
+.case-board .react-flow__node,
+.case-board .react-flow__edge {
+  transition: none !important;
+}
+
+/* React Flow's credit sits in a corner of its drawing, which here is larger
+   than the picture and moves under it. film/board.tsx shows it in the corner
+   of the picture instead. */
+.case-board .react-flow__attribution {
+  display: none;
+}
+
+/* Seen from far off, the board's own level of detail drops the words along
+   its lines. The film's board is always drawn at life size, so it says when
+   the camera is far. */
+.film-far .cb-edge-text {
+  display: none;
+}

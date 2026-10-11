@@ -8,6 +8,9 @@ export const TAG_PIPELINE_TYPE = "TAG";
 /** A code detector: a Python notebook that defines detect(asset, ctx). */
 export const CODE_DETECTOR_PIPELINE_TYPE = "CODE_DETECTOR";
 
+/** A decision detector: typed questions a decision model answers with probabilities. */
+export const DECISION_PIPELINE_TYPE = "DECISION";
+
 /** Whether a detector row is a Tag placeholder rather than a real engine. */
 export function isTagDetector(detector: unknown): boolean {
   const schema = (detector as { pipelineSchema?: { type?: unknown } } | null)
@@ -30,7 +33,8 @@ export type PipelineSubtype =
   | "IMAGE_CLASSIFICATION"
   | "OBJECT_DETECTION"
   | "TAG"
-  | "CODE_DETECTOR";
+  | "CODE_DETECTOR"
+  | "DECISION";
 
 export type DetectorMethod = "RULESET" | "CLASSIFIER" | "ENTITY";
 
@@ -123,6 +127,7 @@ export function detectorTypeIconName(
   if (normalizedPipeline === "REGEX") return "Regex";
   if (normalizedPipeline === "GLINER2") return "Layers";
   if (normalizedPipeline === "LLM") return "Bot";
+  if (normalizedPipeline === DECISION_PIPELINE_TYPE) return "Scale";
   if (normalizedPipeline === "TEXT_CLASSIFICATION") return "Brain";
   if (normalizedPipeline === "IMAGE_CLASSIFICATION") return "Image";
   if (normalizedPipeline === "OBJECT_DETECTION") return "ScanSearch";

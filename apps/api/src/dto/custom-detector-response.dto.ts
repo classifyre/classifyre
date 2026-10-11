@@ -20,8 +20,9 @@ export class CustomDetectorResponseDto {
   @ApiProperty({
     nullable: true,
     description:
-      'The engine this detector runs on (TAG, REGEX, LLM, GLINER2, ' +
-      'TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION). Lifted out ' +
+      'The engine this detector runs on (TAG, REGEX, LLM, DECISION, GLINER2, ' +
+      'TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, ' +
+      'CODE_DETECTOR). Lifted out ' +
       'of pipelineSchema so a list response can be audited as it stands: the ' +
       'type and severity of twenty detectors used to mean introspecting twenty ' +
       'opaque pipeline blobs.',
@@ -50,8 +51,9 @@ export class CustomDetectorResponseDto {
   @ApiPropertyOptional({
     type: [String],
     description:
-      'Code detectors (CODE_DETECTOR) only: names of the secrets the detector ' +
-      'holds. Values are write-only and never returned; send `secrets` as a ' +
+      'Code detectors (CODE_DETECTOR) and decision detectors (DECISION) only: ' +
+      'names of the secrets the detector holds (a decision detector holds ' +
+      '`api_key`). Values are write-only and never returned; send `secrets` as a ' +
       'patch on update (a string sets a key, null deletes it, an absent key is kept).',
   })
   secretKeys?: string[];

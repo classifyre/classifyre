@@ -1020,6 +1020,160 @@
       }
     },
     {
+      "name": "Support Ticket Triage (decision)",
+      "description": "Ask a decision model three typed questions about every ticket: is a refund being asked for, how urgent is it, and how frustrated is the customer. Each answer comes back as a probability and becomes a finding with its own severity.",
+      "config": {
+        "custom_detector_key": "ticket_triage_decision",
+        "name": "Support Ticket Triage (decision)",
+        "description": "Refund intent, urgency and frustration, judged by a decision model",
+        "pipeline_schema": {
+          "type": "DECISION",
+          "model": "typesafe/jev-latest",
+          "severity": "medium",
+          "questions": [
+            {
+              "name": "refund_request",
+              "type": "yes_no",
+              "instructions": "Is the customer asking for money back, a refund or a chargeback?",
+              "severity": "low"
+            },
+            {
+              "name": "urgency",
+              "type": "choice",
+              "instructions": "How soon does this ticket need a reply?",
+              "options": [
+                {
+                  "label": "routine",
+                  "description": "No deadline is mentioned and nothing is blocked",
+                  "report": false
+                },
+                {
+                  "label": "this_week",
+                  "description": "A deadline within days is mentioned",
+                  "severity": "medium"
+                },
+                {
+                  "label": "today",
+                  "description": "The customer is blocked now or names today as the deadline",
+                  "severity": "high"
+                }
+              ]
+            },
+            {
+              "name": "frustration",
+              "type": "score",
+              "instructions": "How frustrated is the customer?",
+              "options": [
+                {
+                  "label": "calm",
+                  "description": "Neutral or polite tone",
+                  "report": false
+                },
+                {
+                  "label": "annoyed",
+                  "description": "Complains, repeats the request or mentions earlier attempts",
+                  "severity": "low"
+                },
+                {
+                  "label": "angry",
+                  "description": "Hostile language, threats to leave or to escalate",
+                  "severity": "high"
+                }
+              ]
+            }
+          ],
+          "content_limit": 8000
+        }
+      }
+    },
+    {
+      "name": "Contract Clause Screen (decision)",
+      "description": "Screen contracts for two clauses a reviewer must not miss and classify who carries the liability. Runs on Cloudflare Clef: put your account id into the API base.",
+      "config": {
+        "custom_detector_key": "contract_clause_screen",
+        "name": "Contract Clause Screen (decision)",
+        "description": "Auto-renewal, uncapped liability and liability direction",
+        "pipeline_schema": {
+          "type": "DECISION",
+          "model": "cloudflare/clef",
+          "api_base": "https://api.cloudflare.com/client/v4/accounts/YOUR_ACCOUNT_ID/ai/run",
+          "severity": "medium",
+          "questions": [
+            {
+              "name": "auto_renewal",
+              "type": "yes_no",
+              "instructions": "Does the contract renew automatically unless one party gives notice?",
+              "threshold": 0.6
+            },
+            {
+              "name": "uncapped_liability",
+              "type": "yes_no",
+              "instructions": "Does the contract leave one party's liability without any monetary cap?",
+              "severity": "high",
+              "threshold": 0.6
+            },
+            {
+              "name": "liability_bearer",
+              "type": "choice",
+              "instructions": "Which party carries most of the liability under this contract?",
+              "options": [
+                {
+                  "label": "balanced",
+                  "description": "Liability is mutual or evenly limited",
+                  "report": false
+                },
+                {
+                  "label": "supplier",
+                  "description": "The supplier or vendor carries most of it",
+                  "severity": "low"
+                },
+                {
+                  "label": "customer",
+                  "description": "The customer or buyer carries most of it",
+                  "severity": "high"
+                },
+                {
+                  "label": "unclear",
+                  "description": "The text does not say, or it is not a contract",
+                  "report": false
+                }
+              ]
+            }
+          ],
+          "content_limit": 20000,
+          "scope": {
+            "asset_kinds": [
+              "document",
+              "file"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Escalation Check (self-hosted decision model)",
+      "description": "One yes/no question answered by a decision model you host yourself. The strands_decider route calls POST <API base>/v1/systemone and needs no API key, so it fits any System One compatible server: Strands Decider, Laya, Nimble or OpenJev.",
+      "config": {
+        "custom_detector_key": "escalation_check_self_hosted",
+        "name": "Escalation Check (self-hosted decision model)",
+        "description": "Flags messages that ask for a manager or threaten legal action",
+        "pipeline_schema": {
+          "type": "DECISION",
+          "model": "strands_decider/strands-decider-2B-hobson-v19",
+          "api_base": "http://decider.internal:8080",
+          "severity": "high",
+          "questions": [
+            {
+              "name": "needs_escalation",
+              "type": "yes_no",
+              "instructions": "Does the writer ask for a manager, threaten legal action or say they will go to the press?",
+              "threshold": 0.7
+            }
+          ]
+        }
+      }
+    },
+    {
       "name": "Support Ticket Extractor",
       "description": "Extract order IDs, monetary amounts, and customer intent from support tickets using GLINER2 NER + classification.",
       "config": {

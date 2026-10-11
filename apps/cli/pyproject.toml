@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.6.9"
+version = "0.6.10"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 # Upper bound is load-bearing: onnxruntime publishes no cp315 wheels (notably
@@ -127,7 +127,11 @@ lineage = [
     "sqlglot>=25.0.0",
 ]
 llm = [
-    "litellm>=1.86.2",
+    # 1.104.2 is the first release with litellm.decisions(), which the DECISION
+    # detector calls: one SDK entry point for every Decisions API / System One
+    # provider (OpenAI, TypeSafe Jev, Cloudflare Clef, Perplexity, OpenRouter,
+    # Strands Decider and any self-hosted /v1/systemone server).
+    "litellm>=1.104.2",
     # Pure-wheel PDF renderer (permissive license, no system binaries) used to
     # rasterise PDF pages to images for vision-capable LLM detectors.
     "pypdfium2>=4.30.0",

@@ -18,6 +18,8 @@ describe("resolveDetectorKind", () => {
   it.each([
     [{ type: "REGEX" }, "regex"],
     [{ type: "LLM" }, "llm"],
+    [{ type: "DECISION" }, "decision"],
+    [{ type: "decision" }, "decision"],
     [{ type: "GLINER2" }, "gliner2"],
     [{ type: "TEXT_CLASSIFICATION" }, "transformer"],
     [{ type: "IMAGE_CLASSIFICATION" }, "transformer"],

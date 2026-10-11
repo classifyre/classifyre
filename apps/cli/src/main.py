@@ -892,16 +892,26 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     # clean run; the API reports it from the per-asset
                     # `breaker_open[...]` outcomes, and this is the log line an
                     # operator reads first.
-                    for degraded in pipeline.breaker_summary():
+                    breaker_disabled = pipeline.breaker_summary()
+                    for degraded in breaker_disabled:
                         logger.warning(
                             "Detector %s was disabled mid-run (%s): %s. %d payload(s) "
                             "attempted, %d skipped; the skipped assets keep their "
-                            "findings and are retried on the next run.",
+                            "findings and are retried once the detector works again.",
                             degraded["label"],
                             degraded["cause"],
                             _safe_text(degraded["reason"], redactor),
                             degraded["attempted_payloads"],
                             degraded["skipped_payloads"],
+                        )
+                    if breaker_disabled and hasattr(sink, "set_detectors_degraded"):
+                        # The skipped assets were never evaluated. The sweep
+                        # keeps advancing regardless; the API remembers these
+                        # keys and restarts the sweep once a run completes with
+                        # them healthy, and the scan cache retries the skipped
+                        # work then.
+                        sink.set_detectors_degraded(
+                            [degraded["detector"] for degraded in breaker_disabled]
                         )
 
                     # Persist the advanced AUTOMATIC sampling cursor (no-op for
