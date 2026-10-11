@@ -16,6 +16,30 @@ import type {
 
 const INSTANCE_SETTINGS_ID = 1;
 
+/**
+ * What a stored API key is bound to: the provider and the URL it is sent to.
+ *
+ * The key is write-only, so nobody who can edit a provider can read it. That
+ * would mean little if they could repoint the provider at a server of their
+ * own and have the next assistant/harness/LLM-detector/embedding call deliver
+ * the key there. So update() keeps a stored key only while this value is
+ * unchanged; a different provider or endpoint needs its key entered again.
+ * Mirrors decisionEndpointKey in custom-detector-decision.ts.
+ */
+export function normalizeProviderBaseUrl(
+  value: string | null | undefined,
+): string {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/\/+$/, '').toLowerCase();
+}
+
+export function providerEndpointKey(
+  provider: string,
+  baseUrl: string | null | undefined,
+): string {
+  return `${provider}|${normalizeProviderBaseUrl(baseUrl)}`;
+}
+
 function buildApiKeyPreview(plaintext: string): string {
   if (plaintext.length <= 8) {
     return '•'.repeat(plaintext.length);
@@ -126,7 +150,7 @@ export class AiProviderConfigService {
     id: string,
     dto: UpdateAiProviderConfigDto,
   ): Promise<AiProviderConfigResponseDto> {
-    await this.findOrThrow(id);
+    const existing = await this.findOrThrow(id);
 
     const data: Prisma.AiProviderConfigUpdateInput = {};
 
@@ -169,6 +193,23 @@ export class AiProviderConfigService {
     }
     if (dto.cachedInputCostPerMTok !== undefined) {
       data.cachedInputCostPerMTok = dto.cachedInputCostPerMTok;
+    }
+
+    const hasNewKey = dto.apiKey !== undefined && dto.apiKey.length > 0;
+    if (!hasNewKey && existing.apiKeyEnc) {
+      const nextProvider = dto.provider ?? existing.provider;
+      const nextBaseUrl =
+        dto.baseUrl !== undefined
+          ? dto.baseUrl.length > 0
+            ? dto.baseUrl
+            : null
+          : existing.baseUrl;
+      if (
+        providerEndpointKey(nextProvider, nextBaseUrl) !==
+        providerEndpointKey(existing.provider, existing.baseUrl)
+      ) {
+        data.apiKeyEnc = null;
+      }
     }
 
     const updated = await this.prisma.aiProviderConfig.update({

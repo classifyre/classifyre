@@ -1,5 +1,9 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { AiProviderConfigService } from './ai-provider-config.service';
+import {
+  AiProviderConfigService,
+  normalizeProviderBaseUrl,
+  providerEndpointKey,
+} from './ai-provider-config.service';
 
 function createService() {
   const prisma = {
@@ -152,5 +156,125 @@ describe('AiProviderConfigService supportsVision', () => {
     const runtime = await service.getRuntimeConfig('ai-1');
 
     expect(runtime.supportsVision).toBe(true);
+  });
+});
+
+describe('AiProviderConfigService endpoint-bound key', () => {
+  const stored: {
+    id: string;
+    name: string;
+    provider: string;
+    model: string;
+    apiKeyEnc: string | null;
+    baseUrl: string | null;
+    contextSize: null;
+    supportsVision: boolean;
+    supportsEmbedding: boolean;
+    embeddingDimensions: null;
+    embeddingPooling: null;
+    inputCostPerMTok: null;
+    outputCostPerMTok: null;
+    cachedInputCostPerMTok: null;
+    createdAt: Date;
+    updatedAt: Date;
+  } = {
+    id: 'ai-1',
+    name: 'Gateway',
+    provider: 'OPENAI_COMPATIBLE',
+    model: 'gpt-4o',
+    apiKeyEnc: 'enc:old-key',
+    baseUrl: 'https://gateway.example.test',
+    contextSize: null,
+    supportsVision: false,
+    supportsEmbedding: false,
+    embeddingDimensions: null,
+    embeddingPooling: null,
+    inputCostPerMTok: null,
+    outputCostPerMTok: null,
+    cachedInputCostPerMTok: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  function mockUpdate(existing: typeof stored) {
+    const { service, prisma } = createService();
+    prisma.aiProviderConfig.findUnique.mockResolvedValue(existing);
+    prisma.aiProviderConfig.update.mockImplementation(({ data }: any) => ({
+      ...existing,
+      ...data,
+    }));
+    return { service, prisma };
+  }
+
+  it('normalises the endpoint the way the key binding compares it', () => {
+    expect(normalizeProviderBaseUrl(null)).toBe('');
+    expect(normalizeProviderBaseUrl(undefined)).toBe('');
+    expect(normalizeProviderBaseUrl('')).toBe('');
+    expect(normalizeProviderBaseUrl('   ')).toBe('');
+    expect(
+      providerEndpointKey(
+        'OPENAI_COMPATIBLE',
+        'https://Gateway.example.test/v1/',
+      ),
+    ).toBe('OPENAI_COMPATIBLE|https://gateway.example.test/v1');
+    expect(providerEndpointKey('CLAUDE', null)).toBe(
+      providerEndpointKey('CLAUDE', ''),
+    );
+  });
+
+  it('drops the stored key when the base URL changes without a new key', async () => {
+    const { service, prisma } = mockUpdate(stored);
+
+    await service.update('ai-1', {
+      baseUrl: 'https://collector.example.test',
+    });
+
+    const data = prisma.aiProviderConfig.update.mock.calls[0][0].data;
+    expect(data.apiKeyEnc).toBeNull();
+  });
+
+  it('drops the stored key when the provider changes without a new key', async () => {
+    const { service, prisma } = mockUpdate({
+      ...stored,
+      provider: 'CLAUDE',
+      baseUrl: null,
+    });
+
+    await service.update('ai-1', { provider: 'GEMINI' });
+
+    const data = prisma.aiProviderConfig.update.mock.calls[0][0].data;
+    expect(data.apiKeyEnc).toBeNull();
+  });
+
+  it('keeps the stored key across a model-only change', async () => {
+    const { service, prisma } = mockUpdate(stored);
+
+    await service.update('ai-1', { model: 'gpt-4o-mini' });
+
+    const data = prisma.aiProviderConfig.update.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty('apiKeyEnc');
+  });
+
+  it('keeps the stored key across a trailing-slash-only change', async () => {
+    const { service, prisma } = mockUpdate(stored);
+
+    await service.update('ai-1', {
+      baseUrl: 'https://gateway.example.test/',
+    });
+
+    const data = prisma.aiProviderConfig.update.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty('apiKeyEnc');
+  });
+
+  it('stores a new key together with a new URL', async () => {
+    const { service, prisma } = mockUpdate(stored);
+
+    await service.update('ai-1', {
+      baseUrl: 'https://collector.example.test',
+      apiKey: 'the-new-key',
+    });
+
+    const data = prisma.aiProviderConfig.update.mock.calls[0][0].data;
+    expect(data.apiKeyEnc).toBe('enc:the-new-key');
   });
 });

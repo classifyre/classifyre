@@ -3123,6 +3123,8 @@
     "keyNotStored": "Der Schlüssel wird im Ruhezustand verschlüsselt und niemals zurückgegeben.",
     "enterNewKey": "Neuen Schlüssel zum Ersetzen eingeben…",
     "enterApiKey": "API-Schlüssel eingeben…",
+    "keyWillBeDropped": "Sie haben den Anbieter oder die Basis-URL geändert, daher wird der gespeicherte Schlüssel beim Speichern entfernt. Geben Sie den Schlüssel für den neuen Endpunkt ein.",
+    "apiKeyMissing": "Für diesen Anbieter ist ein API-Schlüssel erforderlich.",
     "testConnection": "Verbindung testen",
     "save": "Speichern",
     "testing": "Wird getestet…",

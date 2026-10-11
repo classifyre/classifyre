@@ -44,6 +44,10 @@ import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import { AssistantCapabilityReport } from "@/components/assistant-capability-report";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
+import {
+  aiProviderEndpointKey,
+  providerStoredKeyIsKept,
+} from "@/lib/ai-provider";
 
 export type ProviderAssignments = {
   assistant: boolean;
@@ -339,6 +343,19 @@ export function AiProviderForm({
   const isOpenAiCompatible =
     draft.provider === AiProviderConfigResponseDtoProviderEnum.OpenaiCompatible;
   const hasStoredKey = config?.hasApiKey ?? false;
+  const storedEndpoint = config
+    ? aiProviderEndpointKey(config.provider, config.baseUrl ?? "")
+    : null;
+  const keyIsKept = providerStoredKeyIsKept({
+    provider: draft.provider,
+    baseUrl: draft.baseUrl,
+    apiKey: draft.apiKey,
+    hasStoredKey,
+    storedEndpoint,
+  });
+  const keyWillBeDropped =
+    hasStoredKey && !keyIsKept && draft.apiKey.length === 0;
+  const keyWillExist = draft.apiKey.length > 0 || keyIsKept;
 
   const handleProviderChange = React.useCallback(
     (value: AiProviderConfigResponseDtoProviderEnum) => {
@@ -376,6 +393,10 @@ export function AiProviderForm({
       setError(t("aiProvider.nameRequired"));
       return;
     }
+    if (keyWillBeDropped) {
+      setError(t("aiProvider.apiKeyMissing"));
+      return;
+    }
     try {
       setSaving(true);
       setError(null);
@@ -390,11 +411,15 @@ export function AiProviderForm({
     } finally {
       setSaving(false);
     }
-  }, [assignments, draft.name, persist, onSaved, t]);
+  }, [assignments, draft.name, keyWillBeDropped, persist, onSaved, t]);
 
   const handleTest = React.useCallback(async () => {
     if (!draft.name.trim()) {
       setError(t("aiProvider.nameRequired"));
+      return;
+    }
+    if (keyWillBeDropped) {
+      setError(t("aiProvider.apiKeyMissing"));
       return;
     }
     try {
@@ -435,7 +460,7 @@ export function AiProviderForm({
     }
   }, [assignments, draft.name, persist, onSaved, t, testType]);
 
-  const canTest = hasStoredKey || draft.apiKey.length > 0;
+  const canTest = keyWillExist;
 
   const connectionFailed =
     testResult !== null &&
@@ -803,9 +828,11 @@ export function AiProviderForm({
                 />
               )}
               <p className="text-xs text-muted-foreground">
-                {hasStoredKey
-                  ? t("aiProvider.keyStored")
-                  : t("aiProvider.keyNotStored")}
+                {keyWillBeDropped
+                  ? t("aiProvider.keyWillBeDropped")
+                  : hasStoredKey
+                    ? t("aiProvider.keyStored")
+                    : t("aiProvider.keyNotStored")}
               </p>
             </CardContent>
           </Card>
