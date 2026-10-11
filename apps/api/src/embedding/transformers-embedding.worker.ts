@@ -153,4 +153,14 @@ if (parentPort) {
     // priority is best-effort (may be denied in sandboxes)
   }
   process.on('message', onMessage);
+  // Leave with the parent. A closed IPC channel does not end this process by
+  // itself: anything else holding the event loop keeps it alive, and under
+  // `bun --watch` something always does, because fork() passes execArgv and
+  // the child runs a file watcher of its own. The dev reload re-execs the
+  // parent in place without killing its children, so every save stranded one
+  // more resident model — on classifyre-dev, 8 to 13 orphans of ~200-250 MB
+  // apiece inside the worker's 3Gi cgroup, and six of its thirteen OOMKills
+  // in a day. A parent killed without running onApplicationShutdown (SIGKILL,
+  // a native crash) strands the child the same way.
+  process.on('disconnect', () => process.exit(0));
 }
