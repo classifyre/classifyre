@@ -80,13 +80,55 @@ export function valuesIndexJobOptions(sourceId: string) {
 export const CORRELATION_SCAN_COALESCE_SECONDS = 60;
 
 /**
- * Default per-label weights for the weighted-overlap score. Concrete
- * identifiers dominate; every unknown/custom label falls back to
- * DEFAULT_LABEL_WEIGHT, keeping the engine fully label-agnostic and free of
- * any user-facing configuration. Keys are matched case-insensitively against a
- * normalized form of the finding label (see weightForLabel).
+ * What the built-in detectors call the things the weight table is written
+ * about. The PII detector labels a finding with its recogniser's own name
+ * (`IBAN_CODE`, `PHONE_NUMBER`, `EMAIL_ADDRESS`, `US_SSN`), the secrets
+ * detector with the kind of secret it matched. Looked up as they stand, none
+ * of those is in the table, so every one of them weighed 1: an IBAN shared by
+ * two letters counted exactly as much as a shared weekday, phone numbers were
+ * compared with their spaces in, and e-mail addresses were matched by sound.
+ *
+ * Each of these names means the label on the right: its weight, its value
+ * normalisation and its place among the labels that are never matched
+ * phonetically. A label keeps its own name everywhere else (stored values,
+ * pattern keys, the tuning screen), so nothing already indexed is renamed.
  */
-export const LABEL_WEIGHTS: Record<string, number> = {
+export const LABEL_ALIASES: Record<string, string> = {
+  email_address: 'email',
+  phone_number: 'phone',
+  iban_code: 'iban',
+  us_bank_number: 'iban',
+  ip_address: 'ip',
+  us_ssn: 'ssn',
+  us_passport: 'passport',
+  it_passport: 'passport',
+  us_itin: 'national_id',
+  us_driver_license: 'national_id',
+  uk_nhs: 'national_id',
+  es_nif: 'national_id',
+  es_nie: 'national_id',
+  it_fiscal_code: 'national_id',
+  it_driver_license: 'national_id',
+  it_identity_card: 'national_id',
+  sg_nric_fin: 'national_id',
+  au_tfn: 'national_id',
+  au_medicare: 'national_id',
+  in_pan: 'national_id',
+  in_aadhaar: 'national_id',
+  in_voter: 'national_id',
+  fi_personal_identity_code: 'national_id',
+  pl_pesel: 'national_id',
+  at_svnr: 'national_id',
+  ch_ahv: 'national_id',
+  de_tax_id: 'national_id',
+  eu_national_id: 'national_id',
+  aws_access_key: 'api_key',
+  private_key: 'secret',
+  secret_keyword: 'secret',
+};
+
+/** The weight table as written: one entry per kind of value. */
+const CANONICAL_LABEL_WEIGHTS: Record<string, number> = {
   credit_card: 6,
   iban: 6,
   ssn: 6,
@@ -103,6 +145,25 @@ export const LABEL_WEIGHTS: Record<string, number> = {
   domain: 1,
   ip: 1,
   country: 1,
+};
+
+/**
+ * Default per-label weights for the weighted-overlap score. Concrete
+ * identifiers dominate; every unknown/custom label falls back to
+ * DEFAULT_LABEL_WEIGHT, keeping the engine fully label-agnostic and free of
+ * any user-facing configuration. Keys are matched case-insensitively against a
+ * normalized form of the finding label (see weightForLabel), and each alias
+ * is listed under its own name with the weight of what it stands for: the
+ * scoring SQL reads this table by label, with no chance to translate.
+ */
+export const LABEL_WEIGHTS: Record<string, number> = {
+  ...CANONICAL_LABEL_WEIGHTS,
+  ...Object.fromEntries(
+    Object.entries(LABEL_ALIASES).map(([alias, label]) => [
+      alias,
+      CANONICAL_LABEL_WEIGHTS[label],
+    ]),
+  ),
 };
 
 /** Weight for any label not present in LABEL_WEIGHTS. */
@@ -180,7 +241,7 @@ export const PHONETIC_MIN_JW = 0.75;
  * is already canonical and phonetics would produce false positives.
  * Custom/unknown labels are considered phonetic-eligible by default.
  */
-export const NON_PHONETIC_LABELS = new Set([
+const CANONICAL_NON_PHONETIC_LABELS = [
   'email',
   'phone',
   'url',
@@ -194,6 +255,13 @@ export const NON_PHONETIC_LABELS = new Set([
   'api_key',
   'secret',
   'country',
+];
+
+export const NON_PHONETIC_LABELS = new Set([
+  ...CANONICAL_NON_PHONETIC_LABELS,
+  ...Object.entries(LABEL_ALIASES)
+    .filter(([, label]) => CANONICAL_NON_PHONETIC_LABELS.includes(label))
+    .map(([alias]) => alias),
 ]);
 
 // ── Review queue ────────────────────────────────────────────────────────────

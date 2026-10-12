@@ -20,6 +20,13 @@ import {
     EmbeddingAiProviderOptionDtoToJSON,
     EmbeddingAiProviderOptionDtoToJSONTyped,
 } from './EmbeddingAiProviderOptionDto';
+import type { EmbeddingLocalModelDto } from './EmbeddingLocalModelDto';
+import {
+    EmbeddingLocalModelDtoFromJSON,
+    EmbeddingLocalModelDtoFromJSONTyped,
+    EmbeddingLocalModelDtoToJSON,
+    EmbeddingLocalModelDtoToJSONTyped,
+} from './EmbeddingLocalModelDto';
 import type { EmbeddingSettingValueDto } from './EmbeddingSettingValueDto';
 import {
     EmbeddingSettingValueDtoFromJSON,
@@ -150,6 +157,42 @@ export interface EmbeddingSettingsResponseDto {
      */
     hnswEfSearch: number;
     /**
+     * Whether this workspace wants pictures embedded as pictures. Takes effect only on a model that can (see supportedMedia).
+     * @type {boolean}
+     * @memberof EmbeddingSettingsResponseDto
+     */
+    embedImages: boolean;
+    /**
+     * Whether this workspace wants sound embedded as sound. Takes effect only on a model that can.
+     * @type {boolean}
+     * @memberof EmbeddingSettingsResponseDto
+     */
+    embedAudio: boolean;
+    /**
+     * What the model in use can embed besides text, in the same vector space
+     * @type {Array<string>}
+     * @memberof EmbeddingSettingsResponseDto
+     */
+    supportedMedia: Array<EmbeddingSettingsResponseDtoSupportedMediaEnum>;
+    /**
+     * What is embedded besides text right now: wanted by the workspace and supported by the model
+     * @type {Array<string>}
+     * @memberof EmbeddingSettingsResponseDto
+     */
+    mediaModalities: Array<EmbeddingSettingsResponseDtoMediaModalitiesEnum>;
+    /**
+     * Request shape the bound remote provider takes media in
+     * @type {string}
+     * @memberof EmbeddingSettingsResponseDto
+     */
+    mediaFormat?: EmbeddingSettingsResponseDtoMediaFormatEnum | null;
+    /**
+     * Models the built-in provider is known to run
+     * @type {Array<EmbeddingLocalModelDto>}
+     * @memberof EmbeddingSettingsResponseDto
+     */
+    localModels: Array<EmbeddingLocalModelDto>;
+    /**
      * AI provider supplying the remote embedding endpoint and key
      * @type {string}
      * @memberof EmbeddingSettingsResponseDto
@@ -227,6 +270,34 @@ export const EmbeddingSettingsResponseDtoDisabledModeEnum = {
 } as const;
 export type EmbeddingSettingsResponseDtoDisabledModeEnum = typeof EmbeddingSettingsResponseDtoDisabledModeEnum[keyof typeof EmbeddingSettingsResponseDtoDisabledModeEnum];
 
+/**
+ * @export
+ */
+export const EmbeddingSettingsResponseDtoSupportedMediaEnum = {
+    Image: 'image',
+    Audio: 'audio'
+} as const;
+export type EmbeddingSettingsResponseDtoSupportedMediaEnum = typeof EmbeddingSettingsResponseDtoSupportedMediaEnum[keyof typeof EmbeddingSettingsResponseDtoSupportedMediaEnum];
+
+/**
+ * @export
+ */
+export const EmbeddingSettingsResponseDtoMediaModalitiesEnum = {
+    Image: 'image',
+    Audio: 'audio'
+} as const;
+export type EmbeddingSettingsResponseDtoMediaModalitiesEnum = typeof EmbeddingSettingsResponseDtoMediaModalitiesEnum[keyof typeof EmbeddingSettingsResponseDtoMediaModalitiesEnum];
+
+/**
+ * @export
+ */
+export const EmbeddingSettingsResponseDtoMediaFormatEnum = {
+    LlamaCpp: 'llama-cpp',
+    Gemini: 'gemini',
+    Openrouter: 'openrouter'
+} as const;
+export type EmbeddingSettingsResponseDtoMediaFormatEnum = typeof EmbeddingSettingsResponseDtoMediaFormatEnum[keyof typeof EmbeddingSettingsResponseDtoMediaFormatEnum];
+
 
 /**
  * Check if a given object implements the EmbeddingSettingsResponseDto interface.
@@ -249,6 +320,11 @@ export function instanceOfEmbeddingSettingsResponseDto(value: object): value is 
     if (!('hnswM' in value) || value['hnswM'] === undefined) return false;
     if (!('hnswEfConstruction' in value) || value['hnswEfConstruction'] === undefined) return false;
     if (!('hnswEfSearch' in value) || value['hnswEfSearch'] === undefined) return false;
+    if (!('embedImages' in value) || value['embedImages'] === undefined) return false;
+    if (!('embedAudio' in value) || value['embedAudio'] === undefined) return false;
+    if (!('supportedMedia' in value) || value['supportedMedia'] === undefined) return false;
+    if (!('mediaModalities' in value) || value['mediaModalities'] === undefined) return false;
+    if (!('localModels' in value) || value['localModels'] === undefined) return false;
     if (!('allowRemoteModels' in value) || value['allowRemoteModels'] === undefined) return false;
     if (!('fields' in value) || value['fields'] === undefined) return false;
     if (!('aiProviders' in value) || value['aiProviders'] === undefined) return false;
@@ -286,6 +362,12 @@ export function EmbeddingSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscr
         'hnswM': json['hnswM'],
         'hnswEfConstruction': json['hnswEfConstruction'],
         'hnswEfSearch': json['hnswEfSearch'],
+        'embedImages': json['embedImages'],
+        'embedAudio': json['embedAudio'],
+        'supportedMedia': json['supportedMedia'],
+        'mediaModalities': json['mediaModalities'],
+        'mediaFormat': json['mediaFormat'] == null ? undefined : json['mediaFormat'],
+        'localModels': ((json['localModels'] as Array<any>).map(EmbeddingLocalModelDtoFromJSON)),
         'aiProviderConfigId': json['aiProviderConfigId'] == null ? undefined : json['aiProviderConfigId'],
         'allowRemoteModels': json['allowRemoteModels'],
         'fields': (mapValues(json['fields'], EmbeddingSettingValueDtoFromJSON)),
@@ -329,6 +411,12 @@ export function EmbeddingSettingsResponseDtoToJSONTyped(value?: EmbeddingSetting
         'hnswM': value['hnswM'],
         'hnswEfConstruction': value['hnswEfConstruction'],
         'hnswEfSearch': value['hnswEfSearch'],
+        'embedImages': value['embedImages'],
+        'embedAudio': value['embedAudio'],
+        'supportedMedia': value['supportedMedia'],
+        'mediaModalities': value['mediaModalities'],
+        'mediaFormat': value['mediaFormat'],
+        'localModels': ((value['localModels'] as Array<any>).map(EmbeddingLocalModelDtoToJSON)),
         'aiProviderConfigId': value['aiProviderConfigId'],
         'allowRemoteModels': value['allowRemoteModels'],
         'fields': (mapValues(value['fields'], EmbeddingSettingValueDtoToJSON)),

@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -10,6 +11,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { MEDIA_MODALITIES } from '../embedding-modality';
 
 export class AssetChunkDto {
   @ApiProperty()
@@ -38,6 +40,32 @@ export class AssetChunkDto {
   text!: string;
 }
 
+/**
+ * A picture or sound clip prepared from an asset, to be embedded as what it
+ * is. Prepared by the scan the way `GET /embeddings/collection` asks for it.
+ */
+export class AssetMediaChunkDto {
+  @ApiProperty({ enum: MEDIA_MODALITIES })
+  @IsIn(MEDIA_MODALITIES)
+  modality!: string;
+
+  @ApiProperty({ example: 'image/jpeg' })
+  @IsString()
+  mimeType!: string;
+
+  @ApiProperty({ description: 'The prepared bytes, base64-encoded' })
+  @IsString()
+  data!: string;
+
+  @ApiPropertyOptional({
+    description: 'Page, frame or clip number within the asset, from 1',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  page?: number;
+}
+
 export class PutAssetChunksDto {
   @ApiProperty()
   @IsString()
@@ -49,6 +77,63 @@ export class PutAssetChunksDto {
   @ValidateNested({ each: true })
   @Type(() => AssetChunkDto)
   chunks!: AssetChunkDto[];
+
+  @ApiPropertyOptional({ type: [AssetMediaChunkDto], maxItems: 64 })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(64)
+  @ValidateNested({ each: true })
+  @Type(() => AssetMediaChunkDto)
+  media?: AssetMediaChunkDto[];
+}
+
+/** One kind of media a scan should prepare, and how. */
+export class EmbeddingCollectionMediaDto {
+  @ApiProperty({ enum: MEDIA_MODALITIES })
+  modality!: string;
+
+  @ApiProperty({ example: 'image/jpeg' })
+  mimeType!: string;
+
+  @ApiProperty({ description: 'Most items taken from one asset' })
+  maxItems!: number;
+
+  @ApiProperty({
+    description:
+      'Key the scan records in the asset scan-cache state, with `fingerprint` as its value, once this media was sent',
+    example: 'EMBED_MEDIA::image',
+  })
+  cacheKey!: string;
+
+  @ApiProperty({
+    description:
+      'Changes whenever the way this kind of media is prepared changes; an asset recorded under another value sends its media again',
+  })
+  fingerprint!: string;
+
+  @ApiPropertyOptional({ description: 'Pictures: longest edge, in pixels' })
+  maxEdge?: number;
+
+  @ApiPropertyOptional({ description: 'Pictures: JPEG quality, 1-100' })
+  quality?: number;
+
+  @ApiPropertyOptional({ description: 'Sound: sample rate, in Hz' })
+  sampleRate?: number;
+
+  @ApiPropertyOptional({ description: 'Sound: length of one clip, in seconds' })
+  clipSeconds?: number;
+}
+
+/** What a scan should send for embedding in this workspace right now. */
+export class EmbeddingCollectionPlanDto {
+  @ApiProperty({
+    description:
+      'Whether text chunks are stored at all (false after embeddings were turned off and deleted)',
+  })
+  chunks!: boolean;
+
+  @ApiProperty({ type: [EmbeddingCollectionMediaDto] })
+  media!: EmbeddingCollectionMediaDto[];
 }
 
 export class SimilarFindingsQueryDto {

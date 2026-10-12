@@ -7,6 +7,7 @@ All URIs are relative to *http://localhost*
 | [**embeddingControllerBoilerplate**](EmbeddingsApi.md#embeddingcontrollerboilerplate) | **GET** /sources/{sourceId}/boilerplate-clusters | Near-duplicate finding clusters in a source (repeated boilerplate) |
 | [**embeddingControllerBoilerplateGlobal**](EmbeddingsApi.md#embeddingcontrollerboilerplateglobal) | **GET** /embeddings/boilerplate-clusters | Near-duplicate finding clusters across the corpus, optionally filtered to specific sources |
 | [**embeddingControllerChunks**](EmbeddingsApi.md#embeddingcontrollerchunks) | **POST** /sources/{sourceId}/embeddings/chunks | Store asset chunk-to-content mappings |
+| [**embeddingControllerCollection**](EmbeddingsApi.md#embeddingcontrollercollection) | **GET** /embeddings/collection | What a scan should prepare for embedding in this workspace: text chunks, and which media in what form |
 | [**embeddingControllerGetSettings**](EmbeddingsApi.md#embeddingcontrollergetsettings) | **GET** /embeddings/settings | Embedding configuration for this workspace, the deployment defaults behind it, and corpus size |
 | [**embeddingControllerRebuild**](EmbeddingsApi.md#embeddingcontrollerrebuild) | **POST** /embeddings/rebuild | Purge every stored vector for this workspace and re-embed the corpus from scratch |
 | [**embeddingControllerRecalibrate**](EmbeddingsApi.md#embeddingcontrollerrecalibrate) | **POST** /embeddings/recalibrate | Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups) |
@@ -223,6 +224,63 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## embeddingControllerCollection
+
+> EmbeddingCollectionPlanDto embeddingControllerCollection()
+
+What a scan should prepare for embedding in this workspace: text chunks, and which media in what form
+
+### Example
+
+```ts
+import {
+  Configuration,
+  EmbeddingsApi,
+} from '@workspace/api-client';
+import type { EmbeddingControllerCollectionRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new EmbeddingsApi();
+
+  try {
+    const data = await api.embeddingControllerCollection();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**EmbeddingCollectionPlanDto**](EmbeddingCollectionPlanDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

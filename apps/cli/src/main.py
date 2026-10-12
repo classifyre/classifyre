@@ -553,6 +553,24 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         await augmentation.startup()
 
                     scan_cache = ScanCache(recipe, source, payload_windows=payload_windows)
+
+                    # What the workspace embeds besides text follows its
+                    # embedding model, so the API says and the run asks once.
+                    # The pipeline prepares that media; the scan cache uses the
+                    # same plan to know which unchanged assets still owe theirs.
+                    if hasattr(sink, "fetch_embedding_plan"):
+                        from .pipeline.media_artifact import EmbeddingPlan
+
+                        embedding_plan = EmbeddingPlan.from_payload(
+                            await sink.fetch_embedding_plan()
+                        )
+                        if embedding_plan.collects_media:
+                            logger.info(
+                                "Preparing media for embedding: %s",
+                                ", ".join(sorted(embedding_plan.media)),
+                            )
+                        pipeline.set_embedding_plan(embedding_plan)
+                        scan_cache.set_embedding_plan(embedding_plan)
                     if scan_cache.enabled:
                         logger.info(
                             "Scan cache active (verify=%s): unchanged assets and"
@@ -675,7 +693,13 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     source.evict_asset_cache(asset_hash)
                                     return
 
-                                if plan.mode == "partial":
+                                if plan.media_only:
+                                    logger.info(
+                                        "Cached %s, but %s",
+                                        asset.name,
+                                        plan.reason,
+                                    )
+                                elif plan.mode == "partial":
                                     logger.info(
                                         "Partially cached %s: running %s",
                                         asset.name,
@@ -761,6 +785,13 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 f_total, f_by_sev, f_by_det = _compute_findings_counts(
                                     result.findings or []
                                 )
+                                if plan.media_only and plan.prior is not None:
+                                    # Read again only to send its picture or
+                                    # recording: no detector ran, so the counts
+                                    # of its last real scan are still its counts.
+                                    f_total = plan.prior.findings_total or 0
+                                    f_by_sev = plan.prior.findings_by_severity or {}
+                                    f_by_det = plan.prior.findings_by_detector or {}
                                 payload = _asset_to_payload(result)
 
                                 content_hash = plan.content_hash
@@ -785,6 +816,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     findings_total=f_total,
                                     findings_by_severity=f_by_sev,
                                     findings_by_detector=f_by_det,
+                                    media_state=scan_cache.media_state_for(asset),
                                 )
                                 if state is not None:
                                     payload["scan_cache"] = state

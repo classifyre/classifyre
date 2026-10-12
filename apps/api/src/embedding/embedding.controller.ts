@@ -21,6 +21,7 @@ import { EmbeddingService } from './embedding.service';
 import {
   BoilerplateClusterDto,
   BoilerplateClustersQueryDto,
+  EmbeddingCollectionPlanDto,
   EmbeddingRecalibrateResponseDto,
   EmbeddingReindexResponseDto,
   EmbeddingStatusResponseDto,
@@ -39,6 +40,12 @@ import {
   type ResolvedEmbeddingConfig,
 } from './embedding-settings.service';
 import { EmbeddingStatsService } from './embedding-stats.service';
+import {
+  MEDIA_COLLECTION,
+  mediaCollectionFingerprint,
+  mediaScanCacheKey,
+} from './embedding-modality';
+import { LOCAL_EMBEDDING_MODELS } from './embedding-local-models';
 import { EmbeddingRebuildService } from './embedding-rebuild.service';
 import { BlockWhenPaused } from '../namespace/block-when-paused.decorator';
 import { featureOffMessage } from '../maintenance/workspace-features.constants';
@@ -71,6 +78,8 @@ const EXPOSED_FIELDS = [
   'dtype',
   'device',
   'autoBackfill',
+  'embedImages',
+  'embedAudio',
   'hnswM',
   'hnswEfConstruction',
   'hnswEfSearch',
@@ -107,7 +116,15 @@ export class EmbeddingController {
   async updateSettings(
     @Body() dto: UpdateEmbeddingSettingsDto,
   ): Promise<UpdateEmbeddingSettingsResponseDto> {
+    const before = await this.settings.resolve();
     const { requiresRebuild, changedFields } = await this.settings.update(dto);
+    // Pictures switched off, or a move to a model that cannot see: what was
+    // stored for them goes. Switched on, or a move to one that can: scans go
+    // back for the pictures they already passed.
+    await this.embeddings.applyMediaChange(
+      before.mediaModalities,
+      (await this.settings.resolve()).mediaModalities,
+    );
 
     // Started here rather than left to the operator: a workspace whose stored
     // vectors no longer match its configuration would keep answering searches
@@ -193,6 +210,20 @@ export class EmbeddingController {
       dtype: effective.dtype,
       device: effective.device,
       autoBackfill: effective.autoBackfill,
+      embedImages: effective.embedImages,
+      embedAudio: effective.embedAudio,
+      supportedMedia: effective.supportedMedia,
+      mediaModalities: effective.mediaModalities,
+      mediaFormat: effective.mediaFormat ?? null,
+      localModels: LOCAL_EMBEDDING_MODELS.map((model) => ({
+        id: model.id,
+        label: model.label,
+        dimensions: model.dimensions,
+        pooling: model.pooling,
+        mediaModalities: [...model.mediaModalities],
+        aliases: [...(model.aliases ?? [])],
+        downloadMb: model.downloadMb ?? null,
+      })),
       hnswM: effective.hnswM,
       hnswEfConstruction: effective.hnswEfConstruction,
       hnswEfSearch: effective.hnswEfSearch,
@@ -218,6 +249,8 @@ export class EmbeddingController {
           baseUrl: provider.baseUrl ?? null,
           hasApiKey: provider.hasApiKey,
           supportsEmbedding: provider.supportsEmbedding,
+          embeddingModalities: provider.embeddingModalities ?? [],
+          embeddingMediaFormat: provider.embeddingMediaFormat ?? null,
         })),
       // `enabled` is not a trigger any more: turning embeddings off keeps or
       // deletes the corpus by explicit choice (Settings → Cleanup), and on
@@ -267,9 +300,44 @@ export class EmbeddingController {
     if (!(await this.settings.collectsChunks())) {
       return { stored: 0, queued: 0 };
     }
-    const result = await this.embeddings.putChunks(sourceId, dto);
+    // Media is kept only for what this workspace embeds; anything else a scan
+    // sent (one started before a setting changed) is dropped on arrival.
+    const { mediaModalities } = await this.settings.resolve();
+    const result = await this.embeddings.putChunks(
+      sourceId,
+      dto,
+      mediaModalities,
+    );
     this.queue.enqueue(result.contents);
     return { stored: result.stored, queued: result.contents.length };
+  }
+
+  @InternalOnly()
+  @Get('embeddings/collection')
+  @ApiOperation({
+    summary:
+      'What a scan should prepare for embedding in this workspace: text chunks, and which media in what form',
+  })
+  @ApiOkResponse({ type: EmbeddingCollectionPlanDto })
+  async collection(): Promise<EmbeddingCollectionPlanDto> {
+    const [chunks, cfg] = await Promise.all([
+      this.settings.collectsChunks(),
+      this.settings.resolve(),
+    ]);
+    // Nothing is prepared for a corpus that is meant to stay empty, and media
+    // is only worth preparing while embeddings are on: unlike text, which is
+    // kept through a pause so nothing has to be rescanned, a paused workspace
+    // would be storing bytes for a model that is not running.
+    const modalities = chunks && cfg.enabled ? cfg.mediaModalities : [];
+    return {
+      chunks,
+      media: modalities.map((modality) => ({
+        modality,
+        ...MEDIA_COLLECTION[modality],
+        cacheKey: mediaScanCacheKey(modality),
+        fingerprint: mediaCollectionFingerprint(modality),
+      })),
+    };
   }
 
   @Get('findings/:findingId/similar')

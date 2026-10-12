@@ -104,6 +104,18 @@ export interface UpdateEmbeddingSettingsDto {
      */
     autoBackfill?: boolean | null;
     /**
+     * Embed pictures as pictures when the model can. Turning it off deletes the stored pictures and their vectors.
+     * @type {boolean}
+     * @memberof UpdateEmbeddingSettingsDto
+     */
+    embedImages?: boolean | null;
+    /**
+     * Embed sound as sound when the model can. Turning it off deletes the stored clips and their vectors.
+     * @type {boolean}
+     * @memberof UpdateEmbeddingSettingsDto
+     */
+    embedAudio?: boolean | null;
+    /**
      * 
      * @type {number}
      * @memberof UpdateEmbeddingSettingsDto
@@ -139,6 +151,7 @@ export type UpdateEmbeddingSettingsDtoProviderEnum = typeof UpdateEmbeddingSetti
 export const UpdateEmbeddingSettingsDtoPoolingEnum = {
     Mean: 'mean',
     Cls: 'cls',
+    LastToken: 'last_token',
     None: 'none'
 } as const;
 export type UpdateEmbeddingSettingsDtoPoolingEnum = typeof UpdateEmbeddingSettingsDtoPoolingEnum[keyof typeof UpdateEmbeddingSettingsDtoPoolingEnum];
@@ -175,6 +188,8 @@ export function UpdateEmbeddingSettingsDtoFromJSONTyped(json: any, ignoreDiscrim
         'dtype': json['dtype'] == null ? undefined : json['dtype'],
         'device': json['device'] == null ? undefined : json['device'],
         'autoBackfill': json['autoBackfill'] == null ? undefined : json['autoBackfill'],
+        'embedImages': json['embedImages'] == null ? undefined : json['embedImages'],
+        'embedAudio': json['embedAudio'] == null ? undefined : json['embedAudio'],
         'hnswM': json['hnswM'] == null ? undefined : json['hnswM'],
         'hnswEfConstruction': json['hnswEfConstruction'] == null ? undefined : json['hnswEfConstruction'],
         'hnswEfSearch': json['hnswEfSearch'] == null ? undefined : json['hnswEfSearch'],
@@ -206,6 +221,8 @@ export function UpdateEmbeddingSettingsDtoToJSONTyped(value?: UpdateEmbeddingSet
         'dtype': value['dtype'],
         'device': value['device'],
         'autoBackfill': value['autoBackfill'],
+        'embedImages': value['embedImages'],
+        'embedAudio': value['embedAudio'],
         'hnswM': value['hnswM'],
         'hnswEfConstruction': value['hnswEfConstruction'],
         'hnswEfSearch': value['hnswEfSearch'],

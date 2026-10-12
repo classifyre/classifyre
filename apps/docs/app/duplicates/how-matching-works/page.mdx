@@ -60,6 +60,13 @@ Classifyre doesn't recognise — including every [custom
 detector](/detectors/custom/) — starts at the default weight of 1. See
 [Tuning](/duplicates/tuning/).
 
+The built-in detectors label a finding with their own name for it:
+`IBAN_CODE`, `PHONE_NUMBER`, `EMAIL_ADDRESS`, `US_SSN`, `DE_TAX_ID`,
+`AWS Access Key`. Each of those is read as the label it stands for, so
+`IBAN_CODE` weighs 6 like `iban`, `PHONE_NUMBER` is normalised and weighs 4
+like `phone`, and the national identifiers weigh 5. The tuning screen lists
+them under the names your findings carry.
+
 ### The score
 
 The result is a number between **0 and 1**: *the share of the two assets'
@@ -132,10 +139,27 @@ A completely different engine. This one comes from the
 vector, and passages whose vectors sit close together are grouped as
 near-duplicate text — even when they share no literal values at all.
 
+What is embedded is a finding's **evidence**: the match together with about
+160 characters of text on either side of it. Two pieces of evidence are grouped
+when the cosine similarity of their vectors is 0.95 or more.
+
 This is what catches **boilerplate**: the confidentiality notice on four hundred
 contracts, the template paragraph in every ticket, the standard footer. Those
 groups are a real problem, because boilerplate quietly drives value matches
 everywhere it appears.
+
+Two findings a few words apart in one sentence (a name, and the date after it)
+carry almost the same evidence text. That is one passage read twice, not a
+passage that occurs twice, and such pairs are left out of the grouping: a
+finding whose match lies in the other's surrounding text is its neighbour, not
+its duplicate.
+
+How strict 0.95 is depends on the embedding model. Models spread their scores
+differently: on one, a reworded letter scores 0.87 against its original and
+two unrelated sentences score 0.04; on another the same letter scores 0.98 and
+unrelated sentences 0.73. See
+[How alike is alike](/settings/embeddings/#how-alike-is-alike) before reading
+much into the size of this pattern family after a model change.
 
 Which is why patterns in this family are marked **rule candidate**: the fix isn't
 to judge four hundred pairs, it's to stop the values inside the boilerplate from

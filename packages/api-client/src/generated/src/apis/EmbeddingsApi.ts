@@ -16,6 +16,7 @@
 import * as runtime from '../runtime';
 import type {
   BoilerplateClusterDto,
+  EmbeddingCollectionPlanDto,
   EmbeddingRebuildResponseDto,
   EmbeddingRecalibrateResponseDto,
   EmbeddingReindexResponseDto,
@@ -29,6 +30,8 @@ import type {
 import {
     BoilerplateClusterDtoFromJSON,
     BoilerplateClusterDtoToJSON,
+    EmbeddingCollectionPlanDtoFromJSON,
+    EmbeddingCollectionPlanDtoToJSON,
     EmbeddingRebuildResponseDtoFromJSON,
     EmbeddingRebuildResponseDtoToJSON,
     EmbeddingRecalibrateResponseDtoFromJSON,
@@ -210,6 +213,35 @@ export class EmbeddingsApi extends runtime.BaseAPI {
      */
     async embeddingControllerChunks(requestParameters: EmbeddingControllerChunksRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.embeddingControllerChunksRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * What a scan should prepare for embedding in this workspace: text chunks, and which media in what form
+     */
+    async embeddingControllerCollectionRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<EmbeddingCollectionPlanDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/embeddings/collection`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => EmbeddingCollectionPlanDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * What a scan should prepare for embedding in this workspace: text chunks, and which media in what form
+     */
+    async embeddingControllerCollection(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<EmbeddingCollectionPlanDto> {
+        const response = await this.embeddingControllerCollectionRaw(initOverrides);
+        return await response.value();
     }
 
     /**
