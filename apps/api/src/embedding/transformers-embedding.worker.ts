@@ -24,6 +24,10 @@ type WorkerConfig = {
     | 'clap';
   /** Width the workspace stores, for models that can be cut shorter. */
   dimensions?: number;
+  /** Megabytes the model cache may hold; older models make room above it. */
+  cacheMaxMb?: number;
+  /** Megabytes this model is known to download, all its parts together. */
+  expectedMb?: number;
 };
 
 type WorkerMedia = {
@@ -156,6 +160,108 @@ export function truncateVectors(
     const norm = Math.sqrt(cut.reduce((sum, value) => sum + value * value, 0));
     return norm > 0 ? cut.map((value) => value / norm) : cut;
   });
+}
+
+const MB = 1024 * 1024;
+
+/** What a model nothing is known about is assumed to download. */
+const UNKNOWN_MODEL_MB = 700;
+
+/** Marks when a cached model was last loaded; its age is what eviction goes by. */
+const LAST_USED = '.last-used';
+
+function directorySize(dir: string): number {
+  let bytes = 0;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) bytes += directorySize(full);
+    else if (entry.isFile()) bytes += fs.statSync(full).size;
+  }
+  return bytes;
+}
+
+/** The directories under the cache that each hold one model's files. */
+function cachedModelDirs(root: string, depth = 0): string[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  // A model is where its config lies, or its weights. Anything above that is
+  // an organisation's folder and is looked into, three levels at most.
+  const names = new Set(entries.map((entry) => entry.name));
+  if (depth > 0 && (names.has('config.json') || names.has('onnx'))) {
+    return [root];
+  }
+  if (depth >= 3) return [];
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) => cachedModelDirs(path.join(root, entry.name), depth + 1));
+}
+
+/**
+ * Makes room in the model cache for the model about to be loaded, by
+ * deleting the models that were used longest ago.
+ *
+ * Nothing ever left this cache. That was harmless while the choice was six
+ * models of 23 to 130 MB. With models of 300 to 850 MB on the list it is not:
+ * the cache is a volume with a size limit (2 Gi in the Helm chart), and
+ * Kubernetes evicts a pod whose volume goes over. Measured while trying one
+ * model after another: the fifth large model took the worker pod down
+ * mid-rebuild with "Usage of EmptyDir volume embedding-cache exceeds the
+ * limit", and the API pod stood at 1.3 of its 2 GiB.
+ *
+ * A deleted model is downloaded again when a workspace next asks for it,
+ * which costs time and never a result. Only called where a download is
+ * possible at all: an offline deployment's cache is its only copy.
+ *
+ * Returns what it removed, for the log.
+ */
+export function pruneModelCache(options: {
+  cacheDir: string;
+  model: string;
+  budgetMb: number;
+  expectedMb?: number;
+}): string[] {
+  const own = path.resolve(options.cacheDir, options.model);
+  const cached = cachedModelDirs(options.cacheDir).map((dir) => {
+    let used = 0;
+    try {
+      used = fs.statSync(path.join(dir, LAST_USED)).mtimeMs;
+    } catch {
+      used = fs.statSync(dir).mtimeMs;
+    }
+    return { dir, bytes: directorySize(dir), used };
+  });
+  const mine = cached.find((entry) => path.resolve(entry.dir) === own);
+  // A model already here may still fetch a part it has not needed yet (an
+  // encoder); one that is not here fetches everything.
+  const expected = (options.expectedMb ?? UNKNOWN_MODEL_MB) * MB;
+  const need = mine ? Math.max(0, expected - mine.bytes) : expected;
+  let total = cached.reduce((sum, entry) => sum + entry.bytes, 0);
+  const removed: string[] = [];
+  const others = cached
+    .filter((entry) => path.resolve(entry.dir) !== own)
+    .sort((left, right) => left.used - right.used);
+  for (const entry of others) {
+    if (total + need <= options.budgetMb * MB) break;
+    fs.rmSync(entry.dir, { recursive: true, force: true });
+    total -= entry.bytes;
+    removed.push(path.relative(options.cacheDir, entry.dir));
+  }
+  return removed;
+}
+
+/** Notes that the model was loaded now, so it is the last to make room. */
+function markModelUsed(config: WorkerConfig): void {
+  try {
+    const dir = path.resolve(config.cacheDir, config.model);
+    if (fs.existsSync(dir)) fs.writeFileSync(path.join(dir, LAST_USED), '');
+  } catch {
+    // The mark only orders eviction; a cache that cannot be written to has
+    // louder problems than this.
+  }
 }
 
 function prepareEnvironment(
@@ -517,6 +623,43 @@ const FAMILIES_WITH_ENCODERS = new Set([
   'clap',
 ]);
 
+/**
+ * Whether one inference call takes one item, whatever the batch it came in.
+ *
+ * On a CPU, yes, for two reasons that were both measured on this product's
+ * own text (714 passages and finding contexts, 60 to 1,200 characters):
+ *
+ *  - **The vector must not depend on the neighbours.** The default weights
+ *    are 8-bit, and onnxruntime works out the number range of every
+ *    activation tensor per call, over the whole batch. So the same sentence
+ *    came back as a different vector depending on what else was in its batch:
+ *    cosine 0.990 to itself on MiniLM, 0.986 on bge-m3, 0.975 on Granite. A
+ *    question is embedded alone and a passage was not, two rebuilds of one
+ *    corpus disagreed, and a pair sitting at the near-duplicate cut-off was a
+ *    duplicate on Monday and not on Tuesday. Alone, a text is always the same
+ *    vector.
+ *  - **Batching is slower here, not faster.** Every row is padded to the
+ *    longest one present, and two threads have nothing to run in parallel
+ *    that they were not already running: 67 texts a second in batches of 32
+ *    against 174 one at a time on MiniLM, 3.4 against 11.9 on bge-m3.
+ *
+ * A GPU is the opposite on both counts — float weights, and a batch is what
+ * it is for — so there the batch goes in whole.
+ */
+export function infersOneAtATime(config: Pick<WorkerConfig, 'device'>): boolean {
+  return config.device === 'cpu' || config.device === 'wasm';
+}
+
+/** `embed` over `items` one call each, answers in order. */
+export async function inSingles<T>(
+  items: readonly T[],
+  embed: (batch: T[]) => Promise<number[][]>,
+): Promise<number[][]> {
+  const vectors: number[][] = [];
+  for (const item of items) vectors.push(...(await embed([item])));
+  return vectors;
+}
+
 /** The encoders a batch cannot be embedded without. */
 function encodersFor(request: WorkerRequest): Encoder[] {
   const modality = request.media?.[0]?.modality;
@@ -536,6 +679,8 @@ async function modelFor(request: WorkerRequest): Promise<Loaded> {
     dimensions: undefined,
     normalize: undefined,
     pooling: undefined,
+    cacheMaxMb: undefined,
+    expectedMb: undefined,
   });
   const needed = FAMILIES_WITH_ENCODERS.has(family) ? encodersFor(request) : [];
   if (
@@ -561,6 +706,28 @@ async function modelFor(request: WorkerRequest): Promise<Loaded> {
   if (previous) {
     await previous.then((model) => model.dispose()).catch(() => undefined);
   }
+  // Room is made before the load, not after: the download is what fills the
+  // volume. Offline, and with models mounted from elsewhere, nothing is
+  // deleted, because nothing could be fetched again.
+  if (config.cacheMaxMb && config.allowRemoteModels && !config.localModelPath) {
+    try {
+      const removed = pruneModelCache({
+        cacheDir: config.cacheDir,
+        model: config.model,
+        budgetMb: config.cacheMaxMb,
+        expectedMb: config.expectedMb,
+      });
+      if (removed.length) {
+        console.log(
+          `[embedding-cache] removed ${removed.join(', ')} to keep the model cache under ${config.cacheMaxMb} MB for ${config.model}`,
+        );
+      }
+    } catch (error) {
+      console.warn(
+        `[embedding-cache] could not make room: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
   loadedKey = key;
   loadedEncoders = encoders;
   loaded =
@@ -571,6 +738,7 @@ async function modelFor(request: WorkerRequest): Promise<Loaded> {
         : family === 'sentence-embedding'
           ? loadSentenceEmbedding(config, key)
           : loadFeatureExtraction(config, key);
+  void loaded.then(() => markModelUsed(config)).catch(() => undefined);
   // A failed load must not be remembered as the loaded model: the next
   // request would await the same rejection forever instead of trying again.
   loaded.catch(() => {
@@ -595,16 +763,27 @@ function send(message: unknown): void {
 async function handleRequest(request: WorkerRequest): Promise<void> {
   try {
     const model = await modelFor(request);
+    const single = infersOneAtATime(request.config);
     let vectors: number[][];
     if (request.media?.length) {
-      if (!model.embedMedia) {
+      const embedMedia = model.embedMedia;
+      if (!embedMedia) {
         throw new Error(
           `Embedding model ${request.config.model} embeds text only; it cannot take ${request.media[0].modality} input`,
         );
       }
-      vectors = await model.embedMedia(request.media, request.config);
+      vectors = single
+        ? await inSingles(request.media, (batch) =>
+            embedMedia(batch, request.config),
+          )
+        : await embedMedia(request.media, request.config);
     } else {
-      vectors = await model.embedTexts(request.texts ?? [], request.config);
+      const texts = request.texts ?? [];
+      vectors = single
+        ? await inSingles(texts, (batch) =>
+            model.embedTexts(batch, request.config),
+          )
+        : await model.embedTexts(texts, request.config);
     }
     send({ id: request.id, vectors });
   } catch (error) {

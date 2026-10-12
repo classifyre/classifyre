@@ -1,4 +1,8 @@
-import { EmbeddingService, mergeBestScores } from './embedding.service';
+import {
+  EmbeddingService,
+  mergeBestScores,
+  mergeByStanding,
+} from './embedding.service';
 import { mediaContentHash } from './embedding-modality';
 
 /**
@@ -239,6 +243,121 @@ describe('media chunks', () => {
       await expect(
         h.service.applyMediaChange(['image'], []),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  /**
+   * A model puts a caption and its picture in one space, but further apart
+   * than two unrelated sentences. Measured with Gemini Embedding 2: a
+   * description scored 0.62 against the clip it described and 0.56 against a
+   * sentence about something else. By raw score the clip never surfaced.
+   */
+  describe('text and media, each read against its own kind', () => {
+    const text = { middle: 0.5, count: 512 };
+    const sound = { middle: 0.51, count: 22 };
+    const pictures = { middle: 0.25, count: 46 };
+
+    it('puts the clip that stands out among clips above text that does not stand out among text', () => {
+      const merged = mergeByStanding(
+        [
+          { id: 'invoice', score: 0.56 },
+          { id: 'rota', score: 0.55 },
+        ],
+        text,
+        [
+          { id: 'dog', score: 0.62, ...sound },
+          { id: 'rain', score: 0.5, ...sound },
+        ],
+        10,
+      );
+
+      expect(merged.map((row) => row.id)).toEqual([
+        'dog',
+        'invoice',
+        'rota',
+        'rain',
+      ]);
+    });
+
+    // A picture model scores a caption against its own picture far lower
+    // than against any sentence: 0.33 against 0.8 here. By raw score no
+    // picture is ever seen.
+    it('finds the picture a caption describes on a model that keeps pictures far from text', () => {
+      const merged = mergeByStanding(
+        [{ id: 'unrelated sentence', score: 0.55 }],
+        text,
+        [
+          { id: 'described picture', score: 0.33, ...pictures },
+          { id: 'another picture', score: 0.24, ...pictures },
+        ],
+        10,
+      );
+
+      expect(merged.map((row) => row.id)).toEqual([
+        'described picture',
+        'unrelated sentence',
+        'another picture',
+      ]);
+    });
+
+    it('still puts a passage that answers above a clip that merely leads its kind', () => {
+      const merged = mergeByStanding(
+        [{ id: 'report', score: 0.8 }],
+        text,
+        [{ id: 'clip', score: 0.55, ...sound }],
+        10,
+      );
+
+      expect(merged.map((row) => row.id)).toEqual(['report', 'clip']);
+    });
+
+    it('leaves the cosine each row carries as it was', () => {
+      const merged = mergeByStanding(
+        [{ id: 'invoice', score: 0.56 }],
+        text,
+        [{ id: 'dog', score: 0.62, ...sound }],
+        10,
+      );
+
+      expect(merged).toEqual([
+        { id: 'dog', score: 0.62 },
+        { id: 'invoice', score: 0.56 },
+      ]);
+    });
+
+    // Three photographs have no middle worth the name.
+    it('reads a kind with too few items against the text', () => {
+      const few = { middle: 0.3, count: 3 };
+      const merged = mergeByStanding(
+        [{ id: 'report', score: 0.6 }],
+        text,
+        [{ id: 'photo', score: 0.31, ...few }],
+        10,
+      );
+
+      expect(merged.map((row) => row.id)).toEqual(['report', 'photo']);
+    });
+
+    it('falls back to the raw score when text has no background either', () => {
+      const merged = mergeByStanding(
+        [{ id: 'note', score: 0.4 }],
+        null,
+        [{ id: 'photo', score: 0.55, ...sound }],
+        10,
+      );
+
+      expect(merged.map((row) => row.id)).toEqual(['photo', 'note']);
+    });
+
+    it('counts an asset found both ways once, where it stands higher', () => {
+      const merged = mergeByStanding(
+        [{ id: 'scan', score: 0.53 }],
+        text,
+        [{ id: 'scan', score: 0.6, ...sound }],
+        10,
+      );
+
+      expect(merged).toEqual([{ id: 'scan', score: 0.6 }]);
     });
   });
 

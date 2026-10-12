@@ -63,7 +63,11 @@ describe('EmbeddingSettingsService', () => {
     expect(resolved.model).toBe('Xenova/bge-small-en-v1.5');
     expect(resolved.dimensions).toBe(512);
     // Untouched fields must still track the deployment, not a frozen copy.
-    expect(resolved.pooling).toBe(service.deploymentDefaults().pooling);
+    expect(resolved.normalize).toBe(service.deploymentDefaults().normalize);
+    expect(resolved.batchSize).toBe(service.deploymentDefaults().batchSize);
+    // Pooling is not one of them: it follows the model that was chosen, and
+    // BGE is read from its first token.
+    expect(resolved.pooling).toBe('cls');
   });
 
   it('treats a model change as a rebuild', async () => {
