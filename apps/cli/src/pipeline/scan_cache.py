@@ -317,6 +317,16 @@ class ScanPlan:
     def skipped(self) -> bool:
         return self.mode == "skip"
 
+    @property
+    def media_only(self) -> bool:
+        """Re-read for its media alone: no detector has anything new to say.
+
+        The asset and every detector are unchanged; what is missing is the
+        picture or recording the workspace has since started embedding. The
+        asset is read again to prepare it, and its findings stand as they were.
+        """
+        return self.mode == "partial" and not self.run_detector_keys
+
     @classmethod
     def full(cls, reason: str) -> ScanPlan:
         return cls(mode="full", reason=reason)
@@ -337,6 +347,8 @@ class ScanCache:
         self._scope_fingerprint = scope_fingerprint
         self._payload_windows = payload_windows
         self._prior: dict[str, PriorScanState] = {}
+        # Set once the run knows what the workspace embeds besides text.
+        self._embedding_plan: Any = None
 
         config = recipe.get("scan_cache")
         config = config if isinstance(config, dict) else {}
@@ -364,6 +376,23 @@ class ScanCache:
             self._disabled_reason = "scan cache disabled for this source"
         else:
             self._disabled_reason = ""
+
+    def set_embedding_plan(self, plan: Any) -> None:
+        """Teach the cache which assets have media to send.
+
+        Without this an unchanged photograph is skipped forever: nothing about
+        it or its detectors changed when the workspace moved to a model that
+        can see, so the cache has every reason to believe the work is done.
+        """
+        self._embedding_plan = plan
+
+    def media_state_for(self, asset: Any) -> dict[str, str]:
+        """What to record once this asset's media has been sent, if it has any."""
+        plan = self._embedding_plan
+        entry = (
+            plan.cache_entry_for(getattr(asset, "asset_type", None)) if plan is not None else None
+        )
+        return {entry[0]: entry[1]} if entry else {}
 
     @staticmethod
     def _force_full_rescan() -> bool:
@@ -490,7 +519,18 @@ class ScanCache:
             key: fingerprint for key, fingerprint in self._cacheable.items() if key not in stale
         }
 
-        if not run_keys:
+        # Media the workspace embeds and this asset has not yet sent under the
+        # current rules. It is recorded beside the detector fingerprints, and
+        # like them it only ever asks for work on the assets it applies to: a
+        # text file has no entry, and is skipped as before.
+        media_state = self.media_state_for(asset)
+        media_due = any(
+            prior.detectors.get(key) != fingerprint for key, fingerprint in media_state.items()
+        )
+        if not media_due:
+            carried.update(media_state)
+
+        if not run_keys and not media_due:
             return ScanPlan(
                 mode="skip",
                 reason="content and every detector configuration unchanged",
@@ -499,9 +539,14 @@ class ScanCache:
                 prior=prior,
             )
 
+        reasons = []
+        if run_keys:
+            reasons.append(f"{len(run_keys)} detector(s) changed or always run")
+        if media_due:
+            reasons.append("its media has not been sent for embedding yet")
         return ScanPlan(
             mode="partial",
-            reason=f"{len(run_keys)} detector(s) changed or always run",
+            reason=" and ".join(reasons),
             run_detector_keys=frozenset(run_keys),
             carried_detectors=carried,
             content_hash=content_hash,
@@ -550,6 +595,7 @@ class ScanCache:
         findings_total: int | None = None,
         findings_by_severity: dict[str, int] | None = None,
         findings_by_detector: dict[str, dict[str, int]] | None = None,
+        media_state: dict[str, str] | None = None,
     ) -> dict[str, Any] | None:
         """The scan-cache state to persist for this asset, or None when off.
 
@@ -619,6 +665,10 @@ class ScanCache:
             if fingerprint is not None:
                 detectors[key] = fingerprint
 
+        # Reaching here means the chunk request went through (`completed`), and
+        # this asset's media travelled in it.
+        detectors.update(media_state or {})
+
         state: dict[str, Any] = {
             "complete": True,
             "content_hash": content_hash,
@@ -638,6 +688,12 @@ class ScanCache:
             return state
 
         status = getattr(scan_stats, "text_extraction_status", None)
+        if plan.media_only and plan.prior is not None:
+            # No detector ran, so this run found nothing and that says nothing:
+            # the counts the last real scan recorded are still the asset's.
+            findings_total = plan.prior.findings_total
+            findings_by_severity = plan.prior.findings_by_severity
+            findings_by_detector = plan.prior.findings_by_detector
         state.update(
             findings_total=findings_total,
             findings_by_severity=findings_by_severity,

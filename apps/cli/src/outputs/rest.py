@@ -347,13 +347,29 @@ class RestOutputSink:
             )
 
     async def emit_text_chunks(self, asset_hash: str, artifact: TextArtifact) -> None:
-        """Send extracted text provenance; the API embeds it asynchronously."""
+        """Send extracted text provenance; the API embeds it asynchronously.
+
+        Prepared pictures and clips ride in the same request, because the API
+        replaces everything it holds for the asset in one step.
+        """
         source_id = self._require_source_id()
-        self._request_json(
-            "POST",
-            f"/sources/{source_id}/embeddings/chunks",
-            {"assetHash": asset_hash, "chunks": artifact.chunks},
-        )
+        body: dict[str, Any] = {"assetHash": asset_hash, "chunks": artifact.chunks}
+        if artifact.media:
+            body["media"] = artifact.media
+        self._request_json("POST", f"/sources/{source_id}/embeddings/chunks", body)
+
+    async def fetch_embedding_plan(self) -> dict[str, Any]:
+        """What this workspace wants prepared for embedding besides text.
+
+        Asked once per run. An API that predates the endpoint answers 404, and
+        any failure here means the same thing: prepare no media, and embed the
+        text as every scan before this did.
+        """
+        try:
+            return self._request_json("GET", "/embeddings/collection")
+        except Exception as exc:
+            logger.info("No embedding collection plan (%s); embedding text only", exc)
+            return {}
 
     def _split_by_size(self, assets: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
         """Split assets into chunks that each stay under _MAX_BATCH_BYTES."""

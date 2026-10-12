@@ -51,6 +51,10 @@ describe('embedding task prompts', () => {
     Object.assign(service, {
       config: {},
       settings: undefined,
+      // Object.create skips the constructor, so the Logger field initializer
+      // never runs; embedMany logs at debug level since per-call timing was
+      // added, and the double has to answer it.
+      logger: { debug: jest.fn() },
       embedRemote: (texts: string[]) => {
         sent.push(texts);
         return Promise.resolve(texts.map(() => [1, 0]));

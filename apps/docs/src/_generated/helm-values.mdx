@@ -64,6 +64,7 @@
 | api.database.transactionMaxWaitMs | int | `10000` | own default is 2000, which a busy pool exceeds routinely. |
 | api.database.transactionTimeoutMs | int | `30000` | Max duration of a single interactive transaction (ms). |
 | api.embedding.allowRemoteModels | bool | `true` |  |
+| api.embedding.audio | bool | `false` | Embed audio files as sound when the embedding model can. No effect on a text-only model. |
 | api.embedding.autoBackfill | bool | `true` | embedding space on API startup. Existing vectors are hash-skipped. |
 | api.embedding.batchSize | int | `16` | backfill burst cannot spike the worker heap into an OOM. |
 | api.embedding.cacheDir | string | `"/var/cache/classifyre/transformers"` |  |
@@ -78,6 +79,7 @@
 | api.embedding.hnsw.efConstruction | int | `64` |  |
 | api.embedding.hnsw.efSearch | int | `100` |  |
 | api.embedding.hnsw.m | int | `16` |  |
+| api.embedding.images | bool | `true` | Embed image files as pictures when the embedding model can. No effect on a text-only model. |
 | api.embedding.localModelPath | string | `""` | Optional local Transformers.js model root mounted into the API pod. |
 | api.embedding.maxParallelCalls | int | `2` |  |
 | api.embedding.model | string | `"Xenova/all-MiniLM-L6-v2"` | Hugging Face model id or external provider model id. |

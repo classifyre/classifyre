@@ -12,6 +12,8 @@ Name | Type
 `baseUrl` | string
 `hasApiKey` | boolean
 `supportsEmbedding` | boolean
+`embeddingModalities` | Array&lt;string&gt;
+`embeddingMediaFormat` | string
 
 ## Example
 
@@ -26,6 +28,8 @@ const example = {
   "baseUrl": null,
   "hasApiKey": null,
   "supportsEmbedding": null,
+  "embeddingModalities": null,
+  "embeddingMediaFormat": null,
 } satisfies EmbeddingAiProviderOptionDto
 
 console.log(example)

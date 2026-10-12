@@ -15482,6 +15482,28 @@
         ]
       }
     },
+    "/embeddings/collection": {
+      "get": {
+        "operationId": "EmbeddingController_collection",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingCollectionPlanDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What a scan should prepare for embedding in this workspace: text chunks, and which media in what form",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
     "/findings/{findingId}/similar": {
       "get": {
         "operationId": "EmbeddingController_similar",
@@ -21966,6 +21988,31 @@
             "nullable": true,
             "example": "task: search result | query: "
           },
+          "embeddingModalities": {
+            "type": "array",
+            "description": "What this embedding model takes besides text, in the same vector space. Empty for a text-only model.",
+            "example": [
+              "image"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "image",
+                "audio"
+              ]
+            }
+          },
+          "embeddingMediaFormat": {
+            "type": "string",
+            "description": "Request shape the endpoint takes media in: \"llama-cpp\" (llama.cpp server with a multimodal projector), \"gemini\" (Google Gemini API) or \"openrouter\" (OpenRouter). Null for a text-only model.",
+            "enum": [
+              "llama-cpp",
+              "gemini",
+              "openrouter"
+            ],
+            "nullable": true,
+            "example": "gemini"
+          },
           "inputCostPerMTok": {
             "type": "number",
             "description": "Cost in USD per 1M input tokens. Null when pricing is not configured.",
@@ -22008,6 +22055,8 @@
           "embeddingPooling",
           "embeddingDocumentPrefix",
           "embeddingQueryPrefix",
+          "embeddingModalities",
+          "embeddingMediaFormat",
           "inputCostPerMTok",
           "outputCostPerMTok",
           "cachedInputCostPerMTok",
@@ -22081,6 +22130,31 @@
             "type": "string",
             "description": "Text put in front of every search query before it is embedded.",
             "example": "task: search result | query: "
+          },
+          "embeddingModalities": {
+            "type": "array",
+            "description": "What the embedding model takes besides text. Only kept together with embeddingMediaFormat, and only the kinds that format carries.",
+            "example": [
+              "image"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "image",
+                "audio"
+              ]
+            }
+          },
+          "embeddingMediaFormat": {
+            "type": "string",
+            "description": "Request shape the endpoint takes media in. Required for embeddingModalities to have an effect.",
+            "enum": [
+              "llama-cpp",
+              "gemini",
+              "openrouter"
+            ],
+            "nullable": true,
+            "example": "gemini"
           },
           "inputCostPerMTok": {
             "type": "number",
@@ -22172,6 +22246,31 @@
             "type": "string",
             "description": "Text put in front of every search query before it is embedded. An empty string clears it.",
             "example": "task: search result | query: "
+          },
+          "embeddingModalities": {
+            "type": "array",
+            "description": "What the embedding model takes besides text. An empty list makes the provider text-only again; a workspace bound to it then drops its stored media vectors.",
+            "example": [
+              "image"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "image",
+                "audio"
+              ]
+            }
+          },
+          "embeddingMediaFormat": {
+            "type": "string",
+            "description": "Request shape the endpoint takes media in. Pass null to clear it.",
+            "enum": [
+              "llama-cpp",
+              "gemini",
+              "openrouter"
+            ],
+            "nullable": true,
+            "example": "gemini"
           },
           "inputCostPerMTok": {
             "type": "number",
@@ -36166,6 +36265,84 @@
           "overridden"
         ]
       },
+      "EmbeddingLocalModelDownloadDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "number"
+          },
+          "image": {
+            "type": "number"
+          },
+          "audio": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "EmbeddingLocalModelDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Hugging Face repository holding the ONNX files"
+          },
+          "label": {
+            "type": "string"
+          },
+          "dimensions": {
+            "type": "number"
+          },
+          "pooling": {
+            "type": "string",
+            "enum": [
+              "mean",
+              "cls",
+              "last_token",
+              "none"
+            ],
+            "description": "How the model is pooled. Picking the model resets pooling to this."
+          },
+          "mediaModalities": {
+            "type": "array",
+            "description": "What it embeds besides text. Empty for a text-only model.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "image",
+                "audio"
+              ]
+            }
+          },
+          "aliases": {
+            "description": "Other names accepted for it, such as the repository of the original (non-ONNX) weights",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "downloadMb": {
+            "nullable": true,
+            "description": "Megabytes fetched on first use at q8, where stated",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmbeddingLocalModelDownloadDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "dimensions",
+          "pooling",
+          "mediaModalities",
+          "aliases"
+        ]
+      },
       "EmbeddingAiProviderOptionDto": {
         "type": "object",
         "properties": {
@@ -36189,6 +36366,26 @@
           "supportsEmbedding": {
             "type": "boolean",
             "description": "Whether the provider is marked as serving an embeddings endpoint"
+          },
+          "embeddingModalities": {
+            "type": "array",
+            "description": "What its embedding model takes besides text",
+            "items": {
+              "type": "string",
+              "enum": [
+                "image",
+                "audio"
+              ]
+            }
+          },
+          "embeddingMediaFormat": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "llama-cpp",
+              "gemini",
+              "openrouter"
+            ]
           }
         },
         "required": [
@@ -36196,7 +36393,8 @@
           "name",
           "provider",
           "hasApiKey",
-          "supportsEmbedding"
+          "supportsEmbedding",
+          "embeddingModalities"
         ]
       },
       "EmbeddingSpaceStatsDto": {
@@ -36273,6 +36471,14 @@
             "nullable": true,
             "description": "Bytes held by the vector table and its HNSW indexes"
           },
+          "mediaChunks": {
+            "type": "number",
+            "description": "Pictures and sound clips stored for embedding, of every modality"
+          },
+          "mediaBytes": {
+            "type": "number",
+            "description": "Bytes those prepared media items occupy"
+          },
           "analysisStorageBytes": {
             "type": "number",
             "nullable": true,
@@ -36280,7 +36486,7 @@
           },
           "chunks": {
             "type": "number",
-            "description": "Text chunks eligible for embedding"
+            "description": "Text chunks eligible for embedding (media is counted apart)"
           },
           "embeddableFindings": {
             "type": "number",
@@ -36295,6 +36501,8 @@
           "spaces",
           "vectors",
           "vectorsAllSpaces",
+          "mediaChunks",
+          "mediaBytes",
           "chunks",
           "embeddableFindings",
           "rankedFindings"
@@ -36364,6 +36572,53 @@
           },
           "hnswEfSearch": {
             "type": "number"
+          },
+          "embedImages": {
+            "type": "boolean",
+            "description": "Whether this workspace wants pictures embedded as pictures. Takes effect only on a model that can (see supportedMedia)."
+          },
+          "embedAudio": {
+            "type": "boolean",
+            "description": "Whether this workspace wants sound embedded as sound. Takes effect only on a model that can."
+          },
+          "supportedMedia": {
+            "type": "array",
+            "description": "What the model in use can embed besides text, in the same vector space",
+            "items": {
+              "type": "string",
+              "enum": [
+                "image",
+                "audio"
+              ]
+            }
+          },
+          "mediaModalities": {
+            "type": "array",
+            "description": "What is embedded besides text right now: wanted by the workspace and supported by the model",
+            "items": {
+              "type": "string",
+              "enum": [
+                "image",
+                "audio"
+              ]
+            }
+          },
+          "mediaFormat": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "llama-cpp",
+              "gemini",
+              "openrouter"
+            ],
+            "description": "Request shape the bound remote provider takes media in"
+          },
+          "localModels": {
+            "description": "Models the built-in provider is known to run",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingLocalModelDto"
+            }
           },
           "aiProviderConfigId": {
             "type": "string",
@@ -36437,6 +36692,11 @@
           "hnswM",
           "hnswEfConstruction",
           "hnswEfSearch",
+          "embedImages",
+          "embedAudio",
+          "supportedMedia",
+          "mediaModalities",
+          "localModels",
           "allowRemoteModels",
           "fields",
           "aiProviders",
@@ -36476,6 +36736,7 @@
             "enum": [
               "mean",
               "cls",
+              "last_token",
               "none"
             ]
           },
@@ -36522,6 +36783,16 @@
           "autoBackfill": {
             "type": "boolean",
             "nullable": true
+          },
+          "embedImages": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Embed pictures as pictures when the model can. Turning it off deletes the stored pictures and their vectors."
+          },
+          "embedAudio": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Embed sound as sound when the model can. Turning it off deletes the stored clips and their vectors."
           },
           "hnswM": {
             "type": "number",
@@ -36794,6 +37065,35 @@
           "text"
         ]
       },
+      "AssetMediaChunkDto": {
+        "type": "object",
+        "properties": {
+          "modality": {
+            "type": "string",
+            "enum": [
+              "image",
+              "audio"
+            ]
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/jpeg"
+          },
+          "data": {
+            "type": "string",
+            "description": "The prepared bytes, base64-encoded"
+          },
+          "page": {
+            "type": "number",
+            "description": "Page, frame or clip number within the asset, from 1"
+          }
+        },
+        "required": [
+          "modality",
+          "mimeType",
+          "data"
+        ]
+      },
       "PutAssetChunksDto": {
         "type": "object",
         "properties": {
@@ -36806,11 +37106,89 @@
             "items": {
               "$ref": "#/components/schemas/AssetChunkDto"
             }
+          },
+          "media": {
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetMediaChunkDto"
+            }
           }
         },
         "required": [
           "assetHash",
           "chunks"
+        ]
+      },
+      "EmbeddingCollectionMediaDto": {
+        "type": "object",
+        "properties": {
+          "modality": {
+            "type": "string",
+            "enum": [
+              "image",
+              "audio"
+            ]
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/jpeg"
+          },
+          "maxItems": {
+            "type": "number",
+            "description": "Most items taken from one asset"
+          },
+          "cacheKey": {
+            "type": "string",
+            "description": "Key the scan records in the asset scan-cache state, with `fingerprint` as its value, once this media was sent",
+            "example": "EMBED_MEDIA::image"
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Changes whenever the way this kind of media is prepared changes; an asset recorded under another value sends its media again"
+          },
+          "maxEdge": {
+            "type": "number",
+            "description": "Pictures: longest edge, in pixels"
+          },
+          "quality": {
+            "type": "number",
+            "description": "Pictures: JPEG quality, 1-100"
+          },
+          "sampleRate": {
+            "type": "number",
+            "description": "Sound: sample rate, in Hz"
+          },
+          "clipSeconds": {
+            "type": "number",
+            "description": "Sound: length of one clip, in seconds"
+          }
+        },
+        "required": [
+          "modality",
+          "mimeType",
+          "maxItems",
+          "cacheKey",
+          "fingerprint"
+        ]
+      },
+      "EmbeddingCollectionPlanDto": {
+        "type": "object",
+        "properties": {
+          "chunks": {
+            "type": "boolean",
+            "description": "Whether text chunks are stored at all (false after embeddings were turned off and deleted)"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingCollectionMediaDto"
+            }
+          }
+        },
+        "required": [
+          "chunks",
+          "media"
         ]
       },
       "Object": {

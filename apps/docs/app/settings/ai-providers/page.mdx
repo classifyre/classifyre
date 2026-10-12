@@ -78,6 +78,7 @@ into one column and the save controls remain available at the bottom.
 | **Context size**            | Optional model context window in tokens. Used by Harness capacity analysis.                  |
 | **Vision support**          | Whether the model accepts image and PDF input.                                               |
 | **Document prompt**, **Query prompt** | For an embedding model trained with task prompts: the text put in front of what is stored and of what is asked. See [Embeddings](/settings/embeddings#task-prompts). |
+| **Pictures and sound**      | For an embedding model that puts pictures or sound in the same vector space as its text: what it takes, and the request format the endpoint takes it in (**llama.cpp server**, **Google Gemini API** or **OpenRouter**). Left at **Text only** for every other model. The connection test sends a test picture. See [Embeddings](/settings/embeddings#pictures-and-sound). |
 | **Input/output token cost** | Optional USD price per one million tokens, used for Harness cost estimates and usage charts. |
 
 Testing a new provider saves its credential first. A later save updates that

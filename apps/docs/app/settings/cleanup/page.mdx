@@ -26,7 +26,7 @@ assets, cases, inquiries and the glossary.
 
 | Feature | What it builds | What reads it |
 | --- | --- | --- |
-| **Embeddings** | Vectors of finding evidence and document text, the importance rankings derived from them, and the document text chunks they are embedded from | Importance ranking, near-duplicate text groups, semantic search, similar findings, semantic case leads, the AI harness's evidence lookups |
+| **Embeddings** | Vectors of finding evidence, document text and (on a model that embeds them) pictures and sound; the importance rankings derived from them; and the document text chunks and prepared pictures and clips they are embedded from | Importance ranking, near-duplicate text groups, semantic search, similar findings, semantic case leads, the AI harness's evidence lookups |
 | **Duplicate detection** | Correlation values, signatures, clusters, patterns and the scored duplicate links in the asset graph | [Duplicate review](/duplicates/), "where else found", similar-asset links in the graph, look-alike [case leads](/investigations/cases/leads/), the harness duplicates tools |
 | **Entities** | Alias and identifier values of entities, spelling-variant candidates, mention counters and the semantic links that mentions create | [Entity pages and review](/how-it-works/glossary/#entities-from-mentions-to-things), entity watches, entity-based [case leads](/investigations/cases/leads/), "Make entity" |
 
@@ -70,6 +70,7 @@ Either way:
 | New vectors | None | None |
 | Stored vectors and importance rankings | Kept, frozen | Deleted; importance scores reset to 0 |
 | Document text chunks | Kept — and scans keep saving them | Deleted — and scans stop saving them |
+| Stored pictures and sound clips | Kept. No new ones are collected while paused; a picture first scanned during the pause is collected the next time a scan reads it | Deleted |
 | Semantic search, similar findings, near-duplicate text groups, semantic case leads | Unavailable (search falls back to exact text) | Unavailable |
 | Workers held | `semantic-embeddings-…`, `semantic-recalibrate-…` | The same |
 | Turning back on | A catch-up pass embeds whatever arrived while off | Every finding is re-embedded (hours of worker CPU on a large corpus); document text comes back only by rescanning sources with **Full rescan** (in the scan wizard) |
@@ -236,7 +237,7 @@ all of it previously counted as protected assets.
 | ------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------- |
 | Scan history        | Finished runs, per-run asset snapshots, log files                    | Pending/running scans; asset “last seen by” pointers are cleared, not the assets | No — history is history                 |
 | Duplicate artefacts | Match candidates, signatures, correlation values, clusters, patterns, profiles, scored duplicate links in the asset graph | Review decisions and batches (human triage), lineage, config | Yes, on the next duplicate check (while duplicate detection is on) |
-| Embeddings          | Vectors, importance rankings (scores reset to 0), document text chunks, vector spaces and their indexes | Embedding settings | Findings: yes, while embeddings are on. Document text: only by a full rescan |
+| Embeddings          | Vectors, importance rankings (scores reset to 0), document text chunks, stored pictures and sound clips, vector spaces and their indexes | Embedding settings | Findings: yes, while embeddings are on. Document text, pictures and sound: only by a full rescan |
 | AI harness history  | Agent runs incl. dreams, logs, decisions, supervisor notes           | Learned memory, goals, briefs, configs, undo history                             | No — history is history                 |
 | Finished queue jobs | Completed/failed/cancelled jobs and archived history                 | Pending, scheduled and running jobs; the schedules themselves                    | N/A (history)                           |
 | Finding statistics  | Precomputed daily rollups and worker state                           | —                                                                                | Yes, automatically via the stats worker |

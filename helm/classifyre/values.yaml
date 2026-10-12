@@ -66,6 +66,16 @@ api:
     # -- Reconcile all stored findings and asset chunks into the configured
     # -- embedding space on API startup. Existing vectors are hash-skipped.
     autoBackfill: true
+    # Pictures and sound embedded as what they are, next to the text read out
+    # of them. Both only take effect on a model that can (EmbeddingGemma 2, or
+    # a remote provider marked as taking them), and a workspace can override
+    # either. Sound is off by default: the audio encoder is the largest part of
+    # a multimodal model and a stored clip is close to a megabyte, for content
+    # that is already transcribed.
+    # -- Embed image files as pictures when the embedding model can. No effect on a text-only model.
+    images: true
+    # -- Embed audio files as sound when the embedding model can. No effect on a text-only model.
+    audio: false
     # -- Maximum embedding batches processed concurrently across all API replicas.
     workerConcurrency: 1
     maxParallelCalls: 2

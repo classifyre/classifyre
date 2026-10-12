@@ -92,6 +92,18 @@ export interface CreateAiProviderConfigDto {
      */
     embeddingQueryPrefix?: string;
     /**
+     * What the embedding model takes besides text. Only kept together with embeddingMediaFormat, and only the kinds that format carries.
+     * @type {Array<string>}
+     * @memberof CreateAiProviderConfigDto
+     */
+    embeddingModalities?: Array<CreateAiProviderConfigDtoEmbeddingModalitiesEnum>;
+    /**
+     * Request shape the endpoint takes media in. Required for embeddingModalities to have an effect.
+     * @type {string}
+     * @memberof CreateAiProviderConfigDto
+     */
+    embeddingMediaFormat?: CreateAiProviderConfigDtoEmbeddingMediaFormatEnum | null;
+    /**
      * Optional cost in USD per 1M input tokens (enables cost estimates on autopilot runs).
      * @type {number}
      * @memberof CreateAiProviderConfigDto
@@ -121,6 +133,25 @@ export const CreateAiProviderConfigDtoProviderEnum = {
     Gemini: 'GEMINI'
 } as const;
 export type CreateAiProviderConfigDtoProviderEnum = typeof CreateAiProviderConfigDtoProviderEnum[keyof typeof CreateAiProviderConfigDtoProviderEnum];
+
+/**
+ * @export
+ */
+export const CreateAiProviderConfigDtoEmbeddingModalitiesEnum = {
+    Image: 'image',
+    Audio: 'audio'
+} as const;
+export type CreateAiProviderConfigDtoEmbeddingModalitiesEnum = typeof CreateAiProviderConfigDtoEmbeddingModalitiesEnum[keyof typeof CreateAiProviderConfigDtoEmbeddingModalitiesEnum];
+
+/**
+ * @export
+ */
+export const CreateAiProviderConfigDtoEmbeddingMediaFormatEnum = {
+    LlamaCpp: 'llama-cpp',
+    Gemini: 'gemini',
+    Openrouter: 'openrouter'
+} as const;
+export type CreateAiProviderConfigDtoEmbeddingMediaFormatEnum = typeof CreateAiProviderConfigDtoEmbeddingMediaFormatEnum[keyof typeof CreateAiProviderConfigDtoEmbeddingMediaFormatEnum];
 
 
 /**
@@ -154,6 +185,8 @@ export function CreateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscrimi
         'embeddingPooling': json['embeddingPooling'] == null ? undefined : json['embeddingPooling'],
         'embeddingDocumentPrefix': json['embeddingDocumentPrefix'] == null ? undefined : json['embeddingDocumentPrefix'],
         'embeddingQueryPrefix': json['embeddingQueryPrefix'] == null ? undefined : json['embeddingQueryPrefix'],
+        'embeddingModalities': json['embeddingModalities'] == null ? undefined : json['embeddingModalities'],
+        'embeddingMediaFormat': json['embeddingMediaFormat'] == null ? undefined : json['embeddingMediaFormat'],
         'inputCostPerMTok': json['inputCostPerMTok'] == null ? undefined : json['inputCostPerMTok'],
         'outputCostPerMTok': json['outputCostPerMTok'] == null ? undefined : json['outputCostPerMTok'],
         'cachedInputCostPerMTok': json['cachedInputCostPerMTok'] == null ? undefined : json['cachedInputCostPerMTok'],
@@ -183,6 +216,8 @@ export function CreateAiProviderConfigDtoToJSONTyped(value?: CreateAiProviderCon
         'embeddingPooling': value['embeddingPooling'],
         'embeddingDocumentPrefix': value['embeddingDocumentPrefix'],
         'embeddingQueryPrefix': value['embeddingQueryPrefix'],
+        'embeddingModalities': value['embeddingModalities'],
+        'embeddingMediaFormat': value['embeddingMediaFormat'],
         'inputCostPerMTok': value['inputCostPerMTok'],
         'outputCostPerMTok': value['outputCostPerMTok'],
         'cachedInputCostPerMTok': value['cachedInputCostPerMTok'],

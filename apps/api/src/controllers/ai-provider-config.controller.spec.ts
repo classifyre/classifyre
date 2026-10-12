@@ -17,6 +17,7 @@ function buildController(completeText: jest.Mock) {
     {} as never,
     { overrides: jest.fn().mockResolvedValue(null) } as never,
     { start: jest.fn() } as never,
+    { applyMediaChange: jest.fn() } as never,
   );
 }
 

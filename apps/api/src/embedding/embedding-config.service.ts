@@ -159,6 +159,19 @@ export class EmbeddingConfigService {
     5_000_000,
   );
   readonly retrySeconds = integerEnv('EMBEDDING_RETRY_SECONDS', 30, 1, 3600);
+  /**
+   * Whether pictures and sound are embedded as what they are, next to the
+   * text read out of them, when the model in use can do it.
+   *
+   * These say what a workspace WANTS; what it gets is this and what the model
+   * supports (see ResolvedEmbeddingConfig.modalities), so both are harmless on
+   * a text-only model. Pictures default to on because a model that can see is
+   * usually chosen for exactly that. Sound defaults to off: its encoder is the
+   * largest part of a multimodal model and a stored clip is close to a
+   * megabyte, for content that is already transcribed.
+   */
+  readonly embedImages = booleanEnv('EMBEDDING_IMAGES', true);
+  readonly embedAudio = booleanEnv('EMBEDDING_AUDIO', false);
   readonly autoBackfill = booleanEnv('EMBEDDING_AUTO_BACKFILL', true);
 
   readonly intraOpThreads = integerEnv(
@@ -171,6 +184,19 @@ export class EmbeddingConfigService {
   readonly dtype = process.env.EMBEDDING_DTYPE ?? 'q8';
   readonly device = process.env.EMBEDDING_DEVICE ?? 'cpu';
   readonly cacheDir = process.env.EMBEDDING_CACHE_DIR ?? defaultCacheDir();
+  /**
+   * Megabytes the model cache may hold. Above it, the model used longest ago
+   * is deleted before another is downloaded (see pruneModelCache). It has to
+   * stay under the cache volume's own limit, which is 2 Gi in the Helm chart:
+   * a volume over its limit gets the pod evicted. 1,500 leaves room for the
+   * largest model on the list next to one other.
+   */
+  readonly cacheMaxMb = integerEnv(
+    'EMBEDDING_CACHE_MAX_MB',
+    1500,
+    100,
+    1_000_000,
+  );
   readonly localModelPath = process.env.EMBEDDING_LOCAL_MODEL_PATH;
   readonly allowRemoteModels = booleanEnv(
     'EMBEDDING_ALLOW_REMOTE_MODELS',

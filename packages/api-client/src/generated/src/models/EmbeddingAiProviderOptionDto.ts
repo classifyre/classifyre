@@ -55,7 +55,40 @@ export interface EmbeddingAiProviderOptionDto {
      * @memberof EmbeddingAiProviderOptionDto
      */
     supportsEmbedding: boolean;
+    /**
+     * What its embedding model takes besides text
+     * @type {Array<string>}
+     * @memberof EmbeddingAiProviderOptionDto
+     */
+    embeddingModalities: Array<EmbeddingAiProviderOptionDtoEmbeddingModalitiesEnum>;
+    /**
+     * 
+     * @type {string}
+     * @memberof EmbeddingAiProviderOptionDto
+     */
+    embeddingMediaFormat?: EmbeddingAiProviderOptionDtoEmbeddingMediaFormatEnum | null;
 }
+
+
+/**
+ * @export
+ */
+export const EmbeddingAiProviderOptionDtoEmbeddingModalitiesEnum = {
+    Image: 'image',
+    Audio: 'audio'
+} as const;
+export type EmbeddingAiProviderOptionDtoEmbeddingModalitiesEnum = typeof EmbeddingAiProviderOptionDtoEmbeddingModalitiesEnum[keyof typeof EmbeddingAiProviderOptionDtoEmbeddingModalitiesEnum];
+
+/**
+ * @export
+ */
+export const EmbeddingAiProviderOptionDtoEmbeddingMediaFormatEnum = {
+    LlamaCpp: 'llama-cpp',
+    Gemini: 'gemini',
+    Openrouter: 'openrouter'
+} as const;
+export type EmbeddingAiProviderOptionDtoEmbeddingMediaFormatEnum = typeof EmbeddingAiProviderOptionDtoEmbeddingMediaFormatEnum[keyof typeof EmbeddingAiProviderOptionDtoEmbeddingMediaFormatEnum];
+
 
 /**
  * Check if a given object implements the EmbeddingAiProviderOptionDto interface.
@@ -66,6 +99,7 @@ export function instanceOfEmbeddingAiProviderOptionDto(value: object): value is 
     if (!('provider' in value) || value['provider'] === undefined) return false;
     if (!('hasApiKey' in value) || value['hasApiKey'] === undefined) return false;
     if (!('supportsEmbedding' in value) || value['supportsEmbedding'] === undefined) return false;
+    if (!('embeddingModalities' in value) || value['embeddingModalities'] === undefined) return false;
     return true;
 }
 
@@ -85,6 +119,8 @@ export function EmbeddingAiProviderOptionDtoFromJSONTyped(json: any, ignoreDiscr
         'baseUrl': json['baseUrl'] == null ? undefined : json['baseUrl'],
         'hasApiKey': json['hasApiKey'],
         'supportsEmbedding': json['supportsEmbedding'],
+        'embeddingModalities': json['embeddingModalities'],
+        'embeddingMediaFormat': json['embeddingMediaFormat'] == null ? undefined : json['embeddingMediaFormat'],
     };
 }
 
@@ -105,6 +141,8 @@ export function EmbeddingAiProviderOptionDtoToJSONTyped(value?: EmbeddingAiProvi
         'baseUrl': value['baseUrl'],
         'hasApiKey': value['hasApiKey'],
         'supportsEmbedding': value['supportsEmbedding'],
+        'embeddingModalities': value['embeddingModalities'],
+        'embeddingMediaFormat': value['embeddingMediaFormat'],
     };
 }
 

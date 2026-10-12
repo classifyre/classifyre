@@ -41,7 +41,9 @@ import {
   EmbeddingSettingsService,
   SPACE_DEFINING_FIELDS,
   resolvedFromEnv,
+  withModelCapabilities,
 } from '../embedding/embedding-settings.service';
+import { EmbeddingService } from '../embedding/embedding.service';
 import { EmbeddingRebuildService } from '../embedding/embedding-rebuild.service';
 import { EmbeddingConfigService } from '../embedding/embedding-config.service';
 
@@ -69,6 +71,7 @@ export class AiProviderConfigController {
     private readonly embeddingDefaults: EmbeddingConfigService,
     private readonly embeddingSettings: EmbeddingSettingsService,
     private readonly embeddingRebuilds: EmbeddingRebuildService,
+    private readonly embeddings: EmbeddingService,
   ) {}
 
   /**
@@ -101,6 +104,13 @@ export class AiProviderConfigController {
         `Embedding provider changed: ${changed.join(', ')}`,
       );
     }
+    // A provider that stopped taking pictures leaves the workspace holding
+    // pictures nothing will embed, and vectors a search would still return;
+    // one that started leaves it with pictures no scan has collected.
+    await this.embeddings.applyMediaChange(
+      before.mediaModalities,
+      after.mediaModalities,
+    );
     return result;
   }
 
@@ -236,17 +246,25 @@ export class AiProviderConfigController {
       const runtime = await this.service.getRuntimeConfig(id);
       const declared = config.embeddingDimensions ?? null;
       const result = await this.embeddingProvider.testConnection(
-        {
-          ...resolvedFromEnv(this.embeddingDefaults),
-          provider: 'openai-compatible',
-          model: config.model,
-          baseUrl: runtime.baseUrl ?? undefined,
-          apiKey: runtime.apiKey,
-          dimensions: declared ?? this.embeddingDefaults.dimensions,
-          // The probe must not be rejected for the width it came back with —
-          // testConnection reports the mismatch, embedMany would throw on it.
-          normalize: false,
-        },
+        // What the PROVIDER says it takes, whatever any workspace has turned
+        // on: this is the provider's test, and a picture it cannot embed is
+        // worth knowing about before a workspace is pointed at it.
+        withModelCapabilities(
+          {
+            ...resolvedFromEnv(this.embeddingDefaults),
+            provider: 'openai-compatible',
+            model: config.model,
+            baseUrl: runtime.baseUrl ?? undefined,
+            apiKey: runtime.apiKey,
+            dimensions: declared ?? this.embeddingDefaults.dimensions,
+            // The probe must not be rejected for the width it came back with —
+            // testConnection reports the mismatch, embedMany would throw on it.
+            normalize: false,
+            embedImages: true,
+            embedAudio: true,
+          },
+          runtime,
+        ),
         // Declared width only: a provider *told* to produce 384 dimensions
         // produces them, and the check meant to catch a misconfiguration
         // passes on a vector the deployment default asked for.
@@ -289,6 +307,21 @@ export class AiProviderConfigController {
               : learned
                 ? `Dimensions were not set; saved the ${result.dimensions} this model returned.`
                 : `This model returns ${result.dimensions} dimensions.`,
+          ...(result.media.length
+            ? [
+                `${result.media
+                  .map((modality) =>
+                    modality === 'audio'
+                      ? 'a test sound clip'
+                      : 'a test picture',
+                  )
+                  .join(' and ')
+                  .replace(
+                    /^a/,
+                    'A',
+                  )} came back as ${result.dimensions}-dimension vectors too.`,
+              ]
+            : []),
         ],
         durationMs: Date.now() - startedAt,
         inputTokens: null,

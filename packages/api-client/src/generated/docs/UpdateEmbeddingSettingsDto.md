@@ -20,6 +20,8 @@ Name | Type
 `dtype` | string
 `device` | string
 `autoBackfill` | boolean
+`embedImages` | boolean
+`embedAudio` | boolean
 `hnswM` | number
 `hnswEfConstruction` | number
 `hnswEfSearch` | number
@@ -45,6 +47,8 @@ const example = {
   "dtype": null,
   "device": null,
   "autoBackfill": null,
+  "embedImages": null,
+  "embedAudio": null,
   "hnswM": null,
   "hnswEfConstruction": null,
   "hnswEfSearch": null,

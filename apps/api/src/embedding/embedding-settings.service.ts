@@ -9,6 +9,18 @@ import {
 } from './embedding-config.service';
 import { MAX_VECTOR_DIMENSIONS } from './embedding-vector';
 import {
+  MEDIA_FORMAT_MODALITIES,
+  isEmbeddingMediaFormat,
+  normalizeMediaModalities,
+  type EmbeddingMediaFormat,
+  type MediaModality,
+} from './embedding-modality';
+import {
+  canonicalLocalModelId,
+  localModelProfile,
+  type LocalModelFamily,
+} from './embedding-local-models';
+import {
   WORKSPACE_FEATURES_LOCATION,
   type FeatureDisabledMode,
 } from '../maintenance/workspace-features.constants';
@@ -109,6 +121,95 @@ export interface ResolvedEmbeddingConfig {
    */
   documentPrefix?: string;
   queryPrefix?: string;
+  /** Whether the workspace wants pictures and sound embedded as such. */
+  embedImages: boolean;
+  embedAudio: boolean;
+  /** What the model in use can embed besides text, in the same space. */
+  supportedMedia: MediaModality[];
+  /**
+   * What IS embedded besides text: wanted and supported. Everything that
+   * collects, stores, embeds or searches media reads this one list.
+   */
+  mediaModalities: MediaModality[];
+  /** Request shape the bound provider's endpoint takes media in. */
+  mediaFormat?: EmbeddingMediaFormat;
+  /** How the local worker loads the model. */
+  localFamily: LocalModelFamily;
+}
+
+/**
+ * What a provider says about its embedding model's media support. Only the
+ * fields the resolver reads, so a test can pass a literal.
+ */
+export interface RemoteMediaCapability {
+  embeddingModalities?: readonly string[] | null;
+  embeddingMediaFormat?: string | null;
+}
+
+/**
+ * Fills in what follows from the model: what it can embed besides text, the
+ * task prompts a known local model was trained with, and from those and the
+ * workspace's wishes what is actually embedded.
+ *
+ * One function for both layers on purpose. The deployment default can name a
+ * multimodal model just as a workspace can, and two places working this out
+ * would be two answers to "does this workspace embed pictures".
+ */
+export function withModelCapabilities(
+  cfg: ResolvedEmbeddingConfig,
+  remote?: RemoteMediaCapability | null,
+): ResolvedEmbeddingConfig {
+  const next = { ...cfg };
+  if (next.provider === 'transformers-js') {
+    const profile = localModelProfile(next.model);
+    next.localFamily = profile?.family ?? 'feature-extraction';
+    next.supportedMedia = [...(profile?.mediaModalities ?? [])];
+    next.mediaFormat = undefined;
+    // Prompts belong to the model. A remote provider states its own; a local
+    // one is known from the catalogue.
+    next.documentPrefix = profile?.documentPrefix;
+    next.queryPrefix = profile?.queryPrefix;
+  } else {
+    next.localFamily = 'feature-extraction';
+    const format = remote?.embeddingMediaFormat;
+    // Without a request shape there is no way to send media, whatever the
+    // provider row claims the model can take.
+    next.mediaFormat = isEmbeddingMediaFormat(format) ? format : undefined;
+    const carried = next.mediaFormat
+      ? MEDIA_FORMAT_MODALITIES[next.mediaFormat]
+      : [];
+    next.supportedMedia = normalizeMediaModalities(
+      remote?.embeddingModalities,
+    ).filter((modality) => carried.includes(modality));
+  }
+  const wanted: Record<MediaModality, boolean> = {
+    image: next.embedImages,
+    audio: next.embedAudio,
+  };
+  next.mediaModalities = next.supportedMedia.filter(
+    (modality) => wanted[modality],
+  );
+  return next;
+}
+
+/**
+ * Fields a change report leaves out: the key is a secret, and the other two
+ * are worked out from the model rather than set — what was changed is the
+ * model, and `mediaModalities` already says what that did to pictures and
+ * sound.
+ */
+const UNREPORTED_FIELDS: ReadonlySet<keyof ResolvedEmbeddingConfig> = new Set([
+  'apiKey',
+  'supportedMedia',
+  'localFamily',
+]);
+
+/** Equal as settings: lists by content, everything else by identity. */
+function sameSetting(left: unknown, right: unknown): boolean {
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return JSON.stringify(left ?? []) === JSON.stringify(right ?? []);
+  }
+  return left === right;
 }
 
 /** One knob as the settings page shows it: what it is now, and what it would be. */
@@ -118,7 +219,7 @@ export interface EffectiveField<T> {
   overridden: boolean;
 }
 
-const ALLOWED_POOLING = ['mean', 'cls', 'none'] as const;
+const ALLOWED_POOLING = ['mean', 'cls', 'last_token', 'none'] as const;
 const ALLOWED_DTYPE = ['fp32', 'fp16', 'q8', 'int8', 'uint8', 'q4'] as const;
 const ALLOWED_DEVICE = ['cpu', 'gpu', 'webgpu', 'wasm', 'auto'] as const;
 
@@ -132,7 +233,7 @@ const ALLOWED_DEVICE = ['cpu', 'gpu', 'webgpu', 'wasm', 'auto'] as const;
 export function resolvedFromEnv(
   d: EmbeddingConfigService,
 ): ResolvedEmbeddingConfig {
-  return {
+  return withModelCapabilities({
     enabled: d.enabled,
     disabledMode: null,
     provider: d.provider,
@@ -165,7 +266,15 @@ export function resolvedFromEnv(
     // back from a provider with prompts to one without has to show up there.
     documentPrefix: undefined,
     queryPrefix: undefined,
-  };
+    embedImages: d.embedImages,
+    embedAudio: d.embedAudio,
+    // A deployment that points at a remote endpoint by environment variable
+    // has no provider row to say what the endpoint takes, so it embeds text.
+    supportedMedia: [],
+    mediaModalities: [],
+    mediaFormat: undefined,
+    localFamily: 'feature-extraction',
+  });
 }
 
 /**
@@ -245,7 +354,8 @@ export class EmbeddingSettingsService {
       );
     }
 
-    const resolved: ResolvedEmbeddingConfig = { ...base };
+    let resolved: ResolvedEmbeddingConfig = { ...base };
+    let remote: RemoteMediaCapability | null = null;
     if (row) {
       const pick = <K extends keyof ResolvedEmbeddingConfig>(
         field: K,
@@ -271,6 +381,30 @@ export class EmbeddingSettingsService {
       pick('dtype', row.dtype);
       pick('device', row.device);
       pick('autoBackfill', row.autoBackfill);
+      pick('embedImages', row.embedImages);
+      pick('embedAudio', row.embedAudio);
+      // The deployment's width and pinned revision describe the deployment's
+      // model. A workspace that chose another local model and left those two
+      // alone would inherit a commit its repository does not have, and a
+      // width the model does not return — every batch failing for a setting
+      // nobody made. So for another model the unset ones follow the model:
+      // its own width where it is known, and the head of its repository.
+      if (
+        resolved.provider === 'transformers-js' &&
+        row.model &&
+        canonicalLocalModelId(row.model) !== base.model
+      ) {
+        const profile = localModelProfile(resolved.model);
+        if (row.dimensions == null && profile) {
+          resolved.dimensions = profile.dimensions;
+        }
+        // Pooling is how the model was trained to be read, not a taste: BGE
+        // and Granite put the sentence in their first token, Qwen3 in its
+        // last. Mean-pooling them returns a vector of the right width that
+        // retrieves worse, with nothing to say why.
+        if (row.pooling == null && profile) resolved.pooling = profile.pooling;
+        if (row.revision == null) resolved.revision = 'main';
+      }
       pick('hnswM', row.hnswM);
       pick('hnswEfConstruction', row.hnswEfConstruction);
       pick('hnswEfSearch', row.hnswEfSearch);
@@ -304,6 +438,7 @@ export class EmbeddingSettingsService {
             resolved.documentPrefix =
               runtime.embeddingDocumentPrefix || undefined;
             resolved.queryPrefix = runtime.embeddingQueryPrefix || undefined;
+            remote = runtime;
           }
         } catch (error) {
           this.logger.warn(
@@ -314,6 +449,10 @@ export class EmbeddingSettingsService {
         }
       }
     }
+
+    // Last, because it reads the model and provider the overrides just
+    // settled: what this model can embed, and so what this workspace does.
+    resolved = withModelCapabilities(resolved, remote);
 
     this.cache.set(key, { cfg: resolved, at: Date.now() });
     return resolved;
@@ -466,6 +605,12 @@ export class EmbeddingSettingsService {
     }
 
     const data = { ...patch };
+    // A local model is known by the repository this runtime can load. The
+    // author's own repository (PyTorch weights) is accepted as a name for it,
+    // and what is stored is what will be fetched.
+    if (providerAfter === 'transformers-js' && typeof data.model === 'string') {
+      data.model = canonicalLocalModelId(data.model);
+    }
     // Switching to a remote provider hands model, width and pooling to the
     // credential — the settings page stops showing inputs for them and says
     // so. A model override left over from the local provider would survive
@@ -490,7 +635,11 @@ export class EmbeddingSettingsService {
 
     const changedFields = (
       Object.keys(after) as (keyof ResolvedEmbeddingConfig)[]
-    ).filter((field) => field !== 'apiKey' && before[field] !== after[field]);
+    ).filter(
+      (field) =>
+        !UNREPORTED_FIELDS.has(field) &&
+        !sameSetting(before[field], after[field]),
+    );
 
     // On/off is not a patch field any more (see above), so only a change to
     // the coordinate system itself forces a rebuild. A space-defining change
@@ -594,6 +743,8 @@ export interface EmbeddingSettingsPatch {
   dtype?: string | null;
   device?: string | null;
   autoBackfill?: boolean | null;
+  embedImages?: boolean | null;
+  embedAudio?: boolean | null;
   hnswM?: number | null;
   hnswEfConstruction?: number | null;
   hnswEfSearch?: number | null;

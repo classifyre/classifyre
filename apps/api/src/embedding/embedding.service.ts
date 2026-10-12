@@ -29,9 +29,19 @@ import {
   EmbeddingSettingsService,
   type ResolvedEmbeddingConfig,
 } from './embedding-settings.service';
-import { embeddingContentHash } from './embedding-text';
+import {
+  embeddingContentHash,
+  windowsOntoOnePassage,
+} from './embedding-text';
 import { reasonsForStorage, type StoredReason } from './reason-labels';
 import { MAX_INDEXED_DIMENSIONS, vectorCast } from './embedding-vector';
+import {
+  MAX_MEDIA_BYTES,
+  isMediaModality,
+  mediaContentHash,
+  mediaScanCacheKey,
+  type MediaModality,
+} from './embedding-modality';
 
 type SimilarityRow = { id: string; score: number };
 /** One neighbour of a (content hash, finding type) pair. */
@@ -66,6 +76,14 @@ const MIN_NEIGHBORHOOD = 5;
 // bar sits at the top decile (~0.55) rather than the old 0.35, which flagged
 // half the corpus.
 const OUTLIER_BONUS_THRESHOLD = 0.55;
+
+/**
+ * Cosine from which two pieces of evidence are taken for the same text said
+ * twice. One number for every model, which is a simplification: models spread
+ * their scores very differently (see the embeddings docs, "How alike is
+ * alike"), so the same cut-off is strict on one and loose on another.
+ */
+const NEAR_DUPLICATE_MIN = 0.95;
 const RECALIBRATE_BATCH_SIZE = 500;
 /** Findings read per page when fanning a neighbourhood back out. */
 const NEIGHBORHOOD_PAGE_SIZE = 2000;
@@ -106,6 +124,111 @@ const RECALIBRATE_REFRESH_BATCHES = 20;
  */
 function candidateBudget(limit: number): number {
   return Math.max(limit * 5, 200);
+}
+
+/**
+ * One ranked list out of two, keeping each id's better score.
+ *
+ * An asset can be in both — a scanned page is found by its text and by its
+ * picture — and it is one result, as good as its best match.
+ */
+export function mergeBestScores(
+  left: SimilarityRow[],
+  right: SimilarityRow[],
+  limit: number,
+): SimilarityRow[] {
+  const best = new Map<string, number>();
+  for (const row of [...left, ...right]) {
+    const score = Number(row.score);
+    const known = best.get(row.id);
+    if (known === undefined || score > known) best.set(row.id, score);
+  }
+  return [...best.entries()]
+    .map(([id, score]) => ({ id, score }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+/** How one kind of content scores a question on the whole: what a single score is read against. */
+export interface ScoreBackground {
+  /** The middle score of its kind for this question (the median). */
+  middle: number;
+  count: number;
+}
+
+/** A picture or a clip with its score, and how its kind scored the same question. */
+export type MediaScoreRow = SimilarityRow & ScoreBackground;
+
+/** Fewer items of a kind than this are no background to measure a score against. */
+const MIN_BACKGROUND = 8;
+
+/** Text passages read to learn how text scores a question. */
+const BACKGROUND_SAMPLE = 512;
+
+/**
+ * One ranked list out of text and media, each read against its own kind.
+ *
+ * A model puts text, pictures and sound in one space, but not at one
+ * distance. The picture a caption describes sits further from the caption
+ * than an unrelated sentence does: measured with Gemini Embedding 2, "a dog
+ * barking" scored 0.62 against the recording of the dog and 0.56 against a
+ * sentence about an invoice. Ranked by raw score, every passage in the
+ * workspace came before the one clip that answered, and a model that picked
+ * the right clip nine times in ten found none in the product.
+ *
+ * So each result is placed by how far its score lies above the middle of its
+ * own kind for this question: text above the median of a sample of the
+ * passages, pictures above the median of all pictures, sound above the median
+ * of all sound. The cosine each row carries is left as it was; only the order
+ * uses the standing.
+ *
+ * The median and nothing more, on purpose. Dividing by each kind's spread as
+ * well (a z-score) was tried on the same questions and lost: a kind in which
+ * several items answer (a photograph and four copies of it) has a wide
+ * spread and was marked down for it, and a kind in which nothing answers has
+ * a narrow one and was marked up. Measured over 110 questions, right result
+ * first, raw / z-score / above the median: Gemini Embedding 2 83 / 81 / 92,
+ * SigLIP 2 43 / 44 / 51, CLIP 42 / 54 / 57.
+ *
+ * A kind with too few items to have a middle (a workspace with three
+ * photographs) is read against the text's, which is the old behaviour.
+ */
+export function mergeByStanding(
+  text: SimilarityRow[],
+  textBackground: ScoreBackground | null,
+  media: MediaScoreRow[],
+  limit: number,
+): SimilarityRow[] {
+  const usable = (background: ScoreBackground | null) =>
+    background != null &&
+    background.count >= MIN_BACKGROUND &&
+    Number.isFinite(background.middle);
+  if (!usable(textBackground)) {
+    return mergeBestScores(text, media, limit);
+  }
+  const base = textBackground as ScoreBackground;
+
+  const best = new Map<string, { score: number; standing: number }>();
+  const place = (id: string, score: number, stands: number) => {
+    const known = best.get(id);
+    if (!known || stands > known.standing) {
+      best.set(id, { score, standing: stands });
+    }
+  };
+  for (const row of text) {
+    const score = Number(row.score);
+    place(row.id, score, score - base.middle);
+  }
+  for (const row of media) {
+    const score = Number(row.score);
+    const own = { middle: Number(row.middle), count: Number(row.count) };
+    place(row.id, score, score - (usable(own) ? own : base).middle);
+  }
+  return [...best.entries()]
+    .map(([id, entry]) => ({ id, ...entry }))
+    .sort((a, b) => b.standing - a.standing)
+    .slice(0, limit)
+    .map(({ id, score }) => ({ id, score }));
 }
 
 @Injectable()
@@ -733,6 +856,58 @@ export class EmbeddingService {
     }
   }
 
+  /**
+   * Of the given near pairs, the ones that are two windows onto one passage
+   * (see windowsOntoOnePassage), keyed `target\0neighbour`.
+   *
+   * One row per content hash is enough to judge: the hash IS the evidence
+   * text, so every finding sharing it has the same match and surroundings.
+   */
+  private async pairsOntoOnePassage(
+    pairs: Array<{ targetHash: string; neighborHash: string }>,
+  ): Promise<Set<string>> {
+    const found = new Set<string>();
+    if (!pairs.length) return found;
+    const hashes = [
+      ...new Set(pairs.flatMap((pair) => [pair.targetHash, pair.neighborHash])),
+    ];
+    let rows: Array<{
+      hash: string;
+      matched: string;
+      before: string | null;
+      after: string | null;
+    }>;
+    try {
+      rows = await this.prisma.$queryRaw(Prisma.sql`
+        SELECT DISTINCT ON (embed_content_hash)
+          embed_content_hash AS hash,
+          matched_content AS matched,
+          context_before AS before,
+          context_after AS after
+        FROM findings
+        WHERE embed_content_hash = ANY(${hashes}::text[])
+      `);
+    } catch (error) {
+      // Grouping too much is the old behaviour; failing the whole
+      // recalibration over a refinement of it would be worse.
+      this.logger.warn(
+        `Could not read evidence text to tell passages from repeats: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return found;
+    }
+    const byHash = new Map(rows.map((row) => [row.hash, row]));
+    for (const pair of pairs) {
+      const left = byHash.get(pair.targetHash);
+      const right = byHash.get(pair.neighborHash);
+      if (left && right && windowsOntoOnePassage(left, right)) {
+        found.add(`${pair.targetHash}\u0000${pair.neighborHash}`);
+      }
+    }
+    return found;
+  }
+
   private async calibrateNeighborhood(
     space: { id: string; dim: number },
     contentHashes: string[],
@@ -799,6 +974,14 @@ export class EmbeddingService {
     // finding_type, so every finding sharing a (hash, type) has the same
     // answer. Computing it once and fanning it out here is the same result
     // from ~400 rows instead of ~1.5M — nothing is sampled or dropped.
+    // Two findings a few words apart share nearly all of their evidence text.
+    // Those are one passage, not a repeat, and are kept out of the grouping.
+    const onePassage = await this.pairsOntoOnePassage(
+      seeds.filter((row) => Number(row.score) >= NEAR_DUPLICATE_MIN),
+    );
+    const repeats = (row: { targetHash: string; neighborHash: string }) =>
+      !onePassage.has(`${row.targetHash}\u0000${row.neighborHash}`);
+
     const seedsByKey = new Map<string, NeighborhoodSeedRow[]>();
     const nearDuplicateComponents = new UnionFind([]);
     for (const row of seeds) {
@@ -807,7 +990,7 @@ export class EmbeddingService {
       const values = seedsByKey.get(key) ?? [];
       values.push(normalized);
       seedsByKey.set(key, values);
-      if (normalized.score >= 0.95) {
+      if (normalized.score >= NEAR_DUPLICATE_MIN && repeats(row)) {
         nearDuplicateComponents.union(row.targetHash, row.neighborHash);
       }
     }
@@ -870,7 +1053,8 @@ export class EmbeddingService {
             neighbors.reduce((sum, neighbor) => sum + neighbor.score, 0) /
             neighbors.length;
           const nearDuplicates = neighbors.filter(
-            (neighbor) => neighbor.score >= 0.95,
+            (neighbor) =>
+              neighbor.score >= NEAR_DUPLICATE_MIN && repeats(neighbor),
           );
           // A sparse neighbourhood (fewer than MIN_NEIGHBORHOOD same-type
           // vectors in the space) says nothing about how unusual the evidence
@@ -991,7 +1175,21 @@ export class EmbeddingService {
     return calibrated;
   }
 
-  async putChunks(sourceId: string, dto: PutAssetChunksDto) {
+  /**
+   * Replace what is stored for an asset: its text passages and, for the
+   * modalities in `accepted`, the media prepared from it.
+   *
+   * Both in one transaction because a scan sends both in one request and the
+   * pair describes one reading of the asset — keeping last week's picture next
+   * to this week's text would be a state no scan ever produced. Media of a
+   * kind this workspace does not embed is dropped here rather than stored:
+   * the bytes would only wait for a setting that may never change.
+   */
+  async putChunks(
+    sourceId: string,
+    dto: PutAssetChunksDto,
+    accepted: readonly MediaModality[] = [],
+  ) {
     const asset = await this.prisma.asset.findUnique({
       where: { sourceId_hash: { sourceId, hash: dto.assetHash } },
       select: { id: true },
@@ -1006,6 +1204,25 @@ export class EmbeddingService {
       const text = chunk.text.split('\u0000').join('');
       return { ...chunk, text, contentHash: embeddingContentHash(text) };
     });
+    const media = (dto.media ?? []).flatMap((item) => {
+      if (
+        !isMediaModality(item.modality) ||
+        !accepted.includes(item.modality)
+      ) {
+        return [];
+      }
+      const data = Buffer.from(String(item.data ?? ''), 'base64');
+      if (!data.byteLength || data.byteLength > MAX_MEDIA_BYTES) return [];
+      return [
+        {
+          modality: item.modality,
+          mimeType: String(item.mimeType || 'application/octet-stream'),
+          page: item.page ?? null,
+          data,
+          contentHash: mediaContentHash(data),
+        },
+      ];
+    });
     await this.prisma.$transaction(async (tx) => {
       await tx.assetChunk.deleteMany({ where: { assetId: asset.id } });
       if (chunks.length) {
@@ -1018,14 +1235,133 @@ export class EmbeddingService {
           })),
         });
       }
+      if (media.length) {
+        // Numbered after the text so the two cannot collide on the asset's
+        // (asset, ordinal) key whatever the scan numbered them.
+        const first =
+          chunks.reduce((max, chunk) => Math.max(max, chunk.ordinal), -1) + 1;
+        await tx.assetChunk.createMany({
+          data: media.map((item, index) => ({
+            id: randomUUID(),
+            assetId: asset.id,
+            sourceId,
+            ordinal: first + index,
+            page: item.page,
+            charOffset: 0,
+            charLength: 0,
+            text: '',
+            modality: item.modality,
+            mimeType: item.mimeType,
+            data: item.data,
+            contentHash: item.contentHash,
+          })),
+        });
+      }
     });
     return {
-      stored: chunks.length,
-      contents: chunks.map((chunk) => ({
-        hash: chunk.contentHash,
-        text: chunk.text,
-      })),
+      stored: chunks.length + media.length,
+      contents: [
+        ...chunks.map((chunk) => ({
+          hash: chunk.contentHash,
+          text: chunk.text,
+        })),
+        ...media.map((item) => ({
+          hash: item.contentHash,
+          text: '',
+          media: true,
+        })),
+      ],
     };
+  }
+
+  /**
+   * Bring what is stored in line with a change in what the workspace embeds
+   * besides text: delete what is no longer embedded, and have scans go back
+   * for what now is.
+   *
+   * Called by whatever changed the answer — the embedding settings, or the
+   * provider a workspace is bound to — with the configuration before and
+   * after. Best effort: the setting is already saved, and a failure here
+   * leaves rows nothing reads, or pictures a full rescan would still collect.
+   */
+  async applyMediaChange(
+    before: readonly MediaModality[],
+    after: readonly MediaModality[],
+  ): Promise<void> {
+    const removed = before.filter((modality) => !after.includes(modality));
+    const added = after.filter((modality) => !before.includes(modality));
+    try {
+      if (removed.length) await this.dropMedia(removed);
+      if (added.length) await this.revisitScannedSources();
+    } catch (error) {
+      this.logger.warn(
+        `Could not apply the change in embedded media (removed: ${removed.join(', ') || 'none'}; added: ${added.join(', ') || 'none'}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * Make the next scans walk every source again from the start.
+   *
+   * A source on the AUTOMATIC sweep keeps its place between runs, and one
+   * that has covered everything discovers nothing more — so pictures it
+   * passed before the workspace could embed them would wait until their files
+   * changed. Dropping the place is all it takes: the scan cache still skips
+   * every unchanged asset without running a detector, and only reads again
+   * the ones that owe media. Notebook sources keep their own state in the
+   * cursor, which is not ours to drop.
+   */
+  private async revisitScannedSources(): Promise<number> {
+    return this.prisma.$executeRaw`
+      UPDATE sources
+      SET sampling_cursor = NULL
+      WHERE sampling_cursor IS NOT NULL
+        AND type::text <> 'CUSTOM'
+    `;
+  }
+
+  /**
+   * Remove everything held for media the workspace no longer embeds: the
+   * prepared bytes and the vectors taken over them.
+   *
+   * Without this a picture would stay findable after pictures were turned
+   * off, and its bytes would stay on disk for a model that will not read
+   * them. Text is untouched — it is the same space, and nothing about the
+   * text vectors depended on the pictures beside them.
+   */
+  async dropMedia(
+    modalities: readonly MediaModality[],
+  ): Promise<{ chunks: number; vectors: number }> {
+    const kinds = modalities.filter(isMediaModality);
+    if (!kinds.length) return { chunks: 0, vectors: 0 };
+    // Forget that these assets' media was ever sent, while the chunks still
+    // say which assets those are. The scan cache skips an unchanged asset on
+    // the strength of that record, so without this the media could never come
+    // back: turned on again, every picture would read as already collected.
+    for (const kind of kinds) {
+      await this.prisma.$executeRaw`
+        UPDATE assets
+        SET scan_cache = scan_cache #- ARRAY['detectors', ${mediaScanCacheKey(kind)}]
+        WHERE scan_cache IS NOT NULL
+          AND id IN (
+            SELECT asset_id FROM asset_chunks WHERE modality = ${kind}
+          )
+      `;
+    }
+    const vectors = await this.prisma.$executeRaw`
+      DELETE FROM content_embeddings ce
+      USING (
+        SELECT DISTINCT content_hash FROM asset_chunks
+        WHERE modality = ANY(${kinds}::text[])
+      ) gone
+      WHERE ce.content_hash = gone.content_hash
+    `;
+    const chunks = await this.prisma.assetChunk.deleteMany({
+      where: { modality: { in: [...kinds] } },
+    });
+    return { chunks: chunks.count, vectors };
   }
 
   private async rowsForVector(
@@ -1137,7 +1473,7 @@ export class EmbeddingService {
       // and therefore uses relaxed_order, which is the setting that pattern
       // needs.
       await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = strict_order`;
-      return tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
+      const nearest = await tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
         WITH nearest AS (
           SELECT ce.content_hash,
             1 - (
@@ -1158,6 +1494,88 @@ export class EmbeddingService {
         ORDER BY score DESC
         LIMIT ${limit}
       `);
+      if (!this.cfg.mediaModalities.length) return nearest;
+
+      // Pictures and clips are scored on their own, exactly. The pass above
+      // stops at a fixed number of nearest vectors, and in a space that is
+      // mostly text those are text: a matching picture a little further out
+      // would never be looked at. Media is the small side of the corpus, so
+      // reading every one of its vectors costs little, and it is driven from
+      // the media chunks (their own partial index) rather than from the
+      // vector index, which cannot filter by what a vector was taken over.
+      //
+      // Each row comes back with how its kind scored this question (the
+      // middle score, and how many there were), because that is what its
+      // score is read against: see mergeByStanding.
+      const media = await tx.$queryRaw<MediaScoreRow[]>(Prisma.sql`
+        WITH scored AS (
+          SELECT ac.asset_id AS id, ac.modality, MAX(1 - (
+            ce.vec::public.${vecType}(${dim}) <=>
+            ${vector}::public.${vecType}(${dim})
+          )) AS score
+          FROM asset_chunks ac
+          JOIN content_embeddings ce
+            ON ce.content_hash = ac.content_hash
+           AND ce.space_id = ${this.spaceIdLiteral(space.id)}
+          WHERE ac.modality <> 'text'
+            AND (${sourceId ?? null}::text IS NULL OR ac.source_id = ${sourceId ?? null})
+          GROUP BY ac.asset_id, ac.modality
+        ), kinds AS (
+          SELECT modality,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score) AS middle,
+            COUNT(*)::int AS count
+          FROM scored
+          GROUP BY modality
+        ), placed AS (
+          SELECT scored.id, scored.score, kinds.middle, kinds.count,
+            ROW_NUMBER() OVER (
+              PARTITION BY scored.modality ORDER BY scored.score DESC
+            ) AS position
+          FROM scored
+          JOIN kinds ON kinds.modality = scored.modality
+        )
+        SELECT id, score, middle, count
+        FROM placed
+        WHERE position <= ${limit}
+        ORDER BY score DESC
+      `);
+      if (!media.length) return nearest;
+
+      // How text scores this question: a fixed sample of passages, the same
+      // ones every time (content hashes are as good as random, and reading
+      // them in order is one short walk along their index).
+      const [textBackground] = await tx.$queryRaw<
+        Array<{ middle: number | null; count: number }>
+      >(Prisma.sql`
+        SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY score) AS middle,
+          COUNT(*)::int AS count
+        FROM (
+          SELECT 1 - (
+            ce.vec::public.${vecType}(${dim}) <=>
+            ${vector}::public.${vecType}(${dim})
+          ) AS score
+          FROM (
+            SELECT content_hash FROM asset_chunks
+            WHERE modality = 'text'
+            ORDER BY content_hash
+            LIMIT ${BACKGROUND_SAMPLE}
+          ) sample
+          JOIN content_embeddings ce
+            ON ce.content_hash = sample.content_hash
+           AND ce.space_id = ${this.spaceIdLiteral(space.id)}
+        ) scored
+      `);
+      return mergeByStanding(
+        nearest,
+        textBackground?.middle == null
+          ? null
+          : {
+              middle: Number(textBackground.middle),
+              count: Number(textBackground.count),
+            },
+        media,
+        limit,
+      );
     });
   }
 

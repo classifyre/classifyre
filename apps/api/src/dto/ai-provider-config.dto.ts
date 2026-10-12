@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -11,6 +13,10 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import {
+  EMBEDDING_MEDIA_FORMATS,
+  MEDIA_MODALITIES,
+} from '../embedding/embedding-modality';
 
 export const AI_PROVIDER_TYPE_VALUES = [
   'OPENAI_COMPATIBLE',
@@ -112,6 +118,24 @@ export class AiProviderConfigResponseDto {
     example: 'task: search result | query: ',
   })
   embeddingQueryPrefix: string | null;
+
+  @ApiProperty({
+    description:
+      'What this embedding model takes besides text, in the same vector space. Empty for a text-only model.',
+    enum: MEDIA_MODALITIES,
+    isArray: true,
+    example: ['image'],
+  })
+  embeddingModalities: string[];
+
+  @ApiProperty({
+    description:
+      'Request shape the endpoint takes media in: "llama-cpp" (llama.cpp server with a multimodal projector), "gemini" (Google Gemini API) or "openrouter" (OpenRouter). Null for a text-only model.',
+    enum: EMBEDDING_MEDIA_FORMATS,
+    nullable: true,
+    example: 'gemini',
+  })
+  embeddingMediaFormat: string | null;
 
   @ApiProperty({
     description:
@@ -256,6 +280,29 @@ export class CreateAiProviderConfigDto {
 
   @ApiPropertyOptional({
     description:
+      'What the embedding model takes besides text. Only kept together with embeddingMediaFormat, and only the kinds that format carries.',
+    enum: MEDIA_MODALITIES,
+    isArray: true,
+    example: ['image'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(MEDIA_MODALITIES, { each: true })
+  embeddingModalities?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Request shape the endpoint takes media in. Required for embeddingModalities to have an effect.',
+    enum: EMBEDDING_MEDIA_FORMATS,
+    nullable: true,
+    example: 'gemini',
+  })
+  @IsOptional()
+  @IsIn(EMBEDDING_MEDIA_FORMATS)
+  embeddingMediaFormat?: string | null;
+
+  @ApiPropertyOptional({
+    description:
       'Optional cost in USD per 1M input tokens (enables cost estimates on autopilot runs).',
     example: 3,
     nullable: true,
@@ -394,6 +441,29 @@ export class UpdateAiProviderConfigDto {
   @IsString()
   @MaxLength(500)
   embeddingQueryPrefix?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'What the embedding model takes besides text. An empty list makes the provider text-only again; a workspace bound to it then drops its stored media vectors.',
+    enum: MEDIA_MODALITIES,
+    isArray: true,
+    example: ['image'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(MEDIA_MODALITIES, { each: true })
+  embeddingModalities?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Request shape the endpoint takes media in. Pass null to clear it.',
+    enum: EMBEDDING_MEDIA_FORMATS,
+    nullable: true,
+    example: 'gemini',
+  })
+  @IsOptional()
+  @IsIn(EMBEDDING_MEDIA_FORMATS)
+  embeddingMediaFormat?: string | null;
 
   @ApiPropertyOptional({
     description:

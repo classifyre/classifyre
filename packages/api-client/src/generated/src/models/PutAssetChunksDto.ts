@@ -20,6 +20,13 @@ import {
     AssetChunkDtoToJSON,
     AssetChunkDtoToJSONTyped,
 } from './AssetChunkDto';
+import type { AssetMediaChunkDto } from './AssetMediaChunkDto';
+import {
+    AssetMediaChunkDtoFromJSON,
+    AssetMediaChunkDtoFromJSONTyped,
+    AssetMediaChunkDtoToJSON,
+    AssetMediaChunkDtoToJSONTyped,
+} from './AssetMediaChunkDto';
 
 /**
  * 
@@ -39,6 +46,12 @@ export interface PutAssetChunksDto {
      * @memberof PutAssetChunksDto
      */
     chunks: Array<AssetChunkDto>;
+    /**
+     * 
+     * @type {Array<AssetMediaChunkDto>}
+     * @memberof PutAssetChunksDto
+     */
+    media?: Array<AssetMediaChunkDto>;
 }
 
 /**
@@ -62,6 +75,7 @@ export function PutAssetChunksDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         
         'assetHash': json['assetHash'],
         'chunks': ((json['chunks'] as Array<any>).map(AssetChunkDtoFromJSON)),
+        'media': json['media'] == null ? undefined : ((json['media'] as Array<any>).map(AssetMediaChunkDtoFromJSON)),
     };
 }
 
@@ -78,6 +92,7 @@ export function PutAssetChunksDtoToJSONTyped(value?: PutAssetChunksDto | null, i
         
         'assetHash': value['assetHash'],
         'chunks': ((value['chunks'] as Array<any>).map(AssetChunkDtoToJSON)),
+        'media': value['media'] == null ? undefined : ((value['media'] as Array<any>).map(AssetMediaChunkDtoToJSON)),
     };
 }
 

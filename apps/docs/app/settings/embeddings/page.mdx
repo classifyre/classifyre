@@ -1,7 +1,7 @@
 ---
 sidebarTitle: Embeddings
 title: Embeddings
-description: What embeddings do for an investigation, how to choose a model, and what happens to your data when you change one.
+description: What embeddings do for an investigation, how to choose a model, how pictures and sound are embedded, and what happens to your data when you change a model.
 ---
 
 import { Callout } from "nextra/components"
@@ -27,17 +27,18 @@ company" should return a document that never uses either word.
 
 ## What an embedding actually is
 
-An embedding is a list of numbers — a **vector** — that stands for a piece of
-text's meaning. Text that means similar things gets similar vectors, so
+An embedding is a list of numbers — a **vector** — that stands for what a piece
+of content means. Content that means similar things gets similar vectors, so
 "meaning" becomes something the database can measure: two pieces of evidence
 are related when their vectors sit close together.
 
-Classifyre embeds two kinds of text:
+Classifyre embeds:
 
 | What is embedded | Where it comes from |
 | --- | --- |
 | **Evidence text of a finding** | The match itself plus the text before and after it |
-| **Document chunks** | Passages of ingested documents, split during scanning |
+| **Document chunks** | Passages of ingested documents, split during scanning. This includes the text OCR reads out of pictures and the transcript of recordings and video |
+| **Pictures and recordings** | Image and audio files themselves, when the model can embed them. See [Pictures and sound](#pictures-and-sound) |
 
 Nothing is embedded that a detector did not already surface or that a scan did
 not already read. Turning embeddings off does not change what is scanned — it
@@ -74,11 +75,39 @@ text leaves the deployment**, which is usually the deciding factor for
 regulated corpora. It costs CPU: embedding a large corpus is the heaviest
 sustained work the system does.
 
-The bundled default, `all-MiniLM-L6-v2`, is small and fast and handles general
-English well. The dropdown offers alternatives that trade speed for quality —
-`bge-base-en-v1.5` is noticeably better at English retrieval and noticeably
-slower, and `multilingual-e5-small` is the one to pick for a corpus that is not
-mostly English.
+The list offers seventeen models. They fall into four groups, and the group
+matters more than the name:
+
+| Group | Models | Choose it when |
+| --- | --- | --- |
+| **English, small** | `all-MiniLM-L6-v2` (the bundled default), `all-MiniLM-L12-v2`, `bge-small-en-v1.5`, `bge-base-en-v1.5`, `gte-small`, `granite-embedding-small-english-r2` | The corpus and the questions are in English and indexing speed matters most. 23 to 106 MB. |
+| **Many languages, small** | `multilingual-e5-small`, `granite-embedding-97m-multilingual-r2` | The corpus is not all English and the machine is small. About 100 to 130 MB, and about a third of the default model's indexing speed. |
+| **Many languages, large** | `EmbeddingGemma 300m`, `Harrier 270m`, `Voyage 4 nano`, `bge-m3`, `Qwen3 Embedding 0.6B` | Search quality on real documents matters more than indexing time. 300 to 620 MB, and in our measurements 14 to 120 times slower to index than MiniLM. |
+| **Pictures or sound** | `EmbeddingGemma 2` (documents, pictures and sound), `SigLIP 2 base` and `CLIP ViT-B/32` (pictures), `CLAP` (sound) | See [Pictures and sound](#pictures-and-sound). Only EmbeddingGemma 2 is also a document model. |
+
+An English-only model does not fail on German text. It answers, and finds
+little: in [our own measurements](#measured-on-one-drive) the English-only
+models found 4 to 9 of 30 German sentences from an English question, and
+every multilingual model 23 or more.
+
+**EmbeddingGemma 2** puts text, pictures and sound in the same 768 numbers, in
+over a hundred languages, so a question typed in words can land next to a
+photograph. It is also by far the heaviest: about 314 MB to download for
+text, 195 MB more for pictures and 340 MB more for sound, about one passage a
+second on two CPU cores, and close to a minute for each picture. It is listed
+under its ONNX conversion, `onnx-community/embeddinggemma-2-ONNX`, because
+that is what the built-in worker can load. Typing `google/embeddinggemma-2`
+as a custom model selects the same thing: Google's own repository holds the
+PyTorch weights only. The other models' own repository names are accepted
+the same way.
+
+Dimensions, pooling and task prompts of a model on the list are filled in for
+you.
+
+Downloaded models are kept in a cache on the pod, and the cache has a budget
+(`EMBEDDING_CACHE_MAX_MB`, 1,500 by default, under the 2 Gi volume the Helm
+chart gives it). When another model would not fit, the one used longest ago
+is deleted and fetched again if a workspace returns to it.
 
 <Callout type="info">
   The all-in-one Docker image ships one pinned model and runs offline. It cannot
@@ -130,12 +159,15 @@ URL (`http://llama-embedding.my-namespace.svc:8080/v1`), mark it **Embedding
 model**, and leave the API key empty: such servers take none, and nothing
 leaves your network.
 
-That is how a larger open model is run on your own hardware. EmbeddingGemma 2,
-for example, is too new for the built-in Transformers.js worker and runs well
-enough behind llama.cpp on CPU: about a tenth of a second for a search, and
-well under one passage a second while indexing on four cores, against about
-six a second for the bundled MiniLM. Searching is fast on a CPU; building the
-index for a large corpus is not.
+That is how a larger open model is run on hardware you size separately from
+Classifyre. EmbeddingGemma 2 runs in the built-in worker too, but behind
+llama.cpp it gets its own CPU and memory, or a GPU. On four CPU cores it takes
+about a tenth of a second for a search and well under one passage a second
+while indexing, against about six a second for the bundled MiniLM. Searching is
+fast on a CPU; building the index for a large corpus is not.
+
+Such a server can take pictures and sound as well: see
+[Pictures and sound](#pictures-and-sound).
 
 ### Task prompts
 
@@ -156,9 +188,29 @@ prompt there itself: set **Document prompt** and **Query prompt** on the
 provider, exactly as the model card writes them, trailing space included.
 Leave both empty for a model that has none (OpenAI's, the bundled MiniLM).
 
+A built-in model from the list needs none of this: the prompts of
+EmbeddingGemma, E5, Voyage 4 nano, Qwen3 and Harrier are known and applied for
+you. The last two take an instruction in front of the question only
+(`Instruct: Given a web search query, retrieve relevant passages that answer
+the query`), and nothing in front of a stored passage. Prompts go in front of
+text only. A picture or a clip is embedded as it is.
+
 The document prompt is part of what a stored vector means, so changing it
 rebuilds the corpus like a model change does. The query prompt only shapes
 the next search; nothing is re-embedded.
+
+### Pooling follows the model
+
+A text model produces one vector per token, and **pooling** is how those
+become one vector for the passage: the average of all of them (`mean`), the
+first token's (`cls`), or the last token's (`last_token`). Which one is right
+is decided when the model is trained. BGE and Granite put the sentence in their
+first token, Qwen3 in its last, MiniLM and E5 are averaged. Read the wrong way,
+a model still returns a vector of the right width, and retrieves worse with
+nothing to say why.
+
+Picking a model from the list sets its pooling. The **Pooling** field under
+**Advanced** is for a custom model; take the value from its model card.
 
 ### Dimensions must match the model
 
@@ -211,6 +263,14 @@ how much disk will be deleted.
 
 Turning embeddings off or back on is **not** on this list any more: it no
 longer implies a rebuild. See [Turning embeddings off](#turning-embeddings-off).
+
+Neither are the **Pictures** and **Sound** switches. A picture's vector lives
+in the same space as the text beside it, so turning one on adds vectors and
+turning it off removes them, and nothing already stored changes meaning.
+
+A rebuild re-embeds stored pictures and clips along with the text, without a
+rescan, when the new model can embed them. Moving to a model that cannot
+deletes them: they would be bytes nothing reads.
 
 ### What is deleted, and what is not
 
@@ -293,6 +353,15 @@ If the machine is under memory pressure, a smaller batch size is the first
 lever to reach for — it is the single setting that most directly bounds how
 much memory one inference step needs.
 
+On a CPU the built-in worker gives the model **one text at a time**, whatever
+the batch size: the batch is how many texts travel to the worker in one
+message. Two measurements are behind that. The default weights are 8-bit, and
+with those the vector of a text depended on what else was in its batch (the
+same sentence came back at a cosine of 0.975 to 0.997 to itself, depending on
+the model). And a batch is padded to its longest text, which on two CPU
+threads made batches of 32 two to three times slower than the same texts one
+by one. With a GPU device the batch goes to the model whole.
+
 ---
 
 ## Search index settings
@@ -322,6 +391,11 @@ Every setting on this page has a **deployment default** underneath it:
 - On **Kubernetes**, from the Helm chart's `api.embedding` values.
 - In the **all-in-one Docker image**, from the baked-in defaults sized to the container.
 
+The **Pictures** and **Sound** switches follow `api.embedding.images` (on) and
+`api.embedding.audio` (off), or the `EMBEDDING_IMAGES` and `EMBEDDING_AUDIO`
+environment variables. Both only say what a workspace wants: on a text-only
+model neither does anything.
+
 The page shows that default under any setting you have overridden, along with
 **Use default** to return to it. An override applies to **one workspace** —
 other workspaces on the same instance are unaffected and continue to follow the
@@ -340,6 +414,7 @@ workspace in the instance.
 | **Vectors** | Embeddings stored in the active model's space |
 | **On disk** | Space taken by those vectors and their search index |
 | **Text chunks** | Document passages eligible for embedding |
+| **Pictures and clips** | Pictures and sound clips stored for embedding, and the disk they take. Shown when the workspace embeds either |
 | **Embeddable findings** | Findings that carry evidence text |
 | **Ranked findings** | Findings that already have an importance score |
 
@@ -353,18 +428,163 @@ in. After a normal rebuild there is exactly one, marked active.
 
 ---
 
-## Text only, for now
+## Pictures and sound
 
-Everything on this page embeds **text**: the evidence around a finding, and
-passages of documents read during a scan. Images are handled elsewhere — by
-vision-capable detectors that classify or read them — and what those detectors
-produce is text, which is then embedded like anything else.
+Most embedding models read text and nothing else. With one of those, a picture
+is findable only through the words OCR reads in it, and a recording through
+its transcript. A photograph with no writing in it has no words, so no search
+finds it.
 
-That means an image is currently findable by what a detector *said* about it,
-not by what it looks like. Multimodal embedding models, which place pictures
-and text in a single space so "a photo of a passport" retrieves the picture
-itself, are not wired in. Pointing a workspace at a multimodal model
-(EmbeddingGemma 2, Gemini Embedding 2) therefore uses its text side only:
-photographs, scans, audio and video are searchable through the text that OCR
-and transcription read out of them, and a picture with no words in it has
-nothing to index.
+A **multimodal** model embeds the picture itself. It is trained so that a
+photograph of a stained ceiling and the sentence "water coming through the
+bedroom ceiling" get vectors close to each other. Text, pictures and sound all
+go into **one** vector space, which is why the same search box finds all of
+them and nothing else on this page changes.
+
+### Which models can do it
+
+| Model | Where it runs | Pictures | Sound |
+| --- | --- | --- | --- |
+| **EmbeddingGemma 2**, built in | The built-in worker, no data leaves the deployment | Yes | Yes |
+| **SigLIP 2 base**, **CLIP ViT-B/32**, built in | The built-in worker | Yes | No |
+| **CLAP**, built in | The built-in worker | No | Yes |
+| **EmbeddingGemma 2** behind llama.cpp | A server you run, as a remote provider | Yes | Yes |
+| **Gemini Embedding 2** | Google's API or OpenRouter, as a remote provider | Yes | Yes |
+| Every other model on the list, and any text embeddings API | — | No | No |
+
+SigLIP, CLIP and CLAP are a different kind of model from EmbeddingGemma 2: two
+separate encoders, one for a caption and one for a picture (or a sound),
+trained against each other. Their text side was trained on captions: SigLIP 2
+reads 64 tokens and CLIP 77 and both cut a longer passage there, and CLAP's
+was tuned to match descriptions of sounds. They are on the list for a workspace that is
+mostly pictures or recordings; for documents they are the wrong choice, and
+[the measurements](#measured-on-one-drive) show by how much.
+
+Two models that both "do pictures" are still two separate spaces. A picture
+embedded by one cannot be found by a question embedded by the other, so the
+pictures always go through the same model as the text.
+
+### Turning it on
+
+Under **Harness AI → Embedding → What is embedded**:
+
+| Switch | What it embeds | Default |
+| --- | --- | --- |
+| **Text** | Documents, and the text read out of pictures, recordings and video | Always on |
+| **Pictures** | Image files, as pictures | On, when the model can |
+| **Sound** | Audio files, as sound: the first two minutes of each | Off |
+
+A switch is greyed out when the selected model embeds text only. Picking a
+model that can see turns **Pictures** on with it; that is what such a model is
+usually chosen for. **Sound** stays off until you turn it on: its encoder is
+the largest part of the model, and recordings are already searchable through
+their transcript.
+
+For a **remote provider**, the provider says what its model takes. Edit it
+under [AI Providers](/settings/ai-providers) and set two things in the
+**Pictures and sound** block:
+
+- **How media is sent**. Text embedding has one request format that every
+  server copied from OpenAI. Pictures and sound have one per server, so it has
+  to be named: **llama.cpp server**, **Google Gemini API**, or **OpenRouter**.
+  Left at **Text only**, the provider is never sent a picture.
+- **Pictures** and **Sound**: what the model takes.
+
+**Test connection** then sends the provider a small test picture (and a test
+clip) as well as a test sentence, and checks that all of them come back as
+vectors of the same width. A server started without its vision encoder, or a
+wrong format, fails there and not on the first scanned photograph.
+
+<Callout type="info">
+  With llama.cpp, the vision and audio encoders are a separate file (the
+  "mmproj" file of the model's GGUF repository). `llama-server --embedding`
+  loads it when given the repository with `--hf-repo`, and leaves it out with
+  `--no-mmproj`. A server without it answers text and refuses pictures.
+</Callout>
+
+### What a scan sends, and what is kept
+
+When the workspace embeds pictures, a scan prepares each image file once more
+for the model: a JPEG copy with its longest edge at 768 pixels, usually 20 to
+90 KB. Vision encoders work at a few hundred pixels a side, so a larger copy
+would only take space. For sound, a recording is decoded to mono 16 kHz audio
+and cut into clips of 30 seconds, at most four per file. A full clip is just
+under 1 MB.
+
+Classifyre **keeps these prepared copies** in the database, next to the text
+chunks. That is what lets a rebuild re-embed them under a new model without
+reading the sources again. The **Corpus** panel shows how many there are and
+what they weigh. The original files are not copied anywhere.
+
+Only files that *are* a picture or a recording are prepared. Not yet covered:
+pictures inside documents (a photograph pasted into a Word file, the pages of a
+scanned PDF) and the frames of a video. Those are still found through the text
+read out of them.
+
+### Pictures that were already scanned
+
+Turning **Pictures** or **Sound** on does not need a full rescan. The next
+ordinary scan of each source goes back for the files it concerns: an image
+file whose picture has not been sent yet is read once more, and everything
+else stays cached. No detector runs again and no finding changes. A source on
+the automatic sweep starts its sweep over so that it reaches the files it had
+already passed.
+
+Reading a picture again does repeat its OCR, and a recording its
+transcription, so the first scan after turning a switch on takes longer in
+proportion to how many such files a source holds.
+
+Turning a switch **off** deletes the stored copies and their vectors for that
+kind of content at once. Turning it back on collects them again on the next
+scan.
+
+### What to expect from search
+
+Text, pictures and sound come back as one list. They are not ranked by raw
+score, because a model does not put them at one distance: the picture a
+caption describes sits further from the caption than an unrelated sentence
+does. Measured with Gemini Embedding 2, "a dog barking" scored 0.62 against
+the recording of the dog and 0.56 against a sentence about an invoice. So each
+result is placed by how far its score lies above the middle score of its own
+kind for that question: a passage above the median of a sample of the
+passages, a picture above the median of all pictures, a clip above the median
+of all clips. A kind with fewer than eight items has no middle to speak of and
+is read against the text's.
+
+Measured on a small mixed drive (38 files, six of them pictures,
+EmbeddingGemma 2):
+
+- "water coming through the bedroom ceiling" returned the photograph of that
+  ceiling in the first two results; "the pipe joint that failed under a sink"
+  returned the photograph of the joint first. Neither photograph has a word of
+  writing in it.
+- A picture of a delivery note and the text OCR read from it came out almost on
+  top of each other (similarity 0.89), which is the model saying they are the
+  same thing.
+- Pictures that had nothing to do with a question stayed far down the list.
+
+Pictures appear in **Assets** search and wherever the Assistant and the Harness
+look for assets by meaning. Findings are still text: a picture gets a finding
+when a detector reads or classifies it, not from its embedding, so a
+photograph with no writing typically has none. The Assets page lists assets
+without findings by default; an API search has to ask for them with
+`options.includeAssetsWithoutFindings`.
+
+### What it costs
+
+Speed is the price. Measured on one CPU-only machine (an Apple M1 Pro, the
+model limited to a few cores), rebuilding a workspace of 252 texts and six
+pictures:
+
+| | The 252 texts (finding contexts and passages) | Each picture |
+| --- | --- | --- |
+| EmbeddingGemma 2, built in, 2 CPU threads | about 5 minutes, loading the model included | about 50 seconds |
+| EmbeddingGemma 2 behind llama.cpp, 4 CPU threads | under 3 minutes | about 10 seconds |
+
+A drive with thousands of photographs is hours of indexing on a CPU, once.
+Searching stays fast: a search embeds one short question, never a picture.
+
+Memory grows with what is loaded. The built-in worker held about 1.4 GB with
+the text model and the vision encoder loaded and about 1.7 GB with the audio
+encoder as well; a llama.cpp server with both encoders held about 1.9 GB. The encoders are loaded only by the process that embeds
+scanned content; answering searches needs the text model alone.

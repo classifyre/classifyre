@@ -465,6 +465,10 @@ which each deployment sets on its own after including this block.
   value: {{ .Values.api.embedding.retrySeconds | quote }}
 - name: EMBEDDING_AUTO_BACKFILL
   value: {{ .Values.api.embedding.autoBackfill | quote }}
+- name: EMBEDDING_IMAGES
+  value: {{ .Values.api.embedding.images | quote }}
+- name: EMBEDDING_AUDIO
+  value: {{ .Values.api.embedding.audio | quote }}
 - name: EMBEDDING_WORKER_CONCURRENCY
   value: {{ .Values.api.embedding.workerConcurrency | quote }}
 - name: EMBEDDING_MAX_PARALLEL_CALLS

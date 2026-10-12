@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   DEFAULT_LABEL_WEIGHT,
+  LABEL_ALIASES,
   LABEL_WEIGHTS,
   MAX_VALUE_LENGTH,
   NON_PHONETIC_LABELS,
@@ -33,7 +34,10 @@ export function weightForLabel(label: string): number {
  */
 export function normalizeValue(label: string, raw: string): string | null {
   if (raw == null) return null;
-  const key = normalizeLabel(label);
+  // A detector's own name for a kind of value is normalised as that kind:
+  // PHONE_NUMBER as a phone, EMAIL_ADDRESS as an email.
+  const own = normalizeLabel(label);
+  const key = LABEL_ALIASES[own] ?? own;
   let value: string;
 
   if (key === 'email') {

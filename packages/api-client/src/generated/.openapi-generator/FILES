@@ -47,6 +47,7 @@ docs/AssetFindingSummaryListResponseDto.md
 docs/AssetFindingTypeCountDto.md
 docs/AssetListItemDto.md
 docs/AssetListResponseDto.md
+docs/AssetMediaChunkDto.md
 docs/AssetResponseDto.md
 docs/AssetSeverityCountsItemDto.md
 docs/AssetSeverityCountsRequestDto.md
@@ -221,6 +222,10 @@ docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
 docs/EdgeDetailDto.md
 docs/EmbeddingAiProviderOptionDto.md
+docs/EmbeddingCollectionMediaDto.md
+docs/EmbeddingCollectionPlanDto.md
+docs/EmbeddingLocalModelDownloadDto.md
+docs/EmbeddingLocalModelDto.md
 docs/EmbeddingProviderHealthDto.md
 docs/EmbeddingRebuildResponseDto.md
 docs/EmbeddingRecalibrateResponseDto.md
@@ -629,6 +634,7 @@ src/models/AssetFindingSummaryListResponseDto.ts
 src/models/AssetFindingTypeCountDto.ts
 src/models/AssetListItemDto.ts
 src/models/AssetListResponseDto.ts
+src/models/AssetMediaChunkDto.ts
 src/models/AssetResponseDto.ts
 src/models/AssetSeverityCountsItemDto.ts
 src/models/AssetSeverityCountsRequestDto.ts
@@ -791,6 +797,10 @@ src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
 src/models/EdgeDetailDto.ts
 src/models/EmbeddingAiProviderOptionDto.ts
+src/models/EmbeddingCollectionMediaDto.ts
+src/models/EmbeddingCollectionPlanDto.ts
+src/models/EmbeddingLocalModelDownloadDto.ts
+src/models/EmbeddingLocalModelDto.ts
 src/models/EmbeddingProviderHealthDto.ts
 src/models/EmbeddingRebuildResponseDto.ts
 src/models/EmbeddingRecalibrateResponseDto.ts
