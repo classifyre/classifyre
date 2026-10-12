@@ -184,6 +184,19 @@ export class EmbeddingConfigService {
   readonly dtype = process.env.EMBEDDING_DTYPE ?? 'q8';
   readonly device = process.env.EMBEDDING_DEVICE ?? 'cpu';
   readonly cacheDir = process.env.EMBEDDING_CACHE_DIR ?? defaultCacheDir();
+  /**
+   * Megabytes the model cache may hold. Above it, the model used longest ago
+   * is deleted before another is downloaded (see pruneModelCache). It has to
+   * stay under the cache volume's own limit, which is 2 Gi in the Helm chart:
+   * a volume over its limit gets the pod evicted. 1,500 leaves room for the
+   * largest model on the list next to one other.
+   */
+  readonly cacheMaxMb = integerEnv(
+    'EMBEDDING_CACHE_MAX_MB',
+    1500,
+    100,
+    1_000_000,
+  );
   readonly localModelPath = process.env.EMBEDDING_LOCAL_MODEL_PATH;
   readonly allowRemoteModels = booleanEnv(
     'EMBEDDING_ALLOW_REMOTE_MODELS',

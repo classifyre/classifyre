@@ -13,6 +13,7 @@ import {
   type EmbeddingMediaItem,
   type MediaModality,
 } from './embedding-modality';
+import { localModelProfile } from './embedding-local-models';
 import { embedMediaRemote } from './embedding-media-remote';
 import { probeMedia } from './embedding-media-probe';
 import {
@@ -42,6 +43,13 @@ export function withTaskPrompt(
 ): string[] {
   const prefix = role === 'query' ? cfg.queryPrefix : cfg.documentPrefix;
   return prefix ? texts.map((text) => prefix + text) : texts;
+}
+
+/** Megabytes a listed model downloads with all its parts; undefined when it is not on the list. */
+function expectedDownloadMb(model: string): number | undefined {
+  const sizes = localModelProfile(model)?.downloadMb;
+  if (!sizes) return undefined;
+  return sizes.text + (sizes.image ?? 0) + (sizes.audio ?? 0);
 }
 
 /**
@@ -628,6 +636,8 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
           allowRemoteModels: cfg.allowRemoteModels,
           family: cfg.localFamily,
           dimensions: cfg.dimensions,
+          cacheMaxMb: this.config.cacheMaxMb,
+          expectedMb: expectedDownloadMb(cfg.model),
         },
       });
     });

@@ -79,37 +79,58 @@ const EMBEDDINGGEMMA_2: LocalEmbeddingModel = {
  *
  * The dimension is not a preference — it is a property of the model, and
  * getting it wrong fails every batch at the provider's dimension check rather
- * than producing bad vectors. The text-only entries carry no task prompts on
- * purpose: workspaces already hold vectors made without them, and a prompt
- * added here would put new text somewhere else than the old.
+ * than producing bad vectors. Pooling and task prompts are the same kind of
+ * fact: how the model was trained to be read and to be asked. An entry states
+ * them where the model card does, and a workspace on that model follows.
  */
 export const LOCAL_EMBEDDING_MODELS: readonly LocalEmbeddingModel[] = [
   textModel(
     'Xenova/all-MiniLM-L6-v2',
     384,
     'all-MiniLM-L6-v2 — fastest, general purpose',
+    23,
   ),
   textModel(
     'Xenova/all-MiniLM-L12-v2',
     384,
     'all-MiniLM-L12-v2 — slower, a little sharper',
+    34,
   ),
-  textModel(
-    'Xenova/bge-small-en-v1.5',
-    384,
-    'bge-small-en-v1.5 — strong English retrieval',
-  ),
-  textModel(
-    'Xenova/bge-base-en-v1.5',
-    768,
-    'bge-base-en-v1.5 — best English quality, heaviest',
-  ),
-  textModel('Xenova/gte-small', 384, 'gte-small — balanced retrieval'),
-  textModel(
-    'Xenova/multilingual-e5-small',
-    384,
-    'multilingual-e5-small — non-English corpora',
-  ),
+  {
+    ...textModel(
+      'Xenova/bge-small-en-v1.5',
+      384,
+      'bge-small-en-v1.5 — strong English retrieval',
+      34,
+    ),
+    // BGE puts the sentence in its first token; the average of all tokens is
+    // a different, weaker vector.
+    pooling: 'cls',
+  },
+  {
+    ...textModel(
+      'Xenova/bge-base-en-v1.5',
+      768,
+      'bge-base-en-v1.5 — best English quality, heaviest',
+      106,
+    ),
+    // BGE puts the sentence in its first token; the average of all tokens is
+    // a different, weaker vector.
+    pooling: 'cls',
+  },
+  textModel('Xenova/gte-small', 384, 'gte-small — balanced retrieval', 34),
+  {
+    ...textModel(
+      'Xenova/multilingual-e5-small',
+      384,
+      'multilingual-e5-small — non-English corpora',
+      130,
+    ),
+    // E5 is trained with these two words in front of everything; without
+    // them it still answers, and measurably worse.
+    documentPrefix: 'passage: ',
+    queryPrefix: 'query: ',
+  },
   {
     ...textModel(
       'onnx-community/granite-embedding-small-english-r2-ONNX',
@@ -226,6 +247,7 @@ function textModel(
   id: string,
   dimensions: number,
   label: string,
+  downloadMb?: number,
 ): LocalEmbeddingModel {
   return {
     id,
@@ -234,6 +256,7 @@ function textModel(
     pooling: 'mean',
     family: 'feature-extraction',
     mediaModalities: [],
+    ...(downloadMb ? { downloadMb: { text: downloadMb } } : {}),
   };
 }
 

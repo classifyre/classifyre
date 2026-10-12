@@ -45,6 +45,11 @@ Classifyre ships a weight table so scoring is meaningful out of the box:
 **Default weight** applies to every label not in that table — including all
 custom ones. Leave it at 1 unless you have a reason.
 
+The built-in detectors' own label names are covered by the table: `IBAN_CODE`
+starts at 6, `EMAIL_ADDRESS` at 5, `PHONE_NUMBER` at 4, `US_SSN` and passport
+numbers at 6, national identifiers such as `DE_TAX_ID` at 5. They appear on
+this screen under those names.
+
 ### Changing a weight
 
 Raise a label when it's identifying in *your* estate and lower it when it's

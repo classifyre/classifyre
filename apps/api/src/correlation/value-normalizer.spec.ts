@@ -25,6 +25,18 @@ describe('value-normalizer', () => {
       expect(weightForLabel('credit card')).toBe(6);
     });
 
+    // The PII detector labels findings with its recognisers' names. Looked up
+    // as they stand they were unknown labels, and an IBAN weighed 1.
+    it("gives the built-in detector's own names the weight of what they mean", () => {
+      expect(weightForLabel('IBAN_CODE')).toBe(6);
+      expect(weightForLabel('US_SSN')).toBe(6);
+      expect(weightForLabel('EMAIL_ADDRESS')).toBe(5);
+      expect(weightForLabel('DE_TAX_ID')).toBe(5);
+      expect(weightForLabel('PHONE_NUMBER')).toBe(4);
+      expect(weightForLabel('AWS Access Key')).toBe(5);
+      expect(weightForLabel('IP_ADDRESS')).toBe(1);
+    });
+
     it('defaults to 1 for unknown/custom labels (label-agnostic)', () => {
       expect(weightForLabel('customer_id')).toBe(1);
       expect(weightForLabel('sentiment')).toBe(1);
@@ -41,6 +53,15 @@ describe('value-normalizer', () => {
     it('keeps only digits (and a leading +) for phones', () => {
       expect(normalizeValue('phone', '+43 (1) 234-567')).toBe('+431234567');
       expect(normalizeValue('phone', '01 234 567')).toBe('01234567');
+    });
+
+    it("normalises a detector's phone and email labels as phones and emails", () => {
+      expect(normalizeValue('PHONE_NUMBER', '020 7946 0143')).toBe(
+        normalizeValue('phone', '02079460143'),
+      );
+      expect(normalizeValue('EMAIL_ADDRESS', ' Pip.Marlow@Example.com ')).toBe(
+        'pip.marlow@example.com',
+      );
     });
 
     it('casefolds and collapses whitespace for person names', () => {
@@ -95,6 +116,14 @@ describe('value-normalizer', () => {
     it('allows unknown / custom labels', () => {
       expect(isPhoneticEligible('employee')).toBe(true);
       expect(isPhoneticEligible('customer_id_text')).toBe(true);
+    });
+
+    it("blocks structured identifiers under the detector's own names too", () => {
+      for (const label of ['EMAIL_ADDRESS', 'PHONE_NUMBER', 'IBAN_CODE', 'US_SSN']) {
+        expect(isPhoneticEligible(label)).toBe(false);
+      }
+      // A place or an organisation is still a name.
+      expect(isPhoneticEligible('LOCATION')).toBe(true);
     });
 
     it('blocks structured identifier labels', () => {

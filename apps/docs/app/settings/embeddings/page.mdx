@@ -75,24 +75,39 @@ text leaves the deployment**, which is usually the deciding factor for
 regulated corpora. It costs CPU: embedding a large corpus is the heaviest
 sustained work the system does.
 
-The bundled default, `all-MiniLM-L6-v2`, is small and fast and handles general
-English well. The dropdown offers alternatives that trade speed for quality —
-`bge-base-en-v1.5` is noticeably better at English retrieval and noticeably
-slower, and `multilingual-e5-small` is the one to pick for a corpus that is not
-mostly English.
+The list offers seventeen models. They fall into four groups, and the group
+matters more than the name:
 
-**EmbeddingGemma 2** is the one model on the list that is not text-only. It
-puts text, pictures and sound in the same 768 numbers, in over a hundred
-languages, so a question typed in words can land next to a photograph. It is
-also by far the heaviest: about 314 MB to download for text, 195 MB more for
-pictures and 340 MB more for sound, and several times slower than MiniLM on a
-CPU. It is listed under its ONNX conversion,
-`onnx-community/embeddinggemma-2-ONNX`, because that is what the built-in
-worker can load. Typing `google/embeddinggemma-2` as a custom model selects the
-same thing: Google's own repository holds the PyTorch weights only.
+| Group | Models | Choose it when |
+| --- | --- | --- |
+| **English, small** | `all-MiniLM-L6-v2` (the bundled default), `all-MiniLM-L12-v2`, `bge-small-en-v1.5`, `bge-base-en-v1.5`, `gte-small`, `granite-embedding-small-english-r2` | The corpus and the questions are in English and indexing speed matters most. 23 to 106 MB. |
+| **Many languages, small** | `multilingual-e5-small`, `granite-embedding-97m-multilingual-r2` | The corpus is not all English and the machine is small. About 100 to 130 MB, and about a third of the default model's indexing speed. |
+| **Many languages, large** | `EmbeddingGemma 300m`, `Harrier 270m`, `Voyage 4 nano`, `bge-m3`, `Qwen3 Embedding 0.6B` | Search quality on real documents matters more than indexing time. 300 to 620 MB, and in our measurements 14 to 120 times slower to index than MiniLM. |
+| **Pictures or sound** | `EmbeddingGemma 2` (documents, pictures and sound), `SigLIP 2 base` and `CLIP ViT-B/32` (pictures), `CLAP` (sound) | See [Pictures and sound](#pictures-and-sound). Only EmbeddingGemma 2 is also a document model. |
 
-The dimensions of a model on the list, and the task prompts EmbeddingGemma 2 is
-trained with, are filled in for you.
+An English-only model does not fail on German text. It answers, and finds
+little: in [our own measurements](#measured-on-one-drive) the English-only
+models found 4 to 9 of 30 German sentences from an English question, and
+every multilingual model 23 or more.
+
+**EmbeddingGemma 2** puts text, pictures and sound in the same 768 numbers, in
+over a hundred languages, so a question typed in words can land next to a
+photograph. It is also by far the heaviest: about 314 MB to download for
+text, 195 MB more for pictures and 340 MB more for sound, about one passage a
+second on two CPU cores, and close to a minute for each picture. It is listed
+under its ONNX conversion, `onnx-community/embeddinggemma-2-ONNX`, because
+that is what the built-in worker can load. Typing `google/embeddinggemma-2`
+as a custom model selects the same thing: Google's own repository holds the
+PyTorch weights only. The other models' own repository names are accepted
+the same way.
+
+Dimensions, pooling and task prompts of a model on the list are filled in for
+you.
+
+Downloaded models are kept in a cache on the pod, and the cache has a budget
+(`EMBEDDING_CACHE_MAX_MB`, 1,500 by default, under the 2 Gi volume the Helm
+chart gives it). When another model would not fit, the one used longest ago
+is deleted and fetched again if a workspace returns to it.
 
 <Callout type="info">
   The all-in-one Docker image ships one pinned model and runs offline. It cannot
@@ -173,13 +188,29 @@ prompt there itself: set **Document prompt** and **Query prompt** on the
 provider, exactly as the model card writes them, trailing space included.
 Leave both empty for a model that has none (OpenAI's, the bundled MiniLM).
 
-The built-in EmbeddingGemma 2 needs none of this: its prompts are known and
-applied for you. Prompts go in front of text only. A picture or a clip is
-embedded as it is.
+A built-in model from the list needs none of this: the prompts of
+EmbeddingGemma, E5, Voyage 4 nano, Qwen3 and Harrier are known and applied for
+you. The last two take an instruction in front of the question only
+(`Instruct: Given a web search query, retrieve relevant passages that answer
+the query`), and nothing in front of a stored passage. Prompts go in front of
+text only. A picture or a clip is embedded as it is.
 
 The document prompt is part of what a stored vector means, so changing it
 rebuilds the corpus like a model change does. The query prompt only shapes
 the next search; nothing is re-embedded.
+
+### Pooling follows the model
+
+A text model produces one vector per token, and **pooling** is how those
+become one vector for the passage: the average of all of them (`mean`), the
+first token's (`cls`), or the last token's (`last_token`). Which one is right
+is decided when the model is trained. BGE and Granite put the sentence in their
+first token, Qwen3 in its last, MiniLM and E5 are averaged. Read the wrong way,
+a model still returns a vector of the right width, and retrieves worse with
+nothing to say why.
+
+Picking a model from the list sets its pooling. The **Pooling** field under
+**Advanced** is for a custom model; take the value from its model card.
 
 ### Dimensions must match the model
 
@@ -322,6 +353,15 @@ If the machine is under memory pressure, a smaller batch size is the first
 lever to reach for — it is the single setting that most directly bounds how
 much memory one inference step needs.
 
+On a CPU the built-in worker gives the model **one text at a time**, whatever
+the batch size: the batch is how many texts travel to the worker in one
+message. Two measurements are behind that. The default weights are 8-bit, and
+with those the vector of a text depended on what else was in its batch (the
+same sentence came back at a cosine of 0.975 to 0.997 to itself, depending on
+the model). And a batch is padded to its longest text, which on two CPU
+threads made batches of 32 two to three times slower than the same texts one
+by one. With a GPU device the batch goes to the model whole.
+
 ---
 
 ## Search index settings
@@ -406,9 +446,19 @@ them and nothing else on this page changes.
 | Model | Where it runs | Pictures | Sound |
 | --- | --- | --- | --- |
 | **EmbeddingGemma 2**, built in | The built-in worker, no data leaves the deployment | Yes | Yes |
+| **SigLIP 2 base**, **CLIP ViT-B/32**, built in | The built-in worker | Yes | No |
+| **CLAP**, built in | The built-in worker | No | Yes |
 | **EmbeddingGemma 2** behind llama.cpp | A server you run, as a remote provider | Yes | Yes |
-| **Gemini Embedding 2** | Google's API, as a remote provider | Yes | Yes |
+| **Gemini Embedding 2** | Google's API or OpenRouter, as a remote provider | Yes | Yes |
 | Every other model on the list, and any text embeddings API | — | No | No |
+
+SigLIP, CLIP and CLAP are a different kind of model from EmbeddingGemma 2: two
+separate encoders, one for a caption and one for a picture (or a sound),
+trained against each other. Their text side was trained on captions: SigLIP 2
+reads 64 tokens and CLIP 77 and both cut a longer passage there, and CLAP's
+was tuned to match descriptions of sounds. They are on the list for a workspace that is
+mostly pictures or recordings; for documents they are the wrong choice, and
+[the measurements](#measured-on-one-drive) show by how much.
 
 Two models that both "do pictures" are still two separate spaces. A picture
 embedded by one cannot be found by a question embedded by the other, so the
@@ -436,8 +486,8 @@ under [AI Providers](/settings/ai-providers) and set two things in the
 
 - **How media is sent**. Text embedding has one request format that every
   server copied from OpenAI. Pictures and sound have one per server, so it has
-  to be named: **llama.cpp server**, or **Google Gemini API**. Left at **Text
-  only**, the provider is never sent a picture.
+  to be named: **llama.cpp server**, **Google Gemini API**, or **OpenRouter**.
+  Left at **Text only**, the provider is never sent a picture.
 - **Pictures** and **Sound**: what the model takes.
 
 **Test connection** then sends the provider a small test picture (and a test
@@ -490,8 +540,19 @@ scan.
 
 ### What to expect from search
 
-Results are ranked by one score across text and pictures. Measured on a small
-mixed drive (38 files, six of them pictures, EmbeddingGemma 2):
+Text, pictures and sound come back as one list. They are not ranked by raw
+score, because a model does not put them at one distance: the picture a
+caption describes sits further from the caption than an unrelated sentence
+does. Measured with Gemini Embedding 2, "a dog barking" scored 0.62 against
+the recording of the dog and 0.56 against a sentence about an invoice. So each
+result is placed by how far its score lies above the middle score of its own
+kind for that question: a passage above the median of a sample of the
+passages, a picture above the median of all pictures, a clip above the median
+of all clips. A kind with fewer than eight items has no middle to speak of and
+is read against the text's.
+
+Measured on a small mixed drive (38 files, six of them pictures,
+EmbeddingGemma 2):
 
 - "water coming through the bedroom ceiling" returned the photograph of that
   ceiling in the first two results; "the pipe joint that failed under a sink"

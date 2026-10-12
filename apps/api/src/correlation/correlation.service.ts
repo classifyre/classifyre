@@ -18,6 +18,7 @@ import {
   FANOUT_CAP,
   IDENTICAL_GROUP_CAP,
   IDENTICAL_GROUP_PAGE,
+  LABEL_ALIASES,
   LABEL_WEIGHTS,
   MAX_CLUSTER_TOP_VALUES,
   PHONETIC_FANOUT_CAP,
@@ -695,7 +696,17 @@ export class CorrelationService {
     // The built-ins are folded in by effectiveLabelWeights, so the tuning
     // screen shows the weight that is actually being applied rather than a
     // flat default the scorer never used.
-    const labels = [...new Set([...inUse, ...Object.keys(weights)])]
+    // A detector's own name for a kind of value (IBAN_CODE for iban) is in the
+    // weight table so that it weighs what it should. On this screen it is
+    // listed when findings carry it and left out when they do not: thirty
+    // rows of "not in data" for recognisers nobody ran would bury the labels
+    // that are. One somebody set a weight for stays, in data or not.
+    const stored = (row?.labelWeights as Record<string, number> | null) ?? {};
+    const listed = Object.keys(weights).filter(
+      (label) =>
+        inUse.has(label) || !(label in LABEL_ALIASES) || label in stored,
+    );
+    const labels = [...new Set([...inUse, ...listed])]
       .sort()
       .map((label) => ({
         label,
