@@ -5768,6 +5768,11 @@
           },
           "description": "Optional table allowlist. Accepted forms: table or database.table"
         },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include view assets in extraction. A view's column lineage is read from its SQL."
+        },
         "table_limit": {
           "type": "integer",
           "minimum": 1,
