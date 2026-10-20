@@ -336,11 +336,6 @@ def test_mssql_collect_foreign_key_links_respects_table_lineage_toggle(
     monkeypatch.setattr(
         source, "_collect_fk_links", lambda _tables: {("a", "b", "c"): {("x", "y", "z")}}
     )
-    monkeypatch.setattr(
-        source,
-        "_collect_view_dependency_links",
-        lambda _tables: {("v", "s", "w"): {("x", "y", "z")}},
-    )
 
     links = source._collect_foreign_key_links([])
 

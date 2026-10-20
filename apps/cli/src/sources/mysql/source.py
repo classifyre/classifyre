@@ -179,7 +179,11 @@ class MySQLSource(BaseTabularSource):
         limit = self._scope_options().table_limit
         return int(limit) if limit else None
 
+    def _include_views_enabled(self) -> bool:
+        return self._scope_options().include_views is not False
+
     def _list_tables_for_database(self, database: str) -> list[TableRef]:
+        table_types = ("BASE TABLE", "VIEW") if self._include_views_enabled() else ("BASE TABLE",)
         table_allowlist = self._table_allowlist()
         limit = self._table_limit()
 
@@ -187,22 +191,31 @@ class MySQLSource(BaseTabularSource):
         conn = self._get_cached_connection(database)
         with conn.cursor() as cursor:
             cursor.execute(
-                """
-                SELECT table_name
+                f"""
+                SELECT table_name, table_type
                 FROM information_schema.tables
                 WHERE table_schema = %s
-                  AND table_type = 'BASE TABLE'
+                  AND table_type IN ({", ".join(f"'{t}'" for t in table_types)})
                 ORDER BY table_name
                 """,
                 (database,),
             )
             for row in cursor.fetchall():
-                table_name = row[0] if isinstance(row, tuple) else None
+                if not isinstance(row, tuple) or len(row) < 2:
+                    continue
+                table_name, table_type = row[0], row[1]
                 if not isinstance(table_name, str) or not table_name:
                     continue
                 if not self._accept_table(table_allowlist, database, None, table_name):
                     continue
-                tables.append(TableRef(database=database, schema=None, table=table_name))
+                tables.append(
+                    TableRef(
+                        database=database,
+                        schema=None,
+                        table=table_name,
+                        object_type="VIEW" if table_type == "VIEW" else "TABLE",
+                    )
+                )
                 if limit is not None and len(tables) >= limit:
                     break
         return tables

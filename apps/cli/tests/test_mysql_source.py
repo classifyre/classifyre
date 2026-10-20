@@ -360,3 +360,54 @@ async def test_mysql_extract_runs_detector_pipeline_when_enabled(
 
     assert [len(batch) for batch in batches] == [1]
     assert processed_batches == [1]
+
+
+class _CatalogCursor:
+    """information_schema.tables for app_db: one table, one view."""
+
+    def __init__(self) -> None:
+        self._rows: list[tuple[Any, ...]] = []
+
+    def execute(self, query: str, _params: Any = None) -> None:
+        catalog = [("orders", "BASE TABLE"), ("v_open_orders", "VIEW")]
+        self._rows = [row for row in catalog if f"'{row[1]}'" in query]
+
+    def fetchall(self) -> list[tuple[Any, ...]]:
+        return list(self._rows)
+
+    def __enter__(self) -> _CatalogCursor:
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        return None
+
+
+class _CatalogConnection:
+    def cursor(self) -> _CatalogCursor:
+        return _CatalogCursor()
+
+
+def test_mysql_lists_views_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Without the view as an asset, its lineage has nothing to attach to.
+    source = MySQLSource(_recipe())
+    monkeypatch.setattr(source, "_get_cached_connection", lambda _db=None: _CatalogConnection())
+
+    tables = source._list_tables_for_database("app_db")
+
+    assert [(t.table, t.object_type) for t in tables] == [
+        ("orders", "TABLE"),
+        ("v_open_orders", "VIEW"),
+    ]
+
+
+def test_mysql_include_views_false_lists_only_base_tables(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = MySQLSource(
+        _recipe(optional={"scope": {"database": "app_db", "include_views": False}})
+    )
+    monkeypatch.setattr(source, "_get_cached_connection", lambda _db=None: _CatalogConnection())
+
+    tables = source._list_tables_for_database("app_db")
+
+    assert [(t.table, t.object_type) for t in tables] == [("orders", "TABLE")]

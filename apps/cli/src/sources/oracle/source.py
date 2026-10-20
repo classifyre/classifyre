@@ -564,25 +564,8 @@ class OracleSource(BaseTabularSource):
         self,
         tables: list[TableRef],
     ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
-        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
-
-        # FK links
-        fk_links = self._collect_fk_links(tables)
-        for source, targets in fk_links.items():
-            links.setdefault(source, set()).update(targets)
-
-        # View lineage links
-        if self._include_view_lineage_enabled():
-            view_links = self._collect_view_links(tables)
-            for source, targets in view_links.items():
-                links.setdefault(source, set()).update(targets)
-
-        return links
-
-    def _collect_fk_links(
-        self,
-        tables: list[TableRef],
-    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
+        # Only declared constraints: a view's dependencies are lineage, and
+        # _collect_view_lineage already emits them as FLOW.
         table_keys = {t.table_key for t in tables if t.object_type == "TABLE"}
         if not table_keys:
             return {}
@@ -627,49 +610,6 @@ class OracleSource(BaseTabularSource):
                     links.setdefault(source_key, set()).add(target_key)
         except Exception as exc:
             logger.warning("Could not resolve Oracle foreign key links: %s", exc)
-
-        return links
-
-    def _collect_view_links(
-        self,
-        tables: list[TableRef],
-    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
-        object_keys = {t.table_key for t in tables}
-        view_keys = {t.table_key for t in tables if t.object_type == "VIEW"}
-        if not view_keys:
-            return {}
-
-        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
-        try:
-            conn = self._get_cached_connection(self._service_name)
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT
-                        owner,
-                        name,
-                        referenced_owner,
-                        referenced_name,
-                        referenced_type
-                    FROM all_dependencies
-                    WHERE type = 'VIEW'
-                      AND referenced_type IN ('TABLE', 'VIEW')
-                    """
-                )
-                for row in cursor.fetchall():
-                    if not isinstance(row, tuple) or len(row) < 5:
-                        continue
-                    owner, name, ref_owner, ref_name = row[0], row[1], row[2], row[3]
-                    if not all(isinstance(v, str) for v in (owner, name, ref_owner, ref_name)):
-                        continue
-
-                    source_key = (self._service_name, str(owner).upper(), str(name))
-                    target_key = (self._service_name, str(ref_owner).upper(), str(ref_name))
-                    if source_key not in view_keys or target_key not in object_keys:
-                        continue
-                    links.setdefault(source_key, set()).add(target_key)
-        except Exception as exc:
-            logger.warning("Could not resolve Oracle view lineage links: %s", exc)
 
         return links
 

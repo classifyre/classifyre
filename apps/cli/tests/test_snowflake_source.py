@@ -153,9 +153,9 @@ async def test_snowflake_extract_streams_assets_in_batches(
         "_collect_foreign_key_links",
         lambda _tables: {
             ("ANALYTICS", "PUBLIC", "PAYMENTS"): {("ANALYTICS", "PUBLIC", "ORDERS")},
-            ("ANALYTICS", "PUBLIC", "V_ORDERS"): {("ANALYTICS", "PUBLIC", "ORDERS")},
         },
     )
+    monkeypatch.setattr(source, "_collect_view_lineage", lambda _tables: [])
 
     original_batch_size = SnowflakeSource.BATCH_SIZE
     SnowflakeSource.BATCH_SIZE = 2
@@ -171,7 +171,8 @@ async def test_snowflake_extract_streams_assets_in_batches(
     assert all(asset.asset_type == OutputAssetType.TABLE for batch in batches for asset in batch)
     parent_hash = source.generate_hash_id("ANALYTICS_#_PUBLIC_#_ORDERS")
     assert parent_hash in batches[0][1].links
-    assert parent_hash in batches[1][0].links
+    # A view's upstream is lineage (a FLOW edge), not a foreign key.
+    assert batches[1][0].links == []
 
 
 @pytest.mark.asyncio
