@@ -1873,6 +1873,9 @@ class CustomDetectorConfig(DetectorConfig):
     Configuration for user-defined detector execution
     """
 
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     custom_detector_key: str = Field(
         ..., description='Stable key used to identify one custom detector instance'
     )
