@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from src.models.generated_single_asset_scan_results import AssetType as OutputAssetType
+from src.sources.snowflake import source as source_module
 from src.sources.snowflake.source import SnowflakeSource, TableRef
 
 
@@ -327,3 +328,26 @@ async def test_snowflake_fetch_content_pages_batches_for_all_strategy(
     assert len(pages) == 12
     assert "item1" in pages[0]
     assert "item12" in pages[11]
+
+
+def test_catalog_view_lineage_keeps_the_view_sql_for_columns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # OBJECT_DEPENDENCIES names the upstreams but not the columns; without the
+    # view text the edge could only ever be dataset-level.
+    source = SnowflakeSource(_default_recipe())
+    view = TableRef("ANALYTICS", "PUBLIC", "ACTIVE_USERS", object_type="VIEW")
+    sql = "SELECT ID, LOWER(EMAIL) AS EMAIL FROM ANALYTICS.PUBLIC.USERS"
+    monkeypatch.setattr(source, "_view_definitions", lambda _by_db: {view.table_key: sql})
+    monkeypatch.setattr(
+        source,
+        "_object_dependencies",
+        lambda _keys: [
+            source_module.ViewLineage(view.table_key, (("ANALYTICS", "PUBLIC", "USERS"),), None)
+        ],
+    )
+
+    [entry] = source._collect_view_lineage([view])
+
+    assert entry.upstreams == (("ANALYTICS", "PUBLIC", "USERS"),)
+    assert entry.sql == sql

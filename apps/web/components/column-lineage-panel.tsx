@@ -1,7 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Columns3, CornerDownRight } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  Columns3,
+  CornerDownRight,
+  ExternalLink,
+} from "lucide-react";
 import { api, type ColumnLineageStepDto } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components/badge";
 import { EmptyState } from "@workspace/ui/components/empty-state";
@@ -82,6 +89,15 @@ export function ColumnLineagePanel({
             ))}
           </SelectContent>
         </Select>
+        <a
+          href="/docs/sources/lineage/column-level/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        >
+          How to read this
+          <ExternalLink className="h-3 w-3" />
+        </a>
       </div>
 
       {loading ? (
@@ -120,6 +136,14 @@ export function ColumnLineagePanel({
   );
 }
 
+const METHOD_LABEL: Record<string, string> = {
+  RUNTIME_OBSERVED: "observed",
+  SYSTEM_CATALOG: "catalog",
+  SQL_PARSED: "SQL parsed",
+  HEURISTIC: "heuristic",
+  MANUAL: "manual",
+};
+
 function StepTable({
   caption,
   hint,
@@ -139,35 +163,111 @@ function StepTable({
         <table className="w-full min-w-[520px] text-xs">
           <tbody>
             {steps.map((step, index) => (
-              <tr
+              <StepRow
                 key={`${step.assetId}:${step.column}:${index}`}
-                className="border-t border-border align-top"
-              >
-                <td className="whitespace-nowrap py-2 pr-3">
-                  <span
-                    className="inline-flex items-center gap-1 text-muted-foreground"
-                    style={{ paddingLeft: `${(step.depth - 1) * 12}px` }}
-                  >
-                    {step.depth > 1 && <CornerDownRight className="h-3 w-3" />}
-                    <span className="font-mono">{step.assetLabel}</span>
-                  </span>
-                </td>
-                <td className="py-2 pr-3 font-mono">
-                  {(step.upstreams ?? []).join(", ") || "—"}
-                </td>
-                <td className="py-2 pr-3">
-                  <Badge variant="outline" className="text-[10px] uppercase">
-                    {step.type}
-                  </Badge>
-                </td>
-                <td className="py-2 font-mono text-[11px] text-muted-foreground">
-                  {step.transform ?? ""}
-                </td>
-              </tr>
+                step={step}
+              />
             ))}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * One hop, read left to right the way the data moves:
+ * `customers.name → LOWER → customer`. The full expression and the SQL it
+ * was read from sit one click away, for when the chain is not enough.
+ */
+function StepRow({ step }: { step: ColumnLineageStepDto }) {
+  const [open, setOpen] = React.useState(false);
+  const upstreams = step.upstreams ?? [];
+  const hasDetail = Boolean(step.transform || step.sql);
+  const indirect = step.type === "INDIRECT";
+
+  return (
+    <>
+      <tr className="border-t border-border align-top">
+        <td className="whitespace-nowrap py-2 pr-3">
+          <span
+            className="inline-flex items-center gap-1 text-muted-foreground"
+            style={{ paddingLeft: `${(step.depth - 1) * 12}px` }}
+          >
+            {step.depth > 1 && <CornerDownRight className="h-3 w-3" />}
+            <span className="font-mono">{step.assetLabel}</span>
+          </span>
+        </td>
+        <td className="py-2 pr-3">
+          <span className="inline-flex flex-wrap items-center gap-1 font-mono">
+            <span>
+              {upstreams.length > 0 ? upstreams.join(", ") : "constant"}
+            </span>
+            {(step.steps ?? []).map((name, index) => (
+              <React.Fragment key={`${name}:${index}`}>
+                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                  {name}
+                </Badge>
+              </React.Fragment>
+            ))}
+            {!indirect && (
+              <>
+                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                <span className="font-semibold">{step.column}</span>
+              </>
+            )}
+          </span>
+        </td>
+        <td className="whitespace-nowrap py-2 pr-3">
+          <span className="inline-flex items-center gap-1">
+            <Badge variant="outline" className="text-[10px] uppercase">
+              {step.type}
+            </Badge>
+            <Badge
+              variant="outline"
+              className="text-[10px] text-muted-foreground"
+              title="How this edge was learned, and how sure we are of it"
+            >
+              {METHOD_LABEL[step.method] ?? step.method} ·{" "}
+              {Math.round(step.confidence * 100)}%
+            </Badge>
+          </span>
+        </td>
+        <td className="py-2 text-right">
+          {hasDetail && (
+            <button
+              type="button"
+              onClick={() => setOpen((value) => !value)}
+              className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+              aria-expanded={open}
+            >
+              {open ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+              SQL
+            </button>
+          )}
+        </td>
+      </tr>
+      {open && (
+        <tr>
+          <td colSpan={4} className="space-y-2 pb-3">
+            {step.transform && (
+              <pre className="whitespace-pre-wrap rounded bg-muted px-2 py-1 font-mono text-[11px]">
+                {step.transform}
+              </pre>
+            )}
+            {step.sql && (
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded border border-border px-2 py-1 font-mono text-[11px] text-muted-foreground">
+                {step.sql}
+              </pre>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }

@@ -14,8 +14,8 @@ from typing import Any
 
 import pytest
 
-from src.detectors.custom_detector.sdk import DetectorAsset, Finding, iter_findings
-from src.detectors.custom_detector.session import CustomDetectorSession
+from src.detectors.custom_detector.sdk import DetectorAsset, Finding, PriorFinding, iter_findings
+from src.detectors.custom_detector.session import CustomDetectorSession, prior_finding_payload
 from src.models.generated_single_asset_scan_results import (
     DetectionResult,
     DetectorType,
@@ -273,6 +273,48 @@ async def test_needs_findings_exposes_prior_findings_only_when_enabled() -> None
         disabled.close()
     assert seen.ok and [f.matched_content for f in seen.findings] == ["DE89370400440532013000"]
     assert refused.error is not None and "needs_findings" in refused.error
+
+
+def test_prior_findings_carry_what_a_model_extracted() -> None:
+    """A rule reading an LLM or decision finding needs the extracted fields and
+    the answer, not only the label: "the company says its free cash flow is X"
+    is in ``fields``, and comparing X with the tagged figures is the rule's job."""
+    llm = DetectionResult(
+        detector_type=DetectorType.CUSTOM,
+        finding_type="company_reports_fcf",
+        category="CLASSIFICATION",
+        severity=Severity.info,
+        confidence=0.9,
+        matched_content="Free cash flow EUR 412 million",
+        custom_detector_key="fcf_claim",
+        metadata={
+            "runner": "LLM",
+            "label": "company_reports_fcf",
+            "fields": {"fcf_value": "412", "scale": "million"},
+            "api_key": "never-copied",
+        },
+    )
+    decision = DetectionResult(
+        detector_type=DetectorType.CUSTOM,
+        finding_type="sector:utilities",
+        category="CLASSIFICATION",
+        severity=Severity.info,
+        confidence=0.8,
+        matched_content="utilities",
+        custom_detector_key="sector",
+        metadata={
+            "runner": "DECISION",
+            "question": "sector",
+            "answer": "utilities",
+            "label": "sector:utilities",
+        },
+    )
+
+    llm_payload = prior_finding_payload(llm)
+    assert llm_payload["metadata"]["fields"] == {"fcf_value": "412", "scale": "million"}
+    assert "api_key" not in llm_payload["metadata"]
+    assert prior_finding_payload(decision)["metadata"]["answer"] == "utilities"
+    assert PriorFinding.from_payload(llm_payload).metadata["fields"]["fcf_value"] == "412"
 
 
 def test_detector_asset_is_read_only() -> None:

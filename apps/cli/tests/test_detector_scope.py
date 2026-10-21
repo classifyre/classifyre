@@ -16,6 +16,7 @@ from types import SimpleNamespace
 from src.pipeline.detector_pipeline import (
     _detector_covers_asset,
     _detector_covers_content_type,
+    _detector_covers_text,
 )
 
 
@@ -35,6 +36,7 @@ def _scope(**kwargs):
         asset_kinds=kwargs.get("asset_kinds"),
         content_types=kwargs.get("content_types"),
         metadata=kwargs.get("metadata"),
+        content_pattern=kwargs.get("content_pattern"),
     )
 
 
@@ -108,3 +110,25 @@ def test_predicates_and_together() -> None:
         _detector_covers_asset(detector, _asset(kind="document", metadata={"source": "jab"}))
         is False
     )
+
+
+def test_a_content_pattern_narrows_a_paged_document_to_matching_pages() -> None:
+    # One annual report is one asset; a model asked about free cash flow should
+    # read the pages that use the term, not every page of it.
+    detector = _detector(_scope(content_pattern=r"free cash flow|freier cashflow"))
+    assert _detector_covers_text(detector, "Free Cash Flow rose to 412 million") is True
+    assert _detector_covers_text(detector, "Der freie Cashflow stieg") is False
+    assert _detector_covers_text(detector, "Freier Cashflow: 3,2 Mrd.") is True
+    assert _detector_covers_text(detector, "Statement of changes in equity") is False
+
+
+def test_a_content_pattern_never_matches_a_payload_without_text() -> None:
+    detector = _detector(_scope(content_pattern="anything"))
+    assert _detector_covers_text(detector, b"\x89PNG") is False
+
+
+def test_no_content_pattern_and_an_invalid_one_run_everywhere() -> None:
+    assert _detector_covers_text(_detector(_scope()), "any page") is True
+    assert _detector_covers_text(_detector(None), b"bytes") is True
+    # A broken pattern must not silently switch a detector off.
+    assert _detector_covers_text(_detector(_scope(content_pattern="(")), "any page") is True

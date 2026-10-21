@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
+import re
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import UTC, datetime
@@ -105,6 +107,32 @@ def _detector_covers_content_type(detector: BaseDetector, content_type: str) -> 
     if not actual:
         return False
     return any(actual.startswith(str(prefix).strip().lower()) for prefix in content_types)
+
+
+@functools.lru_cache(maxsize=256)
+def _content_pattern(pattern: str) -> re.Pattern[str] | None:
+    try:
+        return re.compile(pattern, re.IGNORECASE)
+    except re.error:
+        logger.warning("Ignoring invalid detector scope content_pattern %r", pattern)
+        return None
+
+
+def _detector_covers_text(detector: BaseDetector, content: str | bytes) -> bool:
+    """Whether a payload's text contains the scope's ``content_pattern``.
+
+    Checked per payload, so a paged document is narrowed page by page: an
+    expensive model runs on the pages that use the words it is asked about,
+    not on the whole report. A payload without text never matches.
+    """
+    scope = _detector_scope(detector)
+    pattern = getattr(scope, "content_pattern", None) if scope is not None else None
+    if not pattern:
+        return True
+    if not isinstance(content, str):
+        return False
+    compiled = _content_pattern(str(pattern))
+    return compiled is None or compiled.search(content) is not None
 
 
 class _DetectorInfo:
@@ -909,6 +937,7 @@ class DetectorPipeline:
             # A declared scope narrows what the engine already supports; it
             # can never widen it, so this runs after the engine's own check.
             and _detector_covers_content_type(detector, content_type)
+            and _detector_covers_text(detector, content)
         ]
         async with self._breaker.first_contact(
             *(self._breaker_key_or_default(detector) for detector in compatible)

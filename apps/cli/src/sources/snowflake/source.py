@@ -551,11 +551,38 @@ class SnowflakeSource(BaseTabularSource):
         for t in tables:
             by_database.setdefault(t.database, set()).add(t.table_key)
 
+        definitions = self._view_definitions(by_database)
         catalog = self._object_dependencies(scoped_keys)
         if catalog:
-            return catalog
+            # The catalog names the upstream tables; the view text is still
+            # what the columns are read from.
+            return [
+                ViewLineage(entry.view, entry.upstreams, definitions.get(entry.view))
+                for entry in catalog
+            ]
 
         results: list[ViewLineage] = []
+        for view_key, definition in definitions.items():
+            database, schema, _ = view_key
+            upstreams = [
+                key
+                for key in upstream_tables_from_sql(
+                    definition,
+                    dialect="snowflake",
+                    default_database=database,
+                    default_schema=schema,
+                )
+                if key != view_key
+            ]
+            if upstreams:
+                results.append(ViewLineage(view_key, tuple(upstreams), definition))
+        return results
+
+    def _view_definitions(
+        self, by_database: dict[str, set[tuple[str, ...]]]
+    ) -> dict[tuple[str, ...], str]:
+        """The text of every in-scope view, from each database's INFORMATION_SCHEMA."""
+        definitions: dict[tuple[str, ...], str] = {}
         for database, keys in by_database.items():
             try:
                 conn = self._get_cached_connection(database)
@@ -569,26 +596,14 @@ class SnowflakeSource(BaseTabularSource):
                 finally:
                     cursor.close()
             except Exception as exc:
-                logger.warning("Could not resolve view lineage for %s: %s", database, exc)
+                logger.warning("Could not read view definitions for %s: %s", database, exc)
                 continue
 
             for schema, name, definition in rows:
                 view_key = (database, schema, name)
-                if view_key not in keys or not definition:
-                    continue
-                upstreams = [
-                    key
-                    for key in upstream_tables_from_sql(
-                        definition,
-                        dialect="snowflake",
-                        default_database=database,
-                        default_schema=schema,
-                    )
-                    if key != view_key
-                ]
-                if upstreams:
-                    results.append(ViewLineage(view_key, tuple(upstreams), definition))
-        return results
+                if view_key in keys and definition:
+                    definitions[view_key] = definition
+        return definitions
 
     def _object_dependencies(self, scoped_keys: set[tuple[str, ...]]) -> list[ViewLineage]:
         """Account-level dependencies, or an empty list when not readable."""

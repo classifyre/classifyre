@@ -2230,7 +2230,23 @@ export class CliRunnerService {
         // disabling the scan cache alone still leaves the AUTOMATIC cursor
         // where the last run stopped, so a covered source would discover
         // nothing. Start from scratch instead. A notebook source keeps its
-        // own state in the cursor and decides for itself.
+        // own state in the cursor and decides for itself, so it is told the
+        // way a settings change tells it (ctx.config_changed): its windows
+        // start over, and what else it keeps in the cursor stays.
+        if (
+          options?.restartSweep === true &&
+          source.type === AssetType.CUSTOM
+        ) {
+          this.logger.log(
+            `Source ${source.id}: forced full rescan; the notebook is told to ` +
+              'start its sweep over.',
+          );
+          return {
+            ...unchanged,
+            samplingFingerprint: fingerprint,
+            samplingReset: true,
+          };
+        }
         if (
           options?.restartSweep === true &&
           source.type !== AssetType.CUSTOM &&
@@ -2269,7 +2285,7 @@ export class CliRunnerService {
         return {
           ...unchanged,
           samplingFingerprint: fingerprint,
-          samplingReset: stored !== null,
+          samplingReset: stored !== null || options?.restartSweep === true,
         };
       }
 
