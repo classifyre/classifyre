@@ -1,4 +1,4 @@
-import { planInferenceBatches } from './embedding-batching';
+import { planInferenceBatches, planRemoteCalls } from './embedding-batching';
 
 /**
  * The worker was OOMKilled in a loop by one inference call.
@@ -77,5 +77,20 @@ describe('planInferenceBatches', () => {
 
   it('returns nothing for no texts', () => {
     expect(planInferenceBatches([], limits)).toEqual([]);
+  });
+});
+
+describe('planRemoteCalls', () => {
+  it('keeps a remote request under the 100 inputs Gemini accepts', () => {
+    const texts = Array.from({ length: 2000 }, (_, i) => `chunk ${i}`);
+    const groups = planRemoteCalls(texts);
+
+    expect(groups.every((g) => g.length <= 96)).toBe(true);
+    expect(groups.flat()).toEqual(texts);
+  });
+
+  it('sends a small batch as one request', () => {
+    expect(planRemoteCalls(['a', 'b'])).toEqual([['a', 'b']]);
+    expect(planRemoteCalls([])).toEqual([]);
   });
 });

@@ -29,12 +29,19 @@ import {
   EmbeddingSettingsService,
   type ResolvedEmbeddingConfig,
 } from './embedding-settings.service';
-import {
-  embeddingContentHash,
-  windowsOntoOnePassage,
-} from './embedding-text';
+import { embeddingContentHash, windowsOntoOnePassage } from './embedding-text';
 import { reasonsForStorage, type StoredReason } from './reason-labels';
 import { MAX_INDEXED_DIMENSIONS, vectorCast } from './embedding-vector';
+import {
+  COMMON_TERM_SHARE,
+  FIGURE_FLOOR,
+  FIGURE_SHARE,
+  LEXICAL_TIMEOUT_MS,
+  MAX_QUERY_TERMS,
+  PASSAGE_CHARS,
+  squeezedFigures,
+  type LexicalChunkHit,
+} from './chunk-lexical';
 import {
   MAX_MEDIA_BYTES,
   isMediaModality,
@@ -43,7 +50,13 @@ import {
   type MediaModality,
 } from './embedding-modality';
 
-type SimilarityRow = { id: string; score: number };
+type SimilarityRow = {
+  id: string;
+  score: number;
+  /** Where in the asset the best match is: its chunk's page and text. */
+  page?: number | null;
+  text?: string | null;
+};
 /** One neighbour of a (content hash, finding type) pair. */
 type NeighborhoodSeedRow = {
   targetHash: string;
@@ -230,6 +243,9 @@ export function mergeByStanding(
     .slice(0, limit)
     .map(({ id, score }) => ({ id, score }));
 }
+
+/** Content hashes per neighbourhood query (one short transaction each). */
+const NEIGHBOURHOOD_SEED_SLICE = 200;
 
 @Injectable()
 export class EmbeddingService {
@@ -908,27 +924,16 @@ export class EmbeddingService {
     return found;
   }
 
-  private async calibrateNeighborhood(
-    space: { id: string; dim: number },
+  private neighbourhoodSeeds(
+    spaceId: Prisma.Sql,
+    dim: Prisma.Sql,
+    vecType: Prisma.Sql,
     contentHashes: string[],
-    // Same budget as `analyzeHashes`, for the same reason: this walks the
-    // cohorts too, so a caller that bounded the analysis and not this one has
-    // bounded nothing.
-    maxRows = Number.POSITIVE_INFINITY,
-  ): Promise<number> {
-    if (!contentHashes.length || maxRows <= 0) return 0;
-    const spaceId = this.spaceIdLiteral(space.id);
-    const dim = Prisma.raw(String(space.dim));
-    // Must match the expression ensureHnswIndex built, or the planner ignores
-    // the index and silently falls back to a sequential scan.
-    const vecType = Prisma.raw(vectorCast(space.dim).type);
-    const seeds = await this.prisma.$transaction(async (tx) => {
+  ): Promise<NeighborhoodSeedRow[]> {
+    return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw(
         Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.cfg.hnswEfSearch}`),
       );
-      // The candidate pre-filters (space, hash, finding_type) are applied after
-      // the index scan; relaxed_order lets the scan keep going until LIMIT is
-      // filled instead of falling back to an exact full-table sort.
       await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = relaxed_order`;
       return tx.$queryRaw<NeighborhoodSeedRow[]>(Prisma.sql`
         SELECT target.embed_content_hash AS "targetHash",
@@ -960,6 +965,45 @@ export class EmbeddingService {
         ) neighbor
       `);
     });
+  }
+
+  private async calibrateNeighborhood(
+    space: { id: string; dim: number },
+    contentHashes: string[],
+    // Same budget as `analyzeHashes`, for the same reason: this walks the
+    // cohorts too, so a caller that bounded the analysis and not this one has
+    // bounded nothing.
+    maxRows = Number.POSITIVE_INFINITY,
+  ): Promise<number> {
+    if (!contentHashes.length || maxRows <= 0) return 0;
+    const spaceId = this.spaceIdLiteral(space.id);
+    const dim = Prisma.raw(String(space.dim));
+    // Must match the expression ensureHnswIndex built, or the planner ignores
+    // the index and silently falls back to a sequential scan.
+    const vecType = Prisma.raw(vectorCast(space.dim).type);
+    // One short transaction per slice of hashes: SET LOCAL needs a transaction,
+    // and an interactive one expires after a few seconds. One per batch did,
+    // on every batch of ~1,500 chunks with 3,072-dimension vectors ("A commit
+    // cannot be executed on an expired transaction", classifyre-dev
+    // 2026-10-20), and each failure cost the batch a minute and its ranking.
+    const seeds: NeighborhoodSeedRow[] = [];
+    for (
+      let start = 0;
+      start < contentHashes.length;
+      start += NEIGHBOURHOOD_SEED_SLICE
+    ) {
+      const slice = contentHashes.slice(
+        start,
+        start + NEIGHBOURHOOD_SEED_SLICE,
+      );
+      seeds.push(
+        ...(await this.neighbourhoodSeeds(spaceId, dim, vecType, slice)),
+      );
+    }
+
+    // The candidate pre-filters (space, hash, finding_type) are applied after
+    // the index scan; relaxed_order lets the scan keep going until LIMIT is
+    // filled instead of falling back to an exact full-table sort.
 
     // Neighbours per (hash, finding_type), expanded to findings here.
     //
@@ -1486,11 +1530,18 @@ export class EmbeddingService {
             ${vector}::public.${vecType}(${dim})
           LIMIT ${candidateLimit}
         )
-        SELECT ac.asset_id AS id, MAX(n.score) AS score
-        FROM nearest n
-        JOIN asset_chunks ac ON ac.content_hash = n.content_hash
-        WHERE (${sourceId ?? null}::text IS NULL OR ac.source_id = ${sourceId ?? null})
-        GROUP BY ac.asset_id
+        , best AS (
+          -- Per asset, the chunk that matched best: the asset scores by it,
+          -- and the caller learns where in a long document the answer is.
+          SELECT DISTINCT ON (ac.asset_id)
+            ac.asset_id AS id, n.score, ac.page, LEFT(ac.text, 600) AS text
+          FROM nearest n
+          JOIN asset_chunks ac ON ac.content_hash = n.content_hash
+          WHERE (${sourceId ?? null}::text IS NULL OR ac.source_id = ${sourceId ?? null})
+          ORDER BY ac.asset_id, n.score DESC
+        )
+        SELECT id, score, page, text
+        FROM best
         ORDER BY score DESC
         LIMIT ${limit}
       `);
@@ -1577,6 +1628,132 @@ export class EmbeddingService {
         limit,
       );
     });
+  }
+
+  /**
+   * Assets found by the words of their passages, best first, each with the
+   * passage that matched best.
+   *
+   * The question is cut into words (figures squeezed to one word each: see
+   * FIGURE_SEPARATORS), and a word is weighed by how rare it is among the
+   * passages in scope — a document frequency read from the full-text index —
+   * so a figure outweighs "which page shows". Words in more than a fifth of
+   * the passages are left out. A passage scores the weights of the words it
+   * holds, scaled by how close together they sit (cover density).
+   *
+   * Needs no embeddings: it works with the feature off or the model down,
+   * and it is what hybrid search stands on then. A query that fails or runs
+   * long returns nothing rather than failing the search it is half of.
+   */
+  async lexicalAssetIds(
+    query: string,
+    limit: number,
+    sourceId?: string,
+  ): Promise<LexicalChunkHit[]> {
+    if (!query.trim()) return [];
+    const scope = sourceId ?? null;
+    const inScope = Prisma.sql`(${scope}::text IS NULL OR ac.source_id = ${scope})`;
+    try {
+      const rows = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw(
+          Prisma.raw(`SET LOCAL statement_timeout = ${LEXICAL_TIMEOUT_MS}`),
+        );
+        return tx.$queryRaw<
+          Array<{
+            id: string;
+            score: number;
+            page: number | null;
+            text: string | null;
+            exact: boolean;
+          }>
+        >(Prisma.sql`
+          WITH q AS (
+            SELECT ${squeezedFigures(Prisma.sql`${query}::text`)} AS t
+          ),
+          terms AS (
+            SELECT DISTINCT term
+            FROM (
+              SELECT unnest(tsvector_to_array(to_tsvector('simple', q.t))) AS term
+              FROM q
+            ) split
+            LIMIT ${MAX_QUERY_TERMS}
+          ),
+          tot AS (
+            SELECT COUNT(*)::float8 AS n FROM asset_chunks ac WHERE ${inScope}
+          ),
+          df AS (
+            -- How many passages hold each word: a bitmap scan of the GIN index.
+            SELECT t.term,
+              (
+                SELECT COUNT(*) FROM asset_chunks ac
+                WHERE ac.text_tsv @@ quote_literal(t.term)::tsquery
+                  AND ${inScope}
+              ) AS n
+            FROM terms t
+          ),
+          w AS (
+            SELECT df.term,
+              quote_literal(df.term)::tsquery AS tq,
+              LN((tot.n + 1) / (df.n + 0.5)) AS idf,
+              (
+                df.term ~ '[0-9]'
+                AND df.n <= GREATEST(${FIGURE_FLOOR}, tot.n * ${FIGURE_SHARE})
+              ) AS figure
+            FROM df CROSS JOIN tot
+            WHERE df.n > 0 AND df.n <= tot.n * ${COMMON_TERM_SHARE}
+          ),
+          orq AS (
+            SELECT string_agg(quote_literal(term), ' | ')::tsquery AS tq,
+              COUNT(*) FILTER (WHERE figure) AS figures
+            FROM w
+          ),
+          cand AS (
+            SELECT ac.asset_id, ac.page, ac.text, ac.text_tsv AS v
+            FROM asset_chunks ac CROSS JOIN orq
+            WHERE orq.tq IS NOT NULL
+              AND ac.text_tsv @@ orq.tq
+              AND ${inScope}
+          ),
+          scored AS (
+            SELECT cand.asset_id, cand.page, cand.text,
+              m.idf_sum * (1 + ts_rank_cd(cand.v, orq.tq)) AS score,
+              (orq.figures > 0 AND m.figure_hits = orq.figures) AS exact
+            FROM cand CROSS JOIN orq
+            CROSS JOIN LATERAL (
+              SELECT COALESCE(SUM(w.idf), 0) AS idf_sum,
+                COUNT(*) FILTER (WHERE w.figure) AS figure_hits
+              FROM w WHERE cand.v @@ w.tq
+            ) m
+          ),
+          best AS (
+            -- Per asset, the passage that answers best: one with every figure
+            -- first, then by score.
+            SELECT DISTINCT ON (asset_id)
+              asset_id AS id, score, page, LEFT(text, ${PASSAGE_CHARS}) AS text, exact
+            FROM scored
+            ORDER BY asset_id, exact DESC, score DESC
+          )
+          SELECT id, score, page, text, exact
+          FROM best
+          ORDER BY score DESC
+          LIMIT ${limit}
+        `);
+      });
+      return rows.map((row) => ({
+        id: row.id,
+        score: Number(row.score),
+        page: row.page == null ? null : Number(row.page),
+        text: row.text ?? null,
+        exact: Boolean(row.exact),
+      }));
+    } catch (error) {
+      this.logger.warn(
+        `Passage word search failed; hybrid search falls back to meaning only: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return [];
+    }
   }
 
   // Query params arrive as strings (no global ValidationPipe); coerce before

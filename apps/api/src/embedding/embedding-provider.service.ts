@@ -7,7 +7,7 @@ import {
 import { fork, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { EmbeddingConfigService } from './embedding-config.service';
-import { planInferenceBatches } from './embedding-batching';
+import { planInferenceBatches, planRemoteCalls } from './embedding-batching';
 import {
   MAX_MEDIA_BYTES,
   type EmbeddingMediaItem,
@@ -448,17 +448,41 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
       // Authorization header rather than "Bearer " with nothing after it.
       apiKey: cfg.apiKey || undefined,
     });
+    const model = provider.embeddingModel(cfg.model);
+    const providerOptions: Record<string, { dimensions: number }> =
+      options.sendDimensions === false
+        ? {}
+        : { classifyreEmbedding: { dimensions: cfg.dimensions } };
+    // One request per group of at most 96 texts, `maxParallelCalls` at a time:
+    // the SDK would otherwise send a whole queue fetch in one request, which
+    // Gemini refuses above 100 (see MAX_REMOTE_EMBEDDINGS_PER_CALL).
+    const groups = planRemoteCalls(texts);
+    const vectors: number[][][] = new Array(groups.length);
+    let next = 0;
     try {
-      const result = await embedMany({
-        model: provider.embeddingModel(cfg.model),
-        values: texts,
-        maxParallelCalls: cfg.maxParallelCalls,
-        providerOptions:
-          options.sendDimensions === false
-            ? {}
-            : { classifyreEmbedding: { dimensions: cfg.dimensions } },
-      });
-      return result.embeddings;
+      await Promise.all(
+        Array.from(
+          {
+            length: Math.max(
+              1,
+              Math.min(cfg.maxParallelCalls || 1, groups.length),
+            ),
+          },
+          async () => {
+            while (next < groups.length) {
+              const index = next++;
+              const result = await embedMany({
+                model,
+                values: groups[index],
+                maxParallelCalls: 1,
+                providerOptions,
+              });
+              vectors[index] = result.embeddings;
+            }
+          },
+        ),
+      );
+      return vectors.flat();
     } catch (error) {
       // The SDK's message is the bare status ("Not Found"), which reads as a
       // wrong model name however the request was actually malformed. Say what

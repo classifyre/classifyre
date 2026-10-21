@@ -864,6 +864,7 @@ All URIs are relative to *http://localhost*
 - [ScanCacheEntryDto](docs/ScanCacheEntryDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)
 - [SearchAssetItemDto](docs/SearchAssetItemDto.md)
+- [SearchAssetMatchDto](docs/SearchAssetMatchDto.md)
 - [SearchAssetsChartsOptionsDto](docs/SearchAssetsChartsOptionsDto.md)
 - [SearchAssetsChartsRequestDto](docs/SearchAssetsChartsRequestDto.md)
 - [SearchAssetsChartsResponseDto](docs/SearchAssetsChartsResponseDto.md)

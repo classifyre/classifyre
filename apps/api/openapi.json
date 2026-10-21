@@ -18291,6 +18291,38 @@
           "updatedAt"
         ]
       },
+      "SearchAssetMatchDto": {
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "number",
+            "nullable": true,
+            "description": "Similarity of the best-matching passage to the query (0-1). Null when the passage was found by its words alone."
+          },
+          "page": {
+            "type": "number",
+            "nullable": true,
+            "description": "Page of the asset the passage is on (1-based), when the asset has pages."
+          },
+          "text": {
+            "type": "string",
+            "nullable": true,
+            "description": "The start of the passage that matched."
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "meaning",
+              "words"
+            ],
+            "description": "What found the passage: its meaning (embedding similarity) or the words it shares with the query. Hybrid search prefers the words when one passage holds the exact figures of the query."
+          }
+        },
+        "required": [
+          "score",
+          "via"
+        ]
+      },
       "SearchAssetItemDto": {
         "type": "object",
         "properties": {
@@ -18302,6 +18334,14 @@
             "items": {
               "$ref": "#/components/schemas/SearchAssetFindingDto"
             }
+          },
+          "match": {
+            "description": "Semantic and hybrid search: where in the asset the query matched best. Absent when only the asset name matched.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SearchAssetMatchDto"
+              }
+            ]
           }
         },
         "required": [
@@ -23642,6 +23682,13 @@
             "type": "string",
             "description": "The expression, when one is known"
           },
+          "steps": {
+            "description": "The transformations the value passes through, outermost first (e.g. [\"SUM\", \"CASE\"]). Empty for a straight copy.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "type": {
             "type": "string",
             "description": "IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT"
@@ -27129,6 +27176,13 @@
           "transform": {
             "type": "string"
           },
+          "steps": {
+            "description": "Transformations on the way, outermost first",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "type": {
             "type": "string",
             "description": "IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT"
@@ -27136,6 +27190,19 @@
           "depth": {
             "type": "number",
             "description": "Hops from the column asked about"
+          },
+          "method": {
+            "type": "string",
+            "description": "How the edge was learned: RUNTIME_OBSERVED | SYSTEM_CATALOG | SQL_PARSED | HEURISTIC | MANUAL"
+          },
+          "confidence": {
+            "type": "number",
+            "description": "Confidence in the edge, 0 to 1"
+          },
+          "sql": {
+            "type": "string",
+            "description": "The SQL the mapping was read from, when there was one",
+            "nullable": true
           }
         },
         "required": [
@@ -27143,8 +27210,11 @@
           "assetLabel",
           "column",
           "upstreams",
+          "steps",
           "type",
-          "depth"
+          "depth",
+          "method",
+          "confidence"
         ]
       },
       "ColumnLineageResponseDto": {

@@ -337,4 +337,90 @@ describe('GraphService lineage ingest', () => {
       expect(sql).toContain('e.to_type = t.node_type');
     });
   });
+
+  describe('column lineage', () => {
+    const edge = (fromId: string, toId: string, fieldMappings: unknown[]) => ({
+      from_type: 'asset',
+      from_id: fromId,
+      to_id: toId,
+      field_mappings: fieldMappings,
+      method: 'SQL_PARSED',
+      confidence: 0.8,
+      evidence: { sql: 'SELECT ...' },
+    });
+
+    beforeEach(() => {
+      mockPrisma.asset.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          (where.id.in as string[]).map((id) => ({ id, name: id })),
+        ),
+      );
+    });
+
+    it('follows only the table that feeds the column, with its steps', async () => {
+      // A join view: `customer` comes from customers, not from orders. The
+      // orders edge (and its join-key filter) must not show up.
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([
+          edge('orders', 'view', [
+            { downstream: 'id', upstreams: ['id'], type: 'IDENTITY' },
+            { downstream: null, upstreams: ['customer_id'], type: 'INDIRECT' },
+          ]),
+          edge('customers', 'view', [
+            {
+              downstream: 'customer',
+              upstreams: ['name'],
+              transform: 'LOWER(c.name)',
+              steps: ['LOWER'],
+              type: 'TRANSFORMED',
+            },
+            { downstream: null, upstreams: ['id'], type: 'INDIRECT' },
+          ]),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.columnLineage({
+        assetId: 'view',
+        column: 'customer',
+      });
+
+      expect(result.steps).toHaveLength(1);
+      expect(result.steps[0]).toMatchObject({
+        assetId: 'customers',
+        column: 'customer',
+        upstreams: ['name'],
+        steps: ['LOWER'],
+        method: 'SQL_PARSED',
+        confidence: 0.8,
+        sql: 'SELECT ...',
+      });
+      expect(result.indirect.map((s) => s.assetId)).toEqual(['customers']);
+    });
+
+    it('walks a chain of views and ignores case', async () => {
+      // Snowflake reports TOTAL where the view SQL said total.
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([
+          edge('mid', 'top', [
+            { downstream: 'total', upstreams: ['AMOUNT'], steps: ['SUM'] },
+          ]),
+        ])
+        .mockResolvedValueOnce([
+          edge('base', 'mid', [
+            { downstream: 'amount', upstreams: ['amt'], type: 'IDENTITY' },
+          ]),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.columnLineage({
+        assetId: 'top',
+        column: 'TOTAL',
+      });
+
+      expect(result.steps.map((s) => [s.assetId, s.column, s.depth])).toEqual([
+        ['mid', 'total', 1],
+        ['base', 'amount', 2],
+      ]);
+    });
+  });
 });

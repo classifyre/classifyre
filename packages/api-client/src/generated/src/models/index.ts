@@ -392,6 +392,7 @@ export * from './SaveTrainingExamplesDto';
 export * from './ScanCacheEntryDto';
 export * from './SearchAssetFindingDto';
 export * from './SearchAssetItemDto';
+export * from './SearchAssetMatchDto';
 export * from './SearchAssetsChartsOptionsDto';
 export * from './SearchAssetsChartsRequestDto';
 export * from './SearchAssetsChartsResponseDto';

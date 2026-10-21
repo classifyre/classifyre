@@ -205,7 +205,8 @@ export class SourceFilesService {
                 historyEntryForStorage({
                   timestamp: now,
                   runnerId: 'source-file-delete',
-                  eventType: HistoryEventType.STATUS_CHANGED,
+                  // a system resolution, re-openable if the file comes back
+                  eventType: HistoryEventType.RESOLVED,
                   status: FindingStatus.RESOLVED,
                   changeReason: 'Uploaded source file deleted',
                 }),
