@@ -12,8 +12,12 @@ Name | Type
 `column` | string
 `upstreams` | Array&lt;string&gt;
 `transform` | string
+`steps` | Array&lt;string&gt;
 `type` | string
 `depth` | number
+`method` | string
+`confidence` | number
+`sql` | string
 
 ## Example
 
@@ -28,8 +32,12 @@ const example = {
   "column": null,
   "upstreams": null,
   "transform": null,
+  "steps": null,
   "type": null,
   "depth": null,
+  "method": null,
+  "confidence": null,
+  "sql": null,
 } satisfies ColumnLineageStepDto
 
 console.log(example)

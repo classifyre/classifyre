@@ -84,19 +84,18 @@ precise enough to act on — before you drop a column you need to know whether
 *this* column feeds anything.
 
 Where the information exists, Classifyre records the mapping **per column**:
-which upstream columns feed each output column, and the expression in between.
-Open an asset with columns and pick one to see exactly what feeds it.
+which upstream columns feed each output column, and every function the value
+passes through on the way — `customers.name → LOWER → customer`. Open an asset
+with columns and pick one to see exactly what feeds it, as many views back as
+there are.
 
 A column can also matter *without* feeding any output column — a date used in a
 `WHERE`, a join key, a sort. Those shape which rows came out but no particular
 value, and they're listed separately as **indirect** dependencies rather than
 being drawn as an arrow into a column they don't actually feed.
 
-> **Where column detail comes from.** Some systems answer the column question
-> directly (Databricks Unity Catalog, SQL Server). For the rest, it is recovered
-> from the view's own SQL. A `SELECT *` view yields no column mappings at all —
-> the edge stays at table level, which is the honest answer. A confidently wrong
-> column mapping is worse than a missing one.
+How the panel reads, where the detail comes from, and when it is left out on
+purpose: see [Column-Level Lineage](/sources/lineage/column-level/).
 
 ---
 

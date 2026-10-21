@@ -839,7 +839,11 @@ export function AssetsTable({
       </AssetFilterBar>
 
       {searchMode === "hybrid" && draft.search.trim() ? (
-        <FeatureOffNotice feature="embeddings" context="search" variant="inline" />
+        <FeatureOffNotice
+          feature="embeddings"
+          context="search"
+          variant="inline"
+        />
       ) : null}
 
       {error && (
@@ -1033,6 +1037,22 @@ export function AssetsTable({
                                 {asset.externalUrl}
                               </p>
                             )}
+                            {item.match?.text ? (
+                              <p
+                                className="mt-1 line-clamp-2 max-w-[300px] text-xs text-muted-foreground"
+                                data-testid="asset-match"
+                              >
+                                <span className="font-medium text-foreground">
+                                  {item.match.page != null
+                                    ? t("assets.match.onPage", {
+                                        page: item.match.page,
+                                      })
+                                    : t("assets.match.inText")}
+                                </span>
+                                {": "}
+                                {item.match.text}
+                              </p>
+                            ) : null}
                           </div>
                         </TableCell>
 
@@ -1044,7 +1064,9 @@ export function AssetsTable({
                               size="sm"
                               className="h-auto justify-start p-0 text-left text-sm"
                               onClick={() =>
-                                router.push(nsPath(`/sources/${asset.sourceId}`))
+                                router.push(
+                                  nsPath(`/sources/${asset.sourceId}`),
+                                )
                               }
                             >
                               {sourceName}

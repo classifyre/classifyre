@@ -312,14 +312,17 @@ export function BoardCanvas({
     [items, links, bubbles, threads, supports, systemEdges, suggested, itemByAsset, itemByFinding, graveyard, truncated],
   );
 
-  // Until the viewer picks the hops, a crowded first hop stays hidden (D5).
-  const neighbourHops =
-    !view.neighboursChosen && view.neighbourHops === 1 && suggested.size > SUGGESTED_AUTO_LIMIT ? 0 : view.neighbourHops;
+  // Until the viewer picks the hops, a crowded first hop stays hidden (D5) —
+  // all but its lineage, which is drawn regardless.
+  const crowded = !view.neighboursChosen && view.neighbourHops === 1 && suggested.size > SUGGESTED_AUTO_LIMIT;
+  const neighbourHops = crowded && !view.lineage ? 0 : view.neighbourHops;
+  const lineageOnly = crowded && view.lineage;
   const projView: ProjectionView = React.useMemo(
     () => ({
       lod,
       readOnly,
       neighbourHops,
+      lineageOnly,
       hiddenSuggestions,
       showResolvedComments: view.showResolvedComments,
       showAllRows,
@@ -330,7 +333,7 @@ export function BoardCanvas({
         ),
       ),
     }),
-    [lod, readOnly, neighbourHops, hiddenSuggestions, view, showAllRows, expandedUnattached],
+    [lod, readOnly, neighbourHops, lineageOnly, hiddenSuggestions, view, showAllRows, expandedUnattached],
   );
 
   const boardNodes = React.useMemo(() => projectNodes(domain, projView), [domain, projView]);

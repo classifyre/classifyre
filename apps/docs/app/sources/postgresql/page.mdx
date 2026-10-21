@@ -47,8 +47,10 @@ schemas, list exact tables, or cap how many tables a scan will take.
 <LineageNote>
 
 PostgreSQL's catalog knows what every view is built from, so each view and its
-base tables are recorded as real lineage — with column-level detail where the
-view's SQL names its columns. **Foreign keys** are recorded too, as references
+base tables are recorded as real lineage — with
+[column-level detail](/sources/lineage/column-level/) read from the view's SQL:
+which base column feeds each view column, and the functions in between. Views
+are scanned by default; switch off *Include views* to scan base tables only. **Foreign keys** are recorded too, as references
 rather than lineage: they suggest where data is related, but no data moves along
 them.
 

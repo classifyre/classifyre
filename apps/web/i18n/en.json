@@ -1976,6 +1976,10 @@
       "goBack": "Go back",
       "loading": "Loading asset details...",
       "openSource": "Open Source"
+    },
+    "match": {
+      "onPage": "Best match · page {{page}}",
+      "inText": "Best match"
     }
   },
   "detectors": {
@@ -4317,7 +4321,7 @@
       "tracing": "Tracing…",
       "neighboursShown": "{{count}} shown",
       "hopsOff": "Off",
-      "neighboursAutoHidden": "{{count}} neighbours are hidden to keep the board readable. Pick how far to show them.",
+      "neighboursAutoHidden": "{{count}} neighbours are hidden to keep the board readable; lineage stays visible. Pick how far to show the rest.",
       "neighboursHint": "Assets connected to the evidence, up to this many hops away.",
       "connections": "Connections",
       "connectionsHint": "Kinds of relation drawn on the board and followed to neighbours.",

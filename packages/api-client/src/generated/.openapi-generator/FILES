@@ -420,6 +420,7 @@ docs/SaveTrainingExamplesDto.md
 docs/ScanCacheEntryDto.md
 docs/SearchAssetFindingDto.md
 docs/SearchAssetItemDto.md
+docs/SearchAssetMatchDto.md
 docs/SearchAssetsChartsOptionsDto.md
 docs/SearchAssetsChartsRequestDto.md
 docs/SearchAssetsChartsResponseDto.md
@@ -982,6 +983,7 @@ src/models/SaveTrainingExamplesDto.ts
 src/models/ScanCacheEntryDto.ts
 src/models/SearchAssetFindingDto.ts
 src/models/SearchAssetItemDto.ts
+src/models/SearchAssetMatchDto.ts
 src/models/SearchAssetsChartsOptionsDto.ts
 src/models/SearchAssetsChartsRequestDto.ts
 src/models/SearchAssetsChartsResponseDto.ts

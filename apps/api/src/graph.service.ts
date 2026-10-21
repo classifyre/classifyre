@@ -891,11 +891,13 @@ export class GraphService {
     const steps: ColumnLineageStepDto[] = [];
     const indirect: ColumnLineageStepDto[] = [];
 
-    // (assetId, column) pairs still to explain.
+    // (assetId, column) pairs still to explain. Column names are compared
+    // case-folded: the catalog says ORDERS.ID where the view SQL said id.
+    const fold = (column: string) => column.toLowerCase();
     let frontier: { id: string; column: string }[] = [
       { id: dto.assetId, column: dto.column },
     ];
-    const seen = new Set<string>([`${dto.assetId}::${dto.column}`]);
+    const seen = new Set<string>([`${dto.assetId}::${fold(dto.column)}`]);
 
     for (let depth = 1; depth <= maxDepth && frontier.length > 0; depth++) {
       const rows = await this.prisma.$queryRaw<
@@ -904,9 +906,14 @@ export class GraphService {
           from_id: string;
           to_id: string;
           field_mappings: unknown;
+          method: string;
+          confidence: Prisma.Decimal | number;
+          evidence: unknown;
         }[]
       >(Prisma.sql`
-        SELECT from_type, from_id, to_id, field_mappings FROM "edges"
+        SELECT from_type, from_id, to_id, field_mappings, method::text AS method,
+               confidence, evidence
+        FROM "edges"
         WHERE relation_class = 'FLOW'::"EdgeClass"
           AND granularity = 'FIELD'::"EdgeGranularity"
           AND to_type = 'asset'
@@ -921,44 +928,57 @@ export class GraphService {
 
       const next: { id: string; column: string }[] = [];
       for (const row of rows) {
-        const wanted = frontier
-          .filter((f) => f.id === row.to_id)
-          .map((f) => f.column);
+        const wanted = new Set(
+          frontier.filter((f) => f.id === row.to_id).map((f) => fold(f.column)),
+        );
         const mappings = Array.isArray(row.field_mappings)
           ? (row.field_mappings as FieldMappingDto[])
           : [];
         const external = row.from_type === EXTERNAL_NODE;
+        const evidence =
+          row.evidence && typeof row.evidence === 'object'
+            ? (row.evidence as { sql?: unknown })
+            : {};
+        const toStep = (mapping: FieldMappingDto): ColumnLineageStepDto => ({
+          assetId: row.from_id,
+          assetLabel: external
+            ? externalLabel(row.from_id)
+            : (labels.get(row.from_id) ?? '(deleted asset)'),
+          urn: external ? row.from_id : undefined,
+          column: mapping.downstream ?? '(rows)',
+          upstreams: mapping.upstreams ?? [],
+          transform: mapping.transform ?? null,
+          steps: mapping.steps ?? [],
+          type: mapping.type ?? 'TRANSFORMED',
+          depth,
+          method: row.method,
+          confidence: Number(row.confidence),
+          sql: typeof evidence.sql === 'string' ? evidence.sql : null,
+        });
 
-        for (const mapping of mappings) {
-          const isIndirect =
-            mapping.downstream == null || mapping.type === 'INDIRECT';
-          if (!isIndirect && !wanted.includes(mapping.downstream!)) continue;
+        const isIndirect = (mapping: FieldMappingDto) =>
+          mapping.downstream == null || mapping.type === 'INDIRECT';
+        const matched = mappings.filter(
+          (m) => !isIndirect(m) && wanted.has(fold(m.downstream!)),
+        );
+        // This edge feeds none of the columns asked about, so neither its
+        // values nor its filters explain them.
+        if (matched.length === 0) continue;
 
-          const step: ColumnLineageStepDto = {
-            assetId: row.from_id,
-            assetLabel: external
-              ? externalLabel(row.from_id)
-              : (labels.get(row.from_id) ?? '(deleted asset)'),
-            urn: external ? row.from_id : undefined,
-            column: mapping.downstream ?? '(rows)',
-            upstreams: mapping.upstreams ?? [],
-            transform: mapping.transform ?? null,
-            type: mapping.type ?? 'TRANSFORMED',
-            depth,
-          };
+        for (const mapping of mappings.filter(isIndirect)) {
+          // An ORDER BY column shaped the result without feeding this
+          // column's values. Reported apart so it does not read as if the
+          // value was computed from it.
+          indirect.push(toStep(mapping));
+        }
 
-          if (isIndirect) {
-            // An ORDER BY column shaped the result without feeding this
-            // column's values. Reported apart so it does not read as if the
-            // value was computed from it.
-            indirect.push(step);
-            continue;
-          }
+        for (const mapping of matched) {
+          const step = toStep(mapping);
           steps.push(step);
 
           if (external) continue; // nothing further to walk into yet
           for (const upstream of step.upstreams) {
-            const key = `${row.from_id}::${upstream}`;
+            const key = `${row.from_id}::${fold(upstream)}`;
             if (seen.has(key)) continue;
             seen.add(key);
             next.push({ id: row.from_id, column: upstream });

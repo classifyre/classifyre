@@ -964,6 +964,11 @@ class DetectorScope(BaseModel):
         None,
         description='Asset-metadata equality predicate, e.g. {"doc_type": "jab"}. Every named key must be present on the asset and equal (compared as strings, so 4 and "4" match). A key the asset does not carry excludes it — an absent field is not a match.',
     )
+    content_pattern: str | None = Field(
+        None,
+        description='Regular expression (case-insensitive) the text of a payload must contain for this detector to run on it. Applied per payload, so on a paged document only the pages that match are read: a language model asked about free cash flow reads the pages that use the term, not all 500 pages of the annual report. Payloads without text (pictures, raw bytes) never match.',
+        max_length=2000,
+    )
 
 
 class DetectorBudget(BaseModel):

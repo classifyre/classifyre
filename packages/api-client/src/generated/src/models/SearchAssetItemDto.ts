@@ -20,6 +20,13 @@ import {
     SearchAssetFindingDtoToJSON,
     SearchAssetFindingDtoToJSONTyped,
 } from './SearchAssetFindingDto';
+import type { SearchAssetMatchDto } from './SearchAssetMatchDto';
+import {
+    SearchAssetMatchDtoFromJSON,
+    SearchAssetMatchDtoFromJSONTyped,
+    SearchAssetMatchDtoToJSON,
+    SearchAssetMatchDtoToJSONTyped,
+} from './SearchAssetMatchDto';
 import type { AssetListItemDto } from './AssetListItemDto';
 import {
     AssetListItemDtoFromJSON,
@@ -46,6 +53,12 @@ export interface SearchAssetItemDto {
      * @memberof SearchAssetItemDto
      */
     findings: Array<SearchAssetFindingDto>;
+    /**
+     * Semantic and hybrid search: where in the asset the query matched best. Absent when only the asset name matched.
+     * @type {SearchAssetMatchDto}
+     * @memberof SearchAssetItemDto
+     */
+    match?: SearchAssetMatchDto;
 }
 
 /**
@@ -69,6 +82,7 @@ export function SearchAssetItemDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         
         'asset': AssetListItemDtoFromJSON(json['asset']),
         'findings': ((json['findings'] as Array<any>).map(SearchAssetFindingDtoFromJSON)),
+        'match': json['match'] == null ? undefined : SearchAssetMatchDtoFromJSON(json['match']),
     };
 }
 
@@ -85,6 +99,7 @@ export function SearchAssetItemDtoToJSONTyped(value?: SearchAssetItemDto | null,
         
         'asset': AssetListItemDtoToJSON(value['asset']),
         'findings': ((value['findings'] as Array<any>).map(SearchAssetFindingDtoToJSON)),
+        'match': SearchAssetMatchDtoToJSON(value['match']),
     };
 }
 

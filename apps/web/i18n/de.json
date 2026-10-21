@@ -1976,6 +1976,10 @@
       "goBack": "Zurück",
       "loading": "Asset-Details werden geladen...",
       "openSource": "Quelle öffnen"
+    },
+    "match": {
+      "onPage": "Beste Übereinstimmung · Seite {{page}}",
+      "inText": "Beste Übereinstimmung"
     }
   },
   "detectors": {
@@ -4317,7 +4321,7 @@
       "tracing": "Wird verfolgt…",
       "neighboursShown": "{{count}} angezeigt",
       "hopsOff": "Aus",
-      "neighboursAutoHidden": "{{count}} Nachbarn sind ausgeblendet, damit das Board lesbar bleibt. Wählen Sie, wie weit sie gezeigt werden.",
+      "neighboursAutoHidden": "{{count}} Nachbarn sind ausgeblendet, damit das Board lesbar bleibt; die Lineage bleibt sichtbar. Wählen Sie, wie weit der Rest gezeigt wird.",
       "neighboursHint": "Mit den Beweismitteln verbundene Assets, bis zu so vielen Schritten entfernt.",
       "connections": "Verbindungen",
       "connectionsHint": "Arten von Beziehungen, die auf dem Board gezeichnet und zu Nachbarn verfolgt werden.",

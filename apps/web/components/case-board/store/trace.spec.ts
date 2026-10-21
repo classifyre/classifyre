@@ -207,4 +207,12 @@ describe("projection: neighbours beyond the first hop", () => {
     expect(ids).toContain("sg:U");
     expect(ids).not.toContain("sg:S");
   });
+
+  it("keeps lineage on a crowded first hop that hides the rest", () => {
+    const d = mergeTraceNeighbourhood(boardWith(item("item-A", 1000, 1000)), trace);
+    expect(projectNodes(d, view({ neighbourHops: 1 })).map((n) => n.id)).toContain("sg:S");
+    const ids = projectNodes(d, view({ neighbourHops: 1, lineageOnly: true })).map((n) => n.id);
+    expect(ids).toContain("sg:U");
+    expect(ids).not.toContain("sg:S");
+  });
 });

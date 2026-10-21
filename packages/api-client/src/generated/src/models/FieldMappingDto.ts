@@ -38,6 +38,12 @@ export interface FieldMappingDto {
      */
     transform?: string;
     /**
+     * The transformations the value passes through, outermost first (e.g. ["SUM", "CASE"]). Empty for a straight copy.
+     * @type {Array<string>}
+     * @memberof FieldMappingDto
+     */
+    steps?: Array<string>;
+    /**
      * IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT
      * @type {string}
      * @memberof FieldMappingDto
@@ -66,6 +72,7 @@ export function FieldMappingDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'downstream': json['downstream'] == null ? undefined : json['downstream'],
         'upstreams': json['upstreams'],
         'transform': json['transform'] == null ? undefined : json['transform'],
+        'steps': json['steps'] == null ? undefined : json['steps'],
         'type': json['type'] == null ? undefined : json['type'],
     };
 }
@@ -84,6 +91,7 @@ export function FieldMappingDtoToJSONTyped(value?: FieldMappingDto | null, ignor
         'downstream': value['downstream'],
         'upstreams': value['upstreams'],
         'transform': value['transform'],
+        'steps': value['steps'],
         'type': value['type'],
     };
 }
