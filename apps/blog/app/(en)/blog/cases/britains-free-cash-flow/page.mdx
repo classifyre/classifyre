@@ -1,0 +1,520 @@
+---
+title: "Profit Is Reported, Cash Is Counted: Free Cash Flow of 385 UK Companies"
+description: "Free cash flow explained, then measured on every UK-listed company with a track record: 1,823 tagged annual reports from filings.xbrl.org, read year by year. Who turns profit into cash, who compounds, and what companies mean when they say free cash flow."
+date: 2026-10-21T00:00:00.000Z
+tags:
+  - free-cash-flow
+  - esef
+  - xbrl
+  - investigations
+  - glossary
+categories:
+  - Field Notes
+author: Classifyre Team
+image: /blog/assets/images/britains-free-cash-flow.jpg
+keywords:
+  - free cash flow explained
+  - free cash flow UK companies
+  - operating cash flow minus capex
+  - cash conversion
+  - ESEF annual reports
+  - filings.xbrl.org
+  - iXBRL tagged financial statements
+  - dividend cover free cash flow
+  - decision model industry classification
+  - Classifyre
+alternates:
+  canonical: /blog/cases/britains-free-cash-flow
+  languages:
+    en: /blog/cases/britains-free-cash-flow/
+    de: /de/blog/cases/britains-free-cash-flow/
+    x-default: /blog/cases/britains-free-cash-flow/
+openGraph:
+  type: article
+  title: "Profit Is Reported, Cash Is Counted: Free Cash Flow of 385 UK Companies"
+  description: "Free cash flow explained, then measured on 1,823 tagged annual reports of UK-listed companies. Who turns profit into cash, and what they do with it."
+  url: /blog/cases/britains-free-cash-flow
+  siteName: Classifyre
+  publishedTime: 2026-10-21T00:00:00.000Z
+  modifiedTime: 2026-10-21T00:00:00.000Z
+  authors:
+    - Classifyre Team
+  section: Field Notes
+  tags:
+    - free cash flow
+    - ESEF
+    - XBRL
+    - UK companies
+  images:
+    - /blog/assets/images/britains-free-cash-flow.jpg
+twitter:
+  card: summary_large_image
+  title: "Profit Is Reported, Cash Is Counted: Free Cash Flow of 385 UK Companies"
+  description: "Free cash flow explained, then measured on 1,823 tagged annual reports of UK-listed companies. Who turns profit into cash, and what they do with it."
+  images:
+    - /blog/assets/images/britains-free-cash-flow.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/britains-free-cash-flow.jpg"
+  eyebrow="Field notes"
+  title="Britain's Free Cash Flow"
+  description="Does a business turn its profit into cash, and what does it do with it? Asked of every UK-listed company with a track record, on the figures they tag in their own annual reports."
+/>
+
+<ArticleJsonLd
+  headline="Profit Is Reported, Cash Is Counted: Free Cash Flow of 385 UK Companies"
+  description="Free cash flow explained, then measured on 1,823 tagged annual reports of UK-listed companies from filings.xbrl.org: who turns profit into cash, who compounds, and what companies mean when they say free cash flow."
+  path="/blog/cases/britains-free-cash-flow"
+  datePublished="2026-10-21T00:00:00.000Z"
+  dateModified="2026-10-21T00:00:00.000Z"
+  authorName="Classifyre Team"
+  articleSection="Field Notes"
+  about={[
+    "Free cash flow",
+    "Cash conversion",
+    "ESEF tagged annual reports",
+    "UK listed companies",
+    "Dividends and buybacks",
+  ]}
+  mentions={[
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://showcase.classifyre.com/uk-cash-flow",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://showcase.classifyre.com/uk-cash-flow"
+  liveCaseName="Britain's Free Cash Flow"
+/>
+
+<LiveCaseLink
+  href="https://showcase.classifyre.com/uk-cash-flow"
+  caseName="Britain's Free Cash Flow workspace"
+/>
+
+<ArticleSideRail
+  title="Britain's Free Cash Flow"
+  path="/blog/cases/britains-free-cash-flow/"
+  tags={["free-cash-flow", "esef", "xbrl", "investigations", "glossary"]}
+  backHref="/blog/cases"
+  backLabel="All case files"
+/>
+
+A company can report a profit every year and still run out of money.
+
+Profit is what the accounts say was earned. It rests on judgements: when a
+sale counts, how fast a machine wears out, what a debt is still worth. Cash is
+what actually arrived, and it is counted. The two drift apart all the time,
+and most of the interesting questions about a business live in the gap.
+
+So we asked one plain question of every company listed in the UK that has a
+track record of digital annual reports: **does the business turn its profit
+into cash, and what does it do with that cash?** This post explains the
+measure, where the figures come from, how the workspace that reads them is
+built, and what 385 companies turned out to do.
+
+![A typed sheet on a black table: profit 90, cash at the start 50, cash at the end 20; beside it a cash-register window reading CASH NO SALE .00, a strip of adding-machine tape stamped COUNTED, and the question "Does the business turn its profit into cash? And what does it do with it?"](/blog/assets/images/uk-free-cash-flow-profit-reported-cash-counted.webp)
+
+<Alert>
+  <AlertTitle>What is real and what is not</AlertTitle>
+  <AlertDescription>
+    Every company figure in this post is real: read from the companies' own
+    tagged filings and counted in the workspace on 21 October 2026. The sheet
+    in the first picture (profit 90, cash down to 20) is an invented example.
+    The pictures are stills from a film we made with this post; the case
+    board and detector screens in them are the real workspace, the paper on
+    the black table is ours.
+  </AlertDescription>
+</Alert>
+
+## What free cash flow is
+
+The measure for this question is **free cash flow**.
+
+- **Operating cash flow** is the cash the business brought in from what it
+  does, after paying staff, suppliers and tax. It is a line of every
+  cash-flow statement.
+- **Capital expenditure** (capex) is what it paid for machines, buildings and
+  software: in IFRS terms, purchases of property, plant and equipment and of
+  intangible assets.
+- **Free cash flow** is what is left: operating cash flow minus capex.
+
+That is the cash a business leaves after keeping and growing its assets.
+Lenders, dividends and share buybacks are paid out of it. When it is negative
+year after year, the money comes from somewhere else: savings, new shares or
+new debt.
+
+A real year. NEXT plc, the retailer, in the year to 31 January 2026, from its
+own tagged filing:
+
+| £ million | |
+| --- | ---: |
+| Operating cash flow | 1,233.6 |
+| − Purchases of property, plant and equipment | 135.4 |
+| − Purchases of intangible assets | 35.8 |
+| **= Free cash flow** | **1,062.4** |
+| Profit for the year | 898.0 |
+| Free cash flow as a share of profit | **118 %** |
+| Dividends paid | 286.5 |
+| Share buybacks | 131.4 |
+
+Every pound of profit arrived as cash, and more: depreciation is a cost in the
+income statement but not a payment. About £420 million went back to
+shareholders.
+
+![NEXT plc's year to January 2026 on a typed sheet: operating cash flow 1,233.6, capital expenditure 171.2, free cash flow 1,062.4 marked in lime, profit 898.0, free cash flow ÷ profit 118 %; beside it a cash box and tabs for dividends 286.5, buybacks 131.4 and about 420 back to shareholders](/blog/assets/images/next-plc-free-cash-flow-worked-example.webp)
+
+One thing to keep in mind from the start: **free cash flow is not a line in
+IFRS accounts.** Companies that report it define it themselves, as an
+*alternative performance measure*. This workspace uses the plain formula above
+for every company, so that they can be compared, and keeps what companies call
+free cash flow as a question of its own (below).
+
+## Where the figures come from
+
+For financial years starting on or after 1 January 2021, issuers with
+securities on a UK regulated market publish their annual financial report in
+the European Single Electronic Format (FCA rule DTR 4.1.14). The report is a
+web page (XHTML) in which every figure of the primary statements carries a
+tag from the IFRS taxonomy: operating cash flow is
+`ifrs-full:CashFlowsFromUsedInOperatingActivities` in every report, whoever
+designed the page.
+
+![A drawn annual-report page with three figures outlined in lime and their IFRS element names under them, next to a print of an old records archive and a print of a punch-card store](/blog/assets/images/esef-tagged-annual-report-ifrs-elements.webp)
+
+**XBRL International**, the not-for-profit body behind the XBRL standard,
+collects these reports at [filings.xbrl.org](https://filings.xbrl.org/). For
+each filing it offers an Inline XBRL viewer, every tagged figure as xBRL-JSON,
+the report package as filed, and the validator's messages. In its own words
+there are, at present, "no restrictions on the ways that the data can be
+used", and "the repository is not complete". Filings arrive from the national
+collection mechanisms, sometimes well after the original submission.
+
+![The filings.xbrl.org index filtered to country GB, in a browser](/blog/assets/images/filings-xbrl-org-gb-filings-index.webp)
+
+That is why we read it:
+
+- **The figures are the company's own**, tagged by the company, not guessed
+  from a PDF by a scraper.
+- **The tags line up** across companies and across years, so years can be laid
+  side by side without a mapping table per company.
+- **Anyone can check them** against the same page we read, figure by figure.
+- **It needs no key and no account.** The JSON:API at
+  `filings.xbrl.org/api/filings` lists 500 filings a request.
+
+## Who is in
+
+A company is in when it has **at least three reporting periods on the index**
+and **a filing submitted this year**: a track record, and still current. Then
+every one of its filings is read, however old, back to 2020 for some.
+
+One surprise on the way: **"GB" on the index means filed with the UK
+regulator, not British.** The FCA's list includes every issuer with
+securities in London: Kazakh, Russian, Korean, Japanese, Hong Kong and
+Bermudan groups, the Irish groups, and a British retailer incorporated in
+Luxembourg. Of the 444 companies that met the rule, **59 name a domicile or
+country of incorporation outside the UK** in their own filings, and they are
+left out. A first, naive filter also dropped about sixty British companies,
+because reports converted from PDF print the place as "En gl an d & Wal es";
+spaces are now ignored when the place is read.
+
+What remains: **385 British companies, 1,823 filings** with periods ending
+2020 to 2026, and **12 printed annual reports** (2,890 pages) of the largest
+British non-financial groups, read page by page.
+
+![A rule card (three or more reporting periods, a filing this year), a stack of binders, and a print of Tower Bridge in fog captioned 385 British companies; beside it 385 British companies, 1,823 filings, 12 printed annual reports](/blog/assets/images/uk-cash-flow-selection-385-british-companies.webp)
+
+## The workspace: three sources and their lineage
+
+In Classifyre this is one workspace with three sources, each a small Python
+notebook:
+
+| Source | One record per | What it reads |
+| --- | --- | --- |
+| **UK ESEF filings** | filing | the index, newest first; each filing's xBRL-JSON (cash-flow statement, income statement, balance sheet, current and comparative year) and its validation messages |
+| **UK company profiles** | company, and one benchmark per financial year | computed from the filings: a company's years side by side, converted to pounds at ECB cross rates; a benchmark holds the medians of every company in a year |
+| **UK annual reports** | printed report | the twelve largest British non-financial groups by revenue, cut into pages so that a finding can point at one |
+
+The first source checks the index on a schedule, so a company's next report
+joins by itself, and a company that files its first report of a new year
+joins the workspace.
+
+The connectors also **declare lineage**: a profile names the filings it was
+computed from, a benchmark names the profiles behind its medians, a filing
+names the printed report it was read from. Open NEXT's profile and its five
+annual filings and every benchmark it went into are one click away.
+
+![The lineage graph of NEXT plc's company profile: its annual filings feeding it, and the yearly benchmarks it feeds, in the Classifyre asset page](/blog/assets/images/classifyre-lineage-company-profile-filings-benchmarks.webp)
+
+## The vocabulary: glossary and entities
+
+Records hold figures. A question needs words, and the words live in the
+glossary: **84 concepts in six groups** (free cash flow, IFRS figures, data
+quality, industries, multi-year trends, kinds of record), each defined in one
+sentence. A *cash machine*, for example, is "positive free cash flow two years
+running, at least 10% of revenue, and at least 80% of profit: the profit
+arrives as cash."
+
+Every kind of finding a detector can produce is **bound** to one of these
+concepts. The detector says `cash_machine`; the glossary knows what that means
+and that it sits under *strong free cash flow*. That binding is what lets a
+standing question be asked in words rather than in detector keys.
+
+![The glossary concept Cash machine in Classifyre: 81 assets, 81 findings, its binding to the detector output cash_machine](/blog/assets/images/classifyre-glossary-cash-machine-binding.webp)
+
+The companies are in the same glossary, as **entities**: 385 of them, declared
+by the profiles source. A small pattern detector finds each company's Legal
+Entity Identifier (LEI) in every record, so a company's filings, its profile
+and its printed report all land on one entity page.
+
+## The readers: rules, a decision model, a language model
+
+Ten detectors read the records. **Most are plain Python rules** that anyone can
+read: does the cash-flow statement add up, what is the free cash flow, what do
+three to six years show together, where does a company stand in its
+industry. Subtracting two numbers needs no model.
+
+Two questions do, and only there does the workspace use one.
+
+### A decision model for the industry
+
+A free cash flow margin means little without peers: a software company and a
+water company should not be held to the same number. **No ESEF tag says what
+industry a company is in.** What every company does give, in its filing, is a
+description of its principal activities in its own words.
+
+So a **decision model** reads that text and picks one of eleven industries,
+and also answers whether the company is a financial institution. A decision
+model is not a chatbot: it gets the question and the options, each with a
+description, and returns a probability for every option, no text. Here it is
+Perplexity's Decider (`pplx-decider-v1.2`) through OpenRouter. (We wrote about
+[what decision models are](/blog/articles/decision-models-system-one-explained/)
+separately.)
+
+For Rio Tinto, whose filing says its business is "finding, mining, and
+processing mineral resources", the answer was *materials* at 99.6%. A Python
+rule then places each company's free cash flow margin within its industry:
+top quarter, bottom quarter, or capex far above the industry's.
+
+![On a table: a print of a sorting office with pigeonholes, Rio Tinto's own description of its business with the words finding, mining and processing mineral resources marked, and the probability the decision model gave each of eleven industries, materials 99.6](/blog/assets/images/decision-model-industry-probabilities-rio-tinto.webp)
+
+### A language model for what companies call free cash flow
+
+What a company means by free cash flow lives in the **text** of its report, not
+in its tags, and the printed reports run to as many as 396 pages (BP's). A
+**language model**, GLM 5.3 Flash, reads only the pages that use the term:
+a pattern on the detector (`content_pattern`) decides which, in eighteen
+languages. That came to about **one page in twenty** (142 of 2,890).
+
+On each page it writes down the figure, the page, the words used and the
+definition, and whether leases, interest and acquisitions are deducted.
+Unilever, page 46: "cash flow from operating activities, less income taxes
+paid, net capital expenditure and net interest payments." A Python rule then
+sets the stated figure against operating cash flow minus capex from the same
+report's tags.
+
+![A thick report beside a grid of a hundred and twenty small pages, six of them outlined in lime and the rest dimmed, a magnifying glass over them, tags reading GLM 5.3 Flash and "only pages that use the term, about 1 in 20"](/blog/assets/images/llm-reads-free-cash-flow-pages-one-in-twenty.webp)
+
+## Questions that stay asked
+
+Findings are answers. An investigation needs **questions that stay asked**:
+the workspace holds thirty of them as *inquiry watches*, each asked through
+glossary concepts. *Which companies are cash machines? Who leads its industry
+on free cash flow? Whose cash-flow statement does not add up?*
+
+**Eight cases** are built on them, each one question, each with a desk:
+
+| Case | Asks |
+| --- | --- |
+| Cash machines | Who turns profit into cash, year after year? |
+| Compounders | Who grew capital and cash in every year? |
+| Paying out what they did not earn | Who returned more than it generated, and borrowed the difference? |
+| Growth that costs cash | Whose growth eats cash; who is in an investment cycle? |
+| Profit without cash | Whose earnings never arrive as money? |
+| Numbers that don't add up | How reliable are UK digital annual reports? |
+| What companies call free cash flow | How far is a company's own figure from the formula? |
+| Can search find the number? | Do tagged reports make a ground truth for search? |
+
+A case **pulls new answers in** as scans land them, and lets a company go when
+its next report no longer supports the finding. Each case also states two or
+three **hypotheses**, claims that sound right, written down before they were
+tested. The workspace counts each one on the data, writes the tally into a
+dated note on the hypothesis, links a few findings for and against, and marks
+it. Of 23 hypotheses, 12 came out supported, **9 refuted** and 2
+inconclusive. The refuted ones are the most interesting.
+
+![The case board of Cash machines in Classifyre: the hypothesis "Cash machines keep most of their cash" stamped SUPPORTED, lines to six companies' cash_machine findings, and its dated note: 69 cash machines paid dividends; the median paid out 35% of its free cash flow](/blog/assets/images/classifyre-case-board-cash-machines-hypothesis.webp)
+
+## What 385 companies did with their cash
+
+All figures are the hypotheses' tallies of 21 October 2026, on non-financial
+companies.
+
+**Half are steady.** Of 231 companies with four or more years, **117 (51%)
+never had a year of negative free cash flow**. *(Most UK companies generate
+cash every year: supported.)*
+
+**Profit compounds more often than cash, but not by much.** Of 232 companies
+with three or more years, 61 grew profit at least 10% a year; **44 grew free
+cash flow that fast with every year positive.** The cliché says "far more
+often". *(Refuted.)*
+
+**Real compounders are rare, and pay their own way.** Twelve companies grew
+their equity by 10% or more in every year, **Greggs, NEXT and Halma among
+them; eleven of the twelve did it without borrowing** or paying out more than
+they generated. *(Compounders grow on their own cash, not on debt:
+supported.)*
+
+![A typed card: equity up 10% or more in every year, 12 companies, 11 self-funded, among them Greggs, NEXT and Halma, beside a print of a drawing office; the hypothesis "Compounders grow on their own cash, not on debt" stamped SUPPORTED](/blog/assets/images/uk-capital-compounders-greggs-next-halma.webp)
+
+**Cash machines keep most of what they make.** Of 69 cash machines that paid
+dividends, the median paid out **35% of its free cash flow**. *(Supported.)*
+
+**Paying out more than the business generates, while debt rises, is the
+exception.** Of 169 companies that paid dividends in three or more years,
+**18 (11%)** paid out more in dividends and buybacks than they generated over
+the period while net debt rose. *(One UK dividend payer in ten borrows to pay
+out: supported.)* And the usual suspect is wrong: where payouts exceed cash,
+**dividends, not buybacks, are the larger part for 18 of 21.** *(Buybacks,
+not dividends, open the gap: refuted.)* In a single year it is more common:
+32 of 213 dividend payers paid more than that year's free cash flow (15%).
+
+![A typed card: 18 of 169 paid out more than they generated while net debt rose, beside a print of pound coins; two hypotheses, "One UK dividend payer in ten borrows to pay out" stamped SUPPORTED and "Buybacks, not dividends, open the gap" stamped REFUTED](/blog/assets/images/uk-dividends-beyond-free-cash-flow-18-of-169.webp)
+
+**Fast growth that burns cash is not an investment phase.** Eight companies
+grew revenue 10% or more a year while burning cash over the period; **none of
+them had raised its capex share**, and five of the eight raised their net debt
+by half or more. *(Investment-led: refuted. Paid for with debt: supported.)*
+
+**IFRS 16 hides less than people think.** Since 2019 most rent is financing
+cash flow, outside the usual formula. Of 191 companies with positive free cash
+flow that tag lease payments, only **8 (4%)** turn negative once those
+payments are deducted. *(IFRS 16 hides cash burn: refuted.)*
+
+**Where interest is shown matters.** IAS 7 lets a company show interest paid
+under operating or under financing cash flow. 102 of 385 show it under
+financing; for 50 it is worth at least a tenth of free cash flow, and **8 cash
+machines would fall below the 10% margin** if they showed it the way their
+peers do.
+
+**Asset-light industries keep more of their revenue.** The median free cash
+flow margin of technology, health care and consumer staples companies is
+**11.5%**, against **7.7%** for utilities, energy, materials and telecoms.
+*(Supported.)*
+
+The largest free cash flow in the latest year: Shell (£16.65bn), BP
+(£8.55bn), AstraZeneca (£6.58bn), Vodafone (£6.03bn), Unilever (£5.79bn).
+
+## What companies call free cash flow
+
+Ten of the twelve printed reports state a free cash flow of their own. Two
+things stand out.
+
+- **It is usually stricter than the formula.** For 8 of the 10, the company's
+  own figure is lower than operating cash flow minus capex on the same
+  report's tags: UK companies also deduct interest, tax, leases or
+  investments. For BP and Rio Tinto it is higher. *(Companies' own free cash
+  flow is usually higher than the formula: refuted.)*
+- **It comes with an adjective.** Six of the ten qualify the name: BP's
+  *adjusted* and *modified* free cash flow, Compass's *underlying*,
+  Sainsbury's *retail*, M&S's *free cash flow from operations*, Vodafone's
+  *adjusted*. The name already tells you it is their own measure.
+
+So two companies' "free cash flow" are rarely the same number, which is the
+reason this workspace computes one formula for everyone and keeps the
+companies' own figures beside it, with their definitions.
+
+## How reliable are the digital reports?
+
+The tags are the company's own, which cuts both ways.
+
+- **Four in five annual reports** of non-financial companies tag operating
+  cash flow and capex with standard IFRS elements (1,219 of 1,520); for 57
+  more, free cash flow can be read only through the company's own capex
+  element.
+- **7% of filings** (131 of 1,823) have tagged figures that contradict each
+  other: a cash-flow statement that does not add up, one figure with two
+  values, statements that disagree, a payment with its sign reversed, a filing
+  indexed for one year that holds another. The share is flat, not falling:
+  4%, 9%, 8%, 6%, 8% for 2021 to 2025.
+- **Tagging capex with a company's own element is a habit**, not a teething
+  problem: 13% of filings in 2021, 16 to 17% every year since 2023. A screen
+  that reads only standard tags misses that investment and overstates free
+  cash flow. Diageo tags capex as
+  `PurchaseOfPropertyPlantAndEquipmentAndComputerSoftware`; RELX, Unilever,
+  Diageo and Tesco tag their buybacks with elements of their own. Without
+  reading those, the payouts case would miss most of the FTSE's buybacks.
+
+## Can search find the number?
+
+Every tagged figure is a verified answer printed on a known page, which makes
+the twelve printed reports a free test of document search. We asked the
+workspace's search 201 questions written from the tags
+(`text-embedding-3-small`, 2,890 pages):
+
+| Question | Right report first | Passage on the page that prints the figure |
+| --- | ---: | ---: |
+| In plain words ("BP's operating cash flow for 2025") | 97–100% | 23% |
+| In the statement's own words | 91–100% | 29% |
+| The figure alone ("which page shows 24,483?"), meaning only | 10% | 1.6% |
+| The figure alone, hybrid search (meaning and words) | 24% | **48%** |
+
+Search by meaning finds the right report nearly every time (the company's name
+does the work) but prefers the note that *discusses* a figure to the
+statement that *prints* it. And embeddings do not read digits: a figure alone
+found its page 1.6% of the time until hybrid search learned to match the
+words of passages, figures included.
+
+## What it does not tell you
+
+- **Free cash flow here is the textbook formula.** A company's own measure may
+  suit that company better.
+- **Banks, insurers, investment trusts, property companies and parent-only
+  accounts are not judged**, by their tags, their investment property share or
+  the industry the model reads.
+- **The industry is a model's reading,** and a model can be wrong.
+- **Capex from a company's own element is matched by name**; the anchoring
+  ESEF requires is not in the xBRL-JSON.
+- **"Three years" means three reporting periods on the index**, where UK
+  filings go back only to 2020/21.
+- **A group and its filing subsidiary can both be in** (Rolls-Royce Holdings
+  and Rolls-Royce plc, BT Group and British Telecommunications). The medians
+  barely move.
+- **Amounts are in the company's currency**, with pounds at ECB rates beside
+  them.
+
+And above all: **a finding is a question to ask about a company, not a
+verdict on it.**
+
+![A typed sheet headed "What this does not tell you" listing the limits, ending on "A finding is a question, not a verdict" marked in lime](/blog/assets/images/free-cash-flow-limits-question-not-verdict.webp)
+
+## Open it yourself
+
+The workspace is open to read on the Classifyre showcase, and keeps itself
+current as new reports are filed:
+
+1. Open the case **Cash machines** and click a hypothesis: its evidence lights
+   up, and its dated note says how it was counted.
+2. Open **NEXT PLC** under Entities and follow its lineage to the filings.
+3. Open the detector **Industry from the company's own words** and read the
+   eleven options the model chooses from.
+
+## Sources
+
+- XBRL International, [filings.xbrl.org](https://filings.xbrl.org/) and
+  [its about page](https://filings.xbrl.org/about.html), read on 21 October
+  2026.
+- Financial Reporting Council, [UK Structured Reporting Resources](https://www.frc.org.uk/documents/2622/UK_Structured_reporting_Resources.pdf)
+  (DTR 4.1.14).
+- Herbert Smith Freehills, [Delay to implementation of European Single
+  Electronic Format for annual reports](https://www.hsfkramer.com/notes/corporate/2020-11/delay-to-implementation-of-european-single-electronic-format-for-annual-reports),
+  November 2020 (FCA PS20/14).
+- ESMA, Guidelines on Alternative Performance Measures (2015).
+- IAS 7 *Statement of Cash Flows* and IFRS 16 *Leases*.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/blog/cases/britains-free-cash-flow"
+/>

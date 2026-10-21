@@ -1,0 +1,552 @@
+---
+title: "Gewinn wird ausgewiesen, Cash wird gezählt: der freie Cashflow von 385 britischen Unternehmen"
+description: "Freier Cashflow erklärt und dann gemessen, an jedem britischen börsennotierten Unternehmen mit einer Vorgeschichte: 1.823 getaggte Jahresberichte von filings.xbrl.org, Jahr für Jahr gelesen. Wer macht aus Gewinn Geld, wer wächst stetig, und was meinen Unternehmen, wenn sie freier Cashflow sagen."
+date: 2026-10-21T00:00:00.000Z
+tags:
+  - free-cash-flow
+  - esef
+  - xbrl
+  - investigations
+  - glossary
+categories:
+  - Field Notes
+author: Classifyre Team
+image: /blog/assets/images/britains-free-cash-flow.jpg
+keywords:
+  - freier Cashflow erklärt
+  - Free Cashflow britische Unternehmen
+  - operativer Cashflow minus Investitionen
+  - Cash Conversion
+  - ESEF Jahresberichte
+  - filings.xbrl.org
+  - iXBRL getaggte Abschlüsse
+  - Dividendendeckung freier Cashflow
+  - Entscheidungsmodell Branchenklassifikation
+  - Classifyre
+alternates:
+  canonical: /de/blog/cases/britains-free-cash-flow
+  languages:
+    en: /blog/cases/britains-free-cash-flow/
+    de: /de/blog/cases/britains-free-cash-flow/
+    x-default: /blog/cases/britains-free-cash-flow/
+openGraph:
+  type: article
+  title: "Gewinn wird ausgewiesen, Cash wird gezählt: der freie Cashflow von 385 britischen Unternehmen"
+  description: "Freier Cashflow erklärt und gemessen an 1.823 getaggten Jahresberichten britischer börsennotierter Unternehmen. Wer macht aus Gewinn Geld, und was macht er damit?"
+  url: /de/blog/cases/britains-free-cash-flow
+  siteName: Classifyre
+  publishedTime: 2026-10-21T00:00:00.000Z
+  modifiedTime: 2026-10-21T00:00:00.000Z
+  authors:
+    - Classifyre Team
+  section: Field Notes
+  tags:
+    - freier Cashflow
+    - ESEF
+    - XBRL
+    - britische Unternehmen
+  images:
+    - /blog/assets/images/britains-free-cash-flow.jpg
+twitter:
+  card: summary_large_image
+  title: "Gewinn wird ausgewiesen, Cash wird gezählt: der freie Cashflow von 385 britischen Unternehmen"
+  description: "Freier Cashflow erklärt und gemessen an 1.823 getaggten Jahresberichten britischer börsennotierter Unternehmen. Wer macht aus Gewinn Geld, und was macht er damit?"
+  images:
+    - /blog/assets/images/britains-free-cash-flow.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/britains-free-cash-flow.jpg"
+  eyebrow="Field notes"
+  title="Britain's Free Cash Flow"
+  description="Macht ein Geschäft aus seinem Gewinn Geld, und was macht es damit? Gefragt bei jedem britischen börsennotierten Unternehmen mit einer Vorgeschichte, an den Zahlen, die es in seinem eigenen Jahresbericht taggt."
+/>
+
+<ArticleJsonLd
+  headline="Gewinn wird ausgewiesen, Cash wird gezählt: der freie Cashflow von 385 britischen Unternehmen"
+  description="Freier Cashflow erklärt und gemessen an 1.823 getaggten Jahresberichten britischer börsennotierter Unternehmen von filings.xbrl.org: wer aus Gewinn Geld macht, wer stetig wächst, und was Unternehmen meinen, wenn sie freier Cashflow sagen."
+  path="/de/blog/cases/britains-free-cash-flow"
+  datePublished="2026-10-21T00:00:00.000Z"
+  dateModified="2026-10-21T00:00:00.000Z"
+  authorName="Classifyre Team"
+  articleSection="Field Notes"
+  about={[
+    "Freier Cashflow",
+    "Cash Conversion",
+    "ESEF-Jahresberichte",
+    "Britische börsennotierte Unternehmen",
+    "Dividenden und Aktienrückkäufe",
+  ]}
+  mentions={[
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://showcase.classifyre.com/uk-cash-flow",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://showcase.classifyre.com/uk-cash-flow"
+  liveCaseName="Britain's Free Cash Flow"
+/>
+
+<LiveCaseLink
+  href="https://showcase.classifyre.com/uk-cash-flow"
+  caseName="Workspace Britain's Free Cash Flow"
+/>
+
+<ArticleSideRail
+  title="Britain's Free Cash Flow"
+  path="/de/blog/cases/britains-free-cash-flow/"
+  tags={["free-cash-flow", "esef", "xbrl", "investigations", "glossary"]}
+  backHref="/de/blog/cases"
+  backLabel="Alle Fallakten"
+/>
+
+Ein Unternehmen kann jedes Jahr einen Gewinn ausweisen und trotzdem kein Geld
+mehr haben.
+
+Gewinn ist, was die Bücher als verdient ausweisen. Er beruht auf Ermessen: wann
+ein Verkauf zählt, wie schnell eine Maschine verschleißt, was eine Forderung
+noch wert ist. Cash ist, was tatsächlich eingegangen ist, und es wird gezählt.
+Beides läuft ständig auseinander, und die meisten interessanten Fragen an ein
+Unternehmen stecken in dieser Lücke.
+
+Also haben wir jedem im Vereinigten Königreich börsennotierten Unternehmen mit
+einer Vorgeschichte digitaler Jahresberichte eine einfache Frage gestellt:
+**Macht das Geschäft aus seinem Gewinn Geld, und was macht es damit?** Dieser
+Beitrag erklärt das Maß, woher die Zahlen kommen, wie der Workspace gebaut ist,
+der sie liest, und was 385 Unternehmen tatsächlich tun.
+
+![Ein getipptes Blatt auf einem schwarzen Tisch: Gewinn 90, Kassenbestand zu Beginn 50, am Ende 20; daneben das Fenster einer Registrierkasse mit CASH NO SALE .00, ein Streifen Addierrolle mit dem Stempel COUNTED und die Frage, ob das Geschäft aus Gewinn Geld macht und was es damit tut](/blog/assets/images/uk-free-cash-flow-profit-reported-cash-counted.webp)
+
+<Alert>
+  <AlertTitle>Was echt ist und was nicht</AlertTitle>
+  <AlertDescription>
+    Jede Unternehmenszahl in diesem Beitrag ist echt: gelesen aus den eigenen
+    getaggten Einreichungen der Unternehmen und im Workspace am 21. Oktober
+    2026 gezählt. Das Blatt im ersten Bild (Gewinn 90, Kasse sinkt auf 20)
+    ist ein erfundenes Beispiel. Die Bilder sind Standbilder aus einem Film,
+    den wir zu diesem Beitrag gemacht haben; Fallboard und Detektorseiten
+    darin sind der echte Workspace, das Papier auf dem schwarzen Tisch ist
+    unseres.
+  </AlertDescription>
+</Alert>
+
+## Was freier Cashflow ist
+
+Das Maß für diese Frage ist der **freie Cashflow** (Free Cash Flow).
+
+- **Operativer Cashflow** ist das Geld, das das Unternehmen mit seinem
+  Geschäft eingenommen hat, nach Löhnen, Lieferanten und Steuern. Er steht in
+  jeder Kapitalflussrechnung.
+- **Investitionen** (Capex) sind, was es für Maschinen, Gebäude und Software
+  bezahlt hat: in IFRS-Begriffen Auszahlungen für Sachanlagen und
+  immaterielle Vermögenswerte.
+- **Freier Cashflow** ist, was übrig bleibt: operativer Cashflow minus
+  Investitionen.
+
+Das ist das Geld, das einem Unternehmen bleibt, nachdem es seine Anlagen
+erhalten und ausgebaut hat. Kreditgeber, Dividenden und Aktienrückkäufe
+werden daraus bezahlt. Ist er Jahr für Jahr negativ, kommt das Geld von
+anderswo: aus Ersparnissen, neuen Aktien oder neuen Schulden.
+
+Ein echtes Jahr. NEXT plc, der Händler, im Geschäftsjahr bis 31. Januar 2026,
+aus der eigenen getaggten Einreichung:
+
+| Mio. £ | |
+| --- | ---: |
+| Operativer Cashflow | 1.233,6 |
+| − Auszahlungen für Sachanlagen | 135,4 |
+| − Auszahlungen für immaterielle Vermögenswerte | 35,8 |
+| **= Freier Cashflow** | **1.062,4** |
+| Jahresgewinn | 898,0 |
+| Freier Cashflow im Verhältnis zum Gewinn | **118 %** |
+| Gezahlte Dividenden | 286,5 |
+| Aktienrückkäufe | 131,4 |
+
+Jedes Pfund Gewinn kam als Geld an, und mehr: Abschreibungen sind in der
+Gewinn- und Verlustrechnung ein Aufwand, aber keine Zahlung. Rund 420 Mio. £
+gingen an die Aktionäre zurück.
+
+![Das Geschäftsjahr von NEXT plc bis Januar 2026 auf einem getippten Blatt: operativer Cashflow 1.233,6, Investitionen 171,2, freier Cashflow 1.062,4 in Lime markiert, Gewinn 898,0, freier Cashflow ÷ Gewinn 118 %; daneben eine Geldkassette und Zettel mit Dividenden 286,5, Rückkäufen 131,4 und rund 420 an die Aktionäre](/blog/assets/images/next-plc-free-cash-flow-worked-example.webp)
+
+Eines gleich vorweg: **Der freie Cashflow ist keine Zeile im
+IFRS-Abschluss.** Unternehmen, die ihn angeben, definieren ihn selbst, als
+*alternative Leistungskennzahl*. Dieser Workspace verwendet für jedes
+Unternehmen die einfache Formel oben, damit sie vergleichbar sind, und
+behandelt, was Unternehmen selbst freien Cashflow nennen, als eigene Frage
+(siehe unten).
+
+## Woher die Zahlen kommen
+
+Für Geschäftsjahre ab dem 1. Januar 2021 veröffentlichen Emittenten mit
+Wertpapieren an einem regulierten Markt im Vereinigten Königreich ihren
+Jahresfinanzbericht im European Single Electronic Format (FCA-Regel DTR
+4.1.14). Der Bericht ist eine Webseite (XHTML), in der jede Zahl der
+Hauptabschlüsse ein Tag aus der IFRS-Taxonomie trägt: Der operative Cashflow
+ist in jedem Bericht `ifrs-full:CashFlowsFromUsedInOperatingActivities`, egal
+wer die Seite gestaltet hat.
+
+![Eine gezeichnete Seite eines Jahresberichts, drei Zahlen in Lime umrandet und die Namen ihrer IFRS-Elemente darunter, neben einem Abzug eines alten Aktenarchivs und eines Lochkartenlagers](/blog/assets/images/esef-tagged-annual-report-ifrs-elements.webp)
+
+**XBRL International**, die gemeinnützige Organisation hinter dem
+XBRL-Standard, sammelt diese Berichte auf
+[filings.xbrl.org](https://filings.xbrl.org/). Zu jeder Einreichung gibt es
+einen Inline-XBRL-Viewer, jede getaggte Zahl als xBRL-JSON, das eingereichte
+Berichtspaket und die Meldungen des Validators. Nach eigener Aussage gibt es
+derzeit keine Einschränkungen dafür, wie die Daten verwendet werden dürfen, und
+das Verzeichnis ist nicht vollständig. Einreichungen kommen über die
+nationalen Sammelstellen, manchmal lange nach der eigentlichen Abgabe.
+
+![Der Index von filings.xbrl.org, gefiltert auf das Land GB, in einem Browser](/blog/assets/images/filings-xbrl-org-gb-filings-index.webp)
+
+Deshalb lesen wir dort:
+
+- **Die Zahlen sind die des Unternehmens selbst**, vom Unternehmen getaggt,
+  nicht von einem Scraper aus einem PDF geraten.
+- **Die Tags passen zusammen**, über Unternehmen und über Jahre, sodass sich
+  Jahre nebeneinanderlegen lassen, ohne Zuordnungstabelle je Unternehmen.
+- **Jeder kann sie prüfen**, Zahl für Zahl an derselben Seite, die wir lesen.
+- **Es braucht weder Schlüssel noch Konto.** Die JSON:API unter
+  `filings.xbrl.org/api/filings` liefert 500 Einreichungen je Abruf.
+
+## Wer dabei ist
+
+Ein Unternehmen ist dabei, wenn es **mindestens drei Berichtsperioden im
+Index** hat und **in diesem Jahr eingereicht hat**: eine Vorgeschichte, und
+noch aktuell. Dann wird jede seiner Einreichungen gelesen, wie alt sie auch
+ist, bei manchen zurück bis 2020.
+
+Eine Überraschung unterwegs: **„GB“ im Index heißt bei der britischen Aufsicht
+eingereicht, nicht britisch.** Die Liste der FCA umfasst jeden Emittenten mit
+Wertpapieren in London: kasachische, russische, koreanische, japanische,
+Hongkonger und bermudische Konzerne, die irischen Konzerne und einen britischen
+Händler mit Sitz in Luxemburg. Von den 444 Unternehmen, die die Regel
+erfüllten, **nennen 59 in ihren eigenen Einreichungen einen Sitz oder ein
+Gründungsland außerhalb des Vereinigten Königreichs** und bleiben draußen. Ein
+erster, naiver Filter warf außerdem rund sechzig britische Unternehmen hinaus,
+weil aus PDF umgewandelte Berichte den Ort als „En gl an d & Wal es“ drucken;
+Leerzeichen werden beim Lesen des Orts jetzt ignoriert.
+
+Übrig bleiben **385 britische Unternehmen, 1.823 Einreichungen** mit
+Perioden von 2020 bis 2026 und **12 gedruckte Jahresberichte** (2.890 Seiten)
+der größten britischen Konzerne außerhalb der Finanzbranche, Seite für Seite
+gelesen.
+
+![Eine Regelkarte (drei oder mehr Berichtsperioden, eine Einreichung in diesem Jahr), ein Stapel Ordner und ein Abzug der Tower Bridge im Nebel mit der Unterschrift 385 British companies; daneben 385 britische Unternehmen, 1.823 Einreichungen, 12 gedruckte Jahresberichte](/blog/assets/images/uk-cash-flow-selection-385-british-companies.webp)
+
+## Der Workspace: drei Quellen und ihre Herkunft
+
+In Classifyre ist das ein Workspace mit drei Quellen, jede ein kleines
+Python-Notebook:
+
+| Quelle | Ein Datensatz je | Was sie liest |
+| --- | --- | --- |
+| **UK ESEF filings** | Einreichung | den Index, neueste zuerst; das xBRL-JSON jeder Einreichung (Kapitalflussrechnung, Gewinn- und Verlustrechnung, Bilanz, laufendes Jahr und Vorjahr) und ihre Validierungsmeldungen |
+| **UK company profiles** | Unternehmen, und ein Vergleichswert je Geschäftsjahr | aus den Einreichungen berechnet: die Jahre eines Unternehmens nebeneinander, zu EZB-Kursen in Pfund; ein Vergleichswert enthält die Mediane aller Unternehmen eines Jahres |
+| **UK annual reports** | gedruckten Bericht | die zwölf umsatzstärksten britischen Konzerne außerhalb der Finanzbranche, in Seiten zerlegt, damit ein Befund auf eine Seite zeigen kann |
+
+Die erste Quelle schaut nach Zeitplan in den Index, sodass der nächste Bericht
+eines Unternehmens von selbst dazukommt, und ein Unternehmen, das seinen ersten
+Bericht eines neuen Jahres einreicht, in den Workspace aufgenommen wird.
+
+Die Konnektoren **deklarieren auch die Herkunft** (Lineage): Ein Profil nennt
+die Einreichungen, aus denen es berechnet wurde, ein Vergleichswert die
+Profile hinter seinen Medianen, eine Einreichung den gedruckten Bericht, aus
+dem sie gelesen wurde. Öffnet man das Profil von NEXT, sind seine fünf
+Jahreseinreichungen und jeder Vergleichswert, in den es einging, einen Klick
+entfernt.
+
+![Der Herkunftsgraph des Unternehmensprofils von NEXT plc: die Jahreseinreichungen, aus denen es entsteht, und die jährlichen Vergleichswerte, in die es eingeht, auf der Asset-Seite in Classifyre](/blog/assets/images/classifyre-lineage-company-profile-filings-benchmarks.webp)
+
+## Das Vokabular: Glossar und Entitäten
+
+Datensätze enthalten Zahlen. Eine Frage braucht Wörter, und die Wörter stehen
+im Glossar: **84 Begriffe in sechs Gruppen** (freier Cashflow, IFRS-Zahlen,
+Datenqualität, Branchen, Mehrjahrestrends, Arten von Datensätzen), jeder in
+einem Satz definiert. Eine *Cash-Maschine* zum Beispiel ist „zwei Jahre in
+Folge positiver freier Cashflow, mindestens 10 % des Umsatzes und mindestens
+80 % des Gewinns: Der Gewinn kommt als Geld an“.
+
+Jede Art von Befund, die ein Detektor erzeugen kann, ist an einen dieser
+Begriffe **gebunden**. Der Detektor sagt `cash_machine`; das Glossar weiß, was
+das bedeutet und dass es unter *starker freier Cashflow* steht. Diese Bindung
+erlaubt es, eine stehende Frage in Worten zu stellen statt in
+Detektorschlüsseln.
+
+![Der Glossarbegriff Cash machine in Classifyre: 81 Assets, 81 Befunde, seine Bindung an die Detektorausgabe cash_machine](/blog/assets/images/classifyre-glossary-cash-machine-binding.webp)
+
+Die Unternehmen stehen im selben Glossar, als **Entitäten**: 385 davon, von der
+Profilquelle deklariert. Ein kleiner Musterdetektor findet in jedem Datensatz
+die Rechtsträgerkennung (LEI), sodass Einreichungen, Profil und gedruckter
+Bericht eines Unternehmens auf einer Entitätsseite landen.
+
+## Die Leser: Regeln, ein Entscheidungsmodell, ein Sprachmodell
+
+Zehn Detektoren lesen die Datensätze. **Die meisten sind einfache
+Python-Regeln**, die jeder lesen kann: Geht die Kapitalflussrechnung auf, wie
+hoch ist der freie Cashflow, was zeigen drei bis sechs Jahre zusammen, wo
+steht ein Unternehmen in seiner Branche. Um zwei Zahlen abzuziehen, braucht es
+kein Modell.
+
+Zwei Fragen brauchen eines, und nur dort setzt der Workspace eines ein.
+
+### Ein Entscheidungsmodell für die Branche
+
+Eine Cashflow-Marge sagt ohne Vergleichsgruppe wenig: Ein Softwarehaus und ein
+Wasserversorger sollten nicht an derselben Zahl gemessen werden. **Kein
+ESEF-Tag sagt, in welcher Branche ein Unternehmen ist.** Was jedes Unternehmen
+in seiner Einreichung angibt, ist eine Beschreibung seiner Haupttätigkeit, in
+eigenen Worten.
+
+Also liest ein **Entscheidungsmodell** diesen Text und wählt eine von elf
+Branchen; zusätzlich beantwortet es, ob das Unternehmen ein Finanzinstitut ist.
+Ein Entscheidungsmodell ist kein Chatbot: Es bekommt die Frage und die
+Optionen, jede beschrieben, und gibt für jede Option eine Wahrscheinlichkeit
+zurück, keinen Text. Hier ist es Perplexitys Decider (`pplx-decider-v1.2`)
+über OpenRouter. (Was Entscheidungsmodelle sind, steht in einem
+[eigenen Beitrag](/de/blog/articles/decision-models-system-one-explained/).)
+
+Für Rio Tinto, dessen Einreichung das eigene Geschäft als „finding, mining,
+and processing mineral resources“ beschreibt, lautete die Antwort *Rohstoffe*
+mit 99,6 %. Eine Python-Regel ordnet dann die Cashflow-Marge jedes
+Unternehmens innerhalb seiner Branche ein: oberes Viertel, unteres Viertel
+oder Investitionen weit über dem Branchenschnitt.
+
+![Auf einem Tisch: ein Abzug eines Sortierraums mit Fächern, Rio Tintos eigene Beschreibung seines Geschäfts mit markierten Worten und die Wahrscheinlichkeit, die das Entscheidungsmodell jeder der elf Branchen gab, Rohstoffe 99,6](/blog/assets/images/decision-model-industry-probabilities-rio-tinto.webp)
+
+### Ein Sprachmodell für das, was Unternehmen freien Cashflow nennen
+
+Was ein Unternehmen unter freiem Cashflow versteht, steht im **Text** seines
+Berichts, nicht in seinen Tags, und die gedruckten Berichte haben bis zu 396
+Seiten (der von BP). Ein **Sprachmodell**, GLM 5.3 Flash, liest nur die
+Seiten, die den Begriff verwenden: Ein Muster am Detektor
+(`content_pattern`) entscheidet welche, in achtzehn Sprachen. Das war **etwa
+eine Seite von zwanzig** (142 von 2.890).
+
+Auf jeder Seite notiert es die Zahl, die Seite, den Wortlaut und die
+Definition und ob Leasing, Zinsen und Akquisitionen abgezogen werden.
+Unilever, Seite 46: Cashflow aus laufender Geschäftstätigkeit, abzüglich
+gezahlter Ertragsteuern, Nettoinvestitionen und Nettozinszahlungen. Eine
+Python-Regel stellt die genannte Zahl dann dem operativen Cashflow minus
+Investitionen aus den Tags desselben Berichts gegenüber.
+
+![Ein dicker Bericht neben einem Raster aus hundertzwanzig kleinen Seiten, sechs davon in Lime umrandet und die übrigen abgedunkelt, eine Lupe darüber, Zettel mit GLM 5.3 Flash und „nur Seiten mit dem Begriff, etwa 1 von 20“](/blog/assets/images/llm-reads-free-cash-flow-pages-one-in-twenty.webp)
+
+## Fragen, die gestellt bleiben
+
+Befunde sind Antworten. Eine Untersuchung braucht **Fragen, die gestellt
+bleiben**: Der Workspace hält dreißig davon als *Inquiry Watches*, jede über
+Glossarbegriffe gestellt. *Welche Unternehmen sind Cash-Maschinen? Wer führt
+seine Branche beim freien Cashflow an? Wessen Kapitalflussrechnung geht nicht
+auf?*
+
+**Acht Fälle** bauen darauf auf, jeder eine Frage, jeder mit einem Ressort:
+
+| Fall | Fragt |
+| --- | --- |
+| Cash machines | Wer macht Jahr für Jahr aus Gewinn Geld? |
+| Compounders | Wer hat Kapital und Cash in jedem Jahr gesteigert? |
+| Paying out what they did not earn | Wer hat mehr ausgeschüttet als erwirtschaftet und die Differenz geliehen? |
+| Growth that costs cash | Wessen Wachstum frisst Geld, wer steckt in einem Investitionszyklus? |
+| Profit without cash | Wessen Gewinn kommt nie als Geld an? |
+| Numbers that don't add up | Wie verlässlich sind britische digitale Jahresberichte? |
+| What companies call free cash flow | Wie weit liegt die eigene Zahl eines Unternehmens von der Formel? |
+| Can search find the number? | Taugen getaggte Berichte als Prüfstein für die Suche? |
+
+Ein Fall **holt neue Antworten herein**, sobald Scans sie liefern, und lässt
+ein Unternehmen gehen, wenn sein nächster Bericht den Befund nicht mehr
+stützt. Jeder Fall nennt außerdem zwei oder drei **Hypothesen**: Behauptungen,
+die richtig klingen, aufgeschrieben, bevor sie geprüft wurden. Der Workspace
+zählt jede an den Daten nach, schreibt das Ergebnis in eine datierte Notiz zur
+Hypothese, verknüpft einige Befunde dafür und dagegen und vergibt den Status.
+Von 23 Hypothesen wurden 12 bestätigt, **9 widerlegt** und 2 blieben offen.
+Die widerlegten sind die interessantesten.
+
+![Das Fallboard von Cash machines in Classifyre: die Hypothese „Cash machines keep most of their cash“ mit dem Stempel SUPPORTED, Linien zu den cash_machine-Befunden von sechs Unternehmen und ihre datierte Notiz: 69 Cash-Maschinen zahlten Dividenden; der Median schüttete 35 % seines freien Cashflows aus](/blog/assets/images/classifyre-case-board-cash-machines-hypothesis.webp)
+
+## Was 385 Unternehmen mit ihrem Geld gemacht haben
+
+Alle Zahlen sind die Zählungen der Hypothesen vom 21. Oktober 2026, für
+Unternehmen außerhalb der Finanzbranche.
+
+**Die Hälfte ist beständig.** Von 231 Unternehmen mit vier oder mehr Jahren
+hatten **117 (51 %) nie ein Jahr mit negativem freiem Cashflow**. *(Die meisten
+britischen Unternehmen erwirtschaften jedes Jahr Geld: bestätigt.)*
+
+**Gewinn wächst öfter stetig als Cash, aber nicht viel öfter.** Von 232
+Unternehmen mit drei oder mehr Jahren steigerten 61 den Gewinn um mindestens
+10 % im Jahr; **44 steigerten den freien Cashflow ebenso schnell, mit jedem
+Jahr positiv.** Das Klischee sagt „weit öfter“. *(Widerlegt.)*
+
+**Echte Compounder sind selten und finanzieren sich selbst.** Zwölf
+Unternehmen steigerten ihr Eigenkapital in jedem Jahr um 10 % oder mehr,
+**darunter Greggs, NEXT und Halma; elf der zwölf schafften das, ohne sich zu
+verschulden** oder mehr auszuschütten, als sie erwirtschafteten. *(Compounder
+wachsen aus eigenem Geld, nicht auf Schulden: bestätigt.)*
+
+![Eine getippte Karte: Eigenkapital in jedem Jahr um 10 % oder mehr gestiegen, 12 Unternehmen, 11 aus eigenen Mitteln, darunter Greggs, NEXT und Halma, neben einem Abzug eines Zeichensaals; die Hypothese „Compounders grow on their own cash, not on debt“ mit dem Stempel SUPPORTED](/blog/assets/images/uk-capital-compounders-greggs-next-halma.webp)
+
+**Cash-Maschinen behalten das meiste von dem, was sie erwirtschaften.** Von 69
+Cash-Maschinen, die Dividenden zahlten, schüttete der Median **35 % seines
+freien Cashflows** aus. *(Bestätigt.)*
+
+**Mehr auszuschütten, als das Geschäft erwirtschaftet, während die Schulden
+steigen, ist die Ausnahme.** Von 169 Unternehmen, die in drei oder mehr Jahren
+Dividenden zahlten, schütteten **18 (11 %)** über den Zeitraum mehr an
+Dividenden und Rückkäufen aus, als sie erwirtschafteten, während ihre
+Nettoverschuldung stieg. *(Jeder zehnte britische Dividendenzahler leiht sich
+die Ausschüttung: bestätigt.)* Und der übliche Verdächtige ist der falsche: Wo
+Ausschüttungen das Geld übersteigen, sind **Dividenden, nicht Rückkäufe, der
+größere Teil, bei 18 von 21.** *(Rückkäufe, nicht Dividenden, reißen die
+Lücke: widerlegt.)* In einem einzelnen Jahr ist es häufiger: 32 von 213
+Dividendenzahlern zahlten mehr als den freien Cashflow dieses Jahres (15 %).
+
+![Eine getippte Karte: 18 von 169 schütteten mehr aus, als sie erwirtschafteten, während die Nettoverschuldung stieg, neben einem Abzug von Pfundmünzen; zwei Hypothesen, „One UK dividend payer in ten borrows to pay out“ mit SUPPORTED und „Buybacks, not dividends, open the gap“ mit REFUTED](/blog/assets/images/uk-dividends-beyond-free-cash-flow-18-of-169.webp)
+
+**Schnelles Wachstum, das Geld verbrennt, ist keine Investitionsphase.** Acht
+Unternehmen steigerten den Umsatz um 10 % oder mehr im Jahr und verbrannten
+dabei über den Zeitraum Geld; **keines hatte seinen Investitionsanteil
+erhöht**, und fünf der acht steigerten ihre Nettoverschuldung um die Hälfte
+oder mehr. *(Investitionsgetrieben: widerlegt. Auf Schulden finanziert:
+bestätigt.)*
+
+**IFRS 16 versteckt weniger, als man denkt.** Seit 2019 sind die meisten
+Mieten Finanzierungs-Cashflow und fallen aus der üblichen Formel. Von 191
+Unternehmen mit positivem freiem Cashflow, die Leasingzahlungen taggen, werden
+nur **8 (4 %)** negativ, wenn man diese Zahlungen abzieht. *(IFRS 16 versteckt
+Geldverbrennung: widerlegt.)*
+
+**Wo die Zinsen stehen, macht einen Unterschied.** IAS 7 erlaubt, gezahlte
+Zinsen im operativen oder im Finanzierungs-Cashflow zu zeigen. 102 von 385
+zeigen sie unter Finanzierung; bei 50 macht das mindestens ein Zehntel des
+freien Cashflows aus, und **8 Cash-Maschinen fielen unter die 10-%-Marge**,
+wenn sie die Zinsen so zeigten wie ihre Vergleichsunternehmen.
+
+**Anlagenleichte Branchen behalten mehr von ihrem Umsatz.** Die mittlere
+Cashflow-Marge von Technologie, Gesundheit und Basiskonsumgütern liegt bei
+**11,5 %**, die von Versorgern, Energie, Rohstoffen und Telekom bei
+**7,7 %**. *(Bestätigt.)*
+
+Der größte freie Cashflow im letzten Jahr: Shell (16,65 Mrd. £), BP
+(8,55 Mrd. £), AstraZeneca (6,58 Mrd. £), Vodafone (6,03 Mrd. £), Unilever
+(5,79 Mrd. £).
+
+## Was Unternehmen freien Cashflow nennen
+
+Zehn der zwölf gedruckten Berichte nennen einen eigenen freien Cashflow. Zwei
+Dinge fallen auf.
+
+- **Er ist meist strenger als die Formel.** Bei 8 der 10 liegt die eigene Zahl
+  des Unternehmens unter operativem Cashflow minus Investitionen aus den Tags
+  desselben Berichts: Britische Unternehmen ziehen zusätzlich Zinsen, Steuern,
+  Leasing oder Beteiligungen ab. Bei BP und Rio Tinto liegt sie darüber.
+  *(Der eigene freie Cashflow liegt meist über der Formel: widerlegt.)*
+- **Er kommt mit einem Beiwort.** Sechs der zehn schränken den Namen ein: BPs
+  *adjusted* und *modified free cash flow*, Compass' *underlying*,
+  Sainsbury's *retail*, M&S' *free cash flow from operations*, Vodafones
+  *adjusted*. Schon der Name sagt, dass es ein eigenes Maß ist.
+
+Der „freie Cashflow“ zweier Unternehmen ist also selten dieselbe Zahl. Deshalb
+rechnet dieser Workspace für alle eine Formel und hält die eigenen Zahlen der
+Unternehmen mit ihren Definitionen daneben.
+
+## Wie verlässlich sind die digitalen Berichte?
+
+Die Tags sind die des Unternehmens selbst, und das wirkt in beide Richtungen.
+
+- **Vier von fünf Jahresberichten** von Unternehmen außerhalb der
+  Finanzbranche taggen operativen Cashflow und Investitionen mit
+  IFRS-Standardelementen (1.219 von 1.520); bei 57 weiteren lässt sich der
+  freie Cashflow nur über ein eigenes Investitionselement lesen.
+- **7 % der Einreichungen** (131 von 1.823) haben getaggte Zahlen, die sich
+  widersprechen: eine Kapitalflussrechnung, die nicht aufgeht, eine Zahl mit
+  zwei Werten, Abschlüsse, die nicht übereinstimmen, eine Zahlung mit
+  umgekehrtem Vorzeichen, eine Einreichung, die für ein Jahr gelistet ist und
+  ein anderes enthält. Der Anteil ist flach, nicht fallend: 4 %, 9 %, 8 %,
+  6 %, 8 % für 2021 bis 2025.
+- **Investitionen mit einem eigenen Element zu taggen, ist eine Gewohnheit**,
+  keine Kinderkrankheit: 13 % der Einreichungen 2021, 16 bis 17 % in jedem
+  Jahr seit 2023. Ein Screening, das nur Standard-Tags liest, übersieht diese
+  Investitionen und überschätzt den freien Cashflow. Diageo taggt Capex als
+  `PurchaseOfPropertyPlantAndEquipmentAndComputerSoftware`; RELX, Unilever,
+  Diageo und Tesco taggen ihre Aktienrückkäufe mit eigenen Elementen. Ohne
+  diese zu lesen, würde der Fall zu Ausschüttungen die meisten Rückkäufe des
+  FTSE übersehen.
+
+## Findet die Suche die Zahl?
+
+Jede getaggte Zahl ist eine geprüfte Antwort auf einer bekannten Seite. Das
+macht die zwölf gedruckten Berichte zu einem kostenlosen Test für
+Dokumentensuche. Wir haben der Suche des Workspace 201 Fragen gestellt, aus den
+Tags formuliert (`text-embedding-3-small`, 2.890 Seiten):
+
+| Frage | Richtiger Bericht zuerst | Fundstelle auf der Seite, die die Zahl druckt |
+| --- | ---: | ---: |
+| In einfachen Worten („operativer Cashflow von BP 2025“) | 97–100 % | 23 % |
+| In den Worten des Abschlusses | 91–100 % | 29 % |
+| Nur die Zahl („welche Seite zeigt 24.483?“), nur Bedeutung | 10 % | 1,6 % |
+| Nur die Zahl, hybride Suche (Bedeutung und Wörter) | 24 % | **48 %** |
+
+Die Suche nach Bedeutung findet fast immer den richtigen Bericht (der Name des
+Unternehmens erledigt das), bevorzugt aber den Anhang, der eine Zahl
+*bespricht*, gegenüber dem Abschluss, der sie *druckt*. Und Embeddings lesen
+keine Ziffern: Eine Zahl allein fand ihre Seite in 1,6 % der Fälle, bis die
+hybride Suche lernte, die Wörter der Passagen zu vergleichen, Zahlen
+eingeschlossen.
+
+## Was das nicht sagt
+
+- **Freier Cashflow ist hier die Lehrbuchformel.** Das eigene Maß eines
+  Unternehmens kann zu diesem Unternehmen besser passen.
+- **Banken, Versicherer, Investmentgesellschaften, Immobilienunternehmen und
+  reine Einzelabschlüsse werden nicht beurteilt**, erkannt an ihren Tags, ihrem
+  Anteil an Renditeimmobilien oder der Branche, die das Modell liest.
+- **Die Branche ist die Lesart eines Modells,** und ein Modell kann sich
+  irren.
+- **Investitionen aus einem eigenen Element werden über den Namen zugeordnet**;
+  die von ESEF verlangte Verankerung steht nicht im xBRL-JSON.
+- **„Drei Jahre“ heißt drei Berichtsperioden im Index**, wo britische
+  Einreichungen nur bis 2020/21 zurückreichen.
+- **Ein Konzern und seine einreichende Tochter können beide dabei sein**
+  (Rolls-Royce Holdings und Rolls-Royce plc, BT Group und British
+  Telecommunications). Die Mediane bewegen sich kaum.
+- **Beträge stehen in der Währung des Unternehmens**, Pfund zu EZB-Kursen
+  daneben.
+
+Und vor allem: **Ein Befund ist eine Frage an ein Unternehmen, kein Urteil
+über es.**
+
+![Ein getipptes Blatt mit der Überschrift „What this does not tell you“, das die Grenzen aufzählt und mit „A finding is a question, not a verdict“ in Lime endet](/blog/assets/images/free-cash-flow-limits-question-not-verdict.webp)
+
+## Selbst öffnen
+
+Der Workspace ist im Classifyre-Showcase offen zum Lesen und hält sich selbst
+aktuell, sobald neue Berichte eingereicht werden:
+
+1. Öffnen Sie den Fall **Cash machines** und klicken Sie eine Hypothese an:
+   Ihre Belege leuchten auf, und ihre datierte Notiz sagt, wie gezählt wurde.
+2. Öffnen Sie **NEXT PLC** unter Entitäten und folgen Sie seiner Herkunft zu
+   den Einreichungen.
+3. Öffnen Sie den Detektor **Industry from the company's own words** und lesen
+   Sie die elf Optionen, aus denen das Modell wählt.
+
+## Quellen
+
+- XBRL International, [filings.xbrl.org](https://filings.xbrl.org/) und
+  [die Seite „About“](https://filings.xbrl.org/about.html), gelesen am
+  21. Oktober 2026.
+- Financial Reporting Council, [UK Structured Reporting Resources](https://www.frc.org.uk/documents/2622/UK_Structured_reporting_Resources.pdf)
+  (DTR 4.1.14).
+- Herbert Smith Freehills, [Delay to implementation of European Single
+  Electronic Format for annual reports](https://www.hsfkramer.com/notes/corporate/2020-11/delay-to-implementation-of-european-single-electronic-format-for-annual-reports),
+  November 2020 (FCA PS20/14).
+- ESMA, Leitlinien zu alternativen Leistungskennzahlen (2015).
+- IAS 7 *Kapitalflussrechnungen* und IFRS 16 *Leasingverhältnisse*.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/de/blog/cases/britains-free-cash-flow"
+  heading="Weitere Fallakten"
+  locale="de"
+/>

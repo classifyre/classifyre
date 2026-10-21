@@ -1,5 +1,6 @@
 export default {
   index: "Alle Fallakten",
+  "britains-free-cash-flow": "Der freie Cashflow britischer Unternehmen",
   "nova-manufacturing-one-bad-friday":
     "Ein schlechter Freitag in der Pumpenfabrik",
   "from-9601-clinton-email-files-to-eight-open-cases":
