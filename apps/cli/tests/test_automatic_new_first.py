@@ -433,26 +433,42 @@ def _order(doc: dict[str, Any]) -> tuple[int, str]:
 
 
 def test_ctx_newest_first_keeps_its_place_beside_the_notebooks_own_cursor() -> None:
-    ctx = Context(sampling={"strategy": "ALL", "rows_per_page": 4}, cursor={"mine": 1})
+    ctx = Context(sampling={"strategy": "AUTOMATIC", "rows_per_page": 4}, cursor={"mine": 1})
     first = ctx.newest_first(_docs(10), order=_order)
     assert [doc["id"] for doc in first] == ["d09", "d08", "d07", "d06"]
     assert ctx.partial_coverage is True
     cursor = ctx.next_cursor
     assert cursor is not None and cursor["mine"] == 1
 
-    ctx = Context(sampling={"strategy": "ALL", "rows_per_page": 4}, cursor=cursor)
+    ctx = Context(sampling={"strategy": "AUTOMATIC", "rows_per_page": 4}, cursor=cursor)
     ctx.set_cursor({"mine": 2})
     second = ctx.newest_first([*_docs(10), *_docs(1, start=10)], order=_order)
     assert [doc["id"] for doc in second] == ["d10", "d05", "d04", "d03"]
     assert ctx.next_cursor is not None and ctx.next_cursor["mine"] == 2
 
 
+def test_ctx_newest_first_reads_the_whole_listing_under_all() -> None:
+    # ALL means everything: the run takes the listing whole however small a
+    # page is set, and afterwards only what is new.
+    ctx = Context(sampling={"strategy": "ALL", "rows_per_page": 4})
+    first = ctx.newest_first(_docs(10), order=_order)
+    assert [doc["id"] for doc in first] == [f"d{n:02d}" for n in range(9, -1, -1)]
+
+    ctx = Context(sampling={"strategy": "ALL", "rows_per_page": 4}, cursor=ctx.next_cursor)
+    second = ctx.newest_first([*_docs(10), *_docs(2, start=10)], order=_order)
+    assert [doc["id"] for doc in second] == ["d11", "d10"]
+
+    # An explicit limit still pages, whatever the strategy.
+    ctx = Context(sampling={"strategy": "ALL"})
+    assert len(ctx.newest_first(_docs(10), order=_order, limit=3)) == 3
+
+
 def test_ctx_config_changed_restarts_newest_first_and_leaves_the_rest() -> None:
-    ctx = Context(sampling={"rows_per_page": 4}, cursor={"mine": 1})
+    ctx = Context(sampling={"strategy": "AUTOMATIC", "rows_per_page": 4}, cursor={"mine": 1})
     ctx.newest_first(_docs(10), order=_order)
     cursor = ctx.next_cursor
 
-    unchanged = Context(sampling={"rows_per_page": 4}, cursor=cursor)
+    unchanged = Context(sampling={"strategy": "AUTOMATIC", "rows_per_page": 4}, cursor=cursor)
     assert unchanged.config_changed is False
     assert [d["id"] for d in unchanged.newest_first(_docs(10), order=_order)] == [
         "d05",
@@ -461,7 +477,9 @@ def test_ctx_config_changed_restarts_newest_first_and_leaves_the_rest() -> None:
         "d02",
     ]
 
-    changed = Context(sampling={"rows_per_page": 4}, cursor=cursor, config_changed=True)
+    changed = Context(
+        sampling={"strategy": "AUTOMATIC", "rows_per_page": 4}, cursor=cursor, config_changed=True
+    )
     assert changed.config_changed is True
     # The notebook's own state is still there for it to decide about...
     assert changed.cursor["mine"] == 1

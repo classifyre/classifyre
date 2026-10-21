@@ -760,10 +760,11 @@ class Context:
         ``(rank, id)``: ``rank`` is what makes an item newer -- a timestamp, an
         increasing number -- and must be an int, float or string of one
         consistent type that only changes when the item does; ``id`` is unique
-        to the item. Each run gets ``limit`` items (``rows_per_page`` by
-        default): everything newer than what earlier runs read comes first,
-        the rest continues backwards from where the last run stopped, and once
-        the whole listing has been read only new items are returned.
+        to the item. Each run gets ``limit`` items -- by default ``ctx.limit``:
+        the whole listing under the ALL strategy, ``rows_per_page`` otherwise.
+        Everything newer than what earlier runs read comes first, the rest
+        continues backwards from where the last run stopped, and once the whole
+        listing has been read only new items are returned.
 
         The position is kept in the cursor beside whatever you store there,
         one per ``name``, and starts over when ``ctx.config_changed``. Calling
@@ -772,10 +773,11 @@ class Context:
         stored = self._cursor.get("frontier")
         previous = stored.get(str(name)) if isinstance(stored, dict) else None
         frontier = ListFrontier(None if self._config_changed else previous)
-        window = frontier.window(
-            ((*order(item), item) for item in items),
-            int(limit) if limit else self.page_size,
-        )
+        entries = [(*order(item), item) for item in items]
+        # Without a limit of its own the run takes what the source's sampling
+        # asks for: everything under ALL, ``rows_per_page`` otherwise.
+        budget = int(limit) if limit else (self.limit if self.limit is not None else len(entries))
+        window = frontier.window(entries, budget)
         state = frontier.to_state()
         if state is not None:
             self._frontier_state[str(name)] = state

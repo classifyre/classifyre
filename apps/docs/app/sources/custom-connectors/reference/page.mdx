@@ -692,9 +692,12 @@ def extract():
 
 Pass the whole listing, in any order. `order` returns `(rank, id)`: `rank` is
 what makes an item newer — a timestamp, an increasing number — and should only
-change when the item does; `id` is unique. Each run gets `ctx.page_size` items
-(or `limit=`). Its position is kept in the cursor beside whatever you store
-there, so you can use both. Calling it declares the run's coverage partial.
+change when the item does; `id` is unique. Each run gets what the source's
+sampling asks for: the whole listing under **All**, `ctx.page_size` items under a
+paged strategy, or `limit=` when you pass one. Once the listing has been read,
+a run gets only what is new. Its position is kept in the cursor beside whatever
+you store there, so you can use both. Calling it declares the run's coverage
+partial.
 
 ### When the settings change
 
