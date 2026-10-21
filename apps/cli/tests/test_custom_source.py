@@ -231,6 +231,32 @@ def test_content_survives_between_discovery_and_detection(source) -> None:
     assert fetched[1] == "Body of record 1"
 
 
+def test_a_document_with_form_feeds_is_read_page_by_page(source) -> None:
+    # One annual report is one asset; its pages still reach the detectors and
+    # the search index one by one, numbered, the empty one included.
+    paged = SIMPLE_NOTEBOOK.replace(
+        'content=f"Body of record {index}"',
+        'content="Cover\\fCash flow statement\\f\\fNotes"',
+    )
+    instance = source(build_recipe(paged))
+    assets = collect(instance)
+
+    async def pages() -> list[str]:
+        return [text async for _raw, text in instance.fetch_content_pages(assets[0].hash)]
+
+    assert asyncio.run(pages()) == ["Cover", "Cash flow statement", "", "Notes"]
+
+
+def test_a_document_without_form_feeds_is_one_page(source) -> None:
+    instance = source()
+    assets = collect(instance)
+
+    async def pages() -> list[str]:
+        return [text async for _raw, text in instance.fetch_content_pages(assets[0].hash)]
+
+    assert asyncio.run(pages()) == ["Body of record 1"]
+
+
 def test_evicting_an_asset_releases_its_cached_content(source) -> None:
     instance = source()
     assets = collect(instance)

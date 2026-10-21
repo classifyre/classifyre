@@ -2,7 +2,5 @@ export default {
   index: "All articles",
   "embeddinggemma-2-on-a-cpu": "EmbeddingGemma 2 on a CPU",
   "decision-models-system-one-explained": "Decision models, explained",
-  "leaked-secrets-on-your-laptop": "Leaked secrets on your laptop",
-  "from-findings-to-decisions": "From findings to decisions",
-  "from-fingerprints-to-near-duplicates": "From fingerprints to near-duplicates",
+  "leaked-secrets-on-your-laptop": "Leaked secrets on your laptop"
 };

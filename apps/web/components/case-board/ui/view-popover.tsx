@@ -15,6 +15,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 import { useBoard, useBoardStore, useUi, useUiStore } from "../store/board-context";
 import { combine, setCollapsed } from "../store/commands";
+import { suggestionKinds } from "../store/projection";
 import { hypothesisMeta } from "../store/selectors";
 import { SUGGESTED_AUTO_LIMIT, type NeighbourHops, type ViewPrefs } from "../store/ui-store";
 import type { TraceKind } from "../store/trace";
@@ -70,9 +71,13 @@ export function ViewPopover() {
   const firstHopLimited = useBoard((s) => s.truncated);
   const walkLimited = useUi((s) => s.neighbourhoodTruncated);
   const autoHidden = !view.neighboursChosen && view.neighbourHops === 1 && suggestedCount > SUGGESTED_AUTO_LIMIT;
-  const shownNeighbours = useBoard((s) =>
-    autoHidden ? 0 : [...s.suggested.values()].filter((sg) => (sg.hop ?? 1) <= view.neighbourHops).length,
-  );
+  // A crowded first hop still shows its lineage (see board-canvas).
+  const shownNeighbours = useBoard((s) => {
+    if (!autoHidden) return [...s.suggested.values()].filter((sg) => (sg.hop ?? 1) <= view.neighbourHops).length;
+    if (!view.lineage) return 0;
+    const kinds = suggestionKinds(s);
+    return [...s.suggested.values()].filter((sg) => (sg.hop ?? 1) === 1 && kinds.get(`asset:${sg.assetId}`)?.has("lineage")).length;
+  });
   const bubbles = useBoard((s) => s.bubbles);
   const threads = useBoard((s) => s.threads);
   const readOnly = useBoard((s) => s.readOnly);

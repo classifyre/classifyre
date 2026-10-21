@@ -426,12 +426,26 @@ def prior_finding_payload(finding: Any) -> dict[str, Any]:
         "severity": str(getattr(data.get("severity"), "value", data.get("severity")) or ""),
         "confidence": data.get("confidence") or 0.0,
         "location": dict(location),
-        "metadata": {
-            key: value
-            for key, value in metadata.items()
-            if key in {"tabular_row_index", "tabular_column_name", "entity_label", "label"}
-        },
+        "metadata": {key: value for key, value in metadata.items() if key in _PRIOR_METADATA_KEYS},
     }
+
+
+#: What a rule may read of another detector's finding metadata: where it sits,
+#: what it is called, and what a model said -- an LLM's extracted ``fields``, a
+#: decision model's ``question`` and ``answer``. Runner internals stay out.
+_PRIOR_METADATA_KEYS = frozenset(
+    {
+        "tabular_row_index",
+        "tabular_column_name",
+        "entity_label",
+        "label",
+        "fields",
+        "question",
+        "answer",
+        "certainty",
+        "model",
+    }
+)
 
 
 __all__ = [

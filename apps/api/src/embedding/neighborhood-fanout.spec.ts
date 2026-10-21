@@ -186,6 +186,21 @@ describe('neighbourhood fan-out', () => {
     ).toBeDefined();
   });
 
+  it('asks for a large batch in short transactions, not one that expires', async () => {
+    const h = harness([], [[]]);
+    const hashes = Array.from({ length: 450 }, (_, i) => `h${i}`);
+
+    await h.service.calibrateNeighborhood({ id: 'space-1', dim: 384 }, hashes);
+
+    // three slices of at most 200 hashes, each its own transaction
+    expect(h.queryRaw).toHaveBeenCalledTimes(3);
+    const asked = h.queryRaw.mock.calls.flatMap((call) =>
+      ((call[0] as { values: unknown[] }).values ?? []).filter(Array.isArray),
+    ) as string[][];
+    expect(asked.every((slice) => slice.length <= 200)).toBe(true);
+    expect(asked.flat()).toEqual(hashes);
+  });
+
   it('does nothing when given no hashes', async () => {
     const h = harness([], [[]]);
 

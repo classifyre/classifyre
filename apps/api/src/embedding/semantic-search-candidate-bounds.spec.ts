@@ -61,7 +61,7 @@ describe('semantic search candidate bounds', () => {
       capability as never,
       { valueRecurrenceSnapshot: jest.fn() } as never,
     );
-    return { service, queries, values };
+    return { service, queries, values, prisma, capability };
   }
 
   it('does not join asset_chunks inside the ordered vector search', async () => {
@@ -72,7 +72,7 @@ describe('semantic search candidate bounds', () => {
     // The vector search is a plain scan of one table; the join comes after.
     const nearest = sql.slice(
       sql.indexOf('WITH nearest'),
-      sql.indexOf('SELECT ac.asset_id'),
+      sql.indexOf(', best AS'),
     );
     expect(nearest).toContain('FROM content_embeddings');
     expect(nearest).toContain('LIMIT');
@@ -119,5 +119,80 @@ describe('semantic search candidate bounds', () => {
     await h.service.semanticAssetIds([0.1, 0.2, 0.3], 5);
 
     expect(h.values).toContain(200);
+  });
+
+  describe('lexicalAssetIds', () => {
+    it('does not need embeddings: no semantic gate, no vector', async () => {
+      const h = harness();
+      h.capability.ensureReady.mockRejectedValue(new Error('feature off'));
+      await expect(
+        h.service.lexicalAssetIds('Which page shows 24,483?', 200),
+      ).resolves.toEqual([]);
+
+      expect(h.prisma.$queryRaw).toHaveBeenCalled();
+      expect(h.queries.join('\n')).not.toContain('content_embeddings');
+    });
+
+    it('searches the stored words of passages, scoped to the source', async () => {
+      const h = harness();
+      await h.service.lexicalAssetIds(
+        'Which page shows 24,483?',
+        200,
+        'source-1',
+      );
+
+      const sql = h.queries.join('\n');
+      expect(sql).toContain('ac.text_tsv');
+      // Words are weighed by how many passages hold them, read from the index.
+      expect(sql).toContain('LN(');
+      expect(sql).toContain('ts_rank_cd');
+      // Both the document frequencies and the candidates are in the source.
+      expect(sql.match(/ac\.source_id = /g)?.length).toBeGreaterThanOrEqual(3);
+      expect(h.values).toContain('source-1');
+      expect(h.values).toContain('Which page shows 24,483?');
+      // The best passage per asset, a passage with every figure first.
+      expect(sql).toContain('DISTINCT ON (asset_id)');
+      expect(sql).toContain('exact DESC, score DESC');
+    });
+
+    it('is not held longer than a statement timeout', async () => {
+      const h = harness();
+      await h.service.lexicalAssetIds('revenue', 200);
+
+      const timeout = h.prisma.$executeRaw.mock.calls
+        .map(([sql]: [{ sql?: string; strings?: string[] }]) =>
+          String(sql?.sql ?? (sql?.strings ?? []).join('?')),
+        )
+        .find((text: string) => text.includes('statement_timeout'));
+      expect(timeout).toBeDefined();
+    });
+
+    it('asks nothing of an empty query', async () => {
+      const h = harness();
+      await expect(h.service.lexicalAssetIds('   ', 200)).resolves.toEqual([]);
+      expect(h.prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('maps rows to hits', async () => {
+      const h = harness();
+      h.prisma.$queryRaw.mockResolvedValueOnce([
+        { id: 'a', score: '9.5', page: 116, text: 'Total assets', exact: true },
+        { id: 'b', score: 2, page: null, text: null, exact: false },
+      ]);
+      await expect(h.service.lexicalAssetIds('10,114.8', 200)).resolves.toEqual(
+        [
+          { id: 'a', score: 9.5, page: 116, text: 'Total assets', exact: true },
+          { id: 'b', score: 2, page: null, text: null, exact: false },
+        ],
+      );
+    });
+
+    it('gives hybrid search nothing rather than an error when the query fails', async () => {
+      const h = harness();
+      h.prisma.$queryRaw.mockRejectedValueOnce(new Error('statement timeout'));
+      await expect(h.service.lexicalAssetIds('revenue', 200)).resolves.toEqual(
+        [],
+      );
+    });
   });
 });

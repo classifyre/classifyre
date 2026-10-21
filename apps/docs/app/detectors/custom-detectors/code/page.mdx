@@ -111,7 +111,7 @@ Then:
 | `asset.payload()` | Raw bytes for file-shaped sources; `None` for row-shaped ones. |
 | `asset.metadata` | The connector's metadata (read-only mapping). |
 | `asset.id`, `name`, `kind`, `url`, `urn`, `source_type`, `mime_type`, `hash` | Identity. |
-| `asset.findings` | With *needs findings* on: what the other detectors found on this asset in this run — each with `detector`, `type`, `value`, `severity`, `confidence`, `location`. |
+| `asset.findings` | With *needs findings* on: what the other detectors found on this asset in this run — each with `detector`, `custom_detector_key`, `type`, `value`, `severity`, `confidence`, `location` and `metadata`. `metadata` carries what a model said: an AI detector's extracted `fields`, a decision detector's `question` and `answer`. When a rule with *needs findings* has to re-run on an unchanged asset (you edited it), the detectors it reads re-run with it, so it never judges an asset as if nothing had been found. |
 
 Payload is fetched **lazily** and **once**: an accessor you never call costs
 nothing, and augmentation plus any number of code detectors share one fetch per

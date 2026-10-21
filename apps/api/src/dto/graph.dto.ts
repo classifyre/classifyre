@@ -174,6 +174,14 @@ export class FieldMappingDto {
   transform?: string | null;
 
   @ApiPropertyOptional({
+    type: [String],
+    description:
+      'The transformations the value passes through, outermost first ' +
+      '(e.g. ["SUM", "CASE"]). Empty for a straight copy.',
+  })
+  steps?: string[];
+
+  @ApiPropertyOptional({
     description: 'IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT',
   })
   type?: string;
@@ -613,12 +621,33 @@ export class ColumnLineageStepDto {
   transform?: string | null;
 
   @ApiProperty({
+    type: [String],
+    description: 'Transformations on the way, outermost first',
+  })
+  steps!: string[];
+
+  @ApiProperty({
     description: 'IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT',
   })
   type!: string;
 
   @ApiProperty({ description: 'Hops from the column asked about' })
   depth!: number;
+
+  @ApiProperty({
+    description:
+      'How the edge was learned: RUNTIME_OBSERVED | SYSTEM_CATALOG | SQL_PARSED | HEURISTIC | MANUAL',
+  })
+  method!: string;
+
+  @ApiProperty({ description: 'Confidence in the edge, 0 to 1' })
+  confidence!: number;
+
+  @ApiPropertyOptional({
+    description: 'The SQL the mapping was read from, when there was one',
+    nullable: true,
+  })
+  sql?: string | null;
 }
 
 export class ColumnLineageResponseDto {

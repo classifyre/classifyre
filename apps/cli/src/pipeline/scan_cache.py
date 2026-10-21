@@ -367,6 +367,7 @@ class ScanCache:
         self._verify: str = verify if verify in {"metadata", "content"} else "content"
 
         self._cacheable, self._always_run = self._build_fingerprints(recipe)
+        self._reads_findings = self._rules_reading_findings(recipe)
 
         if not supported:
             self._disabled_reason = "source does not support the scan cache"
@@ -422,6 +423,20 @@ class ScanCache:
                 always_run.add(key)
 
         return cacheable, frozenset(always_run)
+
+    @staticmethod
+    def _rules_reading_findings(recipe: dict[str, Any]) -> frozenset[str]:
+        """Keys of the code detectors that read the other detectors' findings."""
+        keys: set[str] = set()
+        entries = recipe.get("detectors")
+        for entry in entries if isinstance(entries, list) else []:
+            if not isinstance(entry, dict) or not entry.get("enabled", True):
+                continue
+            config = entry.get("config")
+            schema = config.get("pipeline_schema") if isinstance(config, dict) else None
+            if isinstance(schema, dict) and schema.get("needs_findings"):
+                keys.add(detector_cache_key(str(entry.get("type") or ""), config))
+        return frozenset(keys)
 
     @property
     def enabled(self) -> bool:
@@ -515,8 +530,12 @@ class ScanCache:
             if prior.detectors.get(key) != fingerprint
         }
         run_keys = stale | set(self._always_run)
+        if run_keys & self._reads_findings:
+            # A rule with needs_findings sees only what ran in this pass: re-run
+            # alone, it would judge an asset as if nothing else had found anything.
+            run_keys |= set(self._cacheable)
         carried = {
-            key: fingerprint for key, fingerprint in self._cacheable.items() if key not in stale
+            key: fingerprint for key, fingerprint in self._cacheable.items() if key not in run_keys
         }
 
         # Media the workspace embeds and this asset has not yet sent under the

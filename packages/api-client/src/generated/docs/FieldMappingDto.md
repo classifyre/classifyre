@@ -9,6 +9,7 @@ Name | Type
 `downstream` | string
 `upstreams` | Array&lt;string&gt;
 `transform` | string
+`steps` | Array&lt;string&gt;
 `type` | string
 
 ## Example
@@ -21,6 +22,7 @@ const example = {
   "downstream": null,
   "upstreams": null,
   "transform": null,
+  "steps": null,
   "type": null,
 } satisfies FieldMappingDto
 

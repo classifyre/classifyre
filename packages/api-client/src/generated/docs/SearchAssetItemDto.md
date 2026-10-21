@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `asset` | [AssetListItemDto](AssetListItemDto.md)
 `findings` | [Array&lt;SearchAssetFindingDto&gt;](SearchAssetFindingDto.md)
+`match` | [SearchAssetMatchDto](SearchAssetMatchDto.md)
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { SearchAssetItemDto } from '@workspace/api-client'
 const example = {
   "asset": null,
   "findings": null,
+  "match": null,
 } satisfies SearchAssetItemDto
 
 console.log(example)

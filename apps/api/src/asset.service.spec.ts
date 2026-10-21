@@ -10,6 +10,7 @@ import {
   AssetType,
   DetectorType,
   FindingStatus,
+  Prisma,
   Severity,
 } from '@prisma/client';
 import {
@@ -21,6 +22,7 @@ import {
 import { generateDetectionIdentity } from './utils/detection-identity';
 import { computeScopeFingerprint } from './utils/scope-fingerprint';
 import { HistoryEventType } from './types/finding-history.types';
+import { lastEntryOfType } from './types/finding-history';
 import {
   SearchAssetsSortBy,
   SearchAssetsSortOrder,
@@ -97,6 +99,7 @@ describe('AssetService', () => {
 
   const mockEmbeddingService = {
     semanticAssetIds: jest.fn(),
+    lexicalAssetIds: jest.fn(),
   };
 
   const mockQueryEmbeddingService = {
@@ -149,6 +152,7 @@ describe('AssetService', () => {
     mockStatsJobs.scheduleFull.mockResolvedValue(undefined);
     mockStatsJobs.scheduleForDays.mockResolvedValue(undefined);
     mockCustomDetectorsService.buildRuntimeTagDetectors.mockResolvedValue([]);
+    mockEmbeddingService.lexicalAssetIds.mockResolvedValue([]);
   });
 
   it('should be defined', () => {
@@ -211,6 +215,21 @@ describe('AssetService', () => {
     });
   });
 
+  describe('listAssets', () => {
+    it('orders pages totally, so paging with skip returns every asset once', async () => {
+      // One run stamps hundreds of assets with the same scan time; sorted on
+      // that alone, page N and page N+1 shared a row while another asset was
+      // never returned (1,823 filings paged out as 1,822 distinct).
+      mockPrismaService.asset.findMany.mockResolvedValue([]);
+      mockPrismaService.asset.count.mockResolvedValue(0);
+
+      await service.listAssets({ sourceId: 'source-1', skip: 200, limit: 200 });
+
+      const { orderBy } = mockPrismaService.asset.findMany.mock.calls[0][0];
+      expect(orderBy[orderBy.length - 1]).toEqual({ id: 'asc' });
+    });
+  });
+
   describe('searchAssets', () => {
     it('ranks asset chunks semantically while preserving asset filters', async () => {
       const now = new Date();
@@ -233,7 +252,12 @@ describe('AssetService', () => {
       };
       mockQueryEmbeddingService.embed.mockResolvedValue([1, 0]);
       mockEmbeddingService.semanticAssetIds.mockResolvedValue([
-        { id: asset.id, score: 0.91 },
+        {
+          id: asset.id,
+          score: 0.91,
+          page: 74,
+          text: 'Net cash flows from operating activities 9 505',
+        },
       ]);
       mockPrismaService.asset.findMany
         .mockResolvedValueOnce([{ id: asset.id }])
@@ -255,6 +279,15 @@ describe('AssetService', () => {
         'source-1',
       );
       expect(result.items[0]?.asset.id).toBe(asset.id);
+      // A long document is found by one passage; the hit says which page.
+      expect(result.items[0]?.match).toEqual({
+        score: 0.91,
+        page: 74,
+        text: 'Net cash flows from operating activities 9 505',
+        via: 'meaning',
+      });
+      // Meaning only: the words of the query are not searched.
+      expect(mockEmbeddingService.lexicalAssetIds).not.toHaveBeenCalled();
       expect(result.ranking).toEqual({
         mode: SemanticSearchMode.VECTOR,
         query: 'meaning not filename',
@@ -300,6 +333,172 @@ describe('AssetService', () => {
       expect(mockEmbeddingService.semanticAssetIds).not.toHaveBeenCalled();
       expect(result.items[0]?.asset.id).toBe(asset.id);
       expect(result.ranking?.mode).toBe('lexical-fallback');
+    });
+
+    describe('hybrid: the words of the question in the passages of assets', () => {
+      const now = new Date();
+      const report = (id: string, name: string) => ({
+        id,
+        hash: `hash-${id}`,
+        checksum: `checksum-${id}`,
+        name,
+        externalUrl: null,
+        links: [],
+        metadata: null,
+        assetType: 'file',
+        sourceType: AssetType.LOCAL_FOLDER,
+        sourceId: 'source-1',
+        runnerId: 'runner-1',
+        status: AssetStatus.NEW,
+        lastScannedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const meaningHit = (id: string, score: number, page: number) => ({
+        id,
+        score,
+        page,
+        text: `passage by meaning on page ${page}`,
+      });
+      const wordsHit = (
+        id: string,
+        page: number,
+        exact: boolean,
+        score = 9,
+      ) => ({
+        id,
+        score,
+        page,
+        text: `passage by words on page ${page}`,
+        exact,
+      });
+      const run = (query: string, found: string[]) => {
+        mockQueryEmbeddingService.embedIfAvailable.mockResolvedValue([1, 0]);
+        // asset names holding the whole query; then, only if anything was
+        // found, the permitted ids and the page of assets
+        mockPrismaService.asset.findMany.mockResolvedValueOnce([]);
+        if (found.length) {
+          mockPrismaService.asset.findMany
+            .mockResolvedValueOnce(found.map((id) => ({ id })))
+            .mockResolvedValueOnce(found.map((id) => report(id, id)));
+        }
+        mockPrismaService.finding.findMany.mockResolvedValue([]);
+        return service.searchAssets({
+          assets: { sourceId: 'source-1' },
+          semantic: { query, mode: SemanticSearchMode.HYBRID },
+          options: { includeAssetsWithoutFindings: true },
+        });
+      };
+
+      it('searches passages in the same source as the vector half', async () => {
+        mockEmbeddingService.semanticAssetIds.mockResolvedValue([]);
+        await run('Which page shows 24,483?', []);
+
+        expect(mockEmbeddingService.lexicalAssetIds).toHaveBeenCalledWith(
+          'Which page shows 24,483?',
+          200,
+          'source-1',
+        );
+      });
+
+      it('finds an asset that only its passages answer, and says which page', async () => {
+        // Meaning has no opinion on a bare figure; the words know the page.
+        mockEmbeddingService.semanticAssetIds.mockResolvedValue([]);
+        mockEmbeddingService.lexicalAssetIds.mockResolvedValue([
+          wordsHit('report-a', 116, true),
+        ]);
+
+        const result = await run('Which page shows 10,114.8?', ['report-a']);
+
+        expect(result.items.map((item) => item.asset.id)).toEqual(['report-a']);
+        expect(result.items[0]?.match).toEqual({
+          score: null,
+          page: 116,
+          text: 'passage by words on page 116',
+          via: 'words',
+        });
+        expect(result.ranking?.mode).toBe(SemanticSearchMode.HYBRID);
+      });
+
+      it('ranks an asset both halves found above one only meaning found', async () => {
+        mockEmbeddingService.semanticAssetIds.mockResolvedValue([
+          meaningHit('only-meaning', 0.9, 3),
+          meaningHit('both', 0.8, 5),
+        ]);
+        mockEmbeddingService.lexicalAssetIds.mockResolvedValue([
+          wordsHit('both', 7, false),
+        ]);
+
+        const result = await run('operating cash flow', [
+          'only-meaning',
+          'both',
+        ]);
+
+        expect(result.items.map((item) => item.asset.id)).toEqual([
+          'both',
+          'only-meaning',
+        ]);
+      });
+
+      it('keeps the passage meaning chose when the words hold no exact figure', async () => {
+        mockEmbeddingService.semanticAssetIds.mockResolvedValue([
+          meaningHit('report-a', 0.8, 5),
+        ]);
+        mockEmbeddingService.lexicalAssetIds.mockResolvedValue([
+          wordsHit('report-a', 7, false),
+        ]);
+
+        const result = await run('operating cash flow', ['report-a']);
+
+        expect(result.items[0]?.match).toEqual({
+          score: 0.8,
+          page: 5,
+          text: 'passage by meaning on page 5',
+          via: 'meaning',
+        });
+      });
+
+      it('takes the passage with the exact figures over the one meaning chose', async () => {
+        mockEmbeddingService.semanticAssetIds.mockResolvedValue([
+          meaningHit('report-a', 0.8, 185),
+        ]);
+        mockEmbeddingService.lexicalAssetIds.mockResolvedValue([
+          wordsHit('report-a', 116, true),
+        ]);
+
+        const result = await run('Which page shows 10,114.8?', ['report-a']);
+
+        expect(result.items[0]?.match).toMatchObject({
+          page: 116,
+          via: 'words',
+          score: null,
+        });
+      });
+
+      it('still ranks by meaning when the query has no embedding and no passage has its words', async () => {
+        mockQueryEmbeddingService.embedIfAvailable.mockResolvedValue(null);
+        mockPrismaService.asset.findMany
+          .mockResolvedValueOnce([{ id: 'named' }])
+          .mockResolvedValueOnce([{ id: 'named' }])
+          .mockResolvedValueOnce([report('named', 'docket reference.pdf')]);
+        mockPrismaService.finding.findMany.mockResolvedValue([]);
+
+        const result = await service.searchAssets({
+          assets: { sourceId: 'source-1' },
+          semantic: {
+            query: 'docket reference',
+            mode: SemanticSearchMode.HYBRID,
+          },
+          options: { includeAssetsWithoutFindings: true },
+        });
+
+        // Words in passages are searched without a vector, so hybrid still has
+        // its lexical half when embeddings are unavailable.
+        expect(mockEmbeddingService.lexicalAssetIds).toHaveBeenCalled();
+        expect(result.items[0]?.asset.id).toBe('named');
+        expect(result.items[0]?.match).toBeUndefined();
+        expect(result.ranking?.mode).toBe('lexical-fallback');
+      });
     });
 
     it('should return paginated assets with matching findings', async () => {
@@ -2359,10 +2558,17 @@ describe('AssetService', () => {
         );
 
         expect(result).toMatchObject({ deleted: 1, outOfScope: 0 });
+        // Its findings are resolved, so its scan-cache state is dropped with it:
+        // were the asset to come back unchanged, the CLI must detect it again
+        // instead of skipping it as already judged and leaving it bare.
         expect(assetUpdateMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: { id: { in: ['genuinely-deleted'] } },
-            data: { status: AssetStatus.DELETED, runnerId },
+            data: {
+              status: AssetStatus.DELETED,
+              runnerId,
+              scanCache: Prisma.DbNull,
+            },
           }),
         );
         // The retired asset was not discovered by this run, so it has no
@@ -2379,6 +2585,63 @@ describe('AssetService', () => {
           ],
           skipDuplicates: true,
         });
+      });
+
+      it('retires the findings of a gone asset so they re-open if it returns', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'genuinely-deleted',
+            hash: 'deleted-hash',
+            scopeFingerprint: currentScope,
+          },
+        ]);
+        const findingUpdate = jest.fn().mockResolvedValue({});
+        mockPrismaService.$transaction.mockImplementation((callback: any) =>
+          callback({
+            asset: { updateMany: assetUpdateMany },
+            finding: {
+              findMany: jest
+                .fn()
+                .mockResolvedValueOnce([
+                  {
+                    id: 'finding-on-gone-asset',
+                    status: FindingStatus.OPEN,
+                    history: [],
+                  },
+                ])
+                .mockResolvedValue([]),
+              update: findingUpdate,
+            },
+            runner: { update: runnerTxUpdate },
+            runnerAsset: {
+              createMany: runnerAssetCreateMany,
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+          }),
+        );
+
+        await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        const call = findingUpdate.mock.calls.find(
+          ([args]) => args.where.id === 'finding-on-gone-asset',
+        );
+        expect(call?.[0].data.status).toBe(FindingStatus.RESOLVED);
+        // A STATUS_CHANGED entry is what an operator's resolve writes, and the
+        // ingest treats it as a pin against re-opening. The system retiring a
+        // finding with its asset must leave none, or a returning asset's
+        // detections stay resolved for good.
+        const history = call?.[0].data.history;
+        expect(
+          lastEntryOfType(history, HistoryEventType.STATUS_CHANGED),
+        ).toBeUndefined();
+        expect(lastEntryOfType(history, HistoryEventType.RESOLVED)).toEqual(
+          expect.objectContaining({ status: FindingStatus.RESOLVED }),
+        );
       });
 
       // §14 operational note: changing a notebook variable moved the scope, and

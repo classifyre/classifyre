@@ -206,9 +206,10 @@ export const metadata: Metadata = {
     "security scanning",
     "software architecture",
   ],
-  alternates: {
-    canonical: docsBasePath || "/",
-  },
+  // No site-wide canonical: every page inherits this object, and a canonical
+  // here told search engines that each page was a copy of the home page. A
+  // page without one is its own canonical; a page may still set one in its
+  // front matter (`alternates.canonical`), as the home page does.
   robots: {
     index: true,
     follow: true,
@@ -282,7 +283,6 @@ export default async function RootLayout({
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <Head>
-        <link rel="canonical" href={docsSiteUrl} />
         <link rel="dns-prefetch" href="//fonts.googleapis.com" />
         <link
           rel="preconnect"

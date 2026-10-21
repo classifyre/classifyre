@@ -32,7 +32,7 @@ from ..utils.file_metadata import build_columns
 from ..utils.file_parser import render_bytes_cell
 from ..utils.hashing import hash_id, unhash_id
 from ..utils.sampling_frontier import RangeFrontier
-from ..utils.sql_lineage import column_mappings_from_sql, sqlglot_dialect
+from ..utils.sql_lineage import NO_UPSTREAM, column_mappings_by_table, sqlglot_dialect
 from ..utils.urn import Urn, UrnError
 from .base import BaseSource
 from .tabular_utils import (
@@ -244,8 +244,13 @@ class BaseTabularSource(BaseSource):
         """Max tables per database, or ``None`` for unlimited."""
         return None
 
+    def _include_views_enabled(self) -> bool:
+        """Whether the default listing returns views as well as base tables."""
+        return False
+
     def _list_tables_for_database(self, database: str) -> list[TableRef]:
         """Discover tables in *database*.  Default uses ``information_schema.tables``."""
+        table_types = ("BASE TABLE", "VIEW") if self._include_views_enabled() else ("BASE TABLE",)
         schema_allowlist = self._schema_allowlist()
         schema_denylist = self._schema_denylist()
         table_allowlist = self._table_allowlist()
@@ -255,14 +260,14 @@ class BaseTabularSource(BaseSource):
         conn = self._get_cached_connection(database)
         with conn.cursor() as cursor:
             cursor.execute(
-                """
-                SELECT table_schema, table_name
+                f"""
+                SELECT table_schema, table_name, table_type
                 FROM information_schema.tables
-                WHERE table_type = 'BASE TABLE'
+                WHERE table_type IN ({", ".join(f"'{t}'" for t in table_types)})
                 ORDER BY table_schema, table_name
                 """
             )
-            for schema_name, table_name in cursor.fetchall():
+            for schema_name, table_name, table_type in cursor.fetchall():
                 if not isinstance(schema_name, str) or not isinstance(table_name, str):
                     continue
                 if schema_name in schema_denylist:
@@ -272,7 +277,14 @@ class BaseTabularSource(BaseSource):
                 if not self._accept_table(table_allowlist, database, schema_name, table_name):
                     continue
 
-                tables.append(TableRef(database=database, schema=schema_name, table=table_name))
+                tables.append(
+                    TableRef(
+                        database=database,
+                        schema=schema_name,
+                        table=table_name,
+                        object_type="VIEW" if table_type == "VIEW" else "TABLE",
+                    )
+                )
                 if limit is not None and len(tables) >= limit:
                     break
         return tables
@@ -1014,11 +1026,20 @@ class BaseTabularSource(BaseSource):
             if not view_hash:
                 continue
             # Columns are read from the view's own SQL once, not once per
-            # upstream: the mapping describes the view, and re-deriving it for
-            # each base table would both cost more and claim that every column
-            # came from every upstream.
-            fields = column_mappings_from_sql(entry.sql, dialect=dialect) if entry.sql else []
+            # upstream, and each edge carries only the columns its own table
+            # feeds — a join view must not claim every column came from every
+            # base table.
+            by_table = column_mappings_by_table(entry.sql, dialect=dialect) if entry.sql else {}
+            # Columns no table feeds still belong to the view; the first edge
+            # written holds them, so they are listed once.
+            constants = by_table.pop(NO_UPSTREAM, [])
             for upstream_key in entry.upstreams:
+                if len(entry.upstreams) == 1:
+                    # One base table: every column is its, however the SQL
+                    # spelled the name (a synonym, a quoted alias).
+                    fields = [mapping for group in by_table.values() for mapping in group]
+                else:
+                    fields = list(by_table.get(str(upstream_key[-1]).lower(), []))
                 upstream_hash = table_hash_by_key.get(upstream_key)
                 upstream_ref = (
                     Ref.asset(upstream_hash)
@@ -1029,6 +1050,7 @@ class BaseTabularSource(BaseSource):
                     # Outside this scan and unnameable — a schema the scope
                     # excludes. Dropping it is better than inventing a node.
                     continue
+                fields, constants = [*fields, *constants], []
                 self.add_edge(
                     flow(
                         upstream=upstream_ref,

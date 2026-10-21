@@ -103,6 +103,9 @@ class PostgreSQLSource(BaseTabularSource):
     def _default_excluded_schemas(self) -> set[str]:
         return set(_DEFAULT_EXCLUDED_SCHEMAS)
 
+    def _include_views_enabled(self) -> bool:
+        return self._scope_options().include_views is not False
+
     def _schema_allowlist(self) -> set[str] | None:
         include_schemas = self._scope_options().include_schemas
         if not include_schemas:

@@ -967,6 +967,13 @@
           "detail": "FieldTransform",
           "required": false,
           "insertText": "type="
+        },
+        {
+          "label": "steps",
+          "kind": "field",
+          "detail": "Sequence[str]",
+          "required": false,
+          "insertText": "steps="
         }
       ]
     }

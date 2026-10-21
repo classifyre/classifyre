@@ -54,7 +54,9 @@ Open **View** (bottom left) → **Neighbours not in the case**:
 The menu tells you how many neighbours are drawn. Under **Connections**, choose
 which kinds of relation count: **Lineage**, **Links**, **Duplicates** and
 **Similar**. With only *Lineage* on, for example, the board suggests only where
-data came from and went, and ignores mentions and look-alikes.
+data came from and went, and ignores mentions and look-alikes. To see which
+*column* carried the data, open the asset's **Lineage** tab: see
+[Column-Level Lineage](/sources/lineage/column-level/).
 
 You can also right-click a piece of evidence → **Show neighbours**, which turns
 neighbours on if they were off.
@@ -73,7 +75,10 @@ neighbours on if they were off.
 spreadsheet, mailbox or folder can be connected to thousands of assets. Drawing
 all of them would bury your evidence. So the board draws the **nearest
 neighbours first**, keeps the number readable, and tells you in **View** when
-there are more than it drew. Nothing in the case itself is ever hidden: the
+there are more than it drew. When the first hop alone is too crowded (a table
+with hundreds of foreign keys, say), only the neighbours connected by
+**lineage** are drawn until you pick how far to look: where the data came from
+and went is never the part held back. Nothing in the case itself is ever hidden: the
 limit applies only to assets that are *not* in the case. To see everything
 around one asset, use **Show connections** on it, below.
 </Callout>

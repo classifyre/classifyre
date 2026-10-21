@@ -60,6 +60,9 @@ logger = logging.getLogger(__name__)
 #: Asset kinds declared for CUSTOM in the x-asset-metadata catalog. A notebook
 #: that uses anything else is corrected rather than failed: losing a four-hour
 #: scan at asset 40,000 over a typo in `kind` is a worse outcome than a warning.
+#: Separates the pages of one asset's text (see ``fetch_content_pages``).
+PAGE_BREAK = "\f"
+
 KNOWN_KINDS = frozenset({"record", "document", "page", "file", "table"})
 FALLBACK_KIND = "record"
 
@@ -985,6 +988,24 @@ class CustomSource(BaseSource):
             except OSError:
                 pass
         self._mime_by_hash.pop(asset_hash, None)
+
+    async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
+        """The asset's text page by page, when the notebook marked its pages.
+
+        A connector that reads a paged document (an annual report, a scanned
+        file it extracted itself) yields ONE asset and separates the pages with
+        a form feed, the convention of pdftotext. Each page then goes through
+        the detectors on its own and every chunk of the search index keeps its
+        page number, so a finding or a search hit points at the page, not just
+        the document. Empty pages are passed on so the numbering holds.
+        """
+        cached = self._cached_content(asset_id)
+        if cached is not None and PAGE_BREAK in cached:
+            for page in cached.split(PAGE_BREAK):
+                yield page, page
+            return
+        async for page in super().fetch_content_pages(asset_id):
+            yield page
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         cached = self._cached_content(asset_id)

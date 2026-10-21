@@ -44,6 +44,25 @@ Nothing is embedded that a detector did not already surface or that a scan did
 not already read. Turning embeddings off does not change what is scanned — it
 changes what can be *concluded* from it.
 
+### Where in a document a search matched
+
+A document is ranked by its best-matching chunk, and a search by meaning returns
+that chunk with the document: `match.page` (the page it is on, when the document
+has pages) and `match.text` (the start of the passage). On the assets page it
+reads as *Best match · page 175* under the document's name. For a 500-page annual
+report that is the difference between "it is in there somewhere" and the page
+that answers the question. Pages come from the file itself (a PDF) or from a
+custom connector that separates them with a form feed (see
+[One document, many pages](/sources/custom-connectors/reference#one-document-many-pages)).
+
+```json
+POST /<workspace>/search/assets
+{"semantic": {"query": "Diageo operating cash flow 2026", "mode": "vector"}, "page": {"limit": 5}}
+
+→ {"items": [{"asset": {...}, "findings": [...],
+              "match": {"score": 0.71, "page": 175, "text": "Consolidated cash flow statement …"}}]}
+```
+
 ---
 
 ## What stops working without it
