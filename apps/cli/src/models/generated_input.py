@@ -1357,6 +1357,10 @@ class PostgreSQLOptionalScope(BaseModel):
         None,
         description='Optional table allowlist. Accepted forms: schema.table or database.schema.table',
     )
+    include_views: bool | None = Field(
+        True,
+        description="Include view assets in extraction. A view's column lineage is read from its SQL.",
+    )
     table_limit: int | None = Field(
         None, description='Optional cap on number of table assets extracted', ge=1
     )

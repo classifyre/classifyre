@@ -89,6 +89,12 @@ export interface ProjectionView {
   expandedUnattached: ReadonlySet<string>;
   /** Kinds of relation drawn (and followed to neighbours). */
   kinds: ReadonlySet<TraceKind>;
+  /**
+   * Draw only the suggestions tied to the board by lineage. Set while a
+   * crowded first hop is held back: lineage is what an investigator traces,
+   * and a database's hundreds of foreign keys must not hide it.
+   */
+  lineageOnly?: boolean;
 }
 
 /**
@@ -233,6 +239,7 @@ export function projectNodes(d: BoardDomain, view: ProjectionView): BoardNode[] 
       if (view.hiddenSuggestions.has(s.key) || (s.hop ?? 1) > view.neighbourHops) continue;
       const kinds = kindsOf.get(`asset:${s.assetId}`);
       if (kinds && ![...kinds].some((k) => view.kinds.has(k))) continue;
+      if (view.lineageOnly && !kinds?.has("lineage")) continue;
       let from: { x: number; y: number; right: number } | null = null;
       const anchorId = s.neighbourOf.find((id) => itemPlaced(d.items.get(id)));
       if (anchorId) {
@@ -271,7 +278,7 @@ export function projectNodes(d: BoardDomain, view: ProjectionView): BoardNode[] 
 }
 
 /** The kinds of relation that tie each suggested asset (`asset:<id>`) to the board. */
-function suggestionKinds(d: BoardDomain): Map<string, Set<TraceKind>> {
+export function suggestionKinds(d: BoardDomain): Map<string, Set<TraceKind>> {
   const out = new Map<string, Set<TraceKind>>();
   for (const e of d.systemEdges.values()) {
     const kind = edgeKind(e);

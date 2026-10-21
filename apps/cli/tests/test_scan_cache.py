@@ -485,6 +485,72 @@ async def test_only_the_changed_detector_re_runs() -> None:
     assert cache.skipped_detector_runs(plan) == 1
 
 
+def _code_rule(key: str, *, needs_findings: bool, revision: int = 1) -> dict[str, Any]:
+    return {
+        "type": "CUSTOM",
+        "enabled": True,
+        "config": {
+            "custom_detector_key": key,
+            "pipeline_schema": {
+                "type": "CODE_DETECTOR",
+                "needs_findings": needs_findings,
+                "notebook": {
+                    "cells": [{"id": "detect", "source": f"# revision {revision}"}],
+                    "revision": revision,
+                },
+            },
+        },
+    }
+
+
+def _decision(key: str) -> dict[str, Any]:
+    return {
+        "type": "CUSTOM",
+        "enabled": True,
+        "config": {
+            "custom_detector_key": key,
+            "pipeline_schema": {"type": "DECISION", "model": "x/y", "questions": []},
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_a_rule_that_reads_findings_re_runs_with_the_detectors_it_reads() -> None:
+    """A rule with needs_findings judges what the other detectors found in *this* run.
+
+    Re-running it alone on an unchanged asset hands it no findings at all, so a
+    rule like "cash burn in a capital-light industry" would read "no industry"
+    and report the wrong thing. When it has to re-run, so does everything else.
+    """
+    recipe = _recipe([_decision("sector"), _code_rule("peer", needs_findings=True)])
+    prior = _fingerprints(recipe)
+
+    edited = _recipe([_decision("sector"), _code_rule("peer", needs_findings=True, revision=2)])
+    cache = ScanCache(edited, _FakeSource())
+    cache.record_prior([_entry("h1", prior)])
+
+    plan = await cache.plan(_FakeAsset("h1", "checksum-1"))
+
+    assert plan.mode == "partial"
+    assert plan.run_detector_keys == frozenset({"CUSTOM::sector", "CUSTOM::peer"})
+    assert plan.carried_detectors == {}
+
+
+@pytest.mark.asyncio
+async def test_a_rule_that_reads_no_findings_still_re_runs_alone() -> None:
+    recipe = _recipe([_decision("sector"), _code_rule("plain", needs_findings=False)])
+    prior = _fingerprints(recipe)
+
+    edited = _recipe([_decision("sector"), _code_rule("plain", needs_findings=False, revision=2)])
+    cache = ScanCache(edited, _FakeSource())
+    cache.record_prior([_entry("h1", prior)])
+
+    plan = await cache.plan(_FakeAsset("h1", "checksum-1"))
+
+    assert plan.run_detector_keys == frozenset({"CUSTOM::plain"})
+    assert set(plan.carried_detectors) == {"CUSTOM::sector"}
+
+
 @pytest.mark.asyncio
 async def test_broken_links_always_runs() -> None:
     """Link health changes without the document changing, so it is never cached."""

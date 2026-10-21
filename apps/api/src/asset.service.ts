@@ -1250,7 +1250,14 @@ export class AssetService {
         where,
         skip: safeSkip,
         take: safeLimit,
-        orderBy: [{ lastScannedAt: 'desc' }, { updatedAt: 'desc' }],
+        // The id breaks ties: one run stamps many assets with the same scan
+        // time, and without a total order page N and page N+1 can share a
+        // row while another is never returned.
+        orderBy: [
+          { lastScannedAt: 'desc' },
+          { updatedAt: 'desc' },
+          { id: 'asc' },
+        ],
       }),
       this.prisma.asset.count({ where }),
     ]);

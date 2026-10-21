@@ -210,6 +210,37 @@ You do not need to parse anything here — a PDF's text, an image's dimensions a
 the file's size are all filled in for you. Parse it yourself only when you want
 the text *before* yielding, for example to skip empty documents.
 
+### One document, many pages
+
+A connector that extracts a long document itself (an annual report, a scanned
+file, a book) yields **one asset** and separates its pages with a form feed,
+`"\f"`, the convention of `pdftotext`. Do not yield one asset per page: a
+document is one thing to search, to attach to a case and to find on its entity
+page.
+
+```python
+def extract():
+    for report in reports():
+        pages = [render_page(p) for p in report.pages]       # your own extraction
+        yield Asset(
+            id=report.id,
+            name=report.title,
+            content="\f".join(pages),
+            kind="document",
+        )
+```
+
+The platform then reads the text page by page: detectors see one page at a
+time, a finding records its page, and every chunk of the search index keeps its
+page number, so a search hit says *where* in the document it matched (see
+[where a search matched](/settings/embeddings#where-in-a-document-a-search-matched)). Empty pages are kept, so page 175
+is still page 175. Text without a form feed is one page, as before.
+
+Point an expensive detector at the right pages with a scope pattern rather than
+at the whole document: `"scope": {"content_pattern": "free cash flow"}` sends a
+language model only the pages that use the term
+([detector scope](/detectors/custom-detectors#where-a-detector-runs-scope)).
+
 ---
 
 ## Reading files: `parse` and `pages`
@@ -615,7 +646,7 @@ client = ApiClient(
 | `ctx.sampling` | The whole sampling config. |
 | `ctx.cursor` | What the previous run recorded. Empty on the first run. |
 | `ctx.set_cursor(dict)` | Record where this run got to, for the next one. Kept under every sampling strategy — use it for any run-to-run state, not just pagination. |
-| `ctx.config_changed` | `True` on the first run after the source's settings, or a custom detector it uses, changed. See below. |
+| `ctx.config_changed` | `True` on the first run after the source's settings, or a custom detector it uses, changed, and on a run started as a **Full rescan**. See below. |
 | `ctx.newest_first(items, order=…)` | This run's slice of a listing: what is new first, then older items not read yet. See below. |
 | `ctx.should_abort` | `True` once the run has been asked to stop. |
 | `ctx.log(*parts)` | Write to the scan log. |
@@ -681,6 +712,11 @@ def extract():
 The flag stays set until a run finishes, so a run that fails before acting on
 it does not lose it. `ctx.newest_first` restarts by itself, and so does the
 positional offset Classifyre keeps for a connector that just yields everything.
+
+A **Full rescan** (in the scan wizard, or `forceFullRescan` on the run) sets the
+same flag with the settings unchanged: it asks for the whole sweep again, and a
+notebook that reads a window at a time would otherwise carry on where it stopped
+and read nothing new.
 
 ### Long-running work
 

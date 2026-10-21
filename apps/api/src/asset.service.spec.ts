@@ -215,6 +215,21 @@ describe('AssetService', () => {
     });
   });
 
+  describe('listAssets', () => {
+    it('orders pages totally, so paging with skip returns every asset once', async () => {
+      // One run stamps hundreds of assets with the same scan time; sorted on
+      // that alone, page N and page N+1 shared a row while another asset was
+      // never returned (1,823 filings paged out as 1,822 distinct).
+      mockPrismaService.asset.findMany.mockResolvedValue([]);
+      mockPrismaService.asset.count.mockResolvedValue(0);
+
+      await service.listAssets({ sourceId: 'source-1', skip: 200, limit: 200 });
+
+      const { orderBy } = mockPrismaService.asset.findMany.mock.calls[0][0];
+      expect(orderBy[orderBy.length - 1]).toEqual({ id: 'asc' });
+    });
+  });
+
   describe('searchAssets', () => {
     it('ranks asset chunks semantically while preserving asset filters', async () => {
       const now = new Date();

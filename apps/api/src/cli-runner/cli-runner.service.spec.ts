@@ -674,6 +674,36 @@ describe('CliRunnerService', () => {
       expect(prisma.source.update).not.toHaveBeenCalled();
     });
 
+    it('tells a notebook source to start over on a forced full rescan of unchanged settings', async () => {
+      // A notebook keeps its own position (ctx.newest_first) in the cursor. With
+      // its settings unchanged, nothing told it a full rescan was asked for, and
+      // the forced run read nothing; it now hears it as ctx.config_changed.
+      const { service, prisma } = createService();
+      const notebook = { type: 'CUSTOM', required: {} };
+      const first = await resolve(service, {
+        id: 'source-1',
+        type: 'CUSTOM',
+        config: notebook,
+        samplingCursor: null,
+        samplingCursorFingerprint: null,
+      });
+
+      const state = await (service as any).resolveSamplingState(
+        {
+          id: 'source-1',
+          type: 'CUSTOM',
+          config: notebook,
+          samplingCursor: cursor,
+          samplingCursorFingerprint: first.samplingFingerprint,
+        },
+        { restartSweep: true },
+      );
+
+      expect(state.samplingReset).toBe(true);
+      expect(state.samplingCursor).toEqual(cursor);
+      expect(prisma.source.update).not.toHaveBeenCalled();
+    });
+
     it('passes the fingerprint to the scan', () => {
       const { service } = createService();
       const command = (service as any).buildCliCommand(

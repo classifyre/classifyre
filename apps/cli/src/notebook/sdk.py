@@ -716,12 +716,14 @@ class Context:
 
     @property
     def config_changed(self) -> bool:
-        """True on the first run after this source's settings changed.
+        """True on the first run after this source's settings changed, and on a
+        run started as a full rescan.
 
         "Settings" is anything in the source's configuration -- scope,
         sampling, variables, the notebook itself, which detectors are on --
         and the definition of any custom detector it uses. Rotating a secret
-        does not count.
+        does not count. A full rescan asks for the whole sweep again with the
+        same settings, so it sets the flag as well.
 
         A built-in source starts its sweep over when that happens. A notebook
         owns its own cursor, so nothing is taken from it; it is told instead,

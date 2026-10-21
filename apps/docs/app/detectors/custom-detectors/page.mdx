@@ -73,3 +73,33 @@ Each custom detector runs one of seven detection engines, or your own Python as 
 
 Classifyre creates semantic embeddings automatically during ingestion; they are
 infrastructure rather than detector findings.
+
+## Where a detector runs: scope
+
+A custom detector is attached to a source, so by default it runs on everything the
+source produces. Every detector type except Tag takes a `scope` in its pipeline
+schema that narrows that. The fields are optional and combine with AND:
+
+| Field | Runs only on | Example |
+|---|---|---|
+| `asset_kinds` | assets of these kinds (`record`, `document`, `page`, `file`, `table`) | `["record"]`: the derived summaries, not the documents they came from |
+| `content_types` | payloads of these MIME types or prefixes | `["application/pdf"]` |
+| `metadata` | assets whose metadata has these values (compared as text) | `{"record_type": "company_profile"}` |
+| `content_pattern` | the **pages** whose text matches this regular expression (case-insensitive) | `"free cash flow\|freier cashflow"` |
+
+`content_pattern` is checked page by page. On a 500-page annual report a language
+model asked about free cash flow then reads the dozen pages that use the term,
+not the whole report: the cost of an expensive detector follows the pages that
+can answer it. A payload without text (a picture, raw bytes) never matches; an
+invalid pattern is logged and ignored rather than switching the detector off.
+
+```json
+{
+  "type": "LLM",
+  "system_prompt": "Extract the free cash flow figure the company states for its own year …",
+  "scope": {
+    "asset_kinds": ["document"],
+    "content_pattern": "free cash flow|flux de trésorerie disponible|freier cashflow"
+  }
+}
+```

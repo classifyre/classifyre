@@ -150,10 +150,17 @@ class FieldMapping:
     upstreams: Sequence[str] = ()
     transform: str | None = None
     type: FieldTransform = FieldTransform.TRANSFORMED
+    #: The transformations the value passes through, outermost first
+    #: (``("SUM", "CASE")``) — what a reader scans for before the full
+    #: ``transform`` text.
+    steps: Sequence[str] = ()
 
     def __post_init__(self) -> None:
         cleaned = tuple(str(name).strip() for name in self.upstreams if str(name).strip())
         object.__setattr__(self, "upstreams", cleaned)
+        object.__setattr__(
+            self, "steps", tuple(str(step).strip() for step in self.steps if str(step).strip())
+        )
         if self.downstream is not None:
             object.__setattr__(self, "downstream", str(self.downstream).strip() or None)
         if self.downstream is None and self.type is not FieldTransform.INDIRECT:
@@ -167,6 +174,7 @@ class FieldMapping:
             "downstream": self.downstream,
             "upstreams": list(self.upstreams),
             "transform": self.transform,
+            "steps": list(self.steps),
             "type": str(self.type),
         }
 
@@ -339,6 +347,7 @@ def edge_from_payload(payload: dict[str, Any]) -> Edge:
                 downstream=item.get("downstream"),
                 upstreams=item.get("upstreams") or [],
                 transform=item.get("transform"),
+                steps=item.get("steps") or [],
                 type=FieldTransform(str(item.get("type") or FieldTransform.TRANSFORMED)),
             )
             for item in payload.get("fields") or []
