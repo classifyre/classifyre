@@ -4987,6 +4987,9 @@ class CoreInput(BaseModel):
 
 
 class SlackInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['SLACK'] = Field(..., description='Type of the asset or source')
     required: SlackRequired
     masked: SlackMasked
@@ -5009,6 +5012,9 @@ class SlackInput(CoreInput):
 
 
 class EmailInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['EMAIL'] = Field(..., description='Type of the asset or source')
     required: EmailRequired
     masked: EmailMasked
@@ -5031,6 +5037,9 @@ class EmailInput(CoreInput):
 
 
 class S3CompatibleStorageInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['S3_COMPATIBLE_STORAGE'] = Field(
         ..., description='Type of the asset or source'
     )
@@ -5055,6 +5064,9 @@ class S3CompatibleStorageInput(CoreInput):
 
 
 class LocalFolderInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['LOCAL_FOLDER'] = Field(
         ..., description='Type of the asset or source'
     )
@@ -5079,6 +5091,9 @@ class LocalFolderInput(CoreInput):
 
 
 class SandboxInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['SANDBOX'] = Field(..., description='Type of the asset or source')
     required: SandboxRequired
     masked: SandboxMasked | None = None
@@ -5101,6 +5116,9 @@ class SandboxInput(CoreInput):
 
 
 class AzureBlobStorageInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['AZURE_BLOB_STORAGE'] = Field(
         ..., description='Type of the asset or source'
     )
@@ -5125,6 +5143,9 @@ class AzureBlobStorageInput(CoreInput):
 
 
 class GoogleCloudStorageInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['GOOGLE_CLOUD_STORAGE'] = Field(
         ..., description='Type of the asset or source'
     )
@@ -5149,6 +5170,9 @@ class GoogleCloudStorageInput(CoreInput):
 
 
 class WordPressInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['WORDPRESS'] = Field(..., description='Type of the asset or source')
     required: WordPressRequired
     masked: WordPressMasked
@@ -5171,6 +5195,9 @@ class WordPressInput(CoreInput):
 
 
 class PostgreSQLInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['POSTGRESQL'] = Field(..., description='Type of the asset or source')
     required: PostgreSQLRequired
     masked: PostgreSQLMasked
@@ -5193,6 +5220,9 @@ class PostgreSQLInput(CoreInput):
 
 
 class MySQLInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['MYSQL'] = Field(..., description='Type of the asset or source')
     required: MySQLRequired
     masked: MySQLMasked
@@ -5215,6 +5245,9 @@ class MySQLInput(CoreInput):
 
 
 class MSSQLInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['MSSQL'] = Field(..., description='Type of the asset or source')
     required: MSSQLRequired
     masked: MSSQLMasked
@@ -5237,6 +5270,9 @@ class MSSQLInput(CoreInput):
 
 
 class OracleInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['ORACLE'] = Field(..., description='Type of the asset or source')
     required: OracleRequired
     masked: OracleMasked
@@ -5259,6 +5295,9 @@ class OracleInput(CoreInput):
 
 
 class HiveInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['HIVE'] = Field(..., description='Type of the asset or source')
     required: HiveRequired
     masked: HiveMasked
@@ -5281,6 +5320,9 @@ class HiveInput(CoreInput):
 
 
 class DatabricksInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['DATABRICKS'] = Field(..., description='Type of the asset or source')
     required: PersonalAccessToken | ServicePrincipalOAuthM2M | AzureServicePrincipal = (
         Field(..., title='DatabricksRequired')
@@ -5307,6 +5349,9 @@ class DatabricksInput(CoreInput):
 
 
 class SnowflakeInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['SNOWFLAKE'] = Field(..., description='Type of the asset or source')
     required: (
         SnowflakeRequiredDefaultAuthenticator
@@ -5339,6 +5384,9 @@ class SnowflakeInput(CoreInput):
 
 
 class DremioInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['DREMIO'] = Field(..., description='Type of the asset or source')
     required: DremioRequiredSoftware | DremioRequiredCloud = Field(
         ..., title='DremioRequired'
@@ -5363,6 +5411,9 @@ class DremioInput(CoreInput):
 
 
 class MongoDBInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['MONGODB'] = Field(..., description='Type of the asset or source')
     required: MongoDBRequiredAtlas | MongoDBRequiredOnPrem = Field(
         ..., title='MongoDBRequired'
@@ -5389,6 +5440,9 @@ class MongoDBInput(CoreInput):
 
 
 class Neo4jInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['NEO4J'] = Field(..., description='Type of the asset or source')
     required: Neo4jRequired
     masked: Neo4jMaskedUsernamePassword | Neo4jMaskedNone = Field(
@@ -5413,6 +5467,9 @@ class Neo4jInput(CoreInput):
 
 
 class PowerBIInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['POWERBI'] = Field(..., description='Type of the asset or source')
     required: PowerBIRequiredServicePrincipal | PowerBIRequiredAccessToken = Field(
         ..., title='PowerBIRequired'
@@ -5439,6 +5496,9 @@ class PowerBIInput(CoreInput):
 
 
 class TableauInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['TABLEAU'] = Field(..., description='Type of the asset or source')
     required: TableauRequiredUsernamePassword | TableauRequiredPersonalAccessToken = (
         Field(..., title='TableauRequired')
@@ -5465,6 +5525,9 @@ class TableauInput(CoreInput):
 
 
 class ConfluenceInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['CONFLUENCE'] = Field(..., description='Type of the asset or source')
     required: ConfluenceRequired
     masked: ConfluenceMasked
@@ -5487,6 +5550,9 @@ class ConfluenceInput(CoreInput):
 
 
 class JiraInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['JIRA'] = Field(..., description='Type of the asset or source')
     required: JiraRequired
     masked: JiraMasked
@@ -5509,6 +5575,9 @@ class JiraInput(CoreInput):
 
 
 class ServiceDeskInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['SERVICEDESK'] = Field(..., description='Type of the asset or source')
     required: ServiceDeskRequired
     masked: ServiceDeskMasked
@@ -5531,6 +5600,9 @@ class ServiceDeskInput(CoreInput):
 
 
 class SQLiteInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['SQLITE'] = Field(..., description='Type of the asset or source')
     required: SQLiteRequired
     masked: dict[str, Any] | None = Field(
@@ -5557,6 +5629,9 @@ class SQLiteInput(CoreInput):
 
 
 class NotionInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['NOTION'] = Field(..., description='Type of the asset or source')
     required: NotionRequired
     masked: NotionMasked
@@ -5587,6 +5662,9 @@ class DeltaLakeOptional(BaseModel):
 
 
 class DeltaLakeInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['DELTA_LAKE'] = Field(..., description='Type of the asset or source')
     required: DeltaLakeRequired
     masked: S3CompatibleStorageMasked | None = None
@@ -5617,6 +5695,9 @@ class IcebergOptional(BaseModel):
 
 
 class IcebergInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['ICEBERG'] = Field(..., description='Type of the asset or source')
     required: IcebergRequired
     masked: S3CompatibleStorageMasked | None = None
@@ -5639,6 +5720,9 @@ class IcebergInput(CoreInput):
 
 
 class KafkaInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['KAFKA'] = Field(..., description='Type of the asset or source')
     required: (
         NoAuthentication
@@ -5672,6 +5756,9 @@ class KafkaInput(CoreInput):
 
 
 class ElasticsearchInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['ELASTICSEARCH'] = Field(
         ..., description='Type of the asset or source'
     )
@@ -5700,6 +5787,9 @@ class ElasticsearchInput(CoreInput):
 
 
 class OpenSearchInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['OPENSEARCH'] = Field(..., description='Type of the asset or source')
     required: NoAuthentication2 | BasicUsernamePassword | APIKeyBearerToken = Field(
         ..., title='OpenSearchRequired'
@@ -5726,6 +5816,9 @@ class OpenSearchInput(CoreInput):
 
 
 class MeilisearchInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['MEILISEARCH'] = Field(..., description='Type of the asset or source')
     required: NoAuthentication4 | APIKeyBearerToken2 = Field(
         ..., title='MeilisearchRequired'
@@ -5752,6 +5845,9 @@ class MeilisearchInput(CoreInput):
 
 
 class Microsoft365Input(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['MICROSOFT_365'] = Field(
         ..., description='Type of the asset or source'
     )
@@ -5784,6 +5880,9 @@ class Microsoft365Input(CoreInput):
 
 
 class GoogleWorkspaceInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['GOOGLE_WORKSPACE'] = Field(
         ..., description='Type of the asset or source'
     )
@@ -5812,6 +5911,9 @@ class GoogleWorkspaceInput(CoreInput):
 
 
 class DropboxInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['DROPBOX'] = Field(..., description='Type of the asset or source')
     required: (
         DropboxOAuthRefreshTokenRecommended
@@ -5840,6 +5942,9 @@ class DropboxInput(CoreInput):
 
 
 class HuggingFaceInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['HUGGING_FACE'] = Field(
         ..., description='Type of the asset or source'
     )
@@ -5864,6 +5969,9 @@ class HuggingFaceInput(CoreInput):
 
 
 class GitInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['GIT'] = Field(..., description='Type of the asset or source')
     required: GitRequired
     masked: GitMasked | None = None
@@ -5915,6 +6023,9 @@ class CustomCohortWeights(BaseModel):
 
 
 class YouTubeInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['YOUTUBE'] = Field(..., description='Type of the asset or source')
     required: YouTubeRequired
     masked: YouTubeMasked | None = None
@@ -5937,6 +6048,9 @@ class YouTubeInput(CoreInput):
 
 
 class RedditInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['REDDIT'] = Field(..., description='Type of the asset or source')
     required: (
         RedditRequiredReadOnly | RedditRequiredScript | RedditRequiredRefreshToken
@@ -5991,6 +6105,9 @@ class CustomOptional(BaseModel):
 
 
 class CustomInput(CoreInput):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     type: Literal['CUSTOM'] = Field(..., description='Type of the asset or source')
     required: CustomRequired
     masked: CustomMasked | None = None
