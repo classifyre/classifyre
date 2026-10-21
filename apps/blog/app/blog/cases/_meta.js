@@ -1,5 +1,6 @@
 export default {
   index: "All case files",
+  "britains-free-cash-flow": "Britain's free cash flow",
   "nova-manufacturing-one-bad-friday":
     "One bad Friday at a pump factory",
   "from-9601-clinton-email-files-to-eight-open-cases":
