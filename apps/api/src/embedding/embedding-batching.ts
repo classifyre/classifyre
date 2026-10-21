@@ -80,3 +80,32 @@ export function planInferenceBatches(
   if (current.length) batches.push(current);
   return batches;
 }
+
+/**
+ * How many texts go into one request to a remote embedding endpoint.
+ *
+ * The AI SDK's OpenAI-compatible model sends up to 2048 inputs per request,
+ * and a queue handler hands over one fetch of jobs at once (up to ~2000
+ * chunks, see above). OpenAI accepts that; Gemini Embedding, also when
+ * reached through OpenRouter, answers 400 "at most 100 requests can be in one
+ * batch", and Cohere stops at 96. Measured on classifyre-dev (2026-10-20): the
+ * workspace's embedding stopped entirely after the fetch size was raised. A
+ * request of 96 is accepted by every one of them.
+ */
+export const MAX_REMOTE_EMBEDDINGS_PER_CALL = 96;
+
+/** Split texts into request-sized groups, in order. */
+export function planRemoteCalls<T>(
+  texts: readonly T[],
+  perCall: number = MAX_REMOTE_EMBEDDINGS_PER_CALL,
+): T[][] {
+  const size = Math.max(
+    1,
+    Math.floor(perCall) || MAX_REMOTE_EMBEDDINGS_PER_CALL,
+  );
+  const groups: T[][] = [];
+  for (let i = 0; i < texts.length; i += size) {
+    groups.push(texts.slice(i, i + size));
+  }
+  return groups;
+}

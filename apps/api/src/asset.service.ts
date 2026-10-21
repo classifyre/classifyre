@@ -57,6 +57,7 @@ import {
   embeddingContentHash,
   normalizeEmbeddingText,
 } from './embedding/embedding-text';
+import { chooseMatch, type AssetMatch } from './embedding/chunk-lexical';
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import { EmbeddingQueueService } from './embedding/embedding-queue.service';
@@ -1272,6 +1273,7 @@ export class AssetService {
     items: Array<{
       asset: NormalizedAsset;
       findings: FindingForAssetListItem[];
+      match?: AssetMatch;
     }>;
     total: number;
     skip: number;
@@ -1441,45 +1443,64 @@ export class AssetService {
 
     let assets: Asset[];
     let total: number;
+    // Semantic and hybrid hits: where in each asset the query matched best.
+    const matchById = new Map<string, AssetMatch>();
     let ranking:
       | { mode: string; query: string; explained: boolean }
       | undefined;
     if (semanticEnabled) {
       const query = semantic?.query.trim() as string;
+      const scopeSourceId =
+        typeof sourceId === 'string' && sourceId.trim()
+          ? sourceId.trim()
+          : undefined;
       const vector =
         semantic?.mode === SemanticSearchMode.VECTOR
           ? await this.queryEmbeddings.embed(query)
           : await this.queryEmbeddings.embedIfAvailable(query);
       const semanticRows = vector
-        ? await this.embeddings.semanticAssetIds(
-            vector,
-            200,
-            typeof sourceId === 'string' && sourceId.trim()
-              ? sourceId.trim()
-              : undefined,
-          )
+        ? await this.embeddings.semanticAssetIds(vector, 200, scopeSourceId)
         : [];
-      const lexical =
-        semantic?.mode === SemanticSearchMode.VECTOR
-          ? []
-          : await this.prisma.asset.findMany({
-              where: {
-                AND: [
-                  where,
-                  { name: { contains: query, mode: 'insensitive' } },
-                ],
-              },
-              select: { id: true },
-              take: 200,
-              orderBy,
-            });
+      const hybrid = semantic?.mode !== SemanticSearchMode.VECTOR;
+      // The lexical half is two lists: the words of the question in the
+      // passages of each asset, and the whole query in an asset's name.
+      const passageHits = hybrid
+        ? await this.embeddings.lexicalAssetIds(query, 200, scopeSourceId)
+        : [];
+      const nameHits = hybrid
+        ? await this.prisma.asset.findMany({
+            where: {
+              AND: [where, { name: { contains: query, mode: 'insensitive' } }],
+            },
+            select: { id: true },
+            take: 200,
+            orderBy,
+          })
+        : [];
       const rrf = new Map<string, number>();
+      const meaningById = new Map<
+        string,
+        { score: number; page: number | null; text: string | null }
+      >();
       semanticRows.forEach((row, index) => {
         rrf.set(row.id, 1 / (60 + index + 1));
+        meaningById.set(row.id, {
+          score: Number(row.score),
+          page: row.page == null ? null : Number(row.page),
+          text: row.text ?? null,
+        });
       });
-      lexical.forEach((row, index) => {
+      const wordsById = new Map(passageHits.map((hit) => [hit.id, hit]));
+      passageHits.forEach((hit, index) => {
+        rrf.set(hit.id, (rrf.get(hit.id) ?? 0) + 1 / (60 + index + 1));
+      });
+      nameHits.forEach((row, index) => {
         rrf.set(row.id, (rrf.get(row.id) ?? 0) + 1 / (60 + index + 1));
       });
+      for (const id of new Set([...meaningById.keys(), ...wordsById.keys()])) {
+        const match = chooseMatch(meaningById.get(id), wordsById.get(id));
+        if (match) matchById.set(id, match);
+      }
       const ranked = [...rrf.entries()].sort(
         (left, right) => right[1] - left[1],
       );
@@ -1541,6 +1562,9 @@ export class AssetService {
             metadata: this.metadataRecord(asset.metadata),
           },
           findings: [],
+          ...(matchById.has(asset.id)
+            ? { match: matchById.get(asset.id) }
+            : {}),
         })),
         total,
         skip: safeSkip,
@@ -1607,6 +1631,7 @@ export class AssetService {
           metadata: this.metadataRecord(asset.metadata),
         },
         findings: findingsByAssetId.get(asset.id) ?? [],
+        ...(matchById.has(asset.id) ? { match: matchById.get(asset.id) } : {}),
       })),
       total,
       skip: safeSkip,
@@ -2403,11 +2428,17 @@ export class AssetService {
 
     await this.prisma.$transaction(
       async (tx) => {
-        // Mark assets as DELETED
+        // Mark assets as DELETED. Their findings are resolved below, so their
+        // scan-cache state no longer describes what stands: an asset that comes
+        // back unchanged must be detected again, not skipped as already judged.
         if (missingAssetIds.length > 0) {
           await tx.asset.updateMany({
             where: { id: { in: missingAssetIds } },
-            data: { status: AssetStatus.DELETED, runnerId },
+            data: {
+              status: AssetStatus.DELETED,
+              runnerId,
+              scanCache: Prisma.DbNull,
+            },
           });
 
           // A retired asset was, by definition, not discovered by this run, so
@@ -2467,10 +2498,14 @@ export class AssetService {
               resolutionReason: 'Asset deleted from source (full scan)',
               history: historyColumn([
                 ...currentHistory,
+                // RESOLVED, not STATUS_CHANGED: a status change is what an
+                // operator's resolve records, and it pins the finding against
+                // re-opening. The system retiring it must not: an asset that
+                // comes back with the same detection re-opens it.
                 historyEntryForStorage({
                   timestamp: now,
                   runnerId,
-                  eventType: HistoryEventType.STATUS_CHANGED,
+                  eventType: HistoryEventType.RESOLVED,
                   status: FindingStatus.RESOLVED,
                   changeReason: 'Asset deleted from source (full scan)',
                 }),

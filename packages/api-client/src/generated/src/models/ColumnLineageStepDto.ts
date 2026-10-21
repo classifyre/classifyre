@@ -56,6 +56,12 @@ export interface ColumnLineageStepDto {
      */
     transform?: string;
     /**
+     * Transformations on the way, outermost first
+     * @type {Array<string>}
+     * @memberof ColumnLineageStepDto
+     */
+    steps: Array<string>;
+    /**
      * IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT
      * @type {string}
      * @memberof ColumnLineageStepDto
@@ -67,6 +73,24 @@ export interface ColumnLineageStepDto {
      * @memberof ColumnLineageStepDto
      */
     depth: number;
+    /**
+     * How the edge was learned: RUNTIME_OBSERVED | SYSTEM_CATALOG | SQL_PARSED | HEURISTIC | MANUAL
+     * @type {string}
+     * @memberof ColumnLineageStepDto
+     */
+    method: string;
+    /**
+     * Confidence in the edge, 0 to 1
+     * @type {number}
+     * @memberof ColumnLineageStepDto
+     */
+    confidence: number;
+    /**
+     * The SQL the mapping was read from, when there was one
+     * @type {string}
+     * @memberof ColumnLineageStepDto
+     */
+    sql?: string | null;
 }
 
 /**
@@ -77,8 +101,11 @@ export function instanceOfColumnLineageStepDto(value: object): value is ColumnLi
     if (!('assetLabel' in value) || value['assetLabel'] === undefined) return false;
     if (!('column' in value) || value['column'] === undefined) return false;
     if (!('upstreams' in value) || value['upstreams'] === undefined) return false;
+    if (!('steps' in value) || value['steps'] === undefined) return false;
     if (!('type' in value) || value['type'] === undefined) return false;
     if (!('depth' in value) || value['depth'] === undefined) return false;
+    if (!('method' in value) || value['method'] === undefined) return false;
+    if (!('confidence' in value) || value['confidence'] === undefined) return false;
     return true;
 }
 
@@ -98,8 +125,12 @@ export function ColumnLineageStepDtoFromJSONTyped(json: any, ignoreDiscriminator
         'column': json['column'],
         'upstreams': json['upstreams'],
         'transform': json['transform'] == null ? undefined : json['transform'],
+        'steps': json['steps'],
         'type': json['type'],
         'depth': json['depth'],
+        'method': json['method'],
+        'confidence': json['confidence'],
+        'sql': json['sql'] == null ? undefined : json['sql'],
     };
 }
 
@@ -120,8 +151,12 @@ export function ColumnLineageStepDtoToJSONTyped(value?: ColumnLineageStepDto | n
         'column': value['column'],
         'upstreams': value['upstreams'],
         'transform': value['transform'],
+        'steps': value['steps'],
         'type': value['type'],
         'depth': value['depth'],
+        'method': value['method'],
+        'confidence': value['confidence'],
+        'sql': value['sql'],
     };
 }
 
