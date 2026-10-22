@@ -56,6 +56,8 @@ type SimilarityRow = {
   /** Where in the asset the best match is: its chunk's page and text. */
   page?: number | null;
   text?: string | null;
+  /** Found by a picture or a sound clip, not by text (see fuseHybridRanks). */
+  media?: boolean;
 };
 /** One neighbour of a (content hash, finding type) pair. */
 type NeighborhoodSeedRow = {
@@ -150,16 +152,17 @@ export function mergeBestScores(
   right: SimilarityRow[],
   limit: number,
 ): SimilarityRow[] {
-  const best = new Map<string, number>();
+  // The whole winning row is kept: its page, its text and whether it was a
+  // picture are what the caller shows and ranks by.
+  const best = new Map<string, SimilarityRow>();
   for (const row of [...left, ...right]) {
     const score = Number(row.score);
     const known = best.get(row.id);
-    if (known === undefined || score > known) best.set(row.id, score);
+    if (known === undefined || score > known.score) {
+      best.set(row.id, { ...row, score });
+    }
   }
-  return [...best.entries()]
-    .map(([id, score]) => ({ id, score }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+  return [...best.values()].sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
 /** How one kind of content scores a question on the whole: what a single score is read against. */
@@ -216,32 +219,39 @@ export function mergeByStanding(
     background != null &&
     background.count >= MIN_BACKGROUND &&
     Number.isFinite(background.middle);
+  const asMedia = media.map(
+    ({ id, score }): SimilarityRow => ({ id, score, media: true }),
+  );
   if (!usable(textBackground)) {
-    return mergeBestScores(text, media, limit);
+    return mergeBestScores(text, asMedia, limit);
   }
   const base = textBackground as ScoreBackground;
 
-  const best = new Map<string, { score: number; standing: number }>();
-  const place = (id: string, score: number, stands: number) => {
-    const known = best.get(id);
+  // The winning row is kept whole: a passage's page and text are what the
+  // results show as the match, and `media` is what hybrid ranking reads.
+  const best = new Map<string, { row: SimilarityRow; standing: number }>();
+  const place = (row: SimilarityRow, stands: number) => {
+    const known = best.get(row.id);
     if (!known || stands > known.standing) {
-      best.set(id, { score, standing: stands });
+      best.set(row.id, { row, standing: stands });
     }
   };
   for (const row of text) {
     const score = Number(row.score);
-    place(row.id, score, score - base.middle);
+    place({ ...row, score }, score - base.middle);
   }
   for (const row of media) {
     const score = Number(row.score);
     const own = { middle: Number(row.middle), count: Number(row.count) };
-    place(row.id, score, score - (usable(own) ? own : base).middle);
+    place(
+      { id: row.id, score, media: true },
+      score - (usable(own) ? own : base).middle,
+    );
   }
-  return [...best.entries()]
-    .map(([id, entry]) => ({ id, ...entry }))
+  return [...best.values()]
     .sort((a, b) => b.standing - a.standing)
     .slice(0, limit)
-    .map(({ id, score }) => ({ id, score }));
+    .map(({ row }) => row);
 }
 
 /** Content hashes per neighbourhood query (one short transaction each). */

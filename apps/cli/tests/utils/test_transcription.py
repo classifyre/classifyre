@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+import wave
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -115,3 +117,39 @@ class TestTranscribeMedia:
         assert err is None
         assert text == "Hello world.\nSecond line."
         assert fake.calls[0]["path"] == str(media_path)
+
+
+class TestSplitAudioChunks:
+    def test_compressed_audio_keeps_its_length(self, tmp_path: Path) -> None:
+        """A resampled frame's buffer is padded past its samples; only the samples are audio.
+
+        Copying whole buffers stretched every recording by about a fifth with
+        slivers of junk every 23 ms, and Whisper's voice filter then found no
+        speech at all in a quiet voicemail.
+        """
+        av = pytest.importorskip("av")
+        np = pytest.importorskip("numpy")
+        rate, seconds = 44100, 3.0
+        path = tmp_path / "memo.m4a"
+        with av.open(str(path), "w") as container:
+            stream = container.add_stream("aac", rate=rate, layout="mono")
+            tone = (0.3 * np.sin(2 * np.pi * 440 * np.arange(int(rate * seconds)) / rate)).astype(
+                np.float32
+            )
+            for start in range(0, len(tone), 1024):
+                frame = av.AudioFrame.from_ndarray(
+                    tone[None, start : start + 1024], format="fltp", layout="mono"
+                )
+                frame.rate = rate
+                for packet in stream.encode(frame):
+                    container.mux(packet)
+            for packet in stream.encode(None):
+                container.mux(packet)
+
+        total = 0.0
+        for chunk in transcription._split_audio_chunks(path, 30):
+            assert isinstance(chunk, bytes)
+            with wave.open(io.BytesIO(chunk)) as decoded:
+                total += decoded.getnframes() / decoded.getframerate()
+
+        assert total == pytest.approx(seconds, abs=0.1)

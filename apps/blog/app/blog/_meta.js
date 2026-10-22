@@ -1,5 +1,5 @@
 export default {
   index: "Overview",
-  articles: "Business blog",
+  articles: "Blog",
   cases: "Case files",
 };
