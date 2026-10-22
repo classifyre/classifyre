@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import os
 import subprocess
+import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from src.sources.git.source import GitObjectRef, GitSource
+from src.sources.git.source import GitCommandError, GitObjectRef, GitSource
 
 pytestmark = pytest.mark.usefixtures("git_binary")
 
@@ -598,3 +600,215 @@ def test_test_connection_reports_an_unreachable_repository(tmp_path):
 )
 def test_path_matching_accepts_folders_and_globs(path, pattern, matches):
     assert GitSource._path_matches(path, pattern) is matches
+
+
+# ── listing stability ──────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_listing_needs_no_promisor_access(remote_repo):
+    """The listing must survive a promisor that is gone or failing.
+
+    Sizes come from objects already held locally, and the tree walk itself
+    needs no blobs, so removing the remote after the clone must change
+    nothing: small files keep exact sizes, deferred ones stay unmeasured.
+    """
+    source = _source(remote_repo, optional={"connection": {"max_object_bytes": 4096}})
+    try:
+        repo = source._repo()
+        subprocess.run(
+            ["git", "remote", "remove", "origin"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+        refs = {ref.key: ref for ref in source._list_objects()}
+    finally:
+        source.cleanup()
+
+    assert refs["src/app.py"].size_known is True
+    assert refs["src/app.py"].size > 0
+    assert refs["big.bin"].size_known is False
+    assert refs["big.bin"].size == 0
+
+
+@pytest.mark.asyncio
+async def test_listing_repairs_a_truncated_clone_with_an_explicit_fetch(remote_repo):
+    """A listing that misses trees is completed with one fetch, not a failure.
+
+    The partial-clone filter stays recorded in the repo config, so fetching
+    the scanned commit pulls exactly the missing trees — not the blobs the
+    strategy deliberately left behind.
+    """
+    source = _source(remote_repo, optional={"connection": {"max_object_bytes": 4096}})
+    try:
+        original = source._run_git
+        calls: list[list[str]] = []
+
+        def flaky(args: list[str], **kwargs: Any) -> bytes:
+            calls.append(args)
+            if args[0] == "ls-tree" and not any(call[0] == "fetch" for call in calls):
+                raise GitCommandError(
+                    "git ls-tree failed: fatal: could not fetch "
+                    "a52c38d25d9fd882472b8a77b894027a699e713b from promisor remote"
+                )
+            return original(args, **kwargs)
+
+        source._run_git = flaky  # type: ignore[method-assign]
+        refs = {ref.key: ref for ref in source._list_objects()}
+    finally:
+        source.cleanup()
+
+    assert "src/app.py" in refs
+    assert "big.bin" in refs
+    assert any(call[:2] == ["fetch", "--no-tags"] for call in calls)
+
+
+def test_unmeasured_files_are_catalogued_but_not_expanded(remote_repo):
+    """A blob the clone does not hold keeps size 0 and stays unmeasured."""
+    source = _source(remote_repo)
+    try:
+        ref = source._make_object_ref(
+            "big.bin",
+            "d" * 40,
+            None,
+            source._parse_datetime("2026-01-01T00:00:00Z"),
+            {},
+        )
+    finally:
+        source.cleanup()
+
+    assert ref is not None
+    assert ref.size_known is False
+    assert ref.size == 0
+
+
+# ── transient failures ─────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("message", "transient"),
+    [
+        # The skaffold failure that motivated the retries.
+        (
+            "git ls-tree failed: warning: lazy fetching disabled; "
+            "some objects may not be available "
+            "fatal: could not fetch a52c38d25d9fd882472b8a77b894027a699e713b "
+            "from promisor remote",
+            True,
+        ),
+        (
+            "fatal: unable to access 'https://git.example.com/a.git': Failed to connect: Connection refused",
+            True,
+        ),
+        ("error: RPC failed; HTTP 502 curl 22 The requested URL returned error", True),
+        ("fatal: early EOF", True),
+        ("fatal: the remote end hung up unexpectedly", True),
+        ("git clone timed out after 1800s", True),
+        ("fatal: Authentication failed for 'https://git.example.com/a.git'", False),
+        (
+            "fatal: could not read Username for 'https://git.example.com': terminal prompts disabled",
+            False,
+        ),
+        ("error: Permission denied (publickey)", False),
+        ("fatal: Remote branch does-not-exist not found in upstream origin", False),
+        ("fatal: repository 'https://git.example.com/a.git' not found", False),
+        ("Unsupported Git auth_method 'oauth'.", False),
+    ],
+)
+def test_transient_error_classification(message, transient):
+    assert GitSource._is_transient_git_error(message) is transient
+
+
+def _flaky_run(monkeypatch, stderr: bytes, failures: int) -> dict[str, int]:
+    """Fail `subprocess.run` `failures` times, then run for real."""
+    import subprocess as subprocess_module
+
+    real_run = subprocess_module.run
+    state = {"count": 0}
+
+    def flaky(*args: Any, **kwargs: Any) -> Any:
+        state["count"] += 1
+        if state["count"] <= failures:
+            return subprocess_module.CompletedProcess(args[0], 128, b"", stderr)
+        return real_run(*args, **kwargs)
+
+    monkeypatch.setattr(subprocess_module, "run", flaky)
+    monkeypatch.setattr(time, "sleep", lambda _seconds: None)
+    return state
+
+
+def test_transient_git_failures_are_retried(remote_repo, monkeypatch):
+    source = _source(remote_repo)
+    try:
+        state = _flaky_run(
+            monkeypatch,
+            b"fatal: could not fetch a52c38d25d9fd882472b8a77b894027a699e713b from promisor remote",
+            failures=1,
+        )
+        output = source._run_git(["--version"], timeout=60.0)
+    finally:
+        source.cleanup()
+
+    assert b"git version" in output
+    assert state["count"] == 2
+
+
+def test_permanent_git_failures_are_not_retried(remote_repo, monkeypatch):
+    source = _source(remote_repo)
+    try:
+        state = _flaky_run(
+            monkeypatch,
+            b"fatal: Authentication failed for 'https://git.example.com/a.git'",
+            failures=10,
+        )
+        with pytest.raises(GitCommandError, match="Authentication failed"):
+            source._run_git(["--version"], timeout=60.0)
+    finally:
+        source.cleanup()
+
+    assert state["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_transient_blob_read_failures_are_retried(remote_repo, monkeypatch):
+    """A promisor hiccup while fetching one file must not fail its read."""
+    import subprocess as subprocess_module
+
+    source = _source(remote_repo, optional={"connection": {"clone_strategy": "blobless"}})
+    try:
+        refs = {ref.key: ref for ref in source._list_objects()}
+        ref = refs["src/app.py"]
+
+        real_popen = subprocess_module.Popen
+        state = {"count": 0}
+
+        # First process exits non-zero with promisor stderr, the retry runs
+        # for real.
+        def flaky_popen(*args: Any, **kwargs: Any) -> Any:
+            state["count"] += 1
+            if state["count"] == 1:
+
+                class Failed:
+                    returncode = 128
+
+                    def __init__(self) -> None:
+                        import io
+
+                        self.stdout = io.BytesIO(b"")
+                        self.stderr = io.BytesIO(b"fatal: could not fetch abc from promisor remote")
+
+                    def wait(self) -> int:
+                        return self.returncode
+
+                return Failed()
+            return real_popen(*args, **kwargs)
+
+        monkeypatch.setattr(subprocess_module, "Popen", flaky_popen)
+        monkeypatch.setattr(time, "sleep", lambda _seconds: None)
+        content = b"".join(source._stream_object(ref))
+    finally:
+        source.cleanup()
+
+    assert b"AWS_KEY" in content
+    assert state["count"] == 2

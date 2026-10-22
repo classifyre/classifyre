@@ -35,6 +35,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 from collections.abc import AsyncGenerator, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -76,6 +77,57 @@ _DEFAULT_TOKEN_USERNAME = "git"
 # scp-style remote: user@host:path, distinguished from ssh://host/path by having
 # no scheme and from a Windows path by requiring the @.
 _SCP_STYLE = re.compile(r"^(?P<user>[^/@]+)@(?P<host>[^/:]+):(?P<path>.+)$")
+
+# How many times a single git invocation is attempted before the scan gives up
+# on it. Transient network and promisor failures are retried with exponential
+# backoff, so a blip costs seconds instead of the whole run. An operational
+# knob rather than per-source config (like CLASSIFYRE_GIT_BINARY):
+# CLASSIFYRE_GIT_MAX_ATTEMPTS.
+_DEFAULT_GIT_MAX_ATTEMPTS = 3
+_GIT_RETRY_BASE_DELAY_SECONDS = 2.0
+_GIT_RETRY_MAX_DELAY_SECONDS = 30.0
+
+# Substrings (matched lowercase) of git stderr that mean "try again" rather
+# than "misconfigured". Kept to failures outside the scan's control: dropped
+# connections, overloaded or unreachable servers, and a promisor remote that
+# did not hand over an object on this attempt. Authentication failures, missing
+# branches, unknown repositories and bad URLs fail immediately.
+_TRANSIENT_GIT_ERROR_PATTERNS = (
+    "from promisor remote",
+    "lazy fetching disabled",
+    "connection reset",
+    "connection was reset",
+    "connection timed out",
+    "operation timed out",
+    "timed out",
+    "transfer closed",
+    "early eof",
+    "rpc failed",
+    "http 502",
+    "http 503",
+    "http 504",
+    "bad gateway",
+    "service unavailable",
+    "gateway timeout",
+    "could not resolve host",
+    "temporary failure in name resolution",
+    "network is unreachable",
+    "no route to host",
+    "connection refused",
+    "the remote end hung up",
+)
+
+# Substrings (matched lowercase) showing the clone arrived without an object
+# the listing needs. Unlike a transient failure, retrying the same command
+# cannot help — the missing objects have to be fetched first.
+_MISSING_OBJECT_PATTERNS = (
+    "from promisor remote",
+    "lazy fetching disabled",
+    "did not find object",
+    "unable to read",
+    "bad object",
+    "missing object",
+)
 
 
 class GitCommandError(RuntimeError):
@@ -538,6 +590,37 @@ class GitSource(ObjectStorageSourceBase):
                 cleaned = cleaned.replace(secret, "***")
         return cleaned
 
+    def _git_max_attempts(self) -> int:
+        """How many times a git invocation is attempted before giving up.
+
+        ``CLASSIFYRE_GIT_MAX_ATTEMPTS`` overrides the default; anything that
+        is not a positive integer means the default. Read per invocation so a
+        long-lived process picks up a changed value without restarting.
+        """
+        try:
+            raw = os.environ.get("CLASSIFYRE_GIT_MAX_ATTEMPTS") or _DEFAULT_GIT_MAX_ATTEMPTS
+            return max(1, int(raw))
+        except (TypeError, ValueError):
+            return _DEFAULT_GIT_MAX_ATTEMPTS
+
+    @staticmethod
+    def _is_transient_git_error(message: str) -> bool:
+        """Whether this failure is worth retrying rather than reporting."""
+        lowered = message.lower()
+        return any(pattern in lowered for pattern in _TRANSIENT_GIT_ERROR_PATTERNS)
+
+    @staticmethod
+    def _is_missing_object_error(message: str) -> bool:
+        """Whether the clone is truncated rather than the network broken."""
+        lowered = message.lower()
+        return any(pattern in lowered for pattern in _MISSING_OBJECT_PATTERNS)
+
+    @staticmethod
+    def _git_retry_delay(attempt: int) -> float:
+        return min(
+            _GIT_RETRY_BASE_DELAY_SECONDS * (2.0 ** (attempt - 1)), _GIT_RETRY_MAX_DELAY_SECONDS
+        )
+
     def _run_git(
         self,
         args: list[str],
@@ -545,29 +628,54 @@ class GitSource(ObjectStorageSourceBase):
         cwd: Path | None = None,
         timeout: float | None = None,
     ) -> bytes:
+        """Run one git command, retrying transient failures with backoff.
+
+        A dropped connection or a promisor hiccup therefore costs seconds,
+        not the scan. Anything that retrying cannot fix — bad credentials, a
+        missing branch, an unknown repository — fails on the first attempt.
+        """
         command = [self._git_binary(), *args]
-        try:
-            completed = subprocess.run(
-                command,
-                cwd=str(cwd) if cwd else None,
-                env=self._git_env(),
-                capture_output=True,
-                timeout=timeout or self._command_timeout_seconds(),
-                check=False,
+        limit = timeout or self._command_timeout_seconds()
+        attempts = self._git_max_attempts()
+        error: GitCommandError | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                completed = subprocess.run(
+                    command,
+                    cwd=str(cwd) if cwd else None,
+                    env=self._git_env(),
+                    capture_output=True,
+                    timeout=limit,
+                    check=False,
+                )
+            except FileNotFoundError as exc:  # pragma: no cover - environment issue
+                raise GitCommandError(
+                    "The git executable was not found on this runner. Git scanning requires git "
+                    "to be installed and on PATH."
+                ) from exc
+            except subprocess.TimeoutExpired as exc:
+                error = GitCommandError(f"git {args[0]} timed out after {exc.timeout:.0f}s")
+            else:
+                if completed.returncode == 0:
+                    return completed.stdout
+                stderr = self._redact(completed.stderr.decode("utf-8", errors="replace").strip())
+                error = GitCommandError(f"git {args[0]} failed: {stderr or completed.returncode}")
+
+            assert error is not None
+            if attempt >= attempts or self._aborted or not self._is_transient_git_error(str(error)):
+                raise error
+            delay = self._git_retry_delay(attempt)
+            logger.warning(
+                "git %s failed transiently (attempt %d/%d), retrying in %.0fs: %s",
+                args[0],
+                attempt,
+                attempts,
+                delay,
+                self._redact(str(error)),
             )
-        except FileNotFoundError as exc:  # pragma: no cover - environment issue
-            raise GitCommandError(
-                "The git executable was not found on this runner. Git scanning requires git "
-                "to be installed and on PATH."
-            ) from exc
-        except subprocess.TimeoutExpired as exc:
-            raise GitCommandError(f"git {args[0]} timed out after {exc.timeout:.0f}s") from exc
-
-        if completed.returncode != 0:
-            stderr = self._redact(completed.stderr.decode("utf-8", errors="replace").strip())
-            raise GitCommandError(f"git {args[0]} failed: {stderr or completed.returncode}")
-
-        return completed.stdout
+            time.sleep(delay)
+        assert error is not None
+        raise error
 
     @staticmethod
     def _git_binary() -> str:
@@ -649,77 +757,183 @@ class GitSource(ObjectStorageSourceBase):
 
     # ── listing ──────────────────────────────────────────────────────────
 
-    def _list_objects(self) -> Iterator[ObjectRef]:
-        repo = self._repo()
-        env = dict(self._git_env())
-        # Sizes come from the objects already present locally. Without this, a
-        # blob missing from a filtered clone would be lazily fetched just to
-        # report its size — turning a metadata-only listing into a full download
-        # of the repository, which is the whole thing this source avoids.
-        env["GIT_NO_LAZY_FETCH"] = "1"
+    def _list_tree_raw(self, repo: Path) -> bytes:
+        """The raw ``ls-tree`` output for the scanned commit.
 
-        completed = subprocess.run(
-            [self._git_binary(), "ls-tree", "-r", "-l", "-z", "--full-tree", "HEAD"],
-            cwd=str(repo),
-            env=env,
-            capture_output=True,
-            timeout=self._command_timeout_seconds(),
-            check=False,
-        )
+        Deliberately without ``-l``: the long format needs every blob's size,
+        which sends a filtered clone back to the promisor for each file it
+        deliberately left on the server — one failed lazy fetch and the whole
+        scan dies. The plain format only walks commits and trees, which a
+        filtered clone always carries, so listing never touches the network.
+        Sizes come from ``_batch_blob_sizes`` instead.
+        """
+        args = ["ls-tree", "-r", "-z", "--full-tree", "HEAD"]
+        limit = self._command_timeout_seconds()
+        try:
+            return self._run_git(args, cwd=repo, timeout=limit)
+        except GitCommandError as exc:
+            if not self._is_missing_object_error(str(exc)) or not self._commit_sha:
+                raise
+            # The clone arrived truncated: a tree the listing needs never made
+            # it. The partial-clone filter stays recorded in the repo config,
+            # so fetching the scanned commit completes exactly the missing
+            # trees without pulling the blobs the strategy left behind.
+            logger.warning(
+                "Tree objects missing after clone; fetching %s to complete it",
+                self._commit_sha[:12],
+            )
+            self._run_git(
+                ["fetch", "--no-tags", "origin", self._commit_sha], cwd=repo, timeout=limit
+            )
+            return self._run_git(args, cwd=repo, timeout=limit)
+
+    def _batch_blob_sizes(self, repo: Path, oids: list[str]) -> dict[str, int]:
+        """The locally-known blob sizes, read straight out of the pack files.
+
+        ``verify-pack -v`` lists every object the clone actually holds, with
+        its size, from purely local data: unlike ``ls-tree -l`` or
+        ``cat-file --batch-check`` it can neither stall the listing on the
+        network nor fail it. Older git versions fetch a missing blob just to
+        report its size, and one transient promisor failure then fails the
+        whole command — exactly the SCAN FAILED this replaces. A blob with no
+        pack entry is one this clone deliberately left on the server (or has
+        not fetched yet); its size stays unknown rather than being guessed at.
+
+        Anything unexpected — a failed process, an unparsable line — degrades
+        to unknown rather than failing the scan: an unmeasured file is still
+        scanned, just spooled to disk instead of held in memory.
+        """
+        unique = list(dict.fromkeys(oids))
+        if not unique or self._clone_strategy() == "blobless":
+            return {}
+        wanted = set(unique)
+        sizes: dict[str, int] = {}
+        try:
+            pack_dir = repo / ".git" / "objects" / "pack"
+            indexes = sorted(pack_dir.glob("*.idx")) if pack_dir.is_dir() else []
+            for index in indexes:
+                if len(sizes) >= len(wanted):
+                    break
+                self._accumulate_pack_sizes(repo, index, wanted, sizes)
+            for oid in unique:
+                if oid in sizes:
+                    continue
+                # Fresh clones keep everything in packs, but a blob kept as a
+                # loose object is still held locally — and asking for the size
+                # of an object that exists cannot trigger a fetch.
+                if (repo / ".git" / "objects" / oid[:2] / oid[2:]).is_file():
+                    try:
+                        out = self._run_git(["cat-file", "-s", oid], cwd=repo)
+                        sizes[oid] = int(out.decode("utf-8", errors="replace").strip())
+                    except (GitCommandError, ValueError):
+                        continue
+        except OSError as exc:
+            logger.warning("Could not read blob sizes, treating every file as unmeasured: %s", exc)
+        return sizes
+
+    def _accumulate_pack_sizes(
+        self, repo: Path, index: Path, wanted: set[str], sizes: dict[str, int]
+    ) -> None:
+        """Add the wanted blobs found in one pack index to ``sizes``."""
+        try:
+            completed = subprocess.run(
+                [self._git_binary(), "verify-pack", "-v", str(index)],
+                cwd=str(repo),
+                env=self._git_env(),
+                capture_output=True,
+                timeout=self._command_timeout_seconds(),
+                check=False,
+            )
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            logger.warning("Could not read blob sizes, treating every file as unmeasured: %s", exc)
+            return
         if completed.returncode != 0:
             stderr = self._redact(completed.stderr.decode("utf-8", errors="replace").strip())
-            raise GitCommandError(f"git ls-tree failed: {stderr or completed.returncode}")
+            logger.warning(
+                "Could not read blob sizes, treating every file as unmeasured: %s",
+                stderr or completed.returncode,
+            )
+            return
+        for line in completed.stdout.decode("utf-8", errors="replace").splitlines():
+            parts = line.split()
+            # "<oid> blob <size> ..." for a blob held locally; pack headers,
+            # trees, commits and statistics lines never match and are skipped.
+            if len(parts) >= 3 and parts[1] == "blob" and parts[2].isdigit() and parts[0] in wanted:
+                sizes[parts[0]] = int(parts[2])
+                if len(sizes) >= len(wanted):
+                    return
+
+    def _list_objects(self) -> Iterator[ObjectRef]:
+        repo = self._repo()
+        raw = self._list_tree_raw(repo)
+
+        candidates: list[tuple[str, str]] = []  # (blob object id, repo-relative path)
+        for entry in raw.decode("utf-8", errors="replace").split("\0"):
+            if self._aborted:
+                return
+            parsed = self._split_tree_entry(entry)
+            if parsed is None:
+                continue
+            _mode, object_type, oid, path = parsed
+            # Submodules are recorded as a commit pointer, not content; symlinks
+            # point at a path that has no meaning outside a checked-out worktree.
+            if object_type != "blob" or _mode == "120000":
+                continue
+            cleaned = path.strip().lstrip("/")
+            if not cleaned:
+                continue
+            if not self._path_in_scope(cleaned):
+                continue
+            if not self._object_matches_extension_filters(cleaned):
+                continue
+            candidates.append((oid, cleaned))
+
+        sizes = self._batch_blob_sizes(repo, [oid for oid, _ in candidates])
 
         commit_time = self._commit_time()
         commit_times = self._last_commit_times() if self._include_last_commit() else {}
         self._lfs_globs = self._lfs_tracked_patterns()
 
-        for entry in completed.stdout.decode("utf-8", errors="replace").split("\0"):
+        for oid, path in candidates:
             if self._aborted:
                 return
-            ref = self._parse_tree_entry(entry, commit_time, commit_times)
+            ref = self._make_object_ref(path, oid, sizes.get(oid), commit_time, commit_times)
             if ref is None:
                 continue
             self._ref_by_key[ref.key] = ref
             yield ref
 
-    def _parse_tree_entry(
-        self,
-        entry: str,
-        commit_time: datetime,
-        commit_times: dict[str, datetime],
-    ) -> GitObjectRef | None:
+    @staticmethod
+    def _split_tree_entry(entry: str) -> tuple[str, str, str, str] | None:
+        """Split one NUL-separated ``ls-tree`` record into mode, type, id, path."""
         if not entry.strip() or "\t" not in entry:
             return None
         info, path = entry.split("\t", 1)
         fields = info.split()
-        if len(fields) < 4:
+        if len(fields) < 3:
             return None
-        mode, object_type, oid, raw_size = fields[0], fields[1], fields[2], fields[3]
+        return fields[0], fields[1], fields[2], path
 
-        # Submodules are recorded as a commit pointer, not content; symlinks
-        # point at a path that has no meaning outside a checked-out worktree.
-        if object_type != "blob" or mode == "120000":
-            return None
-
-        path = path.strip().lstrip("/")
-        if not path:
-            return None
-        if not self._path_in_scope(path):
-            return None
-        if not self._object_matches_extension_filters(path):
-            return None
-
-        # "BAD" is what ls-tree reports for a blob this clone does not hold —
-        # exactly the files a filtered clone deliberately left on the server.
-        size_known = raw_size.isdigit()
-        size = int(raw_size) if size_known else 0
-        if size_known and size == 0 and not self._include_empty_objects():
+    def _make_object_ref(
+        self,
+        path: str,
+        oid: str,
+        size: int | None,
+        commit_time: datetime,
+        commit_times: dict[str, datetime],
+    ) -> GitObjectRef | None:
+        # A size of None is a blob this clone does not hold — exactly the
+        # files a filtered clone deliberately left on the server. Git cannot
+        # report the size of an object it does not have, so it stays 0 until
+        # the file is read rather than being guessed at.
+        size_known = size is not None
+        resolved = size or 0
+        if size_known and resolved == 0 and not self._include_empty_objects():
             return None
 
         return GitObjectRef(
             key=path,
-            size=size,
+            size=resolved,
             last_modified=commit_times.get(path, commit_time),
             etag=oid,
             blob_id=oid,
@@ -810,37 +1024,68 @@ class GitSource(ObjectStorageSourceBase):
         large repository stay small. The blob is written into the per-run object
         store, so a second read of the same file costs nothing and everything is
         discarded together at the end of the run.
+
+        A fetch that fails before producing a single byte is retried: that is
+        the promisor failing the handshake, not the file being unreadable.
+        Once bytes have flowed the stream is not restarted — the consumer
+        already holds a prefix, and a second stream would duplicate it.
         """
         oid = self._blob_id(ref)
         if oid == _EMPTY_BLOB_OID:
             return
 
-        process = subprocess.Popen(
-            [self._git_binary(), "cat-file", "blob", oid],
-            cwd=str(self._repo()),
-            env=self._git_env(),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        assert process.stdout is not None
-        try:
-            while True:
-                chunk = process.stdout.read(_CHUNK_BYTES)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
+        attempts = self._git_max_attempts()
+        yielded = 0
+        for attempt in range(1, attempts + 1):
+            process = subprocess.Popen(
+                [self._git_binary(), "cat-file", "blob", oid],
+                cwd=str(self._repo()),
+                env=self._git_env(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            assert process.stdout is not None
+            outcome: GitCommandError | None = None
             try:
-                process.stdout.close()
-            except Exception:  # pragma: no cover - close is best effort
-                pass
-            stderr = process.stderr.read() if process.stderr else b""
-            if process.stderr is not None:
-                process.stderr.close()
-            returncode = process.wait()
-            if returncode != 0:
-                message = self._redact(stderr.decode("utf-8", errors="replace").strip())
-                raise GitCommandError(f"Could not read {ref.key} from Git: {message or returncode}")
+                while True:
+                    chunk = process.stdout.read(_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    yielded += len(chunk)
+                    yield chunk
+            finally:
+                try:
+                    process.stdout.close()
+                except Exception:  # pragma: no cover - close is best effort
+                    pass
+                stderr = process.stderr.read() if process.stderr else b""
+                if process.stderr is not None:
+                    process.stderr.close()
+                # Recorded, not raised: raising or returning from inside a
+                # finally would silence the exception the stream ended with.
+                if process.wait() != 0:
+                    message = self._redact(stderr.decode("utf-8", errors="replace").strip())
+                    outcome = GitCommandError(
+                        f"Could not read {ref.key} from Git: {message or process.returncode}"
+                    )
+            if outcome is None:
+                return
+            if (
+                yielded > 0
+                or attempt >= attempts
+                or self._aborted
+                or not self._is_transient_git_error(str(outcome))
+            ):
+                raise outcome
+            delay = self._git_retry_delay(attempt)
+            logger.warning(
+                "Retrying read of %s after transient Git failure (attempt %d/%d): %s",
+                ref.key,
+                attempt,
+                attempts,
+                outcome,
+            )
+            time.sleep(delay)
 
     def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         """Every byte of one file.

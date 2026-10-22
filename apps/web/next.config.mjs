@@ -14,6 +14,9 @@ const LOCALE_ALTERNATION = LOCALES.join("|");
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // `bun dev:showcase` runs beside the normal dev server; Next locks one dev
+  // server per build folder, so it needs a folder of its own.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   trailingSlash: true,
   outputFileTracingRoot: path.join(__dirname, "../../"),
   transpilePackages: ["@workspace/ui", "@workspace/case-board"],

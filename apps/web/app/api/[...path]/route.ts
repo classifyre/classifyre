@@ -83,7 +83,11 @@ function createTargetUrl(
   request: NextRequest,
   path: string[],
 ) {
-  const targetUrl = new URL(`${baseUrl}/${path.join("/")}`);
+  // A deployed frontend (`SHOWCASE_MODE`) answers `/api/<path>` with a 308 to
+  // `/api/<path>/` (trailingSlash), and `redirect: "manual"` would hand that
+  // redirect to the browser, so ask for the final URL straight away.
+  const suffix = process.env.SHOWCASE_MODE === "1" ? "/" : "";
+  const targetUrl = new URL(`${baseUrl}/${path.join("/")}${suffix}`);
   request.nextUrl.searchParams.forEach((value, key) => {
     targetUrl.searchParams.append(key, value);
   });
@@ -99,6 +103,12 @@ async function proxy(request: NextRequest, context: RouteContext) {
   }
   for (const header of STRIPPED_REQUEST_HEADERS) {
     headers.delete(header);
+  }
+  // Local frontend pointed at a demo-mode deployment (`bun dev:showcase`):
+  // the key lets writes through. Only in that mode, so the secret never goes
+  // to a local or unrelated upstream.
+  if (process.env.SHOWCASE_MODE === "1" && process.env.DEMO_BYPASS_KEY) {
+    headers.set("x-bypass-demo", process.env.DEMO_BYPASS_KEY);
   }
   headers.set("x-forwarded-host", request.headers.get("host") ?? "");
   headers.set("x-forwarded-proto", request.nextUrl.protocol.replace(":", ""));
