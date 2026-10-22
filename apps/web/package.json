@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:showcase": "NEXT_DIST_DIR=.next-showcase SHOWCASE_MODE=1 INTERNAL_API_URL=https://showcase.classifyre.com/api next dev --turbopack -p 3333",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

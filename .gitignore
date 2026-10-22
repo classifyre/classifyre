@@ -32,6 +32,7 @@ coverage
 
 # Build Outputs
 .next/
+.next-showcase/
 .vite/
 out/
 build
