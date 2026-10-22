@@ -119,7 +119,12 @@ describe('value-normalizer', () => {
     });
 
     it("blocks structured identifiers under the detector's own names too", () => {
-      for (const label of ['EMAIL_ADDRESS', 'PHONE_NUMBER', 'IBAN_CODE', 'US_SSN']) {
+      for (const label of [
+        'EMAIL_ADDRESS',
+        'PHONE_NUMBER',
+        'IBAN_CODE',
+        'US_SSN',
+      ]) {
         expect(isPhoneticEligible(label)).toBe(false);
       }
       // A place or an organisation is still a name.

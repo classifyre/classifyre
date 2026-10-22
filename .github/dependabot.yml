@@ -129,8 +129,13 @@ updates:
       # (Prisma's query engine, onnxruntime) are compiled for Node 24's ABI.
       # Patch and minor bumps are wanted; a major has to change the service
       # images first, deliberately.
+      #
+      # For Python the ABI changes with the *minor* version (3.12 -> 3.14 is a
+      # "minor" bump to Dependabot): the all-in-one copies the CLI image's
+      # virtualenv, whose interpreter symlink and cp312 wheels only exist on
+      # 3.12. A semver-minor bump of python broke exactly that on 2026-10-22.
       - dependency-name: python
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: node
         update-types: ["version-update:semver-major"]
 

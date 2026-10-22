@@ -22,9 +22,11 @@ export function formatPostDate(date: string, locale: Locale = "en"): string {
 export function BlogPostCard({
   post,
   locale = "en",
+  featured = false,
 }: {
   post: BlogPostSummary;
   locale?: Locale;
+  featured?: boolean;
 }) {
   const sectionLabel =
     post.section === "cases"
@@ -39,7 +41,13 @@ export function BlogPostCard({
     <Link href={post.route} className="group block h-full no-underline">
       <Card className="panel-card h-full justify-between overflow-hidden py-0 transition-transform duration-200 group-hover:-translate-x-1 group-hover:-translate-y-1">
         <div>
-          <div className="relative h-48 w-full overflow-hidden border-b-2 border-border bg-muted sm:h-52">
+          <div
+            className={
+              featured
+                ? "relative h-56 w-full overflow-hidden border-b-2 border-border bg-muted sm:h-72"
+                : "relative h-48 w-full overflow-hidden border-b-2 border-border bg-muted sm:h-52"
+            }
+          >
             {post.image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -58,7 +66,13 @@ export function BlogPostCard({
             <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               {formatPostDate(post.date, locale)}
             </span>
-            <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.02em] text-foreground sm:text-3xl">
+            <h3
+              className={
+                featured
+                  ? "font-serif text-2xl font-black uppercase leading-tight tracking-[0.02em] text-foreground sm:text-4xl"
+                  : "font-serif text-2xl font-black uppercase leading-tight tracking-[0.02em] text-foreground sm:text-3xl"
+              }
+            >
               {post.title}
             </h3>
             <p className="line-clamp-3 text-base leading-6 text-muted-foreground">

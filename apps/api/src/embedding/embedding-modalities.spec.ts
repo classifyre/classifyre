@@ -10,6 +10,7 @@ import {
   LOCAL_EMBEDDING_MODELS,
 } from './embedding-local-models';
 import {
+  MEDIA_COLLECTION,
   mediaContentHash,
   normalizeMediaModalities,
 } from './embedding-modality';
@@ -245,5 +246,23 @@ describe('embedding modalities', () => {
       mediaContentHash(Buffer.from([1, 2, 4])),
     );
     expect(mediaContentHash(picture)).toHaveLength(64);
+  });
+
+  describe('how recordings are cut', () => {
+    // CLAP hears ten seconds at a time (max_length_s 10, rand_trunc): a longer
+    // clip was cut to a random ten seconds of it. And a sound under someone's
+    // voice (a smoke alarm in a voicemail) only got a vector of its own once
+    // a clip was short enough to hold little else: with Gemini Embedding 2 the
+    // alarm's voicemail scored 0.562 against 0.559 for an unrelated one in
+    // 30 s clips, 0.581 against 0.551 in 10 s ones.
+    it('cuts clips no longer than a sound model hears at once', () => {
+      expect(MEDIA_COLLECTION.audio.clipSeconds).toBeLessThanOrEqual(10);
+    });
+
+    it('still covers the first two minutes of a recording', () => {
+      expect(
+        MEDIA_COLLECTION.audio.clipSeconds * MEDIA_COLLECTION.audio.maxItems,
+      ).toBe(120);
+    });
   });
 });
