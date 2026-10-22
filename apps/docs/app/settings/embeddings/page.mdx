@@ -497,7 +497,10 @@ A switch is greyed out when the selected model embeds text only. Picking a
 model that can see turns **Pictures** on with it; that is what such a model is
 usually chosen for. **Sound** stays off until you turn it on: its encoder is
 the largest part of the model, and recordings are already searchable through
-their transcript.
+their transcript. A transcript holds the words and nothing else, though: a
+smoke alarm going off, water dripping, a machine left running in the
+background are not in it, and only the sound itself carries them. Turn
+**Sound** on when what matters in your recordings is not what is said.
 
 For a **remote provider**, the provider says what its model takes. Edit it
 under [AI Providers](/settings/ai-providers) and set two things in the
@@ -527,8 +530,11 @@ When the workspace embeds pictures, a scan prepares each image file once more
 for the model: a JPEG copy with its longest edge at 768 pixels, usually 20 to
 90 KB. Vision encoders work at a few hundred pixels a side, so a larger copy
 would only take space. For sound, a recording is decoded to mono 16 kHz audio
-and cut into clips of 30 seconds, at most four per file. A full clip is just
-under 1 MB.
+and cut into clips of 10 seconds, at most twelve per file: its first two
+minutes. A full clip is about 320 KB. Ten seconds is as much as CLAP hears at
+once, and short enough that a sound under somebody's voice (an alarm going off
+while they talk) gets a clip, and a vector, nearly to itself; in a longer clip
+that is mostly speech, the vector says speech.
 
 Classifyre **keeps these prepared copies** in the database, next to the text
 chunks. That is what lets a rebuild re-embed them under a new model without
@@ -581,6 +587,19 @@ EmbeddingGemma 2):
   top of each other (similarity 0.89), which is the model saying they are the
   same thing.
 - Pictures that had nothing to do with a question stayed far down the list.
+
+And for sound, with Gemini Embedding 2 and two voicemails whose words never
+name what matters in them:
+
+- A neighbour says "it's started again, just listen" and holds the phone up to
+  water running in her hallway. Text search for "water running" did not return
+  her message in the first twelve: its transcript has none of those words. With
+  **Sound** on it came first by meaning, and third in the search box, after two
+  sentences that contain the words.
+- A caretaker asks "can you hear that?" over a smoke alarm. That one did not
+  stand out: to the model, an alarm going off in a stairwell sounds close to a
+  baby crying and a rooster, and both were in the same drive. Distinct sounds
+  are found; sounds that resemble others in the corpus are ranked among them.
 
 Pictures appear in **Assets** search and wherever the Assistant and the Harness
 look for assets by meaning. Findings are still text: a picture gets a finding

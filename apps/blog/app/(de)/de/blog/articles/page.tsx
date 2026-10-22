@@ -4,7 +4,7 @@ import { BlogSectionPage } from "@/components/blog-section-page";
 import { getPostsBySection } from "@/lib/posts";
 
 export const metadata: Metadata = {
-  title: "Business-Blog",
+  title: "Blog",
   description:
     "Ideen von Classifyre über Ermittlungsarbeit, Beweise und wie aus verstreuten Daten bessere Entscheidungen werden.",
   alternates: {
@@ -17,12 +17,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function BusinessBlogPageDe() {
+export default async function BlogArticlesPageDe() {
   const posts = await getPostsBySection("articles", "de");
 
   return (
     <BlogSectionPage
-      eyebrow="Business-Blog"
+      eyebrow="Blog"
       title="Bessere Fragen. Klarere Beweise. Stärkere Entscheidungen."
       description="Ideen für Führungskräfte und Ermittlungsteams, die verstreute Organisationsdaten in Beweise verwandeln wollen, die sie verstehen und nach denen sie handeln können."
       posts={posts}

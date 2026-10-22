@@ -706,13 +706,11 @@ export class CorrelationService {
       (label) =>
         inUse.has(label) || !(label in LABEL_ALIASES) || label in stored,
     );
-    const labels = [...new Set([...inUse, ...listed])]
-      .sort()
-      .map((label) => ({
-        label,
-        weight: weights[label] ?? defaultWeight,
-        inUse: inUse.has(label),
-      }));
+    const labels = [...new Set([...inUse, ...listed])].sort().map((label) => ({
+      label,
+      weight: weights[label] ?? defaultWeight,
+      inUse: inUse.has(label),
+    }));
 
     return {
       enabled: switchState.enabled,

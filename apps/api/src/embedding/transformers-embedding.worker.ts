@@ -197,7 +197,9 @@ function cachedModelDirs(root: string, depth = 0): string[] {
   if (depth >= 3) return [];
   return entries
     .filter((entry) => entry.isDirectory())
-    .flatMap((entry) => cachedModelDirs(path.join(root, entry.name), depth + 1));
+    .flatMap((entry) =>
+      cachedModelDirs(path.join(root, entry.name), depth + 1),
+    );
 }
 
 /**
@@ -595,7 +597,9 @@ async function loadDualEncoder(
         const out: number[][] = [];
         for (const buffer of bytes) {
           const clip = upsampleTo48k(decodeWavMono16k(buffer));
-          out.push(...vectors(await mediaModel(await processor(clip)), request));
+          out.push(
+            ...vectors(await mediaModel(await processor(clip)), request),
+          );
         }
         return out;
       }
@@ -646,7 +650,9 @@ const FAMILIES_WITH_ENCODERS = new Set([
  * A GPU is the opposite on both counts — float weights, and a batch is what
  * it is for — so there the batch goes in whole.
  */
-export function infersOneAtATime(config: Pick<WorkerConfig, 'device'>): boolean {
+export function infersOneAtATime(
+  config: Pick<WorkerConfig, 'device'>,
+): boolean {
   return config.device === 'cpu' || config.device === 'wasm';
 }
 
