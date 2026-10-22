@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.117",
+      "version": "1.43.118",
       "modules": [
         "boto3"
       ],
@@ -84,7 +84,7 @@
     },
     {
       "name": "dropbox",
-      "version": "12.2.3",
+      "version": "12.2.4",
       "modules": [
         "dropbox"
       ],
@@ -243,7 +243,7 @@
     },
     {
       "name": "pillow",
-      "version": "12.3.0",
+      "version": "13.0.0",
       "modules": [
         "PIL"
       ],
@@ -466,7 +466,7 @@
     },
     {
       "name": "yt-dlp",
-      "version": "2026.8.19",
+      "version": "2026.10.21",
       "modules": [
         "yt_dlp"
       ],
