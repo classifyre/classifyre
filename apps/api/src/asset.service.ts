@@ -58,6 +58,7 @@ import {
   normalizeEmbeddingText,
 } from './embedding/embedding-text';
 import { chooseMatch, type AssetMatch } from './embedding/chunk-lexical';
+import { fuseHybridRanks } from './embedding/hybrid-rank';
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import { EmbeddingQueueService } from './embedding/embedding-queue.service';
@@ -1484,13 +1485,11 @@ export class AssetService {
             orderBy,
           })
         : [];
-      const rrf = new Map<string, number>();
       const meaningById = new Map<
         string,
         { score: number; page: number | null; text: string | null }
       >();
-      semanticRows.forEach((row, index) => {
-        rrf.set(row.id, 1 / (60 + index + 1));
+      semanticRows.forEach((row) => {
         meaningById.set(row.id, {
           score: Number(row.score),
           page: row.page == null ? null : Number(row.page),
@@ -1498,19 +1497,11 @@ export class AssetService {
         });
       });
       const wordsById = new Map(passageHits.map((hit) => [hit.id, hit]));
-      passageHits.forEach((hit, index) => {
-        rrf.set(hit.id, (rrf.get(hit.id) ?? 0) + 1 / (60 + index + 1));
-      });
-      nameHits.forEach((row, index) => {
-        rrf.set(row.id, (rrf.get(row.id) ?? 0) + 1 / (60 + index + 1));
-      });
       for (const id of new Set([...meaningById.keys(), ...wordsById.keys()])) {
         const match = chooseMatch(meaningById.get(id), wordsById.get(id));
         if (match) matchById.set(id, match);
       }
-      const ranked = [...rrf.entries()].sort(
-        (left, right) => right[1] - left[1],
-      );
+      const ranked = fuseHybridRanks(semanticRows, passageHits, nameHits);
       const permitted = ranked.length
         ? await this.prisma.asset.findMany({
             where: { AND: [where, { id: { in: ranked.map(([id]) => id) } }] },

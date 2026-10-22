@@ -58,7 +58,7 @@ class MediaSpec:
     max_edge: int = 768
     quality: int = 85
     sample_rate: int = 16_000
-    clip_seconds: int = 30
+    clip_seconds: int = 10
     cache_key: str = ""
     # Changes when the way this kind of media is prepared changes.
     fingerprint: str = ""
@@ -84,7 +84,7 @@ class MediaSpec:
             max_edge=number("maxEdge", 768, 32),
             quality=min(100, number("quality", 85, 1)),
             sample_rate=number("sampleRate", 16_000, 8_000),
-            clip_seconds=number("clipSeconds", 30, 1),
+            clip_seconds=number("clipSeconds", 10, 1),
             cache_key=str(raw.get("cacheKey") or f"{MEDIA_CACHE_KEY_PREFIX}{modality}"),
             fingerprint=str(raw.get("fingerprint") or ""),
         )

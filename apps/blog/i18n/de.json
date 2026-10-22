@@ -6,7 +6,7 @@
     "editions": "Open Source vs. Enterprise",
     "blog": "Blog",
     "overview": "Publikationsübersicht",
-    "articles": "Business-Blog",
+    "articles": "Blog",
     "cases": "Fallakten",
     "documentation": "Dokumentation",
     "getCta": "Classifyre holen",
@@ -42,7 +42,7 @@
   },
   "blog": {
     "caseFile": "Fallakte",
-    "article": "Business-Blog",
+    "article": "Blog",
     "openCaseFile": "Fallakte öffnen",
     "readArticle": "Artikel lesen",
     "backToOverview": "Zurück zur Publikationsübersicht"

@@ -319,8 +319,10 @@ describe('media chunks', () => {
         10,
       );
 
+      // The clip is marked as one: hybrid search must not hold its lack of
+      // words against it (fuseHybridRanks).
       expect(merged).toEqual([
-        { id: 'dog', score: 0.62 },
+        { id: 'dog', score: 0.62, media: true },
         { id: 'invoice', score: 0.56 },
       ]);
     });
@@ -357,7 +359,7 @@ describe('media chunks', () => {
         10,
       );
 
-      expect(merged).toEqual([{ id: 'scan', score: 0.6 }]);
+      expect(merged).toEqual([{ id: 'scan', score: 0.6, media: true }]);
     });
   });
 

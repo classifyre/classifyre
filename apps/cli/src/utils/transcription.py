@@ -249,7 +249,9 @@ def _split_audio_chunks(
                 frames if isinstance(frames, list) else ([frames] if frames is not None else [])
             )
             for out_frame in result:
-                current.extend(bytes(out_frame.planes[0]))
+                # The plane's buffer is padded past its samples (832 bytes for
+                # 355 of them); the padding is not audio.
+                current.extend(bytes(out_frame.planes[0])[: out_frame.samples * 2])
                 while len(current) >= bytes_per_chunk:
                     yield _pcm_to_wav(bytes(current[:bytes_per_chunk]), _TARGET_SAMPLE_RATE)
                     del current[:bytes_per_chunk]

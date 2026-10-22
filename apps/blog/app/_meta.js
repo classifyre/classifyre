@@ -42,7 +42,7 @@ export default {
         href: "/blog",
       },
       articles: {
-        title: "Business blog",
+        title: "Blog",
         href: "/blog/articles",
       },
       cases: {

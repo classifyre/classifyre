@@ -88,14 +88,21 @@ export interface EmbeddingMediaItem {
  * work at a few hundred pixels a side, so more is only storage); audio is
  * decoded to mono 16 kHz WAV, which is what speech and sound encoders are
  * trained on, and cut into clips.
+ *
+ * Clips of ten seconds, twelve of them: the first two minutes, as before
+ * with four of thirty. Ten seconds is all CLAP hears at once (it cut a longer
+ * clip to a random ten seconds of it), and short enough that a sound under
+ * somebody's voice gets a clip, and a vector, nearly to itself: in a clip that
+ * is mostly speech the vector says speech, and a smoke alarm on a voicemail
+ * was not found by its sound until the clips were this short.
  */
 export const MEDIA_COLLECTION = {
   image: { mimeType: 'image/jpeg', maxEdge: 768, quality: 85, maxItems: 1 },
   audio: {
     mimeType: 'audio/wav',
     sampleRate: 16_000,
-    clipSeconds: 30,
-    maxItems: 4,
+    clipSeconds: 10,
+    maxItems: 12,
   },
 } as const;
 
@@ -110,7 +117,7 @@ export function mediaScanCacheKey(modality: MediaModality): string {
   return `EMBED_MEDIA::${modality}`;
 }
 
-/** Largest stored media item. A clip of 30 s at 16 kHz is just under 1 MB. */
+/** Largest stored media item. A clip of 10 s at 16 kHz is about 320 KB. */
 export const MAX_MEDIA_BYTES = 4 * 1024 * 1024;
 
 /**
