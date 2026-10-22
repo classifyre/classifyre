@@ -44,7 +44,7 @@ ARG S6_OVERLAY_VERSION=3.2.3.2
 ARG PG_MAJOR=18
 
 # ── Sources of binaries (Dependabot keeps these current) ──────────────────────
-FROM ghcr.io/astral-sh/uv:0.13.1 AS uv-bin
+FROM ghcr.io/astral-sh/uv:0.13.5 AS uv-bin
 FROM caddy:2.11.7 AS caddy-bin
 FROM node:24.22.0-bookworm-slim AS node-bin
 
