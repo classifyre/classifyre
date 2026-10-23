@@ -64,7 +64,8 @@ export const SitemapEntriesDtoTypeEnum = {
     Case: 'case',
     Inquiry: 'inquiry',
     Detector: 'detector',
-    Scan: 'scan'
+    Scan: 'scan',
+    Term: 'term'
 } as const;
 export type SitemapEntriesDtoTypeEnum = typeof SitemapEntriesDtoTypeEnum[keyof typeof SitemapEntriesDtoTypeEnum];
 

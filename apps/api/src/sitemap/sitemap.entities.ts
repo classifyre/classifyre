@@ -18,6 +18,7 @@ export const SITEMAP_ENTITY_TYPES = [
   'inquiry',
   'detector',
   'scan',
+  'term',
 ] as const;
 
 export type SitemapEntityType = (typeof SITEMAP_ENTITY_TYPES)[number];
@@ -37,6 +38,13 @@ interface SitemapEntityConfig {
    * are broken by id to keep the order total.
    */
   orderBy: string;
+  /**
+   * SQL expression for the identity the web app puts in the URL. Defaults to
+   * `id`; a glossary term is addressed by its stable key instead.
+   */
+  identity?: string;
+  /** SQL predicate for the rows that have a page worth indexing. */
+  where?: string;
 }
 
 export const SITEMAP_ENTITIES: Record<SitemapEntityType, SitemapEntityConfig> =
@@ -77,6 +85,15 @@ export const SITEMAP_ENTITIES: Record<SitemapEntityType, SitemapEntityConfig> =
       table: 'runners',
       lastModified: 'COALESCE(completed_at, started_at, triggered_at)',
       orderBy: 'triggered_at, id',
+    },
+    // Addressed by key (`/glossary/terms/<key>`); a deprecated term only
+    // redirects to its replacement, so it is not a page of its own.
+    term: {
+      table: 'glossary_terms',
+      lastModified: 'updated_at',
+      orderBy: 'created_at, id',
+      identity: 'key',
+      where: "status <> 'DEPRECATED'",
     },
   };
 

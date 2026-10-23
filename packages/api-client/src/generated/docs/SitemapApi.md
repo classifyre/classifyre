@@ -29,7 +29,7 @@ async function example() {
   const api = new SitemapApi();
 
   const body = {
-    // 'source' | 'asset' | 'finding' | 'case' | 'inquiry' | 'detector' | 'scan'
+    // 'source' | 'asset' | 'finding' | 'case' | 'inquiry' | 'detector' | 'scan' | 'term'
     type: type_example,
     // string | Zero-based chunk. (optional)
     chunk: chunk_example,
@@ -54,7 +54,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **type** | `source`, `asset`, `finding`, `case`, `inquiry`, `detector`, `scan` |  | [Defaults to `undefined`] [Enum: source, asset, finding, case, inquiry, detector, scan] |
+| **type** | `source`, `asset`, `finding`, `case`, `inquiry`, `detector`, `scan`, `term` |  | [Defaults to `undefined`] [Enum: source, asset, finding, case, inquiry, detector, scan, term] |
 | **chunk** | `string` | Zero-based chunk. | [Optional] [Defaults to `undefined`] |
 | **chunkSize** | `string` |  | [Optional] [Defaults to `undefined`] |
 

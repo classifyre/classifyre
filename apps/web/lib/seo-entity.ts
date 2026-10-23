@@ -25,7 +25,9 @@ export type SeoEntityKind =
   | "case"
   | "inquiry"
   | "detector"
-  | "scan";
+  | "scan"
+  | "term"
+  | "provider";
 
 /** Detail endpoint and the field holding the human name, per entity kind. */
 const ENDPOINTS: Record<
@@ -45,6 +47,13 @@ const ENDPOINTS: Record<
   inquiry: { path: (id) => `/inquiries/${id}`, name: (b) => b["title"] },
   detector: {
     path: (id) => `/custom-detectors/${id}`,
+    name: (b) => b["name"],
+  },
+  // A glossary term is addressed by its stable key, which the endpoint also
+  // resolves; the page shows the term itself, never its definition or notes.
+  term: { path: (id) => `/glossary/terms/${id}`, name: (b) => b["term"] },
+  provider: {
+    path: (id) => `/ai-provider-configs/${id}`,
     name: (b) => b["name"],
   },
 };

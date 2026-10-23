@@ -12,6 +12,7 @@
  * `apps/api/src/sitemap/sitemap.entities.ts`.
  */
 
+import { GLOSSARY_TABS } from "./glossary-tabs";
 import {
   DEFAULT_LOCALE,
   LOCALES,
@@ -28,6 +29,7 @@ export const SITEMAP_ENTITY_TYPES = [
   "inquiry",
   "detector",
   "scan",
+  "term",
 ] as const;
 
 export type SitemapEntityType = (typeof SITEMAP_ENTITY_TYPES)[number];
@@ -85,7 +87,21 @@ const ENTITY_CONFIG: Record<SitemapEntityType, EntitySitemapConfig> = {
     changeFrequency: "monthly",
     priority: 0.4,
   },
+  // The API's `id` for a term is its stable key — the glossary routes by key.
+  term: {
+    path: (id) => `/glossary/terms/${encodeURIComponent(id)}`,
+    changeFrequency: "weekly",
+    priority: 0.5,
+  },
 };
+
+const GLOSSARY_TAB_PATHS = GLOSSARY_TABS.filter(
+  (tab) => tab !== "concepts",
+).map((tab) => ({
+  path: `/glossary?tab=${tab}`,
+  changeFrequency: "weekly" as const,
+  priority: 0.4,
+}));
 
 /**
  * Namespace-relative list pages worth indexing. Deliberately excludes routes
@@ -108,6 +124,8 @@ export const NAMESPACE_STATIC_PATHS: ReadonlyArray<{
   { path: "/duplicates", changeFrequency: "weekly", priority: 0.5 },
   { path: "/duplicates/decisions", changeFrequency: "weekly", priority: 0.4 },
   { path: "/glossary", changeFrequency: "weekly", priority: 0.5 },
+  // Each glossary tab is its own address with its own title and description.
+  ...GLOSSARY_TAB_PATHS,
   { path: "/harness", changeFrequency: "weekly", priority: 0.4 },
 ];
 
@@ -227,8 +245,10 @@ export function appUrl(
   const namespace = namespaceSlug
     ? `/${encodeURIComponent(namespaceSlug)}`
     : "";
-  const suffix = path === "" || path === "/" ? "" : path;
-  return `${baseUrl}${localePathPrefix(locale)}${namespace}${suffix}/`;
+  // A tab address keeps its query after the slash: `/glossary/?tab=entities`.
+  const [pathname = "", query] = path.split("?", 2);
+  const suffix = pathname === "" || pathname === "/" ? "" : pathname;
+  return `${baseUrl}${localePathPrefix(locale)}${namespace}${suffix}/${query ? `?${query}` : ""}`;
 }
 
 /** Absolute URL of an entity's detail page. */
@@ -282,7 +302,9 @@ export function entityAlternates(
   return localeAlternates(baseUrl, namespaceSlug, ENTITY_CONFIG[type].path(id));
 }
 
-export function entityChangeFrequency(type: SitemapEntityType): ChangeFrequency {
+export function entityChangeFrequency(
+  type: SitemapEntityType,
+): ChangeFrequency {
   return ENTITY_CONFIG[type].changeFrequency;
 }
 

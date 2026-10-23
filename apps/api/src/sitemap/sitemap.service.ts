@@ -112,8 +112,10 @@ export class SitemapService {
     let rows: EntryRow[] = [];
     try {
       rows = await this.prisma.$queryRaw<EntryRow[]>`
-        SELECT id, ${Prisma.raw(config.lastModified)} AS last_modified
+        SELECT ${Prisma.raw(config.identity ?? 'id')} AS id,
+               ${Prisma.raw(config.lastModified)} AS last_modified
         FROM ${Prisma.raw(config.table)}
+        ${Prisma.raw(config.where ? `WHERE ${config.where}` : '')}
         ORDER BY ${Prisma.raw(config.orderBy)}
         OFFSET ${safeChunk * chunkSize}::bigint
         LIMIT ${chunkSize}::bigint
@@ -156,6 +158,7 @@ export class SitemapService {
                  (ROW_NUMBER() OVER (ORDER BY ${Prisma.raw(config.orderBy)}) - 1)
                    / ${chunkSize}::bigint AS chunk
           FROM ${Prisma.raw(config.table)}
+          ${Prisma.raw(config.where ? `WHERE ${config.where}` : '')}
         ) numbered
         GROUP BY chunk
         ORDER BY chunk
