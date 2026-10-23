@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
+import { siGithub, siX, siYoutube } from "simple-icons";
 
 import { cn } from "../lib/utils";
 import {
@@ -8,7 +9,10 @@ import {
   docsSiteUrl,
   marketingPaths,
   repositoryUrl,
+  xUrl,
+  youtubeUrl,
 } from "../lib/site-links";
+import { simpleIconComponent } from "./simple-icon";
 import { softwareVersionLabel } from "../lib/software-version";
 import { CookieSettingsButton } from "./cookie-consent-banner";
 
@@ -72,19 +76,11 @@ function ColumnHead({ children }: { children: ReactNode }) {
   );
 }
 
-/** Drawn as bars, not an emoji, to match the site's flat, hard-edged language. */
-function AustrianFlag() {
-  return (
-    <span
-      aria-hidden="true"
-      className="flex h-3 w-[18px] shrink-0 flex-col overflow-hidden border border-white/25"
-    >
-      <span className="h-1/3 w-full bg-[#ed2939]" />
-      <span className="h-1/3 w-full bg-white" />
-      <span className="h-1/3 w-full bg-[#ed2939]" />
-    </span>
-  );
-}
+const socialLinks = [
+  { title: "YouTube", href: youtubeUrl, Icon: simpleIconComponent(siYoutube) },
+  { title: "X", href: xUrl, Icon: simpleIconComponent(siX) },
+  { title: "GitHub", href: repositoryUrl, Icon: simpleIconComponent(siGithub) },
+] as const;
 
 export interface SiteFooterCopy {
   tagline: string;
@@ -102,7 +98,6 @@ export interface SiteFooterCopy {
   privacy: string;
   cookieSettings: string;
   contact: string;
-  madeIn: string;
   baselineTagline: string;
 }
 
@@ -123,7 +118,6 @@ const DEFAULT_COPY: SiteFooterCopy = {
   privacy: "Privacy & cookie policy",
   cookieSettings: "Cookie settings",
   contact: "Contact",
-  madeIn: "Made in Austria",
   baselineTagline: "Every leak leaves a trail",
 };
 
@@ -202,6 +196,22 @@ export function SiteFooter({
             {text.blurb}
           </p>
 
+          <ul className="mt-6 flex items-center gap-3">
+            {socialLinks.map(({ title, href, Icon }) => (
+              <li key={title}>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={title}
+                  className="flex size-9 items-center justify-center border-2 border-white/20 text-white/70 transition-colors hover:border-accent hover:text-accent"
+                >
+                  <Icon className="size-4" />
+                </a>
+              </li>
+            ))}
+          </ul>
+
           <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
             Docker · Kubernetes · Apache-2.0
           </p>
@@ -239,15 +249,6 @@ export function SiteFooter({
                 className="text-[13px] leading-6 text-white/70 decoration-accent decoration-2 underline-offset-4 transition-colors hover:text-accent hover:underline"
               >
                 {text.contact}
-              </a>
-            </li>
-            <li className="pt-2">
-              <a
-                href={marketing(marketingPaths.madeInEurope)}
-                className="group inline-flex items-center gap-2.5 border-2 border-white/20 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-white/70 transition-colors hover:border-accent hover:text-white"
-              >
-                <AustrianFlag />
-                {text.madeIn}
               </a>
             </li>
           </ul>

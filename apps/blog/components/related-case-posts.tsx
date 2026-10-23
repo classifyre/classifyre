@@ -19,7 +19,7 @@ type RelatedCasePostsProps = {
 export async function RelatedCasePosts({
   section,
   currentPath,
-  limit = 3,
+  limit = 2,
   heading = "More case files",
   locale = "en",
 }: RelatedCasePostsProps) {
@@ -33,7 +33,7 @@ export async function RelatedCasePosts({
       <h2 className="mb-8 font-serif text-3xl font-black uppercase tracking-[0.04em] text-foreground sm:text-4xl">
         {heading}
       </h2>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {related.map((post) => (
           <BlogPostCard key={post.route} post={post} locale={locale} />
         ))}
