@@ -14,7 +14,8 @@ describe('EmbeddingQueueService', () => {
     finding: { findMany: jest.fn(), update: jest.fn() },
     assetChunk: { findMany: jest.fn() },
     glossaryTerm: { findMany: jest.fn(), update: jest.fn() },
-    embeddingSpace: { findUnique: jest.fn() },
+    embeddingSpace: { findUnique: jest.fn(), findFirst: jest.fn() },
+    $queryRaw: jest.fn(),
   };
   const config = {
     enabled: true,
@@ -356,8 +357,9 @@ describe('EmbeddingQueueService', () => {
     expect(await service.scheduleRecalibration()).toBe(false);
   });
 
-  it('reports an uninitialized queue as unscheduled', async () => {
-    const uninitialized = new EmbeddingQueueService(
+  it('binds the queues before scheduling from a process that registered no worker', async () => {
+    // An `api` pod: the worker owns the queues, the request lands here.
+    const apiPod = new EmbeddingQueueService(
       prisma as never,
       config as never,
       provider as never,
@@ -366,9 +368,77 @@ describe('EmbeddingQueueService', () => {
       capability as never,
       cls as never,
     );
+    boss.send.mockResolvedValueOnce('job-1');
 
-    expect(await uninitialized.scheduleRecalibration()).toBe(false);
-    expect(boss.send).not.toHaveBeenCalled();
+    expect(await apiPod.scheduleRecalibration()).toBe(true);
+    expect(boss.send).toHaveBeenCalledWith(
+      'semantic-recalibrate-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+      { spaceId: '9c85727f-8b6f-4de0-aee6-08a96b57f79b' },
+      expect.any(Object),
+    );
+  });
+
+  it('reports the active space and a live worker from a process that registered none', async () => {
+    const spaceId = '9c85727f-8b6f-4de0-aee6-08a96b57f79b';
+    const registry = {
+      listRows: jest.fn().mockResolvedValue([
+        { queue: `semantic-embeddings-${spaceId}`, status: 'idle' },
+      ]),
+    };
+    const apiPod = new EmbeddingQueueService(
+      prisma as never,
+      config as never,
+      provider as never,
+      embeddings as never,
+      pgBoss as never,
+      capability as never,
+      cls as never,
+      undefined,
+      registry as never,
+    );
+    prisma.embeddingSpace.findFirst.mockResolvedValue({ id: spaceId });
+    prisma.$queryRaw.mockResolvedValue([{ count: 786n }]);
+    boss.getQueueStats.mockResolvedValue({
+      queuedCount: 0,
+      activeCount: 0,
+      deferredCount: 0,
+    });
+
+    const status = await apiPod.status();
+
+    expect(status.spaceId).toBe(spaceId);
+    expect(status.embeddedRows).toBe(786);
+    expect(status.workerRegistered).toBe(true);
+    expect(registry.listRows).toHaveBeenCalledWith('ns_test');
+  });
+
+  it('reports no worker when its heartbeat has gone stale', async () => {
+    const spaceId = '9c85727f-8b6f-4de0-aee6-08a96b57f79b';
+    const registry = {
+      listRows: jest.fn().mockResolvedValue([
+        { queue: `semantic-embeddings-${spaceId}`, status: 'stale' },
+      ]),
+    };
+    const apiPod = new EmbeddingQueueService(
+      prisma as never,
+      config as never,
+      provider as never,
+      embeddings as never,
+      pgBoss as never,
+      capability as never,
+      cls as never,
+      undefined,
+      registry as never,
+    );
+    prisma.embeddingSpace.findFirst.mockResolvedValue({ id: spaceId });
+    prisma.$queryRaw.mockResolvedValue([{ count: 0n }]);
+    boss.getQueueStats.mockResolvedValue({
+      queuedCount: 0,
+      activeCount: 0,
+      deferredCount: 0,
+    });
+
+    expect((await apiPod.status()).workerRegistered).toBe(false);
   });
 
   it('recalibrates the whole space once the inference queue drains', async () => {

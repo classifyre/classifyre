@@ -10,6 +10,7 @@ Name | Type
 `share` | number
 `weight` | number
 `values` | Array&lt;string&gt;
+`holders` | Array&lt;number&gt;
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "share": null,
   "weight": null,
   "values": null,
+  "holders": null,
 } satisfies RejectCauseLabelDto
 
 console.log(example)

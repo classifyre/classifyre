@@ -1542,7 +1542,14 @@ export class CorrelationService {
           if (weighted < cfg.relatedMin && !exact) continue;
 
           const isDuplicate = weighted >= cfg.duplicateMin || exact;
-          const byLabel = r.sharedByLabel as Record<string, number>;
+          // A label weighted 0 is no evidence, so it does not name the
+          // pattern either: setting dates to 0 left "date_time + person"
+          // patterns whose date part counted for nothing.
+          const byLabel = Object.fromEntries(
+            Object.entries(r.sharedByLabel as Record<string, number>).filter(
+              ([label]) => cfg.weightOf(label) > 0,
+            ),
+          );
           buffer.push({
             fromType: ASSET_REL,
             fromId: r.aId,
@@ -2900,10 +2907,16 @@ export class CorrelationService {
   }
 
   /** Finding ids belonging to the given assets (bounded), for case actions. */
+  /**
+   * The findings an asset carries now. Resolved ones are values a later scan
+   * no longer found in the document; attached to a case they read as
+   * evidence that is not there (a twice-rescanned invoice brought every old
+   * finding along, doubling the count).
+   */
   async findingIdsForAssets(assetIds: string[], cap = 2000): Promise<string[]> {
     if (assetIds.length === 0) return [];
     const rows = await this.prisma.finding.findMany({
-      where: { assetId: { in: assetIds } },
+      where: { assetId: { in: assetIds }, status: FindingStatus.OPEN },
       select: { id: true },
       take: cap,
     });

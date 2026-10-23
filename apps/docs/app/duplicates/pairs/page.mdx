@@ -88,9 +88,11 @@ Two habits worth building:
 
 - **Read the shared values before the score.** One shared account number beats
   five shared common words, whatever the arithmetic says.
-- **Use "Where else this value appears".** A value that shows up in four hundred
-  assets isn't identifying this pair — it's boilerplate, and the right response
-  is an [exclusion](/duplicates/tuning/#exclusions), not a verdict.
+- **Use "Where else this value appears".** The search button at the end of a
+  row opens, under it, every document holding that value, grouped by source. A
+  value that shows up in four hundred assets isn't identifying this pair — it's
+  boilerplate, and the right response is an
+  [exclusion](/duplicates/tuning/#exclusions), not a verdict.
 
 ---
 
@@ -107,6 +109,12 @@ obvious; a *high* score means it's a genuine judgement call.
 
 If no single link holds the cluster together, there's nothing to cut, and the
 **Split** action is disabled with a note saying so.
+
+When the two are in **no cluster** — no link between them reaches your merge
+cutoff — the panel reads **Linked documents** instead and shows the documents
+matched to either of them. The one that ties two others together (a supplier
+form naming the account both invoices pay into) is often the evidence. Nothing
+there can be split, because nothing has been joined.
 
 ---
 
@@ -138,17 +146,22 @@ combination produced.** That last number is what turns one rejection into a
 decision worth taking: it's the difference between dismissing one bad match and
 stopping four hundred.
 
+Every shared value is listed with **how many documents hold it**. A value in
+these two documents only is evidence about them; a value in forty is a
+letterhead, a signature or your own bank account, and says nothing about
+whether any two of the forty are the same. Values that reach beyond the pair
+start ticked.
+
 It then offers three ways out:
 
 | Choice | Effect |
 |---|---|
-| **Lower "*label*" weight** | Drops that label's weight by one and re-scores everything |
-| **Stop matching on these values** | Writes an [exclusion](/duplicates/tuning/#exclusions) for that label |
+| **Lower "*label*" weight** | Drops that label's weight by one and re-scores everything. Offered only when **one label genuinely dominates**: on an even split, a weight change would break the labels that were doing their job. |
+| **Stop matching on these values** | Writes one [exclusion](/duplicates/tuning/#exclusions) per ticked value, scoped to its label. The label itself keeps counting: your own bank account stops matching, a supplier's account on two invoices still does. |
 | **Just reject** | Records the verdict and nothing more |
 
-The two fixes are only offered when **one label genuinely dominates**. On an even
-split there's nothing to single out, and suggesting a weight change would be
-advice to break the labels that were doing their job.
+Switching a whole label off is a wider decision and lives on the
+[tuning screen](/duplicates/tuning/#exclusions).
 
 ### Split the cluster here
 
@@ -194,11 +207,14 @@ Where a confirmed duplicate goes next.
 
 - **Add to case** — both assets (optionally with their findings) become evidence
   in a new or existing [case](/investigations/cases/), with the normal case
-  activity trail.
-- **Create inquiry** — opens an [inquiry](/investigations/inquiry/) pre-filled
-  from *this* match: the labels that made it match, scoped to the sources it came
-  from. It keeps watching for the same signature instead of starting from a blank
-  form.
+  activity trail. The rest of the pair's cluster is listed too, unticked: the
+  document that ties two others together is often the evidence.
+- **Create inquiry** — opens an [inquiry](/investigations/inquiry/) built from
+  *this* match: it watches for the values that carried the score (a bank
+  account, a phone number — not the dates every document of the month shares),
+  however they are spaced or capitalised, in the sources the pair came from. It
+  fires when the same account turns up in a new document, not on every finding
+  of the same kind.
 
 ---
 

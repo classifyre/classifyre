@@ -40,7 +40,7 @@ export interface RejectCauseDto {
      */
     dominantLabel?: string | null;
     /**
-     * How many other pairs in the corpus this same label combination produced. A big number means fixing it clears a lot at once.
+     * How many other pairs in the corpus matched on exactly the same labels. A big number means fixing it clears a lot at once.
      * @type {number}
      * @memberof RejectCauseDto
      */

@@ -107,6 +107,12 @@ describe('value-normalizer', () => {
       ).toBeNull();
     });
 
+    it('excludes dates, which sound alike whenever they share a month', () => {
+      expect(isPhoneticEligible('DATE_TIME')).toBe(false);
+      expect(isPhoneticEligible('date_time')).toBe(false);
+      expect(phoneticFingerprint('DATE_TIME', '4 September 2026')).toBeNull();
+    });
+
     it('allows person and name labels', () => {
       expect(isPhoneticEligible('person')).toBe(true);
       expect(isPhoneticEligible('name')).toBe(true);

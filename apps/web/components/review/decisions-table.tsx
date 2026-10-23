@@ -34,9 +34,9 @@ import { PanelCard, panelHeadingClass } from "@/components/panel-card";
 import { useNsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
-import { encodePairId, fmt, score2 } from "./review-format";
+import { encodePairId, fmt, patternNameFromKey, score2 } from "./review-format";
 
-type Filter = "ALL" | "CONFIRMED" | "REJECTED" | "UNSURE" | "UNACTIONED";
+type Filter = "ALL" | "CONFIRMED" | "REJECTED" | "UNSURE" | "SPLIT" | "UNACTIONED";
 
 const CHECKBOX_CLASS =
   "border-2 border-foreground/25 rounded-[2px] data-[state=checked]:bg-accent data-[state=checked]:border-accent data-[state=checked]:text-accent-foreground data-[state=indeterminate]:bg-accent data-[state=indeterminate]:border-accent data-[state=indeterminate]:text-accent-foreground";
@@ -75,6 +75,15 @@ export function DecisionsTable({ onChanged }: { onChanged: () => void }) {
   const [bulkBusy, setBulkBusy] = React.useState(false);
   const [caseOpen, setCaseOpen] = React.useState(false);
   const [casePairs, setCasePairs] = React.useState<ReviewDecisionRowDto[]>([]);
+  // Stable references: the dialog resets its ticks whenever these change.
+  const caseAssetIds = React.useMemo(
+    () => [...new Set(casePairs.flatMap((r) => [r.aId, r.bId]))],
+    [casePairs],
+  );
+  const casePairRefs = React.useMemo(
+    () => casePairs.map((r) => ({ aId: r.aId, bId: r.bId })),
+    [casePairs],
+  );
 
   const key = (r: { aId: string; bId: string }) => `${r.aId}|${r.bId}`;
 
@@ -201,6 +210,7 @@ export function DecisionsTable({ onChanged }: { onChanged: () => void }) {
     { value: "CONFIRMED", label: t("review.decisions.verdict.CONFIRMED") },
     { value: "REJECTED", label: t("review.decisions.verdict.REJECTED") },
     { value: "UNSURE", label: t("review.decisions.verdict.UNSURE") },
+    { value: "SPLIT", label: t("review.decisions.verdict.SPLIT") },
   ];
 
   return (
@@ -415,7 +425,12 @@ export function DecisionsTable({ onChanged }: { onChanged: () => void }) {
 
                     <TableCell className="max-w-[180px] py-3">
                       <span className="block truncate font-mono text-[11px] text-muted-foreground">
-                        {r.patternKey}
+                        {patternNameFromKey(
+                          r.patternKey,
+                          (family) =>
+                            t(`review.patterns.family.${family}` as TranslationKey),
+                          t("review.patterns.miscLabel"),
+                        )}
                       </span>
                     </TableCell>
 
@@ -446,9 +461,14 @@ export function DecisionsTable({ onChanged }: { onChanged: () => void }) {
                         >
                           {t("review.decisions.inInquiry")}
                         </Button>
-                      ) : (
+                      ) : r.verdict === "CONFIRMED" ? (
                         <span className="text-[11px] text-muted-foreground">
                           {t("review.decisions.nowhere")}
+                        </span>
+                      ) : (
+                        // Only a confirmed duplicate has somewhere to go.
+                        <span className="text-[11px] text-muted-foreground">
+                          —
                         </span>
                       )}
                     </TableCell>
@@ -527,7 +547,8 @@ export function DecisionsTable({ onChanged }: { onChanged: () => void }) {
       <FingerprintsCaseDialog
         open={caseOpen}
         onOpenChange={setCaseOpen}
-        assetIds={[...new Set(casePairs.flatMap((r) => [r.aId, r.bId]))]}
+        assetIds={caseAssetIds}
+        pairs={casePairRefs}
         assetLabel={(id) =>
           casePairs.find((r) => r.aId === id)?.aName ??
           casePairs.find((r) => r.bId === id)?.bName ??

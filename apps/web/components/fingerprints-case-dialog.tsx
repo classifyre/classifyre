@@ -48,12 +48,22 @@ export function FingerprintsCaseDialog({
   onOpenChange,
   assetIds,
   assetLabel,
+  preselected,
+  pairs,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   assetIds: string[];
   /** Resolve an asset id to its display name for the noise-filter checklist. */
   assetLabel?: (id: string) => string;
+  /** Which of `assetIds` start ticked; all of them when omitted. */
+  preselected?: string[];
+  /**
+   * The decided pairs these assets come from. Given, the case is made through
+   * duplicate review, which stamps each pair's verdict with the case, so
+   * Decisions shows where the pair went.
+   */
+  pairs?: Array<{ aId: string; bId: string }>;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -76,12 +86,12 @@ export function FingerprintsCaseDialog({
     setSeverity("MEDIUM");
     setAttachFindings(true);
     setCaseId("");
-    setSelectedIds(new Set(assetIds));
+    setSelectedIds(new Set(preselected ?? assetIds));
     api.cases
       .casesControllerList({})
       .then((r) => setCases(r.items ?? []))
       .catch(() => setCases([]));
-  }, [open, assetIds]);
+  }, [open, assetIds, preselected]);
 
   const chosenIds = React.useMemo(
     () => assetIds.filter((id) => selectedIds.has(id)),
@@ -108,15 +118,18 @@ export function FingerprintsCaseDialog({
     }
     setBusy(true);
     try {
-      const res = await api.correlation.correlationControllerCaseAction({
-        caseActionRequestDto: {
-          assetIds: chosenIds,
-          attachFindings,
-          ...(mode === "existing"
-            ? { caseId }
-            : { title: title.trim(), description: description.trim() || undefined, severity }),
-        },
-      });
+      const target =
+        mode === "existing"
+          ? { caseId }
+          : { title: title.trim(), description: description.trim() || undefined, severity };
+      const res =
+        pairs && pairs.length > 0
+          ? await api.correlationReview.correlationReviewControllerDecisionsToCase({
+              decisionsToCaseDto: { pairs, assetIds: chosenIds, attachFindings, ...target },
+            })
+          : await api.correlation.correlationControllerCaseAction({
+              caseActionRequestDto: { assetIds: chosenIds, attachFindings, ...target },
+            });
       toast.success(
         t("correlation.caseAction.done", {
           assets: String(res.assetsAdded),

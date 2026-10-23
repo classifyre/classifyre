@@ -283,7 +283,7 @@ export class EmbeddingController {
   @ApiConflictResponse({ description: 'Embeddings are turned off' })
   async reindex(): Promise<EmbeddingReindexResponseDto> {
     await this.assertEnabled();
-    return this.queue.requestBackfill();
+    return this.queue.startBackfill();
   }
 
   @InternalOnly()

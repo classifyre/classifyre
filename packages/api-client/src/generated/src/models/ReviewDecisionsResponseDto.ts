@@ -46,7 +46,7 @@ export interface ReviewDecisionsResponseDto {
      */
     total: number;
     /**
-     * Decided but not yet taken anywhere
+     * Confirmed duplicates not yet taken into a case or an inquiry
      * @type {number}
      * @memberof ReviewDecisionsResponseDto
      */

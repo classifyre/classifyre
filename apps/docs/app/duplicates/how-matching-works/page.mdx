@@ -102,7 +102,8 @@ Two guards keep this honest:
 
 - **Only name-like labels.** Structured identifiers — emails, phones, IBANs,
   URLs, IPs — are excluded. Their normalised form is already canonical and
-  phonetics would only invent false matches.
+  phonetics would only invent false matches. So are dates: any two in the same
+  month sound alike.
 - **A similarity floor.** Sharing a phonetic code isn't enough on its own
   (`john` and `jane` collide). The pair also has to clear a string-similarity
   threshold, or the match contributes no weight.

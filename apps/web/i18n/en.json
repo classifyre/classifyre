@@ -5109,7 +5109,7 @@
     },
     "caseAction": {
       "title": "Assets → case",
-      "desc": "Use {{count}} asset(s) from the graph in an investigation case.",
+      "desc": "Use {{count}} asset(s) in an investigation case.",
       "newCase": "New case",
       "existingCase": "Existing case",
       "caseTitle": "Title",
@@ -6157,10 +6157,11 @@
       "intro": "These assets share the same passage of text. The values inside it are what make them match documents elsewhere — excluding them stops that, everywhere, from the next scan on.",
       "impact": "{{pairs}} matched pairs in other patterns rest on one of these {{values}} values. This does not change the pairs in this pattern: those come from the repeated text itself, and are recorded as not-duplicates.",
       "assets": "in {{count}} assets",
-      "none": "Nothing to exclude — no value in this group appears in more than one asset.",
+      "none": "Nothing left to exclude: no value in this group appears in more than one asset, or a rule already covers it. The pairs can still be recorded as not duplicates.",
       "capped": "Showing the {{shown}} widest of {{total}} values.",
       "recomputeNote": "Writes instance-wide exclusion rules and re-scores the corpus. Reversible from the undo log.",
       "apply": "Exclude {{count}} values",
+      "applyNone": "Record as not duplicates",
       "cancel": "Cancel",
       "applied": "{{rules}} exclusion rules written, {{pairs}} pairs decided. A recompute is running."
     },
@@ -6195,6 +6196,9 @@
     },
     "ego": {
       "title": "This cluster",
+      "titleLinked": "Linked documents",
+      "linkedCaption": "These two are not joined into a cluster: no link here reaches your merge cutoff. Shown instead are the documents matched to either of them.",
+      "linkedMember": "linked",
       "caption": "One link holds these two groups together. Cutting it splits the cluster in two.",
       "weak": "cut point",
       "truncated": "{{count}} more not shown",
@@ -6240,8 +6244,7 @@
       "splitDone": "Split. Later scans will not rejoin these.",
       "unsureDone": "Marked unsure.",
       "failed": "That did not save — the pair is back in the queue.",
-      "inquiryTitle": "Inquiry Watch from this match",
-      "inquiryDescription": "Assets matching on {{labels}}, first seen on {{a}} and {{b}}.",
+      "inquiryTitle": "Watch for what {{a}} and {{b}} share",
       "reject": "Not a duplicate",
       "rejected": "Recorded as not a duplicate.",
       "causeTitle": "What made these match",
@@ -6251,7 +6254,9 @@
       "fixWeight": "Lower “{{label}}” weight",
       "fixExclude": "Stop matching on these values",
       "fixApplied": "Applied. A recompute is running.",
-      "fixSkip": "Just reject"
+      "fixSkip": "Just reject",
+      "causeHolders": "in {{count}} documents",
+      "causePickHint": "Ticked: values found in more documents than these two. A value on every document of its kind (a letterhead, your own bank account) says nothing about whether two of them are the same."
     },
     "keys": {
       "legend": "Shortcuts",
@@ -6277,8 +6282,8 @@
       "model": "Model",
       "worker": "Worker",
       "workerUp": "running",
-      "workerDown": "not here",
-      "workerDownHint": "The embedding queue lives in the worker process, so reindexing cannot be started from the API. Run it from the worker, or use a deployment where both roles run together.",
+      "workerDown": "not running",
+      "workerDownHint": "No worker is serving the embedding queue right now, so nothing queued would be embedded. Start the worker, then reindex.",
       "dupTitle": "Duplicate index",
       "dupPairs": "Pairs",
       "dupPatterns": "Patterns",

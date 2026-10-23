@@ -15,6 +15,8 @@ import { PanelCard, microLabelClass } from "@/components/panel-card";
 import { FingerprintsCaseDialog } from "@/components/fingerprints-case-dialog";
 import { useNsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
+import { useEntityDocumentTitle } from "@/components/document-title-updater";
 import { LineageEvidenceChip } from "./lineage-evidence-chip";
 import { MatchWeightWaterfall } from "./match-weight-waterfall";
 import { PairActionBar } from "./pair-action-bar";
@@ -23,9 +25,11 @@ import { PairComparison } from "./pair-comparison";
 import { PairValuesTable } from "./pair-values-table";
 import { PairEgoGraph } from "./pair-ego-graph";
 import {
+  cutoffsFor,
   encodePairId,
   encodePatternKey,
   fmt,
+  patternNameFromKey,
   score2,
   type Cutoffs,
 } from "./review-format";
@@ -76,6 +80,23 @@ export const PairLevel = React.forwardRef<
   // Pairs settled in this sitting. The server does not know about them until
   // the optimistic writes land, so the queue is filtered against this instead.
   const decidedRef = React.useRef<Set<string>>(new Set());
+  useEntityDocumentTitle(pair ? `${pair.a.name} \u2194 ${pair.b.name}` : null);
+  // The case can take the rest of the cluster too (the document that ties the
+  // two together is often the evidence); only the pair starts ticked.
+  const caseAssets = React.useMemo(() => {
+    const names = new Map<string, string>();
+    if (pair) {
+      names.set(pair.a.id, pair.a.name);
+      names.set(pair.b.id, pair.b.name);
+      for (const n of pair.ego.nodes) if (!names.has(n.id)) names.set(n.id, n.name);
+    }
+    return {
+      ids: [...names.keys()],
+      pair: pair ? [pair.a.id, pair.b.id] : [],
+      pairRef: pair ? [{ aId: pair.a.id, bId: pair.b.id }] : [],
+      names,
+    };
+  }, [pair]);
 
   /** Back means the pattern this pair came from, not browser history. */
   const goBack = React.useCallback(() => {
@@ -123,12 +144,13 @@ export const PairLevel = React.forwardRef<
     const patternKey = pair?.patternKey;
     if (!patternKey) return;
     let active = true;
+    const band = cutoffsFor(patternKey, cutoffs);
     api.correlationReview
       .correlationReviewControllerSample({
         patternKey,
         n: "25",
-        min: String(cutoffs.review),
-        max: String(cutoffs.merge),
+        min: String(band.review),
+        max: String(band.merge),
       })
       .then((s) => {
         if (!active) return;
@@ -153,7 +175,7 @@ export const PairLevel = React.forwardRef<
     };
     // Deliberately not keyed on the pair: advancing must not refetch the queue
     // it is walking, or every step reshuffles the order under the reviewer.
-  }, [pair?.patternKey, cutoffs.review, cutoffs.merge]);
+  }, [pair?.patternKey, cutoffs]);
 
   /**
    * Move to the next undecided pair, or back to the pattern when there is none.
@@ -216,24 +238,20 @@ export const PairLevel = React.forwardRef<
     if (!pair) return;
     setBusy(true);
     try {
-      // Matchers derived from what actually made this pair match, so the
-      // inquiry watches for the same thing rather than starting blank.
-      const created = await api.inquiries.inquiriesControllerCreate({
-        createInquiryDto: {
-          title: t("review.actions.inquiryTitle"),
-          description: t("review.actions.inquiryDescription", {
-            labels: pair.labels.join(", "),
-            a: pair.a.name,
-            b: pair.b.name,
-          }),
-          matchAllSources: false,
-          sourceIds: Array.from(
-            new Set([pair.a.sourceId, pair.b.sourceId]),
-          ),
-          findingTypes: pair.labels,
-        },
-      });
-      router.push(nsPath(`/investigations/inquiries/${created.id}`));
+      // The API builds the watch from the values that carried this pair (the
+      // same as a bulk inquiry from Decisions), and records where the pair
+      // went if it has a verdict.
+      const created =
+        await api.correlationReview.correlationReviewControllerDecisionsToInquiry({
+          decisionsToInquiryDto: {
+            pairs: [{ aId: pair.a.id, bId: pair.b.id }],
+            title: t("review.actions.inquiryTitle", {
+              a: pair.a.name,
+              b: pair.b.name,
+            }),
+          },
+        });
+      router.push(nsPath(`/investigations/inquiries/${created.inquiryId}`));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("review.loadFailed"));
     } finally {
@@ -338,7 +356,12 @@ export const PairLevel = React.forwardRef<
                 in. A deep link opens one pair before the sample lands, and
                 "1 of 1" would imply the pattern held a single pair. */}
             <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-              {pair.patternKey}
+              {patternNameFromKey(
+                pair.patternKey,
+                (family) =>
+                  t(`review.patterns.family.${family}` as TranslationKey),
+                t("review.patterns.miscLabel"),
+              )}
               {remaining != null && remaining > 0 ? (
                 <>
                   {" · "}
@@ -399,6 +422,7 @@ export const PairLevel = React.forwardRef<
             bId={pair.b.id}
             canSplit={canSplit}
             onSplit={() => void split()}
+            clustered={pair.clusterId != null}
           />
         </PanelCard>
       </div>
@@ -450,8 +474,10 @@ export const PairLevel = React.forwardRef<
       <FingerprintsCaseDialog
         open={caseOpen}
         onOpenChange={setCaseOpen}
-        assetIds={[pair.a.id, pair.b.id]}
-        assetLabel={(id) => (id === pair.a.id ? pair.a.name : pair.b.name)}
+        assetIds={caseAssets.ids}
+        preselected={caseAssets.pair}
+        pairs={caseAssets.pairRef}
+        assetLabel={(id) => caseAssets.names.get(id) ?? id}
       />
     </div>
   );

@@ -91,6 +91,8 @@ function pageLabel(segment: string, previous: string | undefined, t: T): string 
     if (previous === "findings") return t("breadcrumb.finding", { id });
     return id;
   }
+  // A duplicate pattern is named by the labels it matched on.
+  if (previous === "patterns") return decodeURIComponent(segment).split("+").join(" + ");
   return decodeURIComponent(segment)
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -108,6 +110,10 @@ function crumbPath(segments: string[], index: number): string {
     if (index === 1 && segments[1] === "inquiries") return "/investigations?tab=inquiries";
     if (index === 1 && segments[1] === "cases") return "/investigations";
     if (index === 2 && segments[2] === "evidence") return `/investigations/${segments[1]}`;
+  }
+  // Patterns and pairs are opened from the review queue; neither has a list page.
+  if (segments[0] === "duplicates" && index === 1 && (segments[1] === "patterns" || segments[1] === "pairs")) {
+    return "/duplicates";
   }
   return path;
 }
@@ -212,8 +218,9 @@ export function AppBreadcrumbs() {
     const last = segments.length - 1;
     const base: Crumb[] = segments.map((segment, index) => {
       const previous = segments[index - 1];
-      const recordName =
-        index === last && isIdSegment(segment) && entityName ? entityName : labels[`${previous}:${segment}`];
+      // A pattern key or a pair of asset ids names a record too, though neither looks like an id.
+      const isRecord = isIdSegment(segment) || previous === "patterns" || previous === "pairs";
+      const recordName = index === last && isRecord && entityName ? entityName : labels[`${previous}:${segment}`];
       return {
         href: nsHref(crumbPath(segments, index)),
         label: recordName || pageLabel(segment, previous, t),

@@ -49,17 +49,25 @@ export function PairEgoGraph({
   bId,
   onSplit,
   canSplit,
+  clustered = true,
 }: {
   ego: ReviewEgoGraphDto;
   aId: string;
   bId: string;
   onSplit?: () => void;
   canSplit?: boolean;
+  /**
+   * False when the pair is in no cluster: the API then sends the pair's
+   * neighbourhood, the documents matched to either side, and nothing in it
+   * can be cut.
+   */
+  clustered?: boolean;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
   const nsPath = useNsPath();
   const [minWeight, setMinWeight] = React.useState(0);
+  const title = clustered ? t("review.ego.title") : t("review.ego.titleLinked");
 
   const weakest = React.useMemo(
     () => ego.edges.find((e) => e.isWeakest) ?? null,
@@ -160,7 +168,7 @@ export function PairEgoGraph({
         <>
           <Share2 className="h-4 w-4 text-muted-foreground" />
           <span className="font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
-            {t("review.ego.title")}
+            {title}
           </span>
           {/* One control does more for readability here than any amount of
               styling: hide the weak edges and what is holding the cluster
@@ -197,7 +205,9 @@ export function PairEgoGraph({
             <Badge variant="outline" className="text-[10px] uppercase">
               {selectedNode.id === aId || selectedNode.id === bId
                 ? t("review.ego.seed")
-                : t("review.ego.member")}
+                : clustered
+                  ? t("review.ego.member")
+                  : t("review.ego.linkedMember")}
             </Badge>
             <p className="break-words font-mono text-[12px] font-semibold">
               {selectedNode.label}
@@ -229,10 +239,12 @@ export function PairEgoGraph({
         ) : (
           <div className="space-y-2 text-[11px] text-muted-foreground">
             <h3 className="font-serif text-sm font-black uppercase tracking-[0.06em] text-foreground">
-              {t("review.ego.title")}
+              {title}
             </h3>
             <p>
-              {weakest
+              {!clustered
+                ? t("review.ego.linkedCaption")
+                : weakest
                 ? t("review.ego.caption")
                 : ego.nodes.length <= 2 && ego.truncated === 0
                   ? t("review.ego.single")
@@ -246,15 +258,17 @@ export function PairEgoGraph({
                 />
                 {t("review.ego.seed")}
               </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1.5 inline-block h-0 w-6 shrink-0 border-t-2 border-dashed border-destructive" />
-                <span>
-                  <span className="block text-foreground">
-                    {t("review.ego.weak")}
+              {clustered ? (
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 inline-block h-0 w-6 shrink-0 border-t-2 border-dashed border-destructive" />
+                  <span>
+                    <span className="block text-foreground">
+                      {t("review.ego.weak")}
+                    </span>
+                    <span className="block">{t("review.ego.cutHint")}</span>
                   </span>
-                  <span className="block">{t("review.ego.cutHint")}</span>
-                </span>
-              </li>
+                </li>
+              ) : null}
             </ul>
             {ego.truncated > 0 ? (
               <p className="border-t border-border pt-2 font-mono text-[10px] uppercase tracking-[0.12em]">

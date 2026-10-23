@@ -632,7 +632,7 @@ export class ReviewDecisionsResponseDto {
   @ApiPropertyOptional({ nullable: true, type: String })
   nextCursor!: string | null;
   @ApiProperty() total!: number;
-  @ApiProperty({ description: 'Decided but not yet taken anywhere' })
+  @ApiProperty({ description: 'Confirmed duplicates not yet taken into a case or an inquiry' })
   unactioned!: number;
   @ApiProperty({ description: 'Counts by verdict across the whole namespace' })
   byVerdict!: Record<string, number>;
@@ -649,7 +649,7 @@ export class DecisionsQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() patternKey?: string;
 
   @ApiPropertyOptional({
-    description: 'true = only decisions that went nowhere yet',
+    description: 'true = only confirmed duplicates that went nowhere yet',
   })
   @IsOptional()
   unactionedOnly?: boolean;
@@ -675,6 +675,16 @@ export class DecisionsToCaseDto {
   @ApiPropertyOptional({ description: "Attach the assets' findings too" })
   @IsOptional()
   attachFindings?: boolean;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'The assets to add. Defaults to both sides of every pair; a reviewer may leave one out or add a document from the pair’s neighbourhood.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  assetIds?: string[];
 }
 
 export class DecisionsToCaseResponseDto {
@@ -712,6 +722,12 @@ export class RejectCauseLabelDto {
   @ApiProperty() weight!: number;
   @ApiProperty({ type: [String], description: 'The values that matched' })
   values!: string[];
+  @ApiProperty({
+    type: [Number],
+    description:
+      'How many assets hold each value, in the order of `values`. A value far beyond these two is template or letterhead, not evidence about them.',
+  })
+  holders!: number[];
 }
 
 export class RejectCauseDto {
@@ -726,7 +742,7 @@ export class RejectCauseDto {
   dominantLabel!: string | null;
   @ApiProperty({
     description:
-      'How many other pairs in the corpus this same label combination produced. A big number means fixing it clears a lot at once.',
+      'How many other pairs in the corpus matched on exactly the same labels. A big number means fixing it clears a lot at once.',
   })
   similarPairs!: number;
 }

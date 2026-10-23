@@ -11,6 +11,7 @@ import {
   BOILERPLATE_GROUP_BREADTH_CAP,
   BOILERPLATE_RANK_CAP,
   BOILERPLATE_STATEMENT_TIMEOUT_MS,
+  NEAR_DUPLICATE_MIN,
   FANOUT_CAP,
   LINEAGE_HAIRBALL_MIN_ASSETS,
   LINEAGE_HAIRBALL_SHARE,
@@ -448,8 +449,14 @@ export class CorrelationReviewIndexService {
       -- own list. Worse, a verdict is keyed canonically, so a decision on such
       -- a pair would never match its signature and the pair would keep coming
       -- back to be decided again.
+      --
+      -- One row per pair, chosen on purpose. A byte-identical pair usually has
+      -- a value-overlap edge as well, and with ON CONFLICT DO NOTHING over an
+      -- unordered set whichever came first won: the same two copies were "no
+      -- judgement needed" after one recompute and "needs judgement" after the
+      -- next. Identical bytes are the stronger claim, so they win.
       WITH normalised AS (
-        SELECT
+        SELECT DISTINCT ON (LEAST(e.from_id, e.to_id), GREATEST(e.from_id, e.to_id))
           LEAST(e.from_id, e.to_id)    AS a_id,
           GREATEST(e.from_id, e.to_id) AS b_id,
           e.metadata,
@@ -460,6 +467,9 @@ export class CorrelationReviewIndexService {
           AND e.to_type = ${ASSET_REL}
           AND e.relation_type IN (${Prisma.join(REVIEWABLE_RELATION_TYPES)})
           ${edgeScope}
+        ORDER BY LEAST(e.from_id, e.to_id), GREATEST(e.from_id, e.to_id),
+                 (e.relation_type = 'identical_content') DESC,
+                 e.confidence DESC
       )
       INSERT INTO correlation_pair_signatures (
         a_id, b_id, pattern_key, family, weighted, shared_count, labels,
@@ -654,16 +664,30 @@ export class CorrelationReviewIndexService {
           ]
         : []),
       this.prisma.$executeRaw(Prisma.sql`
-      WITH members AS (
+      WITH member_sims AS (
         SELECT a.duplicate_group_hash AS gh,
                f.asset_id,
                MAX(a.importance_score) AS importance,
-               MAX(COALESCE((a.signals ->> 'duplicateSimilarity')::numeric, 0)) AS sim
+               MAX((a.signals ->> 'duplicateSimilarity')::numeric) AS sim
         FROM finding_evidence_analyses a
         JOIN findings f ON f.id = a.finding_id
         WHERE a.duplicate_group_hash IS NOT NULL
         ${groupScope}
         GROUP BY a.duplicate_group_hash, f.asset_id
+      ),
+      -- A member can join its group through another member (the grouping is
+      -- transitive) without a similarity of its own. Scoring it 0 put every
+      -- pair it was in below the review cutoff, so the pattern never reached
+      -- the queue; it is at least as close as the group's weakest measured
+      -- member, and never below the cut-off that grouped it.
+      members AS (
+        SELECT gh, asset_id, importance,
+               COALESCE(
+                 sim,
+                 MIN(sim) OVER (PARTITION BY gh),
+                 ${NEAR_DUPLICATE_MIN}::numeric
+               ) AS sim
+        FROM member_sims
       ),
       broad_groups AS (${broadGroupsCte()}),
       ranked AS (

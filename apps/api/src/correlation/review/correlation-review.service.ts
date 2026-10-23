@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import { valuePattern, valuesToWatch } from './watch-values';
 import { UnionFind } from '../../utils/union-find';
 import { CorrelationService } from '../correlation.service';
 import { DuplicatesFinderAgentService } from '../duplicates-finder-agent.service';
@@ -903,14 +904,35 @@ export class CorrelationReviewService {
     aId: string,
     bId: string,
   ) {
-    if (!clusterId) {
-      return { nodes: [], edges: [], truncated: 0 };
+    // Outside a cluster (no link here reaches the merge cutoff) the graph is
+    // the pair's neighbourhood instead: the documents matched to either side.
+    // The one that ties two others together is often the evidence, and an
+    // empty panel hid it. Nothing is offered for cutting there.
+    let all: string[];
+    if (clusterId) {
+      const members = await this.prisma.assetClusterMember.findMany({
+        where: { clusterId },
+        select: { assetId: true },
+      });
+      all = members.map((m) => m.assetId);
+    } else {
+      const linked = await this.prisma.correlationPairSignature.findMany({
+        where: {
+          family: { not: 'NEAR_DUPLICATE_TEXT' },
+          OR: [
+            { aId: { in: [aId, bId] } },
+            { bId: { in: [aId, bId] } },
+          ],
+        },
+        select: { aId: true, bId: true },
+        orderBy: { weighted: 'desc' },
+        take: EGO_NODE_CAP * 2,
+      });
+      all = [aId, bId, ...linked.flatMap((l) => [l.aId, l.bId])].filter(
+        (id, i, arr) => arr.indexOf(id) === i,
+      );
+      if (all.length <= 2) return { nodes: [], edges: [], truncated: 0 };
     }
-    const members = await this.prisma.assetClusterMember.findMany({
-      where: { clusterId },
-      select: { assetId: true },
-    });
-    const all = members.map((m) => m.assetId);
     // Seeds first so a big cluster still shows the pair being judged.
     const ordered = [
       aId,
@@ -936,7 +958,7 @@ export class CorrelationReviewService {
     const usable = edges.filter(
       (e) => keptSet.has(e.aId) && keptSet.has(e.bId),
     );
-    const weakest = this.weakestBridge(kept, usable);
+    const weakest = clusterId ? this.weakestBridge(kept, usable) : null;
     const assetById = new Map(assets.map((a) => [a.id, a]));
 
     return {
@@ -1326,7 +1348,9 @@ export class CorrelationReviewService {
     const where = {
       ...(verdict ? { verdict: verdict as never } : {}),
       ...(patternKey ? { patternKey } : {}),
-      ...(unactionedOnly ? { caseId: null, inquiryId: null } : {}),
+      ...(unactionedOnly
+        ? { verdict: 'CONFIRMED' as never, caseId: null, inquiryId: null }
+        : {}),
       ...(cursor ? { id: { gt: cursor } } : {}),
     };
 
@@ -1340,11 +1364,15 @@ export class CorrelationReviewService {
         where: {
           ...(verdict ? { verdict: verdict as never } : {}),
           ...(patternKey ? { patternKey } : {}),
-          ...(unactionedOnly ? { caseId: null, inquiryId: null } : {}),
+          ...(unactionedOnly
+            ? { verdict: 'CONFIRMED' as never, caseId: null, inquiryId: null }
+            : {}),
         },
       }),
+      // Only a confirmed duplicate can go anywhere; a "not a duplicate" that
+      // was never put in a case has not "gone nowhere", it is finished.
       this.prisma.correlationPairVerdict.count({
-        where: { caseId: null, inquiryId: null },
+        where: { verdict: 'CONFIRMED', caseId: null, inquiryId: null },
       }),
       this.prisma.correlationPairVerdict.groupBy({
         by: ['verdict'],
@@ -1465,7 +1493,15 @@ export class CorrelationReviewService {
     if (pairs.length === 0) {
       throw new NotFoundException('No pairs given');
     }
-    const assetIds = [...new Set(pairs.flatMap((p) => [p.aId, p.bId]))];
+    // The reviewer may untick an asset, or add the document that ties a pair
+    // to a third; without a list, both sides of every pair go in.
+    const picked = Array.isArray(dto.assetIds)
+      ? dto.assetIds.filter((id): id is string => typeof id === 'string' && !!id)
+      : [];
+    const assetIds =
+      picked.length > 0
+        ? [...new Set(picked)]
+        : [...new Set(pairs.flatMap((p) => [p.aId, p.bId]))];
 
     const result = await this.duplicatesFinder.runCaseAction({
       assetIds,
@@ -1494,38 +1530,85 @@ export class CorrelationReviewService {
   /**
    * Open an inquiry that keeps watching for what these pairs had in common.
    *
-   * The matchers come from the pairs themselves — the labels that made them
-   * match, scoped to the sources they came from — so the inquiry watches for
-   * the same signature rather than starting from a blank form.
+   * The matchers come from the pairs themselves — the values of the labels
+   * that carried each pair, scoped to the sources they came from — so the
+   * inquiry fires when the same account or number turns up again, rather than
+   * on every finding of the same kind (see watch-values.ts).
    */
   async decisionsToInquiry(dto: DecisionsToInquiryDto) {
     const pairs = this.cleanPairs(dto?.pairs);
     if (pairs.length === 0) throw new NotFoundException('No pairs given');
 
-    const signatures = await this.prisma.correlationPairSignature.findMany({
-      where: { OR: pairs.map((p) => ({ aId: p.aId, bId: p.bId })) },
-      select: {
-        labels: true,
-        sourceAId: true,
-        sourceBId: true,
-        patternKey: true,
-      },
-    });
-    const labels = [...new Set(signatures.flatMap((s) => s.labels))];
+    const [signatures, config] = await Promise.all([
+      this.prisma.correlationPairSignature.findMany({
+        where: { OR: pairs.map((p) => ({ aId: p.aId, bId: p.bId })) },
+        select: {
+          aId: true,
+          bId: true,
+          labels: true,
+          sourceAId: true,
+          sourceBId: true,
+          patternKey: true,
+        },
+      }),
+      this.correlation.getConfig(),
+    ]);
     const sourceIds = [
       ...new Set(signatures.flatMap((s) => [s.sourceAId, s.sourceBId])),
     ];
+    const weightOf = (label: string): number =>
+      config.labels.find((l) => l.label === label)?.weight ??
+      config.defaultWeight;
+
+    const assetIds = [...new Set(signatures.flatMap((s) => [s.aId, s.bId]))];
+    const values = await this.prisma.assetCorrelationValue.findMany({
+      where: { assetId: { in: assetIds } },
+      select: { assetId: true, label: true, normalizedValue: true },
+    });
+    const held = new Map<string, Set<string>>();
+    for (const v of values) {
+      const key = `${v.label}\u0000${v.normalizedValue}`;
+      const set = held.get(v.assetId) ?? new Set<string>();
+      set.add(key);
+      held.set(v.assetId, set);
+    }
+    const watched = valuesToWatch(
+      signatures.flatMap((s) => {
+        const b = held.get(s.bId) ?? new Set<string>();
+        return [...(held.get(s.aId) ?? [])]
+          .filter((key) => b.has(key))
+          .map((key) => {
+            const [label, value] = key.split('\u0000');
+            return { label, value, weight: weightOf(label) };
+          })
+          // One pair's strongest labels, not the batch's: each pair is a
+          // pair for its own reasons.
+          .filter((v, _, all) => {
+            const top = Math.max(...all.map((x) => x.weight));
+            return v.weight >= top / 2;
+          });
+      }),
+    );
+    // An inquiry with no value pattern would match every finding in the
+    // source: refuse rather than open one.
+    if (watched.length === 0) {
+      throw new BadRequestException(
+        'These pairs share no weighted value to watch for.',
+      );
+    }
+    const labels = [...new Set(watched.map((w) => w.label))];
 
     const created = await this.inquiries.create({
       title:
         dto.title ??
         `Duplicates matching on ${labels.join(', ') || 'shared values'}`,
       description:
-        `Opened from duplicate review after confirming ${pairs.length} pair(s) ` +
+        `Watches for ${watched.map((w) => w.value).join(', ') || 'the values these pairs share'}. ` +
+        `Opened from duplicate review on ${pairs.length} pair(s) ` +
         `in pattern "${signatures[0]?.patternKey ?? 'unknown'}".`,
       matchAllSources: false,
       sourceIds,
-      findingTypes: labels,
+      findingValueRegex: watched.map((w) => valuePattern(w.value)),
     });
 
     const linked = await this.prisma.correlationPairVerdict.updateMany({
@@ -1574,8 +1657,14 @@ export class CorrelationReviewService {
         take: VALUES_PER_SIDE_CAP * 2,
       }),
       this.correlation.getConfig(),
+      // The same combination, not the same pattern: small patterns are folded
+      // into one "misc" bucket per family, whose members matched on anything.
       this.prisma.correlationPairSignature.count({
-        where: { patternKey: signature.patternKey },
+        where: {
+          family: signature.family,
+          labels: { equals: signature.labels },
+          NOT: { aId, bId },
+        },
       }),
     ]);
 
@@ -1624,15 +1713,39 @@ export class CorrelationReviewService {
       );
     }
 
+    // How far each shared value reaches beyond this pair: the reviewer's way
+    // to tell a letterhead from evidence before excluding anything.
+    const sharedPairs = [...sharedByLabel.entries()].flatMap(([label, vals]) =>
+      vals.map((normalizedValue) => ({ label, normalizedValue })),
+    );
+    const holderRows =
+      sharedPairs.length > 0
+        ? await this.prisma.assetCorrelationValue.groupBy({
+            by: ['label', 'normalizedValue'],
+            where: { OR: sharedPairs },
+            _count: { assetId: true },
+          })
+        : [];
+    const holdersOf = new Map(
+      holderRows.map((r) => [
+        `${r.label}\u0000${r.normalizedValue}`,
+        r._count.assetId,
+      ]),
+    );
+
     const drivers = Object.entries(contrib)
-      .map(([label, value]) => ({
-        label,
-        share: (Number(value) || 0) / totalContrib,
-        weight:
-          config.labels.find((l) => l.label === label)?.weight ??
-          config.defaultWeight,
-        values: sharedByLabel.get(label) ?? [],
-      }))
+      .map(([label, value]) => {
+        const vals = sharedByLabel.get(label) ?? [];
+        return {
+          label,
+          share: (Number(value) || 0) / totalContrib,
+          weight:
+            config.labels.find((l) => l.label === label)?.weight ??
+            config.defaultWeight,
+          values: vals,
+          holders: vals.map((v) => holdersOf.get(`${label}\u0000${v}`) ?? 2),
+        };
+      })
       .sort((x, y) => y.share - x.share);
 
     // "Dominant" only when one label really carries the match. Offering to

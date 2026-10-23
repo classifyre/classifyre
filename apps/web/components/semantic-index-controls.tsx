@@ -146,10 +146,9 @@ export function SemanticIndexControls() {
             />
           </dl>
 
-          {/* The reindex runs in the process that owns the embedding queue.
-              In a split api/worker deployment that is the worker, so firing it
-              from here returns a 500 — better to say so than to let someone
-              click a button that cannot work. */}
+          {/* The reindex only queues work; a worker embeds it. With no
+              worker heartbeat on the queue the button would queue into
+              nothing, so it is disabled and says why. */}
           {!status.workerRegistered && (
             <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
               <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
