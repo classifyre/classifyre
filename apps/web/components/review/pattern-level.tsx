@@ -33,6 +33,7 @@ import {
 import { PanelCard, microLabelClass, panelHeadingClass } from "@/components/panel-card";
 import { useNsPath } from "@/lib/ns-path";
 import { useTranslation } from "@/hooks/use-translation";
+import { useEntityDocumentTitle } from "@/components/document-title-updater";
 import type { TranslationKey } from "@/i18n";
 import { LineageEvidenceChip } from "./lineage-evidence-chip";
 import { UndoLogDialog } from "./undo-log-dialog";
@@ -40,7 +41,8 @@ import { ExcludeValuesDialog } from "./exclude-values-dialog";
 import {
   encodePairId,
   fmt,
-  patternBand,
+  cutoffsFor,
+  patternName,
   score2,
   type Cutoffs,
   type LineageFilter,
@@ -94,8 +96,15 @@ export function PatternLevel({
   // Only a near-duplicate text pattern has a template to read values out of;
   // every other rule kind is settled with a verdict or a cutoff.
   const canExclude = pattern.ruleKind === "EXCLUSION";
+  const name = patternName(
+    pattern,
+    t(`review.patterns.family.${pattern.family}` as TranslationKey),
+    t("review.patterns.miscLabel"),
+  );
+  useEntityDocumentTitle(name);
 
-  const band = patternBand(pattern, cutoffs);
+  // Repeated text is read on its own scale: its whole range is the band.
+  const band = cutoffsFor(pattern.patternKey, cutoffs);
 
   // Unexplained matches are the finding worth chasing, so they get the alarm
   // colour; a clean rule gets the flat foreground; everything else stays quiet.
@@ -129,12 +138,12 @@ export function PatternLevel({
           };
   const filters = React.useMemo(
     () => ({
-      min: String(cutoffs.review),
-      max: String(cutoffs.merge),
+      min: String(band.review),
+      max: String(band.merge),
       sourceIds:
         sourceFilter.length > 0 ? sourceFilter.join(",") : undefined,
     }),
-    [cutoffs, sourceFilter],
+    [band.review, band.merge, sourceFilter],
   );
 
   const load = React.useCallback(() => {
@@ -161,8 +170,8 @@ export function PatternLevel({
         patternKey: pattern.patternKey,
         patternActionDto: {
           verdict: "CONFIRMED",
-          min: cutoffs.review,
-          max: cutoffs.merge,
+          min: band.review,
+          max: band.merge,
           ...(lineage ? { lineage } : {}),
         },
       }),
@@ -183,7 +192,7 @@ export function PatternLevel({
     return () => {
       active = false;
     };
-  }, [pattern.patternKey, filters, cutoffs, lineage]);
+  }, [pattern.patternKey, filters, band.review, band.merge, lineage]);
 
   React.useEffect(() => load(), [load]);
 
@@ -197,8 +206,8 @@ export function PatternLevel({
         patternKey: pattern.patternKey,
         patternActionDto: {
           verdict: "CONFIRMED",
-          min: cutoffs.review,
-          max: cutoffs.merge,
+          min: band.review,
+          max: band.merge,
           ...(lineage ? { lineage } : {}),
         },
       });
@@ -272,7 +281,7 @@ export function PatternLevel({
               {tone.eyebrow}
             </span>
             <h2 className="mt-1 font-serif text-2xl font-black uppercase tracking-[0.04em]">
-              {pattern.labels.join(" + ") || pattern.patternKey}
+              {name}
             </h2>
             <p className="mt-1.5 max-w-[62ch] text-[13px] text-white/85">
               {tone.headline}
@@ -703,7 +712,7 @@ export function PatternLevel({
         open={excludeOpen}
         onOpenChange={setExcludeOpen}
         patternKey={pattern.patternKey}
-        cutoffs={cutoffs}
+        cutoffs={band}
         lineage={lineage}
         onApplied={() => {
           refresh();

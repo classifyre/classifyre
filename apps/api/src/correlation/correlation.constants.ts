@@ -255,6 +255,11 @@ const CANONICAL_NON_PHONETIC_LABELS = [
   'api_key',
   'secret',
   'country',
+  // Dates sound alike whenever they share a month: "4 September 2026" and
+  // "9 September 2026" scored 0.93 on spelling and paired invoices that had
+  // nothing in common but the month they were written in.
+  'date_time',
+  'date',
 ];
 
 export const NON_PHONETIC_LABELS = new Set([
@@ -297,6 +302,14 @@ export const MIN_PATTERN_PAIRS = 5;
  * 50-asset group is 1,225 pairs. The pattern row stores the true size
  * alongside the capped count so the number on screen is not a lie.
  */
+/**
+ * Cosine from which two pieces of evidence are taken for the same text said
+ * twice. One number for every model, which is a simplification: models spread
+ * their scores very differently (see the embeddings docs, "How alike is
+ * alike"), so the same cut-off is strict on one and loose on another.
+ */
+export const NEAR_DUPLICATE_MIN = 0.95;
+
 export const BOILERPLATE_PAIR_CAP = 200;
 
 /**

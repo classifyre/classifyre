@@ -43,6 +43,12 @@ export interface RejectCauseLabelDto {
      * @memberof RejectCauseLabelDto
      */
     values: Array<string>;
+    /**
+     * How many assets hold each value, in the order of `values`. A value far beyond these two is template or letterhead, not evidence about them.
+     * @type {Array<number>}
+     * @memberof RejectCauseLabelDto
+     */
+    holders: Array<number>;
 }
 
 /**
@@ -53,6 +59,7 @@ export function instanceOfRejectCauseLabelDto(value: object): value is RejectCau
     if (!('share' in value) || value['share'] === undefined) return false;
     if (!('weight' in value) || value['weight'] === undefined) return false;
     if (!('values' in value) || value['values'] === undefined) return false;
+    if (!('holders' in value) || value['holders'] === undefined) return false;
     return true;
 }
 
@@ -70,6 +77,7 @@ export function RejectCauseLabelDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'share': json['share'],
         'weight': json['weight'],
         'values': json['values'],
+        'holders': json['holders'],
     };
 }
 
@@ -88,6 +96,7 @@ export function RejectCauseLabelDtoToJSONTyped(value?: RejectCauseLabelDto | nul
         'share': value['share'],
         'weight': value['weight'],
         'values': value['values'],
+        'holders': value['holders'],
     };
 }
 

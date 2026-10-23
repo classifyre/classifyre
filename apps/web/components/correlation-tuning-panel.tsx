@@ -225,31 +225,40 @@ export const CorrelationTuningPanel = React.forwardRef<
                 </p>
               ) : (
                 <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
-                  {config.labels.map((l) => (
-                    <div
-                      key={l.label}
-                      className="flex items-center justify-between gap-3 rounded-[4px] border border-border/60 px-2.5 py-1.5"
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate font-mono text-xs">{l.label}</span>
-                        {!l.inUse && (
-                          <Badge variant="outline" className="text-[9px] uppercase">
-                            {t("correlation.tune.retired")}
-                          </Badge>
-                        )}
+                  {/* The labels this workspace's findings carry come first;
+                      kept settings for labels not in the data follow. */}
+                  {[...config.labels]
+                    .sort(
+                      (a, b) =>
+                        Number(b.inUse) - Number(a.inUse) ||
+                        a.label.localeCompare(b.label),
+                    )
+                    .map((l) => (
+                      <div
+                        key={l.label}
+                        className="flex items-center justify-between gap-3 rounded-[4px] border border-border/60 px-2.5 py-1.5"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="truncate font-mono text-xs">{l.label}</span>
+                          {!l.inUse && (
+                            <Badge variant="outline" className="text-[9px] uppercase">
+                              {t("correlation.tune.retired")}
+                            </Badge>
+                          )}
+                        </div>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          aria-label={l.label}
+                          value={weights[l.label] ?? defaultWeight}
+                          onChange={(e) =>
+                            setWeights((w) => ({ ...w, [l.label]: Number(e.target.value) }))
+                          }
+                          className="h-7 w-16"
+                        />
                       </div>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={weights[l.label] ?? defaultWeight}
-                        onChange={(e) =>
-                          setWeights((w) => ({ ...w, [l.label]: Number(e.target.value) }))
-                        }
-                        className="h-7 w-16"
-                      />
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </div>

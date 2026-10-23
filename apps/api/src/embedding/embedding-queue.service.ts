@@ -4,6 +4,7 @@ import type { Job, JobInsert } from 'pg-boss';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
 import { PgBossService, pgBossSchemaForId } from '../scheduler/pg-boss.service';
+import { WorkerQueueRegistryService } from '../scheduler/worker-queue-registry.service';
 import { EmbeddingCapabilityService } from './embedding-capability.service';
 import { embeddingContentHash, normalizeEmbeddingText } from './embedding-text';
 import { EmbeddingConfigService } from './embedding-config.service';
@@ -212,6 +213,7 @@ export class EmbeddingQueueService {
     private readonly cls: ClsService,
     // Optional and last: the unit tests construct this service positionally.
     @Optional() private readonly settings?: EmbeddingSettingsService,
+    @Optional() private readonly workerRegistry?: WorkerQueueRegistryService,
   ) {}
 
   /** Effective configuration for the current namespace. */
@@ -541,14 +543,32 @@ export class EmbeddingQueueService {
 
   async status() {
     const rt = this.runtime();
+    // On an `api` pod nothing binds the runtime — the worker owns the queues —
+    // so the space, its queues and whether a worker serves them are read from
+    // the database instead. Reporting the process's own empty runtime said
+    // "no vectors, never recalibrated, no worker" about a healthy index.
+    let spaceId = rt.spaceId;
+    if (!spaceId) {
+      const active = await this.prisma.embeddingSpace
+        .findFirst({ where: { isActive: true }, select: { id: true } })
+        .catch(() => null);
+      spaceId = active?.id;
+    }
+    const queueName =
+      rt.queueName ?? (spaceId ? `${EMBEDDING_QUEUE_PREFIX}-${spaceId}` : undefined);
+    const recalibrateQueueName =
+      rt.recalibrateQueueName ??
+      (spaceId ? `${RECALIBRATE_QUEUE_PREFIX}-${spaceId}` : undefined);
+    const workerRegistered =
+      rt.workerRegistered || (await this.workerServes(queueName));
     // A recalibration pass is deliberately debounced (RECALIBRATE_DELAY_SECONDS),
     // so "scheduled but not yet running" is the state operators actually see
     // right after reindexing — surface it instead of looking idle.
     let recalibrationScheduled = false;
-    if (rt.recalibrateQueueName) {
+    if (recalibrateQueueName) {
       try {
         const boss = await this.pgBoss.getBossAsync();
-        const stats = await boss.getQueueStats(rt.recalibrateQueueName);
+        const stats = await boss.getQueueStats(recalibrateQueueName);
         recalibrationScheduled =
           stats.queuedCount + stats.activeCount + stats.deferredCount > 0;
       } catch {
@@ -556,9 +576,9 @@ export class EmbeddingQueueService {
       }
     }
     let lastRecalibratedAt = rt.lastRecalibratedAt;
-    if (rt.spaceId) {
+    if (spaceId) {
       const space = await this.prisma.embeddingSpace.findUnique({
-        where: { id: rt.spaceId },
+        where: { id: spaceId },
         select: { lastRecalibratedAt: true },
       });
       lastRecalibratedAt =
@@ -567,22 +587,22 @@ export class EmbeddingQueueService {
     // Ground truth: rows actually embedded vs rows awaiting embedding.
     let embeddedRows: number | null = null;
     let pendingEmbedJobs: number | null = null;
-    if (rt.spaceId) {
+    if (spaceId) {
       try {
         const rows = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
           SELECT count(*)::bigint AS count
           FROM content_embeddings
-          WHERE space_id = ${rt.spaceId}
+          WHERE space_id = ${spaceId}
         `;
         embeddedRows = Number(rows[0]?.count ?? 0);
       } catch {
         // capability not ready; leave null rather than failing status.
       }
     }
-    if (rt.queueName) {
+    if (queueName) {
       try {
         const boss = await this.pgBoss.getBossAsync();
-        const stats = await boss.getQueueStats(rt.queueName);
+        const stats = await boss.getQueueStats(queueName);
         pendingEmbedJobs =
           stats.queuedCount + stats.activeCount + stats.deferredCount;
       } catch {
@@ -592,7 +612,7 @@ export class EmbeddingQueueService {
     return {
       persistentQueue: true,
       pendingQueueWrites: rt.pendingWrites,
-      workerRegistered: rt.workerRegistered,
+      workerRegistered,
       embeddedRows,
       pendingEmbedJobs,
       embedJobFailureCount: rt.embedJobFailureCount,
@@ -602,7 +622,7 @@ export class EmbeddingQueueService {
       providerHealth: this.provider.status(),
       provider: this.cfg.provider,
       model: this.cfg.model,
-      spaceId: rt.spaceId,
+      spaceId,
       autoBackfill: this.cfg.autoBackfill,
       backfillRunning: Boolean(rt.backfillPromise),
       backfillStartedAt: rt.backfillStartedAt,
@@ -615,9 +635,36 @@ export class EmbeddingQueueService {
     };
   }
 
+  /**
+   * Whether a worker process of this namespace is consuming `queue`, by its
+   * heartbeat in the shared registry — the only way an `api` pod can know.
+   */
+  private async workerServes(queue: string | undefined): Promise<boolean> {
+    const namespaceId = this.cls.get<string>(CLS_NAMESPACE_ID);
+    if (!queue || !namespaceId || !this.workerRegistry) return false;
+    try {
+      const rows = await this.workerRegistry.listRows(namespaceId);
+      return rows.some((row) => row.queue === queue && row.status !== 'stale');
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Reconcile stored content into the space, from whichever process is asked.
+   * The backfill only enqueues; binding the queues first is what lets an `api`
+   * pod start it, the worker then embeds what was queued.
+   */
+  async startBackfill() {
+    await this.ensureRuntime();
+    return this.requestBackfill();
+  }
+
   async scheduleRecalibration(): Promise<boolean> {
     if (!(await this.enabledNow())) return false;
     try {
+      // Sending needs the queue names, which an `api` pod has not bound yet.
+      await this.ensureRuntime();
       return await this.persistRecalibration();
     } catch (error) {
       this.logger.error(

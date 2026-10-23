@@ -12,6 +12,7 @@ Name | Type
 `description` | string
 `severity` | string
 `attachFindings` | boolean
+`assetIds` | Array&lt;string&gt;
 
 ## Example
 
@@ -26,6 +27,7 @@ const example = {
   "description": null,
   "severity": null,
   "attachFindings": null,
+  "assetIds": null,
 } satisfies DecisionsToCaseDto
 
 console.log(example)

@@ -63,12 +63,35 @@ export interface PatternBand {
   reviewValue: number;
 }
 
+/**
+ * Repeated-text pairs carry a cosine, not a weighted overlap: 0.95 or more by
+ * construction. Read against cutoffs drawn on the overlap's scale, every one of
+ * them sat above the merge cutoff — filed as a duplicate nobody needs to see —
+ * when they are the opposite: one template on different documents. So their
+ * whole range is the review band.
+ */
+export const scoredOnOwnScale = (patternKey: string): boolean =>
+  patternKey.startsWith("boilerplate:");
+
+/** The cutoffs a pattern's pairs are read against. */
+export function cutoffsFor(patternKey: string, cutoffs: Cutoffs): Cutoffs {
+  return scoredOnOwnScale(patternKey) ? { review: 0, merge: 1 } : cutoffs;
+}
+
+/** Bucket range [lo, hi) of the review band; a merge cutoff of 1 includes 1. */
+function bandBuckets(patternKey: string, cutoffs: Cutoffs): [number, number] {
+  const c = cutoffsFor(patternKey, cutoffs);
+  return [
+    bucketForScore(c.review),
+    c.merge >= 1 ? BUCKET_COUNT : bucketForScore(c.merge),
+  ];
+}
+
 export function patternBand(
   pattern: ReviewPatternDto,
   cutoffs: Cutoffs,
 ): PatternBand {
-  const lo = bucketForScore(cutoffs.review);
-  const hi = bucketForScore(cutoffs.merge);
+  const [lo, hi] = bandBuckets(pattern.patternKey, cutoffs);
   const inBand = sumRange(pattern.scoreBuckets, lo, hi);
   const decided = sumRange(pattern.decidedBuckets, lo, hi);
   const clustersInBand = sumRange(pattern.clusterBuckets, lo, hi);
@@ -102,13 +125,12 @@ export function portfolioBands(
   patterns: ReviewPatternDto[],
   cutoffs: Cutoffs,
 ): PortfolioBands {
-  const lo = bucketForScore(cutoffs.review);
-  const hi = bucketForScore(cutoffs.merge);
   let autoConfirmed = 0;
   let needsReview = 0;
   let rejected = 0;
   let workRemaining = 0;
   for (const p of patterns) {
+    const [lo, hi] = bandBuckets(p.patternKey, cutoffs);
     rejected += sumRange(p.scoreBuckets, 0, lo);
     needsReview += sumRange(p.scoreBuckets, lo, hi);
     autoConfirmed += sumRange(p.scoreBuckets, hi, BUCKET_COUNT);
@@ -123,10 +145,14 @@ export function portfolioBands(
   };
 }
 
-/** Combined histogram across every pattern, for the level-1 distribution. */
+/**
+ * Combined histogram across every pattern, for the level-1 distribution. It is
+ * drawn on the weighted overlap's scale, so repeated text (a cosine) stays off.
+ */
 export function combinedBuckets(patterns: ReviewPatternDto[]): number[] {
   const out = new Array<number>(BUCKET_COUNT).fill(0);
   for (const p of patterns) {
+    if (scoredOnOwnScale(p.patternKey)) continue;
     p.scoreBuckets.forEach((v, i) => {
       out[i] = (out[i] ?? 0) + v;
     });
@@ -167,3 +193,48 @@ export function decodePairId(
 /** Pattern keys contain `+` and `:`, so they must be encoded into a path. */
 export const encodePatternKey = (key: string): string =>
   encodeURIComponent(key);
+
+/**
+ * What a pattern is called on screen: the labels it matched on, or — for the
+ * families that match on no label (repeated text, identical content) — the
+ * family's name with the short group id that tells two of them apart.
+ */
+export function patternName(
+  pattern: Pick<ReviewPatternDto, "patternKey" | "labels">,
+  familyLabel: string,
+  miscLabel: string,
+): string {
+  if (pattern.patternKey.endsWith("misc")) return miscLabel;
+  if (pattern.labels.length > 0) return pattern.labels.join(" + ");
+  const group = pattern.patternKey.split(":")[1];
+  return group ? `${familyLabel} · ${group}` : familyLabel;
+}
+
+/**
+ * A pattern's screen name from its key alone, for rows that carry the key but
+ * not the pattern (a decision outlives the pattern it was taken in).
+ */
+export function patternNameFromKey(
+  key: string,
+  familyLabel: (family: ReviewPatternDto["family"]) => string,
+  miscLabel: string,
+): string {
+  const cut = key.indexOf(":");
+  const prefix = cut >= 0 ? key.slice(0, cut) : "";
+  const rest = cut >= 0 ? key.slice(cut + 1) : key;
+  const family: ReviewPatternDto["family"] =
+    prefix === "boilerplate"
+      ? "NEAR_DUPLICATE_TEXT"
+      : prefix === "phonetic"
+        ? "PHONETIC"
+        : prefix === "identical"
+          ? "IDENTICAL_CONTENT"
+          : "SHARED_LABELS";
+  if (rest === "misc") return miscLabel;
+  if (family === "NEAR_DUPLICATE_TEXT")
+    return rest ? `${familyLabel(family)} · ${rest}` : familyLabel(family);
+  if (family === "SHARED_LABELS") return rest.split("+").join(" + ");
+  return rest
+    ? `${familyLabel(family)} · ${rest.split("+").join(" + ")}`
+    : familyLabel(family);
+}

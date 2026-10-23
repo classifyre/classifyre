@@ -34449,7 +34449,7 @@
           },
           "unactioned": {
             "type": "number",
-            "description": "Decided but not yet taken anywhere"
+            "description": "Confirmed duplicates not yet taken into a case or an inquiry"
           },
           "byVerdict": {
             "type": "object",
@@ -34537,6 +34537,13 @@
           "attachFindings": {
             "type": "boolean",
             "description": "Attach the assets' findings too"
+          },
+          "assetIds": {
+            "description": "The assets to add. Defaults to both sides of every pair; a reviewer may leave one out or add a document from the pair’s neighbourhood.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -34633,13 +34640,21 @@
             "items": {
               "type": "string"
             }
+          },
+          "holders": {
+            "description": "How many assets hold each value, in the order of `values`. A value far beyond these two is template or letterhead, not evidence about them.",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
           }
         },
         "required": [
           "label",
           "share",
           "weight",
-          "values"
+          "values",
+          "holders"
         ]
       },
       "RejectCauseDto": {
@@ -34658,7 +34673,7 @@
           },
           "similarPairs": {
             "type": "number",
-            "description": "How many other pairs in the corpus this same label combination produced. A big number means fixing it clears a lot at once."
+            "description": "How many other pairs in the corpus matched on exactly the same labels. A big number means fixing it clears a lot at once."
           }
         },
         "required": [

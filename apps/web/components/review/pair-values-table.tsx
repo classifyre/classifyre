@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { ExternalLink } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import type { ReviewFieldRowDto, ReviewWaterfallRowDto } from "@workspace/api-client";
 import {
   Badge,
@@ -18,7 +17,10 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components";
 import { panelHeadingClass } from "@/components/panel-card";
-import { useNsPath } from "@/lib/ns-path";
+import {
+  FingerprintValueOccurrences,
+  type FingerprintOccurrencesCache,
+} from "@/components/fingerprint-value-occurrences";
 import { useTranslation } from "@/hooks/use-translation";
 import { score2 } from "./review-format";
 
@@ -43,8 +45,9 @@ export function PairValuesTable({
   bName: string;
 }) {
   const { t } = useTranslation();
-  const router = useRouter();
-  const nsPath = useNsPath();
+  // One label open at a time; its shared values list where else they occur.
+  const [open, setOpen] = React.useState<string | null>(null);
+  const occurrences = React.useRef<FingerprintOccurrencesCache>(new Map());
 
   const contribution = React.useMemo(
     () => new Map(waterfall.map((r) => [r.label, r])),
@@ -93,8 +96,10 @@ export function PairValuesTable({
           <TableBody>
             {rows.map(({ field, bar }) => {
               const matched = field.sharedValues.length > 0;
+              const expanded = open === field.label;
               return (
-                <TableRow key={field.label} className="align-top">
+                <React.Fragment key={field.label}>
+                <TableRow className="align-top">
                   <TableCell className="py-3">
                     <span className="font-mono text-[12px] font-semibold">
                       {field.label}
@@ -167,18 +172,19 @@ export function PairValuesTable({
                           <TooltipTrigger asChild>
                             <Button
                               size="sm"
-                              variant="outline"
+                              variant={expanded ? "default" : "outline"}
                               className="h-8 rounded-[4px] border-2 border-border"
                               aria-label={t("review.values.whereElse")}
+                              aria-expanded={expanded}
                               onClick={() =>
-                                router.push(
-                                  nsPath(
-                                    `/findings?valueHash=${field.sharedValues[0]!.valueHash}`,
-                                  ),
-                                )
+                                setOpen(expanded ? null : field.label)
                               }
                             >
-                              <ExternalLink className="h-3.5 w-3.5" />
+                              {expanded ? (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              ) : (
+                                <Search className="h-3.5 w-3.5" />
+                              )}
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -189,6 +195,33 @@ export function PairValuesTable({
                     </div>
                   </TableCell>
                 </TableRow>
+                {expanded ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={6} className="py-3">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {field.sharedValues
+                          .filter((s) => s.valueHash)
+                          .slice(0, 4)
+                          .map((s) => (
+                            <div key={s.valueHash} className="min-w-0 space-y-2">
+                              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                                {t("review.values.whereElse")}
+                                {" \u00b7 "}
+                                <span className="normal-case tracking-normal text-foreground">
+                                  {s.value}
+                                </span>
+                              </p>
+                              <FingerprintValueOccurrences
+                                valueHash={s.valueHash}
+                                cache={occurrences.current}
+                              />
+                            </div>
+                          ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+                </React.Fragment>
               );
             })}
           </TableBody>

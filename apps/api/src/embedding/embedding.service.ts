@@ -12,6 +12,7 @@ import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
 import { CLS_SCHEMA } from '../namespace/namespace.constants';
 import { UnionFind } from '../utils/union-find';
+import { NEAR_DUPLICATE_MIN } from '../correlation/correlation.constants';
 import { mapBounded } from '../utils/map-bounded';
 import { EmbeddingCapabilityService } from './embedding-capability.service';
 import { featureOffMessage } from '../maintenance/workspace-features.constants';
@@ -92,13 +93,6 @@ const MIN_NEIGHBORHOOD = 5;
 // half the corpus.
 const OUTLIER_BONUS_THRESHOLD = 0.55;
 
-/**
- * Cosine from which two pieces of evidence are taken for the same text said
- * twice. One number for every model, which is a simplification: models spread
- * their scores very differently (see the embeddings docs, "How alike is
- * alike"), so the same cut-off is strict on one and loose on another.
- */
-const NEAR_DUPLICATE_MIN = 0.95;
 const RECALIBRATE_BATCH_SIZE = 500;
 /** Findings read per page when fanning a neighbourhood back out. */
 const NEIGHBORHOOD_PAGE_SIZE = 2000;

@@ -5109,7 +5109,7 @@
     },
     "caseAction": {
       "title": "Assets → Fall",
-      "desc": "{{count}} Asset(s) aus dem Graphen in einem Untersuchungsfall verwenden.",
+      "desc": "{{count}} Asset(s) in einem Untersuchungsfall verwenden.",
       "newCase": "Neuer Fall",
       "existingCase": "Bestehender Fall",
       "caseTitle": "Titel",
@@ -6157,10 +6157,11 @@
       "intro": "Diese Assets teilen denselben Textabschnitt. Die Werte darin sorgen dafür, dass sie zu Dokumenten anderswo passen — sie auszuschließen beendet das ab dem nächsten Scan, überall.",
       "impact": "{{pairs}} Treffer­paare in anderen Mustern beruhen auf einem dieser {{values}} Werte. An den Paaren in diesem Muster ändert das nichts: die stammen aus dem wiederholten Text selbst und werden als Nicht-Duplikate erfasst.",
       "assets": "in {{count}} Assets",
-      "none": "Nichts auszuschließen — kein Wert dieser Gruppe kommt in mehr als einem Asset vor.",
+      "none": "Nichts mehr auszuschließen: Kein Wert dieser Gruppe steht in mehr als einem Asset, oder eine Regel deckt ihn schon ab. Die Paare lassen sich trotzdem als keine Dubletten erfassen.",
       "capped": "Es werden die {{shown}} weitesten von {{total}} Werten gezeigt.",
       "recomputeNote": "Schreibt instanzweite Ausschlussregeln und bewertet den Korpus neu. Über das Undo-Protokoll umkehrbar.",
       "apply": "{{count}} Werte ausschließen",
+      "applyNone": "Als keine Dubletten erfassen",
       "cancel": "Abbrechen",
       "applied": "{{rules}} Ausschlussregeln geschrieben, {{pairs}} Paare entschieden. Eine Neuberechnung läuft."
     },
@@ -6195,6 +6196,9 @@
     },
     "ego": {
       "title": "Dieses Cluster",
+      "titleLinked": "Verbundene Dokumente",
+      "linkedCaption": "Diese beiden sind zu keinem Cluster verbunden: keine Verbindung hier erreicht Ihre Zusammenführungsgrenze. Stattdessen stehen hier die Dokumente, die mit einem der beiden übereinstimmen.",
+      "linkedMember": "verbunden",
       "caption": "Eine einzige Verbindung hält diese beiden Gruppen zusammen. Sie zu trennen teilt das Cluster in zwei.",
       "weak": "Trennstelle",
       "truncated": "{{count}} weitere nicht gezeigt",
@@ -6240,8 +6244,7 @@
       "splitDone": "Getrennt. Spätere Scans führen diese nicht wieder zusammen.",
       "unsureDone": "Als unsicher markiert.",
       "failed": "Das wurde nicht gespeichert — das Paar ist wieder in der Liste.",
-      "inquiryTitle": "Untersuchung zu diesem Treffer",
-      "inquiryDescription": "Assets mit Übereinstimmung bei {{labels}}, zuerst gesehen bei {{a}} und {{b}}.",
+      "inquiryTitle": "Beobachten, was {{a}} und {{b}} gemeinsam haben",
       "reject": "Keine Dublette",
       "rejected": "Als „keine Dublette“ erfasst.",
       "causeTitle": "Was diese Übereinstimmung verursacht hat",
@@ -6251,7 +6254,9 @@
       "fixWeight": "Gewicht von „{{label}}“ senken",
       "fixExclude": "Diese Werte nicht mehr für Treffer nutzen",
       "fixApplied": "Angewendet. Eine Neuberechnung läuft.",
-      "fixSkip": "Nur ablehnen"
+      "fixSkip": "Nur ablehnen",
+      "causeHolders": "in {{count}} Dokumenten",
+      "causePickHint": "Angehakt: Werte, die in mehr Dokumenten als diesen beiden stehen. Ein Wert auf jedem Dokument seiner Art (ein Briefkopf, das eigene Bankkonto) sagt nichts darüber, ob zwei davon dasselbe sind."
     },
     "keys": {
       "legend": "Tastenkürzel",
@@ -6277,8 +6282,8 @@
       "model": "Modell",
       "worker": "Worker",
       "workerUp": "läuft",
-      "workerDown": "nicht hier",
-      "workerDownHint": "Die Embedding-Warteschlange liegt im Worker-Prozess; eine Neuindizierung lässt sich daher nicht aus der API starten. Starten Sie sie im Worker oder nutzen Sie eine Bereitstellung, in der beide Rollen zusammenlaufen.",
+      "workerDown": "läuft nicht",
+      "workerDownHint": "Gerade bedient kein Worker die Embedding-Warteschlange, Eingereihtes würde also nicht eingebettet. Starten Sie den Worker und indizieren Sie dann neu.",
       "dupTitle": "Dublettenindex",
       "dupPairs": "Paare",
       "dupPatterns": "Muster",

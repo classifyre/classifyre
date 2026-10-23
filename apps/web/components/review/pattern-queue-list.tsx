@@ -11,7 +11,13 @@ import {
 import { panelHeadingClass } from "@/components/panel-card";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
-import { fmt, patternBand, score2, type Cutoffs } from "./review-format";
+import {
+  fmt,
+  patternBand,
+  patternName,
+  score2,
+  type Cutoffs,
+} from "./review-format";
 
 /**
  * The main object on level 1.
@@ -58,10 +64,11 @@ export function PatternQueueList({
       ) : (
         <ul className="border-t-2 border-border">
           {ranked.map(({ pattern, band }, index) => {
-            const isMisc = pattern.patternKey.endsWith("misc");
-            const name = isMisc
-              ? t("review.patterns.miscLabel")
-              : pattern.labels.join(" + ") || pattern.patternKey;
+            const name = patternName(
+              pattern,
+              t(`review.patterns.family.${pattern.family}` as TranslationKey),
+              t("review.patterns.miscLabel"),
+            );
             const capped = pattern.truePairCount > pattern.pairCount;
 
             return (

@@ -63,6 +63,12 @@ export interface DecisionsToCaseDto {
      * @memberof DecisionsToCaseDto
      */
     attachFindings?: boolean;
+    /**
+     * The assets to add. Defaults to both sides of every pair; a reviewer may leave one out or add a document from the pair’s neighbourhood.
+     * @type {Array<string>}
+     * @memberof DecisionsToCaseDto
+     */
+    assetIds?: Array<string>;
 }
 
 /**
@@ -89,6 +95,7 @@ export function DecisionsToCaseDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'description': json['description'] == null ? undefined : json['description'],
         'severity': json['severity'] == null ? undefined : json['severity'],
         'attachFindings': json['attachFindings'] == null ? undefined : json['attachFindings'],
+        'assetIds': json['assetIds'] == null ? undefined : json['assetIds'],
     };
 }
 
@@ -109,6 +116,7 @@ export function DecisionsToCaseDtoToJSONTyped(value?: DecisionsToCaseDto | null,
         'description': value['description'],
         'severity': value['severity'],
         'attachFindings': value['attachFindings'],
+        'assetIds': value['assetIds'],
     };
 }
 

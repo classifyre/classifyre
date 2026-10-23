@@ -95,8 +95,11 @@ export function ExcludeValuesDialog({
       return next;
     });
 
+  // With nothing ticked (or nothing left to exclude: an earlier rule already
+  // took the template's values) the pairs are still recorded as not
+  // duplicates — the one decision this pattern always needs.
   const apply = async () => {
-    if (picked.size === 0) return;
+    if (!data) return;
     setBusy(true);
     try {
       const res = await api.correlationReview.correlationReviewControllerApply({
@@ -208,14 +211,16 @@ export function ExcludeValuesDialog({
           <Button
             size="sm"
             onClick={apply}
-            disabled={busy || picked.size === 0}
+            disabled={busy || !data}
           >
             {busy ? (
               <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
             ) : (
               <Ban className="mr-1.5 h-3.5 w-3.5" aria-hidden />
             )}
-            {t("review.exclude.apply", { count: picked.size })}
+            {picked.size > 0
+              ? t("review.exclude.apply", { count: picked.size })
+              : t("review.exclude.applyNone")}
           </Button>
         </DialogFooter>
       </DialogContent>
