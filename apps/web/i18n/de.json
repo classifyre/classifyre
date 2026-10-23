@@ -3608,6 +3608,7 @@
       "thisQueryLands": "Diese Anfrage-Beobachtung liefert Funde aus",
       "allSources": "allen Quellen",
       "anyFindingType": "jedem Befundtyp",
+      "valueIs": "mit dem Wert",
       "matchesTab": "Treffer",
       "timelineTab": "Verlauf",
       "goneCount": "{{count}} verschwunden",

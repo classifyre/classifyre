@@ -282,6 +282,10 @@ function InquiryDetailInner() {
     ...inquiry.findingTypes,
     ...inquiry.findingTypeRegex.map((r) => `/${r}/`),
   ];
+  // What the detected value itself must look like. A watch opened from
+  // duplicate review is nothing but these, and "any finding type" alone read
+  // as if it fired on everything.
+  const valueTokens = inquiry.findingValueRegex.map(readableValuePattern);
   const isArchived = inquiry.status === "ARCHIVED";
   const newCount = matchStats.newCount;
 
@@ -416,6 +420,22 @@ function InquiryDetailInner() {
                 </span>
               ))
             )}
+            {valueTokens.length > 0 && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground">
+                  {t("investigations.inquiryDetail.valueIs")}
+                </span>
+                {valueTokens.map((token) => (
+                  <span
+                    key={token}
+                    className="rounded border border-accent bg-accent/15 px-1.5 py-0.5 font-mono text-[11px]"
+                  >
+                    {token}
+                  </span>
+                ))}
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -520,4 +540,19 @@ function InquiryDetailInner() {
       </Tabs>
     </div>
   );
+}
+
+/**
+ * A value pattern as a person would write it. Duplicate review writes each
+ * value letter by letter in both cases with optional spacing between
+ * ("[gG][bB]5[\\s.\\-/]*3…"); undone, that is the value itself. Anything
+ * else is shown as the pattern it is.
+ */
+function readableValuePattern(pattern: string): string {
+  const plain = pattern
+    .replaceAll("[\\s.\\-/]*", "")
+    .replace(/\[([a-z])([A-Z])\]/g, (_, lower: string, upper: string) =>
+      lower.toUpperCase() === upper ? upper : `[${lower}${upper}]`,
+    );
+  return /[\\[\]()*+?{}|^$]/.test(plain) ? `/${pattern}/` : plain;
 }

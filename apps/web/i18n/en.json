@@ -3608,6 +3608,7 @@
       "thisQueryLands": "This query lands findings from",
       "allSources": "all sources",
       "anyFindingType": "any finding type",
+      "valueIs": "whose value is",
       "matchesTab": "Matches",
       "timelineTab": "History",
       "goneCount": "{{count}} gone",

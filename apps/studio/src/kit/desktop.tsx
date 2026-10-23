@@ -188,9 +188,10 @@ export function Browser({
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <ChevronLeft className="size-5 text-white/50" />
           <ChevronRight className="size-5 text-white/25" />
-          <div className="mx-auto flex h-[34px] w-[640px] items-center justify-center gap-2 rounded-[9px] bg-black/55 font-sans text-[15px] text-white/85">
-            {!typing && <Lock className="size-3.5 text-white/45" />}
-            <span>{url}</span>
+          {/* One line, as a browser shows it: a long address ends in an ellipsis. */}
+          <div className="mx-auto flex h-[34px] w-[640px] min-w-0 items-center justify-center gap-2 rounded-[9px] bg-black/55 px-4 font-sans text-[15px] text-white/85">
+            {!typing && <Lock className="size-3.5 shrink-0 text-white/45" />}
+            <span className="min-w-0 truncate whitespace-nowrap">{url}</span>
             {typing && <span className="-ml-1.5 h-[18px] w-px bg-white/80" />}
           </div>
           <RotateCw className="size-4 text-white/45" />

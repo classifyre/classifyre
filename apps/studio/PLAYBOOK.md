@@ -546,6 +546,29 @@ tag) is drawn outside the `Camera`.
   `@mdx-js/mdx`, on the file without its frontmatter): a stray brace in MDX
   breaks the site's build, not the studio's.
 
+## Learnt on the fifth film
+
+"Same or not" (duplicate review, October 2026) was the first film made after
+battle-testing the feature it shows, on the same workspace, with the film's
+steps driven through the app by the capture script. About twenty faults were
+fixed before a frame was drawn; a film that had shown them would have taught
+the fault.
+
+- **Drive the product, then film it.** `film/shots/capture.mjs` performs each
+  step (reject a pair, save a weight, save the cutoffs) and takes the screens on
+  the way, writing where each mark is to `marks.json`. Steps change the
+  workspace, so they run once, in the film's order.
+- **The address bar reads the public host** (`classifyre.com/<workspace>/…`)
+  with the real path behind it, never `localhost`.
+- **A dark title or end card covers Mr. Fyre** unless he is wrapped in an
+  `AbsoluteFill` with a higher `zIndex` than the card.
+- **A camera key list must rise.** A beat that is shorter in the voice than in
+  the plan makes two keys swap places, and the render stops; the check reel
+  finds it.
+- **Show a mistake you made, not one the product made.** A weight set to zero
+  that made seven pairs "perfect" is a lesson about weights; the same screen
+  showing a raw key or a broken link is a bug to fix first.
+
 ## Still to do
 
 - Extract the drawing parts of the sources table, findings table, inquiry

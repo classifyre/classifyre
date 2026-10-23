@@ -1,0 +1,351 @@
+---
+title: "Dasselbe oder nicht? Wie Dublettenabgleich die Belege gewichtet"
+description: Eine Erklärung in einfachen Worten zum Dublettenabgleich. Wie zwei Dokumente Wert für Wert verglichen werden, was ein Gewicht ist und wie die Punktzahl entsteht, was die beiden Grenzen entscheiden, wie man das Rauschen Schritt für Schritt wegstellt und was mit einem Treffer geschieht, der zählt, gezeigt am Laufwerk einer erfundenen Firma.
+date: 2026-10-23T00:00:00.000Z
+tags:
+  - duplicates
+  - matching
+  - weights
+  - data-quality
+  - investigations
+  - explainer
+categories:
+  - Guides
+author: Classifyre Team
+image: /blog/assets/images/same-or-not-duplicate-matching.jpg
+keywords:
+  - Dublettenerkennung erklärt
+  - gewichteter Abgleich
+  - Übereinstimmungswert
+  - Dublettenprüfung
+  - Schwellenwert
+  - doppelte Lieferantenrechnungen
+  - Textbausteine erkennen
+  - Deduplizierung einstellen
+  - Classifyre
+alternates:
+  canonical: /de/blog/articles/same-or-not-duplicate-matching
+  languages:
+    en: /blog/articles/same-or-not-duplicate-matching/
+    de: /de/blog/articles/same-or-not-duplicate-matching/
+    x-default: /blog/articles/same-or-not-duplicate-matching/
+openGraph:
+  type: article
+  title: "Dasselbe oder nicht? Wie Dublettenabgleich die Belege gewichtet"
+  description: Werte, Gewichte und zwei Grenzen in einfachen Worten, das Rauschen in einem echten Arbeitsbereich weggestellt, und zwei Lieferantenrechnungen auf ein Bankkonto.
+  url: /de/blog/articles/same-or-not-duplicate-matching
+  siteName: Classifyre
+  publishedTime: 2026-10-23T00:00:00.000Z
+  modifiedTime: 2026-10-23T00:00:00.000Z
+  authors:
+    - Classifyre Team
+  section: Guides
+  tags:
+    - duplicates
+    - matching
+    - weights
+    - data quality
+  images:
+    - /blog/assets/images/same-or-not-duplicate-matching.jpg
+twitter:
+  card: summary_large_image
+  title: "Dasselbe oder nicht? Wie Dublettenabgleich die Belege gewichtet"
+  description: Was ein Gewicht ist, was die beiden Grenzen entscheiden und wie ein Treffer, der zählt, aus der Warteschlange in einen Fall kommt.
+  images:
+    - /blog/assets/images/same-or-not-duplicate-matching.jpg
+---
+
+<ArticleHero
+  image="/blog/assets/images/same-or-not-duplicate-matching.jpg"
+  eyebrow="Erklärt"
+  title="Dasselbe oder nicht? Wie Dublettenabgleich die Belege gewichtet"
+  description="Wie zwei Dokumente verglichen werden, was ein Gewicht ist, was die beiden Grenzen entscheiden und was mit einem Treffer geschieht, der zählt."
+/>
+
+<ArticleJsonLd
+  headline="Dasselbe oder nicht? Wie Dublettenabgleich die Belege gewichtet"
+  description="Eine Erklärung in einfachen Worten zum Dublettenabgleich: Werte, Gewichte, die beiden Grenzen, Einstellen Schritt für Schritt und was mit einem Treffer geschieht, der zählt, gezeigt am Laufwerk einer erfundenen Firma."
+  path="/de/blog/articles/same-or-not-duplicate-matching"
+  datePublished="2026-10-23T00:00:00.000Z"
+  dateModified="2026-10-23T00:00:00.000Z"
+  authorName="Classifyre Team"
+  articleSection="Guides"
+
+  about={[
+    "Dublettenerkennung",
+    "Gewichteter Abgleich",
+    "Schwellenwerte",
+    "Textbausteine",
+    "Datenqualität",
+  ]}
+  mentions={[
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://www.classifyre.com",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+/>
+
+<ArticleSideRail
+  title="Dasselbe oder nicht? Wie Dublettenabgleich die Belege gewichtet"
+  path="/de/blog/articles/same-or-not-duplicate-matching/"
+  tags={["duplicates", "matching", "weights", "data-quality", "explainer"]}
+  backHref="/de/blog/articles"
+  backLabel="Alle Artikel"
+/>
+
+Zwei Rechnungen für denselben Auftrag. Zwei Entfeuchter, ein Luftgebläse,
+neun Tage. Eine über 612,00 £, eine über 598,50 £, einen Tag auseinander.
+Oben verschiedene Namen: Wexcombe Drying Hire Ltd und Wexcomb Dry Hire Ltd.
+Unten dasselbe Bankkonto.
+
+![Zwei Rechnungen auf einem schwarzen Tisch, die Lieferantennamen und die Zeilen mit dem Bankkonto grün markiert, mit den Zetteln „zwei Namen“ und „ein Bankkonto“ und dem Stempel „dasselbe oder nicht?“](/blog/assets/images/two-invoices-one-bank-account.webp)
+
+Ein Lieferant, der doppelt abrechnet, oder zwei Lieferanten? Bevor jemand
+fragen kann, muss etwas bemerken, dass die beiden zusammengehören. Hier geht
+es darum, wie eine Maschine entscheidet, dass zwei Dokumente dasselbe sind,
+wie man sie einstellt und was zu tun ist, wenn sie recht hat.
+
+<Alert>
+  <AlertTitle>Was erfunden ist und was echt</AlertTitle>
+  <AlertDescription>
+    Die Firma Hollowmere Restoration, ihre Kunden, ihre Lieferanten, deren
+    Leute, Bankkonten und Telefonnummern sind erfunden. Der Abgleich und jede
+    Zahl hier sind echt: die Antworten des Arbeitsbereichs am 23. Oktober
+    2026. Die Bilder stammen aus einem kurzen Film, den wir zu diesem Beitrag
+    gemacht haben; die grünen Rahmen und Zettel auf den Bildschirmen sind
+    unsere.
+  </AlertDescription>
+</Alert>
+
+## Was eine Maschine vergleicht
+
+Eine Maschine liest die beiden Rechnungen nicht so wie Sie. Detektoren ziehen
+die Werte heraus: Namen, Daten, Telefonnummern, Bankkonten. Dann werden die
+beiden Listen verglichen.
+
+Ein Wert, den beide Dokumente enthalten, ist ein Faden zwischen ihnen. Ein
+Wert, den nur eines enthält, ist ein loses Ende. Werte werden vor dem
+Vergleich bereinigt (Kleinschreibung, zusammengezogene Leerzeichen, bei
+Telefonnummern nur die Ziffern), also sind `020 7946 0588` und `02079460588`
+derselbe Wert. „Orrin Fairweather“ und „Oren Fairwether“ sind es nicht: Anders
+geschrieben, sind sie andere Werte.
+
+![Die Werte beider Rechnungen in zwei Spalten, grüne Fäden zwischen Telefon, Bankkonto und „nine days“, lose Enden beim Rest](/blog/assets/images/values-threads-and-loose-ends.webp)
+
+## Gewichte, in einfachen Worten
+
+Nicht jeder Faden ist gleich viel wert. Zwei Briefe, in denen beide „neun
+Tage“ steht, sagen nichts. Zwei Rechnungen auf dasselbe Bankkonto sagen viel.
+Darum trägt jede Art von Wert ein Gewicht. Das sind die ausgelieferten
+Werte, und jeder lässt sich ändern:
+
+| Ein gemeinsames … | wiegt |
+| --- | --- |
+| Datum, Ort, Organisation, alles nicht Genannte | 1 |
+| Name | 2 |
+| Adresse | 3 |
+| Telefonnummer | 4 |
+| E-Mail-Adresse | 5 |
+| Bankkonto (IBAN), Kartennummer, Pass | 6 |
+
+Die Punktzahl ist der Anteil dieses Gewichts auf beiden Seiten, der einen
+Partner gefunden hat. Für die beiden Rechnungen, bei den ausgelieferten
+Gewichten:
+
+| Art | Gewicht | Werte (eine + andere) | Im Spiel | Übereinstimmend |
+| --- | --- | --- | --- | --- |
+| Bankkonto | 6 | 1 + 1 | 12 | 12 |
+| Telefon | 4 | 1 + 1 | 8 | 8 |
+| Daten | 1 | 3 + 3 | 6 | 2 |
+| Namen | 2 | 2 + 1 | 6 | 0 |
+| Firmen | 1 | 1 + 2 | 3 | 0 |
+| **Summe** | | | **35** | **22** |
+
+22 ÷ 35 = **0,63**. Die Namen und die Firmennamen zählen gegen die Punktzahl:
+Sie waren im Spiel und haben keinen Partner gefunden.
+
+![Das Rechenbeispiel auf Papier: eine Waage, die Gewichtsleiter und die Tabelle, die mit 22 geteilt durch 35 gleich 0,63 endet, gestempelt: wie viel der Belege übereinstimmt](/blog/assets/images/match-weight-worked-example.webp)
+
+Die Punktzahl sagt also nicht, wie ähnlich sich zwei Dateien anfühlen. Sie
+sagt, wie viel ihrer Belege übereinstimmt. Deshalb kann auch ein kurzer
+Eintrag mit zwei übereinstimmenden Werten höher liegen als ein langer
+Bericht, der zwanzig von vierhundert Werten teilt: Der kurze Eintrag ist
+wirklich eher dasselbe.
+
+## Die zweite Maschine: wiederholter Text
+
+Werte erfassen eine Kontonummer. Einen zweimal geschriebenen Absatz übersehen
+sie. Dafür macht eine zweite Maschine aus Text Zahlenlisten, die ihn nach
+Bedeutung einordnen; [unser Beitrag über Vektoren](/de/blog/articles/search-by-meaning/)
+(und [der Film](https://www.youtube.com/watch?v=25SHwzepPKE)) zeigt, wie.
+
+In der Dublettenprüfung hat sie eine Aufgabe. Sie findet dieselbe Passage auf
+vielen Dokumenten: einen Briefkopf, eine Fußzeile, eine Vorlage. Das ist
+Mobiliar, kein Beleg, und zu wissen, dass es Mobiliar ist, erlaubt erst, es
+vom Abgleich auszunehmen.
+
+## Zwei Linien
+
+Zwei Grenzen entscheiden, was mit einer Punktzahl geschieht:
+
+| Unter der Prüflinie | Zwischen den Linien | Über der Zusammenführungslinie |
+| --- | --- | --- |
+| Fällt weg | Ihre Warteschlange | Gilt als dasselbe; niemand schaut hin |
+
+Ausgeliefert liegen die Linien bei 0,30 und 0,60. Die beiden Rechnungen
+landen mit 0,63 knapp über der Zusammenführungslinie: als dasselbe abgelegt,
+ohne dass jemand sie sieht. Wo Sie die Zusammenführungslinie ziehen,
+entscheidet, was Sie nie zu sehen bekommen.
+
+![Ein Lineal von 0 bis 1 mit der Prüflinie bei 0,30, der Zusammenführungslinie bei 0,60, dazwischen grün die Warteschlange, und die beiden Rechnungen bei 0,63: was Sie nie sehen](/blog/assets/images/review-and-merge-cutoffs.webp)
+
+## Das Rauschen wegstellen, eine Änderung nach der anderen
+
+Das gemeinsame Laufwerk der Firma hatte in Classifyre nach dem Scan 146 Paare
+mit Übereinstimmung, 100 davon über der Zusammenführungslinie. Zieht man die
+Linie kurz auf 0,9 hoch (Ziehen ändert nur die eigene Ansicht, bis man
+speichert), kommen sie in die Warteschlange. Ganz oben: 38 Paare der eigenen
+Rechnungen der Firma, an sechs verschiedene Kunden.
+
+**1. Die eigenen Werte der Firma.** Ein solches Paar erreichte 0,86.
+Verschiedene Kunden, verschiedene Aufträge; gemeinsam hatten sie das eigene
+Bankkonto der Firma, ihr Telefon, ihre Adresse und ihre Zahlungsbedingungen.
+„Keine Dublette“ öffnet **Was diese Übereinstimmung verursacht hat**: jeder
+gemeinsame Wert, mit der Zahl der Dokumente, in denen er steht, hier acht
+oder neun. Dieselben Label hatten 25 weitere Paare erzeugt. Die vier Werte
+anhaken und **Diese Werte nicht mehr für Treffer nutzen** schreibt eine Regel
+je Wert, auf sein Label. Das Label selbst zählt weiter: Das eigene Bankkonto
+der Firma passt nicht mehr, das Bankkonto eines Lieferanten auf zwei
+Rechnungen sehr wohl.
+
+![Der Dialog „Was diese Übereinstimmung verursacht hat“: Bankkonto, Telefon, Zahlungsziel und Adresse der Firma, je in 8 oder 9 Dokumenten, dieselbe Kombination hat 25 weitere Paare erzeugt](/blog/assets/images/classifyre-what-made-these-match.webp)
+
+**2. Die Fußzeile.** Nach der Neuberechnung waren die Werte weg, und übrig
+war die Fußzeile der Rechnungen selbst. Die Maschine für wiederholten Text
+legte sie als *Regelkandidat* ab: 25 Paare. Es gab nichts mehr
+auszuschließen, also wurden die Paare des Musters in einem Schritt als keine
+Dubletten erfasst. Die eine Maschine sagt, was übereinstimmte; die andere,
+dass es Mobiliar war.
+
+![Ein Muster wiederholten Texts, als Regelkandidat markiert, 25 Paare auf 8 Rechnungen](/blog/assets/images/classifyre-repeated-text-footer.webp)
+
+**3. Gewichte.** Wir haben Daten auf null gesetzt. Sieben Paare, die nur einen
+Ortsnamen teilten, sprangen auf eine glatte 1,00. Null heißt nicht: Ignoriere
+ein Datum, wenn es widerspricht. Es heißt, das Datum ist nicht da, und der
+Gegenbeleg verschwindet mit ihm:
+
+| Ein gemeinsamer Ortsname, drei Daten je Seite, keines gemeinsam | Punktzahl |
+| --- | --- |
+| Daten bei 1 | 2 ÷ 8 = 0,25 |
+| Daten bei 0 | 2 ÷ 2 = 1,00 |
+
+Daten gingen zurück auf 1. Stattdessen gingen Namen von 2 auf 1: Eine
+Unterschrift setzt denselben Namen unter jeden Brief. Das Muster der Paare,
+die nur über einen Namen passten, ging von 23 Paaren mit durchschnittlich
+0,65 auf 21 mit 0,58.
+
+![Die Seite zum Einstellen mit Daten auf 0 und einem Kasten, der ein Paar durchrechnet: 0,25 mit Daten bei 1, 1,00 mit Daten bei 0](/blog/assets/images/dates-at-zero-worked-example.webp)
+
+**4. Die Linien.** Prüfen bei 0,40, Zusammenführen bei 0,85, gespeichert.
+Unter 0,40 wird nichts mehr gespeichert, und 73 Paare blieben zum Ansehen. Die
+beiden Rechnungen vom Anfang, jetzt bei 0,71, liegen zwischen den Linien: Bei
+den ausgelieferten 0,60 wären sie als dasselbe abgelegt worden, ohne dass
+jemand hinsieht.
+
+| | Paare | Über der Zusammenführung | Zu prüfen |
+| --- | --- | --- | --- |
+| Nach dem Scan, ausgelieferte Linien | 146 | 100 | 46 |
+| Nach den vier Schritten | 141 | 36 | 73 offen |
+
+## Ein Paar lesen
+
+Das Lieferantenpaar nach dem Einstellen, von oben gelesen:
+
+- **Übereinstimmungsgewicht**, 0,71: der Anteil der gewichteten Belege, der
+  übereinstimmt.
+- **Grün und Rot**: Grüne Werte stehen auf beiden Seiten, rote nur auf einer.
+- **Warum diese Punktzahl**: ein Balken je Art von Wert. Die Balken ergeben
+  zusammen die Zahl darüber; nichts ist in einer Mischung versteckt. Bankkonto
+  (+0,39) und Telefon (+0,26) tragen sie; die Namen ziehen sie herunter.
+- **Verbundene Dokumente**: Die beiden sind zu keinem Cluster verbunden (keine
+  Verbindung erreicht die Zusammenführungslinie), also zeigt der Kasten die
+  Dokumente, die zu einem der beiden passen. Eines ist ein Antrag für einen
+  neuen Lieferanten, mit 0,77 und 0,67 zu beiden. In einem Cluster zeigt
+  derselbe Kasten das Cluster und markiert die schwächste Verbindung, die man
+  trennt, wenn eine Kette zwei Dinge verbunden hat, die nicht zusammengehören.
+- **Die Werte hinter der Übereinstimmung**: jede Art, ihr Gewicht, ihr Beitrag
+  und die gemeinsamen Werte. Die Lupe in einer Zeile zeigt, **wo dieser Wert
+  sonst vorkommt**.
+
+![Warum 0,71: Bankkonto und Telefon tragen die Punktzahl, Namen und Firmen ziehen sie herunter; daneben der Lieferantenantrag, verbunden mit beiden Rechnungen](/blog/assets/images/classifyre-why-it-scored.webp)
+
+Wo kommt das Bankkonto noch vor? In vier Dokumenten. Eines ist die Liste der
+zugelassenen Lieferanten, in der es seit dem 2. November 2022 dem Lieferanten
+S-007, Wexcombe Drying Hire Ltd, gehört. Der „neue“ Lieferant wird also auf
+das Konto eines alten bezahlt, und beide haben dieselben Maschinen für
+dieselben neun Tage und denselben Auftrag berechnet.
+
+![Wo dieser Wert sonst vorkommt: das Bankkonto in vier Dokumenten, darunter die Liste der zugelassenen Lieferanten](/blog/assets/images/classifyre-where-else-supplier-list.webp)
+
+## Wohin der Treffer geht
+
+Vom Paar aus geht es in zwei Richtungen:
+
+- **Zum Fall hinzufügen** legt beide Rechnungen mit allem, was darin gefunden
+  wurde, auf eine Fallwand. Die Umgebung des Paars wird mit angeboten, hier
+  der Lieferantenantrag. Der Fall hielt 3 Dokumente und ihre 23 Befunde.
+- **Untersuchung anlegen** beobachtet weiter die Werte, die die Punktzahl
+  getragen haben: dieses Bankkonto und diese Telefonnummer, wie auch immer
+  geschrieben oder getrennt, in derselben Quelle. Am Tag hatte sie acht
+  Treffer (beide Werte in je vier Dokumenten). Die nächste Rechnung mit diesen
+  Werten landet dort.
+
+![Eine Untersuchung, deren Wert das Bankkonto oder die Telefonnummer ist, mit acht Treffern](/blog/assets/images/classifyre-inquiry-watches-values.webp)
+
+## Entscheidungen
+
+Jedes Paar endet mit einem Urteil:
+
+| Urteil | Bedeutet | Spätere Scans |
+| --- | --- | --- |
+| Bestätigen | Dasselbe | Unverändert |
+| Keine Dublette | Verschieden | Bleiben getrennt |
+| Cluster hier trennen | Das Paar soll kein Cluster zusammenhalten | Bleiben getrennt, Cluster neu gebildet |
+| Unsicher | Eine Antwort, kein Ausweg | Unverändert |
+
+Unter **Entscheidungen** sammeln sie sich: was Sie geurteilt haben, bei
+welcher Punktzahl und wohin es ging. **Noch ungenutzt** zeigt bestätigte
+Dubletten, die nie weitergegangen sind: hier eine geänderte Rechnung und der
+zweite Entwurf eines Briefs. Meistens ist das in Ordnung. Wenn nicht, wählen
+Sie sie aus und schicken sie in einen Fall oder eine Untersuchung. Und schauen
+Sie nach dem Einstellen wieder vorbei: Ein Urteil behält die Punktzahl, bei
+der es gefällt wurde, und ein seitdem neu bewertetes Paar ist zur
+nochmaligen Prüfung markiert.
+
+![Entscheidungen, gefiltert auf noch ungenutzt: eine geänderte Rechnung und ein zweiter Entwurf, beide bestätigt und nicht verwendet](/blog/assets/images/classifyre-decisions-went-nowhere.webp)
+
+## Was das nicht tut
+
+- **Es führt nichts zusammen und löscht nichts.** Es hält Urteile fest; Ihre
+  Dateien bleiben, wie sie sind.
+- **Es kann nicht sagen, warum es zwei Lieferanteneinträge gibt**: ein
+  Versehen, eine Umbenennung oder etwas anderes. Dafür ist der Fall da.
+- **Es gewichtet, was man ihm zu gewichten sagt.** Die Gewichte sind Ihre; die
+  ausgelieferten sind ein Anfang, keine Antwort über Ihre Daten.
+
+## Zwei Gewohnheiten
+
+Lesen Sie die gemeinsamen Werte vor der Punktzahl. Und ändern Sie immer nur
+eine Sache, dann sehen Sie hin.
+
+Jede Zahl auf diesen Seiten ist in der Dokumentation erklärt:
+[docs.classifyre.com/duplicates](https://docs.classifyre.com/duplicates/).
+
+<RelatedCasePosts
+  section="articles"
+  currentPath="/de/blog/articles/same-or-not-duplicate-matching"
+  heading="Mehr aus dem Blog"
+/>
