@@ -919,10 +919,7 @@ export class CorrelationReviewService {
       const linked = await this.prisma.correlationPairSignature.findMany({
         where: {
           family: { not: 'NEAR_DUPLICATE_TEXT' },
-          OR: [
-            { aId: { in: [aId, bId] } },
-            { bId: { in: [aId, bId] } },
-          ],
+          OR: [{ aId: { in: [aId, bId] } }, { bId: { in: [aId, bId] } }],
         },
         select: { aId: true, bId: true },
         orderBy: { weighted: 'desc' },
@@ -1496,7 +1493,9 @@ export class CorrelationReviewService {
     // The reviewer may untick an asset, or add the document that ties a pair
     // to a third; without a list, both sides of every pair go in.
     const picked = Array.isArray(dto.assetIds)
-      ? dto.assetIds.filter((id): id is string => typeof id === 'string' && !!id)
+      ? dto.assetIds.filter(
+          (id): id is string => typeof id === 'string' && !!id,
+        )
       : [];
     const assetIds =
       picked.length > 0
@@ -1575,18 +1574,20 @@ export class CorrelationReviewService {
     const watched = valuesToWatch(
       signatures.flatMap((s) => {
         const b = held.get(s.bId) ?? new Set<string>();
-        return [...(held.get(s.aId) ?? [])]
-          .filter((key) => b.has(key))
-          .map((key) => {
-            const [label, value] = key.split('\u0000');
-            return { label, value, weight: weightOf(label) };
-          })
-          // One pair's strongest labels, not the batch's: each pair is a
-          // pair for its own reasons.
-          .filter((v, _, all) => {
-            const top = Math.max(...all.map((x) => x.weight));
-            return v.weight >= top / 2;
-          });
+        return (
+          [...(held.get(s.aId) ?? [])]
+            .filter((key) => b.has(key))
+            .map((key) => {
+              const [label, value] = key.split('\u0000');
+              return { label, value, weight: weightOf(label) };
+            })
+            // One pair's strongest labels, not the batch's: each pair is a
+            // pair for its own reasons.
+            .filter((v, _, all) => {
+              const top = Math.max(...all.map((x) => x.weight));
+              return v.weight >= top / 2;
+            })
+        );
       }),
     );
     // An inquiry with no value pattern would match every finding in the
@@ -1604,8 +1605,7 @@ export class CorrelationReviewService {
         `Duplicates matching on ${labels.join(', ') || 'shared values'}`,
       description:
         `Watches for ${watched.map((w) => w.value).join(', ') || 'the values these pairs share'}. ` +
-        `Opened from duplicate review on ${pairs.length} pair(s) ` +
-        `in pattern "${signatures[0]?.patternKey ?? 'unknown'}".`,
+        `Opened from duplicate review on ${pairs.length === 1 ? 'one pair' : `${pairs.length} pairs`}.`,
       matchAllSources: false,
       sourceIds,
       findingValueRegex: watched.map((w) => valuePattern(w.value)),
