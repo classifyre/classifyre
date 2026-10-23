@@ -144,6 +144,12 @@ describe("sitemap-config", () => {
       expect(entityUrl(base, "acme", "inquiry", "i1")).toBe(
         `${base}/acme/investigations/inquiries/i1/`,
       );
+      expect(entityUrl(base, "acme", "term", "accommodation-and-food")).toBe(
+        `${base}/acme/glossary/terms/accommodation-and-food/`,
+      );
+      expect(appUrl(base, "acme", "/glossary?tab=entities")).toBe(
+        `${base}/acme/glossary/?tab=entities`,
+      );
       expect(entityUrl(base, "acme", "scan", "r1")).toBe(
         `${base}/acme/scans/r1/`,
       );

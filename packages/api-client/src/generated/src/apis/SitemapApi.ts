@@ -133,6 +133,7 @@ export const SitemapControllerGetEntriesTypeEnum = {
     Case: 'case',
     Inquiry: 'inquiry',
     Detector: 'detector',
-    Scan: 'scan'
+    Scan: 'scan',
+    Term: 'term'
 } as const;
 export type SitemapControllerGetEntriesTypeEnum = typeof SitemapControllerGetEntriesTypeEnum[keyof typeof SitemapControllerGetEntriesTypeEnum];

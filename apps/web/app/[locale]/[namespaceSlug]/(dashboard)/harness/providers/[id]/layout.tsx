@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
 import { isLocale } from "@/lib/locale-detection";
-import { sectionMetadata } from "@/lib/seo-metadata";
+import { entityMetadata } from "@/lib/seo-metadata";
+import { seoEntityName } from "@/lib/seo-entity";
 
 export async function generateMetadata({
   params,
@@ -10,12 +11,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale, namespaceSlug, id } = await params;
   if (!isLocale(locale)) return {};
-  return {
-    ...(await sectionMetadata(locale, "seo.harnessProvider", {
-      namespaceSlug,
-      path: `/harness/providers/${id}`,
-    })),
-  };
+  const name = await seoEntityName("provider", namespaceSlug, id);
+  return entityMetadata(locale, "seo.harnessProvider", name, {
+    namespaceSlug,
+    path: `/harness/providers/${id}`,
+  });
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {

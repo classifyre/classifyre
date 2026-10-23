@@ -8715,7 +8715,8 @@
                 "case",
                 "inquiry",
                 "detector",
-                "scan"
+                "scan",
+                "term"
               ],
               "type": "string"
             }
@@ -28481,7 +28482,8 @@
               "case",
               "inquiry",
               "detector",
-              "scan"
+              "scan",
+              "term"
             ]
           },
           "total": {
@@ -28559,7 +28561,8 @@
               "case",
               "inquiry",
               "detector",
-              "scan"
+              "scan",
+              "term"
             ]
           },
           "chunk": {

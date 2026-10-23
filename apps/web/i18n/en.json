@@ -6549,7 +6549,73 @@
       "title": "Glossary — Canonical Vocabulary & Entity Map",
       "description": "Canonical vocabulary shared by operators, cases and every AI Harness run. Add terms, aliases and entity types — person, organization, location — and verify what the autopilot should treat as ground truth.",
       "ogTitle": "Glossary — Canonical Vocabulary | Classifyre",
-      "ogDescription": "Shared terms, aliases and entity annotations that operators, cases and the AI Harness all rely on."
+      "ogDescription": "Shared terms, aliases and entity annotations that operators, cases and the AI Harness all rely on.",
+      "tabs": {
+        "concepts": {
+          "title": "Glossary Concepts — Canonical Terms & Definitions",
+          "description": "Browse every concept in the glossary: canonical terms, aliases, codes and definitions that operators, cases and the AI Harness share.",
+          "ogTitle": "Glossary Concepts — Canonical Terms & Definitions",
+          "ogDescription": "Browse every concept in the glossary: canonical terms, aliases, codes and definitions that operators, cases and the AI Harness share."
+        },
+        "entities": {
+          "title": "Glossary Entities — People, Organizations & Places",
+          "description": "The entities the glossary knows about — people, organizations and places — with their aliases, identifiers and how often they are mentioned in your data.",
+          "ogTitle": "Glossary Entities — People, Organizations & Places",
+          "ogDescription": "The entities the glossary knows about — people, organizations and places — with their aliases, identifiers and how often they are mentioned in your data."
+        },
+        "schemes": {
+          "title": "Glossary Schemes — Controlled Vocabularies",
+          "description": "Schemes group glossary terms into controlled vocabularies and taxonomies. Review each scheme and the terms filed under it.",
+          "ogTitle": "Glossary Schemes — Controlled Vocabularies",
+          "ogDescription": "Schemes group glossary terms into controlled vocabularies and taxonomies. Review each scheme and the terms filed under it."
+        },
+        "vocabulary": {
+          "title": "Unbound Vocabulary — Values Without a Glossary Term",
+          "description": "The values your data actually produces that no glossary term covers yet. Bind them to a term to give them one meaning everywhere.",
+          "ogTitle": "Unbound Vocabulary — Values Without a Glossary Term",
+          "ogDescription": "The values your data actually produces that no glossary term covers yet. Bind them to a term to give them one meaning everywhere."
+        },
+        "proposals": {
+          "title": "Glossary Proposals — Review Queue",
+          "description": "Suggested terms, aliases and entity links waiting for a decision. Approve what is right and reject what is not.",
+          "ogTitle": "Glossary Proposals — Review Queue",
+          "ogDescription": "Suggested terms, aliases and entity links waiting for a decision. Approve what is right and reject what is not."
+        }
+      }
+    },
+    "glossaryTerm": {
+      "title": "Glossary Term — Definition, Evidence & Bindings",
+      "description": "One glossary term: its definition, aliases and codes, the documents that are evidence of it, and the detectors, cases and watches that rely on it.",
+      "ogTitle": "Glossary Term — Definition & Evidence | Classifyre",
+      "ogDescription": "A glossary term with its definition, aliases, evidence in your data and the cases that rely on it.",
+      "titleWithEntity": "{{name}} — Glossary Term",
+      "descriptionWithEntity": "{{name}} — definition, aliases, evidence in your data and the cases and watches that rely on this glossary term.",
+      "tabs": {
+        "overview": {
+          "titleWithEntity": "{{name}} — Glossary Term",
+          "descriptionWithEntity": "{{name}} — definition, aliases, codes and relations in the glossary, with the data and cases that rely on it."
+        },
+        "entity": {
+          "titleWithEntity": "{{name}} — Mentions & Identifiers",
+          "descriptionWithEntity": "{{name}} — identifiers, attributes and every mention of this entity found in your data."
+        },
+        "evidence": {
+          "titleWithEntity": "{{name}} — Evidence & Documents",
+          "descriptionWithEntity": "{{name}} — the documents and values in your data that are evidence of this glossary term."
+        },
+        "bindings": {
+          "titleWithEntity": "{{name}} — Bindings",
+          "descriptionWithEntity": "{{name}} — the detectors, fields and lookups that bind data to this glossary term."
+        },
+        "usage": {
+          "titleWithEntity": "{{name}} — Cases & Watches",
+          "descriptionWithEntity": "{{name}} — the cases and watches that rely on this glossary term."
+        },
+        "activity": {
+          "titleWithEntity": "{{name}} — Activity",
+          "descriptionWithEntity": "{{name}} — the change history of this glossary term."
+        }
+      }
     },
     "fingerprints": {
       "title": "Fingerprints — Evidence Correlations & Shared Values",

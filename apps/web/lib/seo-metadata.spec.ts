@@ -7,11 +7,24 @@
 
 import type { Metadata } from "next";
 
-import { entityMetadata, sectionMetadata, siteMetadata } from "./seo-metadata";
+import {
+  entityMetadata,
+  sectionMetadata,
+  siteMetadata,
+  tabMetadata,
+} from "./seo-metadata";
 
 // Deliberately not a *.classifyre.com host: the defect being pinned was a
 // self-hosted instance declaring the marketing domain as its own canonical.
 const BASE = "https://data.acme-internal.test";
+
+  const absoluteTitle = (meta: Metadata): string => {
+    const title = meta.title;
+    if (title && typeof title === "object" && "absolute" in title) {
+      return title.absolute ?? "";
+    }
+    return typeof title === "string" ? title : "";
+  };
 
 describe("seo metadata", () => {
   const originalEnv = { ...process.env };
@@ -101,13 +114,6 @@ describe("seo metadata", () => {
     // layout's string title resets Next's stashed title template — so entity
     // titles carry the site suffix as `absolute` (template-immune) instead of
     // relying on the template.
-    const absoluteTitle = (meta: Metadata): string => {
-      const title = meta.title;
-      if (title && typeof title === "object" && "absolute" in title) {
-        return title.absolute ?? "";
-      }
-      return typeof title === "string" ? title : "";
-    };
 
     it("uses the real name when one is known", async () => {
       const meta = await entityMetadata(
@@ -155,6 +161,44 @@ describe("seo metadata", () => {
 
       expect(absoluteTitle(de)).toContain("Wiki");
       expect(absoluteTitle(de)).not.toBe(absoluteTitle(en));
+    });
+  });
+
+  describe("tabs", () => {
+    it("gives each tab its own title, description and canonical", async () => {
+      const entities = await tabMetadata("en", "seo.glossary.tabs.entities", null, {
+        namespaceSlug: "acme",
+        path: "/glossary",
+        query: "tab=entities",
+      });
+      const schemes = await tabMetadata("en", "seo.glossary.tabs.schemes", null, {
+        namespaceSlug: "acme",
+        path: "/glossary",
+        query: "tab=schemes",
+      });
+
+      expect(entities.alternates?.canonical).toBe(
+        `${BASE}/acme/glossary/?tab=entities`,
+      );
+      expect(entities.alternates?.languages?.de).toBe(
+        `${BASE}/de/acme/glossary/?tab=entities`,
+      );
+      expect(entities.title).not.toEqual(schemes.title);
+      expect(entities.description).not.toEqual(schemes.description);
+    });
+
+    it("names the entity on an entity tab, with the site suffix once", async () => {
+      const meta = await tabMetadata(
+        "en",
+        "seo.glossaryTerm.tabs.evidence",
+        "Accommodation",
+        { namespaceSlug: "acme", path: "/glossary/terms/accommodation", query: "tab=evidence" },
+      );
+
+      const title = absoluteTitle(meta);
+      expect(title).toContain("Accommodation");
+      expect(title.match(/\| Classifyre/g)).toHaveLength(1);
+      expect(String(meta.description)).toContain("Accommodation");
     });
   });
 });

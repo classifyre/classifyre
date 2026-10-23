@@ -36,7 +36,10 @@ import {
   TabsTrigger,
   Textarea,
 } from "@workspace/ui/components";
+import { useDocumentView } from "@/components/document-title-updater";
 import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
+import { glossaryTabOf, type GlossaryTab } from "@/lib/glossary-tabs";
 import {
   exportGlossaryUrl,
   importGlossary,
@@ -56,14 +59,7 @@ import { TermEditorDialog } from "./term-editor-dialog";
 import { TermsPanel } from "./terms-panel";
 import { VocabularyPanel } from "./vocabulary-panel";
 
-type Tab = "concepts" | "entities" | "schemes" | "vocabulary" | "proposals";
-const TABS: Tab[] = [
-  "concepts",
-  "entities",
-  "schemes",
-  "vocabulary",
-  "proposals",
-];
+type Tab = GlossaryTab;
 
 function PacksDialog({
   open,
@@ -407,8 +403,18 @@ export function GlossaryWorkspace({
   const searchParams = useSearchParams();
   const [tab, setTab] = React.useState<Tab>(() => {
     const wanted = searchParams?.get("tab");
-    return TABS.includes(wanted as Tab) ? (wanted as Tab) : "concepts";
+    return glossaryTabOf(wanted) ?? "concepts";
   });
+  // Each tab has its own title and description; the embedded copy (inside
+  // another page) leaves the host page's head alone.
+  useDocumentView(
+    embedded
+      ? null
+      : {
+          title: t(`seo.glossary.tabs.${tab}.title` as TranslationKey),
+          description: t(`seo.glossary.tabs.${tab}.description` as TranslationKey),
+        },
+  );
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [editing, setEditing] = React.useState<Term | null>(null);
   const [editorOpen, setEditorOpen] = React.useState(false);
@@ -493,7 +499,11 @@ export function GlossaryWorkspace({
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+      <Tabs
+        urlParam={embedded ? undefined : "tab"}
+        value={tab}
+        onValueChange={(value) => setTab(value as Tab)}
+      >
         <TabsList>
           <TabsTrigger value="concepts">
             {t("glossary.tabs.concepts")}

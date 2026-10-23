@@ -1,5 +1,6 @@
 "use client";
 
+import type { TermTab } from "@/lib/glossary-tabs";
 import * as React from "react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -280,13 +281,7 @@ export function TermEvidence({ term }: { term: TermDetail }) {
 
 // ── Where the term is used ───────────────────────────────────────────────────
 
-export type TermTab =
-  | "overview"
-  | "entity"
-  | "evidence"
-  | "bindings"
-  | "usage"
-  | "activity";
+export type { TermTab };
 
 /**
  * The term's usage at a glance, above the tabs: how much data links to it,

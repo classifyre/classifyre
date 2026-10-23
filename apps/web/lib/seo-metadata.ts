@@ -36,6 +36,13 @@ export interface PageLocation {
   namespaceSlug?: string;
   /** Path below the workspace root, e.g. "/assets" or "/assets/<id>". */
   path?: string;
+  /**
+   * Query string that selects a distinct view of the page, without the `?` —
+   * `"tab=entities"`. Only for views with their own title and description (a
+   * tab); it becomes part of the canonical URL so each such view is indexed
+   * on its own instead of collapsing onto the default one.
+   */
+  query?: string;
 }
 
 /**
@@ -82,7 +89,8 @@ function canonicalPath(locale: Locale, location: PageLocation): string {
     : "";
   const rest = location.path && location.path !== "/" ? location.path : "";
   const path = `${localePathPrefix(locale)}${namespace}${rest}`;
-  return path === "" ? "/" : `${path}/`;
+  const query = location.query ? `?${location.query}` : "";
+  return path === "" ? `/${query}` : `${path}/${query}`;
 }
 
 /** `alternates`, absolute when the origin is known and omitted when it is not. */
@@ -232,6 +240,44 @@ export async function entityMetadata(
     // — a plain string here renders without the site suffix every section
     // page gets. `absolute` never takes the template, so it renders the
     // suffix exactly once and can never double-apply it.
+    title: { absolute: suffixed },
+    description,
+    alternates: alternates(baseUrl, locale, location),
+    openGraph: {
+      locale: localeOpenGraph(locale),
+      title: suffixed,
+      description,
+    },
+  };
+}
+
+/**
+ * Metadata for one tab of a page, in the page's own `<head>` (the tab is a
+ * query string, which only a page — not a layout — can read).
+ *
+ * `key` is the `seo.*` namespace of the tab. With `entityName` it uses the
+ * `*WithEntity` templates (a term's tab); without, plain `title` /
+ * `description` / `ogTitle` / `ogDescription` (a list tab). The title is
+ * `absolute` for the reason spelled out on {@link entityMetadata}.
+ */
+export async function tabMetadata(
+  locale: Locale,
+  key: string,
+  entityName: string | null,
+  location: PageLocation = {},
+): Promise<Metadata> {
+  const baseUrl = await resolveConfiguredBaseUrl();
+  const siteName = translateFor(locale, "app.name");
+  const values = { name: entityName ?? "" };
+  const title = entityName
+    ? translateFor(locale, `${key}.titleWithEntity`, values)
+    : translateFor(locale, `${key}.title`);
+  const description = entityName
+    ? translateFor(locale, `${key}.descriptionWithEntity`, values)
+    : translateFor(locale, `${key}.description`);
+  const suffixed = `${title} | ${siteName}`;
+
+  return {
     title: { absolute: suffixed },
     description,
     alternates: alternates(baseUrl, locale, location),

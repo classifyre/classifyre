@@ -68,6 +68,49 @@ const EntityTitleContext = React.createContext<
   ((name: string | null) => void) | null
 >(null);
 
+/** What a page says about the view it is showing right now (a tab). */
+export interface DocumentView {
+  /** The whole page title, before the workspace and app suffix. */
+  title: string;
+  /** The meta description for this view. */
+  description?: string;
+}
+
+const ViewContext = React.createContext<
+  ((view: DocumentView | null) => void) | null
+>(null);
+
+/**
+ * Announce the view of a page that has its own title and description — a tab.
+ * It wins over the entity name, which only names the page as a whole, and it
+ * also rewrites `<meta name="description">`, so the head says what the visible
+ * tab shows. The server renders the same copy for a deep link
+ * (`?tab=evidence`), which is what crawlers read.
+ */
+export function useDocumentView(view: DocumentView | null): void {
+  const setView = React.useContext(ViewContext);
+  const title = view?.title ?? null;
+  const description = view?.description ?? null;
+  React.useEffect(() => {
+    if (!setView) return;
+    setView(title ? { title, ...(description ? { description } : {}) } : null);
+    return () => setView(null);
+  }, [setView, title, description]);
+}
+
+function writeDescription(content: string): void {
+  for (const selector of [
+    'meta[name="description"]',
+    'meta[property="og:description"]',
+  ]) {
+    document.head
+      .querySelectorAll<HTMLMetaElement>(selector)
+      .forEach((meta) => {
+        if (meta.content !== content) meta.content = content;
+      });
+  }
+}
+
 /** The name the current detail page announced, for the breadcrumb's last crumb. */
 const EntityNameContext = React.createContext<string | null>(null);
 
@@ -111,6 +154,7 @@ export function DocumentTitleUpdater({
   const namespace = useOptionalNamespace();
   const workspaceName = namespace?.displayName ?? null;
   const [entityName, setEntityName] = React.useState<string | null>(null);
+  const [view, setView] = React.useState<DocumentView | null>(null);
 
   React.useEffect(() => {
     // Inside a workspace every route is `/<locale?>/<namespaceSlug>/…`; the
@@ -125,13 +169,16 @@ export function DocumentTitleUpdater({
       return;
     }
 
-    const pageTitle = entityName ?? t(key as Parameters<typeof t>[0]);
+    const pageTitle =
+      view?.title ?? entityName ?? t(key as Parameters<typeof t>[0]);
     const appName = t("app.name");
     const desired = workspaceName
       ? `${pageTitle} - ${workspaceName} | ${appName}`
       : `${pageTitle} | ${appName}`;
 
     document.title = desired;
+    const description = view?.description;
+    if (description) writeDescription(description);
 
     // Route metadata is streamed in its own boundary, so React can write the
     // server-rendered <title> *after* this effect has run. Reassert ours until
@@ -141,17 +188,20 @@ export function DocumentTitleUpdater({
       if (document.title !== desired) {
         document.title = desired;
       }
+      if (description) writeDescription(description);
     });
     observer.observe(document.head, { childList: true, subtree: true });
 
     return () => observer.disconnect();
-  }, [entityName, namespace, pathname, t, workspaceName]);
+  }, [entityName, namespace, pathname, t, view, workspaceName]);
 
   return (
     <EntityTitleContext.Provider value={setEntityName}>
-      <EntityNameContext.Provider value={entityName}>
-        {children}
-      </EntityNameContext.Provider>
+      <ViewContext.Provider value={setView}>
+        <EntityNameContext.Provider value={entityName}>
+          {children}
+        </EntityNameContext.Provider>
+      </ViewContext.Provider>
     </EntityTitleContext.Provider>
   );
 }

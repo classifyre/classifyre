@@ -6549,7 +6549,73 @@
       "title": "Glossar — verbindliches Vokabular & Entitätskarte",
       "description": "Verbindliches Vokabular für Bearbeitende, Fälle und jeden Lauf des KI-Harness. Ergänzen Sie Begriffe, Aliasse und Entitätstypen — Person, Organisation, Ort — und legen Sie fest, was der Autopilot als gesichert behandeln soll.",
       "ogTitle": "Glossar — verbindliches Vokabular | Classifyre",
-      "ogDescription": "Gemeinsame Begriffe, Aliasse und Entitätsangaben, auf die sich Bearbeitende, Fälle und das KI-Harness stützen."
+      "ogDescription": "Gemeinsame Begriffe, Aliasse und Entitätsangaben, auf die sich Bearbeitende, Fälle und das KI-Harness stützen.",
+      "tabs": {
+        "concepts": {
+          "title": "Glossar-Konzepte — verbindliche Begriffe & Definitionen",
+          "description": "Alle Konzepte des Glossars: verbindliche Begriffe, Aliasse, Codes und Definitionen, die Bearbeitende, Fälle und das KI-Harness gemeinsam nutzen.",
+          "ogTitle": "Glossar-Konzepte — verbindliche Begriffe & Definitionen",
+          "ogDescription": "Alle Konzepte des Glossars: verbindliche Begriffe, Aliasse, Codes und Definitionen, die Bearbeitende, Fälle und das KI-Harness gemeinsam nutzen."
+        },
+        "entities": {
+          "title": "Glossar-Entitäten — Personen, Organisationen & Orte",
+          "description": "Die Entitäten, die das Glossar kennt — Personen, Organisationen und Orte — mit Aliassen, Kennungen und der Häufigkeit ihrer Erwähnung in Ihren Daten.",
+          "ogTitle": "Glossar-Entitäten — Personen, Organisationen & Orte",
+          "ogDescription": "Die Entitäten, die das Glossar kennt — Personen, Organisationen und Orte — mit Aliassen, Kennungen und der Häufigkeit ihrer Erwähnung in Ihren Daten."
+        },
+        "schemes": {
+          "title": "Glossar-Schemata — kontrollierte Vokabulare",
+          "description": "Schemata fassen Glossarbegriffe zu kontrollierten Vokabularen und Taxonomien zusammen. Prüfen Sie jedes Schema und die darin abgelegten Begriffe.",
+          "ogTitle": "Glossar-Schemata — kontrollierte Vokabulare",
+          "ogDescription": "Schemata fassen Glossarbegriffe zu kontrollierten Vokabularen und Taxonomien zusammen. Prüfen Sie jedes Schema und die darin abgelegten Begriffe."
+        },
+        "vocabulary": {
+          "title": "Ungebundenes Vokabular — Werte ohne Glossarbegriff",
+          "description": "Die Werte, die Ihre Daten tatsächlich erzeugen und die noch kein Glossarbegriff abdeckt. Binden Sie sie an einen Begriff, damit sie überall dasselbe bedeuten.",
+          "ogTitle": "Ungebundenes Vokabular — Werte ohne Glossarbegriff",
+          "ogDescription": "Die Werte, die Ihre Daten tatsächlich erzeugen und die noch kein Glossarbegriff abdeckt. Binden Sie sie an einen Begriff, damit sie überall dasselbe bedeuten."
+        },
+        "proposals": {
+          "title": "Glossar-Vorschläge — Prüfwarteschlange",
+          "description": "Vorgeschlagene Begriffe, Aliasse und Entitätsverknüpfungen warten auf eine Entscheidung. Genehmigen Sie, was stimmt, und lehnen Sie den Rest ab.",
+          "ogTitle": "Glossar-Vorschläge — Prüfwarteschlange",
+          "ogDescription": "Vorgeschlagene Begriffe, Aliasse und Entitätsverknüpfungen warten auf eine Entscheidung. Genehmigen Sie, was stimmt, und lehnen Sie den Rest ab."
+        }
+      }
+    },
+    "glossaryTerm": {
+      "title": "Glossarbegriff — Definition, Belege & Bindungen",
+      "description": "Ein Glossarbegriff: Definition, Aliasse und Codes, die Dokumente, die ihn belegen, sowie die Detektoren, Fälle und Watches, die sich darauf stützen.",
+      "ogTitle": "Glossarbegriff — Definition & Belege | Classifyre",
+      "ogDescription": "Ein Glossarbegriff mit Definition, Aliassen, Belegen in Ihren Daten und den Fällen, die sich darauf stützen.",
+      "titleWithEntity": "{{name}} — Glossarbegriff",
+      "descriptionWithEntity": "{{name}} — Definition, Aliasse, Belege in Ihren Daten sowie die Fälle und Watches, die sich auf diesen Glossarbegriff stützen.",
+      "tabs": {
+        "overview": {
+          "titleWithEntity": "{{name}} — Glossarbegriff",
+          "descriptionWithEntity": "{{name}} — Definition, Aliasse, Codes und Beziehungen im Glossar, mit den Daten und Fällen, die sich darauf stützen."
+        },
+        "entity": {
+          "titleWithEntity": "{{name}} — Erwähnungen & Kennungen",
+          "descriptionWithEntity": "{{name}} — Kennungen, Attribute und jede Erwähnung dieser Entität in Ihren Daten."
+        },
+        "evidence": {
+          "titleWithEntity": "{{name}} — Belege & Dokumente",
+          "descriptionWithEntity": "{{name}} — die Dokumente und Werte in Ihren Daten, die diesen Glossarbegriff belegen."
+        },
+        "bindings": {
+          "titleWithEntity": "{{name}} — Bindungen",
+          "descriptionWithEntity": "{{name}} — die Detektoren, Felder und Lookups, die Daten an diesen Glossarbegriff binden."
+        },
+        "usage": {
+          "titleWithEntity": "{{name}} — Fälle & Watches",
+          "descriptionWithEntity": "{{name}} — die Fälle und Watches, die sich auf diesen Glossarbegriff stützen."
+        },
+        "activity": {
+          "titleWithEntity": "{{name}} — Verlauf",
+          "descriptionWithEntity": "{{name}} — der Änderungsverlauf dieses Glossarbegriffs."
+        }
+      }
     },
     "fingerprints": {
       "title": "Fingerabdrücke — Belegkorrelationen & gemeinsame Werte",
