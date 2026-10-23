@@ -95,6 +95,14 @@ twitter:
   backLabel="All articles"
 />
 
+<iframe
+  className="my-6 aspect-video w-full border-2 border-border"
+  src="https://www.youtube.com/embed/qM9S0XJ3FlQ"
+  title="One Look: decision models, System One, and what five of them did with fifty messages"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 A customer writes to a bike shop. Two weeks cycling on the coast, lovely
 weather, and one question: which panniers should she buy?
 
@@ -210,8 +218,7 @@ probabilities in parallel instead of generating them token by token.
 
 ### The rule of thumb: count the steps
 
-When do you need which? The clearest rule we found comes from a short video by
-the channel Prompt Engineering: **count the steps.**
+When do you need which? The clearest rule we found: **count the steps.**
 
 - *Is this a refund request?* The answer is visible in the text. One look. A
   decision model will do.
@@ -247,8 +254,8 @@ a small sample, so read it as an order of magnitude.
 
 At that price you can check everything: every email, every ticket, and every
 step an AI agent is about to take. That last use is the one the vendors talk
-about most. TechCrunch describes a demo that checks each action of an agent
-against its task, and blocks the ones the model is confident are wrong.
+about most: a demo that checks each action of an agent against its task, and
+blocks the ones the model is confident are wrong.
 
 ## What is not new
 
@@ -257,10 +264,9 @@ category is not new. Trained transformer classifiers have done it since 2018,
 and zero-shot classifiers, which take the labels as plain text, since 2019.
 
 If your labels never change and you have examples to train on, a small trained
-model can still be cheaper, and sometimes better. The same Prompt Engineering
-channel ran that comparison and reports a 22-million-parameter local model
-scoring 93% on a banking benchmark where Jev scored 80%. That is their test,
-not ours.
+model can still be cheaper, and sometimes better. In one public comparison, a
+22-million-parameter local model scored 93% on a banking benchmark where Jev
+scored 80%. That is their test, not ours.
 
 What is new is the question. You write it in plain language, with a
 description for each answer, and you can change it this afternoon. There is
@@ -424,10 +430,6 @@ So anything near the line still goes to a person.
   and its [documentation](https://docs.typesafe.ai/introduction).
 - OpenRouter, [Jev guide](https://openrouter.ai/docs/guides/community/jev) and
   its list of decision models, counted on 11 October 2026.
-- TechCrunch, [OpenAI's Jev clone could help the frontier lab stop its swarming agents](https://techcrunch.com/2026/09/30/openais-jev-clone-could-help-the-frontier-lab-stop-its-swarming-agents),
-  30 September 2026.
-- Prompt Engineering, [System 1 vs System 2 AI models: what's actually different?](https://www.youtube.com/shorts/8daNaFE-qOg)
-  and [OPEN JEVs are Here!](https://www.youtube.com/watch?v=FVzI3QAxwNs).
 - Daniel Kahneman, *Thinking, Fast and Slow*, 2011.
 
 <RelatedCasePosts

@@ -22,6 +22,8 @@ export const getStartedUrl = `${marketingSiteUrl}/get/`;
 export const helmDeploymentUrl = `${docsSiteUrl}/deployment/kubernetes/`;
 
 export const repositoryUrl = "https://github.com/classifyre/classifyre";
+export const youtubeUrl = "https://youtube.com/@classifyre";
+export const xUrl = "https://x.com/Classifyre";
 export const contactEmail = "contact@classifyre.com";
 
 /** The latest GitHub release, for release notes and source tarballs. */
