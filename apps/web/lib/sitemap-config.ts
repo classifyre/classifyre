@@ -96,7 +96,7 @@ const ENTITY_CONFIG: Record<SitemapEntityType, EntitySitemapConfig> = {
 };
 
 const GLOSSARY_TAB_PATHS = GLOSSARY_TABS.filter(
-  (tab) => tab !== "concepts",
+  (tab) => tab !== GLOSSARY_TABS[0],
 ).map((tab) => ({
   path: `/glossary?tab=${tab}`,
   changeFrequency: "weekly" as const,

@@ -3,7 +3,9 @@
  * client (the tab bars) can import. The value is what `?tab=` carries.
  */
 
+/** The first tab is the default: the glossary opens on its map. */
 export const GLOSSARY_TABS = [
+  "map",
   "concepts",
   "entities",
   "schemes",

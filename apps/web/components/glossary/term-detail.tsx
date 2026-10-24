@@ -11,6 +11,7 @@ import {
   FileSearch,
   GitMerge,
   Loader2,
+  Map as MapIcon,
   Pencil,
   RotateCcw,
   Undo2,
@@ -49,6 +50,7 @@ import {
 } from "@/components/glossary/term-sections";
 import { useTranslation } from "@/hooks/use-translation";
 import { termTabOf, type TermTab } from "@/lib/glossary-tabs";
+import { useNsPath } from "@/lib/ns-path";
 import type { TranslationKey } from "@/i18n";
 import {
   approveTerm,
@@ -133,6 +135,7 @@ function Activity({ termKey }: { termKey: string }) {
 export default function GlossaryTermDetail() {
   const { t } = useTranslation();
   const router = useRouter();
+  const nsPath = useNsPath();
   const termHref = useTermHref();
   const key = useStaticRouteParam("key");
   const [term, setTerm] = React.useState<TermDetail | null>(null);
@@ -323,6 +326,18 @@ export default function GlossaryTermDetail() {
             >
               <RotateCcw className="h-4 w-4" />
               {t("glossary.term.reinstate")}
+            </Button>
+          )}
+          {term.kind === "CONCEPT" && term.status === "APPROVED" && (
+            <Button
+              variant="outline"
+              onClick={() =>
+                router.push(nsPath(`/glossary?tab=map&concept=${encodeURIComponent(term.key)}`))
+              }
+              className="rounded-[4px] border-2 border-border"
+            >
+              <MapIcon className="h-4 w-4" />
+              {t("glossary.term.showOnMap")}
             </Button>
           )}
           {term.kind === "CONCEPT" && (

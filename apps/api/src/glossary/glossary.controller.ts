@@ -294,6 +294,11 @@ export class GlossaryController {
     @Body() dto: CreateGlossaryRelationDto,
     @ActorName() actor?: string,
   ) {
+    if (typeof dto?.from !== 'string' || typeof dto?.to !== 'string') {
+      throw new BadRequestException(
+        'from and to (term id or key) are required',
+      );
+    }
     const [from, to] = await Promise.all([
       this.glossary.resolveOrThrow(dto.from),
       this.glossary.resolveOrThrow(dto.to),

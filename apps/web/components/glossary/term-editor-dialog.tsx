@@ -57,13 +57,13 @@ type FormState = {
   notes: string;
 };
 
-function formOf(term: Term | null, kind: TermKind): FormState {
+function formOf(term: Term | null, kind: TermKind, schemeId?: string | null): FormState {
   return {
     kind: term?.kind ?? kind,
     term: term?.term ?? "",
     key: term?.key ?? "",
     definition: term?.definition ?? "",
-    schemeId: term?.schemeId ?? NO_SCHEME,
+    schemeId: term?.schemeId ?? schemeId ?? NO_SCHEME,
     aliases: (term?.aliases ?? []).join(", "),
     codes: (term?.codes ?? []).join(", "),
     hiddenAliases: (term?.hiddenAliases ?? []).join(", "),
@@ -83,17 +83,20 @@ export function TermEditorDialog({
   onOpenChange,
   term,
   defaultKind = "CONCEPT",
+  defaultSchemeId = null,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   term: Term | null;
   defaultKind?: TermKind;
+  /** The scheme a new concept starts in (the map's frame it was added from). */
+  defaultSchemeId?: string | null;
   onSaved: (term: Term) => void;
 }) {
   const { t } = useTranslation();
   const [form, setForm] = React.useState<FormState>(() =>
-    formOf(term, defaultKind),
+    formOf(term, defaultKind, defaultSchemeId),
   );
   const [schemes, setSchemes] = React.useState<Scheme[]>([]);
   const [saving, setSaving] = React.useState(false);
@@ -101,12 +104,12 @@ export function TermEditorDialog({
 
   React.useEffect(() => {
     if (!open) return;
-    setForm(formOf(term, defaultKind));
+    setForm(formOf(term, defaultKind, defaultSchemeId));
     setError(null);
     listSchemes()
       .then(setSchemes)
       .catch(() => setSchemes([]));
-  }, [open, term, defaultKind]);
+  }, [open, term, defaultKind, defaultSchemeId]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((previous) => ({ ...previous, [key]: value }));

@@ -283,6 +283,7 @@
       "concepts": "Konzepte",
       "entities": "Entitäten",
       "schemes": "Schemata",
+      "map": "Karte",
       "vocabulary": "Ungebundenes Vokabular",
       "proposals": "Vorschläge"
     },
@@ -336,7 +337,8 @@
       "expand": "Aufklappen",
       "collapse": "Zuklappen",
       "pick": "Wählen Sie ein Schema",
-      "pickHint": "Ein Schema ist ein kontrolliertes Vokabular, etwa die Rechtsformen eines Registers."
+      "pickHint": "Ein Schema ist ein kontrolliertes Vokabular, etwa die Rechtsformen eines Registers.",
+      "showOnMap": "Auf der Karte zeigen"
     },
     "vocabulary": {
       "coverage": "Semantische Abdeckung: {{share}} % der offenen Funde haben eine Bedeutung · {{outputs}} Ausgaben ungebunden ({{findings}} Funde)",
@@ -497,7 +499,8 @@
       "narrower": "Untergeordnete Konzepte",
       "relations": "Beziehungen",
       "generatedDetectors": "Aus diesem Begriff erzeugte Detektoren",
-      "noActivity": "Noch kein Verlauf."
+      "noActivity": "Noch kein Verlauf.",
+      "showOnMap": "Auf der Karte zeigen"
     },
     "relations": {
       "out": {
@@ -4731,7 +4734,8 @@
       "title": "Bedeutung",
       "place": "Platzieren",
       "show": "Hierher holen",
-      "truncated": "{{count}} weitere Konzepte nicht angezeigt"
+      "truncated": "{{count}} weitere Konzepte nicht angezeigt",
+      "onMap": "Auf der Karte"
     }
   },
   "caseCleanup": {
@@ -6569,6 +6573,12 @@
           "ogTitle": "Glossar-Schemata — kontrollierte Vokabulare",
           "ogDescription": "Schemata fassen Glossarbegriffe zu kontrollierten Vokabularen und Taxonomien zusammen. Prüfen Sie jedes Schema und die darin abgelegten Begriffe."
         },
+        "map": {
+          "title": "Glossar-Karte — Konzepte, Belege & Verbindungen",
+          "description": "Alle freigegebenen Konzepte auf einer Karte, nach Schema gruppiert und nach ihren Belegen gewichtet. Sehen Sie, wovon Ihre Daten handeln, was gemeinsam auftritt, und handeln Sie: ein Konzept beobachten oder in einen Fall aufnehmen.",
+          "ogTitle": "Glossar-Karte — Konzepte, Belege & Verbindungen",
+          "ogDescription": "Alle freigegebenen Konzepte auf einer Karte, nach Schema gruppiert und nach ihren Belegen gewichtet."
+        },
         "vocabulary": {
           "title": "Ungebundenes Vokabular — Werte ohne Glossarbegriff",
           "description": "Die Werte, die Ihre Daten tatsächlich erzeugen und die noch kein Glossarbegriff abdeckt. Binden Sie sie an einen Begriff, damit sie überall dasselbe bedeuten.",
@@ -6731,19 +6741,13 @@
   },
   "semanticMap": {
     "title": "Bedeutung",
-    "subtitle": "{{concepts}} Konzepte · {{unbound}} Ausgaben ungebunden",
+    "subtitle": "{{concepts}} Konzepte · {{schemes}} Schemata",
     "loading": "Lädt…",
     "loadFailed": "Die semantische Karte konnte nicht geladen werden",
-    "assets": "{{count}} Assets",
     "minAssets": "Min. Assets",
-    "cooccurrence": "Gemeinsames Auftreten",
     "layouts": {
       "taxonomy": "Taxonomie",
       "network": "Netzwerk"
-    },
-    "modes": {
-      "sources": "Quellen",
-      "meaning": "Bedeutung"
     },
     "rebuild": "Neu aufbauen",
     "rebuildQueued": "Karte wird neu aufgebaut…",
@@ -6758,7 +6762,90 @@
     "unbound": "Ungebundenes Vokabular: {{outputs}} Ausgaben · {{findings}} offene Funde ohne Bedeutung.",
     "review": "Prüfen",
     "pending": "{{count}} offene Vorschläge",
-    "openTerm": "Begriff öffnen"
+    "openTerm": "Begriff öffnen",
+    "noScheme": "Ohne Schema",
+    "conceptCount": "{{count}} Konzepte",
+    "together": "{{count}} gemeinsam · {{lift}}×",
+    "search": "Konzept finden…",
+    "searchSchemes": "Schemata suchen…",
+    "searchSources": "Quellen suchen…",
+    "noMatches": "Keine Treffer.",
+    "allSources": "Alle Quellen",
+    "highlightCase": "Fall hervorheben",
+    "noCase": "Kein Fall hervorgehoben",
+    "layout": "Anordnung",
+    "expand": "Vollbild",
+    "collapse": "Vollbild verlassen",
+    "caseLens": "{{title}} · {{count}} Konzepte im Fall",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "fit": "Karte einpassen",
+    "rail": {
+      "schemes": "Schemata",
+      "lines": "Linien",
+      "lineBroader": "Oberbegriff → Unterbegriff",
+      "lineRelated": "Verwandt",
+      "lineTogether": "Auf denselben Assets gefunden",
+      "cards": "Karten",
+      "cardsHint": "Die Zahl gibt an, wie viele Assets von dem Konzept handeln. Die Länge des Balkens vergleicht sie mit dem größten Konzept; seine Farben zeigen die Schwere der Funde dahinter. Eine bernsteinfarbene Zahl steht für Vorschläge, die auf Prüfung warten.",
+      "freshness": "Abdeckung",
+      "coverage": "{{share}} von {{findings}} offenen Funden tragen eine Bedeutung.",
+      "built": "Aufgebaut {{when}}",
+      "notBuilt": "Noch nicht aufgebaut",
+      "hint": "Fahren Sie über ein Konzept, um seine Verbindungen hervorzuheben. Ein Klick zeigt Belege und Aktionen; ein Doppelklick öffnet es.",
+      "addToCase": "Zu Fall hinzufügen…",
+      "watch": "Beobachten",
+      "evidence": "Belege",
+      "copyLink": "Link kopieren",
+      "linkCopied": "Link zu diesem Konzept auf der Karte kopiert.",
+      "linkCopyFailed": "Der Link konnte nicht kopiert werden.",
+      "reviewProposals": "{{count}} Vorschläge prüfen",
+      "together": "Häufig zusammen mit",
+      "togetherCount": "{{count}} · {{lift}}×",
+      "togetherHint": "Assets, die von beiden handeln, und wie viel häufiger als zufällig.",
+      "related": "Verwandte Konzepte",
+      "narrower": "Unterbegriff",
+      "relatedKind": "verwandt",
+      "bySource": "Wo es vorkommt",
+      "topEvidence": "Assets dazu",
+      "noEvidence": "Derzeit handelt kein Asset davon.",
+      "allEvidence": "Alle {{count}} Assets",
+      "howToRead": "So liest man die Karte"
+    },
+    "addToCase": {
+      "title": "„{{concept}}“ zu einem Fall hinzufügen",
+      "description": "Wählen Sie den Fall oder legen Sie einen an, und bestimmen Sie, was die Aufnahme bedeutet.",
+      "about": "Der Fall handelt von diesem Konzept",
+      "aboutHint": "Das Konzept führt den Fall auf, und das Bedeutungs-Panel des Falls das Konzept.",
+      "pin": "Auf dem Fall-Board anheften",
+      "pinHint": "Seine Karte landet auf dem Board, bereit für Verknüpfungen mit Belegen.",
+      "watch": "Danach neue Funde dazu beobachten",
+      "watchHint": "Öffnet eine neue Beobachtung zu diesem Konzept, verknüpft mit dem Fall.",
+      "submit": "Zum Fall hinzufügen",
+      "submitAndWatch": "Hinzufügen und Beobachtung anlegen",
+      "added": "„{{concept}}“ zu „{{title}}“ hinzugefügt."
+    },
+    "legend": "Legende",
+    "schemesChosen": "{{count}} Schemata",
+    "sourcesChosen": "{{count}} Quellen",
+    "edit": {
+      "addConcept": "Konzept hinzufügen",
+      "addInScheme": "Konzept zu {{scheme}} hinzufügen",
+      "addFirst": "Erstes Konzept hinzufügen",
+      "edit": "Bearbeiten",
+      "addNarrower": "Unterbegriff",
+      "relate": "Verknüpfen…",
+      "pickOther": "Klicken Sie auf das Konzept, mit dem „{{concept}}“ verknüpft werden soll, oder suchen Sie es",
+      "relateTitle": "Zwei Konzepte verknüpfen",
+      "relateDescription": "Wie hängt „{{a}}“ mit „{{b}}“ zusammen?",
+      "isKindOf": "{{a}} ist eine Art von {{b}}",
+      "isRelated": "{{a}} ist verwandt mit {{b}}",
+      "custom": "In eigenen Worten",
+      "relateSubmit": "Verknüpfen",
+      "related": "Beziehung hinzugefügt.",
+      "unrelated": "Beziehung entfernt."
+    },
+    "openMap": "Bedeutungskarte"
   },
   "entities": {
     "loadFailed": "Die Entität konnte nicht geladen werden",

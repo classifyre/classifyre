@@ -283,6 +283,7 @@
       "concepts": "Concepts",
       "entities": "Entities",
       "schemes": "Schemes",
+      "map": "Map",
       "vocabulary": "Unbound vocabulary",
       "proposals": "Proposals"
     },
@@ -336,7 +337,8 @@
       "expand": "Expand",
       "collapse": "Collapse",
       "pick": "Pick a scheme",
-      "pickHint": "A scheme is a controlled vocabulary, like the legal forms of a register."
+      "pickHint": "A scheme is a controlled vocabulary, like the legal forms of a register.",
+      "showOnMap": "Show on map"
     },
     "vocabulary": {
       "coverage": "Semantic coverage: {{share}}% of open findings carry a meaning · {{outputs}} outputs unbound ({{findings}} findings)",
@@ -497,7 +499,8 @@
       "narrower": "Narrower concepts",
       "relations": "Relations",
       "generatedDetectors": "Detectors made from this term",
-      "noActivity": "No activity yet."
+      "noActivity": "No activity yet.",
+      "showOnMap": "Show on map"
     },
     "relations": {
       "out": {
@@ -4731,7 +4734,8 @@
       "title": "Meaning",
       "place": "Place",
       "show": "Move here",
-      "truncated": "{{count}} more concepts not shown"
+      "truncated": "{{count}} more concepts not shown",
+      "onMap": "On the map"
     }
   },
   "caseCleanup": {
@@ -6569,6 +6573,12 @@
           "ogTitle": "Glossary Schemes — Controlled Vocabularies",
           "ogDescription": "Schemes group glossary terms into controlled vocabularies and taxonomies. Review each scheme and the terms filed under it."
         },
+        "map": {
+          "title": "Glossary Map — Concepts, Evidence & Connections",
+          "description": "Every approved concept on one map, grouped by scheme and sized by the evidence behind it. See what your data is about, what turns up together, and act on it: watch a concept or bring it into a case.",
+          "ogTitle": "Glossary Map — Concepts, Evidence & Connections",
+          "ogDescription": "Every approved concept on one map, grouped by scheme and sized by the evidence behind it."
+        },
         "vocabulary": {
           "title": "Unbound Vocabulary — Values Without a Glossary Term",
           "description": "The values your data actually produces that no glossary term covers yet. Bind them to a term to give them one meaning everywhere.",
@@ -6731,19 +6741,13 @@
   },
   "semanticMap": {
     "title": "Meaning",
-    "subtitle": "{{concepts}} concepts · {{unbound}} outputs unbound",
+    "subtitle": "{{concepts}} concepts · {{schemes}} schemes",
     "loading": "Loading…",
     "loadFailed": "The semantic map could not be loaded",
-    "assets": "{{count}} assets",
     "minAssets": "Min assets",
-    "cooccurrence": "Co-occurrence",
     "layouts": {
       "taxonomy": "Taxonomy",
       "network": "Network"
-    },
-    "modes": {
-      "sources": "Sources",
-      "meaning": "Meaning"
     },
     "rebuild": "Rebuild",
     "rebuildQueued": "Rebuilding the map…",
@@ -6758,7 +6762,90 @@
     "unbound": "Unbound vocabulary: {{outputs}} outputs · {{findings}} open findings without meaning.",
     "review": "Review",
     "pending": "{{count}} pending proposals",
-    "openTerm": "Open term"
+    "openTerm": "Open term",
+    "noScheme": "No scheme",
+    "conceptCount": "{{count}} concepts",
+    "together": "{{count}} together · {{lift}}×",
+    "search": "Find a concept…",
+    "searchSchemes": "Search schemes…",
+    "searchSources": "Search sources…",
+    "noMatches": "Nothing matches.",
+    "allSources": "All sources",
+    "highlightCase": "Highlight a case",
+    "noCase": "No case highlighted",
+    "layout": "Layout",
+    "expand": "Full screen",
+    "collapse": "Exit full screen",
+    "caseLens": "{{title}} · {{count}} concepts in the case",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit the map",
+    "rail": {
+      "schemes": "Schemes",
+      "lines": "Lines",
+      "lineBroader": "Broader → narrower",
+      "lineRelated": "Related",
+      "lineTogether": "Found on the same assets",
+      "cards": "Cards",
+      "cardsHint": "The number is how many assets are about the concept. The bar's length compares it with the biggest concept; its colours are the severity of the findings behind it. An amber number is proposals waiting for review.",
+      "freshness": "Coverage",
+      "coverage": "{{share}} of {{findings}} open findings carry a meaning.",
+      "built": "Built {{when}}",
+      "notBuilt": "Not built yet",
+      "hint": "Hover a concept to light up what it connects to. Click it for its evidence and actions; double-click opens it.",
+      "addToCase": "Add to case…",
+      "watch": "Watch",
+      "evidence": "Evidence",
+      "copyLink": "Copy link",
+      "linkCopied": "Link to this concept on the map copied.",
+      "linkCopyFailed": "Could not copy the link.",
+      "reviewProposals": "Review {{count}} proposals",
+      "together": "Often found with",
+      "togetherCount": "{{count}} · {{lift}}×",
+      "togetherHint": "Assets about both, and how many times more often than chance.",
+      "related": "Related concepts",
+      "narrower": "narrower",
+      "relatedKind": "related",
+      "bySource": "Where it is found",
+      "topEvidence": "Assets about it",
+      "noEvidence": "No asset is about it right now.",
+      "allEvidence": "All {{count}} assets",
+      "howToRead": "How to read the map"
+    },
+    "addToCase": {
+      "title": "Add “{{concept}}” to a case",
+      "description": "Pick the case, or start one, and choose what joining it means.",
+      "about": "The case is about this concept",
+      "aboutHint": "The concept lists the case, and the case's meaning panel lists the concept.",
+      "pin": "Pin it on the case board",
+      "pinHint": "Its card lands on the board, ready to link evidence to.",
+      "watch": "Then watch for new findings about it",
+      "watchHint": "Opens a new watch about this concept, linked to the case.",
+      "submit": "Add to case",
+      "submitAndWatch": "Add and set up the watch",
+      "added": "“{{concept}}” added to “{{title}}”."
+    },
+    "legend": "Legend",
+    "schemesChosen": "{{count}} schemes",
+    "sourcesChosen": "{{count}} sources",
+    "edit": {
+      "addConcept": "Add a concept",
+      "addInScheme": "Add a concept to {{scheme}}",
+      "addFirst": "Add the first concept",
+      "edit": "Edit",
+      "addNarrower": "Narrower",
+      "relate": "Relate…",
+      "pickOther": "Click the concept to relate “{{concept}}” to, or find it by name",
+      "relateTitle": "Relate two concepts",
+      "relateDescription": "How does “{{a}}” relate to “{{b}}”?",
+      "isKindOf": "{{a}} is a kind of {{b}}",
+      "isRelated": "{{a}} is related to {{b}}",
+      "custom": "In my own words",
+      "relateSubmit": "Relate",
+      "related": "Relation added.",
+      "unrelated": "Relation removed."
+    },
+    "openMap": "Meaning map"
   },
   "entities": {
     "loadFailed": "The entity could not be loaded",

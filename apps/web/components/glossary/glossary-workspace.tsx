@@ -39,6 +39,7 @@ import {
 import { useDocumentView } from "@/components/document-title-updater";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
+import { MEANING_URL_KEYS, MeaningMap } from "@/components/glossary/meaning-map/meaning-map";
 import { glossaryTabOf, type GlossaryTab } from "@/lib/glossary-tabs";
 import {
   exportGlossaryUrl,
@@ -403,7 +404,7 @@ export function GlossaryWorkspace({
   const searchParams = useSearchParams();
   const [tab, setTab] = React.useState<Tab>(() => {
     const wanted = searchParams?.get("tab");
-    return glossaryTabOf(wanted) ?? "concepts";
+    return glossaryTabOf(wanted) ?? "map";
   });
   // Each tab has its own title and description; the embedded copy (inside
   // another page) leaves the host page's head alone.
@@ -423,6 +424,25 @@ export function GlossaryWorkspace({
   const [pending, setPending] = React.useState(0);
 
   const bump = React.useCallback(() => setRefreshKey((value) => value + 1), []);
+
+  // The map keeps its view in the URL; it goes when the map tab does.
+  const changeTab = React.useCallback((next: Tab) => {
+    if (next !== "map" && typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      for (const key of MEANING_URL_KEYS) url.searchParams.delete(key);
+      window.history.replaceState(null, "", url.toString());
+    }
+    setTab(next);
+  }, []);
+
+  /** Open the map on one scheme (the map reads its view from the URL). */
+  const showSchemeOnMap = React.useCallback((schemeId: string) => {
+    const url = new URL(window.location.href);
+    for (const key of MEANING_URL_KEYS) url.searchParams.delete(key);
+    url.searchParams.set("schemes", schemeId);
+    window.history.replaceState(null, "", url.toString());
+    setTab("map");
+  }, []);
 
   React.useEffect(() => {
     proposalCounts()
@@ -502,9 +522,12 @@ export function GlossaryWorkspace({
       <Tabs
         urlParam={embedded ? undefined : "tab"}
         value={tab}
-        onValueChange={(value) => setTab(value as Tab)}
+        onValueChange={(value) => changeTab(value as Tab)}
       >
         <TabsList>
+          <TabsTrigger value="map">
+            {t("glossary.tabs.map")}
+          </TabsTrigger>
           <TabsTrigger value="concepts">
             {t("glossary.tabs.concepts")}
           </TabsTrigger>
@@ -550,7 +573,15 @@ export function GlossaryWorkspace({
           />
         </TabsContent>
         <TabsContent value="schemes" className="pt-4">
-          <SchemesPanel refreshKey={refreshKey} onChanged={bump} />
+          <SchemesPanel refreshKey={refreshKey} onChanged={bump} onShowOnMap={showSchemeOnMap} />
+        </TabsContent>
+        <TabsContent value="map" className="pt-4">
+          <MeaningMap
+            editable
+            refreshKey={refreshKey}
+            onChanged={bump}
+            className="h-[calc(100dvh-16rem)] min-h-[520px]"
+          />
         </TabsContent>
         <TabsContent value="vocabulary" className="pt-4">
           <VocabularyPanel refreshKey={refreshKey} onChanged={bump} />

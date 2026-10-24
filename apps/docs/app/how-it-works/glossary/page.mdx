@@ -24,6 +24,90 @@ graph LR
 
 ---
 
+## The meaning map
+
+**Entities & glossary** opens on the **map**: every approved concept as a card,
+grouped by the scheme it belongs to, with the evidence behind it. It answers
+*what is our data about* at a glance, and it is where the glossary grows.
+
+- **A frame per scheme.** Inside a frame, concepts read as an outline: a broader
+  concept on top, its narrower concepts indented beneath it, the biggest first.
+  A long scheme flows into several columns so the whole map fits the screen.
+- **A card per concept.** The number is how many assets are about the concept
+  (narrower concepts included). The bar under it compares that with the biggest
+  concept on the map, and its colours are the severity of the findings behind
+  it. An amber number counts proposals waiting for review. Zoomed out, a card
+  shows only its name, larger.
+- **Lines.** Solid lines join a broader concept to its narrower ones, dashed
+  lines are *related to*, and a labelled line carries a verb of your own.
+  Dotted lines join concepts **found on the same assets** more often than
+  chance would put them together.
+- **Taxonomy or Network.** *Taxonomy* is the outline described above.
+  *Network* lets concepts that turn up together pull towards each other, while
+  each scheme keeps its own neighbourhood. You can drag cards to untangle it.
+
+Point at a concept and everything connected to it lights up, with the number of
+shared assets on each *found together* line. Click it to open the panel on the
+right:
+
+| In the panel | What it tells you |
+|---|---|
+| Definition and counts | Assets, findings and sources behind the concept |
+| **Often found with** | Concepts on the same assets, with how many and how many times more often than chance |
+| **Related concepts** | Its broader, narrower and related concepts; click one to move there |
+| **Where it is found** | Assets per source |
+| **Assets about it** | The first few, each one click from its page or from a case |
+
+From the panel: **Open concept** (its page), **Add to case…**, **Watch** (a new
+watch about the concept), **Evidence**, **Copy link** (the map, opened on this
+concept) and **Review proposals** when there are any.
+
+### Growing the glossary on the map
+
+- **+** on a scheme's frame adds a concept to that scheme. A new scheme shows an
+  empty frame with *Add the first concept*.
+- **Edit** changes the selected concept: name, definition, scheme, aliases and
+  codes.
+- **Narrower** adds a concept underneath the selected one.
+- **Relate…** then a click on another concept: choose *is a kind of* (either
+  way round), *is related to*, or a verb in your own words. The new line appears
+  at once.
+- Point at a relation in the panel and **×** removes it.
+
+New concepts are approved straight away, so they appear on the map before any
+data is linked to them (with an empty bar).
+
+### Bringing a concept into a case
+
+**Add to case…** picks an open case or starts a new one, then:
+
+- marks the case as **about** the concept, so the concept lists the case and the
+  case's *Meaning* panel lists the concept;
+- **pins** the concept's card on the case board;
+- optionally opens a new **watch** about the concept, already linked to the
+  case, so new findings about it reach the case by themselves.
+
+### Filters and the case highlight
+
+Narrow the map by **scheme**, by **source** (counts are recomputed for those
+sources only) or by a **minimum number of assets**. **Highlight a case** rings
+the concepts its evidence and its own *about* links touch, and dims the rest.
+
+### Ways in
+
+- From a concept page: **Show on map**.
+- From a scheme (Schemes tab): **Show on map**, filtered to that scheme.
+- From a case: *Case file → Meaning → On the map*, with the case highlighted.
+- From Discovery: **Meaning map** on the Connections card.
+- A copied link opens the same view: layout, filters, highlighted case and
+  selected concept.
+
+The counts on the map come from a summary that is rebuilt automatically after
+scans and glossary changes (and on demand with *Rebuild* in the map's legend).
+Two concepts count as *found together* once they share enough assets — twenty
+by default. A small workspace can lower that with the
+`cooccurrenceMinSupport` setting of the suggestions settings API.
+
 ## Concepts and entities
 
 Every term has a **kind**:
@@ -210,10 +294,10 @@ Preview first; nothing you curated is overwritten.
   concept, and build an inquiry watch *about* a concept, with or without its
   narrower concepts.
 - **Exports** carry a `terms` column.
-- **Discovery** has a *Meaning* map next to the source map: concepts sized by
-  their evidence, coloured by scheme, connected by the taxonomy.
-- **Case boards** list the concepts the case's evidence is about and can pin
-  them as cards.
+- **The meaning map** (see above) is the glossary's main view; Discovery links
+  to it from the Connections card.
+- **Case boards** list the concepts the case's evidence is about, can pin them
+  as cards, and open the map with the case highlighted.
 
 ## The review queue
 

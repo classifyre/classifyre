@@ -7,6 +7,7 @@ import {
   ChevronRight,
   FolderTree,
   Loader2,
+  Map as MapIcon,
   Pencil,
   Plus,
   Trash2,
@@ -247,9 +248,12 @@ function SchemeDialog({
 export function SchemesPanel({
   refreshKey,
   onChanged,
+  onShowOnMap,
 }: {
   refreshKey: number;
   onChanged: () => void;
+  /** Open the semantic map filtered to this scheme. */
+  onShowOnMap?: (schemeId: string) => void;
 }) {
   const { t } = useTranslation();
   const [schemes, setSchemes] = React.useState<Scheme[] | null>(null);
@@ -350,6 +354,17 @@ export function SchemesPanel({
                 )}
               </div>
               <div className="flex gap-2">
+                {onShowOnMap && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 rounded-[4px] border-2 border-border"
+                    onClick={() => onShowOnMap(current.id)}
+                  >
+                    <MapIcon className="h-3.5 w-3.5" />
+                    {t("glossary.schemes.showOnMap")}
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"

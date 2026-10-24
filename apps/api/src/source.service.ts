@@ -9,10 +9,7 @@ import { PrismaService } from './prisma.service';
 import { AssetType, Source, Prisma, RunnerStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
-import {
-  mergeEncryptedConfigs,
-  stableStringify,
-} from './utils/masked-config.utils';
+import { mergeEncryptedConfigs } from './utils/masked-config.utils';
 import { normalizeSourceConfig } from './utils/source-config-normalizer';
 import { RunnerLogStorageService } from './cli-runner/runner-log-storage.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
@@ -156,17 +153,6 @@ export class SourceService {
     const encryptedConfig = this.maskedConfigCryptoService.encryptMaskedConfig(
       normalizedIncomingConfig,
     );
-    const existingSource =
-      assetType === AssetType.SANDBOX
-        ? null
-        : await this.findExistingSourceByConfig(
-            assetType,
-            normalizedIncomingConfig,
-          );
-
-    if (existingSource) {
-      return existingSource;
-    }
 
     return this.prisma.source.create({
       data: {
@@ -693,44 +679,6 @@ export class SourceService {
         running,
       },
     };
-  }
-
-  private async findExistingSourceByConfig(
-    type: AssetType,
-    config: Record<string, unknown>,
-  ): Promise<Source | null> {
-    const candidates = await this.prisma.source.findMany({
-      where: { type },
-    });
-
-    const targetSignature = stableStringify(config);
-    for (const candidate of candidates) {
-      if (
-        !candidate.config ||
-        typeof candidate.config !== 'object' ||
-        Array.isArray(candidate.config)
-      ) {
-        continue;
-      }
-
-      let decryptedConfig: Record<string, unknown>;
-      try {
-        decryptedConfig = this.maskedConfigCryptoService.decryptMaskedConfig(
-          candidate.config,
-        );
-      } catch (error: any) {
-        this.logger.warn(
-          `Skipping source ${candidate.id} during config de-duplication: ${error.message}`,
-        );
-        continue;
-      }
-
-      if (stableStringify(decryptedConfig) === targetSignature) {
-        return candidate;
-      }
-    }
-
-    return null;
   }
 
   private asAssetType(type: string): AssetType {
