@@ -2,7 +2,6 @@ import { Prisma } from '@prisma/client';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { SourceService } from './source.service';
 import { MASKED_CONFIG_ENCRYPTED_PREFIX } from './utils/masked-config.utils';
-import { normalizeSourceConfig } from './utils/source-config-normalizer';
 
 jest.mock('uuid', () => ({
   v4: jest.fn().mockReturnValue('mocked-uuid'),
@@ -98,82 +97,41 @@ describe('SourceService', () => {
     expect(savedToken).not.toBe('xoxb-plain-token');
   });
 
-  it('returns existing source when decrypted config already exists', async () => {
-    const { service, prisma, maskedConfigCryptoService } = createService();
-    const plainConfig = {
-      type: 'WORDPRESS',
-      required: { url: 'https://blog.example.com' },
-      masked: { username: 'admin', application_password: 'plain-password' },
-    };
-    const normalizedPlainConfig = normalizeSourceConfig(
-      'WORDPRESS',
-      plainConfig,
-    ) as Record<string, unknown>;
-    const existing = {
-      id: 'existing-source',
-      name: 'Existing',
-      type: 'WORDPRESS',
-      config: maskedConfigCryptoService.encryptMaskedConfig(
-        normalizedPlainConfig,
-      ),
-      currentRunnerId: null,
-      runnerStatus: 'PENDING',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    prisma.source.findMany.mockResolvedValue([existing]);
-
-    const result = await service.createFromConfig({
-      type: 'WORDPRESS',
-      name: 'New Name',
-      config: plainConfig,
-    });
-
-    expect(result).toBe(existing);
-    expect(prisma.source.create).not.toHaveBeenCalled();
-  });
-
-  it('skips corrupted encrypted candidates during de-duplication', async () => {
-    const { service, prisma, maskedConfigCryptoService } = createService();
-    const plainConfig = {
-      type: 'WORDPRESS',
-      required: { url: 'https://blog.example.com' },
-      masked: { username: 'admin', application_password: 'plain-password' },
-    };
-
-    prisma.source.findMany.mockResolvedValue([
-      {
-        id: 'broken-source',
-        type: 'WORDPRESS',
-        config: {
-          masked: {
-            application_password: `${MASKED_CONFIG_ENCRYPTED_PREFIX}broken-payload`,
-          },
-        },
-      },
-      {
-        id: 'non-match',
-        type: 'WORDPRESS',
-        config: maskedConfigCryptoService.encryptMaskedConfig({
-          ...plainConfig,
-          required: {
-            url: 'https://other.example.com',
-          },
-        }),
-      },
-    ]);
+  it('creates a separate source for every create, even with an identical config', async () => {
+    const { service, prisma } = createService();
+    let next = 0;
     prisma.source.create.mockImplementation(({ data }: any) => ({
-      id: 'source-new',
+      id: `source-${++next}`,
       ...data,
     }));
-
-    const result = await service.createFromConfig({
-      type: 'WORDPRESS',
-      config: plainConfig,
+    // A CUSTOM connector notebook is shared by sources that differ only in the
+    // files uploaded to them, so identical config must never mean "same source".
+    const customConfig = () => ({
+      type: 'CUSTOM',
+      required: {
+        notebook: {
+          cells: [{ id: 'connector', type: 'code', source: 'pass' }],
+          revision: 1,
+        },
+      },
     });
 
-    expect(result.id).toBe('source-new');
-    expect(prisma.source.create).toHaveBeenCalledTimes(1);
+    const first = await service.createFromConfig({
+      type: 'CUSTOM',
+      name: 'Front Desk',
+      config: customConfig(),
+    });
+    const second = await service.createFromConfig({
+      type: 'CUSTOM',
+      name: 'Back Office',
+      config: customConfig(),
+    });
+
+    expect(second.id).not.toBe(first.id);
+    expect(first.name).toBe('Front Desk');
+    expect(second.name).toBe('Back Office');
+    expect(prisma.source.create).toHaveBeenCalledTimes(2);
+    expect(prisma.source.findMany).not.toHaveBeenCalled();
   });
 
   it('preserves encrypted values and encrypts updated plaintext on update', async () => {

@@ -224,6 +224,43 @@ describe('CustomDetectorsService', () => {
     });
   });
 
+  it('sends only keys the scan-side CustomDetectorConfig accepts', async () => {
+    // The CLI model forbids extra keys: one unknown key fails the detector
+    // for the whole scan, silently, while old findings stay cached.
+    const { service, prisma } = createService();
+    prisma.customDetector.findMany.mockResolvedValue([
+      {
+        id: 'det-regex',
+        key: 'cust_regex',
+        name: 'Regex',
+        description: 'Finds things',
+        isActive: true,
+        aiProviderConfigId: null,
+        pipelineSchema: { type: 'REGEX', patterns: {} },
+      },
+    ]);
+    const schema = JSON.parse(
+      fs.readFileSync(
+        path.resolve(
+          __dirname,
+          '../../../packages/schemas/src/schemas/all_detectors.json',
+        ),
+        'utf8',
+      ),
+    );
+    const allowed = Object.keys(
+      schema.definitions.CustomDetectorConfig.allOf[1].properties,
+    );
+
+    const [entry] = await service.buildRuntimeCustomDetectorsByKeys([
+      'cust_regex',
+    ]);
+
+    for (const key of Object.keys(entry.detector.config)) {
+      expect(allowed).toContain(key);
+    }
+  });
+
   it('skips an LLM detector whose provider credential cannot be resolved', async () => {
     const { service, prisma, aiProviderConfigService } = createService();
 

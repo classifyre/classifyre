@@ -81,7 +81,7 @@ export function CaseFilePanel({
   return (
     <div className="space-y-6" data-testid="case-file-panel">
       <DetailsSection caseId={caseId} caseData={caseData} readOnly={readOnly} onSaved={onCaseChanged} onStatusChanged={onChanged} />
-      <MeaningSection readOnly={readOnly} />
+      <MeaningSection caseId={caseId} readOnly={readOnly} />
       <AutopilotSection caseId={caseId} caseData={caseData} readOnly={readOnly} onChanged={onChanged} />
       <CleanupSection caseId={caseId} caseData={caseData} readOnly={readOnly} onChanged={onChanged} />
       <ConclusionSection caseId={caseId} caseData={caseData} readOnly={readOnly} onSaved={onCaseChanged} onClosed={onChanged} />
@@ -93,7 +93,7 @@ export function CaseFilePanel({
  * The Meaning lens as a list (SL5 A2): the concepts this case's evidence is
  * about, how much evidence each covers, and a way to pin one to the board.
  */
-function MeaningSection({ readOnly }: { readOnly: boolean }) {
+function MeaningSection({ caseId, readOnly }: { caseId: string; readOnly: boolean }) {
   const { t } = useTranslation();
   const store = useBoardStore();
   const centre = useVisibleCentre();
@@ -105,7 +105,20 @@ function MeaningSection({ readOnly }: { readOnly: boolean }) {
     .sort((a, b) => b.linkedItems.length - a.linkedItems.length);
   return (
     <section className="space-y-2" data-testid="case-meaning-section">
-      <SectionHeading>{t("caseBoard.meaning.title")}</SectionHeading>
+      <SectionHeading
+        aside={
+          // The workspace map, lit up where this case's meaning is.
+          <a
+            href={nsPath(`/glossary?tab=map&case=${encodeURIComponent(caseId)}`)}
+            className="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase hover:text-foreground hover:underline"
+            data-testid="case-meaning-on-map"
+          >
+            {t("caseBoard.meaning.onMap")}
+          </a>
+        }
+      >
+        {t("caseBoard.meaning.title")}
+      </SectionHeading>
       <ul className="space-y-1.5">
         {terms.map((term) => (
           <li key={term.termId} className="flex items-center justify-between gap-2 text-sm">

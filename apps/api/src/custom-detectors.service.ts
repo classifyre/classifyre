@@ -2059,12 +2059,14 @@ export class CustomDetectorsService {
       detector: {
         type: 'CUSTOM' as const,
         enabled: true,
+        // Only keys of the CLI's CustomDetectorConfig: it forbids any other,
+        // and one extra key fails the detector for the whole scan. A
+        // threshold belongs inside pipeline_schema (validation).
         config: {
           custom_detector_key: row.key,
           name: row.name,
           description: row.description,
           languages: ['de', 'en'],
-          confidence_threshold: 0.7,
           max_findings: 100,
           pipeline_schema: pipelineSchema,
         },

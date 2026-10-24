@@ -236,7 +236,7 @@ The command palette gains a **Terms** group: search APPROVED terms by lookup (SL
 
 ### B1 Where
 
-Discovery's connections canvas card gets a header toggle: **Sources | Meaning**. *Sources* is today's map, unchanged. *Meaning* is the semantic map. The choice is kept in the URL (`?map=meaning`).
+The semantic map is the main view of **Entities & glossary** (`/glossary`, tab *Map*, the default), sized to the window, and the place where the glossary is edited (B8). Discovery's connections card links to it; an old `?map=meaning` address redirects there with its view. The view is kept in the URL (`layout`, `concept`, `case`, `schemes`, `sources`, `min`).
 
 ### B2 What it draws
 
@@ -271,9 +271,9 @@ Discovery's connections canvas card gets a header toggle: **Sources | Meaning**.
 | PART_OF, CUSTOM | Labelled |
 | Co-occurrence | Dotted, weighted by lift. Off by default; the top 3 per node |
 
-**Layouts:**
-- **Taxonomy** (default): ELK layered, top-down, broader above narrower. Reuse the board's `elk.worker.ts`.
-- **Network:** force layout with clustering by scheme. Reuse `graph-explorer` (`GraphCanvas`, `use-force-layout`, `use-pan-zoom`), as the source map does.
+**Layouts** (React Flow canvas, concept cards rather than bubbles; `lib/meaning-map-layout.ts`, `lib/meaning-map-network.ts`):
+- **Taxonomy** (default): one frame per scheme; inside it an outline, broader above and narrower indented beneath, biggest first. A tall scheme flows into several columns; frames are packed into the column count that fits the viewport at the largest zoom. (A layered layout drew a glossary that is mostly roots as one long row.)
+- **Network:** d3-force; co-occurrence pulls concepts together, each scheme keeps a home on a ring, cards never overlap (rectangle separation).
 
 **Level of detail.**
 - Labels are hidden below a zoom threshold, except for the top 20 nodes by size.
@@ -299,6 +299,10 @@ Actions: **Open term** · **Show assets** (the asset list filtered by term) · *
 | **Min assets** | Hides concepts below the number |
 | **Entities** | Disabled until G5′, which adds entity nodes as satellites of their INSTANCE_OF concepts |
 | **Highlight case** | Choose a case. Concepts linked to its evidence get the board's lime "in the case" ring; everything else dims. The same overlay opens from a case: *Open in semantic map* |
+
+### B8 Editing on the map
+
+On the glossary page the map edits the glossary: **+** on a scheme frame adds a concept there (an empty scheme draws an empty frame); the rail offers **Edit**, **Narrower** (a new concept with a BROADER relation to the selected one) and **Relate…** (then click another concept: *is a kind of* either way, *related*, or a CUSTOM verb); relations are listed with ids and removable. Taxonomy relations on the map are read live from `glossary_relations` (only co-occurrence comes from the rollup), so an edit shows at once.
 
 ### B5 Empty states
 

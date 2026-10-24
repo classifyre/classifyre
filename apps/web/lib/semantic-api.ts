@@ -341,8 +341,9 @@ export function createRelation(input: {
   label?: string;
   note?: string;
 }) {
+  const { fromTermId, toTermId, ...rest } = input;
   return request<{ id: string }>("POST", "/glossary/relations", {
-    body: input,
+    body: { from: fromTermId, to: toTermId, ...rest },
   });
 }
 
@@ -880,7 +881,7 @@ export interface MapLink {
 export interface SemanticMap {
   nodes: MapNode[];
   links: MapLink[];
-  overlay: unknown;
+  overlay?: { caseId: string; termIds: string[] };
   unbound: { outputs: number; findings: number };
   coverage: {
     share: number;
@@ -907,6 +908,32 @@ export const getSemanticMap = (params: {
 
 export const rebuildSemanticMap = () =>
   request<unknown>("POST", "/semantic/map/rebuild", { body: {} });
+
+/** The map rail for one concept (SL5 B3). */
+export interface MapTermRail {
+  term: {
+    id: string;
+    key: string;
+    term: string;
+    kind: TermKind;
+    status: TermStatus;
+    definition: string | null;
+    scheme: SchemeRef | null;
+  };
+  counts: { assets: number; directAssets: number; findings: number; sources: number };
+  bySource: Array<{ sourceId: string; name: string; assets: number }>;
+  bindings: number;
+  narrower: Array<{ id: string; key: string; term: string }>;
+  cooccurring: Array<{
+    term: { id: string; key: string; term: string } | null;
+    assets: number;
+    lift: number | null;
+  }>;
+  pendingProposals: number;
+}
+
+export const getMapTermRail = (termId: string) =>
+  request<MapTermRail>("GET", `/semantic/map/terms/${encodeURIComponent(termId)}`);
 
 export const getCoverage = () =>
   request<{

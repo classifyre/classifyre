@@ -275,36 +275,58 @@ export class SemanticMapService {
       liveBuild = true;
     }
     const minAssets = Math.max(Number(params.minAssets ?? 1) || 0, 0);
-    const [rows, terms, relations, state, pending] = await Promise.all([
-      this.prisma.termGraphNode.findMany(),
-      this.prisma.glossaryTerm.findMany({
-        where: {
-          status: 'APPROVED',
-          kind: params.includeEntities ? undefined : 'CONCEPT',
-          ...(params.schemeIds?.length
-            ? { schemeId: { in: params.schemeIds } }
-            : {}),
-        },
-        select: {
-          id: true,
-          key: true,
-          term: true,
-          kind: true,
-          definition: true,
-          scheme: { select: { id: true, key: true, name: true, color: true } },
-        },
-      }),
-      this.prisma.termGraphLink.findMany(),
-      this.prisma.termGraphState.findUnique({ where: { id: 'singleton' } }),
-      this.prisma.semanticSuggestion.groupBy({
-        by: ['termId'],
-        where: { status: 'PROPOSED', termId: { not: null } },
-        _count: { _all: true },
-      }),
-    ]);
+    const [rows, terms, cooccurring, taxonomy, state, pending] =
+      await Promise.all([
+        this.prisma.termGraphNode.findMany(),
+        this.prisma.glossaryTerm.findMany({
+          where: {
+            status: 'APPROVED',
+            kind: params.includeEntities ? undefined : 'CONCEPT',
+            ...(params.schemeIds?.length
+              ? { schemeId: { in: params.schemeIds } }
+              : {}),
+          },
+          select: {
+            id: true,
+            key: true,
+            term: true,
+            kind: true,
+            definition: true,
+            scheme: {
+              select: { id: true, key: true, name: true, color: true },
+            },
+          },
+        }),
+        this.prisma.termGraphLink.findMany({
+          where: { kind: 'CO_OCCURRENCE' },
+        }),
+        // Relations are read live, not from the rollup: the glossary page edits
+        // its taxonomy on this map and must see a new relation at once.
+        this.prisma.glossaryRelation.findMany({
+          where: { status: 'APPROVED' },
+          select: { fromTermId: true, toTermId: true, type: true, label: true },
+        }),
+        this.prisma.termGraphState.findUnique({ where: { id: 'singleton' } }),
+        this.prisma.semanticSuggestion.groupBy({
+          by: ['termId'],
+          where: { status: 'PROPOSED', termId: { not: null } },
+          _count: { _all: true },
+        }),
+      ]);
     const filtered = params.sourceIds?.length
       ? await this.sourceCounts(params.sourceIds).catch(() => null)
       : null;
+    const relations = [
+      ...taxonomy.map((r) => ({
+        termAId: r.fromTermId,
+        termBId: r.toTermId,
+        kind: String(r.type),
+        label: r.label ?? '',
+        assetCount: 0,
+        lift: null,
+      })),
+      ...cooccurring,
+    ];
     const rowById = new Map(rows.map((row) => [row.termId, row]));
     const pendingById = new Map(
       pending.map((p) => [p.termId ?? '', p._count._all]),

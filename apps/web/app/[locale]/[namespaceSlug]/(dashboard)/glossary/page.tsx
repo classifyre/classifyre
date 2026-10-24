@@ -19,7 +19,7 @@ export async function generateMetadata({
   const { locale, namespaceSlug } = await params;
   if (!isLocale(locale)) return {};
   const tab = glossaryTabOf(firstParam((await searchParams).tab));
-  if (!tab || tab === "concepts") return {};
+  if (!tab || tab === "map") return {};
   return tabMetadata(locale, `seo.glossary.tabs.${tab}`, null, {
     namespaceSlug,
     path: "/glossary",
