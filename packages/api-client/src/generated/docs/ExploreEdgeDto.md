@@ -19,6 +19,7 @@ Name | Type
 `sharedByLabel` | { [key: string]: number; }
 `note` | string
 `passage` | string
+`review` | string
 
 ## Example
 
@@ -40,6 +41,7 @@ const example = {
   "sharedByLabel": null,
   "note": null,
   "passage": null,
+  "review": null,
 } satisfies ExploreEdgeDto
 
 console.log(example)

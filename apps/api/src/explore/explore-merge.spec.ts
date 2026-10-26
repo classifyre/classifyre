@@ -3,6 +3,7 @@ import {
   mergeNeighbourhood,
   withEdgesAmong,
   withScope,
+  withReview,
   duplicateWalks,
   pickDuplicateHubs,
   type DuplicatePairRow,
@@ -460,5 +461,56 @@ describe('the duplicates map', () => {
     expect(shared.result.nodes.map((n) => n.id)).toEqual(['w']);
     // The starting point is never drawn as its own neighbour.
     expect(same.result.nodes.map((n) => n.id)).toEqual(['x', 'y', 'z']);
+  });
+});
+
+describe('withReview', () => {
+  const view = () =>
+    mergeNeighbourhood({
+      ...empty,
+      seeds: [asset('s')],
+      walks: [
+        {
+          kind: 'duplicates',
+          result: {
+            nodes: [node('a', 'side'), node('b', 'side'), node('c', 'side')],
+            edges: [
+              edge('sa', 's', 'a', 'duplicates'),
+              edge('sb', 'b', 's', 'duplicates'),
+              edge('sc', 's', 'c', 'duplicates'),
+            ],
+            truncated: false,
+          },
+        },
+        {
+          kind: 'lineage',
+          result: {
+            nodes: [node('l', 'down')],
+            edges: [edge('sl', 's', 'l', 'lineage')],
+            truncated: false,
+          },
+        },
+      ],
+    });
+
+  it('says what review decided, and drops what it ruled apart', () => {
+    const after = withReview(
+      view(),
+      new Map([
+        ['a|s', 'CONFIRMED'],
+        ['b|s', 'UNSURE'],
+        ['c|s', 'REJECTED'],
+      ]),
+    );
+    const review = Object.fromEntries(after.edges.map((e) => [e.id, e.review]));
+    expect(review).toEqual({ sa: 'CONFIRMED', sb: 'UNSURE', sl: undefined });
+    // c came only through the rejected pair.
+    expect(after.nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'l', 's']);
+    expect(after.counts.duplicates).toBe(2);
+  });
+
+  it('marks an undecided pair as such', () => {
+    const after = withReview(view(), new Map());
+    expect(after.edges.find((e) => e.id === 'sc')?.review).toBeNull();
   });
 });

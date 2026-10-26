@@ -586,3 +586,57 @@ export function duplicateWalks(
     { kind: 'similar', result: walks.similar },
   ];
 }
+
+/** Duplicate review's verdict for a pair, keyed by `pairKey`. */
+export type PairVerdicts = ReadonlyMap<string, string>;
+
+/**
+ * What duplicate review decided, on every "same as" and "shared values"
+ * line: confirmed, unsure, or nothing yet. A pair someone ruled apart (or
+ * split) is not the same, whatever the scorer says, so its line goes, and so
+ * does a neighbour only that line brought.
+ */
+export function withReview(
+  view: ExploreNeighbourhoodResponseDto,
+  verdicts: PairVerdicts,
+): ExploreNeighbourhoodResponseDto {
+  let dropped = false;
+  const edges: ExploreEdgeDto[] = [];
+  for (const e of view.edges) {
+    const paired =
+      (e.kind === 'duplicates' || e.kind === 'similar') &&
+      e.fromType === 'asset' &&
+      e.toType === 'asset';
+    if (!paired) {
+      edges.push(e);
+      continue;
+    }
+    const verdict = verdicts.get(pairKey(e.fromId, e.toId));
+    if (verdict === 'REJECTED' || verdict === 'SPLIT') {
+      dropped = true;
+      continue;
+    }
+    edges.push({
+      ...e,
+      review: verdict === 'CONFIRMED' || verdict === 'UNSURE' ? verdict : null,
+    });
+  }
+  if (!dropped) return { ...view, edges };
+  const tied = new Set(edges.flatMap((e) => [e.fromId, e.toId]));
+  const nodes = view.nodes.filter((n) => n.side === 'seed' || tied.has(n.id));
+  return { ...view, nodes, edges, counts: countKinds(nodes) };
+}
+
+/** The asset pairs of a view's "same as" and "shared values" lines. */
+export function reviewedPairs(
+  view: ExploreNeighbourhoodResponseDto,
+): Array<[string, string]> {
+  return view.edges
+    .filter(
+      (e) =>
+        (e.kind === 'duplicates' || e.kind === 'similar') &&
+        e.fromType === 'asset' &&
+        e.toType === 'asset',
+    )
+    .map((e) => (e.fromId < e.toId ? [e.fromId, e.toId] : [e.toId, e.fromId]));
+}

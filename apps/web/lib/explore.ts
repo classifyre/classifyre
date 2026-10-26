@@ -169,6 +169,17 @@ export function sharedValues(byLabel: Record<string, number> | null | undefined)
 /** Why two things are linked, in words, as the canvas writes it on the line. */
 export function linkReason(e: ExploreEdgeDto, t: Translate): string {
   if (e.origin === "MANUAL") return e.note?.trim() || humanize(e.relationType);
+  // What duplicate review decided outranks what the scorer says.
+  if (e.review === "CONFIRMED") {
+    return e.relationType === "repeated_text_confirmed"
+      ? t("explore.reason.repeatedTextConfirmed")
+      : t("explore.reason.confirmed");
+  }
+  if (e.review === "UNSURE") return t("explore.reason.unsure", { reason: scoredReason(e, t) });
+  return scoredReason(e, t);
+}
+
+function scoredReason(e: ExploreEdgeDto, t: Translate): string {
   switch (e.kind) {
     case "duplicates": {
       if (e.relationType === "identical_content") return t("explore.reason.identical");

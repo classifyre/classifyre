@@ -10,7 +10,6 @@ import {
   Bookmark,
   BookmarkCheck,
   Compass,
-  Link2,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -27,11 +26,13 @@ import {
   ExploreCanvas,
   EXPLORE_KINDS,
   type ExploreKind,
+  type ExploreMenuTarget,
   type ExploreSelection,
   type ExploreSpotlight,
   type ExploreWords,
 } from "@workspace/case-board/explore";
 import { Button, EmptyState } from "@workspace/ui/components";
+import { ContextMenu, ContextMenuTrigger } from "@workspace/ui/components/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,7 +73,8 @@ import {
   ExploreViewPopover,
   type ExploreDrawer,
 } from "./explore-chrome";
-import { DetailsDrawer, FindDrawer, MarksDrawer, SuggestionsDrawer, useExploreSearch } from "./explore-drawers";
+import { ExploreContextMenuContent } from "./explore-context-menu";
+import { DetailsDrawer, FindDrawer, MarksDrawer, SuggestionsDrawer, useCanvasFind, useExploreSearch } from "./explore-drawers";
 import { ExploreHome } from "./explore-home";
 import { LinkAssetsDialog } from "./link-assets-dialog";
 import { SaveViewDialog } from "./save-view-dialog";
@@ -188,6 +190,7 @@ export function ExploreWorkspace({
   rootLabel?: string;
 }) {
   const { t } = useTranslation();
+  const router = useRouter();
   const onPage = mode === "page";
   const onSource = mode === "source";
   const rootRef = React.useRef<HTMLDivElement>(null);
@@ -367,6 +370,7 @@ export function ExploreWorkspace({
   const anchor = atRoot && mode === "term" ? (termId ?? null) : null;
   const graph = React.useMemo(() => (data ? { ...toExploreGraph(data, t), anchor } : null), [anchor, data, t]);
   const suggestions = React.useMemo(() => (data ? rankSuggestions(data, kinds) : []), [data, kinds]);
+  const canvasIds = React.useMemo(() => graph?.assets.filter((a) => !a.external).map((a) => a.id) ?? [], [graph]);
   const viewCounts = React.useMemo(
     () => (data ? (Object.fromEntries(EXPLORE_VIEWS.map((v) => [v, viewCount(v, data)])) as Record<ExploreViewName, number>) : null),
     [data],
@@ -381,6 +385,7 @@ export function ExploreWorkspace({
   React.useEffect(() => {
     setSelection(null);
     setSpotlight(null);
+    setPeek(false);
     if (!empty && onPage) setDrawer((d) => d ?? "suggestions");
   }, [seedKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -388,6 +393,12 @@ export function ExploreWorkspace({
   // home's table), kept in the address.
   const [query, setQuery] = React.useState(view.q);
   const search = useExploreSearch(empty ? "" : query, onSource ? sourceId : undefined);
+  const onCanvas = useCanvasFind(empty ? "" : query, canvasIds);
+  // What the search matched on the canvas glows while Find is open.
+  const highlight = React.useMemo(
+    () => (drawer === "find" && query.trim() ? new Set(onCanvas.hits.filter((h) => h.lit).map((h) => h.id)) : null),
+    [drawer, onCanvas.hits, query],
+  );
   React.useEffect(() => {
     if (!onPage) return;
     const timer = window.setTimeout(() => {
@@ -396,25 +407,33 @@ export function ExploreWorkspace({
     return () => window.clearTimeout(timer);
   }, [go, onPage, query, view.q]);
 
-  // Linking: pick an asset, then the one to link it to (or drag between ports).
-  const [linkFrom, setLinkFrom] = React.useState<string | null>(null);
+  // Linking: pull a line from one asset's edge to another's.
   const [linkPair, setLinkPair] = React.useState<{ from: string; to: string } | null>(null);
   const [caseCandidates, setCaseCandidates] = React.useState<CaseCandidate[] | null>(null);
+  const [menuTarget, setMenuTarget] = React.useState<ExploreMenuTarget | null>(null);
+  // "Fit to view" from the menu: refits the canvas.
+  const [fitNonce, setFitNonce] = React.useState(0);
+  // A detail opened from a panel's list shows in that panel, with a way back.
+  const [peek, setPeek] = React.useState(false);
 
-  const select = React.useCallback(
+  // From the canvas: Details shows it.
+  const select = React.useCallback((next: ExploreSelection | null) => {
+    setSelection(next);
+    setPeek(false);
+    if (next) {
+      setSpotlight(null);
+      setDrawer("details");
+    }
+  }, []);
+  // From a panel's list: the panel shows it, and the canvas lights it.
+  const selectInPanel = React.useCallback(
     (next: ExploreSelection | null) => {
-      if (linkFrom && next?.type === "asset" && next.id !== linkFrom) {
-        setLinkPair({ from: linkFrom, to: next.id });
-        setLinkFrom(null);
-        return;
-      }
+      if (!next || drawer === "details" || !drawer) return select(next);
       setSelection(next);
-      if (next) {
-        setSpotlight(null);
-        setDrawer("details");
-      }
+      setSpotlight(null);
+      setPeek(true);
     },
-    [linkFrom],
+    [drawer, select],
   );
 
   // A source's own starting points are the ones it was explored from.
@@ -465,7 +484,10 @@ export function ExploreWorkspace({
       yours: t("explore.yours"),
       zoomIn: t("explore.zoomIn"),
       zoomOut: t("explore.zoomOut"),
+      zoomReset: t("explore.zoomReset"),
       fit: t("explore.fit"),
+      zoomSelection: t("explore.zoomSelection"),
+      minimap: t("explore.minimap"),
     }),
     [onPage, t],
   );
@@ -556,7 +578,8 @@ export function ExploreWorkspace({
           {savedView && !dirty ? <BookmarkCheck className="size-3.5" aria-hidden /> : <Bookmark className="size-3.5" aria-hidden />}
           {savedView ? (dirty ? t("explore.saved.saveChanges") : t("explore.saved.isSaved")) : t("explore.saved.saveView")}
         </Button>
-        <DropdownMenu>
+        {/* Not modal, for the same reason: its items open dialogs. */}
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
@@ -592,12 +615,44 @@ export function ExploreWorkspace({
     )
   ) : null;
 
+  const details =
+    data && graph ? (
+      <DetailsDrawer
+        data={data}
+        graph={graph}
+        selection={selection}
+        words={words}
+        onSelect={peek ? selectInPanel : select}
+        onAddSeed={addSeed}
+        onStartFrom={(id) => startFrom([id])}
+        onToCase={(id) => sendToCase([id])}
+        onChanged={() => setReload((n) => n + 1)}
+        seedExtra={(id) => <AssetMeaningPanel assetId={id} onChanged={() => setReload((n) => n + 1)} />}
+        here={onPage ? undefined : assetId}
+        onDiveIn={onPage ? undefined : dive}
+      />
+    ) : null;
+
+  const removeLink = async (edgeId: string) => {
+    try {
+      await api.graph.graphControllerDeleteEdge({ id: edgeId });
+      toast.success(t("explore.linkRemoved"));
+      setSelection(null);
+      setReload((n) => n + 1);
+    } catch (err) {
+      toast.error(await extractApiErrorMessage(err, t("explore.linkRemoveFailed")));
+    }
+  };
+
   return (
     <div
       ref={onPage ? rootRef : undefined}
       className={cn(
         "case-board relative flex flex-col overflow-hidden bg-background",
-        onPage ? "-mx-4 -mt-2 -mb-4 min-h-[480px]" : "h-[72vh] min-h-[520px] rounded-[4px] border-2 border-border",
+        // The canvas is the page's main thing wherever it is drawn: like the
+        // case board, a screen tall, no box around it (a rule above and below
+        // only). It keeps to its page's width; pages pad differently.
+        onPage ? "-mx-4 -mt-2 -mb-4 min-h-[480px]" : "h-[calc(100dvh-7rem)] min-h-[560px] border-y-2 border-border",
       )}
       data-testid="explore"
     >
@@ -605,7 +660,14 @@ export function ExploreWorkspace({
         title={onPage ? title : undefined}
         trail={
           trail.length ? (
-            <ExploreTrail levels={trail.map((l) => l.label)} current={here} onBack={(i) => { setPositions({}); diveOut(i); }} />
+            <ExploreTrail
+              levels={trail.map((l) => l.label)}
+              current={here}
+              onBack={(i) => {
+                setPositions({});
+                diveOut(i);
+              }}
+            />
           ) : undefined
         }
         scope={atRoot && mode === "term" ? undefined : view.scope}
@@ -620,24 +682,8 @@ export function ExploreWorkspace({
           setSpotlight(next);
         }}
         words={words}
-        query={query}
-        onQuery={(q) => {
-          setQuery(q);
-          if (q.trim()) setDrawer("find");
-        }}
-        onSearchFocus={() => query.trim() && setDrawer("find")}
-        showSearch={(onPage && !empty) || onSource}
         actions={actions}
       />
-      {linkFrom && (
-        <div className="flex items-center gap-2 border-b-2 border-border bg-muted px-3 py-1.5 text-xs" role="status">
-          <Link2 className="size-3.5" aria-hidden />
-          {t("explore.linkPick", { name: graph?.assets.find((a) => a.id === linkFrom)?.label ?? "" })}
-          <Button size="sm" variant="outline" className="ml-auto h-6 px-2 text-xs" onClick={() => setLinkFrom(null)}>
-            {t("common.cancel")}
-          </Button>
-        </div>
-      )}
 
       <div className="relative flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1">
@@ -660,47 +706,74 @@ export function ExploreWorkspace({
               action={{ label: t("explore.retry"), onClick: () => setReload((n) => n + 1) }}
             />
           ) : graph && graph.assets.length > 0 ? (
-            <ExploreCanvas
-              graph={graph}
-              kinds={kinds}
-              selection={selection}
-              onSelect={select}
-              spotlight={spotlight}
-              onWalk={onPage ? addSeed : dive}
-              onLink={(from, to) => setLinkPair({ from, to })}
-              iconFor={getAssetKindIcon}
-              words={words}
-              fitKey={`${data?.seeds.join(",")}|${dataKey}|${kindList.join(",")}|${savedView?.id ?? ""}`}
-              positions={positions}
-              onPositionsChange={setPositions}
-              zoomOnScroll={onPage}
-              className="h-full"
-              style={{ height: "100%" }}
-              overlay={
-                <>
-                  {loading && (
-                    <Panel position="top-left">
-                      <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label={t("explore.loading")} />
-                    </Panel>
-                  )}
-                  <Panel position="bottom-left">
-                    <ExploreViewPopover
-                      view={view.view}
-                      kinds={kinds}
-                      custom={!!view.kinds}
-                      counts={viewCounts}
-                      depth={view.depth}
-                      direction={view.direction}
-                      words={words}
-                      onView={(next) => go({ view: next, kinds: null }, "replace")}
-                      onKinds={(next) => go({ kinds: next }, "replace")}
-                      onDepth={(depth) => go({ depth })}
-                      onDirection={(direction) => go({ direction })}
-                    />
-                  </Panel>
-                </>
-              }
-            />
+            <ContextMenu modal={false} onOpenChange={(open) => !open && setMenuTarget(null)}>
+              {/* Not modal: a modal menu leaves the page unclickable (pointer-events on
+                  the body) when one of its items opens a dialog, such as Add to a case. */}
+              <ContextMenuTrigger asChild>
+                <div className="h-full">
+                  <ExploreCanvas
+                    graph={graph}
+                    kinds={kinds}
+                    selection={selection}
+                    onSelect={select}
+                    spotlight={spotlight}
+                    highlight={highlight}
+                    onMenuTarget={setMenuTarget}
+                    onWalk={onPage ? addSeed : dive}
+                    onLink={(from, to) => setLinkPair({ from, to })}
+                    iconFor={getAssetKindIcon}
+                    words={words}
+                    fitKey={`${data?.seeds.join(",")}|${dataKey}|${kindList.join(",")}|${savedView?.id ?? ""}|${fitNonce}`}
+                    positions={positions}
+                    onPositionsChange={setPositions}
+                    className="h-full"
+                    style={{ height: "100%" }}
+                    overlay={
+                      <>
+                        {loading && (
+                          <Panel position="top-left">
+                            <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label={t("explore.loading")} />
+                          </Panel>
+                        )}
+                        <Panel position="bottom-left">
+                          <ExploreViewPopover
+                            view={view.view}
+                            kinds={kinds}
+                            custom={!!view.kinds}
+                            counts={viewCounts}
+                            depth={view.depth}
+                            direction={view.direction}
+                            words={words}
+                            onView={(next) => go({ view: next, kinds: null }, "replace")}
+                            onKinds={(next) => go({ kinds: next }, "replace")}
+                            onDepth={(depth) => go({ depth })}
+                            onDirection={(direction) => go({ direction })}
+                          />
+                        </Panel>
+                      </>
+                    }
+                  />
+                </div>
+              </ContextMenuTrigger>
+              <ExploreContextMenuContent
+                target={menuTarget}
+                data={data}
+                graph={graph}
+                words={words}
+                here={onPage ? undefined : assetId}
+                actions={{
+                  onDetails: select,
+                  onDiveIn: onPage ? undefined : dive,
+                  onAddSeed: onPage ? addSeed : undefined,
+                  onStartFrom: onPage ? (id) => startFrom([id]) : undefined,
+                  onToCase: (id) => sendToCase([id]),
+                  onRemoveLink: (id) => void removeLink(id),
+                  onOpen: (href) => router.push(href),
+                  onFit: () => setFitNonce((n) => n + 1),
+                  onResetLayout: onPage ? () => setPositions({}) : undefined,
+                }}
+              />
+            </ContextMenu>
           ) : data && !loading ? (
             view.scope !== "all" ? (
               <EmptyState
@@ -732,21 +805,41 @@ export function ExploreWorkspace({
         </div>
 
         {!empty && drawer && (
-          <DrawerFrame title={t(`explore.drawer.${drawer}` as TranslationKey)} onClose={() => setDrawer(null)}>
-            {drawer === "find" ? (
+          <DrawerFrame
+            title={t(`explore.drawer.${drawer}` as TranslationKey)}
+            onClose={() => {
+              setDrawer(null);
+              setPeek(false);
+            }}
+            onBack={
+              peek
+                ? () => {
+                    setPeek(false);
+                    setSelection(null);
+                  }
+                : undefined
+            }
+            backLabel={t("explore.backTo", { name: t(`explore.drawer.${drawer}` as TranslationKey) })}
+          >
+            {peek && data && graph ? (
+              details
+            ) : drawer === "find" ? (
               <FindDrawer
                 query={query}
+                onQuery={setQuery}
+                onCanvas={onCanvas}
                 search={search}
-                seeds={view.seeds}
+                seeds={seedsNow}
                 graph={graph}
                 onStartFrom={onPage ? (id) => startFrom([id]) : dive}
+                startLabel={onPage ? t("explore.startFrom") : t("explore.diveIn")}
                 onAddSeed={addSeed}
                 onRemoveSeed={seedsNow.length > 1 ? removeSeed : undefined}
-                onSelect={select}
+                onSelect={selectInPanel}
                 onAllToCase={() => sendToCase(graph?.assets.filter((a) => !a.external).map((a) => a.id) ?? [])}
               />
             ) : drawer === "suggestions" ? (
-              <SuggestionsDrawer suggestions={suggestions} words={words} onAddSeed={addSeed} onSelect={select} />
+              <SuggestionsDrawer suggestions={suggestions} words={words} onAddSeed={addSeed} onSelect={selectInPanel} />
             ) : drawer === "marks" ? (
               <MarksDrawer
                 data={data}
@@ -756,21 +849,7 @@ export function ExploreWorkspace({
                 }}
               />
             ) : data && graph ? (
-              <DetailsDrawer
-                data={data}
-                graph={graph}
-                selection={selection}
-                words={words}
-                onSelect={select}
-                onAddSeed={addSeed}
-                onStartFrom={(id) => startFrom([id])}
-                onLinkFrom={setLinkFrom}
-                onToCase={(id) => sendToCase([id])}
-                onChanged={() => setReload((n) => n + 1)}
-                seedExtra={(id) => <AssetMeaningPanel assetId={id} onChanged={() => setReload((n) => n + 1)} />}
-                here={onPage ? undefined : assetId}
-                onDiveIn={onPage ? undefined : dive}
-              />
+              details
             ) : (
               <p className="p-4 text-xs text-muted-foreground">{t("explore.nothingSelected")}</p>
             )}
@@ -782,7 +861,7 @@ export function ExploreWorkspace({
             onDrawer={setDrawer}
             suggestions={suggestions.length}
             marks={(data?.cases.length ?? 0) + (data?.inquiries.length ?? 0)}
-            hide={onPage || onSource ? [] : ["find"]}
+            hide={[]}
           />
         )}
       </div>

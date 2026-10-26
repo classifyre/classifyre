@@ -1671,6 +1671,40 @@ export class EmbeddingService {
   }
 
   /**
+   * How well each of a few given assets answers a question: the score of its
+   * best passage, and that passage. Exact (no index) because the assets are
+   * already chosen — what is on an Explore canvas — and a nearest-neighbour
+   * scan over the whole space would rank most of them out. Bounded by the
+   * caller (a few hundred assets) and by a statement timeout.
+   */
+  async scoreAssets(queryVector: number[], assetIds: string[]) {
+    await this.assertSemanticEnabled();
+    const space = await this.activeSpace();
+    if (!assetIds.length || queryVector.length !== space.dim) return [];
+    const dim = Prisma.raw(String(space.dim));
+    const vecType = Prisma.raw(vectorCast(space.dim).type);
+    const vector = JSON.stringify(queryVector);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SET LOCAL statement_timeout = '4s'`;
+      return tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
+        SELECT DISTINCT ON (ac.asset_id)
+          ac.asset_id AS id,
+          1 - (
+            ce.vec::public.${vecType}(${dim}) <=>
+            ${vector}::public.${vecType}(${dim})
+          ) AS score,
+          ac.page, LEFT(ac.text, 600) AS text
+        FROM asset_chunks ac
+        JOIN content_embeddings ce
+          ON ce.content_hash = ac.content_hash
+         AND ce.space_id = ${this.spaceIdLiteral(space.id)}
+        WHERE ac.asset_id = ANY(${assetIds}::text[])
+        ORDER BY ac.asset_id, score DESC
+      `);
+    });
+  }
+
+  /**
    * Assets found by the words of their passages, best first, each with the
    * passage that matched best.
    *

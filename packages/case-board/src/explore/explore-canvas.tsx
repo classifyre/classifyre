@@ -5,6 +5,7 @@ import {
   Background,
   BackgroundVariant,
   ConnectionMode,
+  MiniMap,
   Panel,
   ReactFlow,
   ReactFlowProvider,
@@ -13,7 +14,7 @@ import {
   type Connection,
   type NodeChange,
 } from "@xyflow/react";
-import { FileText, Maximize2, Minus, Plus, type LucideIcon } from "lucide-react";
+import { FileText, Map as MapIcon, Maximize2, Minus, Plus, ScanSearch, type LucideIcon } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { EdgeMarkers } from "../components/markers";
 import { ASSET_NODE, ASSET_ROUND, EVIDENCE_ROUND, SOURCE_PORT, TARGET_PORT, type XY } from "../lib/geometry";
@@ -35,6 +36,9 @@ const dim = (on: boolean) => (on ? "cb-dim" : undefined);
 /** What a counter lit up: one kind of connection, or what a case holds or a watch answers. */
 export type ExploreSpotlight = ExploreKind | "cases" | "watches";
 
+/** What a right click landed on: an asset, a term, a line, or the empty canvas. */
+export type ExploreMenuTarget = ExploreSelection | { type: "pane" };
+
 export interface ExploreCanvasProps {
   graph: ExploreGraph;
   /** Kinds of connection to draw; the rest are left out, with what only they reach. */
@@ -51,8 +55,18 @@ export interface ExploreCanvasProps {
   words?: ExploreWords;
   /** The view is fitted again whenever this changes (new starting points). */
   fitKey: string;
-  /** Zoom with the wheel; off where the page has to keep scrolling over it. */
+  /**
+   * The wheel zooms, as on the case board (the default). Off only where a
+   * page must keep scrolling over the canvas: the documentation's demos.
+   */
   zoomOnScroll?: boolean;
+  /** Assets a search matched: they glow and come into view, the rest steps back. */
+  highlight?: ReadonlySet<string> | null;
+  /**
+   * A right click: what it landed on, before the context menu wrapping the
+   * canvas opens (as on the case board, the caller draws the menu).
+   */
+  onMenuTarget?: (target: ExploreMenuTarget) => void;
   /** The caller's own controls, drawn inside the canvas (they may use React Flow's hooks). */
   overlay?: React.ReactNode;
   /**
@@ -74,7 +88,7 @@ export interface ExploreCanvasProps {
  */
 export function ExploreCanvas(props: ExploreCanvasProps) {
   return (
-    <div className={cn("case-board relative overflow-hidden bg-background", props.className)} style={props.style}>
+    <div className={cn("case-board @container/board relative overflow-hidden bg-background", props.className)} style={props.style}>
       <ReactFlowProvider>
         <Canvas {...props} />
       </ReactFlowProvider>
@@ -93,6 +107,8 @@ function Canvas({
   iconFor = defaultIcon,
   words = ENGLISH_WORDS,
   fitKey,
+  highlight = null,
+  onMenuTarget,
   zoomOnScroll = true,
   overlay,
   positions,
@@ -129,6 +145,13 @@ function Canvas({
       if (at) nodes.add(at);
       return { nodes, links };
     }
+    if (highlight?.size) {
+      for (const id of highlight) nodes.add(id);
+      for (const l of layout.links) {
+        if (highlight.has(l.source) && highlight.has(l.target)) links.add(l.id);
+      }
+      return { nodes, links };
+    }
     if (!spotlight) return null;
     for (const a of layout.assets) {
       const lit =
@@ -152,7 +175,7 @@ function Canvas({
       }
     }
     return { nodes, links };
-  }, [layout, selection, spotlight]);
+  }, [highlight, layout, selection, spotlight]);
 
   const nodes = React.useMemo<ExploreFlowNode[]>(() => {
     const termCount = new Map<string, number>();
@@ -184,7 +207,7 @@ function Canvas({
         data: { node: "asset", asset: a, round: a.side === "seed" ? EVIDENCE_ROUND : ASSET_ROUND },
         ...ASSET_SIZE,
         measured: ASSET_SIZE,
-        className: dim(!!focus && !focus.nodes.has(a.id)),
+        className: cn(dim(!!focus && !focus.nodes.has(a.id)), highlight?.has(a.id) && !selection && "cb-glow"),
         selected: selection?.type === "asset" && selection.id === a.id,
       });
     }
@@ -203,7 +226,7 @@ function Canvas({
       });
     }
     return out;
-  }, [focus, layout, moved, selection, words]);
+  }, [focus, highlight, layout, moved, selection, words]);
 
   const edges = React.useMemo<ExploreFlowEdge[]>(() => {
     // Several kinds between one pair bow apart instead of lying on each other.
@@ -252,6 +275,20 @@ function Canvas({
     );
     return () => window.clearTimeout(timer);
   }, [rf, spotlight]);
+
+  // What a search matched comes into view the same way.
+  const highlightKey = highlight ? [...highlight].sort().join(",") : "";
+  React.useEffect(() => {
+    if (!highlightKey) return;
+    const ids = highlightKey.split(",").map((id) => ({ id }));
+    const timer = window.setTimeout(
+      () => void rf.fitView({ nodes: ids, padding: 0.3, maxZoom: 1, duration: 300 }),
+      0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [highlightKey, rf]);
+
+  const [minimap, setMinimap] = React.useState(false);
 
   const onNodesChange = React.useCallback((changes: NodeChange<ExploreFlowNode>[]) => {
     const drags = changes.filter((c) => c.type === "position" && c.position);
@@ -304,6 +341,13 @@ function Canvas({
         onEdgeMouseEnter={(_, e) => setHoveredLinkId(e.id)}
         onEdgeMouseLeave={() => setHoveredLinkId(null)}
         onPaneClick={() => onSelect(null)}
+        onNodeContextMenu={(_, n) => {
+          if (n.data.node === "asset") onMenuTarget?.({ type: "asset", id: n.id });
+          else if (n.data.node === "term") onMenuTarget?.({ type: "term", id: n.data.term.id });
+          else onMenuTarget?.({ type: "pane" });
+        }}
+        onEdgeContextMenu={(_, e) => onMenuTarget?.({ type: "link", id: e.id })}
+        onPaneContextMenu={() => onMenuTarget?.({ type: "pane" })}
         fitView
         fitViewOptions={FIT}
         nodesConnectable={!!onLink}
@@ -314,13 +358,30 @@ function Canvas({
         maxZoom={2}
         zoomOnScroll={zoomOnScroll}
         preventScrolling={zoomOnScroll}
+        zoomOnPinch
+        panOnScroll={false}
         zoomOnDoubleClick={false}
         deleteKeyCode={null}
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
+        {minimap && (
+          <MiniMap
+            pannable
+            zoomable
+            position="top-right"
+            className="!border-2 !border-border"
+            nodeColor={(n) =>
+              (n as ExploreFlowNode).data.node === "term"
+                ? "var(--cb-violet)"
+                : (n as ExploreFlowNode).data.node === "lane"
+                  ? "transparent"
+                  : "var(--foreground)"
+            }
+          />
+        )}
         <Panel position="bottom-right">
-          <ZoomControls words={words} />
+          <ZoomControls words={words} minimap={minimap} onMinimap={() => setMinimap((on) => !on)} />
         </Panel>
         {overlay}
       </ReactFlow>
@@ -328,42 +389,80 @@ function Canvas({
   );
 }
 
-/** Zoom out / percentage / in, and fit: the case board's control, in the same place. */
-function ZoomControls({ words }: { words: ExploreWords }) {
+function ZoomButton({
+  label,
+  onClick,
+  active,
+  wide,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  /** Only shown when the canvas is wide enough for the whole row. */
+  wide?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "size-8 items-center justify-center rounded-[3px] hover:bg-muted",
+        wide ? "hidden @3xl/board:flex" : "flex",
+        active && "bg-foreground text-background hover:bg-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * The case board's zoom row, in the same place: out, percentage (back to
+ * 100 %), in, fit, fit the selection, and the mini-map.
+ */
+function ZoomControls({ words, minimap, onMinimap }: { words: ExploreWords; minimap: boolean; onMinimap: () => void }) {
   const rf = useReactFlow();
   const zoom = useStore((s) => Math.round(s.transform[2] * 100));
-  const button = "flex size-8 items-center justify-center rounded-[3px] hover:bg-muted";
+  const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const duration = reduced ? 0 : 200;
   return (
     <div className="flex items-center gap-0.5 rounded-[6px] border-2 border-border bg-card p-1" data-testid="explore-zoom">
-      <button
-        type="button"
-        className={button}
-        onClick={() => void rf.zoomOut({ duration: 150 })}
-        aria-label={words.zoomOut}
-        title={words.zoomOut}
-      >
+      <ZoomButton wide label={words.zoomOut} onClick={() => void rf.zoomOut({ duration })}>
         <Minus className="size-4" aria-hidden />
-      </button>
+      </ZoomButton>
       <button
         type="button"
         className="w-12 font-mono text-xs tabular-nums hover:underline"
-        onClick={() => void rf.zoomTo(1, { duration: 150 })}
+        title={words.zoomReset}
+        onClick={() => void rf.zoomTo(1, { duration })}
       >
         {zoom}%
       </button>
-      <button
-        type="button"
-        className={button}
-        onClick={() => void rf.zoomIn({ duration: 150 })}
-        aria-label={words.zoomIn}
-        title={words.zoomIn}
-      >
+      <ZoomButton wide label={words.zoomIn} onClick={() => void rf.zoomIn({ duration })}>
         <Plus className="size-4" aria-hidden />
-      </button>
-      <span className="mx-0.5 h-5 w-px bg-border" aria-hidden />
-      <button type="button" className={button} onClick={() => void rf.fitView(FIT)} aria-label={words.fit} title={words.fit}>
+      </ZoomButton>
+      <span className="mx-0.5 hidden h-5 w-px bg-border @3xl/board:block" aria-hidden />
+      <ZoomButton label={words.fit} onClick={() => void rf.fitView({ ...FIT, duration })}>
         <Maximize2 className="size-4" aria-hidden />
-      </button>
+      </ZoomButton>
+      <ZoomButton
+        wide
+        label={words.zoomSelection}
+        onClick={() => {
+          const nodes = rf.getNodes().filter((n) => n.selected);
+          if (nodes.length) void rf.fitView({ nodes, duration, padding: 0.3, maxZoom: 1.2 });
+        }}
+      >
+        <ScanSearch className="size-4" aria-hidden />
+      </ZoomButton>
+      <ZoomButton wide label={words.minimap} active={minimap} onClick={onMinimap}>
+        <MapIcon className="size-4" aria-hidden />
+      </ZoomButton>
     </div>
   );
 }

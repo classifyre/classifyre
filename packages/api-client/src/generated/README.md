@@ -260,6 +260,7 @@ All URIs are relative to *http://localhost*
 *EntitiesApi* | [**entitiesControllerUpdate**](docs/EntitiesApi.md#entitiescontrollerupdate) | **PATCH** /entities/{idOrKey} | Set an entity\&#39;s anchor URN or attributes
 *ExploreApi* | [**exploreControllerCreateView**](docs/ExploreApi.md#explorecontrollercreateview) | **POST** /explore/views | Save an Explore view
 *ExploreApi* | [**exploreControllerDeleteView**](docs/ExploreApi.md#explorecontrollerdeleteview) | **DELETE** /explore/views/{id} | Delete a saved Explore view
+*ExploreApi* | [**exploreControllerFind**](docs/ExploreApi.md#explorecontrollerfind) | **POST** /explore/find | Which of the assets on a canvas answer a question
 *ExploreApi* | [**exploreControllerGetView**](docs/ExploreApi.md#explorecontrollergetview) | **GET** /explore/views/{id} | One saved Explore view
 *ExploreApi* | [**exploreControllerListViews**](docs/ExploreApi.md#explorecontrollerlistviews) | **GET** /explore/views | Saved Explore views, the last changed first
 *ExploreApi* | [**exploreControllerNeighbourhood**](docs/ExploreApi.md#explorecontrollerneighbourhood) | **POST** /explore/neighbourhood | What these assets are connected to, and why
@@ -695,6 +696,9 @@ All URIs are relative to *http://localhost*
 - [ExploreAssetRefDto](docs/ExploreAssetRefDto.md)
 - [ExploreDuplicatesFilterDto](docs/ExploreDuplicatesFilterDto.md)
 - [ExploreEdgeDto](docs/ExploreEdgeDto.md)
+- [ExploreFindHitDto](docs/ExploreFindHitDto.md)
+- [ExploreFindRequestDto](docs/ExploreFindRequestDto.md)
+- [ExploreFindResponseDto](docs/ExploreFindResponseDto.md)
 - [ExploreKind](docs/ExploreKind.md)
 - [ExploreLineageStarterDto](docs/ExploreLineageStarterDto.md)
 - [ExploreLinkStarterDto](docs/ExploreLinkStarterDto.md)

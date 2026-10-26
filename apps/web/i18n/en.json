@@ -3577,7 +3577,6 @@
     "retry": "Try again",
     "gone": "Nothing to show",
     "goneHint": "The assets you started from are no longer there, or were deleted at their source.",
-    "linkPick": "Pick the asset to link {{name}} to.",
     "nothingSelected": "Select an asset, a term or a line.",
     "startingPoints": "Starting points",
     "startingPoint": "Starting point",
@@ -3588,7 +3587,6 @@
     "howToReadLinks": "Each kind of connection has its own line, the one in its counter. Fainter means a weaker score. Point at a line to read why it is there; light a counter to see one kind alone.",
     "howToReadYours": "Drag from one asset's edge to another, or use Link to…, to draw a link the data does not know about.",
     "startOver": "Start over from this",
-    "linkTo": "Link to…",
     "toCase": "Add to a case",
     "openAsset": "Open the asset",
     "openTerm": "Open in the glossary",
@@ -3616,7 +3614,8 @@
       "alike": "{{percent}}% alike",
       "repeatedText": "repeated text · {{percent}}%",
       "repeatedTextConfirmed": "repeated text · confirmed the same",
-      "confirmed": "confirmed the same"
+      "confirmed": "confirmed the same",
+      "unsure": "{{reason}} · unsure"
     },
     "linkTitle": "Link two assets",
     "linkDescription": "Say what connects them. The link shows on Explore, on case boards, and in lineage when it means lineage.",
@@ -3705,11 +3704,8 @@
     "scope": {
       "label": "Which connections",
       "all": "All",
-      "allHint": "Every connection, inside the source and out of it",
       "internal": "Same source",
-      "internalHint": "Only connections to assets of the same source",
       "external": "Other sources",
-      "externalHint": "Only connections that lead to other sources, or to objects no source has scanned",
       "showAll": "Show all connections"
     },
     "scopeEmpty": {
@@ -3732,7 +3728,34 @@
       "termHint": "Assets appear here once a binding, a mention or a link by hand ties them to it.",
       "duplicates": "No pairs match these filters",
       "duplicatesHint": "Widen the filters, or reset them to see every duplicate."
-    }
+    },
+    "trailEarlier": "Earlier levels",
+    "menu": {
+      "details": "Details",
+      "newTab": "Open in a new tab",
+      "carriers": "What carries it",
+      "why": "Why it is there"
+    },
+    "find": {
+      "onCanvas": "On this canvas",
+      "noneOnCanvas": "Nothing on the canvas matches.",
+      "meaningOff": "Embeddings are off: matched by name and words only.",
+      "elsewhere": "Elsewhere in the workspace",
+      "byMeaning": "{{percent}}% by meaning",
+      "by_name": "in its name",
+      "by_words": "in its text"
+    },
+    "linkHint": "To link it to another asset, pull a line from its edge to that asset. Right-click anything on the canvas for all it offers.",
+    "review": {
+      "title": "Duplicate review",
+      "confirmed": "Confirmed the same by a reviewer.",
+      "unsure": "Marked unsure by a reviewer.",
+      "open": "Not reviewed yet."
+    },
+    "zoomReset": "Back to 100%",
+    "zoomSelection": "Zoom to selection",
+    "minimap": "Mini-map",
+    "backTo": "Back to {{name}}"
   },
   "casework": {
     "title": "Casework",

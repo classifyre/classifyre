@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Briefcase, Compass, Eye, Info, PanelRightClose, PanelRightOpen, Search, X, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Briefcase, Compass, Eye, Info, PanelRightClose, PanelRightOpen, Search, type LucideIcon } from "lucide-react";
 import {
   EXPLORE_KINDS,
   KindLine,
@@ -12,13 +12,20 @@ import {
 import { Button } from "@workspace/ui/components/button";
 import {
   Breadcrumb,
+  BreadcrumbEllipsis,
   BreadcrumbItem,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@workspace/ui/components/breadcrumb";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
-import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
 import { DirectionSwitch, HopLadder } from "@/components/case-board/ui/trace-controls";
@@ -88,8 +95,10 @@ function Counter({
 }
 
 /**
- * Explore's one-line top bar, the case board's: the title, a ledger of what
- * is on the canvas (each counter lights what it counts), and the search.
+ * Explore's one-line top bar, the case board's: the title (on Explore's own
+ * page), a ledger of what is on the canvas (each counter lights what it
+ * counts), and on the right which connections are kept, where a dive has
+ * led, and the page's own actions. Search is in the Find panel.
  */
 export function ExploreTopBar({
   title,
@@ -100,10 +109,6 @@ export function ExploreTopBar({
   spotlight,
   onSpotlight,
   words,
-  query,
-  onQuery,
-  onSearchFocus,
-  showSearch = true,
   actions,
   trail,
   scope,
@@ -111,7 +116,7 @@ export function ExploreTopBar({
 }: {
   /** Left out where the page already names what this is (an asset's page). */
   title?: string;
-  /** Where a dive has led, in place of the title. */
+  /** Where a dive has led: top right, next to the actions. */
   trail?: React.ReactNode;
   /** All connections, only those inside the source, or only those leaving it. */
   scope?: ExploreScope;
@@ -123,10 +128,6 @@ export function ExploreTopBar({
   spotlight: ExploreSpotlight | null;
   onSpotlight: (next: ExploreSpotlight | null) => void;
   words: ExploreWords;
-  query: string;
-  onQuery: (q: string) => void;
-  onSearchFocus: () => void;
-  showSearch?: boolean;
   /** Save and the view's menu (the Explore page only): at the end of the bar. */
   actions?: React.ReactNode;
 }) {
@@ -136,15 +137,11 @@ export function ExploreTopBar({
   return (
     <header className="@container/topbar shrink-0 border-b-2 border-border bg-background" data-testid="explore-top-bar">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 @4xl/topbar:h-14 @4xl/topbar:flex-nowrap @4xl/topbar:py-0 @4xl/topbar:pr-2 @4xl/topbar:pl-4">
-        {trail ? (
-          <div className="flex min-w-0 basis-full items-center @4xl/topbar:flex-1 @4xl/topbar:basis-auto">{trail}</div>
-        ) : title ? (
-          <div className="flex min-w-0 basis-full items-center gap-2.5 @4xl/topbar:flex-1 @4xl/topbar:basis-auto">
+        {title && (
+          <div className="flex min-w-0 items-center gap-2.5 @4xl/topbar:max-w-[40%]">
             <Compass className="size-4 shrink-0" aria-hidden />
             <h1 className="min-w-0 truncate font-serif text-[17px] font-black tracking-[0.03em] uppercase">{title}</h1>
           </div>
-        ) : (
-          <div className="hidden @4xl/topbar:block @4xl/topbar:flex-1" aria-hidden />
         )}
 
         {counts && (
@@ -191,70 +188,46 @@ export function ExploreTopBar({
           </div>
         )}
 
-        {scope && onScope && <ScopeSwitch scope={scope} onScope={onScope} />}
-
-        {showSearch && (
-        <label className="group flex h-9 min-w-[2.25rem] flex-1 items-center gap-2.5 rounded-[4px] border-2 border-border bg-card px-3 text-sm transition-colors focus-within:border-foreground/60 hover:border-foreground/50 @4xl/topbar:w-72 @4xl/topbar:flex-none @6xl/topbar:w-[400px]">
-          <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <input
-            value={query}
-            onChange={(e) => onQuery(e.target.value)}
-            onFocus={onSearchFocus}
-            placeholder={t("explore.searchPlaceholder")}
-            aria-label={t("explore.searchPlaceholder")}
-            className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-            data-testid="explore-search"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => onQuery("")}
-              aria-label={t("explore.clearSearch")}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-3.5" aria-hidden />
-            </button>
-          )}
-        </label>
-        )}
-        {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          {scope && onScope && <ScopeSelect scope={scope} onScope={onScope} />}
+          {trail}
+          {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
+        </div>
       </div>
     </header>
   );
 }
 
 /** All connections, those that stay inside the source, or those that leave it. */
-function ScopeSwitch({ scope, onScope }: { scope: ExploreScope; onScope: (scope: ExploreScope) => void }) {
+function ScopeSelect({ scope, onScope }: { scope: ExploreScope; onScope: (scope: ExploreScope) => void }) {
   const { t } = useTranslation();
   return (
-    <ToggleGroup
-      type="single"
-      size="sm"
-      value={scope}
-      onValueChange={(next) => next && onScope(next as ExploreScope)}
-      aria-label={t("explore.scope.label")}
-      className="h-9 shrink-0"
-      data-testid="explore-scope"
-    >
-      {/* A title, not a Tooltip: the tooltip's trigger would overwrite the item's on/off state. */}
-      {EXPLORE_SCOPES.map((value) => (
-        <ToggleGroupItem
-          key={value}
-          value={value}
-          title={t(`explore.scope.${value}Hint` as TranslationKey)}
-          className="h-9 px-2.5 font-mono text-[10px] tracking-[0.08em] uppercase"
-          data-testid={`explore-scope-${value}`}
-        >
-          {t(`explore.scope.${value}` as TranslationKey)}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+    <Select value={scope} onValueChange={(next) => onScope(next as ExploreScope)}>
+      <SelectTrigger
+        className="h-9 w-[170px] shrink-0 rounded-[4px] border-2 border-border"
+        aria-label={t("explore.scope.label")}
+        data-testid="explore-scope"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent align="end">
+        {EXPLORE_SCOPES.map((value) => (
+          <SelectItem key={value} value={value} data-testid={`explore-scope-${value}`}>
+            <span className="flex flex-col">
+              <span>{t(`explore.scope.${value}` as TranslationKey)}</span>
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
 /**
- * Where diving in has led: every level above is a way back out. The level
- * shown is the last one, and is not a link.
+ * Where diving in has led, top right: the level before this one and this
+ * one; every level further back sits behind the ellipsis, which lists them
+ * all. Dives can go deep, and a full trail would push everything else off
+ * the bar.
  */
 export function ExploreTrail({
   levels,
@@ -266,26 +239,44 @@ export function ExploreTrail({
   onBack: (index: number) => void;
 }) {
   const { t } = useTranslation();
+  const last = levels.length - 1;
+  const hidden = levels.slice(0, Math.max(0, last));
+  const crumb = "max-w-[10rem] truncate font-mono text-[11px] tracking-[0.08em] uppercase hover:text-foreground";
   return (
-    <Breadcrumb aria-label={t("explore.trail")} className="min-w-0 flex-1" data-testid="explore-trail">
+    <Breadcrumb aria-label={t("explore.trail")} className="min-w-0" data-testid="explore-trail">
       <BreadcrumbList className="flex-nowrap text-sm">
-        {levels.map((label, i) => (
-          <React.Fragment key={i}>
+        {hidden.length > 0 && (
+          <>
             <BreadcrumbItem className="shrink-0">
-              <button
-                type="button"
-                onClick={() => onBack(i)}
-                className="max-w-[12rem] truncate font-mono text-[11px] tracking-[0.08em] uppercase hover:text-foreground"
-                title={t("explore.diveOut", { name: label })}
-              >
-                {label}
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="inline-flex size-7 items-center justify-center rounded-[4px] hover:bg-muted"
+                  aria-label={t("explore.trailEarlier")}
+                  title={t("explore.trailEarlier")}
+                  data-testid="explore-trail-more"
+                >
+                  <BreadcrumbEllipsis className="size-7" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="max-w-80">
+                  {hidden.map((label, i) => (
+                    <DropdownMenuItem key={i} onSelect={() => onBack(i)}>
+                      <span className="truncate">{label}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
-          </React.Fragment>
-        ))}
-        <BreadcrumbItem className="min-w-0 flex-1">
-          <BreadcrumbPage className="block truncate font-serif text-[15px] font-black tracking-[0.03em] uppercase">
+          </>
+        )}
+        <BreadcrumbItem className="shrink-0">
+          <button type="button" onClick={() => onBack(last)} className={crumb} title={t("explore.diveOut", { name: levels[last] ?? "" })}>
+            {levels[last]}
+          </button>
+        </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem className="min-w-0">
+          <BreadcrumbPage className="block max-w-[16rem] truncate font-mono text-[11px] font-bold tracking-[0.08em] uppercase" title={current}>
             {current}
           </BreadcrumbPage>
         </BreadcrumbItem>
@@ -379,24 +370,42 @@ export function ExploreRail({
 export function DrawerFrame({
   title,
   onClose,
+  onBack,
+  backLabel,
   children,
 }: {
   title: string;
   onClose: () => void;
+  /** Back to the list a detail was opened from, in the same panel. */
+  onBack?: () => void;
+  backLabel?: string;
   children: React.ReactNode;
 }) {
   const { t } = useTranslation();
   return (
     <aside className="flex h-full w-[360px] max-w-[85vw] shrink-0 flex-col border-l-2 border-border bg-background max-lg:absolute max-lg:inset-y-0 max-lg:right-11 max-lg:z-20" aria-label={title} data-testid="explore-drawer">
       <header className="flex h-11 shrink-0 items-center gap-1 border-b-2 border-border pr-1.5 pl-4">
-        <h2 className="min-w-0 flex-1 truncate font-mono text-[11px] font-bold tracking-[0.12em] uppercase">{title}</h2>
+        {onBack && (
+          <button
+            type="button"
+            className="-ml-2 inline-flex size-8 items-center justify-center rounded-[4px] hover:bg-muted"
+            onClick={onBack}
+            aria-label={backLabel}
+            title={backLabel}
+            data-testid="explore-drawer-back"
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+          </button>
+        )}
+        <h2 className="min-w-0 flex-1 truncate font-serif text-sm font-black tracking-[0.03em] uppercase">{title}</h2>
         <button
           type="button"
           className="inline-flex size-8 items-center justify-center rounded-[4px] hover:bg-muted"
           onClick={onClose}
           aria-label={t("explore.railCollapse")}
+          title={t("explore.railCollapse")}
         >
-          <X className="size-4" aria-hidden />
+          <PanelRightClose className="size-4" aria-hidden />
         </button>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>

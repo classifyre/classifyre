@@ -36,13 +36,13 @@ duplicate review, and the Explore card on the Overview.
 
 A source's **Connections** tab opens on its **ten most connected assets**, and
 what they are connected to: the lineage between its tables, the pages that link
-its issues, the duplicates inside it and in other sources. The search in the top
-bar searches this source. **Worth adding next** lists the neighbours reached by
+its issues, the duplicates inside it and in other sources. The **Find** panel
+searches this source. **Worth adding next** lists the neighbours reached by
 the most kinds of connection.
 
-The switch next to the counters says which connections to keep:
+The dropdown at the top right says which connections to keep:
 
-| Switch | Keeps |
+| Choice | Keeps |
 |---|---|
 | **All** | Every connection |
 | **Same source** | Only connections between assets of this source |
@@ -56,9 +56,10 @@ page, *Other sources* starts from the assets with the most connections out of it
 
 **Double-click** an asset, or select it and press **Dive in**: the canvas
 re-centres on it, with its own connections around it, traced the way you had
-chosen. A trail at the top says where you are, *All of Service desk › HD-214 ›
-HD-214 runbook*; click any step to go back out to it. **Open asset**
-opens the asset's own page.
+chosen. A trail at the top right says where you are: the level you came from
+and this one, *HD-214 › HD-214 runbook*; the **…** before them lists every level
+further back, *All of Service desk* first. Click any of them to go back out to
+it. **Open asset** opens the asset's own page.
 
 ## On an asset's page
 
@@ -94,7 +95,7 @@ screen gives (*same content*, *repeated text · 97%*, *likely the same · person
 | **Review** | Every pair not ruled apart, pairs not reviewed yet, or pairs confirmed the same |
 | **Source** | Pairs with a document in one source |
 
-The switch next to the counters keeps pairs **within one source** or **across
+The dropdown at the top right keeps pairs **within one source** or **across
 two**. Pairs someone ruled apart are never drawn as the same. Lineage and links
 between the drawn documents come along, so a copy that is explained by lineage
 shows it. Double-click a document to dive into everything it is connected to;
@@ -116,8 +117,8 @@ starting from, a tab per reason:
 | **Drawn links** | The links people drew last |
 
 Press **Explore** on a row, or tick several and **Explore them together**.
-Once something is on the canvas, the search moves to the top bar and answers in
-the **Find** panel; **+** adds a result next to what is already there.
+Once something is on the canvas, search in the **Find** panel; **+** adds a
+result next to what is already there.
 
 The view lives in the address bar, so **back** and **forward** walk your
 exploration, and a copied link opens exactly what you were looking at.
@@ -184,6 +185,14 @@ to their left, one column per step, what they feed stands to their right. A smal
 
 ## Reading the canvas
 
+The canvas works as the case board's does: the **wheel zooms**, a drag pans, and
+the row in the bottom right zooms out and in, goes back to 100%, fits
+everything, fits what is selected, and shows a mini-map. **Right-click**
+anything for all it offers: an asset (details, dive in, open it, open it in a
+new tab, add it to a case), a term (what carries it, open it in the glossary), a
+line (why it is there, review the pair, remove a link you drew), or the empty
+canvas (fit to view).
+
 The **counters** in the top bar count what is on the canvas, one per kind of
 connection, each with the line it is drawn with. Press one to light that kind and
 bring it into view; the rest steps back. Press it again to see everything.
@@ -207,8 +216,10 @@ bring it into view; the rest steps back. Press it again to see everything.
 | **Alike by meaning** | They read alike, compared by meaning rather than by words | *84% alike*, with the closest passage |
 
 *Same as* and *shared values* come from the same evidence as
-[duplicate review](/duplicates/): select one of those lines and **Review this
-pair** opens it there. *Alike by meaning* needs
+[duplicate review](/duplicates/), and carry what review decided: a pair a
+reviewer confirmed reads *confirmed the same*, one marked unsure says so, and a
+pair ruled apart is never drawn. Select one of those lines to see its review
+state, and **Review this pair** opens it there. *Alike by meaning* needs
 [embeddings](/settings/embeddings/) switched on.
 
 ## What is already in a case
@@ -225,10 +236,13 @@ One rail on the right opens the panels, as on the case board:
 
 | Panel | Holds |
 |---|---|
-| **Find** | Search results, and your starting points |
+| **Find** | One search box. What it matches **on the canvas** glows there and is listed first: by name, by the words of a passage, or closest by meaning (the few that stand out from the rest of the canvas). What it matches **elsewhere** in the workspace can be brought in. Then your starting points |
 | **Worth adding next** | The neighbours reached by the most kinds of connection, the strongest first |
 | **Details** | What you selected: an asset's links with their reasons and the cases and watches it is part of, a line's reason and score, a term's documents |
 | **Cases and watches** | The cases holding these assets and the watches they answer |
+
+Click an asset in a panel's list and its details open in that panel, with an
+arrow back to the list, so you never lose your place.
 
 On a source's or an asset's page, double-click an asset to dive in (see above).
 On Explore's own page, a double click or **Add as a starting point** walks on
@@ -240,9 +254,8 @@ one asset.
 ## Your own links
 
 You often know something the data does not: that the photos were taken for this
-complaint, that this works order answers that survey. Select an asset and use
-**Link to…**, or drag from the edge of one asset to another, and say what the
-link means:
+complaint, that this works order answers that survey. Pull a line from the edge
+of one asset to another, and say what the link means:
 
 | Meaning | Where it shows |
 |---|---|

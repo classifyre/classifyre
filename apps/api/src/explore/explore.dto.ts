@@ -260,6 +260,14 @@ export class ExploreEdgeDto {
     description: 'For alike: the passage of the other asset that read closest',
   })
   passage!: string | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    enum: ['CONFIRMED', 'UNSURE'],
+    description:
+      'For duplicates and shared values: what duplicate review decided about the pair. Pairs ruled apart are never returned.',
+  })
+  review?: 'CONFIRMED' | 'UNSURE' | null;
 }
 
 export class ExploreNeighbourhoodResponseDto {
@@ -449,4 +457,57 @@ export class ExploreViewDto {
     | null;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+}
+
+export class ExploreFindRequestDto {
+  @ApiProperty({
+    type: [String],
+    description: 'The assets on the canvas (at most 400)',
+  })
+  @IsArray()
+  @ArrayMaxSize(400)
+  @IsString({ each: true })
+  assetIds!: string[];
+
+  @ApiProperty({ description: 'What to find among them: words or a question' })
+  @IsString()
+  @MaxLength(200)
+  q!: string;
+}
+
+export class ExploreFindHitDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({
+    enum: ['name', 'words', 'meaning'],
+    description: 'Found in its name, in a passage, or closest by meaning',
+  })
+  how!: 'name' | 'words' | 'meaning';
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Likeness by meaning of its best passage (0–1)',
+  })
+  score!: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true }) page!: number | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'The passage that matched',
+  })
+  text!: string | null;
+  @ApiProperty({
+    description:
+      'Lit on the canvas: a match by name or words, or one of the few that stand out by meaning',
+  })
+  lit!: boolean;
+}
+
+export class ExploreFindResponseDto {
+  @ApiProperty({ type: [ExploreFindHitDto] }) hits!: ExploreFindHitDto[];
+  @ApiProperty({
+    enum: ['ok', 'off'],
+    description:
+      "'off' when embeddings are off: only names and words were read",
+  })
+  meaning!: 'ok' | 'off';
 }

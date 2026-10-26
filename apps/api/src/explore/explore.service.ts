@@ -8,9 +8,12 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { GraphService, type GraphTraceResult } from '../graph.service';
 import { EmbeddingService } from '../embedding/embedding.service';
+import { QueryEmbeddingService } from '../embedding/query-embedding.service';
 import { SemanticBoardLayerService } from '../semantic/board/semantic-board-layer.service';
 import { InquiryMatchingService } from '../matching/inquiry-matching.service';
 import type {
+  ExploreFindRequestDto,
+  ExploreFindResponseDto,
   ExploreAssetRefDto,
   ExploreDuplicatesFilterDto,
   ExploreNeighbourhoodRequestDto,
@@ -33,10 +36,18 @@ import {
 } from './explore-kinds';
 import { TRACE_KIND_SQL, type TraceEdgeRow } from '../graph-trace';
 import {
+  EXPLORE_FIND_LIMIT,
+  rankFindHits,
+  type FindInputs,
+} from './explore-find';
+import {
   mergeNeighbourhood,
   withEdgesAmong,
   withMarks,
   withScope,
+  withReview,
+  reviewedPairs,
+  type PairVerdicts,
   duplicateWalks,
   pairKey,
   pickDuplicateHubs,
@@ -75,7 +86,86 @@ export class ExploreService {
     private readonly embeddings: EmbeddingService,
     @Optional() private readonly semanticLayer?: SemanticBoardLayerService,
     @Optional() private readonly matching?: InquiryMatchingService,
+    @Optional() private readonly queries?: QueryEmbeddingService,
   ) {}
+
+  /**
+   * Which of the assets on a canvas answer a question: by name, by the words
+   * of a passage, and by meaning. Only those assets are read, so a match
+   * ranked far down the whole workspace is still found when it is drawn.
+   */
+  async find(input: ExploreFindRequestDto): Promise<ExploreFindResponseDto> {
+    const ids = [...new Set(input.assetIds.filter(Boolean))].slice(
+      0,
+      EXPLORE_FIND_LIMIT,
+    );
+    const q = input.q.trim();
+    if (!ids.length || !q) return { hits: [], meaning: 'ok' };
+    const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const [named, worded, meant] = await Promise.all([
+      this.prisma.asset.findMany({
+        where: { id: { in: ids }, name: { contains: q, mode: 'insensitive' } },
+        select: { id: true },
+      }),
+      this.prisma
+        .$transaction(
+          async (tx) => {
+            await tx.$executeRaw`SET LOCAL statement_timeout = '3s'`;
+            return tx.$queryRaw<
+              Array<{ id: string; page: number | null; text: string | null }>
+            >(Prisma.sql`
+              SELECT DISTINCT ON (asset_id) asset_id AS id, page, LEFT(text, 600) AS text
+              FROM asset_chunks
+              WHERE asset_id = ANY(${ids}::text[]) AND text ILIKE ${like}
+              ORDER BY asset_id, ordinal
+            `);
+          },
+          { timeout: 6_000, maxWait: 3_000 },
+        )
+        .catch((error: unknown) => {
+          this.logger.warn(`Find by words failed: ${String(error)}`);
+          return [];
+        }),
+      this.meaningScores(q, ids),
+    ]);
+    return {
+      hits: rankFindHits({
+        named: named.map((a) => a.id),
+        worded: worded.map((w) => ({
+          ...w,
+          page: w.page == null ? null : Number(w.page),
+        })),
+        meant: meant.rows,
+      }),
+      meaning: meant.status,
+    };
+  }
+
+  private async meaningScores(
+    q: string,
+    ids: string[],
+  ): Promise<{ status: 'ok' | 'off'; rows: FindInputs['meant'] }> {
+    try {
+      const vector = await this.queries?.embedIfAvailable(q);
+      if (!vector) return { status: 'off', rows: [] };
+      const rows = await this.embeddings.scoreAssets(vector, ids);
+      return {
+        status: 'ok',
+        rows: rows.map((r) => ({
+          id: r.id,
+          score: Number(r.score),
+          page: r.page == null ? null : Number(r.page),
+          text: r.text ?? null,
+        })),
+      };
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        return { status: 'off', rows: [] };
+      }
+      this.logger.warn(`Find by meaning failed: ${String(error)}`);
+      return { status: 'ok', rows: [] };
+    }
+  }
 
   async neighbourhood(
     input: ExploreNeighbourhoodRequestDto,
@@ -177,8 +267,13 @@ export class ExploreService {
       : !asked && input.termId
         ? []
         : [...new Set(seeds.flatMap((s) => (s.sourceId ? [s.sourceId] : [])))];
+    const scoped = withScope(withEdgesAmong(view, among), {
+      home,
+      scope,
+      sourceOf,
+    });
     return withMarks(
-      withScope(withEdgesAmong(view, among), { home, scope, sourceOf }),
+      withReview(scoped, await this.verdicts(reviewedPairs(scoped))),
       marks,
     );
   }
@@ -316,12 +411,13 @@ export class ExploreService {
       this.marks(assetIds),
       this.sourcesOf(assetIds),
     ]);
+    const scoped = withScope(withEdgesAmong(view, among), {
+      home: [],
+      scope: 'all',
+      sourceOf,
+    });
     return withMarks(
-      withScope(withEdgesAmong(view, among), {
-        home: [],
-        scope: 'all',
-        sourceOf,
-      }),
+      withReview(scoped, await this.verdicts(reviewedPairs(scoped))),
       marks,
     );
   }
@@ -398,6 +494,28 @@ export class ExploreService {
         AND e.to_id = ANY(${pairs.map((p) => p.b_id)}::text[])
     `);
     return new Map(rows.map((r) => [pairKey(r.from_id, r.to_id), r]));
+  }
+
+  /** Duplicate review's verdicts for these pairs (canonical order). Bounded by the view. */
+  private async verdicts(
+    pairs: Array<[string, string]>,
+  ): Promise<PairVerdicts> {
+    if (!pairs.length) return new Map();
+    try {
+      const rows = await this.prisma.correlationPairVerdict.findMany({
+        where: {
+          aId: { in: [...new Set(pairs.map(([a]) => a))] },
+          bId: { in: [...new Set(pairs.map(([, b]) => b))] },
+        },
+        select: { aId: true, bId: true, verdict: true },
+      });
+      return new Map(
+        rows.map((r) => [pairKey(r.aId, r.bId), String(r.verdict)]),
+      );
+    } catch (error) {
+      this.logger.warn(`Pair verdicts failed: ${String(error)}`);
+      return new Map();
+    }
   }
 
   /** Each asset's source, for telling what comes from elsewhere. */

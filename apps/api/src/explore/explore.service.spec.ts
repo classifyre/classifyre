@@ -27,6 +27,9 @@ function harness() {
     caseEvidence: { findMany: jest.fn(() => Promise.resolve([] as unknown[])) },
     finding: { findMany: jest.fn(() => Promise.resolve([] as unknown[])) },
     inquiry: { findMany: jest.fn(() => Promise.resolve([] as unknown[])) },
+    correlationPairVerdict: {
+      findMany: jest.fn(() => Promise.resolve([] as unknown[])),
+    },
   };
   prisma.$transaction.mockImplementation(
     (fn: (tx: unknown) => Promise<unknown>) =>

@@ -1,4 +1,4 @@
-export { ExploreCanvas, type ExploreCanvasProps, type ExploreSpotlight } from "./explore-canvas";
+export { ExploreCanvas, type ExploreCanvasProps, type ExploreMenuTarget, type ExploreSpotlight } from "./explore-canvas";
 export { KindLine } from "./kind-line";
 export { ExploreDemo, type ExploreScene } from "./explore-demo";
 export { ENGLISH_WORDS, type ExploreWords } from "./canvas-context";

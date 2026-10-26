@@ -15,6 +15,8 @@
 
 import * as runtime from '../runtime';
 import type {
+  ExploreFindRequestDto,
+  ExploreFindResponseDto,
   ExploreNeighbourhoodRequestDto,
   ExploreNeighbourhoodResponseDto,
   ExploreStartersResponseDto,
@@ -22,6 +24,10 @@ import type {
   SaveExploreViewDto,
 } from '../models/index';
 import {
+    ExploreFindRequestDtoFromJSON,
+    ExploreFindRequestDtoToJSON,
+    ExploreFindResponseDtoFromJSON,
+    ExploreFindResponseDtoToJSON,
     ExploreNeighbourhoodRequestDtoFromJSON,
     ExploreNeighbourhoodRequestDtoToJSON,
     ExploreNeighbourhoodResponseDtoFromJSON,
@@ -40,6 +46,10 @@ export interface ExploreControllerCreateViewRequest {
 
 export interface ExploreControllerDeleteViewRequest {
     id: string;
+}
+
+export interface ExploreControllerFindRequest {
+    exploreFindRequestDto: ExploreFindRequestDto;
 }
 
 export interface ExploreControllerGetViewRequest {
@@ -135,6 +145,47 @@ export class ExploreApi extends runtime.BaseAPI {
      */
     async exploreControllerDeleteView(requestParameters: ExploreControllerDeleteViewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.exploreControllerDeleteViewRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Reads only the assets given (what an Explore canvas shows): those whose name or a passage holds the words, then the rest by meaning, closest first. The few that stand out are marked lit.
+     * Which of the assets on a canvas answer a question
+     */
+    async exploreControllerFindRaw(requestParameters: ExploreControllerFindRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExploreFindResponseDto>> {
+        if (requestParameters['exploreFindRequestDto'] == null) {
+            throw new runtime.RequiredError(
+                'exploreFindRequestDto',
+                'Required parameter "exploreFindRequestDto" was null or undefined when calling exploreControllerFind().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/explore/find`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ExploreFindRequestDtoToJSON(requestParameters['exploreFindRequestDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ExploreFindResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Reads only the assets given (what an Explore canvas shows): those whose name or a passage holds the words, then the rest by meaning, closest first. The few that stand out are marked lit.
+     * Which of the assets on a canvas answer a question
+     */
+    async exploreControllerFind(requestParameters: ExploreControllerFindRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExploreFindResponseDto> {
+        const response = await this.exploreControllerFindRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

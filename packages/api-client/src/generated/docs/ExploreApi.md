@@ -6,6 +6,7 @@ All URIs are relative to *http://localhost*
 |------------- | ------------- | -------------|
 | [**exploreControllerCreateView**](ExploreApi.md#explorecontrollercreateview) | **POST** /explore/views | Save an Explore view |
 | [**exploreControllerDeleteView**](ExploreApi.md#explorecontrollerdeleteview) | **DELETE** /explore/views/{id} | Delete a saved Explore view |
+| [**exploreControllerFind**](ExploreApi.md#explorecontrollerfind) | **POST** /explore/find | Which of the assets on a canvas answer a question |
 | [**exploreControllerGetView**](ExploreApi.md#explorecontrollergetview) | **GET** /explore/views/{id} | One saved Explore view |
 | [**exploreControllerListViews**](ExploreApi.md#explorecontrollerlistviews) | **GET** /explore/views | Saved Explore views, the last changed first |
 | [**exploreControllerNeighbourhood**](ExploreApi.md#explorecontrollerneighbourhood) | **POST** /explore/neighbourhood | What these assets are connected to, and why |
@@ -142,6 +143,73 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## exploreControllerFind
+
+> ExploreFindResponseDto exploreControllerFind(exploreFindRequestDto)
+
+Which of the assets on a canvas answer a question
+
+Reads only the assets given (what an Explore canvas shows): those whose name or a passage holds the words, then the rest by meaning, closest first. The few that stand out are marked lit.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  ExploreApi,
+} from '@workspace/api-client';
+import type { ExploreControllerFindRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new ExploreApi();
+
+  const body = {
+    // ExploreFindRequestDto
+    exploreFindRequestDto: ...,
+  } satisfies ExploreControllerFindRequest;
+
+  try {
+    const data = await api.exploreControllerFind(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **exploreFindRequestDto** | [ExploreFindRequestDto](ExploreFindRequestDto.md) |  | |
+
+### Return type
+
+[**ExploreFindResponseDto**](ExploreFindResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

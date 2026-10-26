@@ -7895,6 +7895,39 @@
         ]
       }
     },
+    "/explore/find": {
+      "post": {
+        "description": "Reads only the assets given (what an Explore canvas shows): those whose name or a passage holds the words, then the rest by meaning, closest first. The few that stand out are marked lit.",
+        "operationId": "ExploreController_find",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploreFindRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreFindResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Which of the assets on a canvas answer a question",
+        "tags": [
+          "explore"
+        ]
+      }
+    },
     "/explore/starters": {
       "get": {
         "description": "The assets with the most lineage, the duplicate patterns with the most pairs (each with its strongest pair), and the links people drew last.",
@@ -27714,6 +27747,15 @@
             "type": "string",
             "nullable": true,
             "description": "For alike: the passage of the other asset that read closest"
+          },
+          "review": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "CONFIRMED",
+              "UNSURE"
+            ],
+            "description": "For duplicates and shared values: what duplicate review decided about the pair. Pairs ruled apart are never returned."
           }
         },
         "required": [
@@ -27826,6 +27868,89 @@
           "truncated",
           "cases",
           "inquiries"
+        ]
+      },
+      "ExploreFindRequestDto": {
+        "type": "object",
+        "properties": {
+          "assetIds": {
+            "description": "The assets on the canvas (at most 400)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "q": {
+            "type": "string",
+            "description": "What to find among them: words or a question"
+          }
+        },
+        "required": [
+          "assetIds",
+          "q"
+        ]
+      },
+      "ExploreFindHitDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "how": {
+            "type": "string",
+            "enum": [
+              "name",
+              "words",
+              "meaning"
+            ],
+            "description": "Found in its name, in a passage, or closest by meaning"
+          },
+          "score": {
+            "type": "number",
+            "nullable": true,
+            "description": "Likeness by meaning of its best passage (0–1)"
+          },
+          "page": {
+            "type": "number",
+            "nullable": true
+          },
+          "text": {
+            "type": "string",
+            "nullable": true,
+            "description": "The passage that matched"
+          },
+          "lit": {
+            "type": "boolean",
+            "description": "Lit on the canvas: a match by name or words, or one of the few that stand out by meaning"
+          }
+        },
+        "required": [
+          "id",
+          "how",
+          "lit"
+        ]
+      },
+      "ExploreFindResponseDto": {
+        "type": "object",
+        "properties": {
+          "hits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreFindHitDto"
+            }
+          },
+          "meaning": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "off"
+            ],
+            "description": "'off' when embeddings are off: only names and words were read"
+          }
+        },
+        "required": [
+          "hits",
+          "meaning"
         ]
       },
       "ExploreAssetRefDto": {
