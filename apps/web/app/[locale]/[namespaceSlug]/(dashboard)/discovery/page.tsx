@@ -36,7 +36,7 @@ import {
 import { useTranslation } from "@/hooks/use-translation";
 import { StatsFreshness } from "@/components/stats-freshness";
 import { CaseworkCard } from "@/components/discovery/casework-card";
-import { DiscoveryMapCard } from "@/components/discovery/discovery-map-card";
+import { ExploreCard } from "@/components/discovery/explore-card";
 import type { TranslationKey } from "@/i18n";
 
 type DiscoveryWindowDays = 7 | 30 | 90;
@@ -387,7 +387,6 @@ export default function DiscoveryPage() {
   }
 
   const criticalHigh = severityCounts.critical + severityCounts.high;
-  const topAssets = overview?.topAssets ?? [];
   const attentionLevel =
     severityLevels.find((severity) => severityCounts[severity] > 0) ?? "none";
   const attentionCount =
@@ -662,8 +661,8 @@ export default function DiscoveryPage() {
           )}
         </PanelCard>
 
-        {/* ── CONNECTIONS ─── */}
-        <DiscoveryMapCard topAssets={topAssets} />
+        {/* ── EXPLORE ─── */}
+        <ExploreCard />
       </div>
 
     </div>

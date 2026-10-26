@@ -177,6 +177,7 @@
   },
   "nav": {
     "overview": "Übersicht",
+    "explore": "Erkunden",
     "findings": "Befunde",
     "assets": "Assets",
     "sources": "Quellen",
@@ -500,7 +501,8 @@
       "relations": "Beziehungen",
       "generatedDetectors": "Aus diesem Begriff erzeugte Detektoren",
       "noActivity": "Noch kein Verlauf.",
-      "showOnMap": "Auf der Karte zeigen"
+      "showOnMap": "Auf der Karte zeigen",
+      "connections": "Womit er verbunden ist"
     },
     "relations": {
       "out": {
@@ -578,7 +580,6 @@
       "title": "Bedeutung",
       "none": "Dieser Fund hat noch keine Bedeutung.",
       "noneAsset": "Noch keine Konzepte.",
-      "assetHint": "Konzepte, für die dieses Asset ein Beleg ist.",
       "impliedBy": "abgeleitet aus {{term}}",
       "throughBinding": "über {{label}}",
       "linkedBy": "verknüpft von {{by}}",
@@ -824,10 +825,6 @@
         "stats": {
           "name": "Befund-Statistiken",
           "desc": "Vorberechnete Tages-Rollups. Werden vom Statistik-Worker automatisch neu aufgebaut."
-        },
-        "graph": {
-          "name": "Quellen-Graph",
-          "desc": "Vorberechneter Beziehungs-Graph der Quellen. Wird vom Graph-Worker automatisch neu aufgebaut."
         },
         "vocabulary": {
           "name": "Vokabular-Inventar",
@@ -1384,11 +1381,11 @@
       "tabFindings": "Befunde",
       "tabAssets": "Assets",
       "runSummaryLine": "{{findings}} Befunde · {{assets}} Assets gescannt",
-      "tabFingerprints": "Fingerabdrücke",
       "textCoverage": "Texterfassung",
       "textCoverageValue": "{{pct}} % extrahiert",
       "lowTextCoverageBadge": "Geringe Texterfassung ({{pct}} %)",
-      "lowTextCoverageTooltip": "Einige Assets lieferten keinen extrahierbaren Text; Befunde könnten unvollständig sein."
+      "lowTextCoverageTooltip": "Einige Assets lieferten keinen extrahierbaren Text; Befunde könnten unvollständig sein.",
+      "tabConnections": "Verbindungen"
     },
     "edit": {
       "loading": "Quellkonfiguration wird geladen...",
@@ -3469,53 +3466,278 @@
       "refresh": "Statistiken jetzt neu berechnen"
     }
   },
+  "explore": {
+    "title": "Erkunden",
+    "titleMany": "{{name}} und {{count}} weitere",
+    "cardTitle": "Verbindungen erkunden",
+    "ledger": "Was auf der Fläche ist",
+    "spotlightClear": "Wieder alles zeigen",
+    "inCases": "In Fällen",
+    "inCasesHint": "Die Assets hervorheben, die Beweismittel in einem Fall sind",
+    "watched": "Beobachtet",
+    "watchedHint": "Die Assets hervorheben, deren Befunde eine Beobachtung beantworten",
+    "searchPlaceholder": "Assets nach Bedeutung oder Wörtern suchen…",
+    "clearSearch": "Suche leeren",
+    "searchHint": "Tippen Sie oben in das Suchfeld. Wählen Sie ein Ergebnis, um dort zu beginnen, oder +, um es zur Fläche hinzuzufügen.",
+    "searchFailed": "Die Suche hat nicht geantwortet. Versuchen Sie es gleich noch einmal.",
+    "noResults": "Dazu wurde nichts gefunden.",
+    "results": "Assets",
+    "page": "Seite {{page}}",
+    "startFrom": "Hier beginnen",
+    "addToCanvas": "Zur Fläche hinzufügen",
+    "addSeed": "Als Ausgangspunkt hinzufügen",
+    "noSuggestions": "Von hier aus gibt es nichts weiter vorzuschlagen.",
+    "suggestionsHint": "Nachbarn, die über die meisten Arten von Verbindung erreicht werden, die stärksten zuerst. Fügen Sie einen hinzu, um seine eigenen Verbindungen zu sehen.",
+    "drawer": {
+      "find": "Finden",
+      "suggestions": "Als Nächstes lohnend",
+      "details": "Details",
+      "marks": "Fälle und Beobachtungen"
+    },
+    "rail": "Bereiche",
+    "railCollapse": "Bereich schließen",
+    "railExpand": "Bereich öffnen",
+    "views": {
+      "lineage": "Herkunft",
+      "duplicates": "Gleiches und gemeinsame Werte",
+      "connected": "Alles Verbundene",
+      "meaning": "Nach Bedeutung"
+    },
+    "viewHints": {
+      "lineage": "Woher die Daten kommen und wohin sie gehen, so weit verfolgt wie gewünscht",
+      "duplicates": "Derselbe Inhalt, wahrscheinlich dasselbe und gemeinsame erkannte Werte",
+      "connected": "Herkunft, Verweise, Duplikate und gemeinsame Werte zusammen",
+      "meaning": "Gemeinsame Begriffe und inhaltlich Ähnliches: für Assets, die noch nichts verbindet"
+    },
+    "view": {
+      "title": "Ansicht",
+      "custom": "Von Hand gewählt",
+      "show": "Zeigen",
+      "trace": "Herkunft und Verweise verfolgen",
+      "traceHint": "In welche Richtung und wie viele Schritte. Duplikate und gemeinsame Werte gehen höchstens zwei Schritte, Begriffe und Ähnlichkeit einen.",
+      "kinds": "Arten von Verbindung"
+    },
+    "guide": {
+      "lineage": "Herkunft: {{up}} vorgelagert, {{down}} nachgelagert.",
+      "noLineage": "Keine Herkunft von diesen Assets in diese Richtung.",
+      "duplicates": "Gleich wie diese oder mit gemeinsamen erkannten Werten: {{count}}.",
+      "connected": "Über Herkunft, Verweise oder Duplikate verbunden: {{count}}.",
+      "meaning": "Mit gemeinsamen Begriffen oder inhaltlich ähnlich: {{count}}.",
+      "unlinked": "Noch verbindet nichts diese Assets. Mit gemeinsamen Begriffen oder inhaltlich ähnlich: {{count}}. Verbinden Sie, was zusammengehört.",
+      "custom": "Über die gewählten Arten erreicht: {{count}}.",
+      "truncated": "Einige wurden weggelassen, damit es lesbar bleibt.",
+      "also": "Außerdem:",
+      "mostConnected": "Ihre am stärksten verbundenen Assets: {{count}}.",
+      "carriers": "Assets, die ihn am stärksten tragen: {{count}}.",
+      "duplicateHubs": "Assets in den meisten Paaren: {{count}}."
+    },
+    "kind": {
+      "lineage": "Herkunft",
+      "links": "Verweise",
+      "duplicates": "Gleich wie",
+      "similar": "Gemeinsame Werte",
+      "meaning": "Gemeinsame Begriffe",
+      "alike": "Inhaltlich ähnlich"
+    },
+    "kindHint": {
+      "lineage": "Woher die Daten kommen und wohin sie gehen",
+      "links": "Verweise, Nutzung und von Personen gezogene Verbindungen",
+      "duplicates": "Derselbe Inhalt oder wahrscheinlich dasselbe",
+      "similar": "Erkannte Werte, die beide enthalten: Personen, IBANs, E-Mails…",
+      "meaning": "Glossarbegriffe und Entitäten, um die es in beiden geht",
+      "alike": "Liest sich ähnlich: nach Bedeutung verglichen, nicht nach Wörtern"
+    },
+    "lane": {
+      "duplicates": "Gleich wie",
+      "similar": "Gemeinsame Werte",
+      "terms": "Gemeinsame Begriffe und Entitäten",
+      "meaning": "Ebenfalls darüber",
+      "alike": "Inhaltlich ähnlich",
+      "links": "Verwiesen"
+    },
+    "where": {
+      "up": "Vorgelagert, Schritt {{count}}",
+      "down": "Nachgelagert, Schritt {{count}}"
+    },
+    "walk": "Doppelklick fügt es als Ausgangspunkt hinzu",
+    "caseMark": "FALL",
+    "inCase": "Beweismittel in",
+    "watchMark": "BEOBACHTET",
+    "watchedLead": "Beantwortet",
+    "concept": "Begriff",
+    "entity": "Entität",
+    "yours": "von einer Person gezogen",
+    "yoursLasts": "Eine Verbindung, die Sie ziehen, bleibt über jeden erneuten Scan erhalten. Sie verschwindet aus der Ansicht, wenn eines der Assets an seiner Quelle gelöscht wird, und kehrt zurück, wenn das Asset zurückkehrt.",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "fit": "Einpassen",
+    "allToCase": "Alle {{count}} in einen Fall",
+    "loading": "Wird geladen…",
+    "error": "Die Verbindungen konnten nicht geladen werden",
+    "retry": "Erneut versuchen",
+    "gone": "Nichts zu zeigen",
+    "goneHint": "Die Assets, bei denen Sie begonnen haben, gibt es nicht mehr oder sie wurden an ihrer Quelle gelöscht.",
+    "linkPick": "Wählen Sie das Asset, mit dem {{name}} verbunden werden soll.",
+    "nothingSelected": "Wählen Sie ein Asset, einen Begriff oder eine Linie.",
+    "startingPoints": "Ausgangspunkte",
+    "startingPoint": "Ausgangspunkt",
+    "neighbour": "Verbunden",
+    "removeSeed": "Aus den Ausgangspunkten entfernen",
+    "howToRead": "So lesen Sie es",
+    "howToReadLayout": "Ihre Ausgangspunkte stehen in der Mitte. Was sie speist, steht links, was sie speisen, rechts. Was gleich ist oder Werte teilt, steht darüber; die gemeinsamen Begriffe, was sonst noch davon handelt und was sich ähnlich liest, darunter.",
+    "howToReadLinks": "Jede Art von Verbindung hat ihre eigene Linie, die in ihrem Zähler. Blasser heißt schwächer bewertet. Fahren Sie über eine Linie, um zu lesen, warum sie da ist; heben Sie einen Zähler hervor, um nur eine Art zu sehen.",
+    "howToReadYours": "Ziehen Sie vom Rand eines Assets zu einem anderen oder nutzen Sie Verbinden mit…, um eine Verbindung zu ziehen, die die Daten nicht kennen.",
+    "startOver": "Hier neu beginnen",
+    "linkTo": "Verbinden mit…",
+    "toCase": "Zu einem Fall hinzufügen",
+    "openAsset": "Asset öffnen",
+    "openTerm": "Im Glossar öffnen",
+    "partOf": "Teil von",
+    "itsLinks": "Seine Verbindungen ({{count}})",
+    "carriedBy": "Darüber auf der Fläche ({{count}})",
+    "why": "Warum",
+    "whyMeaning": "Beide handeln von diesem Begriff.",
+    "whyGeneric": "Die Daten verzeichnen diese Verbindung.",
+    "score": "Bewertung {{percent}} %",
+    "reviewPair": "Dieses Paar prüfen",
+    "removeLink": "Diese Verbindung entfernen",
+    "linkRemoved": "Verbindung entfernt",
+    "linkRemoveFailed": "Die Verbindung konnte nicht entfernt werden",
+    "marksNone": "Nichts auf der Fläche ist Beweismittel in einem Fall oder beantwortet eine Beobachtung.",
+    "marksCases": "Fälle mit diesen Assets",
+    "marksWatches": "Beobachtungen, die diese Assets beantworten",
+    "showOnCanvas": "Auf der Fläche zeigen",
+    "reason": {
+      "identical": "gleicher Inhalt",
+      "likelySame": "wahrscheinlich dasselbe",
+      "likelySameSharing": "wahrscheinlich dasselbe · {{values}}",
+      "shares": "teilt {{values}}",
+      "sharesValues": "teilt erkannte Werte",
+      "alike": "{{percent}} % ähnlich",
+      "repeatedText": "wiederholter Text · {{percent}} %",
+      "repeatedTextConfirmed": "wiederholter Text · als gleich bestätigt",
+      "confirmed": "als gleich bestätigt"
+    },
+    "linkTitle": "Zwei Assets verbinden",
+    "linkDescription": "Sagen Sie, was sie verbindet. Die Verbindung erscheint in Erkunden, auf Fall-Boards und, wenn sie Herkunft bedeutet, in der Herkunft.",
+    "linkFrom": "Von",
+    "linkToField": "Nach",
+    "linkOne": "Ein Asset",
+    "linkOther": "Das andere",
+    "linkSwap": "Richtung umkehren",
+    "linkMeans": "Was die Verbindung bedeutet",
+    "relation": {
+      "related": "Gehört zu",
+      "same": "Gleich wie",
+      "feeds": "Speist",
+      "references": "Verweist auf",
+      "custom": "Etwas anderes"
+    },
+    "relationHint": {
+      "related": "Gehört zusammen; sagt nichts über eine Richtung.",
+      "same": "Dasselbe, zweimal erfasst. Erscheint bei den Duplikaten.",
+      "feeds": "Die Daten des ersten gehen in das zweite ein. Erscheint als Herkunft.",
+      "references": "Das erste verweist auf das zweite.",
+      "custom": "Benennen Sie die Beziehung selbst."
+    },
+    "relationCustom": "Beziehung",
+    "relationCustomPlaceholder": "z. B. ersetzt, beantwortet, freigegeben von",
+    "linkNote": "Warum (optional)",
+    "linkNotePlaceholder": "Was Sie wissen und die Daten nicht",
+    "linkSave": "Verbindung speichern",
+    "linked": "Verbindung gespeichert",
+    "linkFailed": "Die Verbindung konnte nicht gespeichert werden",
+    "assetTab": "Verbindungen",
+    "openConnections": "Seine Verbindungen öffnen",
+    "home": {
+      "savedViews": "Gespeicherte Ansichten",
+      "viewGone": "Ihre Assets gibt es nicht mehr",
+      "tabs": {
+        "search": "Ergebnisse",
+        "critical": "Am kritischsten",
+        "lineage": "Meiste Herkunft",
+        "duplicates": "Duplikate",
+        "links": "Gezogene Verbindungen"
+      },
+      "columns": {
+        "asset": "Asset",
+        "search": "Treffer",
+        "critical": "Offene Befunde",
+        "lineage": "Herkunft",
+        "duplicates": "Paare",
+        "links": "Gezogen"
+      },
+      "empty": {
+        "search": "Dazu wurde nichts gefunden.",
+        "critical": "Keine offenen kritischen oder hohen Befunde.",
+        "lineage": "Noch keine Herkunft.",
+        "duplicates": "Noch keine Duplikatmuster.",
+        "links": "Noch keine gezogenen Verbindungen."
+      },
+      "lineageLinks": "{{count}} Herkunftsverbindungen",
+      "pairs": "{{count}} Paare",
+      "pick": "{{name}} auswählen",
+      "clearPicked": "Leeren",
+      "explorePicked": "{{count}} zusammen erkunden",
+      "explore": "Erkunden"
+    },
+    "saved": {
+      "saveView": "Ansicht speichern",
+      "saveChanges": "Änderungen speichern",
+      "isSaved": "Gespeichert",
+      "more": "Mehr zu dieser Ansicht",
+      "saveAs": "Als neue Ansicht speichern…",
+      "rename": "Umbenennen…",
+      "resetLayout": "Anordnung zurücksetzen",
+      "delete": "Diese Ansicht löschen",
+      "saveTitle": "Diese Ansicht speichern",
+      "renameTitle": "Diese Ansicht umbenennen",
+      "dialogDescription": "Behält die Assets, bei denen sie beginnt, die Ansicht, wie weit sie verfolgt, und wo Sie Dinge hingestellt haben.",
+      "name": "Name",
+      "namePlaceholder": "z. B. Küchenleck in 2C",
+      "description": "Notizen (optional)",
+      "save": "Speichern",
+      "saved": "Ansicht gespeichert",
+      "deleted": "Ansicht gelöscht",
+      "failed": "Die Ansicht konnte nicht gespeichert werden",
+      "gone": "Diese gespeicherte Ansicht gibt es nicht mehr"
+    },
+    "scope": {
+      "label": "Welche Verbindungen",
+      "all": "Alle",
+      "allHint": "Jede Verbindung, innerhalb der Quelle und aus ihr hinaus",
+      "internal": "Gleiche Quelle",
+      "internalHint": "Nur Verbindungen zu Assets derselben Quelle",
+      "external": "Andere Quellen",
+      "externalHint": "Nur Verbindungen, die zu anderen Quellen führen oder zu Objekten, die noch keine Quelle gescannt hat",
+      "showAll": "Alle Verbindungen zeigen"
+    },
+    "scopeEmpty": {
+      "internal": "Hier verbindet nichts innerhalb derselben Quelle",
+      "internalHint": "Alle Verbindungen führen zu anderen Quellen.",
+      "external": "Hier verbindet nichts zu einer anderen Quelle",
+      "externalHint": "Alle Verbindungen bleiben in derselben Quelle."
+    },
+    "trail": "Wohin Sie eingetaucht sind",
+    "diveIn": "Eintauchen",
+    "diveOut": "Zurück zu {{name}}",
+    "walkDive": "Doppelklick zum Eintauchen",
+    "fromSource": "Aus einer anderen Quelle: {{name}}",
+    "elsewhere": "Aus einer anderen Quelle",
+    "sourceLevel": "Ganz {{name}}",
+    "rootEmpty": {
+      "source": "Diese Quelle hat noch keine Assets",
+      "sourceHint": "Starten Sie einen Scan; ihre Assets und womit sie verbunden sind, erscheinen hier.",
+      "term": "Noch trägt nichts diesen Begriff",
+      "termHint": "Assets erscheinen hier, sobald eine Bindung, eine Erwähnung oder eine Verknüpfung von Hand sie mit ihm verbindet.",
+      "duplicates": "Keine Paare passen zu diesen Filtern",
+      "duplicatesHint": "Erweitern Sie die Filter oder setzen Sie sie zurück, um alle Duplikate zu sehen."
+    }
+  },
   "casework": {
     "title": "Fallarbeit",
     "subtitle": "Laufende Fälle und Anfrage-Beobachtungen",
     "viewAll": "Alle anzeigen"
-  },
-  "connections": {
-    "title": "Verbindungen",
-    "subtitle": "{{sources}} Quellen · {{connected}} verbundene Assets · {{isolated}} ohne Verbindung",
-    "loading": "Karte wird geladen…",
-    "building": "Karte wird erstellt…",
-    "expanding": "Quelle wird ausgeklappt…",
-    "error": "Karte konnte nicht geladen werden",
-    "fit": "Einpassen",
-    "reload": "Neu laden",
-    "legend": "Legende",
-    "hint": "Doppelklick auf eine Quelle klappt sie in ihre Assets auf. Assets ohne jede Verbindung werden nicht gezeichnet — sie werden an ihrer Quelle gezählt.",
-    "source": "Quelle",
-    "pairing": "Paarung",
-    "asset": "Asset",
-    "totalAssets": "Assets",
-    "connectedAssets": "Verbunden",
-    "unconnected": "Ohne Verbindung",
-    "internalEdges": "Interne Verbindungen",
-    "assetsInvolved": "Beteiligte Assets",
-    "expand": "Quelle ausklappen",
-    "collapse": "Quelle einklappen",
-    "openSource": "Quelle in neuem Tab öffnen",
-    "openAsset": "Asset öffnen",
-    "traceLineage": "Herkunft verfolgen",
-    "duplicatePairs": "{{count}} Duplikat-Paare",
-    "reviewDuplicates": "Duplikate prüfen",
-    "bundleLabel": "{{count}} verknüpfte Assets",
-    "class": {
-      "FLOW": "Herkunft",
-      "CONTAINMENT": "Enthält",
-      "IDENTITY": "Identisch mit",
-      "REFERENCE": "Verweist auf",
-      "USAGE": "Genutzt von"
-    },
-    "collapseAll": "Alle einklappen",
-    "linkTypes": "Verbindungsarten",
-    "allLinkTypes": "Alle Verbindungsarten",
-    "searchLinkTypes": "Verbindungsarten suchen…",
-    "noLinkTypes": "Keine Verbindungsarten gefunden",
-    "notBuiltYet": "Verbindungskarte wird noch erstellt — Zahlen erscheinen danach.",
-    "browseAssets": "Alle {{count}} Assets ansehen",
-    "browseAllAssets": "Alle Assets ansehen"
   },
   "breadcrumb": {
     "home": "Startseite",
@@ -5035,7 +5257,6 @@
   },
   "correlation": {
     "findingsTab": "Funde",
-    "relatedTab": "Fingerabdrücke",
     "fingerprints": {
       "title": "Beweis-Fingerabdrücke",
       "loadFailed": "Fingerabdruck-Graph konnte nicht geladen werden",
@@ -5066,7 +5287,6 @@
       "strengthHint": "Linienfarbe = Ähnlichkeitsstärke zwischen Assets.",
       "excludeHelp": "Rechtsklick auf einen Wert, um Rauschen auszuschließen (z. B. \"null\").",
       "recomputing": "Neuberechnung…",
-      "external": "Extern ({{count}})",
       "useFocusedInCase": "Fokussierte im Fall verwenden",
       "addVisibleHere": "Sichtbare zu diesem Fall hinzufügen",
       "addFocusedHere": "Fokussierte zu diesem Fall hinzufügen",
@@ -5174,24 +5394,7 @@
   "fingerprints": {
     "tabTune": "Korrelation justieren"
   },
-  "links": {
-    "title": "Asset-Verknüpfungen",
-    "loadFailed": "Verknüpfungsgraph konnte nicht geladen werden",
-    "empty": "Keine Assets",
-    "emptyDesc": "Diese Quelle hat noch keine Assets.",
-    "truncated": "Teilweise",
-    "external": "Extern ({{count}})",
-    "asset": "Asset",
-    "externalBadge": "Externe Quelle",
-    "openAsset": "Asset öffnen",
-    "legend": "Legende",
-    "legendHint": "Assets sind über ihre Verknüpfungen verbunden (Hash → Asset).",
-    "legendAsset": "Asset in dieser Quelle",
-    "legendExternal": "Verknüpftes Asset in anderer Quelle"
-  },
-  "lineage": {
-    "tab": "Herkunft"
-  },
+  "lineage": {},
   "harness": {
     "title": "Harness-KI-Autopilot",
     "subtitle": "Autonome Steuerungsebene",
@@ -6361,7 +6564,28 @@
       "colValues": "Übereinstimmende Werte"
     },
     "backToPatterns": "Zurück zu den Mustern",
-    "backToPattern": "Zurück zum Muster"
+    "backToPattern": "Zurück zum Muster",
+    "explore": {
+      "tab": "Erkunden",
+      "pattern": "Muster",
+      "allPatterns": "Alle Muster",
+      "patternOption": "{{name}} · {{count}}",
+      "family": "Art der Übereinstimmung",
+      "allFamilies": "Jede Art",
+      "score": "Wert",
+      "scoreAny": "Jeder Wert",
+      "score_review": "Einen Blick wert (ab {{score}})",
+      "score_merge": "Wahrscheinlich gleich (ab {{score}})",
+      "review": "Prüfung",
+      "review_any": "Jedes nicht getrennte Paar",
+      "review_open": "Noch nicht geprüft",
+      "review_confirmed": "Als gleich bestätigt",
+      "source": "Quelle",
+      "allSources": "Alle Quellen",
+      "reset": "Filter zurücksetzen",
+      "allDuplicates": "Alle Duplikate",
+      "openPattern": "Erkunden"
+    }
   },
   "seo": {
     "site": {
@@ -6384,6 +6608,12 @@
       "description": "Die Sicherheitslage des Arbeitsbereichs: offene und erledigte Funde, Risikocluster nach Asset und Quelle, jüngste Scanläufe und Verteilung der Erledigungen — Ihr Ausgangspunkt nach jedem Scan.",
       "ogTitle": "Übersicht — Sicherheitslage | Classifyre",
       "ogDescription": "Offene Funde, Risikocluster, jüngste Scans und Erledigungen — der Zustand dieses Arbeitsbereichs auf einen Blick."
+    },
+    "explore": {
+      "title": "Erkunden — Verbindungen, Herkunft & Ähnliches",
+      "description": "Beginnen Sie mit einer Suche und folgen Sie, womit ein Asset verbunden ist: Herkunft, Duplikate, gemeinsame Werte, gemeinsame Glossarbegriffe und inhaltliche Ähnlichkeit — jede Verbindung mit ihrem Grund, dazu Verbindungen, die Sie selbst ziehen.",
+      "ogTitle": "Verbindungen erkunden | Classifyre",
+      "ogDescription": "Suchen, dann Herkunft, Duplikaten, gemeinsamen Begriffen und Ähnlichem folgen — jede Verbindung mit ihrem Grund."
     },
     "findings": {
       "title": "Funde — jede Erkennung nach Schweregrad, Quelle & Detektor triagieren",
@@ -6652,6 +6882,12 @@
       "description": "Die Classifyre-Dokumentation — wie die Anwendung Abschnitt für Abschnitt funktioniert: Confluence, Jira, SharePoint und mehr anbinden, Scans ausführen, Funde triagieren, Assets entdoppeln und mit dem KI-Autopiloten ermitteln.",
       "ogTitle": "Dokumentation — anbinden, scannen & ermitteln | Classifyre",
       "ogDescription": "Quellen anbinden, scannen, Funde prüfen und dem Wesentlichen nachgehen — mit einem KI-Autopiloten, der die Laufarbeit übernimmt. Anleitungen für jeden Arbeitsablauf."
+    },
+    "duplicatesExplore": {
+      "title": "Duplikate erkunden — jede Kopie auf einer Fläche",
+      "description": "Sehen Sie die Paare der Duplikatprüfung auf einer Fläche: welche Dokumente die meisten Kopien sammeln, welche Quellen sie verbinden und was sie sonst zusammenhält. Filtern Sie nach Muster, Art der Übereinstimmung, Wert, Prüfstand und Quelle, und tauchen Sie in jedes Dokument ein.",
+      "ogTitle": "Duplikate erkunden | Classifyre",
+      "ogDescription": "Alle Duplikate oder die, die ein Filter wählt, auf einer Fläche — und ein Weg in jedes Dokument."
     }
   },
   "cohorts": {
@@ -6844,8 +7080,7 @@
       "relateSubmit": "Verknüpfen",
       "related": "Beziehung hinzugefügt.",
       "unrelated": "Beziehung entfernt."
-    },
-    "openMap": "Bedeutungskarte"
+    }
   },
   "entities": {
     "loadFailed": "Die Entität konnte nicht geladen werden",

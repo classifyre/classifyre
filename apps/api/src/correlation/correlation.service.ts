@@ -1383,6 +1383,8 @@ export class CorrelationService {
             fromType: ASSET_REL,
             toType: ASSET_REL,
             relationType: REL_IDENTICAL,
+            // A link someone drew is not the engine's to replace.
+            origin: { not: 'MANUAL' },
             OR: [{ fromId: { in: ids } }, { toId: { in: ids } }],
           },
         });
@@ -1470,18 +1472,21 @@ export class CorrelationService {
       await this.stagePairAggregates(runId, touchedIds, workingIds, cfg, full);
 
       // Wipe stale correlation edges (all of them on a full rebuild, else only
-      // those touching the recomputed assets).
+      // those touching the recomputed assets). Links people drew stay, even
+      // under the same relation name.
       await this.prisma.edge.deleteMany({
         where: full
           ? {
               fromType: ASSET_REL,
               toType: ASSET_REL,
               relationType: { in: SCORED_RELATION_TYPES },
+              origin: { not: 'MANUAL' },
             }
           : {
               fromType: ASSET_REL,
               toType: ASSET_REL,
               relationType: { in: SCORED_RELATION_TYPES },
+              origin: { not: 'MANUAL' },
               OR: [
                 { fromId: { in: touchedIds } },
                 { toId: { in: touchedIds } },
@@ -2585,177 +2590,6 @@ export class CorrelationService {
       });
 
     return { nodes, edges, truncated: droppedHubValues > 0, similarities };
-  }
-
-  async buildLinksGraph(sourceId: string): Promise<CorrelationGraphResult> {
-    const sourceAssets = await this.prisma.asset.findMany({
-      where: { sourceId },
-      select: { ...ASSET_NODE_SELECT, hash: true, links: true },
-    });
-    if (sourceAssets.length === 0)
-      return { nodes: [], edges: [], truncated: false, similarities: [] };
-
-    // Collect every link hash referenced by this source's assets.
-    const linkHashes = new Set<string>();
-    for (const a of sourceAssets) {
-      const links = Array.isArray(a.links) ? (a.links as unknown[]) : [];
-      for (const l of links) if (typeof l === 'string' && l) linkHashes.add(l);
-    }
-
-    // Resolve link hashes → assets (may include external sources).
-    const targets =
-      linkHashes.size > 0
-        ? await this.prisma.asset.findMany({
-            where: { hash: { in: Array.from(linkHashes) } },
-            select: { ...ASSET_NODE_SELECT, hash: true },
-          })
-        : [];
-    const byHash = new Map<string, typeof targets>();
-    for (const t of targets) {
-      (byHash.get(t.hash) ?? byHash.set(t.hash, []).get(t.hash)!).push(t);
-    }
-
-    const nodeById = new Map<string, GraphNodeDto>();
-    for (const a of sourceAssets) nodeById.set(a.id, assetNode(a, sourceId));
-
-    const edges: GraphEdgeDto[] = [];
-    const seen = new Set<string>();
-    for (const a of sourceAssets) {
-      const links = Array.isArray(a.links) ? (a.links as unknown[]) : [];
-      for (const l of links) {
-        if (typeof l !== 'string') continue;
-        for (const target of byHash.get(l) ?? []) {
-          if (target.id === a.id) continue;
-          if (!nodeById.has(target.id)) {
-            nodeById.set(target.id, assetNode(target, sourceId));
-          }
-          const key =
-            a.id < target.id ? `${a.id}|${target.id}` : `${target.id}|${a.id}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          edges.push({
-            id: `link:${key}`,
-            fromType: ASSET_REL,
-            fromId: a.id,
-            toType: ASSET_REL,
-            toId: target.id,
-            relationType: 'links_to',
-            confidence: 1,
-            origin: EdgeOrigin.INFERRED,
-            // `links` says two assets are connected but not how, so this is a
-            // reference and nothing more. A typed edge from the same pair (see
-            // below) is the one that carries meaning.
-            relationClass: 'REFERENCE',
-          });
-        }
-      }
-    }
-
-    // Typed relationships the connector actually declared: lineage,
-    // containment, identity. `links` cannot express any of these — it is a flat
-    // list of hashes — so without this the source view can only ever show that
-    // things are connected, never which way the data flows.
-    const typed = await this.typedEdgesFor(
-      Array.from(nodeById.keys()),
-      nodeById,
-      sourceId,
-    );
-    edges.push(...typed);
-
-    return {
-      nodes: Array.from(nodeById.values()),
-      edges,
-      truncated: false,
-      similarities: [],
-    };
-  }
-
-  /**
-   * Persisted edges among a set of nodes, plus the unresolved/foreign
-   * endpoints they point at.
-   *
-   * Two kinds of endpoint are missing from `nodeById` when this runs: an
-   * `external` one names an object by platform URN that nothing has scanned
-   * yet, and an `asset` one may simply belong to a source other than the one
-   * this canvas is scoped to (e.g. an identity edge stitching a GISA record to
-   * a Firmenbuch one). Both are hydrated into ghost/ringed nodes here rather
-   * than filtered out: an edge whose far end is missing from `nodes` renders
-   * as an arrow to nowhere, and quietly dropping it would hide the most
-   * interesting thing on the canvas — that this source is linked to something
-   * outside it.
-   */
-  private async typedEdgesFor(
-    assetIds: string[],
-    nodeById: Map<string, GraphNodeDto>,
-    scopeSourceId?: string,
-  ): Promise<GraphEdgeDto[]> {
-    if (assetIds.length === 0) return [];
-    const rows = await this.prisma.edge.findMany({
-      where: {
-        origin: { in: [EdgeOrigin.SOURCE_DERIVED, EdgeOrigin.MANUAL] },
-        OR: [
-          { fromType: ASSET_REL, fromId: { in: assetIds } },
-          { toType: ASSET_REL, toId: { in: assetIds } },
-        ],
-      },
-      take: 2000,
-    });
-
-    // Resolve every asset-typed endpoint not already on the canvas — the
-    // other side of a cross-source edge — in one batched query rather than
-    // per-row, then hydrate them the same way `external` endpoints are.
-    const missingAssetIds = new Set<string>();
-    for (const row of rows) {
-      for (const [type, id] of [
-        [row.fromType, row.fromId],
-        [row.toType, row.toId],
-      ] as const) {
-        if (type === ASSET_REL && !nodeById.has(id)) missingAssetIds.add(id);
-      }
-    }
-    if (missingAssetIds.size > 0) {
-      const foreign = await this.prisma.asset.findMany({
-        where: { id: { in: Array.from(missingAssetIds) } },
-        select: ASSET_NODE_SELECT,
-      });
-      for (const a of foreign) nodeById.set(a.id, assetNode(a, scopeSourceId));
-    }
-
-    const edges: GraphEdgeDto[] = [];
-    for (const row of rows) {
-      for (const [type, id] of [
-        [row.fromType, row.fromId],
-        [row.toType, row.toId],
-      ] as const) {
-        if (type === 'external' && !nodeById.has(id)) {
-          nodeById.set(id, {
-            id,
-            type: 'external',
-            label: id,
-            depth: 1,
-            status: 'external',
-            urn: id,
-          });
-        }
-      }
-      // Both ends have to be on the canvas; an asset that no longer exists
-      // (deleted since the edge was written) has nothing to attach to.
-      if (!nodeById.has(row.fromId) || !nodeById.has(row.toId)) continue;
-      edges.push({
-        id: row.id,
-        fromType: row.fromType,
-        fromId: row.fromId,
-        toType: row.toType,
-        toId: row.toId,
-        relationType: row.relationType,
-        confidence: Number(row.confidence),
-        origin: row.origin,
-        relationClass: row.relationClass,
-        granularity: row.granularity,
-        method: row.method,
-      });
-    }
-    return edges;
   }
 
   async getValueOccurrences(args: {

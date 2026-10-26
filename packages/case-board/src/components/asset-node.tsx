@@ -44,6 +44,7 @@ export function AssetNode({
   donut,
   topRight,
   bottomRight,
+  bottomLeft,
   topLeft,
   dots,
   action,
@@ -66,6 +67,7 @@ export function AssetNode({
   donut?: ReadonlyArray<{ severity: SeverityKey; count: number }> | null;
   topRight?: NodeBadge | null;
   bottomRight?: NodeBadge | null;
+  bottomLeft?: NodeBadge | null;
   topLeft?: NodeBadge | null;
   dots?: HypothesisDot[];
   action?: React.ReactNode;
@@ -120,6 +122,7 @@ export function AssetNode({
 
       {lod !== "chip" && topRight && <Badge badge={topRight} style={{ left: cx + 14, top: cy - ring - 4 }} />}
       {lod !== "chip" && bottomRight && <Badge badge={bottomRight} style={{ left: cx + 16, top: cy + 10 }} />}
+      {lod !== "chip" && bottomLeft && <Badge badge={bottomLeft} style={{ right: width - cx + 16, top: cy + 10 }} />}
       {lod !== "chip" && topLeft && <Badge badge={topLeft} style={{ right: width - cx + 14, top: cy - ring - 4 }} />}
       {escalated && escalated.count > 0 && <EscalationBadge escalated={escalated} lod={lod} />}
       {action}

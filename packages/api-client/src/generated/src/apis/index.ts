@@ -16,6 +16,7 @@ export { CustomDetectorsApi } from './CustomDetectorsApi';
 export { DataTransferApi } from './DataTransferApi';
 export { EmbeddingsApi } from './EmbeddingsApi';
 export { EntitiesApi } from './EntitiesApi';
+export { ExploreApi } from './ExploreApi';
 export { FindingsApi } from './FindingsApi';
 export { GlossaryApi } from './GlossaryApi';
 export { GraphApi } from './GraphApi';

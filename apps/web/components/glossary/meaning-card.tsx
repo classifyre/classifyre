@@ -292,8 +292,12 @@ function AssetTermRow({ entry }: { entry: AssetMeaningTerm }) {
   );
 }
 
-/** *Meaning* on the asset page (SL3 R7.2): the asset's concepts, by method. */
-export function AssetMeaningCard({ assetId }: { assetId: string }) {
+/**
+ * An asset's concepts, by method, with the history and a link by hand
+ * (SL3 R7.2). Shown in Explore's details for a starting point: the asset
+ * page's Connections, and Explore itself.
+ */
+export function AssetMeaningPanel({ assetId, onChanged }: { assetId: string; onChanged?: () => void }) {
   const { t } = useTranslation();
   const [data, setData] = React.useState<Awaited<
     ReturnType<typeof getAssetMeaning>
@@ -319,50 +323,45 @@ export function AssetMeaningCard({ assetId }: { assetId: string }) {
   if (failed) return null;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Shapes className="h-4 w-4" />
-          {t("glossary.meaning.title")}
-        </CardTitle>
-        <CardDescription>{t("glossary.meaning.assetHint")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {data === null ? (
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-        ) : data.current.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("glossary.meaning.noneAsset")}</p>
-        ) : (
+    <section className="space-y-3" data-testid="asset-meaning">
+      <div className={MICRO_LABEL}>{t("glossary.meaning.title")}</div>
+      {data === null ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : data.current.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("glossary.meaning.noneAsset")}</p>
+      ) : (
+        <ul className="space-y-2">
+          {data.current.map((entry) => (
+            <AssetTermRow key={entry.term.id} entry={entry} />
+          ))}
+        </ul>
+      )}
+      {history && data && data.history.length > 0 && (
+        <div className="space-y-1">
+          <div className={MICRO_LABEL}>{t("glossary.meaning.history")}</div>
           <ul className="space-y-2">
-            {data.current.map((entry) => (
-              <AssetTermRow key={entry.term.id} entry={entry} />
+            {data.history.map((entry) => (
+              <AssetTermRow key={`h-${entry.term.id}`} entry={entry} />
             ))}
           </ul>
-        )}
-        {history && data && data.history.length > 0 && (
-          <div className="space-y-1">
-            <div className={MICRO_LABEL}>{t("glossary.meaning.history")}</div>
-            <ul className="space-y-2">
-              {data.history.map((entry) => (
-                <AssetTermRow key={`h-${entry.term.id}`} entry={entry} />
-              ))}
-            </ul>
-          </div>
-        )}
-        <div className="flex flex-wrap items-center gap-2">
-          <ManualLink
-            target={{ type: "asset", id: assetId }}
-            onLinked={() => setRefresh((value) => value + 1)}
-          />
-          <button
-            type="button"
-            onClick={() => setHistory((value) => !value)}
-            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-          >
-            {history ? t("glossary.meaning.hideHistory") : t("glossary.meaning.showHistory")}
-          </button>
         </div>
-      </CardContent>
-    </Card>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <ManualLink
+          target={{ type: "asset", id: assetId }}
+          onLinked={() => {
+            setRefresh((value) => value + 1);
+            onChanged?.();
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => setHistory((value) => !value)}
+          className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+        >
+          {history ? t("glossary.meaning.hideHistory") : t("glossary.meaning.showHistory")}
+        </button>
+      </div>
+    </section>
   );
 }

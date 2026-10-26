@@ -63,18 +63,6 @@ export class CorrelationController {
     );
   }
 
-  @Get('correlation/links-graph')
-  @ApiOperation({
-    summary: "A source's assets connected by their links (hash references)",
-  })
-  @ApiQuery({ name: 'sourceId', required: true })
-  @ApiResponse({ status: 200, type: CorrelationGraphResponseDto })
-  async linksGraph(
-    @Query('sourceId') sourceId: string,
-  ): Promise<CorrelationGraphResponseDto> {
-    return this.correlation.buildLinksGraph(sourceId);
-  }
-
   @Get('correlation/config')
   @ApiOperation({
     summary:

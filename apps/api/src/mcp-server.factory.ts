@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   McpServer,
@@ -78,6 +79,7 @@ import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
 import { AutopilotService } from './autopilot/autopilot.service';
 import { GraphService } from './graph.service';
+import { ExploreService } from './explore/explore.service';
 import { CaseBoardService } from './case-board/case-board.service';
 import { CaseBoardReadService } from './case-board/case-board-read.service';
 import { CaseFindingFiltersService } from './cases/case-finding-filters.service';
@@ -388,6 +390,8 @@ export class McpServerFactoryService {
     private readonly entityMentions: EntityMentionsService,
     private readonly entityCandidates: EntityCandidatesService,
     private readonly entitySwitch: EntitySwitchService,
+    // Last and optional: specs construct this class positionally.
+    @Optional() private readonly exploreService?: ExploreService,
   ) {}
 
   /**
@@ -1919,6 +1923,122 @@ export class McpServerFactoryService {
       },
       async () => jsonResult(await this.graphService.getRelationTypes()),
     );
+
+    server.registerTool(
+      'explore_connections',
+      {
+        title: 'Explore Connections',
+        description:
+          "What up to ten assets are connected to, and why — the same view as the Explore page. Kinds: lineage (data flowing in or out, traced `depth` hops `direction` up, down or both), links (references, usage, links people drew, traced the same way), duplicates (the same content or the same thing), similar (shared detected values, with how many per label), meaning (glossary concepts and entities the assets share, returned as terms between them), alike (likeness by meaning from the vectors, with the closest passage). Every asset lists the cases it is evidence in and the watches it answers. Each kind is bounded; assets deleted at their source are left out. Give a sourceId without assetIds to explore a whole source from its most connected assets. scope keeps only connections inside the same source (internal), only those leaving it (external), or all (default); every asset says whether it is foreign. Give a termId to start from the assets that carry a glossary term. Give duplicates (a filter: patternKey, family, minScore, review any|open|confirmed, sourceId) to draw duplicate review's matching pairs around the assets with the most of them; scope then keeps pairs within one source or across two. Start from search_assets to find the seeds.",
+        inputSchema: {
+          assetIds: z.array(z.string()).max(10).optional(),
+          sourceId: z.string().optional(),
+          scope: z.enum(['all', 'internal', 'external']).optional(),
+          termId: z.string().optional(),
+          duplicates: z
+            .object({
+              patternKey: z.string().optional(),
+              family: z
+                .enum([
+                  'SHARED_LABELS',
+                  'PHONETIC',
+                  'IDENTICAL_CONTENT',
+                  'NEAR_DUPLICATE_TEXT',
+                ])
+                .optional(),
+              minScore: z.number().min(0).max(1).optional(),
+              review: z.enum(['any', 'open', 'confirmed']).optional(),
+              sourceId: z.string().optional(),
+            })
+            .optional(),
+          kinds: z
+            .array(
+              z.enum([
+                'lineage',
+                'links',
+                'duplicates',
+                'similar',
+                'meaning',
+                'alike',
+              ]),
+            )
+            .optional(),
+          depth: z.number().int().min(1).max(6).optional(),
+          direction: z.enum(['up', 'down', 'both']).optional(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({
+        assetIds,
+        sourceId,
+        scope,
+        termId,
+        duplicates,
+        kinds,
+        depth,
+        direction,
+      }) =>
+        jsonResult(
+          await this.explore().neighbourhood({
+            assetIds,
+            sourceId,
+            scope,
+            termId,
+            duplicates,
+            kinds,
+            depth,
+            direction,
+          }),
+        ),
+    );
+
+    server.registerTool(
+      'find_similar_assets',
+      {
+        title: 'Find Similar Assets',
+        description:
+          'Assets that read like this one ("more like this"), by meaning from the vectors: the asset\'s own passages, pictures and sound averaged and searched like a question. Each comes with its score and the passage that read closest. Needs embeddings switched on.',
+        inputSchema: {
+          assetId: z.string(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ assetId }) => {
+        const view = await this.explore().neighbourhood({
+          assetIds: [assetId],
+          kinds: ['alike'],
+        });
+        if (view.alike === 'off') {
+          return jsonResult({
+            embeddings: 'off',
+            message:
+              'Embeddings are switched off for this workspace; nothing can be compared by meaning.',
+          });
+        }
+        const byId = new Map(view.nodes.map((n) => [n.id, n]));
+        return jsonResult({
+          assetId,
+          similar: view.edges.map((e) => ({
+            asset: byId.get(e.toId) ?? { id: e.toId },
+            score: e.confidence,
+            passage: e.passage,
+          })),
+        });
+      },
+    );
+  }
+
+  private explore(): ExploreService {
+    if (!this.exploreService) {
+      throw new Error('Explore is not available in this process');
+    }
+    return this.exploreService;
   }
 
   private registerCustomDetectorTools(

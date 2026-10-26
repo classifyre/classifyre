@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GraphService } from './graph.service';
 import { PrismaService } from './prisma.service';
-import { SourceGraphScheduler } from './stats/source-graph-scheduler.service';
 
 describe('GraphService', () => {
   let service: GraphService;
@@ -21,16 +20,34 @@ describe('GraphService', () => {
       providers: [
         GraphService,
         { provide: PrismaService, useValue: mockPrisma },
-        // The map rebuild is fire-and-forget bookkeeping; these tests are
-        // about what lands in `edges`.
-        {
-          provide: SourceGraphScheduler,
-          useValue: { scheduleRebuild: jest.fn() },
-        },
       ],
     }).compile();
     service = module.get<GraphService>(GraphService);
     jest.clearAllMocks();
+  });
+
+  describe('linkReferences', () => {
+    it('writes nothing for a batch without hashes', async () => {
+      expect(await service.linkReferences('src', [])).toBe(0);
+      expect(mockPrisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it("links a batch's assets both ways in one statement", async () => {
+      mockPrisma.$executeRaw.mockResolvedValueOnce(3);
+
+      const linked = await service.linkReferences('src', ['h1', 'h2', 'h1']);
+
+      expect(linked).toBe(3);
+      expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1);
+      const [strings, ...values] = mockPrisma.$executeRaw.mock
+        .calls[0] as unknown as [TemplateStringsArray, ...unknown[]];
+      const sql = strings.join('?');
+      // What they link to, and what already links to them.
+      expect(sql).toContain('jsonb_array_elements_text');
+      expect(sql).toContain('s.links ? m.hash');
+      expect(sql).toContain("'REFERENCES'");
+      expect(values).toEqual(['src', ['h1', 'h2']]);
+    });
   });
 
   describe('expand', () => {

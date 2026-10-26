@@ -184,6 +184,17 @@ describe('exact duplicate linking from the content hash', () => {
     );
   });
 
+  /** A link someone drew under the same name is theirs, not the engine's. */
+  it('never deletes a manual edge when it replaces the group', async () => {
+    oneGroup('hash-a', ['a1', 'a2']);
+
+    await link([], true);
+
+    expect(prisma.edge.deleteMany.mock.calls[0][0].where.origin).toEqual({
+      not: 'MANUAL',
+    });
+  });
+
   /**
    * An incremental run must relink a touched asset's whole group, including
    * partners it did not touch — so the scope is resolved to content hashes

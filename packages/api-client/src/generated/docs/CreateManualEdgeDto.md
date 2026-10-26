@@ -12,6 +12,8 @@ Name | Type
 `toId` | string
 `relationType` | string
 `confidence` | number
+`relationClass` | [EdgeClass](EdgeClass.md)
+`note` | string
 
 ## Example
 
@@ -26,6 +28,8 @@ const example = {
   "toId": null,
   "relationType": null,
   "confidence": null,
+  "relationClass": null,
+  "note": null,
 } satisfies CreateManualEdgeDto
 
 console.log(example)

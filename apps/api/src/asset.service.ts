@@ -3793,6 +3793,24 @@ export class AssetService {
         );
       }
     }
+    // What these assets link to, and what already links to them, as edges:
+    // without them a link is only a hash in a list, and nothing that walks
+    // the graph (Explore, lineage, cases) can see it. Never fatal, like the
+    // stitch above.
+    if (this.graph) {
+      try {
+        await this.graph.linkReferences(
+          sourceId,
+          batch.map((asset) => String(asset.hash)),
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Could not link referenced assets: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
     await this.declareEntities(sourceId, batch);
     return ingestResult;
   }

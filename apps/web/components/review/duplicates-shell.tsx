@@ -58,7 +58,7 @@ export function DuplicatesShell({
   bare,
   children,
 }: {
-  active: "queue" | "decisions" | "sources" | "tune";
+  active: "queue" | "decisions" | "explore" | "sources" | "tune";
   patternKey?: string;
   /** Skip the instrument rail — a full-width section owns the whole page. */
   bare?: boolean;
@@ -165,6 +165,12 @@ export function DuplicatesShell({
       key: "decisions" as const,
       label: t("review.decisions.tabDecisions"),
       href: "/duplicates/decisions",
+    },
+    // The queue decides pairs; Explore shows them, all or as filtered.
+    {
+      key: "explore" as const,
+      label: t("review.explore.tab"),
+      href: "/duplicates/explore",
     },
     // Tuning is a third destination, not a button floating beside the title:
     // it is the same kind of thing as the other two, so it sits with them.

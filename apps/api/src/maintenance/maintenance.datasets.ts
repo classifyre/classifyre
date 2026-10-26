@@ -63,7 +63,6 @@ export type CleanupKey =
   | 'harness'
   | 'scheduler'
   | 'stats'
-  | 'graph'
   | 'vocabulary'
   | 'semanticLinks'
   | 'suggestions'
@@ -78,7 +77,6 @@ export const CLEANUP_KEYS: readonly CleanupKey[] = [
   'harness',
   'scheduler',
   'stats',
-  'graph',
   'vocabulary',
   'semanticLinks',
   'suggestions',
@@ -241,16 +239,6 @@ export const CLEANABLE_DATASETS: readonly CleanableDataset[] = [
       'finding_stats_first_asset_daily',
       'finding_stats_dirty_days',
       'finding_stats_state',
-    ],
-  },
-  // Derived source graph, rebuilt by the graph worker.
-  {
-    key: 'graph',
-    tables: [
-      'source_graph_nodes',
-      'source_graph_links',
-      'source_graph_boundary_assets',
-      'source_graph_state',
     ],
   },
   // The semantic layer's derived tables (SL-9), each rebuilt from the curated

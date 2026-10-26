@@ -54,6 +54,12 @@ export interface TraceEdgeRow {
   relation_class: string | null;
   confidence: number | null;
   kind: TraceKind;
+  /** INFERRED, SOURCE_DERIVED or MANUAL: a link someone drew is marked as theirs. */
+  origin: string;
+  /** Why two assets were scored alike: shared values per label (correlation edges). */
+  shared_by_label: Record<string, number> | null;
+  /** What the person who drew a manual link wrote about it. */
+  note: string | null;
 }
 
 export interface TraceNodeRef {

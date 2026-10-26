@@ -378,7 +378,7 @@ export const PairLevel = React.forwardRef<
               bDegree={pair.lineage.bDegree}
               hairball={hairball}
               onOpenLineage={() =>
-                router.push(nsPath(`/assets/${pair.a.id}?tab=lineage`))
+                router.push(nsPath(`/assets/${pair.a.id}?tab=connections`))
               }
             />
             {pair.verdict ? (

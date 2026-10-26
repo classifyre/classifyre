@@ -14,6 +14,8 @@ Name | Type
 `relationType` | string
 `confidence` | number
 `origin` | string
+`relationClass` | string
+`note` | string
 
 ## Example
 
@@ -30,6 +32,8 @@ const example = {
   "relationType": null,
   "confidence": null,
   "origin": null,
+  "relationClass": null,
+  "note": null,
 } satisfies EdgeDetailDto
 
 console.log(example)

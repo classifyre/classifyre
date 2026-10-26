@@ -12,7 +12,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { EdgeOrigin } from '@prisma/client';
+import { EdgeClass, EdgeOrigin } from '@prisma/client';
 
 export type GraphDirection = 'both' | 'out' | 'in';
 
@@ -489,6 +489,25 @@ export class CreateManualEdgeDto {
   @Min(0)
   @Max(1)
   confidence?: number;
+
+  @ApiPropertyOptional({
+    enum: EdgeClass,
+    enumName: 'EdgeClass',
+    description:
+      'What the link means: FLOW is lineage ("derived from"), IDENTITY is "the same thing", ' +
+      'REFERENCE (default) propagates nothing. Decides which kind of connection it shows under.',
+  })
+  @IsOptional()
+  @IsIn(Object.values(EdgeClass))
+  relationClass?: EdgeClass;
+
+  @ApiPropertyOptional({
+    description: 'Why the link was drawn, shown with it',
+    maxLength: 500,
+  })
+  @IsOptional()
+  @IsString()
+  note?: string;
 }
 
 export class UpdateEdgeDto {
@@ -521,6 +540,12 @@ export class EdgeDetailDto {
 
   @ApiProperty({ enum: ['INFERRED', 'SOURCE_DERIVED', 'MANUAL'] })
   origin!: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  relationClass?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  note?: string | null;
 }
 
 export class LineageGraphDto {

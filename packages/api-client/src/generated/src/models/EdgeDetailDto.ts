@@ -67,6 +67,18 @@ export interface EdgeDetailDto {
      * @memberof EdgeDetailDto
      */
     origin: EdgeDetailDtoOriginEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof EdgeDetailDto
+     */
+    relationClass?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof EdgeDetailDto
+     */
+    note?: string | null;
 }
 
 
@@ -114,6 +126,8 @@ export function EdgeDetailDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'relationType': json['relationType'],
         'confidence': json['confidence'],
         'origin': json['origin'],
+        'relationClass': json['relationClass'] == null ? undefined : json['relationClass'],
+        'note': json['note'] == null ? undefined : json['note'],
     };
 }
 
@@ -136,6 +150,8 @@ export function EdgeDetailDtoToJSONTyped(value?: EdgeDetailDto | null, ignoreDis
         'relationType': value['relationType'],
         'confidence': value['confidence'],
         'origin': value['origin'],
+        'relationClass': value['relationClass'],
+        'note': value['note'],
     };
 }
 

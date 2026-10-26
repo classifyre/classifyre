@@ -1,0 +1,290 @@
+---
+title: "Explore: Following Connections"
+description: Follow what an asset or a whole source is connected to — where its data comes from and goes, what it links to, what is the same, what reads alike — with the reason for every link, inside the source or across to others, and links of your own that survive every re-scan.
+---
+
+import { Callout } from "nextra/components"
+import { ExploreDemo } from "@/components/explore/explore-demo"
+
+# Explore: Following Connections
+
+After the first scans, you have assets, and whatever lineage, links and
+duplicates came with them. Explore is where you follow them. It answers what a
+list cannot:
+
+- *Where does this table's data come from, and what is built on it?*
+- *Is this the same document as that one, or does it only share a name with it?*
+- *What else is this connected to, and is any of it already in a case?*
+- *Nothing links this file yet: what is it like?*
+
+Explore never draws your whole workspace. A picture of ten thousand documents is
+a cloud of dots that answers nothing. It starts from **one asset**, a few, or a
+source's most connected ones, and shows what is connected to them, one view at a
+time. You meet it where you already are: the **Connections** tab of every source
+and every asset, the overview of every glossary term, the **Explore** section of
+duplicate review, and the Explore card on the Overview.
+
+<ExploreDemo
+  scene="complaint"
+  height={500}
+  caption="A live Explore canvas. Light a counter to see one kind of connection alone, click an asset, a term or a line to read why it is there, double-click the surveyor's visit to walk on, or pull a line from one asset to another. Nothing here is saved."
+/>
+
+---
+
+## On a source's page
+
+A source's **Connections** tab opens on its **ten most connected assets**, and
+what they are connected to: the lineage between its tables, the pages that link
+its issues, the duplicates inside it and in other sources. The search in the top
+bar searches this source. **Worth adding next** lists the neighbours reached by
+the most kinds of connection.
+
+The switch next to the counters says which connections to keep:
+
+| Switch | Keeps |
+|---|---|
+| **All** | Every connection |
+| **Same source** | Only connections between assets of this source |
+| **Other sources** | Only connections that leave it: to another source's assets, or to objects no source has scanned yet |
+
+An asset from another source carries that source's name under it, so a wiki
+page linking a ticket reads as such at a glance. On the source's
+page, *Other sources* starts from the assets with the most connections out of it.
+
+## Diving in, and back out
+
+**Double-click** an asset, or select it and press **Dive in**: the canvas
+re-centres on it, with its own connections around it, traced the way you had
+chosen. A trail at the top says where you are, *All of Service desk › HD-214 ›
+HD-214 runbook*; click any step to go back out to it. **Open asset**
+opens the asset's own page.
+
+## On an asset's page
+
+Every asset page has a **Connections** tab: the same canvas, starting from that
+asset, with the same counters, switch, views, trace and panels, and the same way
+of diving in. Select the asset to see its **meaning** (the concepts it is about,
+by binding, declaration, mention or link by hand) and to link a concept by hand.
+For a table or a view, the **column lineage** panel sits under the canvas.
+
+## On a glossary term's page
+
+A concept's or an entity's overview opens on **Where it is connected**: the ten
+assets that carry it most (the most severe findings first, then the most
+evidence), the term itself drawn between them and ringed, the other concepts
+they share, and the documents those bring in. The term stays on the canvas in
+every view, so switching to *Lineage* shows how the documents about it feed
+each other without losing why they are there. Double-click a document to dive
+in; the trail leads back to the term.
+
+## In duplicate review
+
+Duplicate review's **Explore** section draws its pairs on the canvas instead of
+listing them: the documents in the most pairs are the starting points, each
+with what is the same as it around it, every line with the reason the pair
+screen gives (*same content*, *repeated text · 97%*, *likely the same · person
+×2*, *confirmed the same*). Filters above the canvas pick which pairs:
+
+| Filter | Picks |
+|---|---|
+| **Pattern** | One [pattern](/duplicates/patterns/); a pattern's page links straight here with **Explore** |
+| **Kind of match** | Shared values, similar spelling, identical content, repeated text |
+| **Score** | Any, from the *worth a look* cutoff, or from the *likely the same* one |
+| **Review** | Every pair not ruled apart, pairs not reviewed yet, or pairs confirmed the same |
+| **Source** | Pairs with a document in one source |
+
+The switch next to the counters keeps pairs **within one source** or **across
+two**. Pairs someone ruled apart are never drawn as the same. Lineage and links
+between the drawn documents come along, so a copy that is explained by lineage
+shows it. Double-click a document to dive into everything it is connected to;
+the queue is still where pairs are decided.
+
+## Explore on the Overview
+
+The Explore card on the [Overview](/how-it-works/in-the-app/#discovery) opens
+Explore on its own page, for questions that start from nowhere in particular. It
+opens on a search box, your **saved views**, and one table of assets worth
+starting from, a tab per reason:
+
+| Tab | Lists |
+|---|---|
+| **Results** | What the search found, by meaning *and* by the exact words, as on the [Assets](/sources/assets-and-metadata/) page, each with the passage that matched |
+| **Most critical** | Assets with open critical and high findings, the most critical first |
+| **Most lineage** | Assets with the most lineage links |
+| **Duplicates** | The biggest [duplicate patterns](/duplicates/patterns/), each with its strongest pair |
+| **Drawn links** | The links people drew last |
+
+Press **Explore** on a row, or tick several and **Explore them together**.
+Once something is on the canvas, the search moves to the top bar and answers in
+the **Find** panel; **+** adds a result next to what is already there.
+
+The view lives in the address bar, so **back** and **forward** walk your
+exploration, and a copied link opens exactly what you were looking at.
+
+## Saved views
+
+When a canvas tells you something, keep it: **Save view** in the top bar gives it
+a name and notes. A saved view keeps its starting points, the view, how far and
+which way it traces, and **where you put things**: drag assets where they make
+sense, and **Save changes** keeps the layout. The menu next to it saves a copy
+as a new view, renames it, resets the layout, or deletes it.
+
+Saved views belong to that page, and are listed on its start and on the Overview
+card. They are kept
+by the identity of the assets, so re-scans leave them whole; an asset deleted at
+its source is not drawn, and comes back if the asset does.
+
+## The views, and the guide
+
+Explore shows one view at a time, and opens on the one your asset has most to
+show in:
+
+| View | Shows | Opens when |
+|---|---|---|
+| **Lineage** | Where the data comes from and where it goes, traced as far as you ask | The asset has any lineage |
+| **Same and alike values** | The same content, likely the same thing, and shared detected values | It has duplicates or shares values |
+| **All connected** | Lineage, links, duplicates and shared values together | It only has plain links |
+| **By meaning** | The concepts and people it shares, and what reads alike | Nothing links it yet |
+
+A line at the top of the canvas, the **guide**, says what the view shows (*Lineage:
+7 upstream, 7 downstream*) and which other views have something for this asset
+(*Also: By meaning 56*). One click switches.
+
+An asset nothing links yet is not a dead end. Explore opens it **by meaning**, and
+the guide says so: these are the documents it shares concepts with or reads like,
+so you can link what belongs together.
+
+<ExploreDemo
+  scene="meaning"
+  height={420}
+  caption="The same complaint by meaning: documents that share no values at all are still tied by what they are about, and by how alike they read."
+/>
+
+## Tracing lineage
+
+The **View** button in the bottom left corner chooses the view, and how lineage
+and links are traced:
+
+- **Upstream, Both, Downstream**: where the data came from, where it went, or both.
+- **How far**: one step at a time up to **∞**, as far as the lineage goes.
+  Duplicates and shared values go at most two steps; concepts and likeness are
+  always one, because two steps of "alike" is no longer alike.
+- **Kinds of connection**: switch individual kinds on or off when no view fits.
+
+On the canvas, lineage reads left to right: what feeds your starting points stands
+to their left, one column per step, what they feed stands to their right. A small
+↑2 or ↓1 says how many steps away it is.
+
+<ExploreDemo
+  scene="lineage"
+  height={360}
+  caption="The lineage view: the complaint is loaded into a table, and the table is summarised in a weekly report."
+/>
+
+## Reading the canvas
+
+The **counters** in the top bar count what is on the canvas, one per kind of
+connection, each with the line it is drawn with. Press one to light that kind and
+bring it into view; the rest steps back. Press it again to see everything.
+
+- Your starting points are ringed.
+- **Above** them: what is the *same* (duplicates) and what *shares values*.
+- **Below** them: the concepts and entities they share, drawn as labelled boxes
+  between the documents, then other documents about the same things, then what
+  reads alike, then plain references.
+- Every line carries its reason. Zoom in to read it on the line; point at a line
+  to read it at any zoom. A fainter line is a weaker score; an amber line was
+  drawn by a person.
+
+| Kind | Means | The line says |
+|---|---|---|
+| **Lineage** | Data flowed from one into the other, reported by the systems themselves | *loaded into*, *transform*, *copy of* |
+| **Links** | References between documents a scan found (a page that links an issue, a message and its attachment), usage, and links people drew | *references*, or what the person wrote |
+| **Same as** | The same content, very likely the same thing, or the same text read passage for passage | *same content*, *likely the same · person ×2*, *repeated text · 97%* |
+| **Shared values** | Both contain the same detected values: a person, an IBAN, an email | *shares person ×2, phone number ×1* |
+| **Shared concepts** | Both are about the same [glossary](/how-it-works/glossary/) concept or entity | the concept itself, as a box |
+| **Alike by meaning** | They read alike, compared by meaning rather than by words | *84% alike*, with the closest passage |
+
+*Same as* and *shared values* come from the same evidence as
+[duplicate review](/duplicates/): select one of those lines and **Review this
+pair** opens it there. *Alike by meaning* needs
+[embeddings](/settings/embeddings/) switched on.
+
+## What is already in a case
+
+An asset that is evidence in a [case](/investigations/cases/) wears a **CASE**
+badge; one whose findings answer a [watch](/investigations/inquiry/) wears
+**WATCH**. The top bar counts both, and the **Cases and watches** panel lists them
+with links to each, so you see at once what is already being looked at and what
+nobody has picked up yet.
+
+## The panels
+
+One rail on the right opens the panels, as on the case board:
+
+| Panel | Holds |
+|---|---|
+| **Find** | Search results, and your starting points |
+| **Worth adding next** | The neighbours reached by the most kinds of connection, the strongest first |
+| **Details** | What you selected: an asset's links with their reasons and the cases and watches it is part of, a line's reason and score, a term's documents |
+| **Cases and watches** | The cases holding these assets and the watches they answer |
+
+On a source's or an asset's page, double-click an asset to dive in (see above).
+On Explore's own page, a double click or **Add as a starting point** walks on
+instead: its own connections come in around it, next to what is there, and
+**Start over from this** makes it the only starting point. **All to a case**
+sends everything on the canvas to a case as evidence; **Add to a case** sends
+one asset.
+
+## Your own links
+
+You often know something the data does not: that the photos were taken for this
+complaint, that this works order answers that survey. Select an asset and use
+**Link to…**, or drag from the edge of one asset to another, and say what the
+link means:
+
+| Meaning | Where it shows |
+|---|---|
+| **Related to** | As a plain link, no direction |
+| **Same as** | With the duplicates |
+| **Feeds** | As lineage, in the [lineage view](/sources/lineage/) too |
+| **References** | As a link, one way |
+| **Something else** | As a link, named by you |
+
+Add a note saying why. Links people drew are amber everywhere, so they are never
+mistaken for something a system reported.
+
+<Callout type="info">
+**What happens to your link later.** A link is kept by the identity of the two
+documents, not by a copy of them. Re-scanning either source does not touch it,
+and neither does recomputing duplicates. If one of the documents is deleted at
+its source, the link disappears from view, and comes back if the document does.
+Deleting a source removes the links of its documents with it.
+</Callout>
+
+## Built to stay fast
+
+Explore never reads the whole workspace. Each kind of connection is read
+separately and with its own limit, so a document with a thousand look-alikes
+cannot crowd out its lineage, and a workspace of millions of documents answers as
+quickly as one of hundreds. When a limit is reached, the guide says so; add a
+neighbour as a starting point to see its own connections.
+
+## For AI agents
+
+The same view is available to agents over [MCP](/settings/mcp-server/):
+`explore_connections` returns what assets are connected to and why, traced as far
+and in the direction asked, with the cases and watches each asset is part of; given
+a source instead of assets, it starts from the source's most connected ones, and it
+keeps all connections, those inside the source or those leaving it;
+`find_similar_assets` returns the assets that read like a given one.
+
+## Reading next
+
+- [Lineage & Relationships](/sources/lineage/): how lineage is collected
+- [Connections & Duplicates](/how-it-works/duplicates-and-similarity/): the
+  signals behind *same as* and *shared values*
+- [Glossary & Shared Vocabulary](/how-it-works/glossary/): where concepts and
+  entities come from
+- [Cases](/investigations/cases/): where what you found becomes an investigation
