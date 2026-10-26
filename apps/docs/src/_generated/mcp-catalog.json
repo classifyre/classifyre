@@ -6713,11 +6713,13 @@
     },
     {
       "id": "lineage",
-      "title": "Lineage",
-      "description": "Trace how data flows between assets via the stitched edge graph, and look up what a relation type means.",
+      "title": "Lineage & connections",
+      "description": "Trace how data flows between assets, explore every kind of connection between them with its reason, and find assets alike by meaning.",
       "operations": [
         "Walk an asset's upstream/downstream FLOW lineage",
-        "List relation types in use and their FLOW/CONTAINMENT/IDENTITY/REFERENCE/USAGE class"
+        "List relation types in use and their FLOW/CONTAINMENT/IDENTITY/REFERENCE/USAGE class",
+        "Explore what assets are connected to: lineage, links, duplicates, shared values, shared concepts, likeness",
+        "Find assets that read like a given one"
       ],
       "tools": [
         {
@@ -6769,6 +6771,125 @@
           "destructive": false,
           "idempotent": true,
           "parameters": []
+        },
+        {
+          "name": "explore_connections",
+          "title": "Explore Connections",
+          "description": "What up to ten assets are connected to, and why — the same view as the Explore page. Kinds: lineage (data flowing in or out, traced `depth` hops `direction` up, down or both), links (references, usage, links people drew, traced the same way), duplicates (the same content or the same thing), similar (shared detected values, with how many per label), meaning (glossary concepts and entities the assets share, returned as terms between them), alike (likeness by meaning from the vectors, with the closest passage). Every asset lists the cases it is evidence in and the watches it answers. Each kind is bounded; assets deleted at their source are left out. Give a sourceId without assetIds to explore a whole source from its most connected assets. scope keeps only connections inside the same source (internal), only those leaving it (external), or all (default); every asset says whether it is foreign. Give a termId to start from the assets that carry a glossary term. Give duplicates (a filter: patternKey, family, minScore, review any|open|confirmed, sourceId) to draw duplicate review's matching pairs around the assets with the most of them; scope then keeps pairs within one source or across two. Start from search_assets to find the seeds.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "assetIds",
+              "type": "string[]",
+              "required": false
+            },
+            {
+              "name": "sourceId",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "scope",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "all",
+                "internal",
+                "external"
+              ]
+            },
+            {
+              "name": "termId",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "duplicates",
+              "type": "object",
+              "required": false
+            },
+            {
+              "name": "duplicates.patternKey",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "duplicates.family",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "SHARED_LABELS",
+                "PHONETIC",
+                "IDENTICAL_CONTENT",
+                "NEAR_DUPLICATE_TEXT"
+              ]
+            },
+            {
+              "name": "duplicates.minScore",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "duplicates.review",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "any",
+                "open",
+                "confirmed"
+              ]
+            },
+            {
+              "name": "duplicates.sourceId",
+              "type": "string",
+              "required": false
+            },
+            {
+              "name": "kinds",
+              "type": "enum[]",
+              "required": false,
+              "enumValues": [
+                "lineage",
+                "links",
+                "duplicates",
+                "similar",
+                "meaning",
+                "alike"
+              ]
+            },
+            {
+              "name": "depth",
+              "type": "integer",
+              "required": false
+            },
+            {
+              "name": "direction",
+              "type": "enum",
+              "required": false,
+              "enumValues": [
+                "up",
+                "down",
+                "both"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "find_similar_assets",
+          "title": "Find Similar Assets",
+          "description": "Assets that read like this one (\"more like this\"), by meaning from the vectors: the asset's own passages, pictures and sound averaged and searched like a question. Each comes with its score and the passage that read closest. Needs embeddings switched on.",
+          "readOnly": true,
+          "destructive": false,
+          "idempotent": true,
+          "parameters": [
+            {
+              "name": "assetId",
+              "type": "string",
+              "required": true
+            }
+          ]
         }
       ]
     }

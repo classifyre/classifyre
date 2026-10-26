@@ -131,4 +131,20 @@ describe('correlation staging residue', () => {
     expect(h.prisma.correlationPairStaging.deleteMany).not.toHaveBeenCalled();
     expect(h.executed.filter((q) => /TRUNCATE/i.test(q))).toHaveLength(1);
   });
+
+  // Not about staging, but this is the harness that drives the scorer: the
+  // wipe before rewriting scored edges must leave links people drew alone,
+  // on a full rebuild and on an incremental one.
+  it.each([true, false])(
+    'keeps manual edges when it wipes scored edges (full=%s)',
+    async (full) => {
+      const h = harness(null);
+
+      await h.service['scoreAndLink'](['a1'], h.cfg, full);
+
+      expect(h.prisma.edge.deleteMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({ origin: { not: 'MANUAL' } }),
+      });
+    },
+  );
 });

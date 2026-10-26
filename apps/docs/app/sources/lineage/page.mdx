@@ -210,15 +210,22 @@ guard stays off on small estates, where lineage is sparse and every edge matters
 
 ## Where to see it in the app
 
-Open any asset and choose the **Lineage** tab.
+Open any asset and choose the **Connections** tab. It opens on the **Lineage**
+view whenever the asset has any: what feeds it stands to its left, what it feeds
+to its right, one column per step.
 
-| Control | What it does |
+| Control (the View button) | What it does |
 |---|---|
-| **Upstream / Downstream / Both** | Which way to walk — where it came from, what depends on it, or the full picture |
-| **Collapse** | Rolls each item up into whatever contains it (tables into schemas, charts into dashboards) — how four hundred tables become twelve schemas without losing an edge |
-| **Not yet scanned** | Counts endpoints in systems you haven't connected |
+| **Upstream / Both / Downstream** | Which way to walk — where it came from, what depends on it, or the full picture |
+| **How far** | One step at a time up to **∞**, as far as the lineage goes |
 
-Below the graph, the **column lineage** panel traces a single column.
+Endpoints in systems you haven't connected yet are drawn faded: the lineage
+reaches them, but there is nothing to open. Below the canvas, the **column
+lineage** panel traces a single column.
+
+[Explore](/how-it-works/explore/) opens on lineage whenever an asset has any:
+what feeds it stands to its left, what it feeds to its right, one column per
+step, traced upstream, downstream or both and as far as you ask.
 
 Relationships also appear throughout [investigations](/investigations/) and in
 [duplicate review](/duplicates/). On the
@@ -229,10 +236,12 @@ any piece of evidence. In the lineage view, selecting any relationship shows
 its class, how it was derived, whether it carries column detail, and the SQL
 behind it where there is any.
 
-You can also **draw a link by hand** on a case board when you know something
-the systems don't. Links people drew are amber, so they're never mistaken for
-something a platform reported, and a link can be promoted to a global
-relationship that the lineage view shows too.
+You can also **draw a link by hand** when you know something the systems
+don't: on a case board, or in [Explore](/how-it-works/explore/) with **Link to…**
+(choose *Feeds* to make it lineage). Links people drew are amber, so they're
+never mistaken for something a platform reported. They are kept by the identity
+of the two assets, so re-scans leave them alone, and they leave the picture when
+either asset is deleted at its source.
 
 ---
 
@@ -259,7 +268,7 @@ shared in. Those are relationships, and they show up in the graph; they are just
 not lineage, because no data moved.
 
 > **Nothing to see yet?** Lineage appears after a scan of a source that can
-> report it. If an asset's Lineage tab is empty, either its source doesn't
+> report it. If an asset's Connections tab shows no lineage, either its source doesn't
 > expose lineage, or the objects around it haven't been scanned yet.
 
 ---

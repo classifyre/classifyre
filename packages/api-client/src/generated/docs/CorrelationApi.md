@@ -8,7 +8,6 @@ All URIs are relative to *http://localhost*
 | [**correlationControllerCaseAction**](CorrelationApi.md#correlationcontrollercaseaction) | **POST** /correlation/case-action | Create a case (or add to one) from assets selected in the fingerprints graph |
 | [**correlationControllerGetConfig**](CorrelationApi.md#correlationcontrollergetconfig) | **GET** /correlation/config | Correlation tuning: per-label weights (dynamic) + match thresholds |
 | [**correlationControllerGraph**](CorrelationApi.md#correlationcontrollergraph) | **GET** /correlation/graph | Correlation (\&quot;evidence fingerprints\&quot;) graph for ONE asset or ONE source |
-| [**correlationControllerLinksGraph**](CorrelationApi.md#correlationcontrollerlinksgraph) | **GET** /correlation/links-graph | A source\&#39;s assets connected by their links (hash references) |
 | [**correlationControllerOccurrences**](CorrelationApi.md#correlationcontrolleroccurrences) | **GET** /findings/occurrences | Where else a normalized finding value appears (reverse index) |
 | [**correlationControllerRecompute**](CorrelationApi.md#correlationcontrollerrecompute) | **POST** /assets/{id}/recompute-correlation | Recompute correlation for a single asset (on demand) |
 | [**correlationControllerRemoveExclusion**](CorrelationApi.md#correlationcontrollerremoveexclusion) | **DELETE** /correlation/exclusions/{id} | Remove an exclusion rule and recompute |
@@ -250,71 +249,6 @@ example().catch(console.error);
 |------------- | ------------- | ------------- | -------------|
 | **assetId** | `string` | Scope to one asset\&#39;s identity cluster | [Optional] [Defaults to `undefined`] |
 | **sourceId** | `string` | Scope to clusters touching this source (external flagged) | [Optional] [Defaults to `undefined`] |
-
-### Return type
-
-[**CorrelationGraphResponseDto**](CorrelationGraphResponseDto.md)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: `application/json`
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** |  |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
-## correlationControllerLinksGraph
-
-> CorrelationGraphResponseDto correlationControllerLinksGraph(sourceId)
-
-A source\&#39;s assets connected by their links (hash references)
-
-### Example
-
-```ts
-import {
-  Configuration,
-  CorrelationApi,
-} from '@workspace/api-client';
-import type { CorrelationControllerLinksGraphRequest } from '@workspace/api-client';
-
-async function example() {
-  console.log("🚀 Testing @workspace/api-client SDK...");
-  const api = new CorrelationApi();
-
-  const body = {
-    // string
-    sourceId: sourceId_example,
-  } satisfies CorrelationControllerLinksGraphRequest;
-
-  try {
-    const data = await api.correlationControllerLinksGraph(body);
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-
-| Name | Type | Description  | Notes |
-|------------- | ------------- | ------------- | -------------|
-| **sourceId** | `string` |  | [Defaults to `undefined`] |
 
 ### Return type
 

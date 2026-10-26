@@ -471,7 +471,7 @@ function SystemEdgeDetails({ systemEdgeId, onFlyTo }: { systemEdgeId: string; on
 
       <div className="flex flex-wrap gap-2 border-t-2 border-border pt-3">
         {assets && (
-          <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => openInTab(`/assets/${assets.a}?tab=lineage`)}>
+          <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => openInTab(`/assets/${assets.a}?tab=connections`)}>
             <ExternalLink className="size-3" /> {t("caseBoard.edgeDetails.openLineage")}
           </Button>
         )}

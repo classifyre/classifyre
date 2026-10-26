@@ -174,7 +174,6 @@ All URIs are relative to *http://localhost*
 *CorrelationApi* | [**correlationControllerCaseAction**](docs/CorrelationApi.md#correlationcontrollercaseaction) | **POST** /correlation/case-action | Create a case (or add to one) from assets selected in the fingerprints graph
 *CorrelationApi* | [**correlationControllerGetConfig**](docs/CorrelationApi.md#correlationcontrollergetconfig) | **GET** /correlation/config | Correlation tuning: per-label weights (dynamic) + match thresholds
 *CorrelationApi* | [**correlationControllerGraph**](docs/CorrelationApi.md#correlationcontrollergraph) | **GET** /correlation/graph | Correlation (\&quot;evidence fingerprints\&quot;) graph for ONE asset or ONE source
-*CorrelationApi* | [**correlationControllerLinksGraph**](docs/CorrelationApi.md#correlationcontrollerlinksgraph) | **GET** /correlation/links-graph | A source\&#39;s assets connected by their links (hash references)
 *CorrelationApi* | [**correlationControllerOccurrences**](docs/CorrelationApi.md#correlationcontrolleroccurrences) | **GET** /findings/occurrences | Where else a normalized finding value appears (reverse index)
 *CorrelationApi* | [**correlationControllerRecompute**](docs/CorrelationApi.md#correlationcontrollerrecompute) | **POST** /assets/{id}/recompute-correlation | Recompute correlation for a single asset (on demand)
 *CorrelationApi* | [**correlationControllerRemoveExclusion**](docs/CorrelationApi.md#correlationcontrollerremoveexclusion) | **DELETE** /correlation/exclusions/{id} | Remove an exclusion rule and recompute
@@ -259,6 +258,13 @@ All URIs are relative to *http://localhost*
 *EntitiesApi* | [**entitiesControllerSaveConfig**](docs/EntitiesApi.md#entitiescontrollersaveconfig) | **PUT** /entities/config | Declare custom labels as names or identifiers; alias values are regenerated
 *EntitiesApi* | [**entitiesControllerSearch**](docs/EntitiesApi.md#entitiescontrollersearch) | **GET** /entities | Search entities by name, alias or identifier value, with mention counters
 *EntitiesApi* | [**entitiesControllerUpdate**](docs/EntitiesApi.md#entitiescontrollerupdate) | **PATCH** /entities/{idOrKey} | Set an entity\&#39;s anchor URN or attributes
+*ExploreApi* | [**exploreControllerCreateView**](docs/ExploreApi.md#explorecontrollercreateview) | **POST** /explore/views | Save an Explore view
+*ExploreApi* | [**exploreControllerDeleteView**](docs/ExploreApi.md#explorecontrollerdeleteview) | **DELETE** /explore/views/{id} | Delete a saved Explore view
+*ExploreApi* | [**exploreControllerGetView**](docs/ExploreApi.md#explorecontrollergetview) | **GET** /explore/views/{id} | One saved Explore view
+*ExploreApi* | [**exploreControllerListViews**](docs/ExploreApi.md#explorecontrollerlistviews) | **GET** /explore/views | Saved Explore views, the last changed first
+*ExploreApi* | [**exploreControllerNeighbourhood**](docs/ExploreApi.md#explorecontrollerneighbourhood) | **POST** /explore/neighbourhood | What these assets are connected to, and why
+*ExploreApi* | [**exploreControllerStarters**](docs/ExploreApi.md#explorecontrollerstarters) | **GET** /explore/starters | Where to start exploring
+*ExploreApi* | [**exploreControllerUpdateView**](docs/ExploreApi.md#explorecontrollerupdateview) | **PATCH** /explore/views/{id} | Change a saved Explore view; what is left out stays
 *FindingsApi* | [**findingsControllerAssetSeverityCounts**](docs/FindingsApi.md#findingscontrollerassetseveritycounts) | **POST** /findings/assets/severity-counts | Unresolved finding counts per asset, for a set of assets
 *FindingsApi* | [**findingsControllerBulkUpdate**](docs/FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings
 *FindingsApi* | [**findingsControllerCancelBulkOperation**](docs/FindingsApi.md#findingscontrollercancelbulkoperation) | **POST** /findings/bulk-operations/{operationId}/cancel | Cancel a background bulk finding operation
@@ -306,7 +312,6 @@ All URIs are relative to *http://localhost*
 *GlossaryApi* | [**glossarySemanticControllerLinkGroups**](docs/GlossaryApi.md#glossarysemanticcontrollerlinkgroups) | **GET** /glossary/proposals/link-groups | Document suggestions grouped per concept, with a score histogram
 *GlossaryApi* | [**glossarySemanticControllerList**](docs/GlossaryApi.md#glossarysemanticcontrollerlist) | **GET** /glossary/proposals | The review queue: every proposal, one paged list
 *GraphApi* | [**graphControllerColumnLineage**](docs/GraphApi.md#graphcontrollercolumnlineage) | **POST** /graph/lineage/column | Trace one column back through the transformations that produced it
-*GraphApi* | [**graphControllerConstellationMap**](docs/GraphApi.md#graphcontrollerconstellationmap) | **GET** /graph/constellation | How this workspace\&#39;s sources connect
 *GraphApi* | [**graphControllerCreateManualEdge**](docs/GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type)
 *GraphApi* | [**graphControllerDeleteEdge**](docs/GraphApi.md#graphcontrollerdeleteedge) | **DELETE** /graph/edges/{id} | Delete an edge
 *GraphApi* | [**graphControllerExpand**](docs/GraphApi.md#graphcontrollerexpand) | **POST** /graph/expand | Expand the graph around a seed entity (recursive traversal)
@@ -628,16 +633,6 @@ All URIs are relative to *http://localhost*
 - [ColumnLineageResponseDto](docs/ColumnLineageResponseDto.md)
 - [ColumnLineageStepDto](docs/ColumnLineageStepDto.md)
 - [ConnectionTestStatusDto](docs/ConnectionTestStatusDto.md)
-- [ConstellationBoundaryAssetDto](docs/ConstellationBoundaryAssetDto.md)
-- [ConstellationBoundaryEdgeDto](docs/ConstellationBoundaryEdgeDto.md)
-- [ConstellationBundleDto](docs/ConstellationBundleDto.md)
-- [ConstellationClassCountsDto](docs/ConstellationClassCountsDto.md)
-- [ConstellationLinkDto](docs/ConstellationLinkDto.md)
-- [ConstellationResponseDto](docs/ConstellationResponseDto.md)
-- [ConstellationSeverityMixDto](docs/ConstellationSeverityMixDto.md)
-- [ConstellationSourceDto](docs/ConstellationSourceDto.md)
-- [ConstellationStatsDto](docs/ConstellationStatsDto.md)
-- [ConstellationTotalsDto](docs/ConstellationTotalsDto.md)
 - [CorrelationConfigResponseDto](docs/CorrelationConfigResponseDto.md)
 - [CorrelationGraphResponseDto](docs/CorrelationGraphResponseDto.md)
 - [CorrelationLabelWeightDto](docs/CorrelationLabelWeightDto.md)
@@ -677,6 +672,7 @@ All URIs are relative to *http://localhost*
 - [DeprecateGlossaryTermDto](docs/DeprecateGlossaryTermDto.md)
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
+- [EdgeClass](docs/EdgeClass.md)
 - [EdgeDetailDto](docs/EdgeDetailDto.md)
 - [EmbeddingAiProviderOptionDto](docs/EmbeddingAiProviderOptionDto.md)
 - [EmbeddingCollectionMediaDto](docs/EmbeddingCollectionMediaDto.md)
@@ -696,6 +692,21 @@ All URIs are relative to *http://localhost*
 - [EvidenceStance](docs/EvidenceStance.md)
 - [ExclusionRuleDto](docs/ExclusionRuleDto.md)
 - [ExpandGraphDto](docs/ExpandGraphDto.md)
+- [ExploreAssetRefDto](docs/ExploreAssetRefDto.md)
+- [ExploreDuplicatesFilterDto](docs/ExploreDuplicatesFilterDto.md)
+- [ExploreEdgeDto](docs/ExploreEdgeDto.md)
+- [ExploreKind](docs/ExploreKind.md)
+- [ExploreLineageStarterDto](docs/ExploreLineageStarterDto.md)
+- [ExploreLinkStarterDto](docs/ExploreLinkStarterDto.md)
+- [ExploreMarkDto](docs/ExploreMarkDto.md)
+- [ExploreNeighbourhoodRequestDto](docs/ExploreNeighbourhoodRequestDto.md)
+- [ExploreNeighbourhoodResponseDto](docs/ExploreNeighbourhoodResponseDto.md)
+- [ExploreNodeDto](docs/ExploreNodeDto.md)
+- [ExplorePatternStarterDto](docs/ExplorePatternStarterDto.md)
+- [ExplorePositionDto](docs/ExplorePositionDto.md)
+- [ExploreStartersResponseDto](docs/ExploreStartersResponseDto.md)
+- [ExploreTermDto](docs/ExploreTermDto.md)
+- [ExploreViewDto](docs/ExploreViewDto.md)
 - [FieldMappingDto](docs/FieldMappingDto.md)
 - [FinalizeIngestRunDto](docs/FinalizeIngestRunDto.md)
 - [FindingBulkOperationDto](docs/FindingBulkOperationDto.md)
@@ -860,6 +871,7 @@ All URIs are relative to *http://localhost*
 - [RunnersChartsTimelineBucketDto](docs/RunnersChartsTimelineBucketDto.md)
 - [RunnersChartsTopSourceDto](docs/RunnersChartsTopSourceDto.md)
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)
+- [SaveExploreViewDto](docs/SaveExploreViewDto.md)
 - [SaveTrainingExamplesDto](docs/SaveTrainingExamplesDto.md)
 - [ScanCacheEntryDto](docs/ScanCacheEntryDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)

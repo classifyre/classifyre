@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -66,6 +67,12 @@ import {
   type TermUsage,
 } from "@/lib/semantic-api";
 import { useStaticRouteParam } from "@/lib/use-route-id";
+
+// The canvas measures the DOM: client-only, loaded when the overview opens.
+const ExploreWorkspace = dynamic(
+  () => import("@/components/explore/explore-workspace").then((m) => m.ExploreWorkspace),
+  { ssr: false },
+);
 
 function Labels({ term }: { term: TermDetail }) {
   const { t } = useTranslation();
@@ -405,6 +412,12 @@ export default function GlossaryTermDetail() {
             )}
           </section>
           <Labels term={term} />
+          {/* Where it is connected: the assets that carry it, what ties them
+              together, and a way to dive into any of them. */}
+          <section className="space-y-2">
+            <div className={MICRO_LABEL}>{t("glossary.term.connections")}</div>
+            <ExploreWorkspace mode="term" termId={term.id} rootLabel={term.term} />
+          </section>
           {term.narrower.length > 0 && (
             <section className="space-y-2">
               <div className={MICRO_LABEL}>{t("glossary.term.narrower")}</div>

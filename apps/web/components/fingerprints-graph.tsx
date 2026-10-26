@@ -7,7 +7,6 @@ import {
   ExternalLink,
   Fingerprint,
   FolderPlus,
-  Globe,
   Maximize2,
   RotateCw,
   Search,
@@ -119,15 +118,12 @@ const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
  */
 export function FingerprintsGraph({
   assetId,
-  sourceId,
   onTune,
   focus,
   onExitFocus,
   occurrencesCache,
 }: {
-  assetId?: string;
-  /** Scope to a source's clusters; external assets get a show/hide toggle. */
-  sourceId?: string;
+  assetId: string;
   /** When set, the toolbar "Tune" button calls this instead of opening a dialog. */
   onTune?: () => void;
   /** Externally-driven focus: the subset keeps full colour, the rest dims. */
@@ -163,7 +159,6 @@ export function FingerprintsGraph({
   const [sourceFilter, setSourceFilter] = React.useState<string[]>([]);
   const [labelFilter, setLabelFilter] = React.useState<string[]>([]);
   const [minSimilarity, setMinSimilarity] = React.useState(0);
-  const [showExternal, setShowExternal] = React.useState(false);
   const [selection, setSelection] = React.useState<GraphSelection>(null);
   // Focused component ("path") around the last-clicked node; dims everything else.
   const [path, setPath] = React.useState<PathResult | null>(null);
@@ -191,12 +186,11 @@ export function FingerprintsGraph({
     let active = true;
     setFetchLoading(true);
     setFetchError(null);
-    // Always scoped. The unscoped graph was the whole-corpus download that
-    // made the old fingerprints page unusable; it no longer exists, and this
-    // component is only ever mounted against one asset or one source.
-    const req = assetId ? { assetId } : { sourceId: sourceId ?? "" };
+    // Always one asset's cluster. The unscoped graph was the whole-corpus
+    // download that made the old fingerprints page unusable; a source's
+    // connections are on its Connections tab.
     api.correlation
-      .correlationControllerGraph(req)
+      .correlationControllerGraph({ assetId })
       .then((g) => {
         if (!active) return;
         setFetchedNodes(g.nodes ?? []);
@@ -216,12 +210,12 @@ export function FingerprintsGraph({
     return () => {
       active = false;
     };
-  }, [assetId, sourceId, t]);
+  }, [assetId, t]);
 
   React.useEffect(() => {
     return load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetId, sourceId]);
+  }, [assetId]);
 
   /**
    * After a config/exclusion change the recompute runs as a background
@@ -326,7 +320,6 @@ export function FingerprintsGraph({
     visibleAssetIds,
     unconnectedCount,
     valueCount,
-    externalAssetCount,
   } = React.useMemo(() => {
     const valueById = new Map(
       nodes.filter((n) => n.type === "finding").map((n) => [n.id, n]),
@@ -335,20 +328,15 @@ export function FingerprintsGraph({
       nodes.filter((n) => n.type === "asset").map((n) => [n.id, n]),
     );
 
-    // 1) hard filters: source (assets), label (values), and (source-scoped)
-    //    external assets unless "show external" is on.
+    // 1) hard filters: source (assets) and label (values).
     const srcSet = new Set(sourceFilter);
     const labelSet = new Set(labelFilter);
-    const externalAssetCount = nodes.filter(
-      (n) => n.type === "asset" && n.status === "external",
-    ).length;
     const passAssets = new Set(
       nodes
         .filter(
           (n) =>
             n.type === "asset" &&
-            (srcSet.size === 0 || (n.sourceType && srcSet.has(n.sourceType))) &&
-            (showExternal || n.status !== "external"),
+            (srcSet.size === 0 || (n.sourceType && srcSet.has(n.sourceType))),
         )
         .map((n) => n.id),
     );
@@ -522,7 +510,6 @@ export function FingerprintsGraph({
       visibleAssetIds: [...connected],
       unconnectedCount: unconnected,
       valueCount: values,
-      externalAssetCount,
     };
   }, [
     nodes,
@@ -532,7 +519,6 @@ export function FingerprintsGraph({
     labelFilter,
     minSimilarity,
     simByPair,
-    showExternal,
     t,
   ]);
 
@@ -710,7 +696,7 @@ export function FingerprintsGraph({
   // (its node keys may no longer exist → would dim everything).
   React.useEffect(() => {
     clearFocus();
-  }, [nodes, search, sourceFilter, labelFilter, minSimilarity, showExternal, focusSignature, clearFocus]);
+  }, [nodes, search, sourceFilter, labelFilter, minSimilarity, focusSignature, clearFocus]);
 
   // ── Click = focus this node's component (path); greyed nodes are inert ───────
   const onNodeClick = React.useCallback(
@@ -970,20 +956,6 @@ export function FingerprintsGraph({
               className="w-28"
             />
           </div>
-        )}
-
-        {sourceId && externalAssetCount > 0 && (
-          <Button
-            variant={showExternal ? "default" : "outline"}
-            size="sm"
-            className="h-8"
-            onClick={() => setShowExternal((v) => !v)}
-          >
-            <Globe className="mr-1.5 h-3.5 w-3.5" />
-            {t("correlation.fingerprints.external", {
-              count: String(externalAssetCount),
-            })}
-          </Button>
         )}
 
         {truncated && (

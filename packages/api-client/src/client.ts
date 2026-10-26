@@ -348,16 +348,24 @@ export type {
   // test that replaces a request held open for minutes (P2).
   RunnerQueuePositionDto,
   ConnectionTestStatusDto,
-  ConstellationResponseDto,
-  ConstellationSourceDto,
-  ConstellationLinkDto,
-  ConstellationClassCountsDto,
-  ConstellationBoundaryAssetDto,
-  ConstellationBoundaryEdgeDto,
-  ConstellationBundleDto,
-  ConstellationSeverityMixDto,
-  ConstellationTotalsDto,
-  ConstellationStatsDto,
+  // Explore: what assets are connected to, and why.
+  ExploreKind,
+  ExploreNeighbourhoodRequestDto,
+  ExploreDuplicatesFilterDto,
+  ExploreNeighbourhoodResponseDto,
+  ExploreNodeDto,
+  ExploreEdgeDto,
+  ExploreTermDto,
+  ExploreStartersResponseDto,
+  ExplorePatternStarterDto,
+  ExploreLineageStarterDto,
+  ExploreMarkDto,
+  ExploreViewDto,
+  SaveExploreViewDto,
+  ExplorePositionDto,
+  ExploreLinkStarterDto,
+  ExploreAssetRefDto,
+  EdgeClass,
   RebuildEdgesResponseDto,
   CreateManualEdgeDto,
   UpdateEdgeDto,
@@ -1308,6 +1316,7 @@ import { CasesApi } from "./generated/src/apis/CasesApi";
 import { CaseBoardApi } from "./generated/src/apis/CaseBoardApi";
 import { InquiriesApi } from "./generated/src/apis/InquiriesApi";
 import { GraphApi } from "./generated/src/apis/GraphApi";
+import { ExploreApi } from "./generated/src/apis/ExploreApi";
 import { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 import { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 import { CorrelationApi } from "./generated/src/apis/CorrelationApi";
@@ -1946,6 +1955,7 @@ class ApiClient {
   public caseBoard: CaseBoardApi;
   public inquiries: InquiriesApi;
   public graph: GraphApi;
+  public explore: ExploreApi;
   public threads: ThreadsApi;
   public autopilot: AutopilotApi;
   public correlation: CorrelationApi;
@@ -1976,6 +1986,7 @@ class ApiClient {
     this.caseBoard = new CaseBoardApi(this.config);
     this.inquiries = new InquiriesApi(this.config);
     this.graph = new GraphApi(this.config);
+    this.explore = new ExploreApi(this.config);
     this.threads = new ThreadsApi(this.config);
     this.autopilot = new AutopilotApi(this.config);
     this.correlation = new CorrelationApi(this.config);

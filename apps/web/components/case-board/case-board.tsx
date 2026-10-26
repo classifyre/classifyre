@@ -25,6 +25,7 @@ import { useEntityDocumentTitle } from "@/components/document-title-updater";
 import { useServerConfig } from "@/components/server-config-provider";
 import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
 import { FindingFilterDialog } from "@/components/case-cleanup/finding-filter-dialog";
+import { useFullBleedHeight } from "@/hooks/use-full-bleed-height";
 import { useTranslation } from "@/hooks/use-translation";
 import { BoardProviders, useBoard, useBoardStore, useUi, useUiStore } from "./store/board-context";
 import { createBoardStore } from "./store/board-store";
@@ -73,26 +74,6 @@ export function CaseBoard({ caseId }: { caseId: string }) {
       </ReactFlowProvider>
     </BoardProviders>
   );
-}
-
-/** Fill the viewport below wherever the board starts (app header, banners). */
-function useFullBleedHeight(ref: React.RefObject<HTMLDivElement | null>) {
-  React.useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const apply = () => {
-      const top = el.getBoundingClientRect().top + window.scrollY;
-      el.style.height = `calc(100dvh - ${Math.max(0, Math.round(top))}px)`;
-    };
-    apply();
-    window.addEventListener("resize", apply);
-    const observer = new ResizeObserver(apply);
-    if (el.parentElement) observer.observe(el.parentElement);
-    return () => {
-      window.removeEventListener("resize", apply);
-      observer.disconnect();
-    };
-  }, [ref]);
 }
 
 function BoardShell({ caseId }: { caseId: string }) {

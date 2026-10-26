@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, Check, Eye, Loader2, Undo2 } from "lucide-react";
+import { ArrowLeft, Ban, Check, Compass, Eye, Loader2, Undo2 } from "lucide-react";
 import {
   api,
   type PatternPreviewResponseDto,
@@ -334,6 +335,17 @@ export function PatternLevel({
               </TooltipTrigger>
               <TooltipContent>{t("review.bulk.undoLog")}</TooltipContent>
             </Tooltip>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-2 border-white/30 bg-transparent text-white hover:bg-white/10"
+              asChild
+            >
+              <Link href={nsPath(`/duplicates/explore?pattern=${encodeURIComponent(pattern.patternKey)}`)}>
+                <Compass className="h-3.5 w-3.5" />
+                {t("review.explore.openPattern")}
+              </Link>
+            </Button>
           </div>
         </div>
 

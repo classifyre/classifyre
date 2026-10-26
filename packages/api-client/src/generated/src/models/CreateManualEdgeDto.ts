@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { EdgeClass } from './EdgeClass';
+import {
+    EdgeClassFromJSON,
+    EdgeClassFromJSONTyped,
+    EdgeClassToJSON,
+    EdgeClassToJSONTyped,
+} from './EdgeClass';
+
 /**
  * 
  * @export
@@ -55,7 +63,21 @@ export interface CreateManualEdgeDto {
      * @memberof CreateManualEdgeDto
      */
     confidence?: number;
+    /**
+     * What the link means: FLOW is lineage ("derived from"), IDENTITY is "the same thing", REFERENCE (default) propagates nothing. Decides which kind of connection it shows under.
+     * @type {EdgeClass}
+     * @memberof CreateManualEdgeDto
+     */
+    relationClass?: EdgeClass;
+    /**
+     * Why the link was drawn, shown with it
+     * @type {string}
+     * @memberof CreateManualEdgeDto
+     */
+    note?: string;
 }
+
+
 
 /**
  * Check if a given object implements the CreateManualEdgeDto interface.
@@ -85,6 +107,8 @@ export function CreateManualEdgeDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'toId': json['toId'],
         'relationType': json['relationType'],
         'confidence': json['confidence'] == null ? undefined : json['confidence'],
+        'relationClass': json['relationClass'] == null ? undefined : EdgeClassFromJSON(json['relationClass']),
+        'note': json['note'] == null ? undefined : json['note'],
     };
 }
 
@@ -105,6 +129,8 @@ export function CreateManualEdgeDtoToJSONTyped(value?: CreateManualEdgeDto | nul
         'toId': value['toId'],
         'relationType': value['relationType'],
         'confidence': value['confidence'],
+        'relationClass': EdgeClassToJSON(value['relationClass']),
+        'note': value['note'],
     };
 }
 

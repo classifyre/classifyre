@@ -56,10 +56,6 @@ export interface CorrelationControllerGraphRequest {
     sourceId?: string;
 }
 
-export interface CorrelationControllerLinksGraphRequest {
-    sourceId: string;
-}
-
 export interface CorrelationControllerOccurrencesRequest {
     label?: string;
     value?: string;
@@ -226,46 +222,6 @@ export class CorrelationApi extends runtime.BaseAPI {
      */
     async correlationControllerGraph(requestParameters: CorrelationControllerGraphRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CorrelationGraphResponseDto> {
         const response = await this.correlationControllerGraphRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * A source\'s assets connected by their links (hash references)
-     */
-    async correlationControllerLinksGraphRaw(requestParameters: CorrelationControllerLinksGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CorrelationGraphResponseDto>> {
-        if (requestParameters['sourceId'] == null) {
-            throw new runtime.RequiredError(
-                'sourceId',
-                'Required parameter "sourceId" was null or undefined when calling correlationControllerLinksGraph().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        if (requestParameters['sourceId'] != null) {
-            queryParameters['sourceId'] = requestParameters['sourceId'];
-        }
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/correlation/links-graph`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => CorrelationGraphResponseDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * A source\'s assets connected by their links (hash references)
-     */
-    async correlationControllerLinksGraph(requestParameters: CorrelationControllerLinksGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CorrelationGraphResponseDto> {
-        const response = await this.correlationControllerLinksGraphRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

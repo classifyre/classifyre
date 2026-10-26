@@ -7561,29 +7561,6 @@
         ]
       }
     },
-    "/graph/constellation": {
-      "get": {
-        "description": "One bubble per source, one line per source pairing split by edge class, and the assets whose edges actually leave their own source. Assets connected to nothing are never returned — they are a count on their source, which is what keeps this response the same size on a workspace with two thousand assets and one with two million. There is no limit parameter and nothing is truncated: a pairing carrying an unusual number of boundary assets folds into a bundle that expands on demand. Served from a pre-aggregated map; when that has never been built the sources come back empty-handed and a rebuild is queued.",
-        "operationId": "GraphController_constellationMap",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConstellationResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "How this workspace's sources connect",
-        "tags": [
-          "graph"
-        ]
-      }
-    },
     "/graph/lineage": {
       "post": {
         "description": "Walks every edge class, so a connector-declared SAME_AS or REFERENCE is visible here rather than silently dropped. Containment and identity are also controls: collapseContainers rolls tables up into their schemas, and mergeIdentity folds an asset and its twin in another system into one node so a path across them costs one hop instead of two. Note this is deliberately broader than the derivation test the duplicate-review queue uses — see DERIVATION_CLASSES in graph/edge-class.ts, which excludes the correlation engine's own edges so that similarity cannot be used as evidence about similarity.",
@@ -7882,6 +7859,211 @@
         "summary": "Delete an edge",
         "tags": [
           "graph"
+        ]
+      }
+    },
+    "/explore/neighbourhood": {
+      "post": {
+        "description": "Starts from up to ten assets and returns their neighbourhood by kind of connection: lineage and links (traced as far as asked, upstream, downstream or both), duplicates, shared values, shared glossary terms (drawn as the term itself), and likeness by meaning. Every link carries its reason; every asset says which cases hold it and which watches it answers. Each kind is read with its own bound, and assets deleted at their source are left out.",
+        "operationId": "ExploreController_neighbourhood",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploreNeighbourhoodRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreNeighbourhoodResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What these assets are connected to, and why",
+        "tags": [
+          "explore"
+        ]
+      }
+    },
+    "/explore/starters": {
+      "get": {
+        "description": "The assets with the most lineage, the duplicate patterns with the most pairs (each with its strongest pair), and the links people drew last.",
+        "operationId": "ExploreController_starters",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreStartersResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Where to start exploring",
+        "tags": [
+          "explore"
+        ]
+      }
+    },
+    "/explore/views": {
+      "get": {
+        "description": "Each with its starting points that still exist, by name: an asset deleted at its source is left out, and comes back if the asset does.",
+        "operationId": "ExploreController_listViews",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExploreViewDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Saved Explore views, the last changed first",
+        "tags": [
+          "explore"
+        ]
+      },
+      "post": {
+        "description": "A name, the assets it starts from, how it is traced, and where people put things.",
+        "operationId": "ExploreController_createView",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveExploreViewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreViewDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Save an Explore view",
+        "tags": [
+          "explore"
+        ]
+      }
+    },
+    "/explore/views/{id}": {
+      "get": {
+        "operationId": "ExploreController_getView",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreViewDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One saved Explore view",
+        "tags": [
+          "explore"
+        ]
+      },
+      "patch": {
+        "operationId": "ExploreController_updateView",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveExploreViewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreViewDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change a saved Explore view; what is left out stays",
+        "tags": [
+          "explore"
+        ]
+      },
+      "delete": {
+        "operationId": "ExploreController_deleteView",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a saved Explore view",
+        "tags": [
+          "explore"
         ]
       }
     },
@@ -11728,37 +11910,6 @@
           }
         },
         "summary": "Correlation (\"evidence fingerprints\") graph for ONE asset or ONE source",
-        "tags": [
-          "correlation"
-        ]
-      }
-    },
-    "/correlation/links-graph": {
-      "get": {
-        "operationId": "CorrelationController_linksGraph",
-        "parameters": [
-          {
-            "name": "sourceId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CorrelationGraphResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "A source's assets connected by their links (hash references)",
         "tags": [
           "correlation"
         ]
@@ -26713,376 +26864,6 @@
           "targetId"
         ]
       },
-      "ConstellationSeverityMixDto": {
-        "type": "object",
-        "properties": {
-          "critical": {
-            "type": "number"
-          },
-          "high": {
-            "type": "number"
-          },
-          "medium": {
-            "type": "number"
-          },
-          "low": {
-            "type": "number"
-          },
-          "info": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "critical",
-          "high",
-          "medium",
-          "low",
-          "info"
-        ]
-      },
-      "ConstellationSourceDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "JIRA",
-              "CONFLUENCE",
-              "CROWD",
-              "BITBUCKET",
-              "SERVICEDESK",
-              "XRAY",
-              "GOOGLE_DRIVE",
-              "GOOGLE_SHEETS",
-              "GOOGLE_DOCS",
-              "GOOGLE_SLIDES",
-              "WORDPRESS",
-              "SLACK",
-              "S3_COMPATIBLE_STORAGE",
-              "AZURE_BLOB_STORAGE",
-              "GOOGLE_CLOUD_STORAGE",
-              "POSTGRESQL",
-              "MYSQL",
-              "MSSQL",
-              "ORACLE",
-              "HIVE",
-              "DATABRICKS",
-              "SNOWFLAKE",
-              "DREMIO",
-              "MONGODB",
-              "NEO4J",
-              "SQLITE",
-              "NOTION",
-              "POWERBI",
-              "TABLEAU",
-              "EMAIL",
-              "YOUTUBE",
-              "REDDIT",
-              "DELTA_LAKE",
-              "ICEBERG",
-              "KAFKA",
-              "ELASTICSEARCH",
-              "OPENSEARCH",
-              "MEILISEARCH",
-              "LOCAL_FOLDER",
-              "MICROSOFT_365",
-              "GOOGLE_WORKSPACE",
-              "DROPBOX",
-              "HUGGING_FACE",
-              "GIT",
-              "SANDBOX",
-              "CUSTOM"
-            ]
-          },
-          "assetCount": {
-            "type": "number",
-            "description": "Every asset of this source."
-          },
-          "connectedAssetCount": {
-            "type": "number",
-            "description": "Assets touched by at least one edge. The bubble is sized by this."
-          },
-          "isolatedAssetCount": {
-            "type": "number",
-            "description": "Assets with no edge of any class. Never drawn — shown as a count under the bubble, which is what keeps this response independent of corpus size."
-          },
-          "internalEdgeCount": {
-            "type": "number",
-            "description": "Edges with both endpoints inside this source."
-          },
-          "findingCount": {
-            "type": "number"
-          },
-          "severityCounts": {
-            "$ref": "#/components/schemas/ConstellationSeverityMixDto"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "type",
-          "assetCount",
-          "connectedAssetCount",
-          "isolatedAssetCount",
-          "internalEdgeCount",
-          "findingCount",
-          "severityCounts"
-        ]
-      },
-      "ConstellationClassCountsDto": {
-        "type": "object",
-        "properties": {
-          "flow": {
-            "type": "number",
-            "description": "Lineage. The class that says data moved."
-          },
-          "containment": {
-            "type": "number",
-            "description": "Structural containment — archive members, attachments."
-          },
-          "identity": {
-            "type": "number",
-            "description": "The same thing seen twice."
-          },
-          "reference": {
-            "type": "number",
-            "description": "Meaning and navigation. Propagates nothing."
-          },
-          "usage": {
-            "type": "number",
-            "description": "Who touched it."
-          }
-        },
-        "required": [
-          "flow",
-          "containment",
-          "identity",
-          "reference",
-          "usage"
-        ]
-      },
-      "ConstellationLinkDto": {
-        "type": "object",
-        "properties": {
-          "sourceAId": {
-            "type": "string"
-          },
-          "sourceBId": {
-            "type": "string"
-          },
-          "total": {
-            "type": "number",
-            "description": "Edges across this pairing, all classes."
-          },
-          "byClass": {
-            "$ref": "#/components/schemas/ConstellationClassCountsDto"
-          },
-          "assetCount": {
-            "type": "number",
-            "description": "Distinct assets participating, on either side."
-          },
-          "duplicatePairCount": {
-            "type": "number",
-            "description": "Duplicate pairs the review index found across this pairing. Zero when the duplicate index has never been built — absence of evidence, not evidence of absence."
-          }
-        },
-        "required": [
-          "sourceAId",
-          "sourceBId",
-          "total",
-          "byClass",
-          "assetCount",
-          "duplicatePairCount"
-        ]
-      },
-      "ConstellationBoundaryEdgeDto": {
-        "type": "object",
-        "properties": {
-          "peerSourceId": {
-            "type": "string",
-            "nullable": true,
-            "description": "The source on the far side, or null when the far end is external."
-          },
-          "relationClass": {
-            "type": "string",
-            "enum": [
-              "FLOW",
-              "CONTAINMENT",
-              "IDENTITY",
-              "REFERENCE",
-              "USAGE"
-            ]
-          },
-          "edgeCount": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "relationClass",
-          "edgeCount"
-        ]
-      },
-      "ConstellationBoundaryAssetDto": {
-        "type": "object",
-        "properties": {
-          "assetId": {
-            "type": "string"
-          },
-          "assetName": {
-            "type": "string"
-          },
-          "assetType": {
-            "type": "string"
-          },
-          "sourceId": {
-            "type": "string"
-          },
-          "edges": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConstellationBoundaryEdgeDto"
-            }
-          }
-        },
-        "required": [
-          "assetId",
-          "assetName",
-          "assetType",
-          "sourceId",
-          "edges"
-        ]
-      },
-      "ConstellationBundleDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Stable id, derived from the source pairing."
-          },
-          "sourceAId": {
-            "type": "string"
-          },
-          "sourceBId": {
-            "type": "string",
-            "nullable": true
-          },
-          "assetCount": {
-            "type": "number",
-            "description": "Boundary assets folded into this bundle."
-          },
-          "edgeCount": {
-            "type": "number",
-            "description": "Edges those assets carry across the pairing."
-          }
-        },
-        "required": [
-          "id",
-          "sourceAId",
-          "assetCount",
-          "edgeCount"
-        ]
-      },
-      "ConstellationTotalsDto": {
-        "type": "object",
-        "properties": {
-          "sources": {
-            "type": "number"
-          },
-          "assets": {
-            "type": "number"
-          },
-          "connectedAssets": {
-            "type": "number"
-          },
-          "isolatedAssets": {
-            "type": "number"
-          },
-          "crossSourceLinks": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "sources",
-          "assets",
-          "connectedAssets",
-          "isolatedAssets",
-          "crossSourceLinks"
-        ]
-      },
-      "ConstellationStatsDto": {
-        "type": "object",
-        "properties": {
-          "refreshedAt": {
-            "format": "date-time",
-            "type": "string",
-            "nullable": true
-          },
-          "isBuilt": {
-            "type": "boolean"
-          },
-          "source": {
-            "type": "string",
-            "enum": [
-              "rollup",
-              "live"
-            ],
-            "description": "rollup: served from the pre-aggregated map. live: the map has not been built for this workspace yet, so only the source list is populated and a rebuild has been queued."
-          }
-        },
-        "required": [
-          "isBuilt",
-          "source"
-        ]
-      },
-      "ConstellationResponseDto": {
-        "type": "object",
-        "properties": {
-          "sources": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConstellationSourceDto"
-            }
-          },
-          "links": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConstellationLinkDto"
-            }
-          },
-          "boundaryAssets": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConstellationBoundaryAssetDto"
-            }
-          },
-          "bundles": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConstellationBundleDto"
-            }
-          },
-          "totals": {
-            "$ref": "#/components/schemas/ConstellationTotalsDto"
-          },
-          "stats": {
-            "$ref": "#/components/schemas/ConstellationStatsDto"
-          }
-        },
-        "required": [
-          "sources",
-          "links",
-          "boundaryAssets",
-          "bundles",
-          "totals",
-          "stats"
-        ]
-      },
       "LineageGraphDto": {
         "type": "object",
         "properties": {
@@ -27518,6 +27299,17 @@
           "suggestions"
         ]
       },
+      "EdgeClass": {
+        "type": "string",
+        "enum": [
+          "FLOW",
+          "CONTAINMENT",
+          "IDENTITY",
+          "REFERENCE",
+          "USAGE"
+        ],
+        "description": "What the link means: FLOW is lineage (\"derived from\"), IDENTITY is \"the same thing\", REFERENCE (default) propagates nothing. Decides which kind of connection it shows under."
+      },
       "CreateManualEdgeDto": {
         "type": "object",
         "properties": {
@@ -27546,6 +27338,19 @@
             "minimum": 0,
             "maximum": 1,
             "default": 1
+          },
+          "relationClass": {
+            "description": "What the link means: FLOW is lineage (\"derived from\"), IDENTITY is \"the same thing\", REFERENCE (default) propagates nothing. Decides which kind of connection it shows under.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EdgeClass"
+              }
+            ]
+          },
+          "note": {
+            "type": "string",
+            "description": "Why the link was drawn, shown with it",
+            "maxLength": 500
           }
         },
         "required": [
@@ -27587,6 +27392,14 @@
               "SOURCE_DERIVED",
               "MANUAL"
             ]
+          },
+          "relationClass": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -27611,6 +27424,689 @@
         "required": [
           "relationType"
         ]
+      },
+      "ExplorePositionDto": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y"
+        ]
+      },
+      "ExploreKind": {
+        "type": "string",
+        "enum": [
+          "lineage",
+          "links",
+          "duplicates",
+          "similar",
+          "meaning",
+          "alike"
+        ],
+        "description": "Kinds of connection to follow (default: all)"
+      },
+      "ExploreDuplicatesFilterDto": {
+        "type": "object",
+        "properties": {
+          "patternKey": {
+            "type": "string",
+            "description": "Only the pairs of this pattern"
+          },
+          "family": {
+            "type": "string",
+            "enum": [
+              "SHARED_LABELS",
+              "PHONETIC",
+              "IDENTICAL_CONTENT",
+              "NEAR_DUPLICATE_TEXT"
+            ],
+            "description": "Only this kind of match: shared values, similar spelling, identical content, repeated text"
+          },
+          "minScore": {
+            "type": "number",
+            "description": "Only pairs scored at least this (0–1)",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "review": {
+            "type": "string",
+            "enum": [
+              "any",
+              "open",
+              "confirmed"
+            ],
+            "description": "any (default): every pair not ruled apart; open: not reviewed yet (or unsure); confirmed: ruled the same"
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "Only pairs with an asset in this source"
+          }
+        }
+      },
+      "ExploreNeighbourhoodRequestDto": {
+        "type": "object",
+        "properties": {
+          "assetIds": {
+            "description": "Assets to start from (at most 10)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "kinds": {
+            "type": "array",
+            "description": "Kinds of connection to follow (default: all)",
+            "items": {
+              "$ref": "#/components/schemas/ExploreKind"
+            }
+          },
+          "depth": {
+            "type": "number",
+            "description": "Hops to trace lineage and links (1–6; 6 stands for \"all\"). Duplicates and shared values go at most 2; meaning and alike are always one hop.",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "both"
+            ],
+            "description": "Which way to trace lineage and links: where the data came from, where it went, or both (default)"
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "A source to explore. Without assetIds, Explore starts from the source's most connected assets; with them, it is the source that 'same source' and 'other sources' are measured against."
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "internal",
+              "external"
+            ],
+            "description": "Which connections to keep: all (default), only those to assets of the same source ('internal'), or only those leaving it ('external'). The same source is `sourceId`, or the starting points' own sources."
+          },
+          "termId": {
+            "type": "string",
+            "description": "A glossary term to explore: without assetIds, Explore starts from the assets that carry it most, and the term stands between them"
+          },
+          "duplicates": {
+            "description": "Without assetIds: draw duplicate review's pairs that match, around the assets with the most of them. scope then keeps pairs inside one source (internal) or across two (external).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreDuplicatesFilterDto"
+              }
+            ]
+          }
+        }
+      },
+      "ExploreNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "'asset' or 'external' (a URN nothing scanned)"
+          },
+          "label": {
+            "type": "string"
+          },
+          "assetType": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "foreign": {
+            "type": "boolean",
+            "description": "From a source other than the one explored, or than the starting points' own"
+          },
+          "depth": {
+            "type": "number",
+            "description": "Hops from the nearest seed; 0 for a seed"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "seed",
+              "up",
+              "down",
+              "side"
+            ],
+            "description": "Where it stands from the seeds: upstream, downstream, or sideways"
+          },
+          "kinds": {
+            "type": "array",
+            "description": "Every kind of connection that reached it",
+            "items": {
+              "$ref": "#/components/schemas/ExploreKind"
+            }
+          },
+          "caseIds": {
+            "description": "Cases this asset is evidence in (ids into `cases`)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "inquiryIds": {
+            "description": "Watches (inquiries) its open findings answer (ids into `inquiries`)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "label",
+          "foreign",
+          "depth",
+          "side",
+          "kinds",
+          "caseIds",
+          "inquiryIds"
+        ]
+      },
+      "ExploreTermDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "CONCEPT or ENTITY"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "kind"
+        ]
+      },
+      "ExploreEdgeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fromType": {
+            "type": "string",
+            "description": "'asset', 'external' or 'term'"
+          },
+          "fromId": {
+            "type": "string"
+          },
+          "toType": {
+            "type": "string",
+            "description": "'asset', 'external' or 'term'"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreKind"
+              }
+            ]
+          },
+          "relationType": {
+            "type": "string"
+          },
+          "relationClass": {
+            "type": "string",
+            "nullable": true
+          },
+          "confidence": {
+            "type": "number",
+            "nullable": true,
+            "description": "Score of a scored link: shared values, or likeness by meaning"
+          },
+          "origin": {
+            "type": "string",
+            "description": "INFERRED, SOURCE_DERIVED or MANUAL. Only MANUAL links can be changed or removed."
+          },
+          "sharedByLabel": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "nullable": true,
+            "description": "Shared values per label, for duplicates and shared values"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "description": "What the person who drew a link wrote about it"
+          },
+          "passage": {
+            "type": "string",
+            "nullable": true,
+            "description": "For alike: the passage of the other asset that read closest"
+          }
+        },
+        "required": [
+          "id",
+          "fromType",
+          "fromId",
+          "toType",
+          "toId",
+          "kind",
+          "relationType",
+          "origin"
+        ]
+      },
+      "ExploreMarkDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status"
+        ]
+      },
+      "ExploreNeighbourhoodResponseDto": {
+        "type": "object",
+        "properties": {
+          "seeds": {
+            "description": "The assets it started from",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "home": {
+            "description": "The sources 'same source' is measured against: the explored source, or the starting points' own",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreNodeDto"
+            }
+          },
+          "terms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreTermDto"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreEdgeDto"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Assets (not seeds) reached by each kind of connection"
+          },
+          "alike": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "off"
+            ],
+            "description": "'off' when embeddings are switched off, so nothing can be alike by meaning"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when some kind hit its bound or ran out of time"
+          },
+          "cases": {
+            "description": "Cases holding assets of this view as evidence",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreMarkDto"
+            }
+          },
+          "inquiries": {
+            "description": "Watches (inquiries) answered by assets of this view",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreMarkDto"
+            }
+          }
+        },
+        "required": [
+          "seeds",
+          "home",
+          "nodes",
+          "terms",
+          "edges",
+          "counts",
+          "alike",
+          "truncated",
+          "cases",
+          "inquiries"
+        ]
+      },
+      "ExploreAssetRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "ExploreLineageStarterDto": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/ExploreAssetRefDto"
+          },
+          "degree": {
+            "type": "number",
+            "description": "How many lineage links it has"
+          }
+        },
+        "required": [
+          "asset",
+          "degree"
+        ]
+      },
+      "ExplorePatternStarterDto": {
+        "type": "object",
+        "properties": {
+          "patternKey": {
+            "type": "string"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "family": {
+            "type": "string"
+          },
+          "pairCount": {
+            "type": "number"
+          },
+          "assetCount": {
+            "type": "number"
+          },
+          "pair": {
+            "description": "The strongest pair of this pattern, to start from",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreAssetRefDto"
+            }
+          }
+        },
+        "required": [
+          "patternKey",
+          "labels",
+          "family",
+          "pairCount",
+          "assetCount",
+          "pair"
+        ]
+      },
+      "ExploreLinkStarterDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "relationType": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "from": {
+            "$ref": "#/components/schemas/ExploreAssetRefDto"
+          },
+          "to": {
+            "$ref": "#/components/schemas/ExploreAssetRefDto"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "relationType",
+          "from",
+          "to",
+          "createdAt"
+        ]
+      },
+      "ExploreStartersResponseDto": {
+        "type": "object",
+        "properties": {
+          "lineage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreLineageStarterDto"
+            }
+          },
+          "patterns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplorePatternStarterDto"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreLinkStarterDto"
+            }
+          }
+        },
+        "required": [
+          "lineage",
+          "patterns",
+          "links"
+        ]
+      },
+      "ExploreViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "seedIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "seeds": {
+            "description": "The starting points that still exist, by name",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreAssetRefDto"
+            }
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "lineage",
+              "duplicates",
+              "connected",
+              "meaning"
+            ],
+            "nullable": true
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreKind"
+            }
+          },
+          "depth": {
+            "type": "number"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "both"
+            ]
+          },
+          "positions": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ExplorePositionDto"
+            }
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "seedIds",
+          "seeds",
+          "kinds",
+          "depth",
+          "direction",
+          "positions",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "SaveExploreViewDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 2000
+          },
+          "seedIds": {
+            "description": "The assets it starts from (at most 10)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "lineage",
+              "duplicates",
+              "connected",
+              "meaning"
+            ],
+            "nullable": true
+          },
+          "kinds": {
+            "type": "array",
+            "description": "Kinds chosen by hand; empty follows the view",
+            "items": {
+              "$ref": "#/components/schemas/ExploreKind"
+            }
+          },
+          "depth": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 6
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "both"
+            ]
+          },
+          "positions": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ExplorePositionDto"
+            },
+            "description": "Node id → where it was dragged to"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Who saved it"
+          }
+        }
       },
       "ChatBotResponseDto": {
         "type": "object",

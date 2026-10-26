@@ -111,7 +111,7 @@ test.describe("graph performance", () => {
       });
     });
 
-    await mount(<FingerprintsGraph />);
+    await mount(<FingerprintsGraph assetId="a-1" />);
 
     const canvas = page.locator("canvas");
     await expect(canvas).toBeAttached({ timeout: 10_000 });

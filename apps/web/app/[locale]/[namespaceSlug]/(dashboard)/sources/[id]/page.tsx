@@ -3,6 +3,7 @@
 import { nsPath } from "@/lib/ns-path";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useRouteId } from "@/lib/use-route-id";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
@@ -60,8 +61,6 @@ import {
 import { isIngestionSourceType } from "@workspace/ui/components/source-icon";
 import { getSourceLabel } from "@workspace/schemas/source-labels";
 import { AssetsTable } from "@/components/assets-table";
-import { FingerprintsGraph } from "@/components/fingerprints-graph";
-import { AssetLinksGraph } from "@/components/asset-links-graph";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { DeleteSourceAction } from "@/components/delete-source-action";
 import { PurgeFindingsAction } from "@/components/purge-findings-action";
@@ -109,6 +108,12 @@ const detectorLabelKeys: Partial<Record<DetectorType, string>> = {
 };
 
 const getApiBase = () => getNamespacedApiBaseUrl();
+
+// The canvas measures the DOM: client-only, loaded when the tab opens.
+const ExploreWorkspace = dynamic(
+  () => import("@/components/explore/explore-workspace").then((m) => m.ExploreWorkspace),
+  { ssr: false },
+);
 
 export default function SourceViewPage() {
   const { t } = useTranslation();
@@ -595,8 +600,8 @@ export default function SourceViewPage() {
           <TabsTrigger value="assets" className="rounded-[3px]">
             {t("sources.detail.tabAssets")}
           </TabsTrigger>
-          <TabsTrigger value="fingerprints" className="rounded-[3px]">
-            {t("sources.detail.tabFingerprints")}
+          <TabsTrigger value="connections" className="rounded-[3px]">
+            {t("sources.detail.tabConnections")}
           </TabsTrigger>
         </TabsList>
 
@@ -625,15 +630,6 @@ export default function SourceViewPage() {
           </div>
 
           <CohortSelectionCard sourceId={sourceId} />
-
-          <div>
-            <h2 className="mb-2 font-serif text-sm font-black uppercase tracking-[0.08em]">
-              {t("links.title")}
-            </h2>
-            <div className="h-[480px]">
-              <AssetLinksGraph sourceId={sourceId} />
-            </div>
-          </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2">
@@ -1004,10 +1000,8 @@ export default function SourceViewPage() {
           </Suspense>
         </TabsContent>
 
-        <TabsContent value="fingerprints" className="space-y-4">
-          <div className="h-[72vh]">
-            <FingerprintsGraph sourceId={sourceId} />
-          </div>
+        <TabsContent value="connections" className="space-y-4">
+          <ExploreWorkspace mode="source" sourceId={sourceId} sourceName={source.name} />
         </TabsContent>
       </Tabs>
 

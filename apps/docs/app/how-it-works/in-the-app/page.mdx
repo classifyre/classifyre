@@ -33,8 +33,8 @@ the enterprise offering adds.
 
 ## Discovery
 
-**Your at-a-glance overview.** Discovery is the landing dashboard, in three
-rows:
+**Your at-a-glance overview.** Discovery (*Overview* in the sidebar) is the
+landing dashboard, in three rows:
 
 - **The brief** — total findings over the last 7, 30, or 90 days, what needs
   attention broken down by priority, and what has arrived today, this week and
@@ -42,9 +42,9 @@ rows:
   muted line: it is bookkeeping, not the headline.
 - **Casework and recent scans** — the cases and inquiries in flight, how many
   matches appeared since you last looked, and the last ten runs.
-- **[Connections](/how-it-works/connection-map/)** — a map of how your sources
-  connect to each other, with a link to the
-  [meaning map](/how-it-works/glossary/#the-meaning-map) of what they are about.
+- **Explore connections** — a search box, your saved views, and the assets worth
+  starting from (most critical, most lineage, biggest duplicate patterns, links
+  people drew), each one a way into [Explore](/how-it-works/explore/#explore-on-the-overview).
 
 Use it to answer *"what is going on?"* in ten seconds, then click any number to
 jump straight to the filtered detail view behind it.
@@ -52,12 +52,34 @@ jump straight to the filtered detail view behind it.
 > Priority counts, review counts, cases and top assets are all clickable —
 > Discovery is a launchpad, not just a report.
 
+## Explore
+
+**What an asset, a source or a glossary term is connected to, and why.** Every
+source and every asset has a **Connections** tab, every glossary term opens on
+*Where it is connected*, and duplicate review has an **Explore** section that
+draws its pairs, filtered by pattern, kind, score, review state and source: a canvas of what it is connected to, by
+lineage, links, duplicates, shared values and meaning, each line saying why.
+A source's opens on its most connected assets. Keep every connection, only
+those inside the source, or only those leaving it for other sources; double-click
+an asset to dive in, and follow the trail back out. Trace lineage upstream,
+downstream or both, as far as it goes; badges show what is already in a case or
+answers a watch. Send what you found to a case, and draw the links the data does
+not know about (they survive every re-scan).
+
+The Explore card on the Overview opens the same canvas on a page of its own,
+starting from a search, your saved views, or a table of the assets worth
+starting from; a view there can be saved with a name and the layout you gave it.
+
+Learn more: **[Explore: Following Connections](/how-it-works/explore/)**.
+
 ## Sources
 
 **The systems you've connected.** Each source is a connection to something you
 already run — SharePoint, Confluence, Jira, a database, a file share, a local
 folder. Here you add new sources, test their connection, choose which detectors
-run on them, and set scan schedules.
+run on them, and set scan schedules. A source's page has its findings, its
+assets, and its **Connections**: what its assets are connected to, inside the
+source and in others ([Explore](/how-it-works/explore/#on-a-sources-page)).
 
 Learn more: **[Sources](/sources/)** — including the full
 [catalog of source types](/sources/) and
@@ -78,7 +100,9 @@ repeat scans do.
 **Everything your scans have found.** Every document, page, file, or record a
 scan registers becomes an asset with metadata — owner, location, when it last
 changed. The Assets screen is the inventory: filter by new, updated, or
-unchanged, and see which assets carry the most findings.
+unchanged, and see which assets carry the most findings. Each asset's page has
+its findings and a **Connections** tab: Explore's canvas starting from that
+asset, with its lineage, duplicates, shared values and concepts.
 
 Learn more: **[Assets & Metadata](/sources/assets-and-metadata/)**.
 

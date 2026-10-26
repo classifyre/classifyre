@@ -14,7 +14,6 @@ import {
 } from './semantic/term-refs';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
-import { SourceGraphScheduler } from './stats/source-graph-scheduler.service';
 // Value import, not `import type` — see the constructor.
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { resolveEdgeClass } from './graph/edge-class';
@@ -98,6 +97,9 @@ export interface GraphTraceResult {
     relationClass: string | null;
     kind: TraceKind;
     confidence: number | null;
+    origin: string;
+    sharedByLabel: Record<string, number> | null;
+    note: string | null;
   }>;
   truncated: boolean;
 }
@@ -171,6 +173,8 @@ interface RawEdgeRow {
   relation_type: string;
   confidence: number;
   origin: string;
+  relation_class?: string | null;
+  note?: string | null;
 }
 
 interface TraversalRow {
@@ -308,9 +312,6 @@ export class GraphService {
 
   constructor(
     private readonly prisma: PrismaService,
-    // Value import, not `import type` — a type-only import of an injected class
-    // leaves Nest with no metadata to resolve and injects undefined silently.
-    private readonly sourceGraphScheduler: SourceGraphScheduler,
     // Optional so the graph specs can construct this service without the whole
     // matching stack; a case graph simply goes unbadged without it.
     @Optional() private readonly matching?: InquiryMatchingService,
@@ -334,7 +335,6 @@ export class GraphService {
     await this.createReferenceEdges(assetsWithLinks);
 
     const edgeCount = await this.prisma.edge.count();
-    await this.sourceGraphScheduler.scheduleRebuild('edges rebuilt');
     return { edgeCount };
   }
 
@@ -389,6 +389,44 @@ export class GraphService {
     if (asset) {
       await this.createReferenceEdges([asset]);
     }
+  }
+
+  /**
+   * Turn the links a scan reported (`Asset.links`, hashes of what each asset
+   * points at) into REFERENCES edges, both ways: what these assets link to,
+   * and what already links to them. The second half is what makes a link
+   * independent of scan order: a Confluence page can name a Jira issue
+   * before the Jira source is scanned, and the edge appears when it is.
+   *
+   * Links only ever grow (ingest merges them), so this only inserts. Called
+   * after each ingest batch with the hashes it wrote; never fatal there.
+   */
+  async linkReferences(sourceId: string, hashes: string[]): Promise<number> {
+    const wanted = [...new Set(hashes.filter(Boolean))];
+    if (!wanted.length) return 0;
+    return this.prisma.$executeRaw`
+      WITH mine AS (
+        SELECT id, hash, links FROM assets
+        WHERE source_id = ${sourceId} AND hash = ANY(${wanted}::text[])
+      ),
+      pairs AS (
+        SELECT m.id AS from_id, t.id AS to_id
+        FROM mine m
+        CROSS JOIN LATERAL jsonb_array_elements_text(
+          CASE WHEN jsonb_typeof(m.links) = 'array' THEN m.links ELSE '[]'::jsonb END
+        ) AS l(target)
+        JOIN assets t ON t.hash = l.target
+        UNION
+        SELECT s.id, m.id
+        FROM mine m
+        JOIN assets s ON s.links ? m.hash
+      )
+      INSERT INTO edges (id, from_type, from_id, to_type, to_id, relation_type, confidence, origin, created_at)
+      SELECT gen_random_uuid(), 'asset', from_id, 'asset', to_id, 'REFERENCES', 1, 'INFERRED'::"EdgeOrigin", now()
+      FROM pairs
+      WHERE from_id <> to_id
+      ON CONFLICT (from_type, from_id, to_type, to_id, relation_type) DO NOTHING
+    `;
   }
 
   private async insertContainsEdges(): Promise<void> {
@@ -657,13 +695,6 @@ export class GraphService {
           ELSE EXCLUDED."origin"
         END
     `);
-
-    // The connection map is keyed on these edges; a batch that changed any of
-    // them makes it stale. Coalesced upstream, so a scan emitting relationships
-    // for an hour produces a trickle of rebuilds rather than one per batch.
-    if (upserted > 0) {
-      await this.sourceGraphScheduler.scheduleRebuild('edges ingested');
-    }
 
     return { upserted, external, dropped };
   }
@@ -1228,15 +1259,41 @@ export class GraphService {
   ): Promise<EdgeDetailDto> {
     // Use raw SQL so the MANUAL enum value works regardless of the Prisma client
     // version loaded in the running server process (the enum was added post-startup).
+    const db = tx ?? this.prisma;
+    const relationType = dto.relationType.trim();
+    if (!relationType) {
+      throw new BadRequestException('A link needs a relation');
+    }
+    if (dto.fromType === 'asset' && dto.toType === 'asset') {
+      if (dto.fromId === dto.toId) {
+        throw new BadRequestException('An asset cannot be linked to itself');
+      }
+      // No foreign key guards `edges`: a link to an asset that does not exist
+      // would never be cleaned up by anything.
+      const found = await db.asset.count({
+        where: { id: { in: [dto.fromId, dto.toId] } },
+      });
+      if (found < 2) throw new NotFoundException('Asset not found');
+    }
     const confidence = dto.confidence ?? 1;
-    const rows = await (tx ?? this.prisma).$queryRaw<RawEdgeRow[]>`
-      INSERT INTO edges (id, from_type, from_id, to_type, to_id, relation_type, confidence, origin, created_at)
+    const relationClass = dto.relationClass ?? null;
+    const note = dto.note?.trim().slice(0, 500) || null;
+    const metadata = note ? JSON.stringify({ note }) : null;
+    // A class or a note given replaces the old one; left out, the old one stays.
+    const rows = await db.$queryRaw<RawEdgeRow[]>`
+      INSERT INTO edges (id, from_type, from_id, to_type, to_id, relation_type,
+                         confidence, origin, relation_class, metadata, created_at)
       VALUES (gen_random_uuid(), ${dto.fromType}, ${dto.fromId}, ${dto.toType}, ${dto.toId},
-              ${dto.relationType}, ${confidence}, 'MANUAL'::"EdgeOrigin", now())
+              ${relationType}, ${confidence}, 'MANUAL'::"EdgeOrigin",
+              COALESCE(${relationClass}::"EdgeClass", 'REFERENCE'::"EdgeClass"),
+              ${metadata}::jsonb, now())
       ON CONFLICT (from_type, from_id, to_type, to_id, relation_type) DO UPDATE
-        SET origin = EXCLUDED.origin
+        SET origin = EXCLUDED.origin,
+            relation_class = COALESCE(${relationClass}::"EdgeClass", edges.relation_class),
+            metadata = COALESCE(EXCLUDED.metadata, edges.metadata)
       RETURNING id, from_type, from_id, to_type, to_id, relation_type,
-                confidence::float AS confidence, origin::text AS origin
+                confidence::float AS confidence, origin::text AS origin,
+                relation_class::text AS relation_class, metadata->>'note' AS note
     `;
     if (rows.length === 0) throw new Error('Edge insert returned no row');
     return this.rawRowToDetail(rows[0]);
@@ -1291,6 +1348,8 @@ export class GraphService {
       relationType: row.relation_type,
       confidence: Number(row.confidence),
       origin: row.origin,
+      relationClass: row.relation_class ?? null,
+      note: row.note ?? null,
     };
   }
 
@@ -1309,6 +1368,12 @@ export class GraphService {
     direction: TraceDirection;
     kinds: TraceKind[];
     limit: number;
+    /**
+     * Walk only through assets that still exist: a link to an asset deleted
+     * at its source is hidden, and shows again if the asset comes back (it
+     * keeps its id). The case board keeps showing them, as missing.
+     */
+    activeOnly?: boolean;
   }): Promise<GraphTraceResult> {
     let timedOut = false;
     const walk = await walkTrace(input.seeds, input, async (frontier) => {
@@ -1318,7 +1383,11 @@ export class GraphService {
           async (tx) => {
             await tx.$executeRaw`SET LOCAL statement_timeout = '5s'`;
             return tx.$queryRaw<TraceEdgeRow[]>(
-              this.traceLevelSql(frontier, input.kinds),
+              this.traceLevelSql(
+                frontier,
+                input.kinds,
+                input.activeOnly ?? false,
+              ),
             );
           },
           { timeout: 10_000, maxWait: 3_000 },
@@ -1365,18 +1434,40 @@ export class GraphService {
         relationClass: e.relation_class,
         kind: e.kind,
         confidence: e.confidence === null ? null : Number(e.confidence),
+        origin: e.origin,
+        sharedByLabel: e.shared_by_label,
+        note: e.note,
       })),
       truncated: walk.truncated || timedOut,
     };
   }
 
-  /** One hop of a trace: each frontier node's edges out and in, capped per node. */
-  private traceLevelSql(frontier: TraceNodeRef[], kinds: TraceKind[]) {
+  /**
+   * One hop of a trace: each frontier node's edges out and in, capped per
+   * node — the strongest first, so a hub's cap keeps its best links.
+   */
+  private traceLevelSql(
+    frontier: TraceNodeRef[],
+    kinds: TraceKind[],
+    activeOnly: boolean,
+  ) {
     const types = frontier.map((f) => f.type);
     const ids = frontier.map((f) => f.id);
     const columns = Prisma.sql`e.id, e.from_type, e.from_id, e.to_type, e.to_id,
       e.relation_type, e.relation_class::text AS relation_class,
-      e.confidence::float8 AS confidence, ${TRACE_KIND_SQL} AS kind`;
+      e.confidence::float8 AS confidence, ${TRACE_KIND_SQL} AS kind,
+      e.origin::text AS origin,
+      e.metadata->'sharedByLabel' AS shared_by_label,
+      e.metadata->>'note' AS note`;
+    // The far end of the edge, when it is an asset, must still be there.
+    const liveTo = activeOnly
+      ? Prisma.sql`AND (e.to_type <> 'asset' OR EXISTS (
+          SELECT 1 FROM assets a WHERE a.id = e.to_id AND a.status <> 'DELETED'))`
+      : Prisma.empty;
+    const liveFrom = activeOnly
+      ? Prisma.sql`AND (e.from_type <> 'asset' OR EXISTS (
+          SELECT 1 FROM assets a WHERE a.id = e.from_id AND a.status <> 'DELETED'))`
+      : Prisma.empty;
     return Prisma.sql`
       SELECT f.node_type AS src_type, f.node_id AS src_id, x.*
       FROM unnest(${types}::text[], ${ids}::text[]) AS f(node_type, node_id)
@@ -1386,6 +1477,8 @@ export class GraphService {
           WHERE e.from_type = f.node_type AND e.from_id = f.node_id
             AND e.to_type IN ('asset', ${EXTERNAL_NODE})
             AND ${TRACE_KIND_SQL} = ANY(${kinds}::text[])
+            ${liveTo}
+          ORDER BY e.confidence DESC
           LIMIT ${TRACE_PER_NODE})
         UNION ALL
         (SELECT 'in'::text AS dir, ${columns}
@@ -1393,6 +1486,8 @@ export class GraphService {
           WHERE e.to_type = f.node_type AND e.to_id = f.node_id
             AND e.from_type IN ('asset', ${EXTERNAL_NODE})
             AND ${TRACE_KIND_SQL} = ANY(${kinds}::text[])
+            ${liveFrom}
+          ORDER BY e.confidence DESC
           LIMIT ${TRACE_PER_NODE})
       ) x
     `;

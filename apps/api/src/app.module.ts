@@ -47,7 +47,6 @@ import { AssistantService } from './assistant.service';
 import { AssistantMcpService } from './assistant/assistant-mcp.service';
 import { CasesService } from './cases.service';
 import { CaseworkSummaryService } from './casework-summary.service';
-import { ConstellationService } from './constellation.service';
 import { InquiriesService } from './inquiries.service';
 import { CaseThreadsService } from './case-threads.service';
 import { CaseActivityService } from './case-activity.service';
@@ -67,6 +66,9 @@ import { CaseHypothesisRulesController } from './controllers/case-hypothesis-rul
 import { CaseHypothesisRulesService } from './cases/case-hypothesis-rules.service';
 import { CASE_BOARD_ARRIVALS } from './cases/case-board-arrivals.port';
 import { GraphService } from './graph.service';
+import { ExploreController } from './explore/explore.controller';
+import { ExploreService } from './explore/explore.service';
+import { ExploreViewsService } from './explore/explore-views.service';
 import { BuiltinMcpToolsService } from './chat-gateway/builtin-mcp-tools.service';
 import { ChatAgentService } from './chat-gateway/chat-agent.service';
 import { ChatBotsService } from './chat-gateway/chat-bots.service';
@@ -75,7 +77,6 @@ import { ChatHarnessToolset } from './chat-gateway/chat-harness.toolset';
 import { ChatSessionService } from './chat-gateway/chat-session.service';
 import { EmbeddingModule } from './embedding/embedding.module';
 import { FindingStatsModule } from './stats/finding-stats.module';
-import { SourceGraphModule } from './stats/source-graph.module';
 import { GlossaryModule } from './glossary/glossary.module';
 import { CaseLeadsController } from './controllers/case-leads.controller';
 import { CaseEventsController } from './controllers/case-events.controller';
@@ -137,7 +138,6 @@ import {
     DataTransferModule,
     EmbeddingModule,
     FindingStatsModule,
-    SourceGraphModule,
     MaintenanceModule,
     GlossaryModule,
   ],
@@ -168,6 +168,7 @@ import {
     CaseTimelineController,
     CaseThreadsController,
     GraphController,
+    ExploreController,
     ChatBotsController,
     CaseLeadsController,
     CaseEventsController,
@@ -223,7 +224,6 @@ import {
     { provide: CASE_BOARD_ARRIVALS, useExisting: CaseBoardToolsService },
     CaseFindingFiltersService,
     CaseworkSummaryService,
-    ConstellationService,
     InquiriesService,
     CaseThreadsService,
     CaseBoardReadService,
@@ -232,6 +232,8 @@ import {
     CaseBoardToolsService,
     QuickSearchService,
     GraphService,
+    ExploreService,
+    ExploreViewsService,
     AgentMemoryService,
     // Chat gateway (Telegram/Slack bots → chat agent over the harness tools).
     // Registry/dispatcher/audit instances come from AutopilotModule's exports.

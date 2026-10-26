@@ -174,6 +174,8 @@ const MIN_BACKGROUND = 8;
 
 /** Text passages read to learn how text scores a question. */
 const BACKGROUND_SAMPLE = 512;
+/** Passages an asset is read by when looking for assets like it. */
+const ALIKE_CHUNK_CAP = 64;
 
 /**
  * One ranked list out of text and media, each read against its own kind.
@@ -1632,6 +1634,40 @@ export class EmbeddingService {
         limit,
       );
     });
+  }
+
+  /**
+   * Assets that read like this one ("more like this"): the mean of the
+   * asset's own passage, picture and sound vectors, searched the way a
+   * question is (same index, same media pass). Ranked by meaning alone; the
+   * asset itself is left out. Empty when the asset has no vectors yet.
+   *
+   * The mean is taken over the first ALIKE_CHUNK_CAP passages: a long report
+   * is still read by what it opens with, and the aggregate stays one short
+   * index walk along asset_chunks rather than a read of the whole document.
+   */
+  async assetsAlike(assetId: string, limit: number) {
+    await this.assertSemanticEnabled();
+    const space = await this.activeSpace();
+    const rows = await this.prisma.$queryRaw<Array<{ vector: string | null }>>(
+      Prisma.sql`
+        SELECT AVG(ce.vec)::text AS vector
+        FROM (
+          SELECT content_hash FROM asset_chunks
+          WHERE asset_id = ${assetId}
+          ORDER BY ordinal
+          LIMIT ${ALIKE_CHUNK_CAP}
+        ) ac
+        JOIN content_embeddings ce
+          ON ce.content_hash = ac.content_hash
+         AND ce.space_id = ${this.spaceIdLiteral(space.id)}
+      `,
+    );
+    const text = rows[0]?.vector;
+    if (!text) return [];
+    const centroid = JSON.parse(text) as number[];
+    const hits = await this.semanticAssetIds(centroid, limit + 1);
+    return hits.filter((hit) => hit.id !== assetId).slice(0, limit);
   }
 
   /**

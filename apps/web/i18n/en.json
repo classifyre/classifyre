@@ -177,6 +177,7 @@
   },
   "nav": {
     "overview": "Overview",
+    "explore": "Explore",
     "findings": "Findings",
     "assets": "Assets",
     "sources": "Sources",
@@ -500,7 +501,8 @@
       "relations": "Relations",
       "generatedDetectors": "Detectors made from this term",
       "noActivity": "No activity yet.",
-      "showOnMap": "Show on map"
+      "showOnMap": "Show on map",
+      "connections": "Where it is connected"
     },
     "relations": {
       "out": {
@@ -578,7 +580,6 @@
       "title": "Meaning",
       "none": "This finding carries no meaning yet.",
       "noneAsset": "No concepts yet.",
-      "assetHint": "Concepts this asset is evidence of.",
       "impliedBy": "implied by {{term}}",
       "throughBinding": "through {{label}}",
       "linkedBy": "linked by {{by}}",
@@ -824,10 +825,6 @@
         "stats": {
           "name": "Finding statistics",
           "desc": "Precomputed daily rollups. Rebuilt automatically by the stats worker."
-        },
-        "graph": {
-          "name": "Source graph",
-          "desc": "Precomputed source relationship graph. Rebuilt automatically by the graph worker."
         },
         "vocabulary": {
           "name": "Vocabulary inventory",
@@ -1384,11 +1381,11 @@
       "tabFindings": "Findings",
       "tabAssets": "Assets",
       "runSummaryLine": "{{findings}} findings · {{assets}} assets scanned",
-      "tabFingerprints": "Fingerprints",
       "textCoverage": "Text Coverage",
       "textCoverageValue": "{{pct}}% extracted",
       "lowTextCoverageBadge": "Low text coverage ({{pct}}%)",
-      "lowTextCoverageTooltip": "Some assets produced no extractable text; findings may be incomplete."
+      "lowTextCoverageTooltip": "Some assets produced no extractable text; findings may be incomplete.",
+      "tabConnections": "Connections"
     },
     "edit": {
       "loading": "Loading source configuration...",
@@ -3469,53 +3466,278 @@
       "refresh": "Rebuild statistics now"
     }
   },
+  "explore": {
+    "title": "Explore",
+    "titleMany": "{{name}} and {{count}} more",
+    "cardTitle": "Explore connections",
+    "ledger": "What is on the canvas",
+    "spotlightClear": "Show everything again",
+    "inCases": "In cases",
+    "inCasesHint": "Light the assets that are evidence in a case",
+    "watched": "Watched",
+    "watchedHint": "Light the assets whose findings a watch answers",
+    "searchPlaceholder": "Search assets by meaning or by words…",
+    "clearSearch": "Clear the search",
+    "searchHint": "Type in the search box above. Pick a result to start from it, or + to add it to what is on the canvas.",
+    "searchFailed": "Search did not answer. Try again in a moment.",
+    "noResults": "Nothing found for that.",
+    "results": "Assets",
+    "page": "page {{page}}",
+    "startFrom": "Start from this",
+    "addToCanvas": "Add to the canvas",
+    "addSeed": "Add as a starting point",
+    "noSuggestions": "Nothing more to suggest from here.",
+    "suggestionsHint": "Neighbours reached by the most kinds of connection, strongest first. Add one to see its own connections.",
+    "drawer": {
+      "find": "Find",
+      "suggestions": "Worth adding next",
+      "details": "Details",
+      "marks": "Cases and watches"
+    },
+    "rail": "Panels",
+    "railCollapse": "Close the panel",
+    "railExpand": "Open the panel",
+    "views": {
+      "lineage": "Lineage",
+      "duplicates": "Same and alike values",
+      "connected": "All connected",
+      "meaning": "By meaning"
+    },
+    "viewHints": {
+      "lineage": "Where the data comes from and where it goes, traced as far as you ask",
+      "duplicates": "The same content, likely the same thing, and shared detected values",
+      "connected": "Lineage, links, duplicates and shared values together",
+      "meaning": "Shared concepts and what reads alike: for assets nothing links yet"
+    },
+    "view": {
+      "title": "View",
+      "custom": "Chosen by hand",
+      "show": "Show",
+      "trace": "Trace lineage and links",
+      "traceHint": "Which way to walk and how many steps. Duplicates and shared values go at most two steps; concepts and likeness one.",
+      "kinds": "Kinds of connection"
+    },
+    "guide": {
+      "lineage": "Lineage: {{up}} upstream, {{down}} downstream.",
+      "noLineage": "No lineage from these assets in this direction.",
+      "duplicates": "Same as these, or sharing detected values: {{count}}.",
+      "connected": "Connected by lineage, links or duplicates: {{count}}.",
+      "meaning": "Sharing concepts or reading alike: {{count}}.",
+      "unlinked": "Nothing links these yet. Sharing concepts or reading alike: {{count}}. Link what belongs together.",
+      "custom": "Reached by the kinds you chose: {{count}}.",
+      "truncated": "Some were left out to keep this readable.",
+      "also": "Also:",
+      "mostConnected": "Its most connected assets: {{count}}.",
+      "carriers": "Assets that carry it most: {{count}}.",
+      "duplicateHubs": "Assets in the most pairs: {{count}}."
+    },
+    "kind": {
+      "lineage": "Lineage",
+      "links": "Links",
+      "duplicates": "Same as",
+      "similar": "Shared values",
+      "meaning": "Shared concepts",
+      "alike": "Alike by meaning"
+    },
+    "kindHint": {
+      "lineage": "Where the data comes from and where it goes",
+      "links": "References, usage, and links people drew",
+      "duplicates": "The same content, or likely the same thing",
+      "similar": "Detected values both contain: people, IBANs, emails…",
+      "meaning": "Glossary concepts and entities both are about",
+      "alike": "Reads alike: compared by meaning, not by words"
+    },
+    "lane": {
+      "duplicates": "Same as",
+      "similar": "Shared values",
+      "terms": "Concepts and entities they share",
+      "meaning": "Also about them",
+      "alike": "Alike by meaning",
+      "links": "Referenced"
+    },
+    "where": {
+      "up": "Upstream, hop {{count}}",
+      "down": "Downstream, hop {{count}}"
+    },
+    "walk": "Double-click to add as a starting point",
+    "caseMark": "CASE",
+    "inCase": "Evidence in",
+    "watchMark": "WATCH",
+    "watchedLead": "Answers",
+    "concept": "Concept",
+    "entity": "Entity",
+    "yours": "drawn by a person",
+    "yoursLasts": "A link you draw stays through every re-scan. It disappears from view when either asset is deleted at its source, and comes back if the asset does.",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit to view",
+    "allToCase": "All {{count}} to a case",
+    "loading": "Loading…",
+    "error": "Could not load the connections",
+    "retry": "Try again",
+    "gone": "Nothing to show",
+    "goneHint": "The assets you started from are no longer there, or were deleted at their source.",
+    "linkPick": "Pick the asset to link {{name}} to.",
+    "nothingSelected": "Select an asset, a term or a line.",
+    "startingPoints": "Starting points",
+    "startingPoint": "Starting point",
+    "neighbour": "Connected",
+    "removeSeed": "Remove from the starting points",
+    "howToRead": "How to read it",
+    "howToReadLayout": "Your starting points are in the middle. What feeds them stands to the left, what they feed to the right. What is the same or shares values is above; the concepts they share, what else is about them, and what reads alike are below.",
+    "howToReadLinks": "Each kind of connection has its own line, the one in its counter. Fainter means a weaker score. Point at a line to read why it is there; light a counter to see one kind alone.",
+    "howToReadYours": "Drag from one asset's edge to another, or use Link to…, to draw a link the data does not know about.",
+    "startOver": "Start over from this",
+    "linkTo": "Link to…",
+    "toCase": "Add to a case",
+    "openAsset": "Open the asset",
+    "openTerm": "Open in the glossary",
+    "partOf": "Part of",
+    "itsLinks": "Its links ({{count}})",
+    "carriedBy": "About it on the canvas ({{count}})",
+    "why": "Why",
+    "whyMeaning": "Both are about this term.",
+    "whyGeneric": "The data records this link.",
+    "score": "Score {{percent}}%",
+    "reviewPair": "Review this pair",
+    "removeLink": "Remove this link",
+    "linkRemoved": "Link removed",
+    "linkRemoveFailed": "Could not remove the link",
+    "marksNone": "Nothing on the canvas is evidence in a case or answers a watch.",
+    "marksCases": "Cases holding these assets",
+    "marksWatches": "Watches these assets answer",
+    "showOnCanvas": "Show on canvas",
+    "reason": {
+      "identical": "same content",
+      "likelySame": "likely the same",
+      "likelySameSharing": "likely the same · {{values}}",
+      "shares": "shares {{values}}",
+      "sharesValues": "shares detected values",
+      "alike": "{{percent}}% alike",
+      "repeatedText": "repeated text · {{percent}}%",
+      "repeatedTextConfirmed": "repeated text · confirmed the same",
+      "confirmed": "confirmed the same"
+    },
+    "linkTitle": "Link two assets",
+    "linkDescription": "Say what connects them. The link shows on Explore, on case boards, and in lineage when it means lineage.",
+    "linkFrom": "From",
+    "linkToField": "To",
+    "linkOne": "One asset",
+    "linkOther": "The other",
+    "linkSwap": "Swap the direction",
+    "linkMeans": "What the link means",
+    "relation": {
+      "related": "Related to",
+      "same": "Same as",
+      "feeds": "Feeds",
+      "references": "References",
+      "custom": "Something else"
+    },
+    "relationHint": {
+      "related": "Belongs together; says nothing about direction.",
+      "same": "The same thing, recorded twice. Shows with the duplicates.",
+      "feeds": "The first one's data goes into the second. Shows as lineage.",
+      "references": "The first one points at the second.",
+      "custom": "Name the relation yourself."
+    },
+    "relationCustom": "Relation",
+    "relationCustomPlaceholder": "e.g. replaces, answers, approved by",
+    "linkNote": "Why (optional)",
+    "linkNotePlaceholder": "What you know that the data does not",
+    "linkSave": "Save the link",
+    "linked": "Link saved",
+    "linkFailed": "Could not save the link",
+    "assetTab": "Connections",
+    "openConnections": "Open its connections",
+    "home": {
+      "savedViews": "Saved views",
+      "viewGone": "Its assets are no longer there",
+      "tabs": {
+        "search": "Results",
+        "critical": "Most critical",
+        "lineage": "Most lineage",
+        "duplicates": "Duplicates",
+        "links": "Drawn links"
+      },
+      "columns": {
+        "asset": "Asset",
+        "search": "Match",
+        "critical": "Open findings",
+        "lineage": "Lineage",
+        "duplicates": "Pairs",
+        "links": "Drawn"
+      },
+      "empty": {
+        "search": "Nothing found for that.",
+        "critical": "No open critical or high findings.",
+        "lineage": "No lineage yet.",
+        "duplicates": "No duplicate patterns yet.",
+        "links": "No links drawn yet."
+      },
+      "lineageLinks": "{{count}} lineage links",
+      "pairs": "{{count}} pairs",
+      "pick": "Pick {{name}}",
+      "clearPicked": "Clear",
+      "explorePicked": "Explore {{count}} together",
+      "explore": "Explore"
+    },
+    "saved": {
+      "saveView": "Save view",
+      "saveChanges": "Save changes",
+      "isSaved": "Saved",
+      "more": "More for this view",
+      "saveAs": "Save as a new view…",
+      "rename": "Rename…",
+      "resetLayout": "Reset the layout",
+      "delete": "Delete this view",
+      "saveTitle": "Save this view",
+      "renameTitle": "Rename this view",
+      "dialogDescription": "Keeps the assets it starts from, the view, how far it traces, and where you put things.",
+      "name": "Name",
+      "namePlaceholder": "e.g. Kitchen leak at 2C",
+      "description": "Notes (optional)",
+      "save": "Save",
+      "saved": "View saved",
+      "deleted": "View deleted",
+      "failed": "Could not save the view",
+      "gone": "That saved view no longer exists"
+    },
+    "scope": {
+      "label": "Which connections",
+      "all": "All",
+      "allHint": "Every connection, inside the source and out of it",
+      "internal": "Same source",
+      "internalHint": "Only connections to assets of the same source",
+      "external": "Other sources",
+      "externalHint": "Only connections that lead to other sources, or to objects no source has scanned",
+      "showAll": "Show all connections"
+    },
+    "scopeEmpty": {
+      "internal": "Nothing here connects within the same source",
+      "internalHint": "Its connections all lead to other sources.",
+      "external": "Nothing here connects to another source",
+      "externalHint": "Its connections all stay inside the same source."
+    },
+    "trail": "Where you dived in",
+    "diveIn": "Dive in",
+    "diveOut": "Back to {{name}}",
+    "walkDive": "Double-click to dive in",
+    "fromSource": "From another source: {{name}}",
+    "elsewhere": "From another source",
+    "sourceLevel": "All of {{name}}",
+    "rootEmpty": {
+      "source": "This source has no assets yet",
+      "sourceHint": "Run a scan; its assets and what they are connected to appear here.",
+      "term": "Nothing carries this term yet",
+      "termHint": "Assets appear here once a binding, a mention or a link by hand ties them to it.",
+      "duplicates": "No pairs match these filters",
+      "duplicatesHint": "Widen the filters, or reset them to see every duplicate."
+    }
+  },
   "casework": {
     "title": "Casework",
     "subtitle": "Cases and inquiry watches in flight",
     "viewAll": "View all"
-  },
-  "connections": {
-    "title": "Connections",
-    "subtitle": "{{sources}} sources · {{connected}} connected assets · {{isolated}} unconnected",
-    "loading": "Loading the map…",
-    "building": "Building the map…",
-    "expanding": "Expanding source…",
-    "error": "Could not load the map",
-    "fit": "Fit to view",
-    "reload": "Reload",
-    "legend": "Legend",
-    "hint": "Double-click a source to expand it into its assets. Assets connected to nothing are not drawn — they are counted on their source.",
-    "source": "Source",
-    "pairing": "Pairing",
-    "asset": "Asset",
-    "totalAssets": "Assets",
-    "connectedAssets": "Connected",
-    "unconnected": "Unconnected",
-    "internalEdges": "Internal links",
-    "assetsInvolved": "Assets involved",
-    "expand": "Expand source",
-    "collapse": "Collapse source",
-    "openSource": "Open source in new tab",
-    "openAsset": "Open asset",
-    "traceLineage": "Trace lineage",
-    "duplicatePairs": "{{count}} duplicate pairs",
-    "reviewDuplicates": "Review duplicates",
-    "bundleLabel": "{{count}} linked assets",
-    "class": {
-      "FLOW": "Lineage",
-      "CONTAINMENT": "Contains",
-      "IDENTITY": "Same as",
-      "REFERENCE": "References",
-      "USAGE": "Used by"
-    },
-    "collapseAll": "Collapse all",
-    "linkTypes": "Link types",
-    "allLinkTypes": "All link types",
-    "searchLinkTypes": "Search link types…",
-    "noLinkTypes": "No link types found",
-    "notBuiltYet": "Connection map still building — counts appear once it lands.",
-    "browseAssets": "Browse all {{count}} assets",
-    "browseAllAssets": "Browse all assets"
   },
   "breadcrumb": {
     "home": "Home",
@@ -5035,7 +5257,6 @@
   },
   "correlation": {
     "findingsTab": "Findings",
-    "relatedTab": "Fingerprints",
     "fingerprints": {
       "title": "Evidence fingerprints",
       "loadFailed": "Failed to load the fingerprints graph",
@@ -5066,7 +5287,6 @@
       "strengthHint": "Link colour = similarity strength between assets.",
       "excludeHelp": "Right-click a value to exclude noise (e.g. \"null\").",
       "recomputing": "Recomputing…",
-      "external": "External ({{count}})",
       "useFocusedInCase": "Use focused in case",
       "addVisibleHere": "Add visible to this case",
       "addFocusedHere": "Add focused to this case",
@@ -5174,24 +5394,7 @@
   "fingerprints": {
     "tabTune": "Tune correlation"
   },
-  "links": {
-    "title": "Asset links",
-    "loadFailed": "Failed to load the links graph",
-    "empty": "No assets",
-    "emptyDesc": "This source has no assets yet.",
-    "truncated": "Partial",
-    "external": "External ({{count}})",
-    "asset": "Asset",
-    "externalBadge": "External source",
-    "openAsset": "Open asset",
-    "legend": "Legend",
-    "legendHint": "Assets are connected by their link references (hash → asset).",
-    "legendAsset": "Asset in this source",
-    "legendExternal": "Linked asset in another source"
-  },
-  "lineage": {
-    "tab": "Lineage"
-  },
+  "lineage": {},
   "harness": {
     "title": "Harness AI Autopilot",
     "subtitle": "Autonomous control plane",
@@ -6361,7 +6564,28 @@
       "colValues": "Values that matched"
     },
     "backToPatterns": "Back to patterns",
-    "backToPattern": "Back to pattern"
+    "backToPattern": "Back to pattern",
+    "explore": {
+      "tab": "Explore",
+      "pattern": "Pattern",
+      "allPatterns": "All patterns",
+      "patternOption": "{{name}} · {{count}}",
+      "family": "Kind of match",
+      "allFamilies": "Every kind",
+      "score": "Score",
+      "scoreAny": "Any score",
+      "score_review": "Worth a look (from {{score}})",
+      "score_merge": "Likely the same (from {{score}})",
+      "review": "Review",
+      "review_any": "Every pair not ruled apart",
+      "review_open": "Not reviewed yet",
+      "review_confirmed": "Confirmed the same",
+      "source": "Source",
+      "allSources": "All sources",
+      "reset": "Reset filters",
+      "allDuplicates": "All duplicates",
+      "openPattern": "Explore"
+    }
   },
   "seo": {
     "site": {
@@ -6384,6 +6608,12 @@
       "description": "The workspace security brief: open vs resolved findings, risk clusters by asset and source, recent scan runs and resolution mix — your starting point after every scan.",
       "ogTitle": "Overview — Security Brief | Classifyre",
       "ogDescription": "Open findings, risk clusters, recent scans and resolution — the health of this workspace at a glance."
+    },
+    "explore": {
+      "title": "Explore — Connections, Lineage & Look-alikes",
+      "description": "Start from a search and follow what an asset is connected to: lineage, duplicates, shared values, shared glossary concepts and likeness by meaning — every link with its reason, and links you draw yourself.",
+      "ogTitle": "Explore connections | Classifyre",
+      "ogDescription": "Search, then follow lineage, duplicates, shared concepts and look-alikes — each link with its reason."
     },
     "findings": {
       "title": "Findings — Triage Every Detection by Severity, Source & Detector",
@@ -6652,6 +6882,12 @@
       "description": "Classifyre documentation — how the app works, section by section: connect Confluence, Jira, SharePoint and more, run scans, triage findings, dedupe assets and investigate with the AI autopilot.",
       "ogTitle": "Documentation — Connect, Scan & Investigate | Classifyre",
       "ogDescription": "Connect sources, scan them, review findings and investigate what matters — with an AI autopilot doing the legwork. Guides for every workflow."
+    },
+    "duplicatesExplore": {
+      "title": "Explore Duplicates — Every Copy on One Canvas",
+      "description": "See duplicate review’s pairs on a canvas: which documents gather the most copies, which sources they cross, and what else ties them. Filter by pattern, kind of match, score, review state and source, and dive into any document.",
+      "ogTitle": "Explore Duplicates | Classifyre",
+      "ogDescription": "Every duplicate, or the ones a filter picks, on one canvas — and a way into each document."
     }
   },
   "cohorts": {
@@ -6844,8 +7080,7 @@
       "relateSubmit": "Relate",
       "related": "Relation added.",
       "unrelated": "Relation removed."
-    },
-    "openMap": "Meaning map"
+    }
   },
   "entities": {
     "loadFailed": "The entity could not be loaded",

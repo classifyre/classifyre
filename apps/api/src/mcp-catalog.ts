@@ -354,13 +354,20 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
   },
   {
     id: 'lineage',
-    title: 'Lineage',
+    title: 'Lineage & connections',
     description:
-      'Trace how data flows between assets via the stitched edge graph, and look up what a relation type means.',
-    toolNames: ['get_asset_lineage', 'get_relation_types'],
+      'Trace how data flows between assets, explore every kind of connection between them with its reason, and find assets alike by meaning.',
+    toolNames: [
+      'get_asset_lineage',
+      'get_relation_types',
+      'explore_connections',
+      'find_similar_assets',
+    ],
     operations: [
       "Walk an asset's upstream/downstream FLOW lineage",
       'List relation types in use and their FLOW/CONTAINMENT/IDENTITY/REFERENCE/USAGE class',
+      'Explore what assets are connected to: lineage, links, duplicates, shared values, shared concepts, likeness',
+      'Find assets that read like a given one',
     ],
   },
 ];

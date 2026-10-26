@@ -23,7 +23,6 @@ import { CorrelationSwitchService } from './correlation-switch.service';
 import { CorrelationReviewIndexService } from './review/correlation-review-index.service';
 import { CorrelationReviewService } from './review/correlation-review.service';
 import { CorrelationReviewController } from './review/correlation-review.controller';
-import { SourceGraphModule } from '../stats/source-graph.module';
 import { GlossaryModule } from '../glossary/glossary.module';
 
 /**
@@ -34,7 +33,7 @@ import { GlossaryModule } from '../glossary/glossary.module';
  * mutations keep their normal CaseActivity audit trail. PgBossModule is global.
  */
 @Module({
-  imports: [MatchingModule, SourceGraphModule, GlossaryModule],
+  imports: [MatchingModule, GlossaryModule],
   controllers: [CorrelationController, CorrelationReviewController],
   providers: [
     PrismaService,

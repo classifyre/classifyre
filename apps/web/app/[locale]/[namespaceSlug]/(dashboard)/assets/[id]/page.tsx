@@ -25,17 +25,21 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components";
 import { FindingsTable } from "@/components/findings-table";
-import { FingerprintsGraph } from "@/components/fingerprints-graph";
-import { LineageView } from "@/components/lineage-view";
+import dynamic from "next/dynamic";
 import { ColumnLineagePanel } from "@/components/column-lineage-panel";
 import { AssetMetadataCard } from "@/components/asset-metadata-card";
-import { AssetMeaningCard } from "@/components/glossary/meaning-card";
 import { AssetKindBadge } from "@/components/asset-kind-badge";
 import { ReferencingFindingsPanel } from "@/components/referencing-findings-panel";
 import { formatAssetKind } from "@/lib/asset-kind";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { useTranslation } from "@/hooks/use-translation";
 import { useEntityDocumentTitle } from "@/components/document-title-updater";
+
+// The canvas measures the DOM: client-only, loaded when the tab opens.
+const ExploreWorkspace = dynamic(
+  () => import("@/components/explore/explore-workspace").then((m) => m.ExploreWorkspace),
+  { ssr: false },
+);
 
 /**
  * Column names off an asset's normalized metadata.
@@ -298,19 +302,14 @@ export default function AssetDetailPage() {
           <AssetMetadataCard metadata={assetDetails.metadata} />
         )}
 
-      <AssetMeaningCard assetId={assetDetails.id} />
-
       {lockedFilters && (
         <Tabs defaultValue="findings" urlParam="tab" className="space-y-4">
           <TabsList>
             <TabsTrigger value="findings">
               {t("correlation.findingsTab")}
             </TabsTrigger>
-            <TabsTrigger value="related">
-              {t("correlation.relatedTab")}
-            </TabsTrigger>
-            <TabsTrigger value="lineage">
-              {t("lineage.tab")}
+            <TabsTrigger value="connections" data-testid="asset-connections-tab">
+              {t("explore.assetTab")}
             </TabsTrigger>
           </TabsList>
           <TabsContent value="findings" className="space-y-4">
@@ -325,15 +324,14 @@ export default function AssetDetailPage() {
             */}
             <ReferencingFindingsPanel assetId={assetDetails.id} />
           </TabsContent>
-          <TabsContent value="related">
-            <div className="h-[60vh]">
-              <FingerprintsGraph assetId={assetDetails.id} />
-            </div>
-          </TabsContent>
-          <TabsContent value="lineage" className="space-y-4">
-            <div className="h-[60vh]">
-              <LineageView assetId={assetDetails.id} />
-            </div>
+          {/*
+            What this asset is connected to and why: lineage traced either
+            way, duplicates and shared values (fingerprints), the concepts it
+            is about and what reads alike, on Explore's canvas. Its meaning
+            and links by hand are in the canvas's Details for the asset.
+          */}
+          <TabsContent value="connections" className="space-y-4">
+            <ExploreWorkspace mode="asset" assetId={assetDetails.id} />
             <ColumnLineagePanel
               assetId={assetDetails.id}
               columns={columnNames(assetDetails.metadata)}

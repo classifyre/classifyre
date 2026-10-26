@@ -315,7 +315,22 @@ export class SourceService {
       }
     }
 
-    const deleted = await this.prisma.source.delete({ where });
+    // The assets cascade with the source, but `edges` carries no foreign key
+    // (an endpoint can be an external URN), so the links that named them —
+    // lineage, duplicates, and links people drew — go in the same transaction.
+    // Two statements, one per side: an OR across both would not use either
+    // endpoint index.
+    const deleted = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        DELETE FROM edges e USING assets a
+         WHERE a.source_id = ${sourceId}
+           AND e.from_type = 'asset' AND e.from_id = a.id`;
+      await tx.$executeRaw`
+        DELETE FROM edges e USING assets a
+         WHERE a.source_id = ${sourceId}
+           AND e.to_type = 'asset' AND e.to_id = a.id`;
+      return tx.source.delete({ where });
+    });
     await this.correlationJobs.scheduleFull('source deleted');
     return deleted;
   }

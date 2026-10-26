@@ -118,11 +118,13 @@ export const NAMESPACE_STATIC_PATHS: ReadonlyArray<{
   { path: "/assets", changeFrequency: "daily", priority: 0.8 },
   { path: "/findings", changeFrequency: "daily", priority: 0.8 },
   { path: "/discovery", changeFrequency: "daily", priority: 0.7 },
+  { path: "/explore", changeFrequency: "daily", priority: 0.7 },
   { path: "/investigations", changeFrequency: "daily", priority: 0.7 },
   { path: "/scans", changeFrequency: "daily", priority: 0.6 },
   { path: "/detectors", changeFrequency: "weekly", priority: 0.6 },
   { path: "/duplicates", changeFrequency: "weekly", priority: 0.5 },
   { path: "/duplicates/decisions", changeFrequency: "weekly", priority: 0.4 },
+  { path: "/duplicates/explore", changeFrequency: "weekly", priority: 0.4 },
   { path: "/glossary", changeFrequency: "weekly", priority: 0.5 },
   // Each glossary tab is its own address with its own title and description.
   ...GLOSSARY_TAB_PATHS,

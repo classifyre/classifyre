@@ -536,14 +536,6 @@ export class MaintenanceService {
         );
         touched = [...dataset.tables];
         break;
-      case 'graph':
-        result = await this.wipeTables(
-          dataset,
-          [],
-          this.tick(run, dataset.tables[0] ?? 'graph'),
-        );
-        touched = [...dataset.tables];
-        break;
       case 'vocabulary':
       case 'semanticLinks':
       case 'semanticMap':

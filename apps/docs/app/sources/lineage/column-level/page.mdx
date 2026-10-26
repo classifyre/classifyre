@@ -46,8 +46,8 @@ graph LR
 
 ## Reading the column lineage panel
 
-Open any table or view, choose the **Lineage** tab, and pick a column in the
-**Column lineage** panel below the graph. Each row is one step back, read left
+Open any table or view, choose the **Connections** tab, and pick a column in the
+**Column lineage** panel below the canvas. Each row is one step back, read left
 to right in the direction the data moves:
 
 > `customer_income` · `income → ROUND → income`
@@ -156,11 +156,11 @@ follow data out of the evidence:
   far to look.
 - **Show connections** with *Upstream* and *Lineage* walks back to where a
   value came from, as many hops as you ask for.
-- Open any table on the board and its **Lineage** tab has the same column
+- Open any table on the board and its **Connections** tab has the same column
   panel, to see which column carried the data.
 
 A typical trace: a finding flags names in the `customer` column of a report
-view. The column panel shows it is `LOWER(customers.name)`. The **Lineage** tab
+view. The column panel shows it is `LOWER(customers.name)`. The **Connections** tab
 of `customers` then shows every other view that reads that table, which tells
 you where else the same names have gone.
 
@@ -178,7 +178,7 @@ you where else the same names have gone.
 | [Custom connectors](/sources/custom-connectors/reference/#relating-assets) and [augmentation](/sources/augmentation/) | Whatever you declare, including the functions on the way |
 
 Views have to be part of the scan for their lineage to appear. If a view's
-**Lineage** tab shows nothing, check that the source includes views and that
+**Connections** tab shows no lineage, check that the source includes views and that
 the view's base tables are in scope. After changing either, run the source
 again.
 

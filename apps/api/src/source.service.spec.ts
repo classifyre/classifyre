@@ -34,8 +34,14 @@ describe('SourceService', () => {
       runner: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      $executeRaw: jest.fn().mockResolvedValue(0),
+      $transaction: jest.fn(),
       ...prismaOverrides,
     };
+    // The transaction hands the callback the same mock client.
+    prisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) =>
+      fn(prisma),
+    );
     const runnerLogStorage = {
       deleteRunnerLogs: jest.fn(),
     };
@@ -265,6 +271,26 @@ describe('SourceService', () => {
       'source-1',
       'runner-2',
     );
+  });
+
+  it('removes the edges that named the source assets with the source', async () => {
+    const { service, prisma } = createService();
+    prisma.source.findUnique.mockResolvedValue({ id: 'source-1' });
+    prisma.source.delete.mockResolvedValue({ id: 'source-1' });
+
+    await service.deleteSource({ id: 'source-1' });
+
+    // Both endpoint sides, inside the transaction that deletes the source.
+    const statements = prisma.$executeRaw.mock.calls.map((call: any[]) =>
+      (call[0] as string[]).join('?').replace(/\s+/g, ' '),
+    );
+    expect(statements).toHaveLength(2);
+    expect(statements[0]).toContain(
+      "e.from_type = 'asset' AND e.from_id = a.id",
+    );
+    expect(statements[1]).toContain("e.to_type = 'asset' AND e.to_id = a.id");
+    expect(prisma.$executeRaw.mock.calls[0][1]).toBe('source-1');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it('does not delete source when runner log cleanup fails', async () => {

@@ -21,6 +21,9 @@ function fetcher(edges: E[]) {
     relation_class: null,
     confidence: null,
     kind,
+    origin: 'INFERRED',
+    shared_by_label: null,
+    note: null,
   }));
   const calls: string[][] = [];
   const fetchLevel = (frontier: TraceNodeRef[]): Promise<TraceEdgeRow[]> => {

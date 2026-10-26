@@ -11,6 +11,15 @@ export const BOARD_SEMANTIC_HUB_ITEMS = 30;
 /** Other assets per term in the `meaning` trace (SL5 A9). */
 export const MEANING_TRACE_PER_TERM = 10;
 
+/** A term the meaning trace went through. */
+export interface MeaningTraceTerm {
+  id: string;
+  key: string;
+  name: string;
+  /** CONCEPT or ENTITY. */
+  kind: string;
+}
+
 export interface BoardSemanticTerm {
   termId: string;
   key: string;
@@ -434,13 +443,24 @@ export class SemanticBoardLayerService {
    */
   async meaningTrace(seedAssetIds: string[], limit: number) {
     const seeds = [...new Set(seedAssetIds)];
-    if (!seeds.length) return { nodes: [], edges: [], truncated: false };
-    const links = await this.prisma.assetTerm.findMany({
+    const empty = {
+      nodes: [],
+      edges: [],
+      seedTerms: [] as Array<{ assetId: string; termId: string }>,
+      terms: [] as MeaningTraceTerm[],
+      truncated: false,
+    };
+    if (!seeds.length) return empty;
+    const allLinks = await this.prisma.assetTerm.findMany({
       where: { assetId: { in: seeds }, goneAt: null },
       select: { assetId: true, termId: true },
     });
+    // One row per seed and term: an asset can carry a term by several methods.
+    const links = [
+      ...new Map(allLinks.map((l) => [`${l.assetId}:${l.termId}`, l])).values(),
+    ];
     const termIds = [...new Set(links.map((l) => l.termId))];
-    if (!termIds.length) return { nodes: [], edges: [], truncated: false };
+    if (!termIds.length) return empty;
     const others = await this.prisma.$queryRaw<
       Array<{ term_id: string; asset_id: string; rank: bigint }>
     >(Prisma.sql`
@@ -455,7 +475,7 @@ export class SemanticBoardLayerService {
       ) x WHERE rank <= ${MEANING_TRACE_PER_TERM}`);
     const terms = await this.prisma.glossaryTerm.findMany({
       where: { id: { in: termIds } },
-      select: { id: true, key: true, term: true },
+      select: { id: true, key: true, term: true, kind: true },
     });
     const termById = new Map(terms.map((t) => [t.id, t]));
     const assets = await this.prisma.asset.findMany({
@@ -518,6 +538,19 @@ export class SemanticBoardLayerService {
         viaTerm: { id: term.id, key: term.key, name: term.term },
       });
     }
-    return { nodes, edges, truncated };
+    return {
+      nodes,
+      edges,
+      // Which seed carries which term, so a caller can draw the term itself
+      // between every seed and asset that share it.
+      seedTerms: links.map((l) => ({ assetId: l.assetId, termId: l.termId })),
+      terms: terms.map((t) => ({
+        id: t.id,
+        key: t.key,
+        name: t.term,
+        kind: String(t.kind),
+      })),
+      truncated,
+    };
   }
 }
