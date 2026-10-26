@@ -3577,7 +3577,6 @@
     "retry": "Erneut versuchen",
     "gone": "Nichts zu zeigen",
     "goneHint": "Die Assets, bei denen Sie begonnen haben, gibt es nicht mehr oder sie wurden an ihrer Quelle gelöscht.",
-    "linkPick": "Wählen Sie das Asset, mit dem {{name}} verbunden werden soll.",
     "nothingSelected": "Wählen Sie ein Asset, einen Begriff oder eine Linie.",
     "startingPoints": "Ausgangspunkte",
     "startingPoint": "Ausgangspunkt",
@@ -3588,7 +3587,6 @@
     "howToReadLinks": "Jede Art von Verbindung hat ihre eigene Linie, die in ihrem Zähler. Blasser heißt schwächer bewertet. Fahren Sie über eine Linie, um zu lesen, warum sie da ist; heben Sie einen Zähler hervor, um nur eine Art zu sehen.",
     "howToReadYours": "Ziehen Sie vom Rand eines Assets zu einem anderen oder nutzen Sie Verbinden mit…, um eine Verbindung zu ziehen, die die Daten nicht kennen.",
     "startOver": "Hier neu beginnen",
-    "linkTo": "Verbinden mit…",
     "toCase": "Zu einem Fall hinzufügen",
     "openAsset": "Asset öffnen",
     "openTerm": "Im Glossar öffnen",
@@ -3616,7 +3614,8 @@
       "alike": "{{percent}} % ähnlich",
       "repeatedText": "wiederholter Text · {{percent}} %",
       "repeatedTextConfirmed": "wiederholter Text · als gleich bestätigt",
-      "confirmed": "als gleich bestätigt"
+      "confirmed": "als gleich bestätigt",
+      "unsure": "{{reason}} · unsicher"
     },
     "linkTitle": "Zwei Assets verbinden",
     "linkDescription": "Sagen Sie, was sie verbindet. Die Verbindung erscheint in Erkunden, auf Fall-Boards und, wenn sie Herkunft bedeutet, in der Herkunft.",
@@ -3705,11 +3704,8 @@
     "scope": {
       "label": "Welche Verbindungen",
       "all": "Alle",
-      "allHint": "Jede Verbindung, innerhalb der Quelle und aus ihr hinaus",
       "internal": "Gleiche Quelle",
-      "internalHint": "Nur Verbindungen zu Assets derselben Quelle",
       "external": "Andere Quellen",
-      "externalHint": "Nur Verbindungen, die zu anderen Quellen führen oder zu Objekten, die noch keine Quelle gescannt hat",
       "showAll": "Alle Verbindungen zeigen"
     },
     "scopeEmpty": {
@@ -3732,7 +3728,34 @@
       "termHint": "Assets erscheinen hier, sobald eine Bindung, eine Erwähnung oder eine Verknüpfung von Hand sie mit ihm verbindet.",
       "duplicates": "Keine Paare passen zu diesen Filtern",
       "duplicatesHint": "Erweitern Sie die Filter oder setzen Sie sie zurück, um alle Duplikate zu sehen."
-    }
+    },
+    "trailEarlier": "Frühere Ebenen",
+    "menu": {
+      "details": "Details",
+      "newTab": "In neuem Tab öffnen",
+      "carriers": "Was ihn trägt",
+      "why": "Warum sie da ist"
+    },
+    "find": {
+      "onCanvas": "Auf dieser Fläche",
+      "noneOnCanvas": "Nichts auf der Fläche passt.",
+      "meaningOff": "Embeddings sind aus: nur nach Name und Wörtern gefunden.",
+      "elsewhere": "Sonst im Arbeitsbereich",
+      "byMeaning": "{{percent}} % nach Bedeutung",
+      "by_name": "im Namen",
+      "by_words": "im Text"
+    },
+    "linkHint": "Um es mit einem anderen Asset zu verbinden, ziehen Sie eine Linie von seinem Rand zu diesem Asset. Ein Rechtsklick zeigt alles, was die Fläche bietet.",
+    "review": {
+      "title": "Duplikatprüfung",
+      "confirmed": "Von einer Prüferin oder einem Prüfer als gleich bestätigt.",
+      "unsure": "Als unsicher markiert.",
+      "open": "Noch nicht geprüft."
+    },
+    "zoomReset": "Zurück auf 100 %",
+    "zoomSelection": "Auf Auswahl zoomen",
+    "minimap": "Übersichtskarte",
+    "backTo": "Zurück zu {{name}}"
   },
   "casework": {
     "title": "Fallarbeit",

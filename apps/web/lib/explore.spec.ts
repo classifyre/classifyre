@@ -138,6 +138,15 @@ describe("the reason on a link", () => {
     expect(linkReason(edge({ kind: "alike", confidence: 0.836 }), t)).toBe("explore.reason.alike(84)");
   });
 
+  it("says what duplicate review decided before what the scorer says", () => {
+    const shared = { kind: "similar" as const, relationType: "related", sharedByLabel: { person: 2 } };
+    expect(linkReason(edge({ ...shared, review: "CONFIRMED" }), t)).toBe("explore.reason.confirmed");
+    expect(linkReason(edge({ ...shared, review: "UNSURE" }), t)).toBe(
+      "explore.reason.unsure(explore.reason.shares(person ×2))",
+    );
+    expect(linkReason(edge({ ...shared, review: null }), t)).toBe("explore.reason.shares(person ×2)");
+  });
+
   it("shows what a person wrote on their own link", () => {
     expect(linkReason(edge({ origin: "MANUAL", relationType: "derived_from", note: "Copied by hand" }), t)).toBe(
       "Copied by hand",

@@ -26,7 +26,11 @@ export interface ExploreWords {
   yours: string;
   zoomIn: string;
   zoomOut: string;
+  /** The percentage: back to 100 %. */
+  zoomReset: string;
   fit: string;
+  zoomSelection: string;
+  minimap: string;
 }
 
 export const ENGLISH_WORDS: ExploreWords = {
@@ -58,7 +62,10 @@ export const ENGLISH_WORDS: ExploreWords = {
   yours: "Drawn by a person",
   zoomIn: "Zoom in",
   zoomOut: "Zoom out",
+  zoomReset: "Back to 100%",
   fit: "Fit to view",
+  zoomSelection: "Zoom to selection",
+  minimap: "Mini-map",
 };
 
 export interface ExploreCanvasState {

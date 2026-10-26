@@ -7,6 +7,7 @@ import { RotateCcw } from "lucide-react";
 import type { ExploreDuplicatesFilterDto, ReviewPortfolioResponseDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
+import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import { patternName } from "./review-format";
@@ -22,8 +23,6 @@ const REVIEW_STATES = ["any", "open", "confirmed"] as const;
 const SCORES = ["any", "review", "merge"] as const;
 /** Radix Select takes no empty value: "all" stands for no filter. */
 const ALL = "all";
-
-const MICRO = "font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground";
 
 /** The filter, in the address: a pattern page links straight to its own (`?pattern=`). */
 function useDuplicateFilter() {
@@ -45,35 +44,39 @@ function useDuplicateFilter() {
   return { get, set, clear, any: ["pattern", "family", "score", "review", "source"].some((k) => params.has(k)) };
 }
 
+/**
+ * One filter, drawn as the Assets and Findings tables draw theirs: a select
+ * whose value says what it filters ("All patterns", "Any score").
+ */
 function FilterSelect({
   label,
   value,
   onChange,
   options,
+  width,
   testId,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
+  /** The trigger's width, as the tables size theirs. */
+  width: string;
   testId: string;
 }) {
   return (
-    <label className="flex min-w-0 flex-col gap-1">
-      <span className={MICRO}>{label}</span>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-9 w-full min-w-[11rem] rounded-[4px] border-2 sm:w-auto" data-testid={testId}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </label>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={cn("h-9 rounded-[4px] border-2 border-border", width)} aria-label={label} title={label} data-testid={testId}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -116,11 +119,12 @@ export function DuplicatesExplore({ portfolio }: { portfolio: ReviewPortfolioRes
 
   return (
     <div className="space-y-3" data-testid="duplicates-explore">
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <FilterSelect
           label={t("review.explore.pattern")}
           value={patternKey ?? ALL}
           onChange={(v) => filter.set("pattern", v)}
+          width="w-[240px]"
           testId="duplicates-explore-pattern"
           options={[
             { value: ALL, label: t("review.explore.allPatterns") },
@@ -134,6 +138,7 @@ export function DuplicatesExplore({ portfolio }: { portfolio: ReviewPortfolioRes
           label={t("review.explore.family")}
           value={family ?? ALL}
           onChange={(v) => filter.set("family", v)}
+          width="w-[170px]"
           testId="duplicates-explore-family"
           options={[
             { value: ALL, label: t("review.explore.allFamilies") },
@@ -144,6 +149,7 @@ export function DuplicatesExplore({ portfolio }: { portfolio: ReviewPortfolioRes
           label={t("review.explore.score")}
           value={score ?? "any"}
           onChange={(v) => filter.set("score", v === "any" ? null : v)}
+          width="w-[220px]"
           testId="duplicates-explore-score"
           options={SCORES.map((s) => ({
             value: s,
@@ -159,6 +165,7 @@ export function DuplicatesExplore({ portfolio }: { portfolio: ReviewPortfolioRes
           label={t("review.explore.review")}
           value={review ?? "any"}
           onChange={(v) => filter.set("review", v === "any" ? null : v)}
+          width="w-[230px]"
           testId="duplicates-explore-review"
           options={REVIEW_STATES.map((r) => ({ value: r, label: t(`review.explore.review_${r}` as TranslationKey) }))}
         />
@@ -167,7 +174,8 @@ export function DuplicatesExplore({ portfolio }: { portfolio: ReviewPortfolioRes
             label={t("review.explore.source")}
             value={sourceId ?? ALL}
             onChange={(v) => filter.set("source", v)}
-            testId="duplicates-explore-source"
+            width="w-[200px]"
+          testId="duplicates-explore-source"
             options={[
               { value: ALL, label: t("review.explore.allSources") },
               ...portfolio.sources.nodes.map((n) => ({ value: n.id, label: `${n.name} · ${n.pairCount}` })),
@@ -175,7 +183,7 @@ export function DuplicatesExplore({ portfolio }: { portfolio: ReviewPortfolioRes
           />
         )}
         {filter.any && (
-          <Button variant="outline" className="h-9 gap-1.5 rounded-[4px] border-2" onClick={filter.clear}>
+          <Button variant="ghost" size="sm" className="h-9 gap-1.5" onClick={filter.clear}>
             <RotateCcw className="size-3.5" aria-hidden />
             {t("review.explore.reset")}
           </Button>

@@ -11,10 +11,10 @@ import {
   ExternalLink,
   Eye,
   GitBranch,
-  Link2,
   Loader2,
   LogIn,
   Plus,
+  Search,
   Trash2,
   UserRound,
   X,
@@ -22,6 +22,7 @@ import {
 import {
   api,
   type ExploreEdgeDto,
+  type ExploreFindHitDto,
   type ExploreNeighbourhoodResponseDto,
   type SearchAssetItemDto,
 } from "@workspace/api-client";
@@ -35,12 +36,13 @@ import {
 } from "@workspace/case-board/explore";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import { Input } from "@workspace/ui/components/input";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTermHref } from "@/components/glossary/glossary-ui";
 import { encodePairId } from "@/components/review/review-format";
 import { useTranslation } from "@/hooks/use-translation";
-import { getAssetKindIcon } from "@/lib/asset-kind";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
+import type { TranslationKey } from "@/i18n";
 import type { ExploreSuggestion } from "@/lib/explore";
 import { useNsPath } from "@/lib/ns-path";
 
@@ -113,26 +115,107 @@ function IconAction({
   );
 }
 
+/** On-canvas find: which of the drawn assets answer the question, by name, words or meaning. */
+export function useCanvasFind(query: string, assetIds: readonly string[]) {
+  const [state, setState] = React.useState<{ hits: ExploreFindHitDto[]; meaningOff: boolean; finding: boolean }>({
+    hits: [],
+    meaningOff: false,
+    finding: false,
+  });
+  const idsKey = assetIds.join(",");
+  React.useEffect(() => {
+    const q = query.trim();
+    if (!q || !idsKey) {
+      setState({ hits: [], meaningOff: false, finding: false });
+      return;
+    }
+    const controller = new AbortController();
+    setState((s) => ({ ...s, finding: true }));
+    const timer = window.setTimeout(() => {
+      api.explore
+        .exploreControllerFind({ exploreFindRequestDto: { assetIds: idsKey.split(","), q } }, { signal: controller.signal })
+        .then((res) => setState({ hits: res.hits, meaningOff: res.meaning === "off", finding: false }))
+        .catch(() => {
+          if (!controller.signal.aborted) setState({ hits: [], meaningOff: false, finding: false });
+        });
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [idsKey, query]);
+  return state;
+}
+
+/** One row of a panel's list: an asset, what it says, and its actions. */
+function AssetRow({
+  label,
+  detail,
+  meta,
+  lit,
+  onOpen,
+  title,
+  children,
+  testId,
+}: {
+  label: string;
+  detail?: React.ReactNode;
+  meta?: React.ReactNode;
+  lit?: boolean;
+  onOpen: () => void;
+  title?: string;
+  children?: React.ReactNode;
+  testId?: string;
+}) {
+  return (
+    <li className="flex items-start gap-1.5">
+      <button
+        type="button"
+        onClick={onOpen}
+        title={title}
+        className={cn(
+          "min-w-0 flex-1 rounded-[4px] border-2 px-2 py-1.5 text-left hover:bg-muted",
+          lit ? "border-[var(--cb-select)]" : "border-transparent",
+        )}
+        data-testid={testId}
+      >
+        <span className="block truncate text-sm font-semibold">{label}</span>
+        {meta && <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">{meta}</span>}
+        {detail && <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{detail}</span>}
+      </button>
+      {children && <span className="flex shrink-0 gap-1 pt-1.5">{children}</span>}
+    </li>
+  );
+}
+
 /**
- * Find: what the search box found (each with the passage that matched), and
- * the starting points on the canvas.
+ * Find: one search box. What it matches on the canvas glows there (by name,
+ * by the words of a passage, or closest by meaning) and is listed first;
+ * what it matches in the rest of the workspace can be brought in.
  */
 export function FindDrawer({
   query,
+  onQuery,
+  onCanvas,
   search,
   seeds,
   graph,
   onStartFrom,
+  startLabel,
   onAddSeed,
   onRemoveSeed,
   onSelect,
   onAllToCase,
 }: {
   query: string;
+  onQuery: (q: string) => void;
+  onCanvas: ReturnType<typeof useCanvasFind>;
   search: ReturnType<typeof useExploreSearch>;
   seeds: string[];
   graph: ExploreGraph | null;
   onStartFrom: (assetId: string) => void;
+  /** What a click on a workspace result does: start over from it, or dive into it. */
+  startLabel: string;
   onAddSeed: (assetId: string) => void;
   onRemoveSeed?: (assetId: string) => void;
   onSelect: (selection: ExploreSelection) => void;
@@ -140,61 +223,102 @@ export function FindDrawer({
   onAllToCase?: () => void;
 }) {
   const { t } = useTranslation();
-  const onCanvas = graph?.assets.filter((a) => !a.external).length ?? 0;
+  const assets = React.useMemo(() => new Map((graph?.assets ?? []).map((a) => [a.id, a])), [graph]);
+  const drawnCount = graph?.assets.filter((a) => !a.external).length ?? 0;
   const seedAssets = graph?.assets.filter((a) => a.side === "seed") ?? [];
+  const elsewhere = search.results.filter(({ asset }) => !assets.has(asset.id));
+  const how = (hit: ExploreFindHitDto) =>
+    hit.how === "meaning"
+      ? t("explore.find.byMeaning", { percent: Math.round((hit.score ?? 0) * 100) })
+      : t(`explore.find.by_${hit.how}` as TranslationKey);
   return (
     <div className="divide-y-2 divide-border">
-      {query.trim() ? (
-        <section className="space-y-2 p-4">
+      <div className="p-4">
+        <div className="relative">
+          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            placeholder={t("explore.searchPlaceholder")}
+            aria-label={t("explore.searchPlaceholder")}
+            className="h-9 rounded-[4px] border-2 border-border pr-8 pl-9"
+            autoFocus
+            data-testid="explore-search"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => onQuery("")}
+              aria-label={t("explore.clearSearch")}
+              className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-3.5" aria-hidden />
+            </button>
+          )}
+        </div>
+        {!query.trim() && <p className="mt-2 text-xs leading-snug text-muted-foreground">{t("explore.searchHint")}</p>}
+      </div>
+
+      {query.trim() && (
+        <section className="space-y-2 p-4" data-testid="explore-find-canvas">
           <h3 className={cn(MICRO, "flex items-center gap-2")}>
-            {t("explore.results")}
-            {search.searching && <Loader2 className="size-3 animate-spin" aria-hidden />}
+            {t("explore.find.onCanvas")}
+            {onCanvas.finding && <Loader2 className="size-3 animate-spin" aria-hidden />}
           </h3>
-          {search.failed ? (
-            <p className="text-xs text-muted-foreground">{t("explore.searchFailed")}</p>
-          ) : !search.searching && search.results.length === 0 ? (
-            <p className="text-xs text-muted-foreground">{t("explore.noResults")}</p>
+          {!onCanvas.finding && onCanvas.hits.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{t("explore.find.noneOnCanvas")}</p>
           ) : (
             <ul className="space-y-1">
-              {search.results.map(({ asset, match }) => {
-                const Icon = getAssetKindIcon(asset.assetType);
-                const on = seeds.includes(asset.id);
+              {onCanvas.hits.map((hit) => {
+                const a = assets.get(hit.id);
+                if (!a) return null;
                 return (
-                  <li key={asset.id} className="flex items-start gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => onStartFrom(asset.id)}
-                      className={cn(
-                        "min-w-0 flex-1 rounded-[4px] border-2 px-2 py-1.5 text-left hover:bg-muted",
-                        on ? "border-foreground" : "border-transparent",
-                      )}
-                      title={t("explore.startFrom")}
-                      data-testid="explore-result"
-                    >
-                      <span className="flex items-center gap-1.5 text-sm font-semibold">
-                        <Icon className="size-3.5 shrink-0" aria-hidden />
-                        <span className="truncate">{asset.name}</span>
-                      </span>
-                      {match?.text && (
-                        <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
-                          {match.page != null ? `${t("explore.page", { page: match.page })} · ` : ""}
-                          {match.text}
-                        </span>
-                      )}
-                    </button>
-                    <span className="pt-1.5">
-                      <IconAction label={t("explore.addToCanvas")} onClick={() => onAddSeed(asset.id)} disabled={on}>
-                        <Plus className="size-3.5" aria-hidden />
-                      </IconAction>
-                    </span>
-                  </li>
+                  <AssetRow
+                    key={hit.id}
+                    label={a.label}
+                    lit={hit.lit}
+                    onOpen={() => onSelect({ type: "asset", id: hit.id })}
+                    meta={<span className="font-mono text-[10px] text-muted-foreground">{how(hit)}</span>}
+                    detail={hit.text ? `${hit.page != null ? `${t("explore.page", { page: hit.page })} · ` : ""}${hit.text}` : undefined}
+                    testId="explore-find-hit"
+                  />
                 );
               })}
             </ul>
           )}
+          {onCanvas.meaningOff && <p className="text-[11px] text-muted-foreground">{t("explore.find.meaningOff")}</p>}
         </section>
-      ) : (
-        <p className="p-4 text-xs leading-snug text-muted-foreground">{t("explore.searchHint")}</p>
+      )}
+
+      {query.trim() && (
+        <section className="space-y-2 p-4">
+          <h3 className={cn(MICRO, "flex items-center gap-2")}>
+            {t("explore.find.elsewhere")}
+            {search.searching && <Loader2 className="size-3 animate-spin" aria-hidden />}
+          </h3>
+          {search.failed ? (
+            <p className="text-xs text-muted-foreground">{t("explore.searchFailed")}</p>
+          ) : !search.searching && elsewhere.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{t("explore.noResults")}</p>
+          ) : (
+            <ul className="space-y-1">
+              {elsewhere.map(({ asset, match }) => (
+                <AssetRow
+                  key={asset.id}
+                  label={asset.name}
+                  title={startLabel}
+                  onOpen={() => onStartFrom(asset.id)}
+                  detail={match?.text ? `${match.page != null ? `${t("explore.page", { page: match.page })} · ` : ""}${match.text}` : undefined}
+                  testId="explore-result"
+                >
+                  <IconAction label={t("explore.addToCanvas")} onClick={() => onAddSeed(asset.id)} disabled={seeds.includes(asset.id)}>
+                    <Plus className="size-3.5" aria-hidden />
+                  </IconAction>
+                </AssetRow>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
 
       {seedAssets.length > 0 && (
@@ -218,10 +342,10 @@ export function FindDrawer({
               </li>
             ))}
           </ul>
-          {onAllToCase && onCanvas > 0 && (
+          {onAllToCase && drawnCount > 0 && (
             <Button variant="outline" className={ACTION} onClick={onAllToCase}>
               <Briefcase className="size-3.5" aria-hidden />
-              {t("explore.allToCase", { count: onCanvas })}
+              {t("explore.allToCase", { count: drawnCount })}
             </Button>
           )}
         </section>
@@ -369,7 +493,6 @@ export function DetailsDrawer({
   onSelect,
   onAddSeed,
   onStartFrom,
-  onLinkFrom,
   onToCase,
   onChanged,
   seedExtra,
@@ -392,7 +515,6 @@ export function DetailsDrawer({
   onSelect: (selection: ExploreSelection | null) => void;
   onAddSeed: (assetId: string) => void;
   onStartFrom: (assetId: string) => void;
-  onLinkFrom: (assetId: string) => void;
   onToCase: (assetId: string) => void;
   onChanged: () => void;
 }) {
@@ -467,10 +589,6 @@ export function DetailsDrawer({
                 </Button>
               </>
             )}
-            <Button variant="outline" className={ACTION} onClick={() => onLinkFrom(a.id)}>
-              <Link2 className="size-3.5" aria-hidden />
-              {t("explore.linkTo")}
-            </Button>
             <Button variant="outline" className={ACTION} onClick={() => onToCase(a.id)}>
               <Briefcase className="size-3.5" aria-hidden />
               {t("explore.toCase")}
@@ -495,6 +613,8 @@ export function DetailsDrawer({
             )}
           </div>
         )}
+
+        {!a.external && <p className="text-xs leading-snug text-muted-foreground">{t("explore.linkHint")}</p>}
 
         {a.side === "seed" && !a.external && seedExtra?.(a.id)}
 
@@ -696,6 +816,19 @@ function LinkDetails({
         )}
         {manual && <p className="text-xs leading-snug text-muted-foreground">{t("explore.yoursLasts")}</p>}
       </section>
+
+      {(kind === "duplicates" || kind === "similar") && pairHref && (
+        <section className="space-y-1 text-sm" data-testid="explore-pair-review">
+          <h4 className={MICRO}>{t("explore.review.title")}</h4>
+          <p className="leading-snug">
+            {edge.review === "CONFIRMED"
+              ? t("explore.review.confirmed")
+              : edge.review === "UNSURE"
+                ? t("explore.review.unsure")
+                : t("explore.review.open")}
+          </p>
+        </section>
+      )}
 
       <div className="space-y-1.5">
         {pairHref && (

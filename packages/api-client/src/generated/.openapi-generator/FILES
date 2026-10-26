@@ -236,6 +236,9 @@ docs/ExploreApi.md
 docs/ExploreAssetRefDto.md
 docs/ExploreDuplicatesFilterDto.md
 docs/ExploreEdgeDto.md
+docs/ExploreFindHitDto.md
+docs/ExploreFindRequestDto.md
+docs/ExploreFindResponseDto.md
 docs/ExploreKind.md
 docs/ExploreLineageStarterDto.md
 docs/ExploreLinkStarterDto.md
@@ -818,6 +821,9 @@ src/models/ExpandGraphDto.ts
 src/models/ExploreAssetRefDto.ts
 src/models/ExploreDuplicatesFilterDto.ts
 src/models/ExploreEdgeDto.ts
+src/models/ExploreFindHitDto.ts
+src/models/ExploreFindRequestDto.ts
+src/models/ExploreFindResponseDto.ts
 src/models/ExploreKind.ts
 src/models/ExploreLineageStarterDto.ts
 src/models/ExploreLinkStarterDto.ts

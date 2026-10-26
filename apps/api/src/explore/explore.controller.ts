@@ -24,6 +24,8 @@ import {
   ExploreStartersResponseDto,
   ExploreViewDto,
   SaveExploreViewDto,
+  ExploreFindRequestDto,
+  ExploreFindResponseDto,
 } from './explore.dto';
 import { ExploreService } from './explore.service';
 import { ExploreViewsService } from './explore-views.service';
@@ -56,6 +58,22 @@ export class ExploreController {
     @Body() body: ExploreNeighbourhoodRequestDto,
   ): Promise<ExploreNeighbourhoodResponseDto> {
     return this.explore.neighbourhood(body);
+  }
+
+  @AllowInDemoMode()
+  @ReadOnlyEndpoint()
+  @Post('find')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Which of the assets on a canvas answer a question',
+    description:
+      'Reads only the assets given (what an Explore canvas shows): those whose name or a ' +
+      'passage holds the words, then the rest by meaning, closest first. The few that stand ' +
+      'out are marked lit.',
+  })
+  @ApiResponse({ status: 200, type: ExploreFindResponseDto })
+  find(@Body() body: ExploreFindRequestDto): Promise<ExploreFindResponseDto> {
+    return this.explore.find(body);
   }
 
   @AllowInDemoMode()

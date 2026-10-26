@@ -105,8 +105,23 @@ export interface ExploreEdgeDto {
      * @memberof ExploreEdgeDto
      */
     passage?: string | null;
+    /**
+     * For duplicates and shared values: what duplicate review decided about the pair. Pairs ruled apart are never returned.
+     * @type {string}
+     * @memberof ExploreEdgeDto
+     */
+    review?: ExploreEdgeDtoReviewEnum | null;
 }
 
+
+/**
+ * @export
+ */
+export const ExploreEdgeDtoReviewEnum = {
+    Confirmed: 'CONFIRMED',
+    Unsure: 'UNSURE'
+} as const;
+export type ExploreEdgeDtoReviewEnum = typeof ExploreEdgeDtoReviewEnum[keyof typeof ExploreEdgeDtoReviewEnum];
 
 
 /**
@@ -147,6 +162,7 @@ export function ExploreEdgeDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'sharedByLabel': json['sharedByLabel'] == null ? undefined : json['sharedByLabel'],
         'note': json['note'] == null ? undefined : json['note'],
         'passage': json['passage'] == null ? undefined : json['passage'],
+        'review': json['review'] == null ? undefined : json['review'],
     };
 }
 
@@ -174,6 +190,7 @@ export function ExploreEdgeDtoToJSONTyped(value?: ExploreEdgeDto | null, ignoreD
         'sharedByLabel': value['sharedByLabel'],
         'note': value['note'],
         'passage': value['passage'],
+        'review': value['review'],
     };
 }
 
