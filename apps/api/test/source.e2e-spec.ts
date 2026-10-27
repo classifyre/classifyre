@@ -119,7 +119,7 @@ describe('Source (e2e)', () => {
     expect(response.body.message).toContain('must have required property');
   });
 
-  it('should generate same ID for same source config (idempotency)', async () => {
+  it('should create a separate source for each create call, even with the same config', async () => {
     const createSourceDto = {
       type: 'WORDPRESS',
       name: 'Idempotent Test Source',
@@ -149,7 +149,7 @@ describe('Source (e2e)', () => {
       .send(createSourceDto)
       .expect(201);
 
-    expect(response1.body.id).toBe(response2.body.id);
+    expect(response1.body.id).not.toBe(response2.body.id);
   });
 
   it('should test connection for a source and use the correct id', async () => {
