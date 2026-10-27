@@ -7,7 +7,7 @@ import {
   termNodeId,
   type ExploreGraph,
   type ExploreKind,
-} from "@workspace/case-board/explore";
+} from "@workspace/case-board/explore/model";
 import type { TranslationKey } from "@/i18n";
 
 /**

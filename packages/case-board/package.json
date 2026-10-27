@@ -32,6 +32,7 @@
     "./hooks/*": "./src/hooks/*.ts",
     "./components/*": "./src/components/*.tsx",
     "./demo": "./src/demo/index.ts",
-    "./explore": "./src/explore/index.ts"
+    "./explore": "./src/explore/index.ts",
+    "./explore/*": "./src/explore/*.ts"
   }
 }

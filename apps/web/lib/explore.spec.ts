@@ -1,5 +1,5 @@
 import type { ExploreEdgeDto, ExploreNeighbourhoodResponseDto } from "@workspace/api-client";
-import { layoutExplore, visibleGraph } from "@workspace/case-board/explore";
+import { layoutExplore, visibleGraph } from "@workspace/case-board/explore/layout";
 import {
   exploreViewQuery,
   kindsOf,
