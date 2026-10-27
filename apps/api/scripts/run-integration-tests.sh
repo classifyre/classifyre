@@ -53,11 +53,13 @@ cleanup_schema() {
 BASE_DATABASE_URL="${DATABASE_URL}"
 if [[ -n "${INTEGRATION_TEST_SCHEMA_KEY:-}" ]]; then
   echo "Preparing isolated integration schema from key: ${INTEGRATION_TEST_SCHEMA_KEY}"
-  eval "$(
+  # Capture first: a failing command inside eval "$(...)" would not abort the script.
+  schema_env="$(
     DATABASE_URL="${BASE_DATABASE_URL}" \
       INTEGRATION_TEST_SCHEMA_KEY="${INTEGRATION_TEST_SCHEMA_KEY}" \
       bun run ./scripts/manage-integration-schema.ts prepare
   )"
+  eval "${schema_env}"
   trap cleanup_schema EXIT
   echo "Using integration schema ${INTEGRATION_TEST_SCHEMA}"
 fi
