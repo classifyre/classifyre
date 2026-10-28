@@ -1,0 +1,56 @@
+name: Release notes
+
+# Every PR must carry its user-facing release note as a fragment file, or be
+# explicitly labeled as technical. Fragments live in changelog.d/ (see
+# changelog.d/README.md) and are compiled into CHANGELOG.md at release time.
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  fragment:
+    name: Changelog fragment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Dependabot PRs are dependency bumps with no user impact by definition.
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Require a fragment or the skip label
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HAS_SKIP_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'skip-changelog') }}
+        run: |
+          set -euo pipefail
+          git fetch origin "${BASE_REF}" --depth=1 >/dev/null 2>&1 || true
+          base="$(git merge-base "origin/${BASE_REF}" "${HEAD_SHA}")"
+          changed="$(git diff --name-only --diff-filter=ACMRT "${base}" "${HEAD_SHA}" -- 'changelog.d/*.md' || true)"
+          fragments="$(grep -v '^changelog.d/README\.md$' <<< "${changed}" || true)"
+
+          if [[ -n "${fragments}" ]]; then
+            echo "Fragments changed:"
+            echo "${fragments}"
+            # shellcheck disable=SC2086
+            node scripts/check-changelog-fragments.mjs ${fragments}
+            exit 0
+          fi
+
+          if [[ "${HAS_SKIP_LABEL}" == "true" ]]; then
+            echo "No fragment, but the 'skip-changelog' label is present — passing."
+            exit 0
+          fi
+
+          echo "::error::No release-notes fragment in changelog.d/ and no 'skip-changelog' label on this PR."
+          echo "::error::Add changelog.d/<pr-or-slug>.<type>.md (see changelog.d/README.md), or add the 'skip-changelog' label for purely technical PRs."
+          exit 1

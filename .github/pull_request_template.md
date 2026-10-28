@@ -14,6 +14,15 @@
 - [ ] Performance improvement
 - [ ] CI/CD improvements
 
+## Release Notes
+
+<!-- Every PR needs ONE of the following — CI fails otherwise -->
+<!-- 1. A fragment file: changelog.d/<pr-or-slug>.<type>.md (type: added, changed, deprecated, removed, fixed, security). See changelog.d/README.md. -->
+<!-- 2. The `skip-changelog` label, for purely technical PRs (refactors, tests, CI, docs typos, dependency bumps). -->
+
+- [ ] Added `changelog.d/` fragment (user-facing change)
+- [ ] Applied `skip-changelog` label (no user-facing change)
+
 ## How Has This Been Tested?
 
 <!-- Describe the tests you ran -->

@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "build": "turbo build --filter=!@workspace/devops",
+    "changelog:check": "node scripts/check-changelog-fragments.mjs",
+    "changelog:build": "node scripts/build-release-notes.mjs",
     "docs:generate": "node scripts/extract-helm-values.mjs",
     "docs:check-generated": "node scripts/extract-helm-values.mjs --check",
     "docs:build": "bun run --cwd apps/docs build",

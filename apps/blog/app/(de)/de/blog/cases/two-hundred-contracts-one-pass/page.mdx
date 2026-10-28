@@ -1,6 +1,6 @@
 ---
-title: "Auf die Worte zeigen: 200 echte Verträge, einmal gelesen auf einer CPU"
-description: "Wer hat unterschrieben, bis wann läuft der Vertrag, verlängert er sich von selbst, welches Recht gilt, und was passiert, wenn die Firma verkauft wird. Gefragt an 200 echte Handelsverträge, beantwortet von einem kleinen Extraktionsmodell auf eigener Hardware und geprüft an den Antworten von Juristen. Und worin es sich von einem System-One-Entscheidungsmodell unterscheidet."
+title: "Auf die Worte zeigen: Zero-Shot-Extraktion an 200 echten Verträgen"
+description: "Was Named Entity Recognition und Zero-Shot-Extraktion sind, wie GLiNER2 arbeitet und was es in 200 echten Verträgen auf einer CPU fand und übersah."
 date: 2026-10-27T00:00:00.000Z
 tags:
   - contracts
@@ -13,13 +13,16 @@ categories:
 author: Classifyre Team
 image: /blog/assets/images/two-hundred-contracts-one-pass.jpg
 keywords:
+  - Named Entity Recognition
+  - Zero-Shot NER
+  - Eigennamenerkennung
+  - GLiNER2
+  - GLiNER2.5
   - Vertragsdaten extrahieren
-  - Vertragsprüfung Due Diligence
-  - Kündigungsfrist automatische Verlängerung
   - anwendbares Recht extrahieren
-  - Entitätenextraktion CPU
+  - Kündigungsfrist extrahieren
+  - Vertragsprüfung Due Diligence
   - Extraktionsmodell vs. Entscheidungsmodell
-  - System One Modelle
   - CUAD Vertragsdatensatz
   - Classifyre
 alternates:
@@ -30,26 +33,26 @@ alternates:
     x-default: /blog/cases/two-hundred-contracts-one-pass/
 openGraph:
   type: article
-  title: "Auf die Worte zeigen: 200 echte Verträge, einmal gelesen auf einer CPU"
-  description: "Parteien, Daten, Verlängerung, Kündigungsfrist und anwendbares Recht aus 200 echten Verträgen, gelesen von einem kleinen Modell auf eigener Hardware und geprüft an den Antworten von Juristen."
+  title: "Auf die Worte zeigen: Zero-Shot-Extraktion an 200 echten Verträgen"
+  description: "Named Entities, Zero-Shot und GLiNER2 erklärt, dann an 200 echten Verträgen ausprobiert: welches Recht sie nennen, was das Modell über England falsch verstand, und welche Fälle daraus wurden."
   url: /de/blog/cases/two-hundred-contracts-one-pass
   siteName: Classifyre
   publishedTime: 2026-10-27T00:00:00.000Z
-  modifiedTime: 2026-10-27T00:00:00.000Z
+  modifiedTime: 2026-10-28T00:00:00.000Z
   authors:
     - Classifyre Team
   section: Field Notes
   tags:
+    - Named Entity Recognition
+    - Zero-Shot
     - Verträge
-    - Extraktion
     - Due Diligence
-    - System One
   images:
     - /blog/assets/images/two-hundred-contracts-one-pass.jpg
 twitter:
   card: summary_large_image
-  title: "Auf die Worte zeigen: 200 echte Verträge, einmal gelesen auf einer CPU"
-  description: "Parteien, Daten, Verlängerung, Kündigungsfrist und anwendbares Recht aus 200 echten Verträgen, gelesen von einem kleinen Modell auf eigener Hardware und geprüft an den Antworten von Juristen."
+  title: "Auf die Worte zeigen: Zero-Shot-Extraktion an 200 echten Verträgen"
+  description: "Named Entities, Zero-Shot und GLiNER2 erklärt, dann an 200 echten Verträgen ausprobiert: welches Recht sie nennen, was das Modell über England falsch verstand, und welche Fälle daraus wurden."
   images:
     - /blog/assets/images/two-hundred-contracts-one-pass.jpg
 ---
@@ -57,24 +60,25 @@ twitter:
 <ArticleHero
   image="/blog/assets/images/two-hundred-contracts-one-pass.jpg"
   eyebrow="Field notes"
-  title="Auf die Worte zeigen: 200 echte Verträge, einmal gelesen auf einer CPU"
-  description="Wer hat unterschrieben, bis wann läuft der Vertrag, verlängert er sich von selbst, welches Recht gilt, und was passiert, wenn die Firma verkauft wird. Gefragt an 200 echte Verträge, beantwortet von einem kleinen Modell auf eigener Hardware."
+  title="Auf die Worte zeigen: Zero-Shot-Extraktion an 200 echten Verträgen"
+  description="Was Named Entity Recognition und Zero-Shot bedeuten, wie ein kleines Modell Fakten findet, auf die es nie trainiert wurde, und was es in 200 echten Verträgen fand und übersah."
 />
 
 <ArticleJsonLd
-  headline="Auf die Worte zeigen: 200 echte Verträge, einmal gelesen auf einer CPU"
-  description="Parteien, Daten, Verlängerung, Kündigungsfrist und anwendbares Recht aus 200 echten Handelsverträgen, gelesen von einem kleinen Extraktionsmodell auf eigener Hardware, geprüft an den Antworten von Juristen und verglichen mit System-One-Entscheidungsmodellen."
+  headline="Auf die Worte zeigen: Zero-Shot-Extraktion an 200 echten Verträgen"
+  description="Was Named Entity Recognition und Zero-Shot-Extraktion sind, wie GLiNER2 arbeitet und was es in 200 echten Handelsverträgen auf einer CPU fand und übersah, geprüft an den Antworten von Juristen."
   path="/de/blog/cases/two-hundred-contracts-one-pass"
   datePublished="2026-10-27T00:00:00.000Z"
-  dateModified="2026-10-27T00:00:00.000Z"
+  dateModified="2026-10-28T00:00:00.000Z"
   authorName="Classifyre Team"
   articleSection="Field Notes"
   about={[
+    "Named Entity Recognition",
+    "Zero-Shot-Informationsextraktion",
     "Vertragsdaten extrahieren",
     "Due Diligence",
-    "Kündigungsfristen",
     "Anwendbares Recht",
-    "Extraktionsmodelle und Entscheidungsmodelle",
+    "Kündigungsfristen",
   ]}
   mentions={[
     {
@@ -83,22 +87,36 @@ twitter:
       url: "https://showcase.classifyre.com/contract-data-room",
       applicationCategory: "Data classification software",
     },
+    {
+      "@type": "Dataset",
+      name: "Contract Understanding Atticus Dataset (CUAD)",
+      license: "https://creativecommons.org/licenses/by/4.0/",
+    },
   ]}
-  liveCaseUrl="https://showcase.classifyre.com/contract-data-room"
+  liveCaseUrl="https://showcase.classifyre.com/de/contract-data-room"
   liveCaseName="Contract Data Room"
 />
 
 <LiveCaseLink
-  href="https://showcase.classifyre.com/contract-data-room"
+  href="https://showcase.classifyre.com/de/contract-data-room"
   caseName="Workspace Contract Data Room"
+  locale="de"
 />
 
 <ArticleSideRail
-  title="Auf die Worte zeigen: 200 echte Verträge, einmal gelesen auf einer CPU"
+  title="Auf die Worte zeigen: Zero-Shot-Extraktion an 200 echten Verträgen"
   path="/de/blog/cases/two-hundred-contracts-one-pass/"
   tags={["contracts", "extraction", "due-diligence", "glossary", "investigations"]}
   backHref="/de/blog/cases"
   backLabel="Alle Fallakten"
+/>
+
+<iframe
+  className="my-6 aspect-video w-full border-2 border-border"
+  src="https://www.youtube.com/embed/NY-vrC80hIc"
+  title="Auf die Worte zeigen: Zero-Shot-Extraktion an 200 echten Verträgen"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
 />
 
 Eine Firma soll verkauft werden. Die Anwälte des Käufers öffnen den Datenraum
@@ -106,15 +124,14 @@ und finden 200 Verträge. Jedem davon stellen sie dieselben Fragen:
 
 - Wer hat ihn unterschrieben?
 - Wann, und bis wann läuft er?
-- Verlängert er sich von selbst, und mit welcher Frist kann man das stoppen?
+- Mit welcher Frist kann man ihn beenden?
 - Welches Recht gilt?
-- Ändert sich etwas, wenn die Firma den Eigentümer wechselt?
 
 Jede Antwort steht irgendwo im Vertrag. *"This Agreement shall be governed by
-the laws of the State of Delaware"* steht auf Seite vierzehn. Das zweihundertmal
-zu finden, sind Wochen sorgfältiger, öder Lektüre.
+the laws of the State of Delaware"* steht auf Seite vierzehn. Das
+zweihundertmal zu finden, sind Wochen sorgfältiger, öder Lektüre.
 
-Dafür braucht man kein Modell, das denkt. Man braucht eines, das **zeigt**.
+Dafür braucht man kein Modell, das schreibt. Man braucht eines, das **zeigt**.
 
 <Alert>
   <AlertTitle>Was echt ist und was nicht</AlertTitle>
@@ -124,65 +141,117 @@ Dafür braucht man kein Modell, das denkt. Man braucht eines, das **zeigt**.
     veröffentlicht von The Atticus Project als Contract Understanding Atticus
     Dataset (CUAD, CC BY 4.0). CUAD veröffentlicht auch die Antworten, die
     Juristen zu jedem Vertrag geschrieben haben; wir nutzen sie nur, um das
-    Modell zu prüfen. Der Verkauf und der Käufer sind unsere Rahmung; es gibt
-    keinen Deal. Jede Zahl wurde am 27. Oktober 2026 im Workspace gemessen.
+    Modell zu prüfen. Der Verkauf und der Käufer sind unsere Rahmung, ebenso
+    die beiden Beispielsätze mit dem Vermerk "illustration". Jede Zahl wurde am
+    28. Oktober 2026 im Workspace gezählt. Die Bilder sind Standbilder aus dem
+    Film: Die limettengrünen Rahmen, Etiketten und Notizen darauf stammen von
+    uns, nicht aus dem Produkt.
   </AlertDescription>
 </Alert>
 
-## Zwei Arten von Modellen, die in einem Durchgang antworten
+## Was Named Entity Recognition ist
 
-Die meisten kennen KI als Chatmodell. Es liest die Frage und **schreibt** eine
-Antwort, Wort für Wort. Das ist flexibel, langsam, wird pro Wort bezahlt, und es
-kann etwas schreiben, das nicht im Dokument steht.
+**Named Entity Recognition** (NER, Eigennamenerkennung) ist eine der ältesten
+Aufgaben der Sprachverarbeitung: die Namen in einem Text finden und sagen,
+welcher Art jeder ist. Eine Person, eine Firma, ein Ort, ein Datum.
 
-Für Fragen mit fester Form gibt es eine schnellere Art von Modell, die gar
-nicht schreibt. Davon gibt es zwei Familien, und man verwechselt sie leicht.
+![Ein erfundener Satz, "Mara Feld of Larkmoor Homes signed the lease in Leeds on 3 March 2026", jeder Name umrahmt und als Person, Firma, Ort und Datum beschriftet](/blog/assets/images/contract-data-room-ner-sentence.webp)
 
-**Ein Entscheidungsmodell**, auch **System-One**-Modell genannt, beantwortet
-eine Frage über den Text. Man fragt *"Verlängert sich dieser Vertrag
-automatisch?"* und bekommt *ja, zu 93 % sicher*. Es wägt den ganzen Text ab und
-gibt ein Urteil. Darüber haben wir in
-[One Look](/de/blog/articles/decision-models-system-one-explained/)
-geschrieben.
+Klassisch trainiert man dafür ein Modell auf Tausenden von Hand markierten
+Sätzen. Es lernt diese Labels, und nur diese. Wer *anwendbares Recht* oder
+*Kündigungsfrist* will, markiert ein paar Tausend Sätze mehr und trainiert
+neu. Deshalb war NER lange ein fester Satz von vier oder fünf Labels.
 
-**Ein Extraktionsmodell** zeigt die Worte. Man fragt nach *"renewal:
-Formulierung, die den Vertrag verlängert"* und bekommt *"shall automatically
-renew for successive one-year terms"*, zusammen mit der Stelle, an der der Satz
-steht. Im selben Durchgang kann es den Text auch in vorgegebene Kategorien
-einordnen. Es schreibt nie ein eigenes Wort: Alles, was es zurückgibt, ist
-entweder ein Stück des Dokuments oder eines der vorgegebenen Labels.
+## Was Zero-Shot bedeutet
 
-| | Entscheidungsmodell (System One) | Extraktionsmodell |
-| --- | --- | --- |
-| Man fragt | Eine Frage mit festen Antworten | Nach den Textstellen, die zu einer Beschreibung passen |
-| Man bekommt | Ein Urteil und eine Wahrscheinlichkeit | Die genauen Worte, ihre Position, eine Konfidenz |
-| Kann es etwas liefern, das nicht im Text steht? | Es urteilt, also ja: ein Urteil | Nein |
-| Wo es läuft | Meist bei einem Anbieter, mit API-Schlüssel | Auf der eigenen CPU |
-| Stark bei | Urteilen: ist das dringend, gibt es diese Klausel | Fakten: Namen, Daten, Beträge, Fristen, Rechtsordnungen |
+**Zero-Shot** dreht das um. Null heißt null Beispiele: Das Label wird nicht
+vorher gelernt, Sie schreiben es, wenn Sie fragen. Ein Zero-Shot-Extraktionsmodell
+liest Ihr Label als Text, so wie das Dokument, vergleicht es mit jeder
+Wortfolge und behält die Wortfolgen, die gut genug passen.
 
-Ein einfaches Bild: Das Entscheidungsmodell ist ein Kollege, der sagt *"ja, der
-verlängert sich, ziemlich sicher"*. Das Extraktionsmodell ist ein Kollege mit
-Textmarker, der einem die Seite mit dem markierten Satz zurückgibt.
+![Ein Label, notice_period, mit seiner Beschreibung, verglichen mit vier Wortfolgen einer Vertragsklausel; "ninety (90) days' prior written notice" erreicht 0,97, die anderen unter 0,05 (eine Illustration)](/blog/assets/images/contract-data-room-zero-shot.webp)
 
-Sie sind keine Konkurrenten. Erst markieren, dann urteilen.
+Die Kündigungsfrist ist damit kein Trainingsprojekt mehr. Sie ist eine Zeile,
+die Sie tippen: *"Notice needed to end the contract, e.g. 'ninety (90) days'"*.
 
-## Der Datenraum als Workspace
+## GLiNER2 und GLiNER2.5
 
-![Der Detektor "Contract facts" im Editor: die Frage nach der Vertragsart, mit einer einzeiligen Beschreibung pro Label, Lizenz, Vertrieb, Dienstleistung, Lieferung und Marketing](/blog/assets/images/contract-data-room-detector.webp)
+GLiNER2 ist eines dieser Modelle. Es erschien 2025 mit offenen Gewichten
+(Apache 2.0) und hat etwa 205 Millionen Parameter, klein genug für eine
+gewöhnliche CPU, wo Chatmodelle Milliarden haben.
 
-Der Workspace hat fünf Teile, alle mit dem normalen Produkt gebaut.
+Es ist ein **Encoder**: Es liest den Text und schreibt kein einziges Wort.
+Alles, was es zurückgibt, ist entweder ein Stück Ihres Dokuments mit seiner
+Position oder eines Ihrer eigenen Labels. Es erledigt mehrere Aufgaben in einem
+Durchgang: Namen, eine Klassifikation und einen strukturierten Datensatz, alles
+aus einem Schema.
 
-**Die Verträge.** Eine Quelle liest die Textfassungen direkt aus dem
-öffentlichen Datensatz auf Hugging Face. Kein Konto, kein Token, keine Kopie
-dazwischen.
+![Was ein Extraktionsmodell zurückgibt: keinen geschriebenen Satz, sondern ein Stück des Dokuments mit seinen Zeichenpositionen, und eines Ihrer eigenen Labels](/blog/assets/images/contract-data-room-what-comes-back.webp)
 
-**Ein Detektor, ein Durchgang.** Der Extraktionsdetektor benennt sieben Fakten
-und eine Frage. Jeder Fakt ist ein kurzes Label mit einer einzeiligen
-Beschreibung:
+Warum so viele Teams es nutzen:
+
+- **Kosten.** Nichts wird pro Seite bezahlt.
+- **Tempo.** Es bewertet alle Labels zusammen, also dauern fünfzig Labels kaum
+  länger als fünf (das Paper maß 130 ms für 5 Labels und 208 ms für 50, auf
+  einer CPU).
+- **Datenschutz.** Verträge, Arztbriefe und Personalakten verlassen das Haus
+  nie.
+- **Gut genug.** Im Zero-Shot-Test des Papers, Namen in fünf Fachgebieten zu
+  finden, erreichte es 59,0 F1, nur einen Punkt hinter den 59,9 eines großen
+  Chatmodells.
+
+Man nutzt es, um persönliche Daten zu schwärzen, Felder aus Dokumenten zu
+ziehen, Anfragen weiterzuleiten und Wissensgraphen zu bauen.
+
+**GLiNER2.5** kam im August 2026. Das ältere Modell probierte jede kurze
+Wortfolge als mögliche Antwort aus. Das neue sagt voraus, wo eine Antwort
+beginnt und wo sie endet; eine Antwort kann also beliebig lang sein, und es
+liest etwa 4.000 Wörter auf einmal. Es gibt drei Größen von 74 bis 287 Millionen
+Parametern; die größte liest viele Sprachen.
+
+![Dieselben Wörter auf zwei Arten gelesen: jede kurze Wortfolge als Kandidat, und eine Antwort, markiert durch ihren Anfang und ihr Ende](/blog/assets/images/contract-data-room-start-and-end.webp)
+
+## Eine Regel zum Behalten
+
+Was ein Extraktionsmodell nicht tut, ist denken. Es urteilt nicht, und es
+rechnet nicht.
+
+![Vier Karten: Point, wenn es im Text steht; Decide, ein Urteil mit festen Optionen; Write, wenn es ausgerechnet werden muss; Pattern, wenn es eine feste Form hat](/blog/assets/images/contract-data-room-rule-of-thumb.webp)
+
+- **Es steht im Text:** ein Modell, das zeigt (Extraktion). Parteien, Daten,
+  Kündigungsfristen, anwendbares Recht.
+- **Ein Urteil mit festen Optionen:** ein Modell, das entscheidet. *Verlängert
+  sich dieser Vertrag von selbst?* Darüber haben wir in
+  [One Look](/de/blog/articles/decision-models-system-one-explained/)
+  geschrieben.
+- **Es muss ausgerechnet werden:** ein Modell, das schreibt. Das Datum, an dem
+  eine Kündigung fällig ist.
+- **Eine feste Form:** ein Muster. Eine Bestell- oder Kontonummer.
+
+## Der Datenraum
+
+Um zu sehen, wie weit Zeigen trägt, haben wir einen Datenraum gebaut, den jeder
+öffnen kann.
+
+![Der Testsatz: 510 Handelsverträge, von börsennotierten US-Unternehmen bei der SEC eingereicht, mit Antworten von Juristen zu 41 Klauselarten](/blog/assets/images/contract-data-room-cuad.webp)
+
+Die Verträge stammen aus CUAD, einem öffentlichen Satz, der genau für diesen
+Test gemacht ist: 510 Handelsverträge, die börsennotierte US-Unternehmen bei der
+SEC eingereicht haben, mit Antworten von Juristen zu 41 Klauselarten. Eine
+Quelle liest 200 davon, die Klartextfassungen, direkt aus der öffentlichen
+Kopie auf Hugging Face. Kein Konto, kein Token, keine Zwischenkopie.
+
+Der Workspace hat eine Quelle, einen Detektor, drei Glossar-Schemata, drei
+Beobachtungen und zwei Fälle, alles mit dem gewöhnlichen Produkt gebaut.
+
+![Der Workspace Contract Data Room: eine Quelle, SEC contract filings (CUAD), gelesen von Hugging Face, in 75 Minuten abgeschlossen](/blog/assets/images/contract-data-room-source.webp)
+
+**Ein Detektor, ein Durchgang.** Er benennt sieben Fakten und stellt eine
+Frage. Jeder Fakt ist ein kurzes Label mit einer Zeile Beschreibung:
 
 | Fakt | Beschreibung, die das Modell liest |
 | --- | --- |
-| `party` | Ein Unternehmen oder eine Person, die den Vertrag unterschreibt |
+| `party` | Eine Firma oder Person, die diesen Vertrag unterschreibt |
 | `agreement_date` | Das Datum, an dem der Vertrag geschlossen wird |
 | `effective_date` | Das Datum, an dem der Vertrag wirksam wird |
 | `term` | Wie lange der Vertrag läuft oder wann er endet |
@@ -190,205 +259,218 @@ Beschreibung:
 | `notice_period` | Frist, um zu kündigen oder eine Verlängerung zu stoppen |
 | `governing_law` | Staat oder Land, dessen Recht für den Vertrag gilt |
 
-Die Frage lautet *welche Art von Vertrag ist das*: Lizenz, Vertrieb,
-Dienstleistung, Lieferung, Marketing, Partnerschaft oder IP-Übertragung, auch
-jeweils mit einer einzeiligen Beschreibung.
+Die Frage lautet *was für ein Vertrag ist das*: Lizenz, Vertrieb,
+Dienstleistung, Lieferung, Marketing, Partnerschaft oder IP-Übertragung. Der
+Detektor nutzt das neuere GLiNER2.5 in der Basisgröße, innerhalb des Scans, auf
+der eigenen CPU des Scans. (Die Beschreibungen selbst sind englisch, wie die
+Verträge.)
 
-Das Modell ist klein genug für einen Laptop, also läuft es im Scan selbst, auf
-dessen CPU. Nichts verlässt die Maschine.
+![Der Detektor im Editor: jeder Fakt ein Label mit einer einzeiligen Beschreibung und einem Beispiel](/blog/assets/images/contract-data-room-detector.webp)
 
-**Ein Glossar.** Die Ergebnisse bedeuten etwas: eine Taxonomie der
-Vertragsarten, die Vertragsbedingungen und eine Liste von Rechtsordnungen. Jede
-Detektorausgabe ist an ihren Begriff gebunden. Die Werte zum anwendbaren Recht
-werden in der Liste der Rechtsordnungen nachgeschlagen, sodass *"the laws of the
-State of New York"*, *"New York law"* und *"State of New York"* alle zu **New
-York** werden, und New York steht unter **Vereinigte Staaten**.
+**Ein Glossar.** Drei Schemata sagen, was die Ergebnisse bedeuten: eine
+Taxonomie der Vertragsarten, die Vertragsbegriffe und eine Liste der
+Rechtsordnungen, US-Bundesstaaten unter *United States*, alles andere unter
+*Outside the United States*. Die Werte zum anwendbaren Recht werden darin
+nachgeschlagen; *"the laws of the State of New York"*, *"New York law"* und
+*"State of New York"* werden alle zu **New York**.
 
-**Beobachtungen.** Drei stehende Fragen folgen der Bedeutung, nicht dem
-Wortlaut: genannte Kündigungsfristen; Verträge unter Recht außerhalb der USA;
-Verträge unter dem Recht von Delaware.
+## Ein Durchgang, eine englische Klausel
 
-**Fälle.** Zwei Fälle handeln danach: die Verträge, für die ausländische
-Anwälte nötig sind, und die Kündigungsfristen, die in einen Kalender
-gehören.
+Ein Durchgang über einen Vertrag liefert die Wörter und wo sie stehen. Hier ein
+Dienstleistungsvertrag: *"This Agreement is governed by the laws of England
+and Wales."* Das Glossar ordnet England und Wales unter *Outside the United
+States* ein. Niemand hat eine Regel für England geschrieben.
 
-## Was ein Durchgang liefert
+![Die Bedeutung des Werts: Governing law; England and Wales über das Nachschlagen in den Rechtsordnungen; und Outside the United States, abgeleitet aus England and Wales](/blog/assets/images/contract-data-room-england-meaning.webp)
 
-Nehmen wir einen Vertrag: einen Fertigungs-Outsourcing-Vertrag zwischen Nice
-Systems Ltd. und Flextronics (Israel) Ltd., eingereicht 2003, rund 20.000 Wörter
-lang. Ein Durchgang des Modells liefert:
+Alles, was ein Durchgang aus einem Vertrag zog, Label für Label, mit einer
+Konfidenz für jeden Wert:
 
-| Fakt | Was es gefunden hat | Konfidenz |
-| --- | --- | --- |
-| Parteien | *Nice Systems Ltd.*, *Flextronics Israel Ltd.* | 99 %, 96 % |
-| Vertragsdatum | *January 21st, 2002* | 100 % |
-| Wirksam ab | *July 1, 2002* | 100 % |
-| Laufzeit | *3 years*, *7 years* | 99 % |
-| Verlängerung | *automatic renewal* | 95 % |
-| Kündigungsfrist | *six (6) months*, *forty-five (45) Days* und weitere | 100 %, 97 % |
-| Anwendbares Recht | *state of Israel* | 99 % |
-| Vertragsart | Dienstleistung | 99 % |
+![Alles, was ein Durchgang aus einem Vertrag zog, Label für Label, mit einer Konfidenz für jeden Wert](/blog/assets/images/contract-data-room-one-pass.webp)
 
-Jeder Wert ist ein Stück des Vertrags, mit seiner Position. Öffnet man das
-anwendbare Recht, sieht man den Satz, aus dem es stammt, und die fünf anderen
-Verträge im Datenraum, die dasselbe Recht nennen:
+## Wo sich das Recht sammelt
 
-![Der Befund zum anwendbaren Recht im Workspace: der Satz "This Agreement shall be governed by and construed in accordance with the laws of the state of Israel", "state of Israel" hervorgehoben, darunter fünf weitere Verträge mit demselben Wert](/blog/assets/images/contract-data-room-clause-in-context.webp)
+Über alle zweihundert sammelt sich das Recht, wo man es erwartet: Delaware in
+75 Verträgen, New York in 49, Kalifornien in 34, dann Nevada, Florida und
+Texas.
 
-Das Glossar sagt dann, was der Wert bedeutet. *state of Israel* steht unter
-**Israel**, und Israel steht unter **Außerhalb der USA**. So taucht dieser
-Vertrag in der Beobachtung für ausländisches Recht auf, ohne dass jemand eine
-Regel für Israel geschrieben hat:
+Aber **51 Verträge nennen ein Recht außerhalb der Vereinigten Staaten**:
+England und Wales in 16, China in 13, Israel in 7, dann Hongkong, die Schweiz,
+Japan, die Niederlande, Deutschland und Singapur. 26 davon nennen überhaupt
+kein US-Recht.
 
-![Die Bedeutung des Werts: Anwendbares Recht, gebunden an die Vertragsbedingungen; Israel, gebunden über das Nachschlagen in den Rechtsordnungen; und Außerhalb der USA, abgeleitet aus Israel](/blog/assets/images/contract-data-room-meaning-of-a-value.webp)
+![Verträge pro Rechtsordnung, wie das Glossar sie einordnet: Delaware 75, New York 49, Kalifornien 34; außerhalb der USA England und Wales 16, China 13, Israel 7, Hongkong 5](/blog/assets/images/contract-data-room-laws.webp)
 
-Derselbe Durchgang lieferte auch Dinge, nach denen wir nicht gefragt hatten,
-mit geringerer Konfidenz: *supplier*, *it* und *person* als Parteien (62 bis
-74 %), *tax* und *mutatis mutandis* als anwendbares Recht (90 %). Schwelle und
-Regeln entfernen das meiste davon; etwas kommt immer durch, und die Konfidenz
-neben jedem Wert zeigt es an.
+Die Vertragsarten verteilen sich fast gleichmäßig: Dienstleistung 39, Lieferung
+38, Lizenzen 36, Marketing 17, Partnerschaften 13, Vertrieb 8 und
+IP-Übertragungen 2. Die Bedeutungskarte des Glossars zeigt alle diese Begriffe
+und jede Rechtsordnung auf einer Seite:
 
-![Alles, was der eine Durchgang aus diesem Vertrag extrahiert hat, Label für Label, mit einer Konfidenz pro Wert](/blog/assets/images/contract-data-room-one-pass.webp)
+![Die Bedeutungskarte: die Vertragsbegriffe, die Vertragsarten und jede gefundene Rechtsordnung, US-Bundesstaaten unter United States und der Rest unter Outside the United States](/blog/assets/images/contract-data-room-meaning-map.webp)
+
+**Wer mehr als einmal unterschreibt.** 26 Unternehmen werden in zwei oder mehr
+Verträgen als Partei genannt: Cardlytics in vier, A.M. Best und American
+International Group in drei. Jedes wurde zu einer Entität, sodass jeder Vertrag
+eines Unternehmens einen Klick entfernt ist.
+
+![Die Entitäten: Unternehmen, die zwei oder mehr der Verträge unterschreiben, jeweils mit ihren Erwähnungen und den Verträgen, in denen sie vorkommen](/blog/assets/images/contract-data-room-entities.webp)
+
+## England, dreimal
+
+Schauen Sie sich England aber genauer an.
+
+Ein Dienstvertrag gewährt bezahlten Urlaub *"in addition to the usual public or
+bank holidays in England"*. Das Modell legte **England** als anwendbares Recht
+ab, zu 99 Prozent sicher.
+
+![Eine Urlaubsklausel: "the usual public or bank holidays in England", England als anwendbares Recht abgelegt, 99 %](/blog/assets/images/contract-data-room-holiday-clause.webp)
+
+Ein zweiter Vertrag nennt England und Wales nur als den Ort, an dem eine Firma
+eingetragen ist: *"a company incorporated under the laws of England and
+Wales"*. Wieder 99 Prozent.
+
+![Eine Gründungsklausel, "a company incorporated under the laws of England and Wales", als anwendbares Recht abgelegt, 99 %](/blog/assets/images/contract-data-room-incorporated.webp)
+
+Und die echte Rechtswahlklausel, im Dienstleistungsvertrag von oben, bekam
+**65 Prozent**, den niedrigsten von sechs Werten in ihrer Zeile. Ganz vorn
+stand *FCA*, eine Aufsichtsbehörde, mit 100 Prozent.
+
+![Die Zeile zum anwendbaren Recht eines Vertrags: FCA, eine Aufsichtsbehörde, mit 100 %, und die echte Klausel, "the laws of England and Wales", mit 65 %](/blog/assets/images/contract-data-room-real-clause.webp)
+
+Das Modell sieht die Wörter *"the laws of England"*. Es kann nicht sagen, in
+welcher Klausel sie stehen. Ein hoher Wert heißt, dass die Wörter wie ein
+anwendbares Recht aussehen, nicht dass die Klausel eines ist. Im ganzen
+Workspace stehen 88 der 1.064 Werte zum anwendbaren Recht, in 48 Verträgen,
+direkt nach *incorporated*, *organized* oder *formed* under the laws of: das
+Recht, nach dem eine Firma gegründet wurde, nicht das Recht des Vertrags.
 
 ## Wie nah es den Juristen kam
 
-CUAD enthält die Antworten, die Juristen zu jedem Vertrag geschrieben haben.
-Wir haben die Befunde des Detektors damit verglichen. Ein Fakt gilt als
-gefunden, wenn einer der extrahierten Werte die Antwort der Juristen enthält
-oder umgekehrt; Daten werden als Daten verglichen.
+CUAD liefert die Antworten, die Juristen zu jedem Vertrag geschrieben haben. Ein
+Fakt gilt als gefunden, wenn einer der extrahierten Werte die Antwort der
+Juristen enthält oder umgekehrt; Daten werden als Daten verglichen.
 
 | Frage | Gefunden | Von | Anteil |
 | --- | --- | --- | --- |
 | Wer hat unterschrieben (mindestens eine Partei) | 190 | 193 | 98 % |
 | Welches Recht gilt | 155 | 164 | 95 % |
 | Wann wurde unterschrieben | 124 | 158 | 78 % |
-| Welche Vertragsart (wo der Titel sie nennt) | 98 | 144 | 68 % |
+| Welche Vertragsart (wo der Titel es sagt) | 98 | 144 | 68 % |
 | Verlängert er sich, und wie | 4 | 65 | 6 % |
 
 *Von* ist die Zahl der Verträge, zu denen die Juristen eine Antwort geschrieben
-haben. Für 153 der 200 Verträge gab das Modell eine Vertragsart an; beim Rest
-blieb das Feld leer, statt unterhalb der Schwelle zu raten.
+haben.
 
-Die ersten drei sind Fakten, die ein Vertrag klar und an vorhersehbarer Stelle
-nennt, und das Modell findet sie fast immer. Die letzte Zeile ist die
-ehrliche: Verlängerungsklauseln sind auf zu viele Arten formuliert (*"shall
-continue from year to year"*, *"unless either party gives notice"*), und eine
-kurze Beschreibung erfasst sie nicht. Feinabstimmung mit ein paar Dutzend
-Beispielen ist der Weg, das zu verbessern; der Detektor kann das auf derselben
-CPU.
+![Gemessen an den Antworten der Juristen: 190 von 193, 155 von 164, 124 von 158 und Verlängerung 4 von 65; und eine Change-of-Control-Frage, mit Ja bei 0,82 bis 0,99 beantwortet, wo die Juristen keine Klausel fanden](/blog/assets/images/contract-data-room-scores.webp)
 
-## Was es gefunden hat
+Verlängerungsklauseln sind auf zu viele Arten geschrieben (*"shall continue from
+year to year"*, *"unless either party gives notice"*) für eine kurze
+Beschreibung. Und gefragt, ob ein Vertrag eine Change-of-Control-Klausel hat,
+sagte das Modell zu fast allen ja: 0,82 bis 0,99 bei Verträgen, die laut
+Juristen keine haben. Das ist ein Urteil, keine Aufgabe für einen Zeiger.
 
-Die 200 Verträge enthalten 1,66 Millionen Wörter. Gelesen auf der CPU des Scans,
-drei Verträge gleichzeitig, dauerte das 75 Minuten und ergab 6.482 Fakten, jeder
-mit einer Bedeutung im Glossar.
+## Die Beobachtung und die zwei Fälle
 
-**Welche Vertragsarten.** Dienstleistung 39, Lieferung 38, Lizenz 36, Marketing
-17, Partnerschaft 13, Vertrieb 8, IP-Übertragung 2.
+Deshalb gehen die Funde an Menschen, über Beobachtungen und Fälle.
 
-**Welches Recht.** 172 Verträge nennen ein anwendbares Recht, das das Glossar
-kennt. Delaware führt mit 74, dann New York mit 48 und Kalifornien mit 34. 50
-Verträge nennen ein Recht außerhalb der USA: England und Wales 15, China 13,
-Israel 7 und weitere. 26 davon nennen **nur** ein Recht außerhalb der USA.
+**Eine Beobachtung folgt einer Bedeutung, nicht einer Schreibweise.**
+*Governed by law outside the United States* erfasst jeden Vertrag, den das
+Glossar dort einordnet, auch neue, egal mit welchen Worten der Vertrag es
+sagt.
 
-![Die Bedeutungskarte: die Vertragsbedingungen, die Vertragsarten und jede gefundene Rechtsordnung, US-Bundesstaaten unter Vereinigte Staaten, der Rest unter Außerhalb der USA](/blog/assets/images/contract-data-room-meaning-map.webp)
+![Die Beobachtung "Governed by law outside the United States", die den gleichnamigen Fall speist](/blog/assets/images/contract-data-room-watch-drives-case.webp)
 
-**Wer mehr als einmal unterschreibt.** 26 Unternehmen sind in zwei oder mehr
-Verträgen Partei: Cardlytics in vier, A.M. Best und American International Group
-in drei. Jedes wurde zu einer Entität, sodass jeder Vertrag eines Unternehmens
-einen Klick entfernt ist.
+**Fall eins: Verträge unter Recht außerhalb der Vereinigten Staaten.** Die
+Beobachtung speist einen Fall für die Transaktionsanwälte: 26 Verträge, die nur
+ein ausländisches Recht nennen, und jeder braucht einen Juristen, der dieses
+Recht kennt, bevor sich jemand auf eine Lesart verlässt. Die vorläufige
+Schlussfolgerung: lokale Anwälte je Rechtsordnung briefen, beginnend mit dem
+Recht, das mehr als einmal vorkommt. Ein neuer Vertrag unter englischem oder
+chinesischem Recht kommt von selbst in den Fall.
 
-![Die Entitäten: Unternehmen, die zwei oder mehr der Verträge unterschreiben, jeweils mit ihren Erwähnungen und den Verträgen, in denen sie vorkommen](/blog/assets/images/contract-data-room-entities.webp)
+![Die Fallakte: 26 von 200 Verträgen nennen nur ein Recht außerhalb der USA; Priorität mittel, zuständig Deal counsel, in Bearbeitung](/blog/assets/images/contract-data-room-foreign-law-case.webp)
 
-**Zwei Fälle.** Der erste sammelt die 26 Verträge, die nur ein Recht außerhalb
-der USA nennen: Für sie braucht es Anwälte, die dieses Recht kennen, bevor sich
-jemand auf eine Lesart verlässt. Eine Beobachtung hält den Fall aktuell, sodass
-ein neuer Vertrag unter englischem oder chinesischem Recht von selbst
-hinzukommt.
+**Fall zwei: Kündigungsfristen.** 145 Verträge nennen eine Kündigungsfrist, von
+zehn Tagen bis zu vierundzwanzig Monaten. Der Fall prüfte eine Idee an diesen
+Werten: *die meisten Verträge brauchen zwei Monate Frist oder mehr*. 100 der
+145 tun es, der mittlere Wert liegt bei 90 Tagen, also hält die Idee. Das
+Modell liefert *"twenty-four months"*; auf ein Datum im Kalender
+zurückzurechnen, ist Arbeit des Falls.
 
-![Die Beobachtung "Governed by law outside the United States", die den gleichnamigen Fall speist, mit ihren Treffern](/blog/assets/images/contract-data-room-watch-foreign-law.webp)
+![Das Fallboard: die Hypothese "Most contracts need two months' notice or more", gestützt, 100 von 145](/blog/assets/images/contract-data-room-notice-hypothesis.webp)
 
-Der zweite dreht sich um Fristen. 145 Verträge nennen eine Kündigungsfrist. Der
-Fall hat eine Vermutung an den extrahierten Werten geprüft: *Die meisten
-Verträge brauchen zwei Monate Vorlauf oder mehr.* Das stimmt. Bei 100 der 145
-beträgt die längste genannte Frist 60 Tage oder mehr; der mittlere Wert liegt
-bei 90 Tagen, die längste bei 24 Monaten. Jede davon ist ein Datum, das jemand
-zurückrechnen und in einen Kalender eintragen muss, und das Rechnen überlässt
-das Modell euch.
+In den Fällen zählt der England-Fund. Ein Vertrag, der wegen einer
+Urlaubsklausel unter *Outside the United States* landet, ist einer, den ein
+Jurist öffnet, liest und aus dem Fall nimmt. Das Modell markiert. Das Glossar
+sagt, was es bedeutet. Menschen entscheiden.
 
-## Was den Unterschied gemacht hat
+## Was den Unterschied machte
 
-Vier Änderungen haben die Ergebnisse stärker bewegt als alles andere. Keine
-davon ist raffiniert; alle sind an einem Nachmittag erledigt.
-
-**Eine Zeile Beschreibung pro Fakt, mit Beispiel.** Die Beschreibung ist die
-einzige Anweisung, die das Modell bekommt. *"State or country whose laws govern
-the agreement, e.g. 'the State of New York'"* funktioniert. Eine längere
+**Eine Zeile Beschreibung pro Fakt, mit einem Beispiel.** Die Beschreibung ist
+die einzige Anweisung an das Modell. *"State or country whose laws govern the
+agreement, e.g. 'the State of New York'"* funktioniert. Eine längere
 Beschreibung, die auch aufzählte, was der Wert *nicht* ist, machte die
 Ergebnisse schlechter.
 
-**Das richtige Modell für die Sprache.** Die mehrsprachige Variante des
-Modells war bei diesen englischen Verträgen doppelt so langsam und lieferte
-viel mehr falsche Werte zum anwendbaren Recht, darunter Abschnittsnummern und
-Gesetzesnamen. Man wählt sie für deutsche oder französische Texte, nicht als
-Standard.
+**Das richtige Modell für die Sprache.** Die mehrsprachige Version war bei
+diesen englischen Verträgen doppelt so langsam und lieferte viel mehr falsche
+Werte zum anwendbaren Recht. Nehmen Sie sie für deutsche oder französische
+Texte, nicht als Standard.
 
-**Die Art eines Dokuments aus seinem Anfang erfragen.** Ein Vertrag sagt in
-Titel und ersten Absätzen, was er ist. Über den ganzen Vertrag gefragt, gewann
-das Label, das in irgendeinem Abschnitt am stärksten ausschlug: Ein
-Wartungsvertrag mit einem langen Abschnitt über geistiges Eigentum wurde zur
-*IP-Übertragung*. Bei 23 Verträgen stimmte die Vertragsart siebenmal mit dem
-eigenen Titel des Vertrags überein, wenn über den ganzen Text geurteilt wurde,
-und fünfzehnmal, wenn nach dem Anfang geurteilt wurde.
+**Die Art eines Dokuments aus seinem Anfang abfragen.** Über den ganzen Vertrag
+gefragt, gewann das Label, das in irgendeinem Abschnitt am höchsten lag: Ein
+Wartungsvertrag mit einem langen Abschnitt zu geistigem Eigentum wurde zur
+*IP-Übertragung*. Bei 23 Verträgen passte die Vertragsart 7-mal zum eigenen
+Titel, wenn über den ganzen Text geurteilt wurde, und 15-mal, wenn aus dem
+Anfang.
 
-**Regeln hinter dem Modell.** Ein Modell, das zeigt, zeigt manchmal auf die
-falsche Art von Ding: ein Gesetz (*"21 C.F.R. Part 50"*) als anwendbares Recht,
-einen definierten Begriff (*"Servicing Period"*) als Laufzeit. Eine
-Validierungsregel sagt, wie ein Wert aussehen muss: ein anwendbares Recht
-enthält keine Ziffern und ist kein *Act*; eine Laufzeit nennt Jahre, Monate oder
-Tage; ein Datum enthält eine Ziffer. Beim ersten vollständigen Scan entfernten
-diese Regeln ein Drittel der Werte zum anwendbaren Recht und die Hälfte der
-Laufzeitwerte, und keinen einzigen Wert, der zu den Antworten der Juristen
-passte.
+**Regeln hinter dem Modell.** Eine Validierungsregel sagt, wie ein Wert
+aussehen muss: Ein anwendbares Recht enthält keine Ziffern und ist kein *Act*;
+eine Laufzeit nennt Jahre, Monate oder Tage; ein Datum enthält eine Ziffer.
+Beim ersten vollen Scan entfernten diese Regeln 485 von 1.485 Werten zum
+anwendbaren Recht und die Hälfte der Laufzeitwerte, und keinen Wert, der zu den
+Antworten der Juristen passte. *England* in einer Urlaubsklausel fangen sie
+nicht: Das sieht genau wie ein anwendbares Recht aus.
 
-## Wo es an Grenzen stößt
+## Wo es nicht reicht
 
-**Es urteilt nicht.** Wir haben auch gefragt, ob jeder Vertrag eine
-Change-of-Control-Klausel, eine Exklusivitätsklausel, ein Wettbewerbsverbot
-oder eine automatische Verlängerung enthält, zuerst als Ja/Nein-Labels und dann
-als Formulierung, auf die es zeigen soll. Als Labels sagte es zu fast allem ja:
-Change of Control erhielt zwischen 0,82 und 0,99 bei Verträgen, die laut den
-Juristen keine solche Klausel haben. Als Formulierung lag es bei etwa einem
-Drittel bis der Hälfte der Verträge richtig. *Gibt es eine Klausel, die X
-bewirkt?* ist ein Urteil, und das ist die Aufgabe eines Entscheidungsmodells
-oder eines feinabgestimmten Modells.
+- **Es urteilt nicht.** *Gibt es eine Klausel, die X tut?* ist eine Frage für
+  ein Entscheidungsmodell oder ein feinabgestimmtes Modell.
+- **Es kennt die Klausel nicht.** Es findet *"the laws of England"*, wo immer
+  es steht: in einer Rechtswahlklausel, einer Gründungsklausel oder einer
+  Urlaubsklausel.
+- **Es rechnet nicht.** Es liefert *"ninety (90) days prior written notice"*,
+  nicht das Datum, an dem die Kündigung fällig ist.
+- **Es nennt Rollen als Parteien.** *Licensor*, *the Company* und *Provider*
+  kommen zusammen mit den echten Firmennamen zurück.
+- **Es kostet CPU-Zeit.** Etwa 8 Sekunden pro 1.000 Wörter je Worker auf der
+  CPU des Scans in unserem Aufbau. Zweihundert Verträge dauerten 75 Minuten.
+  Nichts wird pro Seite bezahlt, und nichts verlässt das Haus.
 
-**Es rechnet nicht.** Es liefert *"ninety (90) days prior written notice"*. Es
-sagt nicht, dass die Kündigung am 2. Oktober fällig ist. Das Datum ist eine
-Rechnung: eure, die einer Regel oder die eines Chatmodells.
+## Wann welches Modell
 
-**Es nennt Rollen als Parteien.** Verträge nennen ihre Parteien *Licensor*,
-*the Company*, *Provider*. Das sind Namen innerhalb des Vertrags, und das
-Modell liefert sie zusammen mit den echten Firmennamen.
-
-**Es kostet CPU-Zeit.** Etwa 8 Sekunden pro 1.000 Wörter je Worker auf der CPU
-des Scans in unserem Aufbau, ein paar Sekunden auf einem Laptop. Zweihundert
-Verträge brauchten 75 Minuten, nicht eine. Nichts wird pro Seite bezahlt, und
-nichts verlässt das Haus.
-
-## Wann man was nimmt
-
-- **Die Antwort steht im Text, und man will sie wörtlich:** ein
-  Extraktionsmodell. Parteien, Daten, Beträge, Fristen, Produktnamen,
-  personenbezogene Daten ohne festes Format.
+- **Die Antwort steht im Text und Sie wollen sie wörtlich:** ein
+  Extraktionsmodell. Parteien, Daten, Beträge, Kündigungsfristen,
+  Produktnamen, persönliche Daten ohne feste Form.
 - **Die Antwort ist ein Urteil mit festen Optionen:** ein Entscheidungsmodell.
   Ist das dringend, welches Team, hat dieser Vertrag eine
   Change-of-Control-Klausel.
-- **Die Antwort muss erarbeitet werden:** ein Chatmodell. Die Tage bis zur
-  Frist zählen, die Klausel zusammenfassen, das Risiko erklären.
+- **Die Antwort muss ausgerechnet werden:** ein Chatmodell. Die Tage bis zur
+  Frist zählen, die Klausel zusammenfassen.
 - **Der Wert hat eine feste Form:** ein Muster. IBANs, Bestellnummern,
   Kartennummern.
 
+Öffnen Sie den [Contract Data Room](https://showcase.classifyre.com/de/contract-data-room),
+um die Funde, das Glossar und die Beobachtungen selbst zu lesen, und die
+[Live-Fallliste](https://showcase.classifyre.com/de/contract-data-room/investigations/)
+für beide Fälle.
 Der Detektor ist im
 [GLiNER2-Extraktion-Leitfaden](https://docs.classifyre.com/detectors/custom-detectors/gliner2/)
-dokumentiert.
+beschrieben.
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/de/blog/cases/two-hundred-contracts-one-pass"
+  heading="Weitere Fallakten"
+  locale="de"
+/>
