@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from src.graph.edges import FieldMapping, FieldTransform
-from src.utils.sql_lineage import NO_UPSTREAM, column_mappings_by_table
+from src.utils.sql_lineage import NO_UPSTREAM, column_mappings_by_table, fields_for_table
 
 
 def _by_downstream(mappings: list[FieldMapping]) -> dict[str | None, FieldMapping]:
@@ -102,7 +102,7 @@ def test_upper_case_snowflake_names_resolve() -> None:
         "SELECT ID, TRIM(NAME) AS NAME FROM ANALYTICS.PUBLIC.ACCOUNTS", dialect="snowflake"
     )
 
-    name = _by_downstream(by_table["accounts"])["NAME"]
+    name = _by_downstream(by_table["public.accounts"])["NAME"]
     assert name.upstreams == ("NAME",)
     assert name.steps == ("TRIM",)
 
@@ -134,8 +134,8 @@ def test_postgres_stored_view_text() -> None:
         dialect="postgres",
     )
 
-    assert _by_downstream(by_table["orders"])[None].upstreams == ("customer_id", "status")
-    assert _by_downstream(by_table["customers"])[None].upstreams == ("id",)
+    assert _by_downstream(by_table["shop.orders"])[None].upstreams == ("customer_id", "status")
+    assert _by_downstream(by_table["shop.customers"])[None].upstreams == ("id",)
     assert _by_downstream(by_table[NO_UPSTREAM])["channel"].steps == ()
 
 
@@ -146,8 +146,133 @@ def test_each_union_branch_keeps_its_own_kind_and_expression() -> None:
         dialect="postgres",
     )
 
-    orders = _by_downstream(by_table["orders"])["amount"]
-    refunds = _by_downstream(by_table["refunds"])["amount"]
+    orders = _by_downstream(by_table["shop.orders"])["amount"]
+    refunds = _by_downstream(by_table["shop.refunds"])["amount"]
     assert orders.type is FieldTransform.IDENTITY
     assert refunds.steps == ("-",)
     assert refunds.transform == "(-refunds.amount)"
+
+
+# ── Postgres stored text: what pg_get_viewdef really writes ──────────────
+#
+# A single-table view is stored with no qualifiers on its columns at all, which
+# is the shape sqlglot cannot place without a schema.
+
+
+def test_single_table_view_keeps_where_group_and_order_columns_as_indirect() -> None:
+    by_table = column_mappings_by_table(
+        """ SELECT order_date,
+    sum(gross_amount) AS revenue
+   FROM lab_mart.fct_orders f
+  WHERE status <> 'CANCELLED'::text
+  GROUP BY order_date
+  ORDER BY order_date;""",
+        dialect="postgres",
+    )
+
+    mappings = _by_downstream(by_table["lab_mart.fct_orders"])
+    assert mappings["revenue"].upstreams == ("gross_amount",)
+    assert mappings[None].type is FieldTransform.INDIRECT
+    assert mappings[None].upstreams == ("order_date", "status")
+
+
+def test_output_name_that_shadows_a_source_column_can_be_used_again() -> None:
+    # `qty::integer AS qty` renames in place, then `qty` is used a second time.
+    by_table = column_mappings_by_table(
+        """ SELECT order_ref,
+    qty::integer AS qty,
+    qty::integer::numeric * unit_price::numeric AS line_total
+   FROM lab_raw.order_lines_raw l;""",
+        dialect="postgres",
+    )
+
+    mappings = _by_downstream(by_table["lab_raw.order_lines_raw"])
+    assert mappings["qty"].upstreams == ("qty",)
+    assert mappings["line_total"].upstreams == ("qty", "unit_price")
+
+
+def test_order_by_an_output_alias_is_not_mistaken_for_a_column() -> None:
+    by_table = column_mappings_by_table(
+        "SELECT region, SUM(amount) AS total FROM sales GROUP BY region ORDER BY total DESC",
+        dialect="postgres",
+    )
+
+    mappings = _by_downstream(by_table["sales"])
+    assert mappings["total"].upstreams == ("amount",)
+    assert mappings[None].upstreams == ("region",)
+
+
+def test_quoted_mixed_case_output_names_resolve() -> None:
+    by_table = column_mappings_by_table(
+        """ SELECT "Order ID" AS "Id",
+    lower("Customer Email") AS "Mail",
+    "Total (EUR)" * 1.19 AS "Gross"
+   FROM lab_edge."Mixed Case Orders" m;""",
+        dialect="postgres",
+    )
+
+    mappings = _by_downstream(by_table["lab_edge.mixed case orders"])
+    assert mappings["Id"].upstreams == ("Order ID",)
+    assert mappings["Mail"].steps == ("LOWER",)
+    assert mappings["Gross"].upstreams == ("Total (EUR)",)
+
+
+def test_same_table_name_in_two_schemas_is_kept_apart() -> None:
+    by_table = column_mappings_by_table(
+        """ SELECT c.email,
+    e.loyalty_tier
+   FROM lab_core.customers c
+     JOIN lab_edge.customers e ON e.customer_id = c.customer_id;""",
+        dialect="postgres",
+    )
+
+    core = _by_downstream(by_table["lab_core.customers"])
+    edge = _by_downstream(by_table["lab_edge.customers"])
+    assert set(core) == {"email", None}
+    assert set(edge) == {"loyalty_tier", None}
+
+
+def test_lateral_subquery_is_followed_to_its_own_table() -> None:
+    by_table = column_mappings_by_table(
+        """ SELECT c.customer_id,
+    t.order_id,
+    t.total_amount
+   FROM lab_core.customers c
+     CROSS JOIN LATERAL ( SELECT o.order_id,
+            o.total_amount
+           FROM lab_core.orders o
+          WHERE o.customer_id = c.customer_id
+          ORDER BY o.total_amount DESC
+         LIMIT 3) t;""",
+        dialect="postgres",
+    )
+
+    customers = _by_downstream(by_table["lab_core.customers"])
+    orders = _by_downstream(by_table["lab_core.orders"])
+    assert set(customers) == {"customer_id", None}
+    assert orders["order_id"].upstreams == ("order_id",)
+    assert orders["total_amount"].upstreams == ("total_amount",)
+    # The correlation `o.customer_id = c.customer_id` shapes rows from both.
+    assert "customer_id" in orders[None].upstreams
+    assert customers[None].upstreams == ("customer_id",)
+
+
+def test_fields_for_table_prefers_the_schema_it_was_written_with() -> None:
+    by_table = column_mappings_by_table(
+        "SELECT c.email, e.tier FROM lab_core.customers c "
+        "JOIN lab_edge.customers e ON e.customer_id = c.customer_id",
+        dialect="postgres",
+    )
+
+    core = fields_for_table(by_table, ("db", "lab_core", "customers"))
+    edge = fields_for_table(by_table, ("db", "lab_edge", "customers"))
+    assert {m.downstream for m in core} == {"email", None}
+    assert {m.downstream for m in edge} == {"tier", None}
+
+
+def test_fields_for_table_matches_a_bare_name_by_table() -> None:
+    # On the search path Postgres writes the table without its schema.
+    by_table = column_mappings_by_table("SELECT id FROM orders", dialect="postgres")
+
+    assert [m.downstream for m in fields_for_table(by_table, ("db", "public", "orders"))] == ["id"]
+    assert fields_for_table(by_table, ("db", "public", "refunds")) == []
