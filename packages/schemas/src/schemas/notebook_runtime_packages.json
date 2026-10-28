@@ -4,7 +4,7 @@
   "packages": [
     {
       "name": "azure-identity",
-      "version": "1.26.0",
+      "version": "1.27.0",
       "modules": [
         "azure.identity"
       ],
@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.118",
+      "version": "1.43.120",
       "modules": [
         "boto3"
       ],
@@ -48,7 +48,7 @@
     },
     {
       "name": "confluent-kafka",
-      "version": "2.16.0",
+      "version": "2.16.1",
       "modules": [
         "confluent_kafka"
       ],
@@ -57,7 +57,7 @@
     },
     {
       "name": "databricks-sql-connector",
-      "version": "4.7.0",
+      "version": "4.8.0",
       "modules": [
         "databricks.sql"
       ],
@@ -181,7 +181,7 @@
     },
     {
       "name": "litellm",
-      "version": "1.106.2",
+      "version": "1.106.5",
       "modules": [
         "litellm"
       ],
@@ -341,7 +341,7 @@
     },
     {
       "name": "pymssql",
-      "version": "2.4.5",
+      "version": "2.4.6",
       "modules": [
         "pymssql"
       ],
@@ -403,7 +403,7 @@
     },
     {
       "name": "snowflake-connector-python",
-      "version": "4.8.0",
+      "version": "4.8.1",
       "modules": [
         "snowflake.connector"
       ],
@@ -412,7 +412,7 @@
     },
     {
       "name": "sqlglot",
-      "version": "30.24.0",
+      "version": "30.25.0",
       "modules": [
         "sqlglot"
       ],
@@ -421,7 +421,7 @@
     },
     {
       "name": "striprtf",
-      "version": "0.0.34",
+      "version": "0.0.35",
       "modules": [
         "striprtf"
       ],
@@ -466,7 +466,7 @@
     },
     {
       "name": "yt-dlp",
-      "version": "2026.10.21",
+      "version": "2026.10.26",
       "modules": [
         "yt_dlp"
       ],
