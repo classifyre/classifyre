@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "NO_UPSTREAM",
     "column_mappings_by_table",
+    "fields_for_table",
     "sqlglot_dialect",
     "table_paths_from_sql",
     "upstream_tables_from_sql",
@@ -171,6 +172,114 @@ def _paths(node: Any, trail: tuple[Any, ...] = ()) -> Iterator[tuple[Any, ...]]:
         yield from _paths(child, trail)
 
 
+def _table_key(table: Any) -> str:
+    """A table as the SQL named it: ``schema.table``, or ``table`` when written bare.
+
+    The schema stays in the key because two tables can share a name across
+    schemas (``core.customers`` and ``edge.customers``) and a view can read both.
+    """
+    name = str(table.name).lower()
+    schema = str(table.db).lower()
+    return f"{schema}.{name}" if schema else name
+
+
+def fields_for_table(
+    by_table: dict[str, list[FieldMapping]], table_key: tuple[str, ...]
+) -> list[FieldMapping]:
+    """The mappings that belong to one upstream, given its catalog key.
+
+    ``table_key`` ends ``(…, schema, table)``. The schema-qualified spelling wins,
+    so same-named tables in two schemas are never confused; a table written bare
+    (it was on the search path) matches by name; and a name that only one
+    qualified entry carries is that entry, however the SQL spelled the schema.
+    """
+    name = str(table_key[-1]).lower()
+    if len(table_key) >= 2:
+        qualified = f"{str(table_key[-2]).lower()}.{name}"
+        if qualified in by_table:
+            return list(by_table[qualified])
+    if name in by_table:
+        return list(by_table[name])
+    candidates = [key for key in by_table if key.rsplit(".", 1)[-1] == name]
+    return list(by_table[candidates[0]]) if len(candidates) == 1 else []
+
+
+def _inline_lateral_subqueries(statement: Any, exp: Any) -> None:
+    """Make ``LATERAL (SELECT …) t`` an ordinary derived table.
+
+    sqlglot's lineage stops at a lateral and reports every column its subquery
+    mentions, including the outer table's correlated one, as feeding the output.
+    As a plain derived table the output columns follow their own projection to
+    the table they come from; the correlation is still found among the
+    indirect dependencies because scopes resolve names through their parents.
+    A lateral over a function (``jsonb_each(…)``) is left alone.
+    """
+    for lateral in list(statement.find_all(exp.Lateral)):
+        inner = lateral.this
+        if not isinstance(inner, exp.Subquery):
+            continue
+        alias = lateral.args.get("alias")
+        if alias is not None:
+            inner.set("alias", alias.copy())
+        lateral.replace(inner.copy())
+
+
+def _qualify_lone_sources(statement: Any, exp: Any) -> None:
+    """Name the table on columns written without one, where only one table is in play.
+
+    Postgres stores a single-table view with no qualifiers (``WHERE status <> …``),
+    and sqlglot will not place such a column without the table's schema. With one
+    table in the ``FROM`` there is only one place it can come from, so say so.
+    That also stops an output name that re-uses a column name (``qty::int AS qty``)
+    from being ambiguous the next time ``qty`` is read.
+
+    A name in ``ORDER BY`` / ``GROUP BY`` / ``HAVING`` that matches an output alias
+    is left for sqlglot to expand: it means the alias, not the column.
+    """
+    for select in list(statement.find_all(exp.Select)):
+        source = select.args.get("from_") or select.args.get("from")
+        if source is None or select.args.get("joins"):
+            continue
+        node = source.this
+        if isinstance(node, exp.Table) and isinstance(node.this, exp.Identifier):
+            qualifier = (node.args.get("alias") and node.args["alias"].this) or node.this
+        elif isinstance(node, exp.Subquery) and node.args.get("alias"):
+            qualifier = node.args["alias"].this
+        else:
+            continue
+        if not isinstance(qualifier, exp.Identifier):
+            continue
+
+        derived = {
+            projection.alias.lower()
+            for projection in select.expressions
+            if isinstance(projection, exp.Alias)
+            and not (
+                isinstance(projection.this, exp.Column)
+                and projection.this.name.lower() == projection.alias.lower()
+            )
+        }
+        for column in list(select.find_all(exp.Column)):
+            if column.table or not isinstance(column.this, exp.Identifier):
+                continue
+            if column.find_ancestor(exp.Select) is not select:
+                continue
+            tail = column.find_ancestor(exp.Order, exp.Group, exp.Having)
+            if tail is not None and tail.parent is select and column.name.lower() in derived:
+                continue
+            column.set("table", qualifier.copy())
+
+
+def _source_in_scope(scope: Any, name: str) -> Any:
+    """Look a table alias up in this scope, then in the scopes around it."""
+    while scope is not None:
+        found = scope.sources.get(name)
+        if found is not None:
+            return found
+        scope = scope.parent
+    return None
+
+
 def column_mappings_by_table(
     sql: str,
     *,
@@ -178,9 +287,10 @@ def column_mappings_by_table(
 ) -> dict[str, list[FieldMapping]]:
     """Per-column dependencies of a view, split by the table they come from.
 
-    Keys are lower-cased table names (the last part of the name), so a caller
-    holding ``(db, schema, table)`` upstream keys can attach to each edge only
-    the columns that table really feeds. :data:`NO_UPSTREAM` holds output
+    Keys are lower-cased table names as the SQL wrote them (``schema.table``, or
+    ``table`` when bare); :func:`fields_for_table` picks the entry for a catalog
+    key, so a caller can attach to each edge only the columns that table really
+    feeds. :data:`NO_UPSTREAM` holds output
     columns no table feeds.
 
     Columns are resolved through CTEs, derived tables and set operations, so a
@@ -214,6 +324,8 @@ def column_mappings_by_table(
             for projection in statement.copy().selects
             if projection.alias_or_name
         }
+        _inline_lateral_subqueries(statement, exp)
+        _qualify_lone_sources(statement, exp)
         statement = qualify(
             statement, dialect=dialect, validate_qualify_columns=False, identify=False
         )
@@ -234,7 +346,10 @@ def column_mappings_by_table(
             # which we deliberately do not resolve. Dataset-level it is.
             continue
         try:
-            node = lineage(name, statement, {}, dialect=dialect, scope=root)
+            # Quoted, so an alias like "Id" is matched as written instead of folded.
+            node = lineage(
+                exp.column(name, quoted=True), statement, {}, dialect=dialect, scope=root
+            )
         except Exception as exc:
             logger.debug("Could not trace column %s: %s", name, exc)
             continue
@@ -258,8 +373,8 @@ def column_mappings_by_table(
                     constant = _Trace()
                     constant.add(projections, None, exp)
                 continue
-            table = str(leaf.source.name).lower()
-            column = leaf.name.rsplit(".", 1)[-1]
+            table = _table_key(leaf.source)
+            column = leaf.name.rsplit(".", 1)[-1].strip('"`')
             if table and column and column != "*":
                 per_table.setdefault(table, _Trace()).add(projections, column, exp)
 
@@ -312,9 +427,9 @@ def column_mappings_by_table(
             if clause is None:
                 continue
             for column in clause.find_all(exp.Column):
-                source = scope.sources.get(column.table)
+                source = _source_in_scope(scope, column.table)
                 if isinstance(source, exp.Table) and column.name and column.name != "*":
-                    indirect.setdefault(str(source.name).lower(), set()).add(column.name)
+                    indirect.setdefault(_table_key(source), set()).add(column.name)
 
     for table, columns in indirect.items():
         by_table.setdefault(table, []).append(

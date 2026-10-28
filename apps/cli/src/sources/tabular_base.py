@@ -32,7 +32,12 @@ from ..utils.file_metadata import build_columns
 from ..utils.file_parser import render_bytes_cell
 from ..utils.hashing import hash_id, unhash_id
 from ..utils.sampling_frontier import RangeFrontier
-from ..utils.sql_lineage import NO_UPSTREAM, column_mappings_by_table, sqlglot_dialect
+from ..utils.sql_lineage import (
+    NO_UPSTREAM,
+    column_mappings_by_table,
+    fields_for_table,
+    sqlglot_dialect,
+)
 from ..utils.urn import Urn, UrnError
 from .base import BaseSource
 from .tabular_utils import (
@@ -1039,7 +1044,7 @@ class BaseTabularSource(BaseSource):
                     # spelled the name (a synonym, a quoted alias).
                     fields = [mapping for group in by_table.values() for mapping in group]
                 else:
-                    fields = list(by_table.get(str(upstream_key[-1]).lower(), []))
+                    fields = fields_for_table(by_table, upstream_key)
                 upstream_hash = table_hash_by_key.get(upstream_key)
                 upstream_ref = (
                     Ref.asset(upstream_hash)
