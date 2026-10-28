@@ -2121,7 +2121,7 @@
       "validation": "Validation",
       "validationDesc": "Rules and confidence thresholds",
       "model": "Model",
-      "modelDesc": "GLiNER2 model selection",
+      "modelDesc": "Which model reads the text",
       "training": "Training",
       "trainingDesc": "Upload examples and fine-tune"
     },
@@ -2483,10 +2483,10 @@
     },
     "types": {
       "gliner2": {
-        "title": "GLiNER2 Pipeline",
-        "tagline": "Single-pass neural extraction",
-        "description": "Define entities to extract and classification tasks — all run in a single model pass. Ideal for structured information extraction from unstructured text, with no training data required.",
-        "tags": "NER, Zero-shot, Validation rules"
+        "title": "GLiNER2 Extraction",
+        "tagline": "Exact facts from text, on your own CPU",
+        "description": "Name the facts you want (parties, dates, amounts, any concept) and the categories to sort text into. A small model reads each document once on the scan's CPU and returns the exact words with their position. No training data, no API key, no text leaves your infrastructure.",
+        "tags": "Entities, Classification, Runs locally"
       },
       "regex": {
         "title": "Regex Patterns",

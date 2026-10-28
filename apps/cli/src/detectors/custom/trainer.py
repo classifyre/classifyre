@@ -1,7 +1,8 @@
 """GLiNER2 pipeline fine-tuning trainer.
 
 Handles two training modes in a single pass:
-  - NER fine-tuning via the base GLiNER model (entity examples with span values)
+  - NER fine-tuning of the configured GLiNER2 / GLiNER2.5 checkpoint with the
+    gliner2 library's own trainer (entity examples with span values)
   - Zero-shot classification fine-tuning via SetFit (text + label pairs)
 
 Artifacts are written to an output directory structured as:
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -92,7 +94,9 @@ class GLiNER2Trainer:
 
         entities: dict[str, Any] = self._schema.get("entities") or {}
         classification: dict[str, Any] = self._schema.get("classification") or {}
-        base_model: str = (self._schema.get("model") or {}).get("name") or "fastino/gliner2-base-v1"
+        base_model: str = (self._schema.get("model") or {}).get(
+            "name"
+        ) or "fastino/gliner2.5-base-v1"
 
         # ── NER fine-tuning ────────────────────────────────────────────────────
         entity_labels = set(entities.keys())
@@ -165,54 +169,70 @@ class GLiNER2Trainer:
         gliner_out.mkdir(parents=True, exist_ok=True)
 
         try:
-            from gliner import GLiNER  # type: ignore[import-untyped]
-
-            model = GLiNER.from_pretrained(base_model)
-
-            # Attempt to use the trainer API if available
-            try:
-                from gliner.training import Trainer as GLiNERTrainer  # type: ignore[import-untyped]
-                from gliner.training import (
-                    TrainingArguments as GLiNERArgs,  # type: ignore[import-untyped]
-                )
-
-                args = GLiNERArgs(
-                    output_dir=str(gliner_out),
-                    num_train_epochs=3,
-                    per_device_train_batch_size=min(4, len(train_data)),
-                    warmup_ratio=0.1,
-                    save_steps=0,
-                )
-                trainer = GLiNERTrainer(model=model, args=args, train_dataset=train_data)
-                trainer.train()
-            except ImportError:
-                # Fallback: manual training loop if the Trainer API isn't available
-                logger.warning("gliner.training not available — using manual fine-tuning loop")
-                self._manual_ner_train(model, train_data)
-
-            model.save_pretrained(str(gliner_out))
-            logger.info("NER model saved to %s", gliner_out)
-            return {"examples": len(train_data), "epochs": 3, "saved_to": "gliner2/"}
-
+            from gliner2 import AutoExtractor
+            from gliner2.training.data import InputExample
+            from gliner2.training.trainer import ExtractorTrainer, TrainingConfig
         except ImportError as e:
-            return {"skipped": True, "reason": f"gliner not installed: {e}"}
+            return {"skipped": True, "reason": f"gliner2 training is not installed: {e}"}
+
+        # One example per text, with every annotated mention of every label in it.
+        # Described labels the text does not mention are trained as negatives,
+        # which is what keeps a fine-tune from over-predicting a label.
+        descriptions = self._entity_descriptions()
+        by_text: dict[str, dict[str, list[str]]] = {}
+        for item in train_data:
+            mentions = by_text.setdefault(item["text"], {})
+            for span in item["ner"]:
+                value = item["text"][span["start"] : span["end"]]
+                mentions.setdefault(span["label"], [])
+                if value not in mentions[span["label"]]:
+                    mentions[span["label"]].append(value)
+        input_examples = [
+            InputExample(
+                text=text,
+                entities=mentions,
+                entity_descriptions=descriptions or None,
+            )
+            for text, mentions in by_text.items()
+        ]
+
+        epochs = 3
+        try:
+            model = AutoExtractor.from_pretrained(base_model)
+            checkpoint_dir = self._output_dir / "checkpoints"
+            config = TrainingConfig(
+                output_dir=str(checkpoint_dir),
+                num_epochs=epochs,
+                batch_size=min(4, len(input_examples)),
+                eval_strategy="no",
+                save_best=False,
+                num_workers=0,
+                pin_memory=False,
+                logging_steps=10,
+            )
+            ExtractorTrainer(model=model, config=config).train(train_data=input_examples)
+            model.save_pretrained(str(gliner_out))
+            # The library also keeps its own full checkpoint (hundreds of MB);
+            # the runner loads only gliner2/, so the copy is dropped.
+            shutil.rmtree(checkpoint_dir, ignore_errors=True)
+            logger.info("NER model saved to %s", gliner_out)
+            return {
+                "examples": len(input_examples),
+                "spans": len(train_data),
+                "epochs": epochs,
+                "saved_to": "gliner2/",
+            }
         except Exception as e:
             logger.warning("NER fine-tuning failed: %s", e, exc_info=True)
             return {"skipped": True, "reason": str(e)}
 
-    def _manual_ner_train(self, model: Any, train_data: list[dict[str, Any]]) -> None:
-        """Simple SGD loop when Trainer API is unavailable."""
-        import torch  # type: ignore[import-untyped]
-
-        optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
-        model.train()
-        for _epoch in range(3):
-            for item in train_data:
-                optimizer.zero_grad()
-                loss = model.compute_loss(item)
-                if loss is not None:
-                    loss.backward()
-                    optimizer.step()
+    def _entity_descriptions(self) -> dict[str, str]:
+        descriptions: dict[str, str] = {}
+        for label, defn in (self._schema.get("entities") or {}).items():
+            text = defn.get("description") if isinstance(defn, dict) else defn
+            if isinstance(text, str) and text.strip():
+                descriptions[label] = text.strip()
+        return descriptions
 
     # ── Classification (SetFit) ────────────────────────────────────────────────
 

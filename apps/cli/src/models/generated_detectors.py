@@ -676,7 +676,7 @@ class CustomExtractorConfig(BaseModel):
     )
     enabled: bool | None = True
     fields: list[CustomExtractorField] = Field(..., min_length=1)
-    gliner_model: str | None = 'fastino/gliner2-base-v1'
+    gliner_model: str | None = 'fastino/gliner2.5-base-v1'
     content_limit: int | None = Field(
         4000,
         description='Chars of content to pass to extractor (classifier matched_content is only 320 chars)',
@@ -738,7 +738,7 @@ class CustomEntityConfig(BaseModel):
     entity_descriptions: dict[str, str] | None = Field(
         {}, description='Optional GLiNER2 schema descriptions keyed by entity label'
     )
-    model: str | None = 'fastino/gliner2-base-v1'
+    model: str | None = 'fastino/gliner2.5-base-v1'
 
 
 class Skip(RootModel[str]):
@@ -821,8 +821,23 @@ class PipelineModelConfig(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    path: str | None = None
-    name: str | None = None
+    path: str | None = Field(
+        None,
+        description='Local folder holding a model checkpoint. Overrides name when set.',
+    )
+    name: str | None = Field(
+        None,
+        description='Hugging Face model id. Both generations load: GLiNER2.5 (fastino/gliner2.5-small-v1, fastino/gliner2.5-base-v1, fastino/gliner2.5-multi-v1) and GLiNER2 (fastino/gliner2-base-v1, fastino/gliner2-large-v1, fastino/gliner2-multi-v1) along with their fine-tunes. Defaults to fastino/gliner2.5-base-v1 (English); use fastino/gliner2.5-multi-v1 for German and other languages.',
+    )
+
+
+class ReadFrom(StrEnum):
+    """
+    Which part of the text the task judges. whole: every piece of a long text; a label counts at its strongest piece. start: only the opening (about 2,400 characters), where a document says what it is: title, parties, purpose. Use start for the type of a document; on 23 real contracts it named the agreement type right 15 times against 7 for whole.
+    """
+
+    whole = 'whole'
+    start = 'start'
 
 
 class PipelineClassificationDefinition(BaseModel):
@@ -830,16 +845,53 @@ class PipelineClassificationDefinition(BaseModel):
         extra='forbid',
     )
     labels: list[str] | None = []
-    multi_label: bool | None = False
+    descriptions: dict[str, str] | None = Field(
+        {},
+        description='Optional plain-language description per label, keyed by label. The model reads it together with the label name; a precise description is the cheapest way to raise accuracy.',
+    )
+    multi_label: bool | None = Field(
+        False,
+        description='Allow more than one label per document. Each label that clears the confidence threshold becomes its own finding.',
+    )
+    read_from: ReadFrom | None = Field(
+        'whole',
+        description='Which part of the text the task judges. whole: every piece of a long text; a label counts at its strongest piece. start: only the opening (about 2,400 characters), where a document says what it is: title, parties, purpose. Use start for the type of a document; on 23 real contracts it named the agreement type right 15 times against 7 for whole.',
+    )
+
+
+class Type1(StrEnum):
+    """
+    regex: a value must match pattern. min_confidence: a value needs at least threshold confidence for this label, above the detector-wide threshold. required: when the label has no value in a text, the detector reports nothing for that text.
+    """
+
+    regex = 'regex'
+    min_confidence = 'min_confidence'
+    required = 'required'
 
 
 class PipelineValidationRule(BaseModel):
+    """
+    A check every value of one entity label must pass after extraction.
+    """
+
     model_config = ConfigDict(
         extra='forbid',
     )
-    field: str | None = ''
-    type: str | None = 'regex'
-    pattern: str | None = None
+    field: str | None = Field('', description='The entity label the rule applies to.')
+    type: Type1 | None = Field(
+        'regex',
+        description='regex: a value must match pattern. min_confidence: a value needs at least threshold confidence for this label, above the detector-wide threshold. required: when the label has no value in a text, the detector reports nothing for that text.',
+    )
+    pattern: str | None = Field(
+        None,
+        description='For regex rules: the pattern a value must contain a match for (Python syntax).',
+    )
+    threshold: float | None = Field(
+        None,
+        description='For min_confidence rules: the lowest confidence a value of this label may have.',
+        ge=0.0,
+        le=1.0,
+    )
 
 
 class PipelineValidationConfig(BaseModel):
@@ -1002,7 +1054,7 @@ class DetectorBudget(BaseModel):
     )
 
 
-class Type1(StrEnum):
+class Type2(StrEnum):
     GLINER2 = 'GLINER2'
 
 
@@ -1022,10 +1074,15 @@ class GLiNER2PipelineSchema(BaseModel):
     entities: dict[str, PipelineEntityDefinition] | None = None
     classification: dict[str, PipelineClassificationDefinition] | None = None
     model: PipelineModelConfig | None = None
+    severity_map: list[PipelineSeverityRule] | None = Field(
+        [],
+        description='Severity per entity label or classification task. The first rule whose pattern matches the entity label (or, for a classification, the task name or the chosen label) wins. Findings that match no rule are info.',
+        validate_default=True,
+    )
     validation: PipelineValidationConfig | None = None
 
 
-class Type2(StrEnum):
+class Type3(StrEnum):
     REGEX = 'REGEX'
 
 
@@ -1063,7 +1120,7 @@ class LLMLabelDefinition(BaseModel):
     )
 
 
-class Type3(StrEnum):
+class Type4(StrEnum):
     string = 'string'
     number = 'number'
     boolean = 'boolean'
@@ -1085,7 +1142,7 @@ class LLMOutputField(BaseModel):
     description: str | None = Field(
         '', description='Hint for what this field captures.'
     )
-    type: Type3 | None = 'string'
+    type: Type4 | None = 'string'
 
 
 class Provider(StrEnum):
@@ -1125,7 +1182,7 @@ class LLMProviderRuntime(BaseModel):
     )
 
 
-class Type4(StrEnum):
+class Type5(StrEnum):
     LLM = 'LLM'
 
 
@@ -1284,7 +1341,7 @@ class DecisionQuestion(BaseModel):
     )
 
 
-class Type5(StrEnum):
+class Type6(StrEnum):
     DECISION = 'DECISION'
 
 
@@ -1356,7 +1413,7 @@ class DecisionPipelineSchema(BaseModel):
     )
 
 
-class Type6(StrEnum):
+class Type7(StrEnum):
     TEXT_CLASSIFICATION = 'TEXT_CLASSIFICATION'
 
 
@@ -1454,7 +1511,7 @@ class TextClassificationPipelineSchema(BaseModel):
     )
 
 
-class Type7(StrEnum):
+class Type8(StrEnum):
     IMAGE_CLASSIFICATION = 'IMAGE_CLASSIFICATION'
 
 
@@ -1515,7 +1572,7 @@ class ImageClassificationPipelineSchema(BaseModel):
     )
 
 
-class Type8(StrEnum):
+class Type9(StrEnum):
     OBJECT_DETECTION = 'OBJECT_DETECTION'
 
 
@@ -1580,7 +1637,7 @@ class ObjectDetectionPipelineSchema(BaseModel):
     )
 
 
-class Type9(StrEnum):
+class Type10(StrEnum):
     TAG = 'TAG'
 
 
@@ -1623,7 +1680,7 @@ class TagPipelineSchema(BaseModel):
     )
 
 
-class Type10(StrEnum):
+class Type11(StrEnum):
     code = 'code'
     markdown = 'markdown'
 
@@ -1641,7 +1698,7 @@ class DetectorNotebookCell(BaseModel):
         description='Stable cell identifier, unique within the notebook',
         pattern='^[A-Za-z0-9_-]{1,64}$',
     )
-    type: Type10
+    type: Type11
     source: str = Field(..., max_length=100000)
 
 
@@ -1687,7 +1744,7 @@ class DetectorNotebookPackage(BaseModel):
     )
 
 
-class Type11(StrEnum):
+class Type12(StrEnum):
     string = 'string'
     number = 'number'
     boolean = 'boolean'
@@ -1709,7 +1766,7 @@ class DetectorOutputField(BaseModel):
         description='Field name; a key in Finding(fields={...}) and in extracted_data.',
         pattern='^[A-Za-z_][A-Za-z0-9_]{0,63}$',
     )
-    type: Type11 | None = 'string'
+    type: Type12 | None = 'string'
     description: str | None = Field('', max_length=1000)
 
 
@@ -1781,7 +1838,7 @@ class CodeDetectorFileRuntime(BaseModel):
     )
 
 
-class Type12(StrEnum):
+class Type13(StrEnum):
     CODE_DETECTOR = 'CODE_DETECTOR'
 
 

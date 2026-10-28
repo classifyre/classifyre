@@ -54,11 +54,11 @@ const DETECTOR_DATA: Record<
   }
 > = {
   gliner2: {
-    title: "GLiNER2 Pipeline",
-    tagline: "Single-pass neural extraction",
+    title: "GLiNER2 Extraction",
+    tagline: "Exact facts from text, on your own CPU",
     description:
-      "Define entities to extract and classification tasks — all run in a single model pass. Ideal for structured information extraction from unstructured text, with no training data required.",
-    tags: ["NER", "Zero-shot", "Validation rules"],
+      "Name the facts you want (parties, dates, amounts, any concept) and the categories to sort text into. A small model reads each document once on the scan's CPU and returns the exact words with their position. No training data, no API key, no text leaves your infrastructure.",
+    tags: ["Entities", "Classification", "Runs locally"],
     slug: "gliner2",
   },
   regex: {

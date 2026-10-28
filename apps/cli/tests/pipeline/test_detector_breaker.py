@@ -310,6 +310,38 @@ async def test_concurrent_assets_waste_a_single_provider_call() -> None:
     assert summary["skipped_payloads"] == 7
 
 
+class _ConcurrencyProbe(_CustomDetector):
+    """Answers after a short wait and records how many calls overlapped."""
+
+    def __init__(self, key: str) -> None:
+        super().__init__(key)
+        self.in_flight = 0
+        self.max_in_flight = 0
+
+    async def detect(self, content, content_type="text/plain") -> list[DetectionResult]:
+        self.calls += 1
+        self.in_flight += 1
+        self.max_in_flight = max(self.max_in_flight, self.in_flight)
+        await asyncio.sleep(0.05)
+        self.in_flight -= 1
+        return []
+
+
+@pytest.mark.asyncio
+async def test_a_detector_that_answered_runs_payloads_concurrently() -> None:
+    # The gate exists to stop a refused key from being called once per asset
+    # in flight. Held for the whole run, it also serialized every working
+    # detector: a three-worker pool ran one ML detector on one worker, one
+    # payload at a time. After the first success the gate is not taken.
+    detector = _ConcurrencyProbe("contract_facts")
+    pipeline = DetectorPipeline(detectors=[detector], source=_Source(), runner_id="r")
+
+    await pipeline.process([_asset(i) for i in range(8)])
+
+    assert detector.calls == 8
+    assert detector.max_in_flight > 1
+
+
 @pytest.mark.asyncio
 async def test_detector_without_a_cache_key_still_trips_a_default_breaker() -> None:
     detector = _UnkeyedDetector()

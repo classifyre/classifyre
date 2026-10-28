@@ -133,9 +133,11 @@ needed.
 
 **Pipeline engines:**
 
-- **GLiNER2** — multilingual NER for entity extraction and zero-shot
-  classification. Extract structured fields (order IDs, regulatory references,
-  vendor names) without labelled training data.
+- **GLiNER2 Extraction** — a small model that runs on the scan's CPU and
+  returns exact facts with their position (order IDs, regulatory references,
+  vendor names, contract dates) plus zero-shot classification, without
+  labelled training data. English by default; a multilingual model is one
+  click away.
 - **Regex** — deterministic pattern matching for SKU codes, IBANs, date
   formats, internal identifiers.
 - **AI Detector** — LLM-powered classification and extraction for nuanced

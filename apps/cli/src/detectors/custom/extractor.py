@@ -13,10 +13,11 @@ from ...models.generated_detectors import (
     CustomExtractorField,
 )
 from ..dependencies import MissingDependencyError, require_module
+from .runners._gliner2 import _from_pretrained
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_GLINER2_MODEL = "fastino/gliner2-base-v1"
+_DEFAULT_GLINER2_MODEL = "fastino/gliner2.5-base-v1"
 
 # Extraction method tags sent to the API via DetectionResult.extraction_method
 EXTRACTION_METHOD_REGEX = "REGEX"
@@ -219,7 +220,7 @@ class CustomExtractor:
         try:
             gliner2_module = require_module("gliner2", "custom", ["classification", "detectors"])
             model_name = self._config.gliner_model or _DEFAULT_GLINER2_MODEL
-            self._gliner_model = gliner2_module.GLiNER2.from_pretrained(model_name)
+            self._gliner_model = _from_pretrained(gliner2_module, model_name)
             return self._gliner_model
         except MissingDependencyError:
             raise

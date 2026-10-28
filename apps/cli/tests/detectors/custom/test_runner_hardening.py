@@ -39,6 +39,14 @@ def _gliner2_runner(mock_model: MagicMock) -> GLiNER2Runner:
         classification={"intent": PipelineClassificationDefinition(labels=["refund", "question"])},
     )
     runner = GLiNER2Runner(schema, detector_key="test")
+    # These tests pin the separate-call fallback; a runtime without the joint
+    # schema API (create_schema/extract) takes that path.
+    if isinstance(mock_model, MagicMock) and "create_schema" not in dir(type(mock_model)):
+        for name in ("create_schema", "extract", "extract_long"):
+            try:
+                delattr(mock_model, name)
+            except AttributeError:
+                pass
     runner._model = mock_model
     return runner
 
@@ -83,19 +91,49 @@ def test_gliner2_long_text_falls_back_when_long_api_missing() -> None:
 def test_gliner2_long_text_classification_keeps_max_confidence() -> None:
     mock_model = MagicMock()
     mock_model.extract_entities_long.return_value = {"entities": {}}
-    # classify_text returns results keyed by task name — see gliner2>=1.3.
-    mock_model.classify_text.side_effect = [
-        {"intent": {"label": "question", "confidence": 0.55}},
-        {"intent": {"label": "refund", "confidence": 0.97}},
-        {"intent": {"label": "question", "confidence": 0.61}},
-    ] * 10
+    # All chunks go through the batch API in one call, one result per chunk.
+    mock_model.batch_classify_text.side_effect = lambda chunks, *_a, **_k: (
+        [
+            {"intent": {"label": "question", "confidence": 0.55}},
+            {"intent": {"label": "refund", "confidence": 0.97}},
+            {"intent": {"label": "question", "confidence": 0.61}},
+        ][: len(chunks)]
+        + [{} for _ in range(max(0, len(chunks) - 3))]
+    )
     runner = _gliner2_runner(mock_model)
 
     result = runner.run("word " * 2000)  # ~10k chars → multiple chunks
 
-    assert mock_model.classify_text.call_count > 1
+    mock_model.batch_classify_text.assert_called_once()
+    assert len(mock_model.batch_classify_text.call_args.args[0]) > 1
+    mock_model.classify_text.assert_not_called()
     assert result.classification["intent"]["label"] == "refund"
     assert result.classification["intent"]["confidence"] == pytest.approx(0.97)
+
+
+def test_gliner2_classifies_every_task_in_one_call_per_chunk() -> None:
+    # Without a batch API the runner still asks all tasks at once, per chunk.
+    mock_model = MagicMock(spec=["extract_entities", "extract_entities_long", "classify_text"])
+    mock_model.extract_entities_long.return_value = {"entities": {}}
+    mock_model.classify_text.return_value = {
+        "intent": {"label": "refund", "confidence": 0.9},
+        "tone": {"label": "calm", "confidence": 0.8},
+    }
+    schema = GLiNER2PipelineSchema(
+        classification={
+            "intent": PipelineClassificationDefinition(labels=["refund", "question"]),
+            "tone": PipelineClassificationDefinition(labels=["calm", "angry"]),
+        },
+    )
+    runner = GLiNER2Runner(schema, detector_key="test")
+    runner._model = mock_model
+
+    result = runner.run("word " * 2000)
+
+    calls = mock_model.classify_text.call_args_list
+    assert len(calls) > 1
+    assert all(set(call.args[1]) == {"intent", "tone"} for call in calls)
+    assert result.classification["tone"]["label"] == "calm"
 
 
 def test_gliner2_load_failure_raises_once_then_skips() -> None:
@@ -105,7 +143,7 @@ def test_gliner2_load_failure_raises_once_then_skips() -> None:
     runner = GLiNER2Runner(schema, detector_key="test")
 
     fake_module = MagicMock()
-    fake_module.GLiNER2.from_pretrained.side_effect = OSError("no network")
+    fake_module.AutoExtractor.from_pretrained.side_effect = OSError("no network")
     with patch("src.detectors.custom.runners._gliner2.require_module", return_value=fake_module):
         with pytest.raises(RuntimeError, match="failed to load"):
             runner.run("some text")
@@ -113,7 +151,7 @@ def test_gliner2_load_failure_raises_once_then_skips() -> None:
         result = runner.run("some text")
 
     assert not result.entities
-    fake_module.GLiNER2.from_pretrained.assert_called_once()
+    fake_module.AutoExtractor.from_pretrained.assert_called_once()
 
 
 # ── Transformer runner lazy loading ───────────────────────────────────────────

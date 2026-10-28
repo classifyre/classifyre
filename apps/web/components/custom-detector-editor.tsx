@@ -227,7 +227,7 @@ function defaultConfig(
     },
     entity: {
       entity_labels: [],
-      model: "fastino/gliner2-base-v1",
+      model: "fastino/gliner2.5-base-v1",
     },
   };
 }
@@ -2358,7 +2358,7 @@ export const CustomDetectorEditor = React.forwardRef<
                       <Label>Model</Label>
                       <Input
                         value={String(
-                          entity.model ?? "fastino/gliner2-base-v1",
+                          entity.model ?? "fastino/gliner2.5-base-v1",
                         )}
                         onChange={(event) =>
                           updateEntity({
@@ -2515,7 +2515,7 @@ export const CustomDetectorEditor = React.forwardRef<
                           gliner_model:
                             typeof extractor.gliner_model === "string"
                               ? extractor.gliner_model
-                              : "fastino/gliner2-base-v1",
+                              : "fastino/gliner2.5-base-v1",
                           content_limit:
                             Number.isFinite(parsedContentLimit) &&
                             parsedContentLimit > 0
@@ -2551,7 +2551,7 @@ export const CustomDetectorEditor = React.forwardRef<
                               gliner_model:
                                 typeof extractor.gliner_model === "string"
                                   ? extractor.gliner_model
-                                  : "fastino/gliner2-base-v1",
+                                  : "fastino/gliner2.5-base-v1",
                               content_limit:
                                 typeof extractor.content_limit === "number"
                                   ? extractor.content_limit
@@ -2574,7 +2574,7 @@ export const CustomDetectorEditor = React.forwardRef<
                         <Input
                           value={String(
                             extractor.gliner_model ??
-                              "fastino/gliner2-base-v1",
+                              "fastino/gliner2.5-base-v1",
                           )}
                           onChange={(event) =>
                             updateExtractor({
@@ -2622,7 +2622,7 @@ export const CustomDetectorEditor = React.forwardRef<
                               gliner_model:
                                 typeof extractor.gliner_model === "string"
                                   ? extractor.gliner_model
-                                  : "fastino/gliner2-base-v1",
+                                  : "fastino/gliner2.5-base-v1",
                               content_limit: parsed,
                             });
                           }}
@@ -2647,7 +2647,7 @@ export const CustomDetectorEditor = React.forwardRef<
                               gliner_model:
                                 typeof extractor.gliner_model === "string"
                                   ? extractor.gliner_model
-                                  : "fastino/gliner2-base-v1",
+                                  : "fastino/gliner2.5-base-v1",
                               content_limit: normalized,
                             });
                           }}

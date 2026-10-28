@@ -632,7 +632,7 @@ export class CustomDetectorsService {
       confidence_threshold: 0.7,
       max_findings: 100,
       pipeline_schema: {
-        model: { name: 'fastino/gliner2-base-v1', path: null },
+        model: { name: 'fastino/gliner2.5-base-v1', path: null },
         entities: {},
         classification: {},
         validation: { confidence_threshold: 0.7, rules: [] },

@@ -95,20 +95,25 @@ class HuggingFaceSource(ObjectStorageSourceBase):
             )
         return repo_type
 
-    def _token(self) -> str:
-        """The configured access token.
+    def _token(self) -> str | bool:
+        """The configured access token, or ``False`` for anonymous access.
 
         Always read from the recipe's masked block and passed explicitly to every
         Hub call, so a ``HF_TOKEN`` environment variable or a cached CLI login on
-        the runner can never silently authenticate a scan.
+        the runner can never silently authenticate a scan. Without a token the
+        scan reads anonymously, which works for public repositories only:
+        ``huggingface_hub`` treats ``token=False`` as "send no credentials".
         """
         token = self._masked_value("token")
-        if not token:
-            raise ValueError(
-                "Hugging Face scanning requires masked.token — a user access token "
-                "(hf_...) with read permission on the repository."
-            )
-        return token
+        return token if token else False
+
+    def _request_headers(self) -> dict[str, str]:
+        """Headers for streaming file bytes; no Authorization when anonymous."""
+        headers = {"User-Agent": "classifyre"}
+        token = self._token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        return headers
 
     def _endpoint(self) -> str:
         value = self._connection_option("endpoint", DEFAULT_HUB_ENDPOINT)
@@ -391,10 +396,7 @@ class HuggingFaceSource(ObjectStorageSourceBase):
         # to the pre-signed CDN host, which is exactly what the Hub expects.
         response = self._session().get(
             url,
-            headers={
-                "Authorization": f"Bearer {self._token()}",
-                "User-Agent": "classifyre",
-            },
+            headers=self._request_headers(),
             stream=True,
             timeout=self._request_timeout_seconds(),
             allow_redirects=True,
@@ -422,10 +424,7 @@ class HuggingFaceSource(ObjectStorageSourceBase):
         """
         response = self._session().get(
             self._resolve_url(ref.key),
-            headers={
-                "Authorization": f"Bearer {self._token()}",
-                "User-Agent": "classifyre",
-            },
+            headers=self._request_headers(),
             stream=True,
             timeout=self._request_timeout_seconds(),
             allow_redirects=True,
@@ -467,10 +466,7 @@ class HuggingFaceSource(ObjectStorageSourceBase):
             size=int(ref.size),
             # As in _download_object: requests drops this on the redirect to the
             # pre-signed CDN host, which is exactly what the Hub expects.
-            headers={
-                "Authorization": f"Bearer {self._token()}",
-                "User-Agent": "classifyre",
-            },
+            headers=self._request_headers(),
             timeout=self._request_timeout_seconds(),
             label=f"hugging_face:{ref.key}",
         )
@@ -557,6 +553,11 @@ class HuggingFaceSource(ObjectStorageSourceBase):
                 "with the account that owns this token, then retry."
             )
         if "RepositoryNotFound" in name or "401" in text or "404" in text:
+            if not self._token():
+                return (
+                    f"{repo_id} was not found, or it is private. Check the repo_id and "
+                    "repo_type; a private or gated repository needs an access token."
+                )
             return (
                 f"{repo_id} was not found, or the token cannot read it. Check the "
                 "repo_id and repo_type, and that the token has read permission on "
