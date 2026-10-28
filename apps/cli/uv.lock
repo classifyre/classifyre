@@ -41,7 +41,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "safetensors" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f5/b5/1d3ed029ac71d3f2961346829a268da923698e9fd63f218f78841f216bfd/accelerate-1.15.0.tar.gz", hash = "sha256:5654f8c5eaa0d4fa68b33e287a97765da6849bf6d51dcac874e73fbbddfb6134", size = 422615, upload-time = "2026-09-09T13:04:49.078Z" }
 wheels = [
@@ -890,7 +890,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.6.18"
+version = "0.7.0.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -917,7 +917,7 @@ content = [
     { name = "pillow" },
     { name = "sentencepiece" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "transformers" },
 ]
 custom = [
@@ -928,7 +928,7 @@ custom = [
     { name = "setfit" },
     { name = "timm" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "torchvision", version = "0.29.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.29.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "transformers" },
@@ -993,7 +993,7 @@ detectors = [
     { name = "textstat" },
     { name = "timm" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "torchvision", version = "0.29.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.29.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "transformers" },
@@ -1134,7 +1134,7 @@ quality = [
     { name = "sentencepiece" },
     { name = "textstat" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "transformers" },
 ]
 reddit = [
@@ -1165,7 +1165,7 @@ tableau = [
 threat-ml = [
     { name = "sentencepiece" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "transformers" },
 ]
 transcription = [
@@ -1431,7 +1431,7 @@ youtube = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.6.18"
+version = "0.7.0.dev0"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
@@ -1835,14 +1835,14 @@ wheels = [
 
 [[package]]
 name = "docling"
-version = "2.143.1"
+version = "2.144.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "docling-slim", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c3/9c/2423ffd05323a85a255da9d86caff2d58f221a35fe0cf4cd2fa51ca14de3/docling-2.143.1.tar.gz", hash = "sha256:4d6de8a34fc4adffb2c918c37d51e07faae9c2dfcb7a687c400ec508cbe38f41", size = 9178, upload-time = "2026-10-27T17:15:06.113Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/ae/173bb09d89b415adb60624f4eaf4e2b73c254a1c0c8d070ae9a0144769c5/docling-2.144.0.tar.gz", hash = "sha256:12b389ca3d4a9cba017b317749d8e8c455e7d14de0c298cf546f372a0d263278", size = 9177, upload-time = "2026-10-28T12:06:28.575Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/ed/25ac7ec131dbe83b20b46fddd4429577694e2758187474fcae91ea14498b/docling-2.143.1-py3-none-any.whl", hash = "sha256:43b71524373024adaa226c1a45eda92d4891d85c5c848a18e9fe72f6fa67132a", size = 5241, upload-time = "2026-10-27T17:15:04.747Z" },
+    { url = "https://files.pythonhosted.org/packages/84/5d/1eb03e5eb3515844ea51fc37c9063c9d1153645d67b0c6b2bf8fa8926e9a/docling-2.144.0-py3-none-any.whl", hash = "sha256:4653322c413cc4e49ba9be80eacdafd9a8c51b7d0026b10d7b0862c03b75ace8", size = 5241, upload-time = "2026-10-28T12:06:27.288Z" },
 ]
 
 [[package]]
@@ -1891,7 +1891,7 @@ dependencies = [
     { name = "pillow" },
     { name = "safetensors", extra = ["torch"] },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "torchvision", version = "0.29.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.29.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "transformers" },
@@ -1932,7 +1932,7 @@ wheels = [
 
 [[package]]
 name = "docling-slim"
-version = "2.143.1"
+version = "2.144.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1945,9 +1945,9 @@ dependencies = [
     { name = "requests" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b0/6a/43ed9a34fe4947dc8176373fc15512878f170297a6e49ee8fc5915b25b52/docling_slim-2.143.1.tar.gz", hash = "sha256:4bb1c0b18e47df95f3a1d6e02457fb2bd847be01e1134129e27fed1dda798609", size = 935843, upload-time = "2026-10-27T17:13:42.501Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/f0/3d8ef84a97a9fb13bc2858df03bc0723271ddc236eeddd43bd9206287110/docling_slim-2.144.0.tar.gz", hash = "sha256:41011453dc18bf35f367fd0c7479d1e00e2ebf537a9d06248637bdc66a4d015e", size = 942334, upload-time = "2026-10-28T12:04:53.19Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/3b/1fb713d4e39e83e6a3a9ff2c8c939b8d02bc6354f5e2f80b6da2bdcf41ee/docling_slim-2.143.1-py3-none-any.whl", hash = "sha256:fd25feb3ef9d55131cae08a7e4d483713770356cd55448041f25a617d97b6864", size = 1131224, upload-time = "2026-10-27T17:13:40.088Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/0c/a0bb89024451536e1795b86cfbc67e0a8a0926740efe58e234046835d75f/docling_slim-2.144.0-py3-none-any.whl", hash = "sha256:beea693f88ad21ba4b11cd54794d4d8020337ba862bc0cdc26651fa5034ede8e", size = 1138292, upload-time = "2026-10-28T12:04:50.852Z" },
 ]
 
 [package.optional-dependencies]
@@ -1977,7 +1977,7 @@ standard = [
     { name = "rtree" },
     { name = "scipy" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "torchvision", version = "0.29.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.29.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "typer" },
@@ -5899,7 +5899,7 @@ wheels = [
 torch = [
     { name = "numpy" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
 ]
 
 [[package]]
@@ -6016,7 +6016,7 @@ dependencies = [
     { name = "scipy" },
     { name = "tokenizers" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "tqdm" },
     { name = "transformers" },
     { name = "typing-extensions" },
@@ -6676,7 +6676,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "safetensors" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "torchvision", version = "0.29.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.29.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
 ]
@@ -6780,7 +6780,7 @@ wheels = [
 
 [[package]]
 name = "torch"
-version = "2.14.1+cpu"
+version = "2.15.0+cpu"
 source = { registry = "https://download.pytorch.org/whl/cpu" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'linux'",
@@ -6797,18 +6797,18 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-linux_s390x.whl", hash = "sha256:6b06a7f6275c5fdecaf1dbf5546f0820b024a97785575bb99e3d9930d83cd86b", upload-time = "2026-09-30T19:47:30Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:2af649994b36dffc627175c3f306d9e513a309b58d4619ac7107577613336454", upload-time = "2026-09-30T19:47:36Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:5a6363570c753812540a05eb82380e329469cbe668643e88111414c12627711f", upload-time = "2026-09-30T19:47:44Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp313-cp313-linux_s390x.whl", hash = "sha256:4b323c71a5ac184485c87d694842157b1eb217c425ad69761dafd379d1590521", upload-time = "2026-09-30T19:47:59Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:783a3dec10d272e40ed3f1a05ec228400300d3229b8f7521a9327645fae88646", upload-time = "2026-09-30T19:48:06Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:331fa474e26e428e2e6af1143b2fdab19cee492d7d21897b8899ce1c14755662", upload-time = "2026-09-30T19:48:15Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp314-cp314-linux_s390x.whl", hash = "sha256:a7a580e3d92467516c9247a22bc805ae4f79c7b1b9a2052f92849f34e89720f5", upload-time = "2026-09-30T19:48:32Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:f56cd23a3bf003bfbed3da0645ba09b3ccc66c0a2f2ac726a9b98f34e0e4926f", upload-time = "2026-09-30T19:48:39Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:35103e180214793207f95d7e12e100ecba3ace6f5fb37e1fcefbb07e096ed180", upload-time = "2026-09-30T19:48:48Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp314-cp314t-linux_s390x.whl", hash = "sha256:f67ee1fe9c9f7c6ad3785d150bc3cecda442a5880a6d40816e13fee475d97dd8", upload-time = "2026-09-30T19:49:02Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:2547c9f32f8fd9c8fced83119269d85519b123d4e8c87eba71660fe3a6996336", upload-time = "2026-09-30T19:49:10Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:7d2c35e915793f3ae82e8ee4041a960140bcd0bd35f3ec6eb06e1f1f37a89dba", upload-time = "2026-09-30T19:49:18Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp312-cp312-linux_s390x.whl", upload-time = "2026-10-28T11:27:56Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl", upload-time = "2026-10-28T11:27:57Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl", upload-time = "2026-10-28T11:27:57Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp313-cp313-linux_s390x.whl", upload-time = "2026-10-28T11:27:58Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp313-cp313-manylinux_2_28_aarch64.whl", upload-time = "2026-10-28T11:27:59Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl", upload-time = "2026-10-28T11:28:00Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp314-cp314-linux_s390x.whl", upload-time = "2026-10-28T11:28:02Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp314-cp314-manylinux_2_28_aarch64.whl", upload-time = "2026-10-28T11:28:02Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp314-cp314-manylinux_2_28_x86_64.whl", upload-time = "2026-10-28T11:28:04Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp314-cp314t-linux_s390x.whl", upload-time = "2026-10-28T11:28:04Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp314-cp314t-manylinux_2_28_aarch64.whl", upload-time = "2026-10-28T11:28:06Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp314-cp314t-manylinux_2_28_x86_64.whl", upload-time = "2026-10-28T11:28:06Z" },
 ]
 
 [[package]]
@@ -6854,7 +6854,7 @@ resolution-markers = [
 dependencies = [
     { name = "numpy" },
     { name = "pillow" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" } },
+    { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" } },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.29.1%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:3058f855e65089330ec987b8cac1ccf5e7a26cd475f8cab20597b5577ddc8767", upload-time = "2026-09-30T15:46:11Z" },
