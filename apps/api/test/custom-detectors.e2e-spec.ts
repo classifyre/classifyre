@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { createTestApp, TestApp } from './create-test-app';
 
 const PIPELINE_SCHEMA_SUPPORT_TICKET = {
-  model: { name: 'fastino/gliner2-base-v1', path: null },
+  model: { name: 'fastino/gliner2.5-base-v1', path: null },
   entities: {
     order_id: { description: 'Order ID like ORD-123', required: true },
     amount: { description: 'Monetary value like 50€', required: false },
@@ -15,7 +15,7 @@ const PIPELINE_SCHEMA_SUPPORT_TICKET = {
 };
 
 const PIPELINE_SCHEMA_ENTITY_ONLY = {
-  model: { name: 'fastino/gliner2-base-v1', path: null },
+  model: { name: 'fastino/gliner2.5-base-v1', path: null },
   entities: {
     contract_clause: {
       description: 'Legal risk clause like "Haftung ausgeschlossen"',
@@ -139,7 +139,7 @@ describe('Custom Detectors (e2e)', () => {
       .send({
         name: `E2E Empty Pipeline ${suffix}`,
         pipelineSchema: {
-          model: { name: 'fastino/gliner2-base-v1' },
+          model: { name: 'fastino/gliner2.5-base-v1' },
           entities: {},
           classification: {},
         },

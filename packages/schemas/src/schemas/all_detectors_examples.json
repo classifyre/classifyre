@@ -1187,7 +1187,7 @@
         "pipeline_schema": {
           "type": "GLINER2",
           "model": {
-            "name": "fastino/gliner2-base-v1",
+            "name": "fastino/gliner2.5-base-v1",
             "path": null
           },
           "entities": {

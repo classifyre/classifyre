@@ -973,7 +973,7 @@
         },
         "gliner_model": {
           "type": "string",
-          "default": "fastino/gliner2-base-v1"
+          "default": "fastino/gliner2.5-base-v1"
         },
         "content_limit": {
           "type": "integer",
@@ -1101,7 +1101,7 @@
         },
         "model": {
           "type": "string",
-          "default": "fastino/gliner2-base-v1"
+          "default": "fastino/gliner2.5-base-v1"
         }
       },
       "additionalProperties": false
@@ -1303,10 +1303,12 @@
       "type": "object",
       "properties": {
         "path": {
-          "type": "string"
+          "type": "string",
+          "description": "Local folder holding a model checkpoint. Overrides name when set."
         },
         "name": {
-          "type": "string"
+          "type": "string",
+          "description": "Hugging Face model id. Both generations load: GLiNER2.5 (fastino/gliner2.5-small-v1, fastino/gliner2.5-base-v1, fastino/gliner2.5-multi-v1) and GLiNER2 (fastino/gliner2-base-v1, fastino/gliner2-large-v1, fastino/gliner2-multi-v1) along with their fine-tunes. Defaults to fastino/gliner2.5-base-v1 (English); use fastino/gliner2.5-multi-v1 for German and other languages."
         }
       },
       "additionalProperties": false
@@ -1322,9 +1324,24 @@
           },
           "default": []
         },
+        "descriptions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Optional plain-language description per label, keyed by label. The model reads it together with the label name; a precise description is the cheapest way to raise accuracy."
+        },
         "multi_label": {
           "type": "boolean",
-          "default": false
+          "default": false,
+          "description": "Allow more than one label per document. Each label that clears the confidence threshold becomes its own finding."
+        },
+        "read_from": {
+          "type": "string",
+          "enum": ["whole", "start"],
+          "default": "whole",
+          "description": "Which part of the text the task judges. whole: every piece of a long text; a label counts at its strongest piece. start: only the opening (about 2,400 characters), where a document says what it is: title, parties, purpose. Use start for the type of a document; on 23 real contracts it named the agreement type right 15 times against 7 for whole."
         }
       },
       "additionalProperties": false
@@ -1332,17 +1349,28 @@
     "PipelineValidationRule": {
       "title": "PipelineValidationRule",
       "type": "object",
+      "description": "A check every value of one entity label must pass after extraction.",
       "properties": {
         "field": {
           "type": "string",
-          "default": ""
+          "default": "",
+          "description": "The entity label the rule applies to."
         },
         "type": {
           "type": "string",
-          "default": "regex"
+          "enum": ["regex", "min_confidence", "required"],
+          "default": "regex",
+          "description": "regex: a value must match pattern. min_confidence: a value needs at least threshold confidence for this label, above the detector-wide threshold. required: when the label has no value in a text, the detector reports nothing for that text."
         },
         "pattern": {
-          "type": "string"
+          "type": "string",
+          "description": "For regex rules: the pattern a value must contain a match for (Python syntax)."
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "For min_confidence rules: the lowest confidence a value of this label may have."
         }
       },
       "additionalProperties": false
@@ -1555,6 +1583,14 @@
         },
         "model": {
           "$ref": "#/definitions/PipelineModelConfig"
+        },
+        "severity_map": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PipelineSeverityRule"
+          },
+          "default": [],
+          "description": "Severity per entity label or classification task. The first rule whose pattern matches the entity label (or, for a classification, the task name or the chosen label) wins. Findings that match no rule are info."
         },
         "validation": {
           "$ref": "#/definitions/PipelineValidationConfig"

@@ -74,7 +74,7 @@ def _make_gliner2_detector(key: str = "test_gliner2") -> CustomDetector:
         custom_detector_key=key,
         name="Test GLiNER2 Detector",
         pipeline_schema=GLiNER2PipelineSchema(
-            model=PipelineModelConfig(name="fastino/gliner2-base-v1"),
+            model=PipelineModelConfig(name="fastino/gliner2.5-base-v1"),
             entities={
                 "order_id": PipelineEntityDefinition(description="Order ID like ORD-123"),
                 "amount": PipelineEntityDefinition(description="Monetary value like 320€"),

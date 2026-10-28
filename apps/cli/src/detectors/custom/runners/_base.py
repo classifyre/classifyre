@@ -20,7 +20,7 @@ from ....models.generated_single_asset_scan_results import (
     Location,
 )
 
-_DEFAULT_GLINER2_MODEL = "fastino/gliner2-base-v1"
+_DEFAULT_GLINER2_MODEL = "fastino/gliner2.5-base-v1"
 _DEFAULT_IMAGE_CLASSIFICATION_MODEL = "google/vit-base-patch16-224"
 
 _TEXT_CONTENT_TYPES = [
@@ -165,6 +165,44 @@ class BaseRunner(ABC):
         runner_type = (result.metadata or {}).get("runner", "GLINER2")
         pipeline_result_dump = _slim_pipeline_result(result)
 
+        # Document-level answers go first: max_findings truncates this list, and
+        # a long document's entity spans must never crowd out its classification.
+        for task, outcome in (result.classification or {}).items():
+            labels = outcome.get("labels")
+            choices = (
+                [item for item in labels if isinstance(item, dict)]
+                if isinstance(labels, list)
+                else [outcome]
+            )
+            for choice in choices:
+                label = str(choice.get("label", ""))
+                confidence = float(choice.get("confidence", 0.0))
+                if not label:
+                    continue
+
+                choice_severity = choice.get("severity")
+                if isinstance(choice_severity, str) and choice_severity in Severity.__members__:
+                    sev = Severity(choice_severity)
+                else:
+                    sev = Severity.medium if confidence < 0.9 else Severity.high
+
+                findings.append(
+                    self._make_result(
+                        finding_type=f"classification:{task}:{label}",
+                        category="CLASSIFICATION",
+                        severity=sev,
+                        confidence=min(0.99, confidence),
+                        matched_content=text[:320],
+                        location=None,
+                        metadata={
+                            "runner": runner_type,
+                            "task": task,
+                            "label": label,
+                        },
+                        extracted_data=pipeline_result_dump,
+                    )
+                )
+
         for label, spans in (result.entities or {}).items():
             for span in spans:
                 confidence = float(span.get("confidence", 0.0))
@@ -190,6 +228,8 @@ class BaseRunner(ABC):
                 }
                 if "groups" in span:
                     meta["capture_groups"] = span["groups"]
+                if isinstance(span.get("occurrences"), int):
+                    meta["occurrences"] = span["occurrences"]
 
                 findings.append(
                     self._make_result(
@@ -203,28 +243,5 @@ class BaseRunner(ABC):
                         extracted_data=pipeline_result_dump,
                     )
                 )
-
-        for task, outcome in (result.classification or {}).items():
-            label = str(outcome.get("label", ""))
-            confidence = float(outcome.get("confidence", 0.0))
-            if not label:
-                continue
-
-            findings.append(
-                self._make_result(
-                    finding_type=f"classification:{task}:{label}",
-                    category="CLASSIFICATION",
-                    severity=Severity.medium if confidence < 0.9 else Severity.high,
-                    confidence=min(0.99, confidence),
-                    matched_content=text[:320],
-                    location=None,
-                    metadata={
-                        "runner": runner_type,
-                        "task": task,
-                        "label": label,
-                    },
-                    extracted_data=pipeline_result_dump,
-                )
-            )
 
         return findings

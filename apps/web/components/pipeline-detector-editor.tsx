@@ -1,8 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
-import { Plus, Trash2, Info, Upload, X, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import {
+  Plus,
+  Trash2,
+  Info,
+  Upload,
+  X,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+} from "lucide-react";
 import {
   Badge,
   Button,
@@ -24,7 +39,10 @@ import {
   type CustomDetectorStepId,
 } from "@/components/custom-detector-stepper";
 import { api } from "@workspace/api-client";
-import type { TrainingExampleItem, TrainingExampleDto } from "@workspace/api-client";
+import type {
+  TrainingExampleItem,
+  TrainingExampleDto,
+} from "@workspace/api-client";
 import type { ParseTrainingExamplesResponseDto } from "@workspace/api-client";
 import { preserveDetectorScope } from "@/lib/detector-scope";
 
@@ -37,7 +55,19 @@ interface EntityDefinition {
 
 interface ClassificationDefinition {
   labels: string[];
+  /** Plain-language description per label; the model reads it with the label. */
+  descriptions: Record<string, string>;
   multi_label: boolean;
+  /** "start" judges only the opening of a long text, where it says what it is. */
+  read_from: "whole" | "start";
+}
+
+type SeverityLevel = "critical" | "high" | "medium" | "low" | "info";
+
+interface SeverityRule {
+  id: string;
+  pattern: string;
+  severity: SeverityLevel;
 }
 
 interface ValidationRule {
@@ -56,6 +86,7 @@ interface PipelineSchemaState {
     confidence_threshold: number;
     rules: ValidationRule[];
   };
+  severity_map: SeverityRule[];
 }
 
 export interface PipelineDetectorEditorProps {
@@ -82,17 +113,58 @@ export interface PipelineDetectorEditorHandle {
   submit: () => Promise<void>;
 }
 
-const DEFAULT_MODEL = "fastino/gliner2-base-v1";
+const DEFAULT_MODEL = "fastino/gliner2.5-base-v1";
+
+/** Checkpoints offered in the model picker; any other Hugging Face id still works. */
+const MODEL_PRESETS: { id: string; label: string; hint: string }[] = [
+  {
+    id: "fastino/gliner2.5-base-v1",
+    label: "GLiNER2.5 base",
+    hint: "English. The default: accurate and fast on CPU.",
+  },
+  {
+    id: "fastino/gliner2.5-multi-v1",
+    label: "GLiNER2.5 multilingual",
+    hint: "German, French and 100+ other languages. Slower and less precise on English.",
+  },
+  {
+    id: "fastino/gliner2.5-small-v1",
+    label: "GLiNER2.5 small",
+    hint: "English. The fastest; use it when volume matters more than the last points of accuracy.",
+  },
+  {
+    id: "fastino/gliner2-base-v1",
+    label: "GLiNER2 base",
+    hint: "Previous generation, English.",
+  },
+  {
+    id: "fastino/gliner2-large-v1",
+    label: "GLiNER2 large",
+    hint: "Previous generation, English, larger.",
+  },
+];
+const CUSTOM_MODEL = "__custom__";
+const SEVERITY_LEVELS: SeverityLevel[] = [
+  "critical",
+  "high",
+  "medium",
+  "low",
+  "info",
+];
 
 function uuid4(): string {
   return crypto.randomUUID();
 }
 
-function parseInitialSchema(raw?: Record<string, unknown>): PipelineSchemaState {
+function parseInitialSchema(
+  raw?: Record<string, unknown>,
+): PipelineSchemaState {
   const entities: Record<string, EntityDefinition> = {};
   const rawEntities = raw?.entities;
   if (rawEntities && typeof rawEntities === "object") {
-    for (const [label, defn] of Object.entries(rawEntities as Record<string, unknown>)) {
+    for (const [label, defn] of Object.entries(
+      rawEntities as Record<string, unknown>,
+    )) {
       if (defn && typeof defn === "object") {
         const d = defn as Record<string, unknown>;
         entities[label] = {
@@ -106,28 +178,55 @@ function parseInitialSchema(raw?: Record<string, unknown>): PipelineSchemaState 
   const classification: Record<string, ClassificationDefinition> = {};
   const rawClass = raw?.classification;
   if (rawClass && typeof rawClass === "object") {
-    for (const [task, defn] of Object.entries(rawClass as Record<string, unknown>)) {
+    for (const [task, defn] of Object.entries(
+      rawClass as Record<string, unknown>,
+    )) {
       if (defn && typeof defn === "object") {
         const d = defn as Record<string, unknown>;
+        const rawDescriptions =
+          d.descriptions && typeof d.descriptions === "object"
+            ? (d.descriptions as Record<string, unknown>)
+            : {};
         classification[task] = {
           labels: Array.isArray(d.labels) ? d.labels.map(String) : [],
+          descriptions: Object.fromEntries(
+            Object.entries(rawDescriptions).filter(
+              (entry): entry is [string, string] =>
+                typeof entry[1] === "string",
+            ),
+          ),
           multi_label: d.multi_label === true,
+          read_from: d.read_from === "start" ? "start" : "whole",
         };
       }
     }
   }
 
   const rawValidation = raw?.validation as Record<string, unknown> | undefined;
-  const rawRules = Array.isArray(rawValidation?.rules) ? rawValidation!.rules : [];
-  const rules: ValidationRule[] = rawRules.map((r: Record<string, unknown>) => ({
-    id: uuid4(),
-    field: typeof r.field === "string" ? r.field : "",
-    type: (r.type as ValidationRule["type"]) ?? "regex",
-    pattern: typeof r.pattern === "string" ? r.pattern : undefined,
-    threshold: typeof r.threshold === "number" ? r.threshold : undefined,
-  }));
+  const rawRules = Array.isArray(rawValidation?.rules)
+    ? rawValidation!.rules
+    : [];
+  const rules: ValidationRule[] = rawRules.map(
+    (r: Record<string, unknown>) => ({
+      id: uuid4(),
+      field: typeof r.field === "string" ? r.field : "",
+      type: (r.type as ValidationRule["type"]) ?? "regex",
+      pattern: typeof r.pattern === "string" ? r.pattern : undefined,
+      threshold: typeof r.threshold === "number" ? r.threshold : undefined,
+    }),
+  );
 
   const rawModel = raw?.model as Record<string, unknown> | undefined;
+  const rawSeverity = Array.isArray(raw?.severity_map) ? raw!.severity_map : [];
+  const severityMap: SeverityRule[] = (rawSeverity as Record<string, unknown>[])
+    .filter((r) => typeof r?.pattern === "string")
+    .map((r) => ({
+      id: uuid4(),
+      pattern: r.pattern as string,
+      severity: SEVERITY_LEVELS.includes(r.severity as SeverityLevel)
+        ? (r.severity as SeverityLevel)
+        : "info",
+    }));
 
   return {
     model: {
@@ -143,18 +242,34 @@ function parseInitialSchema(raw?: Record<string, unknown>): PipelineSchemaState 
           : 0.7,
       rules,
     },
+    severity_map: severityMap,
   };
 }
 
 function toApiSchema(state: PipelineSchemaState): Record<string, unknown> {
   const entities: Record<string, unknown> = {};
   for (const [label, defn] of Object.entries(state.entities)) {
-    entities[label] = { description: defn.description, required: defn.required };
+    entities[label] = {
+      description: defn.description,
+      required: defn.required,
+    };
   }
 
   const classification: Record<string, unknown> = {};
   for (const [task, defn] of Object.entries(state.classification)) {
-    classification[task] = { labels: defn.labels, multi_label: defn.multi_label };
+    const descriptions = Object.fromEntries(
+      defn.labels
+        .map(
+          (label) => [label, (defn.descriptions[label] ?? "").trim()] as const,
+        )
+        .filter(([, text]) => text.length > 0),
+    );
+    classification[task] = {
+      labels: defn.labels,
+      ...(Object.keys(descriptions).length > 0 ? { descriptions } : {}),
+      multi_label: defn.multi_label,
+      read_from: defn.read_from,
+    };
   }
 
   return {
@@ -166,6 +281,12 @@ function toApiSchema(state: PipelineSchemaState): Record<string, unknown> {
       confidence_threshold: state.validation.confidence_threshold,
       rules: state.validation.rules.map(({ id: _id, ...r }) => r),
     },
+    severity_map: state.severity_map
+      .filter((r) => r.pattern.trim().length > 0)
+      .map(({ id: _id, pattern, severity }) => ({
+        pattern: pattern.trim(),
+        severity,
+      })),
   };
 }
 
@@ -200,8 +321,10 @@ function EntitiesSection({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Define named entities for GLiNER2 to extract. Concrete descriptions with
-        examples (e.g. <em>&ldquo;Order ID like ORD-123&rdquo;</em>) yield the best results.
+        Name the facts to pull out of the text. Each one becomes a finding with
+        the exact words and their position. A one-line description with an
+        example (e.g. <em>&ldquo;Order ID like ORD-123&rdquo;</em>) is the
+        model&rsquo;s only instruction.
       </p>
 
       {Object.entries(entities).map(([label, defn]) => (
@@ -223,11 +346,15 @@ function EntitiesSection({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-wide">Description</Label>
+            <Label className="text-xs uppercase tracking-wide">
+              Description
+            </Label>
             <Input
               data-testid={`gliner2-entity-desc-${label}`}
               value={defn.description}
-              onChange={(e) => updateEntity(label, { description: e.target.value })}
+              onChange={(e) =>
+                updateEntity(label, { description: e.target.value })
+              }
               placeholder='e.g. "Order ID like ORD-123"'
               className="h-9 text-sm"
             />
@@ -240,7 +367,9 @@ function EntitiesSection({
             <Switch
               id={`req-${label}`}
               checked={defn.required}
-              onCheckedChange={(checked) => updateEntity(label, { required: checked })}
+              onCheckedChange={(checked) =>
+                updateEntity(label, { required: checked })
+              }
             />
             <Label htmlFor={`req-${label}`} className="text-xs">
               Required — suppress all findings if this entity is absent
@@ -289,7 +418,15 @@ function ClassificationSection({
   const addTask = () => {
     const task = newTask.trim().replace(/\s+/g, "_").toLowerCase();
     if (!task || task in classification) return;
-    onChange({ ...classification, [task]: { labels: [], multi_label: false } });
+    onChange({
+      ...classification,
+      [task]: {
+        labels: [],
+        descriptions: {},
+        multi_label: false,
+        read_from: "whole",
+      },
+    });
     setNewTask("");
   };
 
@@ -304,15 +441,35 @@ function ClassificationSection({
     if (!label) return;
     const current = classification[task]!;
     if (current.labels.includes(label)) return;
-    onChange({ ...classification, [task]: { ...current, labels: [...current.labels, label] } });
+    onChange({
+      ...classification,
+      [task]: { ...current, labels: [...current.labels, label] },
+    });
     setLabelInput((prev) => ({ ...prev, [task]: "" }));
   };
 
   const removeLabel = (task: string, label: string) => {
     const current = classification[task]!;
+    const descriptions = { ...current.descriptions };
+    delete descriptions[label];
     onChange({
       ...classification,
-      [task]: { ...current, labels: current.labels.filter((l) => l !== label) },
+      [task]: {
+        ...current,
+        labels: current.labels.filter((l) => l !== label),
+        descriptions,
+      },
+    });
+  };
+
+  const describeLabel = (task: string, label: string, text: string) => {
+    const current = classification[task]!;
+    onChange({
+      ...classification,
+      [task]: {
+        ...current,
+        descriptions: { ...current.descriptions, [label]: text },
+      },
     });
   };
 
@@ -320,7 +477,9 @@ function ClassificationSection({
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Define zero-shot classification tasks. Each task gets a set of candidate
-        labels; GLiNER2 picks the best match in a single pass.
+        labels; the model scores them in the same pass as the entities. A short
+        description per label tells the model what the label means and is the
+        cheapest way to raise accuracy.
       </p>
 
       {Object.entries(classification).map(([task, defn]) => (
@@ -343,16 +502,34 @@ function ClassificationSection({
 
           <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-wide">Labels</Label>
-            <div className="flex flex-wrap gap-1.5 mb-2">
+            <div className="mb-2 space-y-1.5">
               {defn.labels.map((label) => (
-                <Badge
-                  key={label}
-                  variant="outline"
-                  className="cursor-pointer rounded-[4px] text-xs font-mono"
-                  onClick={() => removeLabel(task, label)}
-                >
-                  {label} ×
-                </Badge>
+                <div key={label} className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className="w-40 shrink-0 justify-start truncate rounded-[4px] font-mono text-xs"
+                    title={label}
+                  >
+                    {label}
+                  </Badge>
+                  <Input
+                    data-testid={`gliner2-label-desc-${task}-${label}`}
+                    value={defn.descriptions[label] ?? ""}
+                    onChange={(e) => describeLabel(task, label, e.target.value)}
+                    placeholder="What this label means (optional)"
+                    className="h-8 text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeLabel(task, label)}
+                    aria-label={`Remove label ${label}`}
+                    className="h-8 w-8 shrink-0 p-0 text-destructive"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               ))}
             </div>
             <div className="flex gap-2">
@@ -382,11 +559,33 @@ function ClassificationSection({
               id={`ml-${task}`}
               checked={defn.multi_label}
               onCheckedChange={(checked) =>
-                onChange({ ...classification, [task]: { ...defn, multi_label: checked } })
+                onChange({
+                  ...classification,
+                  [task]: { ...defn, multi_label: checked },
+                })
               }
             />
             <Label htmlFor={`ml-${task}`} className="text-xs">
-              Multi-label — allow more than one label to be predicted
+              Multi-label — every label above the threshold becomes its own
+              finding
+            </Label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Switch
+              id={`start-${task}`}
+              data-testid={`gliner2-read-start-${task}`}
+              checked={defn.read_from === "start"}
+              onCheckedChange={(checked) =>
+                onChange({
+                  ...classification,
+                  [task]: { ...defn, read_from: checked ? "start" : "whole" },
+                })
+              }
+            />
+            <Label htmlFor={`start-${task}`} className="text-xs">
+              Judge from the opening only — best for the type of a document,
+              which its title and first paragraphs state
             </Label>
           </div>
         </div>
@@ -427,18 +626,26 @@ function ValidationSection({
   const addRule = () => {
     onChange({
       ...validation,
-      rules: [...validation.rules, { id: uuid4(), field: "", type: "regex", pattern: "" }],
+      rules: [
+        ...validation.rules,
+        { id: uuid4(), field: "", type: "regex", pattern: "" },
+      ],
     });
   };
 
   const removeRule = (id: string) => {
-    onChange({ ...validation, rules: validation.rules.filter((r) => r.id !== id) });
+    onChange({
+      ...validation,
+      rules: validation.rules.filter((r) => r.id !== id),
+    });
   };
 
   const updateRule = (id: string, patch: Partial<ValidationRule>) => {
     onChange({
       ...validation,
-      rules: validation.rules.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+      rules: validation.rules.map((r) =>
+        r.id === id ? { ...r, ...patch } : r,
+      ),
     });
   };
 
@@ -450,7 +657,9 @@ function ValidationSection({
       </p>
 
       <div className="space-y-2">
-        <Label className="text-xs uppercase tracking-wide">Global confidence threshold</Label>
+        <Label className="text-xs uppercase tracking-wide">
+          Global confidence threshold
+        </Label>
         <div className="flex items-center gap-3">
           <Input
             type="number"
@@ -461,7 +670,10 @@ function ValidationSection({
             onChange={(e) =>
               onChange({
                 ...validation,
-                confidence_threshold: Math.min(1, Math.max(0, Number(e.target.value))),
+                confidence_threshold: Math.min(
+                  1,
+                  Math.max(0, Number(e.target.value)),
+                ),
               })
             }
             className="h-9 w-32"
@@ -484,13 +696,17 @@ function ValidationSection({
                 <Input
                   placeholder="field (e.g. order_id)"
                   value={rule.field}
-                  onChange={(e) => updateRule(rule.id, { field: e.target.value })}
+                  onChange={(e) =>
+                    updateRule(rule.id, { field: e.target.value })
+                  }
                   className="h-8 font-mono text-sm"
                 />
                 <Select
                   value={rule.type}
                   onValueChange={(value) =>
-                    updateRule(rule.id, { type: value as ValidationRule["type"] })
+                    updateRule(rule.id, {
+                      type: value as ValidationRule["type"],
+                    })
                   }
                 >
                   <SelectTrigger className="h-8 w-44 text-xs">
@@ -499,7 +715,9 @@ function ValidationSection({
                   <SelectContent>
                     <SelectItem value="regex">Regex pattern</SelectItem>
                     <SelectItem value="required">Required field</SelectItem>
-                    <SelectItem value="min_confidence">Min confidence</SelectItem>
+                    <SelectItem value="min_confidence">
+                      Min confidence
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -516,7 +734,9 @@ function ValidationSection({
                 <Input
                   placeholder="regex pattern (e.g. ^ORD-\d+$)"
                   value={rule.pattern ?? ""}
-                  onChange={(e) => updateRule(rule.id, { pattern: e.target.value })}
+                  onChange={(e) =>
+                    updateRule(rule.id, { pattern: e.target.value })
+                  }
                   className="h-8 font-mono text-sm"
                 />
               )}
@@ -528,7 +748,9 @@ function ValidationSection({
                   step={0.05}
                   placeholder="0.8"
                   value={rule.threshold ?? ""}
-                  onChange={(e) => updateRule(rule.id, { threshold: Number(e.target.value) })}
+                  onChange={(e) =>
+                    updateRule(rule.id, { threshold: Number(e.target.value) })
+                  }
                   className="h-8 w-32"
                 />
               )}
@@ -551,6 +773,80 @@ function ValidationSection({
   );
 }
 
+// ── Severity section ───────────────────────────────────────────────────────
+
+function SeveritySection({
+  rules,
+  onChange,
+}: {
+  rules: SeverityRule[];
+  onChange: (next: SeverityRule[]) => void;
+}) {
+  const update = (id: string, patch: Partial<SeverityRule>) =>
+    onChange(rules.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Severity is set by what was found, not by how sure the model is. Each
+        rule matches an entity label, a classification task or a chosen label
+        (case insensitive); the first match wins. Findings that match no rule
+        are <code className="font-mono text-xs">info</code>.
+      </p>
+      {rules.map((rule) => (
+        <div key={rule.id} className="flex items-center gap-2">
+          <Input
+            data-testid="gliner2-severity-pattern"
+            value={rule.pattern}
+            onChange={(e) => update(rule.id, { pattern: e.target.value })}
+            placeholder="label or task (e.g. notice_period)"
+            className="h-8 font-mono text-sm"
+          />
+          <Select
+            value={rule.severity}
+            onValueChange={(value) =>
+              update(rule.id, { severity: value as SeverityLevel })
+            }
+          >
+            <SelectTrigger className="h-8 w-32 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SEVERITY_LEVELS.map((level) => (
+                <SelectItem key={level} value={level}>
+                  {level}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onChange(rules.filter((r) => r.id !== rule.id))}
+            aria-label="Remove severity rule"
+            className="h-8 w-8 p-0 text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() =>
+          onChange([...rules, { id: uuid4(), pattern: "", severity: "medium" }])
+        }
+        className="h-9"
+      >
+        <Plus className="mr-1 h-3.5 w-3.5" />
+        Add severity rule
+      </Button>
+    </div>
+  );
+}
+
 // ── Model section ──────────────────────────────────────────────────────────
 
 function ModelSection({
@@ -560,31 +856,78 @@ function ModelSection({
   model: PipelineSchemaState["model"];
   onChange: (next: PipelineSchemaState["model"]) => void;
 }) {
+  const preset = MODEL_PRESETS.find((p) => p.id === model.name);
+  const [custom, setCustom] = useState(!preset);
+  const selected = custom ? CUSTOM_MODEL : model.name;
+
   return (
     <div className="space-y-4">
       <div className="text-sm text-muted-foreground flex items-start gap-2">
         <Info className="h-4 w-4 mt-0.5 shrink-0" />
         <span>
-          Specify the GLiNER2 model. Use a HuggingFace model ID or set a local
-          path to load a custom model. Defaults to{" "}
-          <code className="font-mono text-xs">{DEFAULT_MODEL}</code>.
+          The model runs inside the scan on CPU; no text leaves your
+          infrastructure. Both GLiNER2.5 and GLiNER2 checkpoints load, as do
+          fine-tunes of either.
         </span>
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs uppercase tracking-wide">HuggingFace model ID</Label>
-        <Input
-          value={model.name}
-          onChange={(e) => onChange({ ...model, name: e.target.value })}
-          placeholder={DEFAULT_MODEL}
-          className="h-9 font-mono text-sm"
-        />
+        <Label className="text-xs uppercase tracking-wide">Model</Label>
+        <Select
+          value={selected}
+          onValueChange={(value) => {
+            if (value === CUSTOM_MODEL) {
+              setCustom(true);
+              return;
+            }
+            setCustom(false);
+            onChange({ ...model, name: value });
+          }}
+        >
+          <SelectTrigger
+            data-testid="gliner2-model-select"
+            className="h-9 text-sm"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MODEL_PRESETS.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.label}
+              </SelectItem>
+            ))}
+            <SelectItem value={CUSTOM_MODEL}>
+              Other Hugging Face model…
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-[11px] text-muted-foreground">
+          {custom
+            ? "Any GLiNER2-family checkpoint on the Hugging Face Hub."
+            : preset?.hint}
+        </p>
       </div>
+      {custom && (
+        <div className="space-y-1.5">
+          <Label className="text-xs uppercase tracking-wide">
+            Hugging Face model ID
+          </Label>
+          <Input
+            data-testid="gliner2-model-id"
+            value={model.name}
+            onChange={(e) => onChange({ ...model, name: e.target.value })}
+            placeholder={DEFAULT_MODEL}
+            className="h-9 font-mono text-sm"
+          />
+        </div>
+      )}
       <div className="space-y-1.5">
-        <Label className="text-xs uppercase tracking-wide">Local model path (optional)</Label>
+        <Label className="text-xs uppercase tracking-wide">
+          Local model path (optional)
+        </Label>
         <Input
           value={model.path ?? ""}
           onChange={(e) => onChange({ ...model, path: e.target.value || null })}
-          placeholder="/path/to/model — overrides name when set"
+          placeholder="/path/to/model — overrides the model above when set"
           className="h-9 font-mono text-sm"
         />
       </div>
@@ -630,7 +973,8 @@ function TrainingSection({
   // Load persisted examples when detector ID is known
   useEffect(() => {
     if (!detectorId) return;
-    api.listTrainingExamples(detectorId)
+    api
+      .listTrainingExamples(detectorId)
       .then((examples) => setState((s) => ({ ...s, saved: examples })))
       .catch(() => undefined);
   }, [detectorId]);
@@ -639,16 +983,29 @@ function TrainingSection({
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      setState((s) => ({ ...s, isParsing: true, error: null, parseResult: null }));
+      setState((s) => ({
+        ...s,
+        isParsing: true,
+        error: null,
+        parseResult: null,
+      }));
       try {
-        const result = await api.parseCustomDetectorTrainingExamples(file, file.name);
+        const result = await api.parseCustomDetectorTrainingExamples(
+          file,
+          file.name,
+        );
         const staged: TrainingExampleItem[] = result.examples.map((ex) => ({
           label: ex.label,
           text: ex.text,
           accepted: ex.accepted,
           source: ex.source ?? file.name,
         }));
-        setState((s) => ({ ...s, isParsing: false, parseResult: result, staged }));
+        setState((s) => ({
+          ...s,
+          isParsing: false,
+          parseResult: result,
+          staged,
+        }));
       } catch (err) {
         setState((s) => ({
           ...s,
@@ -668,7 +1025,13 @@ function TrainingSection({
     try {
       await api.saveTrainingExamples(detectorId, state.staged, false);
       const refreshed = await api.listTrainingExamples(detectorId);
-      setState((s) => ({ ...s, isSaving: false, saved: refreshed, staged: [], parseResult: null }));
+      setState((s) => ({
+        ...s,
+        isSaving: false,
+        saved: refreshed,
+        staged: [],
+        parseResult: null,
+      }));
     } catch (err) {
       setState((s) => ({
         ...s,
@@ -683,7 +1046,13 @@ function TrainingSection({
     setState((s) => ({ ...s, isSaving: true, error: null }));
     try {
       await api.clearTrainingExamples(detectorId);
-      setState((s) => ({ ...s, isSaving: false, saved: [], staged: [], parseResult: null }));
+      setState((s) => ({
+        ...s,
+        isSaving: false,
+        saved: [],
+        staged: [],
+        parseResult: null,
+      }));
     } catch (err) {
       setState((s) => ({
         ...s,
@@ -698,8 +1067,13 @@ function TrainingSection({
       if (!detectorId) return;
       try {
         await api.deleteTrainingExample(detectorId, exampleId);
-        setState((s) => ({ ...s, saved: s.saved.filter((e) => e.id !== exampleId) }));
-      } catch { /* ignore */ }
+        setState((s) => ({
+          ...s,
+          saved: s.saved.filter((e) => e.id !== exampleId),
+        }));
+      } catch {
+        /* ignore */
+      }
     },
     [detectorId],
   );
@@ -712,7 +1086,9 @@ function TrainingSection({
       setState((s) => ({
         ...s,
         isTraining: false,
-        lastTrainedAt: run.completedAt ? new Date(run.completedAt).toLocaleString() : null,
+        lastTrainedAt: run.completedAt
+          ? new Date(run.completedAt).toLocaleString()
+          : null,
       }));
     } catch (err) {
       setState((s) => ({
@@ -736,9 +1112,12 @@ function TrainingSection({
     setState((s) => ({ ...s, staged: s.staged.filter((_, i) => i !== index) }));
   };
 
-  const entityLabels = Object.keys((pipelineSchema.entities as Record<string, unknown>) ?? {});
+  const entityLabels = Object.keys(
+    (pipelineSchema.entities as Record<string, unknown>) ?? {},
+  );
   const classLabels: string[] = Object.values(
-    (pipelineSchema.classification as Record<string, { labels: string[] }>) ?? {},
+    (pipelineSchema.classification as Record<string, { labels: string[] }>) ??
+      {},
   ).flatMap((t) => t.labels ?? []);
   const knownLabels = new Set([...entityLabels, ...classLabels]);
 
@@ -749,17 +1128,28 @@ function TrainingSection({
     <div className="space-y-6">
       {/* Info */}
       <p className="text-sm text-muted-foreground">
-        Upload labeled examples to fine-tune GLiNER2 for entities (include the exact
-        span value) or SetFit for classification tasks. Training is optional — the
-        detector works zero-shot without any examples.
+        Upload labeled examples to fine-tune GLiNER2 for entities (include the
+        exact span value) or SetFit for classification tasks. Training is
+        optional — the detector works zero-shot without any examples.
       </p>
 
       {/* Format reference */}
       <div className="rounded-[4px] border border-border bg-muted/30 p-3 text-xs font-mono space-y-1 text-muted-foreground">
-        <div className="font-bold text-foreground uppercase tracking-wide text-[10px] mb-2">Expected CSV columns</div>
-        <div><span className="text-foreground">text</span> — context passage (required)</div>
-        <div><span className="text-foreground">label</span> — entity label or classification label (required)</div>
-        <div><span className="text-foreground">value</span> — exact entity span text, e.g. "ORD-123" (NER only)</div>
+        <div className="font-bold text-foreground uppercase tracking-wide text-[10px] mb-2">
+          Expected CSV columns
+        </div>
+        <div>
+          <span className="text-foreground">text</span> — context passage
+          (required)
+        </div>
+        <div>
+          <span className="text-foreground">label</span> — entity label or
+          classification label (required)
+        </div>
+        <div>
+          <span className="text-foreground">value</span> — exact entity span
+          text, e.g. "ORD-123" (NER only)
+        </div>
       </div>
 
       {/* Upload */}
@@ -788,10 +1178,14 @@ function TrainingSection({
           {state.isParsing ? "Parsing…" : "Upload CSV / TSV / XLSX / JSON"}
         </Button>
         {state.parseResult && (
-          <p data-testid="gliner2-parse-result" className="mt-1.5 text-[11px] text-muted-foreground">
+          <p
+            data-testid="gliner2-parse-result"
+            className="mt-1.5 text-[11px] text-muted-foreground"
+          >
             Parsed {state.parseResult.importedRows} rows
-            {state.parseResult.skippedRows > 0 && `, ${state.parseResult.skippedRows} skipped`}
-            {" "}from <span className="font-mono">{state.parseResult.format}</span>
+            {state.parseResult.skippedRows > 0 &&
+              `, ${state.parseResult.skippedRows} skipped`}{" "}
+            from <span className="font-mono">{state.parseResult.format}</span>
           </p>
         )}
       </div>
@@ -809,7 +1203,9 @@ function TrainingSection({
                 variant="ghost"
                 size="sm"
                 className="h-7 text-xs text-muted-foreground"
-                onClick={() => setState((s) => ({ ...s, staged: [], parseResult: null }))}
+                onClick={() =>
+                  setState((s) => ({ ...s, staged: [], parseResult: null }))
+                }
               >
                 Discard
               </Button>
@@ -820,7 +1216,9 @@ function TrainingSection({
                 onClick={() => void handleSaveExamples()}
                 className="h-7 text-xs"
               >
-                {state.isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                {state.isSaving ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : null}
                 Save {state.staged.length} examples
               </Button>
             </div>
@@ -855,7 +1253,9 @@ function TrainingSection({
                     {ex.value}
                   </span>
                 )}
-                <span className="text-muted-foreground truncate flex-1">{ex.text}</span>
+                <span className="text-muted-foreground truncate flex-1">
+                  {ex.text}
+                </span>
                 <button
                   type="button"
                   onClick={() => removeStagedItem(i)}
@@ -874,7 +1274,8 @@ function TrainingSection({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label className="text-xs uppercase tracking-wide">
-              Saved — {positiveSaved} positive · {totalSaved - positiveSaved} negative
+              Saved — {positiveSaved} positive · {totalSaved - positiveSaved}{" "}
+              negative
             </Label>
             <Button
               type="button"
@@ -889,7 +1290,10 @@ function TrainingSection({
           </div>
           <div className="max-h-48 overflow-y-auto rounded-[4px] border border-border divide-y divide-border">
             {state.saved.map((ex) => (
-              <div key={ex.id} className="flex items-start gap-2 px-3 py-2 text-xs">
+              <div
+                key={ex.id}
+                className="flex items-start gap-2 px-3 py-2 text-xs"
+              >
                 {ex.accepted ? (
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5 text-green-600" />
                 ) : (
@@ -897,7 +1301,9 @@ function TrainingSection({
                 )}
                 <span
                   className={`font-mono shrink-0 rounded-[3px] border px-1 py-0.5 text-[10px] ${
-                    knownLabels.has(ex.label) ? "border-border bg-muted" : "border-amber-300 bg-amber-50 text-amber-700"
+                    knownLabels.has(ex.label)
+                      ? "border-border bg-muted"
+                      : "border-amber-300 bg-amber-50 text-amber-700"
                   }`}
                 >
                   {ex.label}
@@ -907,7 +1313,9 @@ function TrainingSection({
                     {ex.value}
                   </span>
                 )}
-                <span className="text-muted-foreground truncate flex-1">{ex.text}</span>
+                <span className="text-muted-foreground truncate flex-1">
+                  {ex.text}
+                </span>
                 <button
                   type="button"
                   onClick={() => void handleDeleteSaved(ex.id)}
@@ -922,9 +1330,7 @@ function TrainingSection({
       )}
 
       {/* Error */}
-      {state.error && (
-        <p className="text-sm text-destructive">{state.error}</p>
-      )}
+      {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 
       {/* Train button */}
       {detectorId && (
@@ -935,21 +1341,28 @@ function TrainingSection({
             disabled={state.isTraining || totalSaved === 0}
             className="h-9 gap-2"
           >
-            {state.isTraining && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {state.isTraining && (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            )}
             {state.isTraining ? "Training…" : "Fine-tune detector"}
           </Button>
           {totalSaved === 0 && (
-            <p className="text-xs text-muted-foreground">Save examples first to enable training</p>
+            <p className="text-xs text-muted-foreground">
+              Save examples first to enable training
+            </p>
           )}
           {state.lastTrainedAt && (
-            <p className="text-xs text-muted-foreground">Last trained: {state.lastTrainedAt}</p>
+            <p className="text-xs text-muted-foreground">
+              Last trained: {state.lastTrainedAt}
+            </p>
           )}
         </div>
       )}
 
       {!detectorId && (
         <p className="text-sm text-muted-foreground italic">
-          Save the detector first to upload training examples and trigger fine-tuning.
+          Save the detector first to upload training examples and trigger
+          fine-tuning.
         </p>
       )}
     </div>
@@ -977,7 +1390,7 @@ function SectionLabel({ label }: { label: string }) {
   return (
     <div className="mb-4">
       <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-0.5">
-        GLiNER2 Pipeline
+        GLiNER2 Extraction
       </div>
       <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">
         {label}
@@ -991,19 +1404,22 @@ function SectionLabel({ label }: { label: string }) {
 export const PipelineDetectorEditor = React.forwardRef<
   PipelineDetectorEditorHandle,
   PipelineDetectorEditorProps
->(function PipelineDetectorEditor({
-  mode,
-  submitLabel,
-  isSubmitting = false,
-  detectorId,
-  initialName = "",
-  initialKey = "",
-  initialDescription = "",
-  initialIsActive = true,
-  initialPipelineSchema,
-  embedded,
-  onSubmit,
-}, ref) {
+>(function PipelineDetectorEditor(
+  {
+    mode,
+    submitLabel,
+    isSubmitting = false,
+    detectorId,
+    initialName = "",
+    initialKey = "",
+    initialDescription = "",
+    initialIsActive = true,
+    initialPipelineSchema,
+    embedded,
+    onSubmit,
+  },
+  ref,
+) {
   const [name, setName] = useState(initialName);
   const [key, setKey] = useState(initialKey);
   const [description, setDescription] = useState(initialDescription);
@@ -1012,7 +1428,8 @@ export const PipelineDetectorEditor = React.forwardRef<
     parseInitialSchema(initialPipelineSchema),
   );
   const [errors, setErrors] = useState<string[]>([]);
-  const [activeStepId, setActiveStepId] = useState<CustomDetectorStepId>("identity");
+  const [activeStepId, setActiveStepId] =
+    useState<CustomDetectorStepId>("identity");
 
   const identityRef = useRef<HTMLDivElement>(null);
   const entitiesRef = useRef<HTMLDivElement>(null);
@@ -1021,7 +1438,10 @@ export const PipelineDetectorEditor = React.forwardRef<
   const modelRef = useRef<HTMLDivElement>(null);
   const trainingRef = useRef<HTMLDivElement>(null);
 
-  const sectionRefs: Record<CustomDetectorStepId, RefObject<HTMLDivElement | null>> = {
+  const sectionRefs: Record<
+    CustomDetectorStepId,
+    RefObject<HTMLDivElement | null>
+  > = {
     identity: identityRef,
     entities: entitiesRef,
     classification: classificationRef,
@@ -1042,9 +1462,14 @@ export const PipelineDetectorEditor = React.forwardRef<
     ];
     const els = stepIds
       .map((id) => ({ id, el: sectionRefs[id].current }))
-      .filter((x): x is { id: CustomDetectorStepId; el: HTMLDivElement } => x.el !== null);
+      .filter(
+        (x): x is { id: CustomDetectorStepId; el: HTMLDivElement } =>
+          x.el !== null,
+      );
 
-    const map = new Map<Element, CustomDetectorStepId>(els.map(({ id, el }) => [el, id]));
+    const map = new Map<Element, CustomDetectorStepId>(
+      els.map(({ id, el }) => [el, id]),
+    );
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -1064,7 +1489,10 @@ export const PipelineDetectorEditor = React.forwardRef<
   }, []);
 
   const scrollToSection = (id: CustomDetectorStepId) => {
-    sectionRefs[id].current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    sectionRefs[id].current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   };
 
   const validate = (): string[] => {
@@ -1084,9 +1512,7 @@ export const PipelineDetectorEditor = React.forwardRef<
       Object.keys(pipeline.entities).length === 0 &&
       Object.keys(pipeline.classification).length === 0
     ) {
-      errs.push(
-        "Define at least one entity or one classification task",
-      );
+      errs.push("Define at least one entity or one classification task");
     }
     return errs;
   };
@@ -1129,8 +1555,8 @@ export const PipelineDetectorEditor = React.forwardRef<
   const classCount = Object.keys(pipeline.classification).length;
   const ruleCount = pipeline.validation.rules.length;
 
-  const badge = (count: number, singular: string) =>
-    count > 0 ? `${count} ${singular}${count !== 1 ? "s" : ""}` : undefined;
+  const badge = (count: number, singular: string, plural = `${singular}s`) =>
+    count > 0 ? `${count} ${count === 1 ? singular : plural}` : undefined;
 
   return (
     <div>
@@ -1146,7 +1572,6 @@ export const PipelineDetectorEditor = React.forwardRef<
       <div className="flex gap-8 lg:gap-12">
         {/* Scrollable content */}
         <div className="min-w-0 flex-1 space-y-16 pb-32">
-
           {/* ── Identity ── */}
           <section ref={identityRef}>
             <SectionLabel label="Identity" />
@@ -1157,7 +1582,10 @@ export const PipelineDetectorEditor = React.forwardRef<
               <div className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="detector-name" className="text-xs uppercase tracking-wide">
+                    <Label
+                      htmlFor="detector-name"
+                      className="text-xs uppercase tracking-wide"
+                    >
                       Name <span className="text-destructive">*</span>
                     </Label>
                     <Input
@@ -1173,9 +1601,14 @@ export const PipelineDetectorEditor = React.forwardRef<
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="detector-key" className="text-xs uppercase tracking-wide">
+                    <Label
+                      htmlFor="detector-key"
+                      className="text-xs uppercase tracking-wide"
+                    >
                       Key{" "}
-                      <span className="text-muted-foreground text-[10px]">(auto-generated if empty)</span>
+                      <span className="text-muted-foreground text-[10px]">
+                        (auto-generated if empty)
+                      </span>
                     </Label>
                     <Input
                       id="detector-key"
@@ -1189,7 +1622,10 @@ export const PipelineDetectorEditor = React.forwardRef<
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="detector-description" className="text-xs uppercase tracking-wide">
+                  <Label
+                    htmlFor="detector-description"
+                    className="text-xs uppercase tracking-wide"
+                  >
                     Description
                   </Label>
                   <Textarea
@@ -1224,11 +1660,16 @@ export const PipelineDetectorEditor = React.forwardRef<
             <SectionLabel label="Entities" />
             <AiAssistedCard
               title="Named entity extraction"
-              description={badge(entityCount, "entity") ?? "No entities defined yet"}
+              description={
+                badge(entityCount, "entity", "entities") ??
+                "No entities defined yet"
+              }
             >
               <EntitiesSection
                 entities={pipeline.entities}
-                onChange={(entities) => setPipeline((p) => ({ ...p, entities }))}
+                onChange={(entities) =>
+                  setPipeline((p) => ({ ...p, entities }))
+                }
               />
             </AiAssistedCard>
             <ErrorBlock errors={entityErrors} />
@@ -1239,11 +1680,16 @@ export const PipelineDetectorEditor = React.forwardRef<
             <SectionLabel label="Classification" />
             <AiAssistedCard
               title="Zero-shot classification"
-              description={badge(classCount, "task") ?? "No classification tasks defined yet"}
+              description={
+                badge(classCount, "task") ??
+                "No classification tasks defined yet"
+              }
             >
               <ClassificationSection
                 classification={pipeline.classification}
-                onChange={(classification) => setPipeline((p) => ({ ...p, classification }))}
+                onChange={(classification) =>
+                  setPipeline((p) => ({ ...p, classification }))
+                }
               />
             </AiAssistedCard>
             <ErrorBlock errors={classErrors} />
@@ -1254,20 +1700,40 @@ export const PipelineDetectorEditor = React.forwardRef<
             <SectionLabel label="Validation" />
             <AiAssistedCard
               title="Post-processing rules"
-              description={badge(ruleCount, "rule") ?? "Confidence threshold only"}
+              description={
+                badge(ruleCount, "rule") ?? "Confidence threshold only"
+              }
             >
               <ValidationSection
                 validation={pipeline.validation}
-                onChange={(validation) => setPipeline((p) => ({ ...p, validation }))}
+                onChange={(validation) =>
+                  setPipeline((p) => ({ ...p, validation }))
+                }
               />
             </AiAssistedCard>
+            <div className="mt-4">
+              <AiAssistedCard
+                title="Severity"
+                description={
+                  badge(pipeline.severity_map.length, "rule") ??
+                  "Everything is info"
+                }
+              >
+                <SeveritySection
+                  rules={pipeline.severity_map}
+                  onChange={(severity_map) =>
+                    setPipeline((p) => ({ ...p, severity_map }))
+                  }
+                />
+              </AiAssistedCard>
+            </div>
           </section>
 
           {/* ── Model ── */}
           <section ref={modelRef}>
             <SectionLabel label="Model" />
             <AiAssistedCard
-              title="GLiNER2 model"
+              title="Extraction model"
               description={pipeline.model.name}
             >
               <ModelSection
@@ -1282,7 +1748,11 @@ export const PipelineDetectorEditor = React.forwardRef<
             <SectionLabel label="Training" />
             <AiAssistedCard
               title="Fine-tuning examples"
-              description={detectorId ? "Upload labeled examples to improve accuracy" : "Save detector first to enable training"}
+              description={
+                detectorId
+                  ? "Upload labeled examples to improve accuracy"
+                  : "Save detector first to enable training"
+              }
             >
               <TrainingSection
                 detectorId={detectorId}
@@ -1290,7 +1760,6 @@ export const PipelineDetectorEditor = React.forwardRef<
               />
             </AiAssistedCard>
           </section>
-
         </div>
 
         {/* Right sticky sidebar — desktop only */}

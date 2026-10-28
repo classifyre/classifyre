@@ -56,7 +56,7 @@ test("renders extracted entity spans", async ({ mount, page }) => {
         cuisine: [{ value: "Italian", confidence: 0.92, start: 0, end: 7 }],
       },
       classification: {},
-      metadata: { runner: "GLINER2", model: "fastino/gliner2-base-v1" },
+      metadata: { runner: "GLINER2", model: "fastino/gliner2.5-base-v1" },
     }),
   );
 

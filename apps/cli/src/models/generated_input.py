@@ -134,7 +134,7 @@ class SamplingConfig(BaseModel):
     )
     rows_per_page: int | None = Field(
         100,
-        description='Tabular sources only. Number of rows per sample (AUTOMATIC/RANDOM/LATEST) or per pagination batch (ALL). For AUTOMATIC this is the size of the incremental slice ingested each run. Controls memory usage during large table scans.',
+        description='For tables, the number of rows per sample (AUTOMATIC/RANDOM/LATEST) or per pagination batch (ALL); for AUTOMATIC this is the size of the incremental slice ingested each run. For documents and other text, the number of lines per page: detectors read one page at a time, so raise it (up to 10000) when a detector should judge a whole document at once. Controls memory usage during large scans.',
         ge=10,
         le=10000,
     )
@@ -4312,9 +4312,9 @@ class HuggingFaceMasked(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    token: str = Field(
-        ...,
-        description='Hugging Face user access token (starts with hf_). Create one under Settings → Access Tokens with at least read permission on the repository. The token is always passed explicitly — no environment variable or locally cached login is ever used.',
+    token: str | None = Field(
+        None,
+        description='Hugging Face user access token (starts with hf_). Leave empty to read a public repository anonymously; private and gated repositories need a token with at least read permission (Settings → Access Tokens). The token is always passed explicitly — no environment variable or locally cached login is ever used.',
     )
 
 
@@ -5949,7 +5949,7 @@ class HuggingFaceInput(CoreInput):
         ..., description='Type of the asset or source'
     )
     required: HuggingFaceRequired
-    masked: HuggingFaceMasked
+    masked: HuggingFaceMasked | None = None
     optional: HuggingFaceOptional | None = None
     detectors: list[Detector] | None = Field(
         None, description='Detectors to run on ingested content'

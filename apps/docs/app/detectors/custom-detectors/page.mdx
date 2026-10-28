@@ -43,7 +43,7 @@ Each custom detector runs one of seven detection engines, or your own Python as 
 
 | Method                   | Modality | ML required               | Best for                                          |
 | ------------------------ | -------- | ------------------------- | ------------------------------------------------- |
-| **GLiNER2**              | Text     | Pretrained (zero-shot)    | Entity extraction without labelled data           |
+| **[GLiNER2 Extraction](/detectors/custom-detectors/gliner2/)** | Text | Small model on your CPU (zero-shot) | Exact facts with their position, plus categories, without labelled data |
 | **Regex**                | Text     | No                        | Codes, IDs, structured patterns                   |
 | **AI Detector**          | Text     | LLM (via provider)        | Nuanced classification, structured extraction     |
 | **Decision Detector**    | Text     | Decision model (via provider) | Yes/no, pick-one and scale questions, answered with a probability |
@@ -57,7 +57,7 @@ Each custom detector runs one of seven detection engines, or your own Python as 
 
 **Start with Regex** if you have deterministic patterns — order numbers, internal codes, IBANs. No model, no latency, and the results are exact.
 
-**Use GLiNER2** when you need entity extraction (names, places, custom concepts) but you don't want to manage a labelled training set. It generalises from label names alone.
+**Use [GLiNER2 Extraction](/detectors/custom-detectors/gliner2/)** when the answer is written in the text and you want the exact words back: parties, dates, amounts, product names, any concept you describe. It sorts text into categories in the same pass, runs on the scan's own CPU, and needs no labelled data and no API key.
 
 **Use AI Detector** for nuanced classification that would be hard to capture with a ruleset — risk signals, renewal intent, escalation tone, or any case where the context matters as much as the words.
 

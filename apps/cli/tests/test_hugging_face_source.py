@@ -195,11 +195,31 @@ def test_hugging_face_token_comes_from_the_recipe_not_the_environment(monkeypatc
     assert source._token() == "hf_test-token"
 
 
-def test_hugging_face_missing_token_fails_loudly():
-    source = HuggingFaceSource({**_recipe(), "masked": {"token": "  "}})
+def test_hugging_face_without_a_token_reads_anonymously(monkeypatch):
+    # A public dataset needs no account. "No token" must mean "send no
+    # credentials" (token=False), never "fall back to HF_TOKEN or a cached login".
+    monkeypatch.setenv("HF_TOKEN", "hf_environment-token")
+    blank = HuggingFaceSource({**_recipe(), "masked": {"token": "  "}})
+    absent = HuggingFaceSource({key: v for key, v in _recipe().items() if key != "masked"})
 
-    with pytest.raises(ValueError, match=r"masked\.token"):
-        source._token()
+    assert blank._token() is False
+    assert absent._token() is False
+    assert "Authorization" not in absent._request_headers()
+
+
+def test_hugging_face_anonymous_api_and_listing_send_no_credentials(monkeypatch):
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "src.sources.hugging_face.source.require_module",
+        lambda **_kw: SimpleNamespace(
+            HfApi=lambda **kwargs: captured.update(kwargs) or SimpleNamespace(),
+        ),
+    )
+    source = HuggingFaceSource({key: v for key, v in _recipe().items() if key != "masked"})
+    source._api()
+
+    assert captured["token"] is False
 
 
 def test_hugging_face_api_is_built_with_the_explicit_token(monkeypatch):
@@ -535,6 +555,18 @@ def test_hugging_face_download_streams_the_resolve_url_with_bearer_token(monkeyp
     )
     assert session.calls[0]["headers"]["Authorization"] == "Bearer hf_test-token"
     assert session.calls[0]["stream"] is True
+
+
+def test_hugging_face_anonymous_download_sends_no_authorization(monkeypatch):
+    source = HuggingFaceSource({key: v for key, v in _recipe().items() if key != "masked"})
+    source._cached_revision = REPO_SHA
+    session = _FakeSession(_FakeResponse(b"plain text", "text/plain"))
+    monkeypatch.setattr(source, "_session", lambda: session)
+
+    source._download_object(_ref("data/contract.txt"))
+
+    assert "Authorization" not in session.calls[0]["headers"]
+    assert session.calls[0]["headers"]["User-Agent"] == "classifyre"
 
 
 def test_hugging_face_download_stops_at_the_byte_cap(monkeypatch, caplog):
@@ -888,6 +920,27 @@ def test_hugging_face_missing_repo_error_points_at_token_permissions(monkeypatch
 
     assert result["status"] == "FAILURE"
     assert "read permission" in result["message"]
+
+
+def test_hugging_face_missing_repo_without_token_says_it_may_be_private(monkeypatch):
+    source = HuggingFaceSource(
+        {key: v for key, v in _recipe(optional={}).items() if key != "masked"}
+    )
+
+    class RepositoryNotFoundError(Exception):
+        pass
+
+    class _Broken:
+        def repo_info(self, **_kwargs):
+            raise RepositoryNotFoundError("401 Client Error")
+
+    _install_hub(monkeypatch, _Broken())
+
+    result = source.test_connection()
+
+    assert result["status"] == "FAILURE"
+    assert "private" in result["message"]
+    assert "needs an access token" in result["message"]
 
 
 def test_hugging_face_bad_revision_error_names_the_revision(monkeypatch):

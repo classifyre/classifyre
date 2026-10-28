@@ -23,10 +23,13 @@ for one detector can each pass the pre-dispatch ``skip_message`` check before
 any of them records a refusal — without coordination the wasted provider calls
 would equal the number of assets in flight, not one. The pipeline therefore
 holds a per-detector gate (``first_contact``) across the whole
-check → call → record window, so at most one payload per detector key is
-undecided at a time: the first refusal trips the breaker and every later
-payload skips without a provider call. The real bound is one wasted call per
-detector per run, never "the first asset decides for free".
+check → call → record window **until the detector has succeeded once**: until
+then at most one payload per detector key is undecided at a time, the first
+refusal trips the breaker, and every later payload skips without a provider
+call. Once a detector has answered, its payloads run concurrently — a working
+detector must be able to use the whole worker pool. The bound is one wasted
+call per detector until it first answers; a key revoked mid-run can waste at
+most the payloads already in flight.
 """
 
 from __future__ import annotations
@@ -99,22 +102,36 @@ class DetectorBreaker:
 
     @asynccontextmanager
     async def first_contact(self, *keys: str) -> AsyncIterator[None]:
-        """Hold one detector's check → call → record window.
+        """Hold a detector's check → call → record window until it first succeeds.
 
-        The pipeline wraps each dispatch batch in this so payloads for the
-        same detector key never overlap: the pre-dispatch ``skip_message``
-        check and the post-call ``record`` for one payload complete before
-        the next payload's check runs. Keys are taken in sorted order so
-        batches covering different detectors cannot deadlock each other.
+        The pipeline wraps each dispatch batch in this. For a detector that has
+        not answered yet, payloads never overlap: the pre-dispatch
+        ``skip_message`` check and the post-call ``record`` for one payload
+        complete before the next payload's check runs. Once a detector has
+        succeeded, the gate is not taken and its payloads run concurrently.
+        Keys are taken in sorted order so batches covering different detectors
+        cannot deadlock each other.
         """
-        gates = [self._gates.setdefault(key, asyncio.Lock()) for key in sorted(set(keys))]
-        for gate in gates:
-            await gate.acquire()
+        held: list[asyncio.Lock] = []
         try:
+            for key in sorted(set(keys)):
+                if self._answered(key):
+                    continue
+                gate = self._gates.setdefault(key, asyncio.Lock())
+                await gate.acquire()
+                if self._answered(key):
+                    # The first contact succeeded while this payload waited.
+                    gate.release()
+                    continue
+                held.append(gate)
             yield
         finally:
-            for gate in reversed(gates):
+            for gate in reversed(held):
                 gate.release()
+
+    def _answered(self, key: str) -> bool:
+        state = self._states.get(key)
+        return state is not None and state.successes > 0
 
     def _state(self, key: str, detector: BaseDetector, label: str) -> _BreakerState:
         state = self._states.get(key)

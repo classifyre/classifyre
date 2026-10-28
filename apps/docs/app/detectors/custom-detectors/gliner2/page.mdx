@@ -1,81 +1,349 @@
 ---
-title: GLiNER2 Pipeline
-description: Single-pass neural entity extraction and classification — no training data required.
+title: GLiNER2 Extraction Detector
+description: Pull exact facts out of text and sort it into categories in one pass of a small model that runs on your own CPU. No training data, no API key, no text leaves your infrastructure.
 ---
 
 import { PipelineSchemaTable } from "@/components/pipeline-schema-table"
 import { Badge, Separator } from "@workspace/ui/components"
+import { Callout } from "nextra/components"
 
-# GLiNER2 Pipeline
+# GLiNER2 Extraction Detector
 
 <Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
-  Text · Zero-shot NER
+  Text · Runs locally · Entities + classification
 </Badge>
 
-GLiNER2 is a generalist named-entity recognition model that extracts entities and runs classification tasks in a single forward pass. You describe the entities you want using plain English labels — no labelled training examples needed.
+The GLiNER2 detector **finds facts in text and points at them**. You name what
+you are looking for, such as *the parties of a contract* or *the notice period*,
+and the detector returns **the exact words** from the document, **where they
+are**, and **how sure** it is.
+
+In the same pass it can also **sort the text into categories** you define, such
+as *what kind of agreement is this*.
+
+It runs **inside the scan, on CPU**. There is no provider, no API key and no
+cost per document, and the text never leaves your infrastructure.
+
+<Separator className="my-6" />
+
+## The idea in one minute
+
+| You write | The model returns | It becomes |
+| --- | --- | --- |
+| An entity `governing_law`: *State or country whose laws govern the agreement* | `the State of New York`, 98% sure, characters 38 614 to 38 631 | A finding `entity:governing_law` with the value and its position |
+| An entity `notice_period`: *Notice needed to end the agreement* | `ninety (90) days prior written notice`, 96% sure | A finding `entity:notice_period` |
+| A task `agreement_type` with the labels `license`, `supply`, `services` | `license`, 99% sure | A finding `classification:agreement_type:license` |
+
+The model does not write anything. Everything it returns is either a piece of
+the document or one of your labels. That is why its answers can be checked by
+clicking on them, and why it never invents a value that is not there.
 
 <Separator className="my-6" />
 
 ## When to use
 
-- **Named entity extraction** — pull people, organisations, locations, products, or any custom concept from unstructured text.
-- **Domain-specific terminology** — extract contract parties, regulatory identifiers, product codes, or internal jargon without building a labelled dataset.
-- **Combined extraction + classification** — run entity extraction and content classification simultaneously in one model call.
-- **Rapid prototyping** — iterate on entity types by editing label names, not retraining a model.
-- **Low-volume or low-latency requirements** — the single-pass design keeps inference cost predictable.
+Use the GLiNER2 detector when **the answer is written in the text** and you want
+it back **word for word**:
 
-## How it works
+- **Contracts**: parties, dates, term, renewal, notice period, governing law.
+- **Tickets and emails**: product names, order numbers, the team a message is
+  for, its topic.
+- **Reports and notes**: equipment, failure modes, people, places, amounts.
+- **Personal data** that has no fixed format: names, addresses, job titles.
 
-The GLiNER2 model treats entity extraction as a token-span prediction task guided by the label names you provide. At inference time, the model attends to both the content and the label strings together, scoring spans for each label. This means you can add or remove entity types by changing configuration alone.
+It is a good fit when you have **many documents**, when the documents **must not
+leave your infrastructure**, and when you want the **same answer every time**
+for the same text.
 
-The `entities` map defines which spans to extract. Each key is a label name your team uses; Classifyre stores matched spans as findings with that label attached. The optional `classification` block runs independent classification heads in the same pass.
+### Compared with the other detectors
 
-The `model` block lets you pin a specific HuggingFace checkpoint and device. The `validation` block adds post-extraction constraints: minimum span length, allowed character sets, or regex guards that filter noisy predictions.
+| Reach for | When |
+| --- | --- |
+| **GLiNER2 Extraction** | The answer is in the text, and you want the exact words and where they are. Runs on your CPU. |
+| **[Decision Detector](/detectors/custom-detectors/decision/)** | The answer is a **judgement**: yes or no, one of a few options, a level on a scale. A System One model weighs the whole text and returns a probability. |
+| **[AI Detector](/detectors/custom-detectors/llm/)** | The answer has to be **worked out or written**: a summary, a reason, a total calculated from two numbers. |
+| **[Regex](/detectors/custom-detectors/regex/)** | The value has a fixed shape, such as an IBAN or an order number. Use it next to GLiNER2, not instead of it. |
+
+**GLiNER2 or a decision model?** Both answer in one pass with a number instead
+of a paragraph, and both are quick. The difference is what comes back:
+
+- A **decision model** answers a question about the text: *"Does this contract
+  renew automatically?" → yes, 93%*. It reads everything and gives you its
+  verdict. It runs at a provider and needs an API key.
+- **GLiNER2** shows you the words: *"renewal" → "automatically renew for
+  successive one-year terms", characters 7 263 to 7 320*. You see the evidence,
+  not a verdict. It runs on your own CPU.
+
+They work well together: GLiNER2 finds the clauses and the values, a decision
+model judges what they mean.
+
+### What it does not do
+
+- **It does not reason.** If the text says *"the daughter of Lord Byron"*, it
+  will not answer a question about her gender. If an answer has to be inferred,
+  counted or calculated, use the AI Detector.
+- **It does not normalise.** `ninety (90) days` stays `ninety (90) days`. Turn
+  values into codes with a [glossary lookup binding](/how-it-works/glossary/#bindings) instead.
+- **It is weak at judging whether something is there.** Asked as a
+  classification whether a long contract has a change-of-control clause, it
+  said yes to nearly every contract, including those that have none. Ask what
+  the whole text *is* (an agreement type, a topic, a team), point at wording you
+  can describe (a notice period, a renewal term), and leave *"does this contract contain
+  X?"* to a [Decision Detector](/detectors/custom-detectors/decision/) or to a
+  fine-tuned model.
+- **A label's meaning is only as good as its description.** See
+  [Writing good descriptions](#writing-good-descriptions).
+
+<Separator className="my-6" />
+
+## Set it up
+
+**1. Create the detector.** Go to *Detectors → New* and choose **GLiNER2
+Extraction**.
+
+**2. Add entities.** Give each one a short label, such as `notice_period`, and a
+one-line description with an example. The label becomes the finding type, so
+keep it short.
+
+**3. Add classification tasks** (optional). A task has a name, such as
+`agreement_type`, and two or more labels. Give each label a short description.
+Switch on **Multi-label** when more than one label can be true at once, as with
+the topics of a support message. Switch on **Judge from the opening only** when
+the task is about what the whole document *is*, such as its type: the title and
+first paragraphs say it, and the rest of a long document only adds noise.
+
+**4. Set the threshold, rules and severity.** The threshold (default `0.7`) is
+the lowest confidence that still becomes a finding. A validation rule can
+require a value to match a pattern, which removes near misses cheaply. On 200
+contracts, rules such as *a governing law contains no digits and is not an
+Act* and *a term mentions years, months or days* removed a third of the
+governing-law values and half of the term values, and no correct one. Severity rules say which labels
+matter; everything else is `info`.
+
+**5. Pick the model.** The default is right for English text. Choose the
+multilingual model for German, French or mixed text.
+
+**6. Add the detector to a source and scan.** The first scan downloads the
+model once; later scans reuse it.
+
+<Separator className="my-6" />
+
+## Choosing a model
+
+| Model | Use it for | Notes |
+| --- | --- | --- |
+| **GLiNER2.5 base** (`fastino/gliner2.5-base-v1`) | English. **The default.** | The most precise on English text. |
+| **GLiNER2.5 multilingual** (`fastino/gliner2.5-multi-v1`) | German, French, Spanish and 100+ other languages, or mixed text. | About twice as slow, and less precise than *base* on English. |
+| **GLiNER2.5 small** (`fastino/gliner2.5-small-v1`) | Very large volumes of English text. | The fastest. |
+| **GLiNER2 base / large** (`fastino/gliner2-base-v1`, `fastino/gliner2-large-v1`) | Detectors built on the previous generation. | Still supported. |
+| **Any other id** | A fine-tune of GLiNER2 or GLiNER2.5 on the Hugging Face Hub, such as a PII model. | Choose *Other Hugging Face model* in the picker. |
+
+Both generations load the same way: the detector reads the checkpoint and uses
+the right architecture for it. A local folder can be set instead of a model id.
+
+<Callout type="info">
+  On the contracts we tested, the multilingual model took twice as long as
+  *base* and returned many more wrong *governing law* values (section numbers
+  and statute names) on English text. Pick it for the language, not by default.
+</Callout>
+
+<Separator className="my-6" />
+
+## Writing good descriptions
+
+The description is the model's only instruction. A good one roughly doubles
+accuracy on specialised text; a vague one lets in near misses.
+
+- **Say what it is, with an example.** *"Notice needed to end the agreement or
+  stop a renewal, e.g. 'ninety (90) days prior written notice'"* beats
+  *"notice"*.
+- **Keep it short.** One line. On our contract tests a long description that
+  also listed what the value is *not* made the results worse, not better.
+- **Name the thing, not the role.** A label `party` described as *"a company or
+  person that signs this agreement"* returns the companies. It will also return
+  role names such as *Licensor*, because a contract uses them as names.
+- **Describe classification labels too.** `services` with *"one party performs
+  services: outsourcing, consulting, hosting or maintenance"* stops hosting
+  agreements from being filed as licences.
+- **Test on documents you know.** Run the detector on twenty documents whose
+  answers you know, open the findings, and change one description at a time.
+
+<Separator className="my-6" />
+
+## How results become findings
+
+| Finding field | Entity | Classification |
+| --- | --- | --- |
+| Type | `entity:<label>` | `classification:<task>:<label>` |
+| Matched content | The exact words | The first 320 characters of the text |
+| Location | Character start and end in the text | None: it is about the whole text |
+| Confidence | The model's confidence in the span | The model's confidence in the label |
+| Severity | The first matching severity rule, else `info` | The first rule matching the task or the label, else `info` |
+| Extracted data | Every entity and answer from the same pass | The same |
+
+- **One finding per value.** A contract names its parties dozens of times. Each
+  distinct value becomes one finding, at its most confident mention, and the
+  finding records how many times the value occurs (`occurrences`).
+- **Classification comes first.** A detector's *max findings* limit never drops
+  the answer about the whole document in favour of the hundredth entity.
+- **Multi-label tasks** record one finding per label that reaches the
+  threshold. Single-label tasks record the best label only.
+- **Long documents** are read in overlapping pieces. Every value still points
+  at its position in the full document, and a classification keeps each label's
+  strongest score across the pieces. Nothing past the first page is dropped.
+- **Judge from the opening only** (`read_from: "start"`) classifies the first
+  2 400 characters instead. On 23 real contracts it named the agreement type
+  right 15 times; judged over every piece, where the label that peaks in any one
+  section wins, 7 times.
+
+<Separator className="my-6" />
+
+## Fine-tuning
+
+When the zero-shot results are close but not good enough, upload labelled
+examples under **Fine-tuning examples** and train. Each example is a piece of
+text, a label and the exact value to find in it.
+
+- About **ten good examples per label** are enough to start.
+- Training runs on CPU. On a laptop, six short examples took about half a
+  minute.
+- The trained model is stored with the detector and used on the next scan. The
+  model you picked stays the base it is trained from.
+- Classification tasks with at least two examples per label are trained as well.
+
+<Separator className="my-6" />
+
+## Good to know
+
+- **Speed.** Entities and every classification task are read in **one pass**
+  over the text. On a laptop CPU, with seven entities and two classification
+  tasks, a 3 800-word contract took about 10 seconds and a 10 000-word one
+  about 35. Adding labels costs little; the length of the text is what counts.
+- **Long documents are read whole.** A scan hands detectors one page of text at
+  a time, and for files a page is a number of lines (the source's *rows per
+  page*, 100 by default). When a classification should judge a whole document,
+  raise it so a document is one page (up to 10 000 lines); the detector reads a
+  long page in overlapping pieces itself.
+- **The first scan downloads the model** (under 1 GB) and keeps it for later
+  scans.
+- **Memory.** Plan for about 1.5 GB per scan worker running the detector.
+- **Unchanged content is not read again.** A rescan only runs the model on
+  content that changed, or after you changed the detector.
+- **Text only.** PDFs, Word files and other documents are converted to text by
+  the source first. Images are not read.
 
 <Separator className="my-6" />
 
 ## Configuration
 
+Everything the form sets is stored as a pipeline schema of type `GLINER2`. You
+only need this section when you create detectors through the API or the
+[MCP server](/settings/mcp-server/).
+
+### Detector
+
 <PipelineSchemaTable definition="GLiNER2PipelineSchema" />
+
+### Entity
+
+<PipelineSchemaTable definition="PipelineEntityDefinition" />
+
+### Classification task
+
+<PipelineSchemaTable definition="PipelineClassificationDefinition" />
+
+### Model
+
+<PipelineSchemaTable definition="PipelineModelConfig" />
+
+### Severity rule
+
+<PipelineSchemaTable definition="PipelineSeverityRule" />
 
 <Separator className="my-6" />
 
 ## Examples
 
-### Extract contract parties and regulatory codes
+### Contract facts
 
 ```json
 {
   "type": "GLINER2",
+  "model": { "name": "fastino/gliner2.5-base-v1" },
   "entities": {
-    "ContractParty": {
-      "description": "Named organisation or individual that is a signatory"
-    },
-    "RegulatoryCode": {
-      "description": "Reference to a regulation, directive, or standard (e.g. GDPR Art. 6)"
-    }
-  }
-}
-```
-
-### Combined extraction and content classification
-
-```json
-{
-  "type": "GLINER2",
-  "entities": {
-    "PersonName": { "description": "Full name of a person mentioned in the document" },
-    "ProjectName": { "description": "Internal project or initiative name" }
+    "party": { "description": "A company or person that signs this agreement, e.g. 'Telcostar Pte, Ltd.'" },
+    "agreement_date": { "description": "The date the agreement is made or entered into, e.g. 'October 1, 2019'" },
+    "notice_period": { "description": "Notice needed to terminate or to stop a renewal, e.g. 'ninety (90) days prior written notice'" },
+    "renewal": { "description": "Wording that renews the agreement, e.g. 'automatically renew for successive one-year terms'" },
+    "governing_law": { "description": "State or country whose laws govern the agreement, e.g. 'the State of New York'" }
   },
   "classification": {
-    "SensitivityLevel": {
-      "description": "Overall sensitivity of the document",
-      "labels": ["public", "internal", "confidential", "restricted"]
+    "agreement_type": {
+      "labels": ["license", "distribution", "services", "supply"],
+      "descriptions": {
+        "license": "grants rights to use a trademark, patent, software or content",
+        "distribution": "a distributor or reseller buys and resells the other party's products",
+        "services": "one party performs services: outsourcing, consulting, hosting or maintenance",
+        "supply": "supply or manufacturing of goods"
+      },
+      "read_from": "start"
     }
   },
-  "model": {
-    "name": "urchade/gliner_multi_pii-v1",
-    "device": "cpu"
+  "severity_map": [
+    { "pattern": "renewal", "severity": "medium" },
+    { "pattern": "notice_period", "severity": "medium" }
+  ],
+  "validation": {
+    "confidence_threshold": 0.6,
+    "rules": [
+      { "field": "governing_law", "type": "regex", "pattern": "^(?!.*\\b(Act|Code|Regulations?|Section)\\b)[^0-9§]*$" },
+      { "field": "notice_period", "type": "regex", "pattern": "(?i)\\b(days?|months?|years?|weeks?)\\b" },
+      { "field": "agreement_date", "type": "regex", "pattern": "\\d" },
+      { "field": "renewal", "type": "regex", "pattern": "(?i)renew" }
+    ]
   }
 }
 ```
+
+### Routing support messages in German and English
+
+A multi-label task, `topics`, records every topic a message touches.
+
+```json
+{
+  "type": "GLINER2",
+  "model": { "name": "fastino/gliner2.5-multi-v1" },
+  "entities": {
+    "order_id": { "description": "An order number such as 'ORD-48213'" },
+    "product": { "description": "A product the customer bought, e.g. 'Trekking 7 frame'" }
+  },
+  "classification": {
+    "team": {
+      "labels": ["billing", "shipping", "workshop", "sales"],
+      "descriptions": {
+        "billing": "payments, invoices, refunds",
+        "shipping": "delivery, tracking, returns in transit",
+        "workshop": "repairs, broken or faulty parts",
+        "sales": "questions before buying"
+      }
+    },
+    "topics": {
+      "labels": ["delivery", "payment", "damage", "warranty"],
+      "multi_label": true
+    }
+  },
+  "validation": { "confidence_threshold": 0.5 }
+}
+```
+
+<Separator className="my-6" />
+
+## Troubleshooting
+
+| What you see | What it means | What to do |
+| --- | --- | --- |
+| No findings at all, and the scan log says the model *failed to load* | The model id is wrong, or the scan could not download it. | Check the id in the model picker. The scan needs to reach the Hugging Face Hub the first time. |
+| Values that are close but wrong, such as a statute named as the governing law | The description lets them in. | Make the description narrower and add an example; raise the threshold to 0.7. |
+| A label never fires | The label name or description does not match how the text says it. | Use the words the documents use. Test the description on a document you know. |
+| Too many role names (*Licensor*, *the Company*) as parties | The text uses them as names. | Keep them, or add a validation rule with a regex that requires a capitalised company suffix. |
+| Slow scans on very long documents | Time grows with the length of the text. | Use *GLiNER2.5 small*, or scope the detector to the content types that matter. |
