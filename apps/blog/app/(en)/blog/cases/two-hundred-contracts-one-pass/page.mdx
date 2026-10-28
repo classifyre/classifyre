@@ -1,6 +1,6 @@
 ---
-title: "Point at the Words: 200 Real Contracts, Read Once on a CPU"
-description: "Who signed it, until when, does it renew by itself, which law governs it, and what happens if the company is sold. Asked of 200 real commercial contracts by a small extraction model that runs on your own hardware, checked against the answers lawyers wrote. And how that differs from a System One decision model."
+title: "Point at the Words: Zero-Shot Extraction on 200 Real Contracts"
+description: "What named entity recognition and zero-shot extraction are, how GLiNER2 works, and what it found and missed in 200 real contracts it read on a CPU."
 date: 2026-10-27T00:00:00.000Z
 tags:
   - contracts
@@ -13,14 +13,16 @@ categories:
 author: Classifyre Team
 image: /blog/assets/images/two-hundred-contracts-one-pass.jpg
 keywords:
+  - zero-shot named entity recognition
+  - zero-shot NER
+  - what is named entity recognition
+  - GLiNER2
+  - GLiNER2.5
   - contract data extraction
-  - contract review due diligence
-  - change of control clause
-  - automatic renewal notice period
   - governing law extraction
-  - named entity extraction CPU
+  - notice period extraction
+  - contract review due diligence
   - extraction model vs decision model
-  - System One models
   - CUAD contract dataset
   - Classifyre
 alternates:
@@ -31,26 +33,26 @@ alternates:
     x-default: /blog/cases/two-hundred-contracts-one-pass/
 openGraph:
   type: article
-  title: "Point at the Words: 200 Real Contracts, Read Once on a CPU"
-  description: "Parties, dates, renewal, notice and governing law pulled out of 200 real contracts by a small model on your own hardware, and checked against the lawyers' answers."
+  title: "Point at the Words: Zero-Shot Extraction on 200 Real Contracts"
+  description: "Named entities, zero-shot and GLiNER2 explained, then tried on 200 real contracts: the laws they name, what the model got wrong about England, and the cases it fed."
   url: /blog/cases/two-hundred-contracts-one-pass
   siteName: Classifyre
   publishedTime: 2026-10-27T00:00:00.000Z
-  modifiedTime: 2026-10-27T00:00:00.000Z
+  modifiedTime: 2026-10-28T00:00:00.000Z
   authors:
     - Classifyre Team
   section: Field Notes
   tags:
+    - named entity recognition
+    - zero-shot
     - contracts
-    - extraction
     - due diligence
-    - System One
   images:
     - /blog/assets/images/two-hundred-contracts-one-pass.jpg
 twitter:
   card: summary_large_image
-  title: "Point at the Words: 200 Real Contracts, Read Once on a CPU"
-  description: "Parties, dates, renewal, notice and governing law pulled out of 200 real contracts by a small model on your own hardware, and checked against the lawyers' answers."
+  title: "Point at the Words: Zero-Shot Extraction on 200 Real Contracts"
+  description: "Named entities, zero-shot and GLiNER2 explained, then tried on 200 real contracts: the laws they name, what the model got wrong about England, and the cases it fed."
   images:
     - /blog/assets/images/two-hundred-contracts-one-pass.jpg
 ---
@@ -58,24 +60,25 @@ twitter:
 <ArticleHero
   image="/blog/assets/images/two-hundred-contracts-one-pass.jpg"
   eyebrow="Field notes"
-  title="Point at the Words: 200 Real Contracts, Read Once on a CPU"
-  description="Who signed it, until when, does it renew by itself, which law governs it, and what happens if the company is sold. Asked of 200 real contracts by a small model on your own hardware."
+  title="Point at the Words: Zero-Shot Extraction on 200 Real Contracts"
+  description="What named entity recognition and zero-shot mean, how a small model finds facts it was never trained on, and what it found and missed in 200 real contracts."
 />
 
 <ArticleJsonLd
-  headline="Point at the Words: 200 Real Contracts, Read Once on a CPU"
-  description="Parties, dates, renewal, notice and governing law pulled out of 200 real commercial contracts by a small extraction model that runs on your own hardware, checked against the answers lawyers wrote, and compared with System One decision models."
+  headline="Point at the Words: Zero-Shot Extraction on 200 Real Contracts"
+  description="What named entity recognition and zero-shot extraction are, how GLiNER2 works, and what it found and missed in 200 real commercial contracts it read on a CPU, checked against the answers lawyers wrote."
   path="/blog/cases/two-hundred-contracts-one-pass"
   datePublished="2026-10-27T00:00:00.000Z"
-  dateModified="2026-10-27T00:00:00.000Z"
+  dateModified="2026-10-28T00:00:00.000Z"
   authorName="Classifyre Team"
   articleSection="Field Notes"
   about={[
+    "Named entity recognition",
+    "Zero-shot information extraction",
     "Contract data extraction",
     "Due diligence",
-    "Change of control clauses",
-    "Automatic renewal",
-    "Extraction models and decision models",
+    "Governing law",
+    "Notice periods",
   ]}
   mentions={[
     {
@@ -83,6 +86,11 @@ twitter:
       name: "Classifyre",
       url: "https://showcase.classifyre.com/contract-data-room",
       applicationCategory: "Data classification software",
+    },
+    {
+      "@type": "Dataset",
+      name: "Contract Understanding Atticus Dataset (CUAD)",
+      license: "https://creativecommons.org/licenses/by/4.0/",
     },
   ]}
   liveCaseUrl="https://showcase.classifyre.com/contract-data-room"
@@ -95,11 +103,19 @@ twitter:
 />
 
 <ArticleSideRail
-  title="Point at the Words: 200 Real Contracts, Read Once on a CPU"
+  title="Point at the Words: Zero-Shot Extraction on 200 Real Contracts"
   path="/blog/cases/two-hundred-contracts-one-pass/"
   tags={["contracts", "extraction", "due-diligence", "glossary", "investigations"]}
   backHref="/blog/cases"
   backLabel="All case files"
+/>
+
+<iframe
+  className="my-6 aspect-video w-full border-2 border-border"
+  src="https://www.youtube.com/embed/NY-vrC80hIc"
+  title="Named entity recognition, zero-shot, and GLiNER2 explained"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
 />
 
 A company is about to be sold. The buyer's lawyers open the data room and
@@ -107,15 +123,14 @@ find 200 contracts. They ask every one of them the same questions:
 
 - Who signed it?
 - When, and until when?
-- Does it renew by itself, and how much notice does it take to stop it?
+- How much notice does it take to end it?
 - Which law governs it?
-- Does anything change if the company changes hands?
 
 Each answer is written somewhere in the contract. *"This Agreement shall be
 governed by the laws of the State of Delaware"* sits on page fourteen. Finding
 it two hundred times is weeks of careful, dull reading.
 
-You do not need a model that thinks for this. You need one that **points**.
+You do not need a model that writes for this. You need one that **points**.
 
 <Alert>
   <AlertTitle>What is real and what is not</AlertTitle>
@@ -124,59 +139,110 @@ You do not need a model that thinks for this. You need one that **points**.
     filed with the Securities and Exchange Commission, published by The Atticus
     Project as the Contract Understanding Atticus Dataset (CUAD, CC BY 4.0).
     CUAD also publishes the answers lawyers wrote for each contract; we use
-    them only to check the model. The sale and the buyer are our framing; no
-    deal is involved. Every number was measured in the workspace on 27 October
-    2026.
+    them only to check the model. The sale and the buyer are our framing, and
+    so are the two example sentences marked "illustration". Every count was
+    taken in the workspace on 28 October 2026. The pictures are stills from
+    the film: the lime boxes, tags and notes on them are ours, not the
+    product's.
   </AlertDescription>
 </Alert>
 
-## Two kinds of model that answer in one pass
+## What named entity recognition is
 
-Most people meet AI as a chat model. It reads your question and **writes** an
-answer, word by word. That is flexible, slow, and paid per word, and it can
-write something that is not in the document.
+**Named entity recognition** (NER) is one of the oldest jobs in language
+processing: find the names in a text, and say what kind each one is. A person,
+a company, a place, a date.
 
-For questions with a fixed shape there is a faster kind of model that does not
-write at all. There are two families, and they are easy to confuse.
+![An invented sentence, "Mara Feld of Larkmoor Homes signed the lease in Leeds on 3 March 2026", with each name boxed and labelled person, company, place and date](/blog/assets/images/contract-data-room-ner-sentence.webp)
 
-**A decision model**, also called a **System One** model, answers a question
-about the text. You ask *"Does this contract renew automatically?"* and it
-returns *yes, 93% sure*. It weighs the whole text and gives you a verdict. We
-wrote about them in
-[One Look](/blog/articles/decision-models-system-one-explained/).
+The classic way to build it is to train a model on thousands of sentences
+that people marked by hand. It learns those labels, and only those. If you
+want *governing law* or *notice period*, you mark a few thousand more
+sentences and train again. That is why NER was, for a long time, a fixed set
+of four or five labels.
 
-**An extraction model** shows you the words. You ask for *"renewal: wording
-that renews the agreement"* and it returns *"shall automatically renew for
-successive one-year terms"*, together with where that sentence is. It can also
-sort the text into labels you give it, in the same pass. It never writes a
-word of its own: everything it returns is either a piece of the document or
-one of your labels.
+## What zero-shot means
 
-| | Decision model (System One) | Extraction model |
-| --- | --- | --- |
-| You ask | A question with fixed answers | For the pieces of text that match a description |
-| You get back | A verdict and a probability | The exact words, their position, a confidence |
-| Can it return something not in the text? | It judges, so yes: a verdict | No |
-| Where it runs | Usually at a provider, with an API key | On your own CPU |
-| Good at | Judgements: is this urgent, does this clause exist | Facts: names, dates, amounts, notice periods, laws |
+**Zero-shot** turns that around. Zero means zero examples: the label is not
+learned in advance, you write it when you ask. A zero-shot extraction model
+reads your label as text, the same way it reads the document, compares it
+with every stretch of words, and keeps the stretches that match it closely
+enough.
 
-A simple way to think about it: the decision model is a colleague who says
-*"yes, it renews, I'm fairly sure"*. The extraction model is a colleague with a
-highlighter, who hands the page back with the sentence marked.
+![A label, notice_period, with its one-line description, compared with four stretches of a contract clause; "ninety (90) days' prior written notice" scores 0.97 and the others under 0.05 (an illustration)](/blog/assets/images/contract-data-room-zero-shot.webp)
 
-They are not rivals. Highlight first, judge second.
+So *notice period* stops being a training project. It is one line you type:
+*"Notice needed to end the contract, e.g. 'ninety (90) days'"*.
 
-## The data room, as a workspace
+## GLiNER2 and GLiNER2.5
 
-![The Contract facts detector in the editor: the agreement-type question with a one-line description for each label, licence, distribution, services, supply and marketing](/blog/assets/images/contract-data-room-detector.webp)
+GLiNER2 is one of these models. It was published in 2025 with open weights
+(Apache 2.0) and has about 205 million parameters, small enough to run on an
+ordinary CPU, where chat models have billions.
 
-The workspace has five parts, all built with the ordinary product.
+It is an **encoder**: it reads the text and never writes a word. Everything
+it returns is either a piece of your document, with its position, or one of
+your own labels. It does several jobs in one pass: names, a classification
+and a structured record, all from one schema.
 
-**The contracts.** A source reads the plain-text versions straight from the
-public dataset on Hugging Face. No account, no token, no copy in between.
+![What comes back from an extraction model: not a written sentence, but a piece of the document with its character positions, and one of your own labels](/blog/assets/images/contract-data-room-what-comes-back.webp)
 
-**One detector, one pass.** The extraction detector names seven facts and one
-question. Each fact is a short label and a one-line description:
+Why so many teams use it:
+
+- **Cost.** Nothing is paid per page.
+- **Speed.** It scores all your labels together, so fifty labels take barely
+  longer than five (its paper measured 130 ms for 5 labels and 208 ms for 50,
+  on a CPU).
+- **Privacy.** Contracts, medical notes and personnel files never leave the
+  building.
+- **Good enough.** On the paper's zero-shot test of finding names in five
+  fields, it scored 59.0 F1, within a point of a large chat model's 59.9.
+
+It is used to redact personal data, pull fields out of documents, route
+requests and build knowledge graphs.
+
+**GLiNER2.5** came in August 2026. The older model tried every short stretch
+of words as a possible answer. The new one predicts where an answer starts
+and where it ends, so an answer can be any length and it reads about 4,000
+words at a time. It comes in three sizes, from 74 to 287 million parameters;
+the largest reads many languages.
+
+![The same words read two ways: every short stretch tried as a candidate, and an answer marked by where it starts and where it ends](/blog/assets/images/contract-data-room-start-and-end.webp)
+
+## A rule worth keeping
+
+What an extraction model does not do is think. It does not judge, and it does
+not calculate.
+
+![Four cards: Point, when it is written in the text; Decide, a judgement with fixed options; Write, when it has to be worked out; Pattern, when it has a fixed shape](/blog/assets/images/contract-data-room-rule-of-thumb.webp)
+
+- **Written in the text:** a model that points (extraction). Parties, dates,
+  notice periods, laws.
+- **A judgement with fixed options:** a model that decides. *Does this
+  contract renew by itself?* We wrote about these in
+  [One Look](/blog/articles/decision-models-system-one-explained/).
+- **Something to work out:** a model that writes. The date a notice is due.
+- **A fixed shape:** a pattern. An order or account number.
+
+## The data room
+
+To see how far pointing goes, we built a data room that anyone can open.
+
+![The test set: 510 commercial contracts, filed with the SEC by US-listed companies, with lawyers' answers for 41 kinds of clause](/blog/assets/images/contract-data-room-cuad.webp)
+
+The contracts come from CUAD, a public set made for exactly this test: 510
+commercial agreements that US-listed companies filed with the SEC, with
+lawyers' answers for 41 kinds of clause. A source reads 200 of them, the
+plain-text versions, straight from the public copy on Hugging Face. No
+account, no token, no copy in between.
+
+The workspace has one source, one detector, three glossary schemes, three
+watches and two cases, all built with the ordinary product.
+
+![The Contract Data Room workspace: one source, SEC contract filings (CUAD), read from Hugging Face, completed in 75 minutes](/blog/assets/images/contract-data-room-source.webp)
+
+**One detector, one pass.** It names seven facts and asks one question. Each
+fact is a short label and a one-line description:
 
 | Fact | Description the model reads |
 | --- | --- |
@@ -189,69 +255,92 @@ question. Each fact is a short label and a one-line description:
 | `governing_law` | State or country whose laws govern the agreement |
 
 The question is *what kind of agreement is this*: licence, distribution,
-services, supply, marketing, partnership or IP transfer, each with a one-line
-description too.
+services, supply, marketing, partnership or IP transfer. The detector runs
+the newer GLiNER2.5, base size, inside the scan, on the scan's own CPU.
 
-The model is small enough for a laptop, so it runs inside the scan, on the
-scan's CPU. Nothing leaves the machine.
+![The detector in the editor: each fact a label with a one-line description and an example](/blog/assets/images/contract-data-room-detector.webp)
 
-**A glossary.** The outputs mean something: a taxonomy of agreement types, the
-contract terms, and a list of jurisdictions.
-Each detector output is bound to its concept. The governing-law values are
-looked up in the jurisdiction list, so *"the laws of the State of New York"*,
-*"New York law"* and *"State of New York"* all become **New York**, and New York
-sits under **United States**.
+**A glossary.** Three schemes say what the outputs mean: a taxonomy of
+agreement types, the contract terms, and a list of jurisdictions with US
+states under *United States* and everything else under *Outside the United
+States*. The governing-law values are looked up in it, so *"the laws of the
+State of New York"*, *"New York law"* and *"State of New York"* all become
+**New York**.
 
-**Watches.** Three standing questions follow the meaning, not the words:
-stated notice periods; contracts under law outside the United States;
-contracts under Delaware law.
+## One pass, one English clause
 
-**Cases.** Two cases act on them: the contracts that need foreign counsel, and
-the notice deadlines to put in a calendar.
+One pass over a contract hands back the words and where they sit. Here, a
+services agreement: *"This Agreement is governed by the laws of England and
+Wales."* The glossary files England and Wales under *Outside the United
+States*. Nobody wrote a rule for England.
 
-## What one pass returns
+![The meaning of the value: Governing law; England and Wales, through the jurisdictions lookup; and Outside the United States, implied by England and Wales](/blog/assets/images/contract-data-room-england-meaning.webp)
 
-Take one contract: a manufacturing outsourcing agreement between Nice Systems
-Ltd. and Flextronics (Israel) Ltd., filed in 2003, about 20 000 words long. One
-pass of the model returns:
+Everything the one pass extracted from one contract, label by label, with a
+confidence for each value:
 
-| Fact | What it found | Confidence |
-| --- | --- | --- |
-| Parties | *Nice Systems Ltd.*, *Flextronics Israel Ltd.* | 99%, 96% |
-| Agreement date | *January 21st, 2002* | 100% |
-| Effective date | *July 1, 2002* | 100% |
-| Term | *3 years*, *7 years* | 99% |
-| Renewal | *automatic renewal* | 95% |
-| Notice | *six (6) months*, *forty-five (45) Days* and others | 100%, 97% |
-| Governing law | *state of Israel* | 99% |
-| Agreement type | services | 99% |
+![Everything one pass extracted from one contract, label by label, with a confidence for each value](/blog/assets/images/contract-data-room-one-pass.webp)
 
-Every value is a piece of the contract, with its position. Open the governing
-law and you see the sentence it came from, and the five other contracts in the
-data room that name the same law:
+## Where the laws pile up
 
-![The governing-law finding in the workspace: the sentence "This Agreement shall be governed by and construed in accordance with the laws of the state of Israel", with "state of Israel" highlighted, and below it five other contracts where the same value appears](/blog/assets/images/contract-data-room-clause-in-context.webp)
+Across all two hundred, the laws pile up where you would expect: Delaware in
+75 contracts, New York in 49, California in 34, then Nevada, Florida and
+Texas.
 
-The glossary then says what the value means. *state of Israel* is filed under
-**Israel**, which sits under **Outside the United States**, so this contract
-turns up in the watch for foreign law without anyone writing a rule for Israel:
+But **51 contracts name a law outside the United States**: England and Wales
+in 16, China in 13, Israel in 7, then Hong Kong, Switzerland, Japan, the
+Netherlands, Germany and Singapore. 26 of them name no US law at all.
 
-![The meaning of the value: Governing law, bound to the contract terms; Israel, bound through the jurisdictions lookup; and Outside the United States, implied by Israel](/blog/assets/images/contract-data-room-meaning-of-a-value.webp)
+![Contracts per law as the glossary files them: Delaware 75, New York 49, California 34; outside the United States, England and Wales 16, China 13, Israel 7, Hong Kong 5](/blog/assets/images/contract-data-room-laws.webp)
 
-The same pass also returned things that are not what we asked for, with lower
-confidence: *supplier*, *it* and *person* as parties (62 to 74%), *tax* and
-*mutatis mutandis* as governing law (90%). The threshold and the rules remove
-most of this kind of noise; some always gets through, and the confidence next
-to each value is how you tell.
+The agreement types spread almost evenly: services 39, supply 38, licences 36,
+marketing 17, partnerships 13, distribution 8 and IP transfers 2. The
+glossary's map puts every one of these concepts, and every jurisdiction, on
+one page:
 
-![Everything the one pass extracted from this contract, label by label, with a confidence for each value](/blog/assets/images/contract-data-room-one-pass.webp)
+![The meaning map: the contract terms, the agreement types and every jurisdiction found, with US states under United States and the rest under Outside the United States](/blog/assets/images/contract-data-room-meaning-map.webp)
+
+**Who signs more than once.** 26 companies are named as a party in two or
+more contracts: Cardlytics in four, A.M. Best and American International
+Group in three. Each became an entity, so every contract a company signed is
+one click away from it.
+
+![The entities: companies that sign two or more of the contracts, each with its mentions and the contracts it appears in](/blog/assets/images/contract-data-room-entities.webp)
+
+## England, three times
+
+Look closer at England, though.
+
+One executive's service agreement grants paid holiday *"in addition to the
+usual public or bank holidays in England"*. The model filed **England** as the
+governing law, 99% sure.
+
+![A holiday clause: "the usual public or bank holidays in England", with England filed as governing law at 99%](/blog/assets/images/contract-data-room-holiday-clause.webp)
+
+A second contract names England and Wales only as where a company is
+incorporated: *"a company incorporated under the laws of England and Wales"*.
+99% again.
+
+![An incorporation clause, "a company incorporated under the laws of England and Wales", filed as governing law at 99%](/blog/assets/images/contract-data-room-incorporated.webp)
+
+And the real governing-law clause, in the services agreement above, scored
+**65%**, the lowest of six values in its row. First came *FCA*, a regulator,
+at 100%.
+
+![The governing-law row of one contract: FCA, a regulator, at 100%, and the real clause, "the laws of England and Wales", at 65%](/blog/assets/images/contract-data-room-real-clause.webp)
+
+The model sees the words *"the laws of England"*. It cannot tell which clause
+they sit in. A high score means the words look like a governing law, not that
+the clause is one. Across the workspace, 88 of the 1,064 governing-law values,
+in 48 contracts, come straight after *incorporated*, *organized* or *formed*
+under the laws of: the law a company was set up under, not the law of the
+contract.
 
 ## How close it came to the lawyers
 
-CUAD comes with the answers lawyers wrote for every contract. We compared the
-detector's findings with them. A fact counts as found when one of the
-extracted values contains the lawyers' answer, or the other way round; dates
-are compared as dates.
+CUAD comes with the answers lawyers wrote for every contract. A fact counts
+as found when one of the extracted values contains the lawyers' answer, or
+the other way round; dates are compared as dates.
 
 | Question | Found | Out of | Share |
 | --- | --- | --- | --- |
@@ -262,104 +351,85 @@ are compared as dates.
 | Does it renew, and how | 4 | 65 | 6% |
 
 *Out of* is the number of contracts for which the lawyers wrote an answer.
-The model gave an agreement type for 153 of the 200 contracts and left the
-rest blank rather than guess below the threshold.
 
-The first three are the facts a contract states plainly, in a predictable
-place, and the model finds them almost every time. The last row is the honest
-one: renewal clauses are written in too many different ways (*"shall continue
-from year to year"*, *"unless either party gives notice"*), and a short
-description does not catch them. Fine-tuning on a few dozen examples is the way
-to raise it; the detector can do that on the same CPU.
+![Against the lawyers' answers: 190 of 193, 155 of 164, 124 of 158, and renewal 4 of 65; and a change-of-control question answered yes at 0.82 to 0.99 where the lawyers found none](/blog/assets/images/contract-data-room-scores.webp)
 
-## What it found
+Renewal clauses are written in too many ways (*"shall continue from year to
+year"*, *"unless either party gives notice"*) for one short description.
+And asked whether a contract has a change-of-control clause, the model said
+yes to nearly all of them: it scored 0.82 to 0.99 on contracts the lawyers
+marked as having none. That is a judgement, not a pointer's job.
 
-The 200 contracts hold 1.66 million words. Read on the scan's own CPU, three
-contracts at a time, they took 75 minutes and produced 6 482 facts, every one
-of them with a meaning in the glossary.
+## The watch and the two cases
 
-**What kind of agreements.** Services 39, supply 38, licences 36, marketing 17,
-partnerships 13, distribution 8, IP transfers 2.
+That is why the findings go to people, through watches and cases.
 
-**Which law.** 172 contracts name a governing law the glossary knows. Delaware
-leads with 74, then New York 48 and California 34. 50 contracts name a law
-outside the United States: England and Wales 15, China 13, Israel 7 and others.
-26 of them name **only** a non-US law.
+**A watch follows a meaning, not a spelling.** *Governed by law outside the
+United States* catches every contract the glossary files there, new ones
+included, whatever words the contract used.
 
-![The meaning map: the contract terms, the agreement types and every jurisdiction found, with US states under United States and the rest under Outside the United States](/blog/assets/images/contract-data-room-meaning-map.webp)
+![The watch "Governed by law outside the United States", which drives the case of the same name](/blog/assets/images/contract-data-room-watch-drives-case.webp)
 
-**Who signs more than once.** 26 companies are named as a party in two or more
-contracts: Cardlytics in four, A.M. Best and American International Group in
-three. Each became an entity, so every contract a company signed is one click
-away from it.
+**Case one: contracts governed by law outside the United States.** The watch
+feeds a case for deal counsel: 26 contracts that name only a foreign law,
+each needing a lawyer who knows that law before anyone relies on a reading
+of it. The working conclusion: brief local counsel per jurisdiction, starting
+with the laws that turn up more than once. A new contract under English or
+Chinese law joins the case by itself.
 
-![The entities: companies that sign two or more of the contracts, each with its mentions and the contracts it appears in](/blog/assets/images/contract-data-room-entities.webp)
+![The case file: 26 of 200 contracts name only a non-US governing law; priority medium, assignee deal counsel, in progress](/blog/assets/images/contract-data-room-foreign-law-case.webp)
 
-**Two cases.** The first collects the 26 contracts under non-US law only:
-those need counsel who knows that law before anyone relies on a reading of
-them. A watch keeps it current, so a new contract under English or Chinese law
-joins the case by itself.
+**Case two: notice periods.** 145 contracts state a notice period, from ten
+days to twenty-four months. The case tested one idea on those values: *most
+contracts need two months' notice or more*. 100 of the 145 do, the middle
+value is 90 days, so the idea stands. The model hands over *"twenty-four
+months"*; counting back to a date in the calendar is the case's work.
 
-![The watch "Governed by law outside the United States", driving the case of the same name, with its matches](/blog/assets/images/contract-data-room-watch-foreign-law.webp)
+![The case board: the hypothesis "Most contracts need two months' notice or more", supported, 100 of 145](/blog/assets/images/contract-data-room-notice-hypothesis.webp)
 
-The second is about deadlines. 145 contracts state a notice period. The case
-tested one idea on the extracted values: *most contracts need two months'
-notice or more*. They do. In 100 of the 145 the longest stated notice is 60
-days or more; the middle value is 90 days, the longest 24 months. Each of those
-is a date that someone has to count back from and put in a calendar, and
-counting is the part the model leaves to you.
+The cases are where the England catch matters. A contract filed under
+*Outside the United States* because of a holiday clause is one a lawyer
+opens, reads and drops from the case. The model highlights. The glossary says
+what it means. People decide.
 
 ## What made the difference
 
-Four changes moved the results more than anything else. None of them is
-clever; all of them are things you can do in an afternoon.
+**One line of description per fact, with an example.** The description is
+the model's only instruction. *"State or country whose laws govern the
+agreement, e.g. 'the State of New York'"* works. A longer description that
+also listed what the value is *not* made the results worse.
 
-**One line of description per fact, with an example.** The description is the
-model's only instruction. *"State or country whose laws govern the agreement,
-e.g. 'the State of New York'"* works. A longer description that also listed
-what the value is *not* made the results worse.
+**The right model for the language.** The multilingual version was twice as
+slow on these English contracts and returned many more wrong governing-law
+values. Pick it for German or French text, not by default.
 
-**The right model for the language.** The multilingual version of the model
-was twice as slow on these English contracts and returned many more wrong
-*governing law* values, section numbers and statute names among them. Pick it
-for German or French text, not by default.
+**Ask the type of a document from its opening.** Asked over the whole
+contract, the label that peaked in any one section won: a maintenance
+agreement with a long intellectual-property section became an *IP transfer*.
+On 23 contracts the agreement type matched the contract's own title 7 times
+when judged over the whole text, and 15 times when judged from the opening.
 
-**Ask the type of a document from its opening.** A contract says what it is in
-its title and first paragraphs. Asked over the whole contract, the label that
-peaked in any one section won: a maintenance agreement with a long
-intellectual-property section became an *IP transfer*. On 23 contracts the
-agreement type matched the contract's own title 7 times when judged over the
-whole text, and 15 times when judged from the opening.
-
-**Rules behind the model.** A model that points will sometimes point at the
-wrong kind of thing: a statute (*"21 C.F.R. Part 50"*) as the governing law, a
-defined term (*"Servicing Period"*) as the term. A validation rule says what a
-value has to look like: a governing law contains no digits and is not an *Act*;
-a term mentions years, months or days; a date contains a digit. On the first
-full scan these rules removed a third of the governing-law values and half of
-the term values, and not one value that matched the lawyers' answers.
+**Rules behind the model.** A validation rule says what a value has to look
+like: a governing law has no digits and is not an *Act*; a term mentions
+years, months or days; a date contains a digit. On the first full scan these
+rules removed 485 of 1,485 governing-law values and half of the term values,
+and not one value that matched the lawyers' answers. They do not catch
+*England* in a holiday clause: that looks exactly like a governing law.
 
 ## Where it falls short
 
-**It does not judge.** We also asked whether each contract has a
-change-of-control clause, an exclusivity clause, a non-compete or an automatic
-renewal, first as yes/no labels and then as wording to point at. As labels it
-said yes to nearly everything: change of control scored between 0.82 and 0.99
-on contracts the lawyers marked as having none. As wording, it was right on
-about a third to a half of the contracts. *Is there a clause that does X?* is
-a judgement, and that is a decision model's job, or a fine-tuned model's.
-
-**It does not calculate.** It returns *"ninety (90) days prior written
-notice"*. It does not tell you that the notice is due on 2 October. The date is
-a calculation: yours, a rule's, or a chat model's.
-
-**It names roles as parties.** Contracts call their parties *Licensor*,
-*the Company*, *Provider*. Those are names inside the contract, and the model
-returns them along with the real company names.
-
-**It costs CPU time.** About 8 seconds per 1 000 words for each worker on the
-scan's CPU in our setup, a few seconds on a laptop. Two hundred contracts took
-75 minutes, not one. Nothing is paid per page, and nothing leaves the building.
+- **It does not judge.** *Is there a clause that does X?* is a question for a
+  decision model or a fine-tuned one.
+- **It does not know the clause.** It finds *"the laws of England"* wherever
+  they are, in a governing-law clause, an incorporation clause or a holiday
+  clause.
+- **It does not calculate.** It returns *"ninety (90) days prior written
+  notice"*, not the date the notice is due.
+- **It names roles as parties.** *Licensor*, *the Company* and *Provider* come
+  back along with the real company names.
+- **It costs CPU time.** About 8 seconds per 1,000 words for each worker on
+  the scan's CPU in our setup. Two hundred contracts took 75 minutes. Nothing
+  is paid per page, and nothing leaves the building.
 
 ## When to use which
 
@@ -369,9 +439,18 @@ scan's CPU in our setup, a few seconds on a laptop. Two hundred contracts took
 - **The answer is a judgement with fixed options:** a decision model. Is this
   urgent, which team, does this contract have a change-of-control clause.
 - **The answer has to be worked out:** a chat model. Count the days to the
-  deadline, summarise the clause, explain the risk.
+  deadline, summarise the clause.
 - **The value has a fixed shape:** a pattern. IBANs, order numbers, card
   numbers.
 
-The detector is documented in the
+Open the [Contract Data Room](https://showcase.classifyre.com/contract-data-room)
+to read the findings, the glossary and the watches yourself, and the
+[live case list](https://showcase.classifyre.com/contract-data-room/investigations/)
+for both cases. The
+detector is documented in the
 [GLiNER2 Extraction guide](https://docs.classifyre.com/detectors/custom-detectors/gliner2/).
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/blog/cases/two-hundred-contracts-one-pass"
+/>

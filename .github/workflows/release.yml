@@ -217,6 +217,19 @@ jobs:
           (cd apps/cli && uv lock)
           (cd packages/schemas && uv lock)
 
+      - name: Compile changelog fragments
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Groups changelog.d fragments under the new version in CHANGELOG.md
+          # and deletes them. With no fragments this is a no-op for the
+          # changelog (purely technical release); the release body falls back
+          # to a placeholder later, when extracted from CHANGELOG.md on main.
+          node scripts/build-release-notes.mjs "${VERSION}" --write
+          git add CHANGELOG.md changelog.d
+          git status --short -- CHANGELOG.md changelog.d || true
+
       - name: Commit release version on develop
         env:
           VERSION: ${{ steps.versions.outputs.version }}
@@ -412,11 +425,24 @@ jobs:
           git push origin main
           git push origin "${{ steps.versions.outputs.tag }}"
 
+      - name: Extract release notes
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The fragments were compiled into CHANGELOG.md on develop and
+          # merged here. This extracts that section as the release body, so
+          # CHANGELOG.md and the GitHub Release always say the same thing.
+          # (Falls back to a placeholder when the release had no fragments.)
+          node scripts/build-release-notes.mjs "${VERSION}" --notes-file "${RUNNER_TEMP}/release-notes.md"
+          cat "${RUNNER_TEMP}/release-notes.md"
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.versions.outputs.tag }}
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/release-notes.md
+          generate_release_notes: false
           draft: false
           prerelease: false
 
