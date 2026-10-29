@@ -2541,6 +2541,38 @@ describe('AssetService', () => {
         expect(assetUpdateMany).not.toHaveBeenCalled();
       });
 
+      it('retires a vanished asset on a catalog run without resolving findings for absence', async () => {
+        // Sampled catalog (AUTOMATIC): the listing was whole, the rows were not.
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'dropped-table',
+            hash: 'dropped-hash',
+            scopeFingerprint: currentScope,
+          },
+        ]);
+        mockPrismaService.finding.findMany.mockClear();
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+          false,
+        );
+
+        expect(result).toMatchObject({
+          deleted: 1,
+          resolvedForAbsence: 0,
+        });
+        expect(assetUpdateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: { in: ['dropped-table'] } },
+          }),
+        );
+        // The not-redetected pass reads the run's manifest; it must not run.
+        expect(mockPrismaService.runnerAsset.findMany).not.toHaveBeenCalled();
+      });
+
       it('still retires an asset genuinely gone from an unchanged scope', async () => {
         mockPrismaService.asset.findMany.mockResolvedValue([
           {

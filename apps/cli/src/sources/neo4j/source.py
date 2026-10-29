@@ -325,6 +325,9 @@ class Neo4jSource(BaseSource):
                 yield batch
                 batch = []
 
+        if not self._aborted and not self._scope_options().node_limit_per_label:
+            self.declare_listing_complete()
+
         if batch:
             logger.info("Emitting final batch of %d asset(s)", len(batch))
             yield batch

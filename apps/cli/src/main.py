@@ -971,6 +971,11 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             source.partial_coverage_reason or "no reason given",
                         )
 
+                    if getattr(source, "listing_complete", False) and hasattr(
+                        sink, "set_listing_complete"
+                    ):
+                        sink.set_listing_complete()
+
                     # Relationships go *before* finish(): finish() finalizes the
                     # run and marks it COMPLETED, and edges that land after that
                     # belong to a run that already claimed to be done.

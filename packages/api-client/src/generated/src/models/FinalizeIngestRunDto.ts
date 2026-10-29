@@ -92,6 +92,12 @@ export interface FinalizeIngestRunDto {
      */
     partialCoverage?: boolean;
     /**
+     * Discovery named every object of the configured scope, whatever the sampling strategy. A catalog connector (tables, node labels) lists its whole scope on every run and samples only inside each asset, so an asset missing from seenHashes is gone and is retired like under strategy=ALL. Findings are still only resolved for absence when assets are read whole (ALL). Ignored when partialCoverage is set.
+     * @type {boolean}
+     * @memberof FinalizeIngestRunDto
+     */
+    discoveryComplete?: boolean;
+    /**
      * Per ctx.cohort() of the run: keys each band visited and the weights used. The API adds how many of those keys produced a new HIGH/CRITICAL finding.
      * @type {object}
      * @memberof FinalizeIngestRunDto
@@ -136,6 +142,7 @@ export function FinalizeIngestRunDtoFromJSONTyped(json: any, ignoreDiscriminator
         'relationshipsDropped': json['relationshipsDropped'] == null ? undefined : json['relationshipsDropped'],
         'relationshipErrors': json['relationshipErrors'] == null ? undefined : json['relationshipErrors'],
         'partialCoverage': json['partialCoverage'] == null ? undefined : json['partialCoverage'],
+        'discoveryComplete': json['discoveryComplete'] == null ? undefined : json['discoveryComplete'],
         'cohortStats': json['cohortStats'] == null ? undefined : json['cohortStats'],
         'detectorsDegraded': json['detectorsDegraded'] == null ? undefined : json['detectorsDegraded'],
     };
@@ -164,6 +171,7 @@ export function FinalizeIngestRunDtoToJSONTyped(value?: FinalizeIngestRunDto | n
         'relationshipsDropped': value['relationshipsDropped'],
         'relationshipErrors': value['relationshipErrors'],
         'partialCoverage': value['partialCoverage'],
+        'discoveryComplete': value['discoveryComplete'],
         'cohortStats': value['cohortStats'],
         'detectorsDegraded': value['detectorsDegraded'],
     };

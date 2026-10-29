@@ -2512,11 +2512,12 @@ export class AssetService {
           });
         }
 
-        resolvedForAbsence = await this.resolveFindingsNotRedetected(
-          tx,
-          sourceId,
-          runnerId,
-        );
+        // A run that listed everything but read each asset only in part (a
+        // sampled catalog) can retire an asset, yet a finding missing from the
+        // rows it skipped is not absent.
+        resolvedForAbsence = scannedAssetsComplete
+          ? await this.resolveFindingsNotRedetected(tx, sourceId, runnerId)
+          : 0;
 
         // Update runner stats with deleted count
         await tx.runner.update({

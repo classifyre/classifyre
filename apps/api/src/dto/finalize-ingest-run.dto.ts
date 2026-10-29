@@ -143,6 +143,19 @@ export class FinalizeIngestRunDto {
   partialCoverage?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      'Discovery named every object of the configured scope, whatever the ' +
+      'sampling strategy. A catalog connector (tables, node labels) lists its ' +
+      'whole scope on every run and samples only inside each asset, so an asset ' +
+      'missing from seenHashes is gone and is retired like under strategy=ALL. ' +
+      'Findings are still only resolved for absence when assets are read whole ' +
+      '(ALL). Ignored when partialCoverage is set.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  discoveryComplete?: boolean;
+
+  @ApiPropertyOptional({
     type: Object,
     description:
       'Per ctx.cohort() of the run: keys each band visited and the weights used. ' +

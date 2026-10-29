@@ -203,6 +203,7 @@ class FinalizeIngestRunRequest(BaseModel):
     # "This run covered a slice of the source." Suppresses retirement: absence
     # from a cohort run is not evidence that an asset is gone.
     partial_coverage: bool | None = Field(None, serialization_alias="partialCoverage")
+    discovery_complete: bool | None = Field(None, serialization_alias="discoveryComplete")
     # Per ctx.cohort(): keys each band visited, and the weights it ran with.
     cohort_stats: dict[str, Any] | None = Field(None, serialization_alias="cohortStats")
     # Detectors the circuit breaker disabled mid-run (scan-cache identity
@@ -261,6 +262,7 @@ class RestOutputSink:
         self._scan_cache_savings: tuple[int, int] | None = None
         self._partial_coverage: bool = False
         self._partial_coverage_reason: str = ""
+        self._listing_complete: bool = False
         self._detectors_degraded: list[str] = []
         self._cohort_stats: dict[str, Any] | None = None
         self.relationship_report = RelationshipReport()
@@ -278,6 +280,10 @@ class RestOutputSink:
         self._partial_coverage = True
         if reason:
             self._partial_coverage_reason = str(reason)
+
+    def set_listing_complete(self) -> None:
+        """Mark that discovery named every object of the configured scope."""
+        self._listing_complete = True
 
     def set_detectors_degraded(self, keys: list[str]) -> None:
         """Record detectors the breaker disabled mid-run, for the next run's sweep."""
@@ -415,6 +421,7 @@ class RestOutputSink:
             relationships_dropped=lineage.dropped,
             relationship_errors=lineage.errors or None,
             partial_coverage=True if self._partial_coverage else None,
+            discovery_complete=True if self._listing_complete else None,
             cohort_stats=self._cohort_stats,
             detectors_degraded=self._detectors_degraded or None,
         )

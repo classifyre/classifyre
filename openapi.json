@@ -2617,7 +2617,7 @@
     },
     "/sources/{sourceId}/assets/finalize": {
       "post": {
-        "description": "Finalizes ingest run. For sources with sampling strategy ALL, marks assets absent from seenHashes as DELETED and auto-resolves their open findings. For RANDOM/LATEST strategies this is a no-op since absence does not imply deletion.",
+        "description": "Finalizes ingest run. For sources with sampling strategy ALL, or a run that declares discoveryComplete, marks assets absent from seenHashes as DELETED and auto-resolves their open findings. For other RANDOM/LATEST/AUTOMATIC runs this is a no-op since absence does not imply deletion.",
         "operationId": "SourceAssetsController_finalizeIngest",
         "parameters": [
           {
@@ -19565,6 +19565,10 @@
           "partialCoverage": {
             "type": "boolean",
             "description": "The connector covered only a slice of the source this run, so absence from seenHashes proves nothing and no asset is retired. Set it when the connector chooses its own cohort — a change feed, a resumable sweep, a date window — which the sampling strategy cannot express: strategy=ALL describes what the RUNTIME does with the stream, not how much of the source the connector decided to ask for."
+          },
+          "discoveryComplete": {
+            "type": "boolean",
+            "description": "Discovery named every object of the configured scope, whatever the sampling strategy. A catalog connector (tables, node labels) lists its whole scope on every run and samples only inside each asset, so an asset missing from seenHashes is gone and is retired like under strategy=ALL. Findings are still only resolved for absence when assets are read whole (ALL). Ignored when partialCoverage is set."
           },
           "cohortStats": {
             "type": "object",

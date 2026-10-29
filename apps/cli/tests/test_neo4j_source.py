@@ -188,6 +188,32 @@ async def test_neo4j_label_discovery() -> None:
 
 
 @pytest.mark.asyncio
+async def test_neo4j_whole_label_list_is_declared_complete() -> None:
+    # Labels are listed in full on every run, so a label that is not there is gone.
+    source = Neo4jSource(_recipe(optional={"scope": {"include_relationships": False}}))
+    _inject_driver(source, _make_driver(["Person", "Transaction"]))
+
+    assert source.listing_complete is False
+    async for _batch in source.extract_raw():
+        pass
+
+    assert source.listing_complete is True
+
+
+@pytest.mark.asyncio
+async def test_neo4j_capped_label_list_is_not_declared_complete() -> None:
+    source = Neo4jSource(
+        _recipe(optional={"scope": {"include_relationships": False, "node_limit_per_label": 1}})
+    )
+    _inject_driver(source, _make_driver(["Person", "Transaction"]))
+
+    async for _batch in source.extract_raw():
+        pass
+
+    assert source.listing_complete is False
+
+
+@pytest.mark.asyncio
 async def test_neo4j_exclude_labels() -> None:
     source = Neo4jSource(
         _recipe(

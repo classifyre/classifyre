@@ -461,3 +461,57 @@ def test_mysql_view_upstreams_are_database_and_table_keys(
     assert len(lineage) == 1
     assert lineage[0].view == ("app_db", "v_orders_with_manager")
     assert set(lineage[0].upstreams) == {("app_db", "orders"), ("hr_db", "employees")}
+
+
+def test_a_failed_database_listing_forfeits_the_complete_declaration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A schema that could not be listed says nothing about the tables in it.
+    source = MySQLSource(_recipe())
+    monkeypatch.setattr(source, "_resolve_databases", lambda: ["app_db", "broken_db"])
+
+    def _list(database: str) -> list[TableRef]:
+        if database == "broken_db":
+            raise RuntimeError("access denied")
+        return [TableRef(database=database, schema=None, table="orders")]
+
+    monkeypatch.setattr(source, "_list_tables_for_database", _list)
+
+    tables = source._iter_tables()
+    source._declare_listing_if_whole()
+
+    assert [t.table for t in tables] == ["orders"]
+    assert source.listing_complete is False
+
+
+def test_a_clean_unlimited_listing_is_declared_complete(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = MySQLSource(_recipe())
+    monkeypatch.setattr(source, "_resolve_databases", lambda: ["app_db"])
+    monkeypatch.setattr(
+        source,
+        "_list_tables_for_database",
+        lambda db: [TableRef(database=db, schema=None, table="orders")],
+    )
+
+    source._iter_tables()
+    source._declare_listing_if_whole()
+
+    assert source.listing_complete is True
+
+
+def test_a_table_limit_means_the_listing_may_be_short() -> None:
+    source = MySQLSource(_recipe(optional={"scope": {"database": "app_db", "table_limit": 5}}))
+
+    source._declare_listing_if_whole()
+
+    assert source.listing_complete is False
+
+
+def test_declared_partial_coverage_overrides_a_complete_listing() -> None:
+    source = MySQLSource(_recipe())
+    source.declare_listing_complete()
+    source.declare_partial_coverage("timed out")
+
+    assert source.listing_complete is False
