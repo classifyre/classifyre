@@ -415,3 +415,73 @@ async def test_databricks_fetch_content_pages_batches_for_all_strategy(
     assert len(pages) == 12
     assert "item1" in pages[0]
     assert "item12" in pages[11]
+
+
+def test_databricks_column_types_come_from_the_system_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = DatabricksSource(_pat_recipe())
+    issued: list[str] = []
+
+    class _TypesCursor(_DummyCursor):
+        def execute(self, query: str, _params: Any = None) -> None:
+            issued.append(query)
+            self._rows = [("order_id", "int"), ("line_total", "decimal(21,2)"), ("note", None)]
+
+    class _TypesConnection(_DummyConnection):
+        def cursor(self) -> _TypesCursor:
+            return _TypesCursor()
+
+    monkeypatch.setattr(source, "_get_cached_connection", lambda _db: _TypesConnection())
+    ref = TableRef(database="main", schema="sales", table="order_lines", object_type="TABLE")
+
+    assert source._available_column_types(ref) == {
+        "order_id": "int",
+        "line_total": "decimal(21,2)",
+        "note": "",
+    }
+    assert source._available_columns(ref) == ["order_id", "line_total", "note"]
+    assert "system.information_schema.columns" in issued[0]
+    assert "table_catalog = 'main'" in issued[0]
+
+
+def test_databricks_lineage_edge_names_the_notebook_that_wrote_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = DatabricksSource(_pat_recipe())
+    downstream = TableRef(database="main", schema="mart", table="daily", object_type="TABLE")
+    monkeypatch.setattr(
+        source,
+        "_request_json",
+        lambda *_a, **_k: {
+            "upstreams": [
+                {
+                    "tableInfo": {
+                        "catalog_name": "main",
+                        "schema_name": "raw",
+                        "name": "orders",
+                    },
+                    "notebookInfos": [{"notebook_id": 1001}],
+                },
+                {
+                    "tableInfo": {
+                        "catalog_name": "main",
+                        "schema_name": "raw",
+                        "name": "payments",
+                    },
+                },
+            ]
+        },
+    )
+
+    refs = source._lineage_refs_for_table(downstream)
+    table_hashes = {
+        ("main", "raw", "orders"): "h-orders",
+        ("main", "raw", "payments"): "h-payments",
+        downstream.table_key: "h-daily",
+    }
+    source._emit_table_lineage(downstream, refs, table_hashes, {"1001": "h-notebook"})
+
+    edges = {edge.from_hash: edge for edge in source.drain_edges()}
+    assert edges["h-orders"].via_id == "h-notebook"
+    assert edges["h-payments"].via_id is None

@@ -109,6 +109,9 @@ class DatabricksSource(BaseTabularSource):
         self._validate_auth_configuration()
 
         self.session = requests.Session()
+        # table_key -> upstream table -> ids of the notebooks Unity Catalog saw
+        # move data between the two. Filled by _lineage_refs_for_table.
+        self._lineage_notebook_ids: dict[tuple[str, ...], dict[tuple[str, str, str], set[str]]] = {}
         self._access_token: str | None = None
         self._access_token_expiry: datetime | None = None
 
@@ -409,9 +412,13 @@ class DatabricksSource(BaseTabularSource):
         without_scheme = raw.split("://", 1)[-1]
         return without_scheme.strip("/").split("/", 1)[0]
 
-    def _available_columns(self, table_ref: TableRef) -> list[str]:
+    def _available_column_types(self, table_ref: TableRef) -> dict[str, str]:
+        # ``system.information_schema`` sees every catalog from one connection;
+        # the default query reads only the connection's current catalog and a
+        # parameter style Databricks does not take, so types used to come back
+        # empty for every column.
         query = (
-            "SELECT column_name "
+            "SELECT column_name, COALESCE(full_data_type, data_type) "
             "FROM system.information_schema.columns "
             f"WHERE table_catalog = {_quote_literal(table_ref.database)} "
             f"AND table_schema = {_quote_literal(table_ref.schema or '')} "
@@ -421,16 +428,16 @@ class DatabricksSource(BaseTabularSource):
         conn = self._get_cached_connection(table_ref.database)
         with conn.cursor() as cursor:
             cursor.execute(query)
-            columns: list[str] = []
+            columns: dict[str, str] = {}
             for row in cursor.fetchall():
-                candidate: Any | None = None
-                try:
-                    candidate = row[0]  # type: ignore[index]
-                except Exception:
-                    candidate = None
-                if isinstance(candidate, str):
-                    columns.append(candidate)
+                name = row[0] if len(row) > 0 else None
+                if isinstance(name, str):
+                    data_type = row[1] if len(row) > 1 else None
+                    columns[name] = str(data_type) if data_type is not None else ""
             return columns
+
+    def _available_columns(self, table_ref: TableRef) -> list[str]:
+        return list(self._available_column_types(table_ref))
 
     # ── Databricks-specific cell serialization ───────────────────────────
 
@@ -653,6 +660,7 @@ class DatabricksSource(BaseTabularSource):
             },
         )
         refs: set[tuple[str, str, str]] = set()
+        notebooks: dict[tuple[str, str, str], set[str]] = {}
         for key in ("upstreams", "upstream_tables"):
             entries = response.get(key)
             if isinstance(entries, list):
@@ -661,6 +669,12 @@ class DatabricksSource(BaseTabularSource):
                         parsed = self._lineage_table_ref_from_payload(entry)
                         if parsed:
                             refs.add(parsed)
+                            for info in entry.get("notebookInfos") or []:
+                                if isinstance(info, dict) and info.get("notebook_id") is not None:
+                                    notebooks.setdefault(parsed, set()).add(
+                                        str(info["notebook_id"])
+                                    )
+        self._lineage_notebook_ids[table_ref.table_key] = notebooks
         return refs
 
     def _emit_table_lineage(
@@ -668,12 +682,16 @@ class DatabricksSource(BaseTabularSource):
         table_ref: TableRef,
         upstream_refs: set[tuple[str, str, str]],
         table_hash_by_key: dict[tuple[str, ...], str],
+        notebook_hash_by_id: dict[str, str] | None = None,
     ) -> None:
         """Turn Unity Catalog's lineage into typed edges.
 
         Unity Catalog is one of the few catalogs that answers the column
         question directly, so nothing here is parsed out of SQL — these edges
         are as trustworthy as lineage gets, and are marked SYSTEM_CATALOG.
+
+        When Unity Catalog saw a notebook run the statement, the edge carries it
+        as ``via`` -- if that notebook is one of this scan's assets.
 
         The upstreams that are *not* part of this scan are the important half.
         They used to be dropped on the floor (``if target in table_hash_by_key``),
@@ -686,6 +704,7 @@ class DatabricksSource(BaseTabularSource):
             return
 
         column_mappings = self._column_mappings_for_table(table_ref)
+        notebook_ids = self._lineage_notebook_ids.get(table_ref.table_key, {})
         for upstream in sorted(upstream_refs):
             upstream_hash = table_hash_by_key.get(upstream)
             upstream_ref = (
@@ -693,12 +712,21 @@ class DatabricksSource(BaseTabularSource):
             )
             if upstream_ref is None:
                 continue
+            via_hash = next(
+                (
+                    notebook_hash_by_id[notebook_id]
+                    for notebook_id in sorted(notebook_ids.get(upstream, ()))
+                    if notebook_id in (notebook_hash_by_id or {})
+                ),
+                None,
+            )
             self.add_edge(
                 flow(
                     upstream=upstream_ref,
                     downstream=Ref.asset(downstream_hash),
                     type=FlowType.TRANSFORM,
                     fields=column_mappings.get(upstream, []),
+                    via=Ref.asset(via_hash) if via_hash else None,
                     method=Method.SYSTEM_CATALOG,
                 )
             )
@@ -935,6 +963,15 @@ class DatabricksSource(BaseTabularSource):
             t.table_key: self.generate_hash_id(t.raw_id) for t in tables
         }
 
+        # Listed before the tables so a lineage edge can name the notebook that
+        # produced it; the notebook assets are still emitted after the tables.
+        notebooks = list(self._iter_notebooks())
+        notebook_hash_by_id = {
+            nb.object_id: self.generate_hash_id(f"notebook_#_{nb.path}")
+            for nb in notebooks
+            if nb.object_id
+        }
+
         include_lineage = self._extraction_options().include_table_lineage
         if include_lineage and tables:
             logger.info("Fetching table lineage for %d table(s)...", len(tables))
@@ -957,7 +994,9 @@ class DatabricksSource(BaseTabularSource):
                         for target in sorted(upstream_refs)
                         if target in table_hash_by_key
                     ]
-                    self._emit_table_lineage(table_ref, upstream_refs, table_hash_by_key)
+                    self._emit_table_lineage(
+                        table_ref, upstream_refs, table_hash_by_key, notebook_hash_by_id
+                    )
                 except Exception as exc:
                     logger.warning(
                         "Could not resolve Databricks lineage for %s: %s", table_label, exc
@@ -974,7 +1013,7 @@ class DatabricksSource(BaseTabularSource):
 
         # Notebooks
         notebook_count = 0
-        for notebook in self._iter_notebooks():
+        for notebook in notebooks:
             if self._aborted:
                 break
             batch.append(self._notebook_to_asset(notebook))
