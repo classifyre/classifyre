@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.120",
+      "version": "1.43.121",
       "modules": [
         "boto3"
       ],
@@ -181,7 +181,7 @@
     },
     {
       "name": "litellm",
-      "version": "1.106.5",
+      "version": "1.106.6",
       "modules": [
         "litellm"
       ],
