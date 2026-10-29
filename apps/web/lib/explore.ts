@@ -131,7 +131,19 @@ export function pickView(counts: Partial<Record<ExploreKind, number>>): ExploreV
 /** What a view would show, as a count of neighbours: for the guide's offers. */
 export function viewCount(view: ExploreViewName, res: ExploreNeighbourhoodResponseDto): number {
   const kinds = new Set(VIEW_KINDS[view]);
-  return res.nodes.filter((n) => n.side !== "seed" && (n.kinds as ExploreKind[]).some((k) => kinds.has(k))).length;
+  const neighbours = new Set(
+    res.nodes.filter((n) => n.side !== "seed" && (n.kinds as ExploreKind[]).some((k) => kinds.has(k))).map((n) => n.id),
+  );
+  // A starting point another one is linked to is a neighbour too: a source with
+  // few enough assets that all are starting points has no one else to link.
+  const seeds = new Set(res.nodes.filter((n) => n.side === "seed").map((n) => n.id));
+  for (const e of res.edges) {
+    if (e.fromId !== e.toId && kinds.has(e.kind as ExploreKind) && seeds.has(e.fromId) && seeds.has(e.toId)) {
+      neighbours.add(e.fromId);
+      neighbours.add(e.toId);
+    }
+  }
+  return neighbours.size;
 }
 
 /**

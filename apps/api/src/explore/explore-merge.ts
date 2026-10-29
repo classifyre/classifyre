@@ -261,7 +261,7 @@ export function mergeNeighbourhood(input: {
     nodes: [...nodes.values()],
     terms: [...terms.values()],
     edges: keptEdges,
-    counts: countKinds([...nodes.values()]),
+    counts: countKinds([...nodes.values()], keptEdges),
     alike: input.alikeStatus,
     truncated,
     cases: [],
@@ -269,13 +269,36 @@ export function mergeNeighbourhood(input: {
   };
 }
 
-/** Neighbours per kind of connection that reached them. */
-function countKinds(nodes: ExploreNodeDto[]): Record<ExploreKind, number> {
+/**
+ * Neighbours per kind of connection that reached them. A starting point that
+ * another starting point is connected to is a neighbour too: a source small
+ * enough that every asset is a starting point would otherwise count none, and
+ * read as having no connections at all.
+ */
+function countKinds(
+  nodes: ExploreNodeDto[],
+  edges: ExploreEdgeDto[],
+): Record<ExploreKind, number> {
+  const seeds = new Set(
+    nodes.filter((n) => n.side === 'seed').map((n) => n.id),
+  );
   return Object.fromEntries(
-    EXPLORE_KINDS.map((kind) => [
-      kind,
-      nodes.filter((n) => n.side !== 'seed' && n.kinds.includes(kind)).length,
-    ]),
+    EXPLORE_KINDS.map((kind) => {
+      const joined = new Set<string>();
+      for (const e of edges) {
+        if (e.kind !== kind || e.fromId === e.toId) continue;
+        if (e.fromType !== 'asset' || e.toType !== 'asset') continue;
+        if (seeds.has(e.fromId) && seeds.has(e.toId)) {
+          joined.add(e.fromId);
+          joined.add(e.toId);
+        }
+      }
+      return [
+        kind,
+        nodes.filter((n) => n.side !== 'seed' && n.kinds.includes(kind))
+          .length + joined.size,
+      ];
+    }),
   ) as Record<ExploreKind, number>;
 }
 
@@ -345,7 +368,7 @@ export function withScope(
     nodes: kept,
     terms,
     edges,
-    counts: countKinds(kept),
+    counts: countKinds(kept, edges),
   };
 }
 
@@ -624,7 +647,7 @@ export function withReview(
   if (!dropped) return { ...view, edges };
   const tied = new Set(edges.flatMap((e) => [e.fromId, e.toId]));
   const nodes = view.nodes.filter((n) => n.side === 'seed' || tied.has(n.id));
-  return { ...view, nodes, edges, counts: countKinds(nodes) };
+  return { ...view, nodes, edges, counts: countKinds(nodes, edges) };
 }
 
 /** The asset pairs of a view's "same as" and "shared values" lines. */
